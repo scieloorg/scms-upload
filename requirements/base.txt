@@ -24,3 +24,8 @@ django-redis==5.2.0  # https://github.com/jazzband/django-redis
 # Wagtail
 # ------------------------------------------------------------------------------
 wagtail==2.16.1  # https://github.com/wagtail/wagtail
+
+# Wagtail-Modeltranslation
+# ------------------------------------------------------------------------------
+django-modeltranslation==0.17.7
+wagtail-modeltranslation==0.10.18
