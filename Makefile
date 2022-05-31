@@ -35,67 +35,67 @@ build_date: ## Show build date
 ## atalhos docker-compose desenvolvimento ##
 ############################################
 
-compose_build:  ## Build app using $(compose)
+build:  ## Build app using $(compose)
 	@docker-compose -f $(compose) build
 
-compose_up:  ## Start app using $(compose)
+up:  ## Start app using $(compose)
 	@docker-compose -f $(compose) up -d
 
-compose_logs: ## See all app logs using $(compose)
+logs: ## See all app logs using $(compose)
 	@docker-compose -f $(compose) logs -f
 
-compose_stop:  ## Stop all app using $(compose)
+stop:  ## Stop all app using $(compose)
 	@docker-compose -f $(compose) stop
 
-compose_ps:  ## See all containers using $(compose)
+ps:  ## See all containers using $(compose)
 	@docker-compose -f $(compose) ps
 
-compose_rm:  ## Remove all containers using $(compose)
+rm:  ## Remove all containers using $(compose)
 	@docker-compose -f $(compose) rm -f
 
-compose_django_shell:  ## Open python terminal from django $(compose)
+django_shell:  ## Open python terminal from django $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py shell
 
-compose_wagtail_sync: ## Wagtail sync Page fields (repeat every time you add a new language and to update the wagtailcore_page translations) $(compose)
+wagtail_sync: ## Wagtail sync Page fields (repeat every time you add a new language and to update the wagtailcore_page translations) $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py sync_page_translation_fields
 
-compose_wagtail_update_translation_field: ## Wagtail update translation fields, user this command first $(compose)
+wagtail_update_translation_field: ## Wagtail update translation fields, user this command first $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py update_translation_fields
 
-compose_django_createsuperuser: ## Create a super user from django $(compose)
+django_createsuperuser: ## Create a super user from django $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py createsuperuser
 
-compose_django_bash: ## Open a bash terminar from django container using $(compose)
+django_bash: ## Open a bash terminar from django container using $(compose)
 	@docker-compose -f $(compose) run --rm django bash
 
-compose_django_test: ## Run tests from django container using $(compose)
+django_test: ## Run tests from django container using $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py test
 
-compose_django_fast: ## Run tests fast from django container using $(compose)
+django_fast: ## Run tests fast from django container using $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py test --failfast
 
-compose_django_makemigrations: ## Run makemigrations from django container using $(compose)
+django_makemigrations: ## Run makemigrations from django container using $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py makemigrations
 
-compose_django_migrate: ## Run migrate from django container using $(compose)
+django_migrate: ## Run migrate from django container using $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py migrate
 
-compose_django_makemessages: ## Run ./manage.py makemessages $(compose)
+django_makemessages: ## Run ./manage.py makemessages $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py makemessages
 
-compose_django_compilemessages: ## Run ./manage.py compilemessages $(compose)
+django_compilemessages: ## Run ./manage.py compilemessages $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py compilemessages
 
-compose_django_dump_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
+django_dump_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py dumpdata auth --indent=2  --output=fixtures/auth.json
 
-compose_django_load_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
+django_load_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py loaddata --database=default fixtures/auth.json
 
-compose_dump_data: ## Dump database into .sql $(compose)
+dump_data: ## Dump database into .sql $(compose)
 	docker exec -t scms_local_postgres pg_dumpall -c -U debug > dump_`date +%d-%m-%Y"_"%H_%M_%S`.sql
 
-compose_restore_data: ## Restore database into from latest.sql file $(compose)
+restore_data: ## Restore database into from latest.sql file $(compose)
 	cat backup/latest.sql | docker exec -i scms_local_postgres psql -U debug
 
 ############################################
