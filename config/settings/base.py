@@ -92,9 +92,9 @@ THIRD_PARTY_APPS = [
     "allauth.account",
     "allauth.socialaccount",
     "django_celery_beat",
-    'wagtail_modeltranslation',
-    'wagtail_modeltranslation.makemigrations',
-    'wagtail_modeltranslation.migrate',
+    "wagtail_modeltranslation",
+    "wagtail_modeltranslation.makemigrations",
+    "wagtail_modeltranslation.migrate",
 ]
 
 LOCAL_APPS = [
@@ -327,7 +327,7 @@ WAGTAIL_SITE_NAME = "core"
 BASE_URL = "https://core"
 
 LANGUAGES = (
-    ('pt-BR', _('Portuguese')),
-    ('es', _('Spanish')),
-    ('EN', _('English')),
+    ("pt-BR", _("Portuguese")),
+    ("es", _("Spanish")),
+    ("EN", _("English")),
 )
