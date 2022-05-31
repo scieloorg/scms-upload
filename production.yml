@@ -1,10 +1,5 @@
 version: '3'
 
-volumes:
-  production_postgres_data: {}
-  production_postgres_data_backups: {}
-  production_traefik: {}
-
 services:
   django: &django
     build:
@@ -20,14 +15,27 @@ services:
       - ./.envs/.production/.postgres
     command: /start
 
+  pgbouncer:
+    image: edoburu/pgbouncer:1.14.0
+    restart: always
+    environment:
+      - DATABASE_URL=postgres://GVRFlLmcCNfGLhsFvSnCioYOPJPYpyfj:DAkWfpsnPHcAxMeQk2QmPOIZuz4BXG5qGFWi2hCCQE6kvndJHTuzz8SjnxOJY5qj@postgres/core
+      - MAX_CLIENT_CONN=100
+    ports:
+      - 6434:5432
+    depends_on:
+      - postgres
+    links:
+      - postgres
+
   postgres:
     build:
       context: .
       dockerfile: ./compose/production/postgres/Dockerfile
     image: core_production_postgres
     volumes:
-      - production_postgres_data:/var/lib/postgresql/data:Z
-      - production_postgres_data_backups:/backups:z
+      - ../scms_data/data_prod:/var/lib/postgresql/data:Z
+      - ../scms_data/data_prod_backup:/backups:z
     env_file:
       - ./.envs/.production/.postgres
 
@@ -39,7 +47,7 @@ services:
     depends_on:
       - django
     volumes:
-      - production_traefik:/etc/traefik/acme:z
+      - ../scms_data/traefik:/etc/traefik/acme:z
     ports:
       - "0.0.0.0:80:80"
       - "0.0.0.0:443:443"

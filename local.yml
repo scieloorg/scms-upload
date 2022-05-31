@@ -1,9 +1,5 @@
 version: '3'
 
-# volumes:
-#   core_local_postgres_data: {}
-#   core_local_postgres_data_backups: {}
-
 services:
   django: &django
     build:
@@ -13,9 +9,12 @@ services:
     container_name: core_local_django
     platform: linux/x86_64
     depends_on:
-      - postgres
       - redis
+      - postgres
       - mailhog
+      - pgbouncer
+    links:
+      - pgbouncer
     volumes:
       - .:/app:z
     env_file:
@@ -25,11 +24,25 @@ services:
       - "8000:8000"
     command: /start
 
+  pgbouncer:
+    image: edoburu/pgbouncer:1.14.0
+    restart: always
+    container_name: core_local_pgbouncer
+    environment:
+      - DATABASE_URL=postgres://GVRFlLmcCNfGLhsFvSnCioYOPJPYpyfj:BQ4hSUL4rdj5WZLdR8ilDLRQMvCtzo0caMaXDO0olGsmycQjlcZlTVK9DepZR8kk@postgres/core
+      - MAX_CLIENT_CONN=100
+    ports:
+      - 6434:5432
+    depends_on:
+      - postgres
+    links:
+      - postgres
+
   postgres:
     build:
       context: .
       dockerfile: ./compose/production/postgres/Dockerfile
-    image: core_production_postgres
+    image: core_local_postgres
     container_name: core_local_postgres
     volumes:
       - ../scms_data/data_dev:/var/lib/postgresql/data:Z
@@ -38,6 +51,7 @@ services:
       - "5432:5432"
     env_file:
       - ./.envs/.local/.postgres
+
 
   docs:
     image: core_local_docs
