@@ -20,12 +20,7 @@ body {
 
 a {
     background-color: transparent;
-    color: #308282;
     text-decoration: underline;
-}
-
-a:hover {
-    color: #ea1b10;
 }
 
 h1,
@@ -108,7 +103,6 @@ svg:not(:root) {
 }
 
 .egg {
-    fill: #43b1b0;
     -webkit-animation: pos 3s ease infinite;
             animation: pos 3s ease infinite;
     -webkit-transform: translateY(50px);
