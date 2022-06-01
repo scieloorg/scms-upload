@@ -1,3 +1,4 @@
+from django.conf.urls.i18n import i18n_patterns
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -20,19 +21,25 @@ urlpatterns = [
     # Wagtail Admin
     path(settings.WAGTAIL_ADMIN_URL, include(wagtailadmin_urls)),
     re_path(r"^documents/", include(wagtaildocs_urls)),
-    re_path(r"^search/$", search_views.search, name="search"),
-    # User management
-    path("users/", include("core.users.urls", namespace="users")),
-    path("", include("allauth.urls")),
     # Your stuff: custom urls includes go here
     # For anything not caught by a more specific rule above, hand over to
     # Wagtail’s page serving mechanism. This should be the last pattern in
     # the list:
-    path("", include(wagtail_urls)),
+    # path("", include(wagtail_urls)),
     # Alternatively, if you want Wagtail pages to be served from a subpath
     # of your site, rather than the site root:
     #    url(r"^pages/", include(wagtail_urls)),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Translatable URLs
+# These will be available under a language code prefix. For example /en/search/
+urlpatterns += i18n_patterns(
+    re_path(r"^search/$", search_views.search, name="search"),
+    # User management
+    path("users/", include("core.users.urls", namespace="users")),
+    path("", include("allauth.urls")),
+    path("", include(wagtail_urls)),
+)
 
 if settings.DEBUG:
     # Wagtail settings: Serve static and media files from development server

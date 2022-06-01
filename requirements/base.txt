@@ -25,7 +25,12 @@ django-redis==5.2.0  # https://github.com/jazzband/django-redis
 # ------------------------------------------------------------------------------
 wagtail==2.16.1  # https://github.com/wagtail/wagtail
 
-# Wagtail-Modeltranslation
+
+# Wagtail Recaptcha
 # ------------------------------------------------------------------------------
-django-modeltranslation==0.17.7
-wagtail-modeltranslation==0.10.18
+django-recaptcha==2.0.6
+wagtail-django-recaptcha==1.0
+
+# Wagtail Menu
+# ------------------------------------------------------------------------------
+wagtailmenus==3.0.2

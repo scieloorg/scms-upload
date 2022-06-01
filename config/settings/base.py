@@ -61,6 +61,8 @@ WAGTAIL = [
     "core.search",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
+    "wagtail.contrib.modeladmin",
+    "wagtail.contrib.simple_translation",
     "wagtail.embeds",
     "wagtail.sites",
     "wagtail.users",
@@ -70,6 +72,7 @@ WAGTAIL = [
     "wagtail.search",
     "wagtail.admin",
     "wagtail.core",
+    "wagtail.locales",
     "modelcluster",
     "taggit",
 ]
@@ -92,9 +95,10 @@ THIRD_PARTY_APPS = [
     "allauth.account",
     "allauth.socialaccount",
     "django_celery_beat",
-    "wagtail_modeltranslation",
-    "wagtail_modeltranslation.makemigrations",
-    "wagtail_modeltranslation.migrate",
+    "captcha",
+    "wagtailcaptcha",
+    "wagtailmenus",
+
 ]
 
 LOCAL_APPS = [
@@ -159,6 +163,7 @@ MIDDLEWARE = [
     "django.middleware.common.BrokenLinkEmailsMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
+    # "wagtailmenus.context_processors.wagtailmenus",
 ]
 
 # STATIC
@@ -322,12 +327,26 @@ SOCIALACCOUNT_FORMS = {"signup": "core.users.forms.UserSocialSignupForm"}
 # https://django-compressor.readthedocs.io/en/latest/quickstart/#installation
 INSTALLED_APPS += ["compressor"]
 STATICFILES_FINDERS += ["compressor.finders.CompressorFinder"]
+
 # Your stuff...
 WAGTAIL_SITE_NAME = "core"
 BASE_URL = "https://core"
 
-LANGUAGES = (
-    ("pt-BR", _("Portuguese")),
-    ("es", _("Spanish")),
-    ("EN", _("English")),
-)
+LANGUAGES = [
+    ('en', "English"),
+    ('es', "Spanish"),
+    ('pt-BR', "Portuguese"),
+]
+
+WAGTAIL_I18N_ENABLED = True
+
+WAGTAIL_CONTENT_LANGUAGES =  [
+    ('en', "English"),
+    ('es', "Spanish"),
+    ('pt-BR', "Portuguese"),
+]
+
+NOCAPTCHA = True
+
+RECAPTCHA_PUBLIC_KEY = env.str("RECAPTCHA_PUBLIC_KEY", default='')
+RECAPTCHA_PRIVATE_KEY = env.str("RECAPTCHA_PRIVATE_KEY", default='')
