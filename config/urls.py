@@ -9,6 +9,7 @@ from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.core import urls as wagtail_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
+from core.api import api_router
 from core.search import views as search_views  # noqa isort:skip
 
 urlpatterns = [
@@ -36,6 +37,7 @@ urlpatterns = [
 urlpatterns += i18n_patterns(
     re_path(r"^search/$", search_views.search, name="search"),
     # User management
+    path("api/v2/", api_router.urls),
     path("users/", include("core.users.urls", namespace="users")),
     path("", include("allauth.urls")),
     path("", include(wagtail_urls)),

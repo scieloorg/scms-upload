@@ -73,6 +73,7 @@ WAGTAIL = [
     "wagtail.admin",
     "wagtail.core",
     "wagtail.locales",
+    "wagtail.api.v2",
     "modelcluster",
     "taggit",
 ]
@@ -88,6 +89,7 @@ DJANGO_APPS = [
     "django.contrib.admin",
     "django.forms",
 ]
+
 THIRD_PARTY_APPS = [
     "crispy_forms",
     "crispy_bootstrap5",
@@ -98,6 +100,7 @@ THIRD_PARTY_APPS = [
     "captcha",
     "wagtailcaptcha",
     "wagtailmenus",
+    "rest_framework",
 
 ]
 
@@ -336,6 +339,7 @@ LANGUAGES = [
     ('en', "English"),
     ('es', "Spanish"),
     ('pt-BR', "Portuguese"),
+    ('it', "Italian"),
 ]
 
 WAGTAIL_I18N_ENABLED = True
@@ -344,6 +348,7 @@ WAGTAIL_CONTENT_LANGUAGES =  [
     ('en', "English"),
     ('es', "Spanish"),
     ('pt-BR', "Portuguese"),
+    ('it', "Italian")
 ]
 
 NOCAPTCHA = True
