@@ -9,7 +9,6 @@ import wagtail.core.fields
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('wagtailcore', '0068_auto_20220531_1845'),
         ('home', '0002_create_homepage'),
     ]
 
