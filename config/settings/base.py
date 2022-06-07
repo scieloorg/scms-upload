@@ -63,6 +63,8 @@ WAGTAIL = [
     "wagtail.contrib.redirects",
     "wagtail.contrib.modeladmin",
     "wagtail.contrib.simple_translation",
+    "wagtail_localize",
+    "wagtail_localize.modeladmin",
     "wagtail.embeds",
     "wagtail.sites",
     "wagtail.users",
@@ -101,7 +103,6 @@ THIRD_PARTY_APPS = [
     "wagtailcaptcha",
     "wagtailmenus",
     "rest_framework",
-
 ]
 
 LOCAL_APPS = [
