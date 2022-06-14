@@ -51,8 +51,20 @@ services:
     env_file:
       - ./.envs/.local/.postgres
 
+  mongo:
+    image: mongo
+    container_name: core_local_mongo
+    restart: always
+    user: mongodb
+    hostname: mongo
+    volumes:
+      - ../scms_data/mongo:/data/db
+    ports:
+        - "27017:27017"
+
   adminer:
     image: adminer
+    container_name: core_local_adminer
     ports:
         - "8080:8080"
 
