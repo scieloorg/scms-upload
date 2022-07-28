@@ -25,3 +25,24 @@ def accept(request):
         messages.success(request, _("Package was accepted."))
 
     return redirect(request.META.get('HTTP_REFERER'))
+
+
+def reject(request):
+    """
+    This view function abilitates the user to reject a package through the graphic-interface.
+
+    When a user clicks the "reject" button, the package state changes to "reject".
+    """
+    package_id = request.GET.get("package_id", None)
+    
+    if package_id:
+        package = get_object_or_404(Package, pk=package_id)
+
+    if request.method == 'GET':
+        package.status = PackageStatus.REJECTED
+        package.updated_by = request.user
+        package.save()
+        messages.success(request, _("Package was rejected."))
+
+    return redirect(request.META.get('HTTP_REFERER'))
+
