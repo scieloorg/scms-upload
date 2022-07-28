@@ -106,6 +106,7 @@ THIRD_PARTY_APPS = [
     "wagtailmenus",
     "rest_framework",
     "core",
+    "upload",
 ]
 
 LOCAL_APPS = [
