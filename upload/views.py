@@ -46,3 +46,24 @@ def reject(request):
 
     return redirect(request.META.get('HTTP_REFERER'))
 
+
+def validate(request):
+    """
+    This view function abilitates the user to schedule the package validation.
+    
+    When a user clicks the "validate" button, the package state changes to "enqueued_for_validation".
+    
+    TODO: This function must be a task.
+    """
+    package_id = request.GET.get("package_id", None)
+    
+    if package_id:
+        package = get_object_or_404(Package, pk=package_id)
+
+    if request.method == 'GET':
+        package.status = PackageStatus.ENQUEUED_FOR_VALIDATION
+        package.updated_by = request.user
+        package.save()
+        messages.success(request, _("Package enqueued for validation."))
+
+    return redirect(request.META.get('HTTP_REFERER'))
