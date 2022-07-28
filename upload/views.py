@@ -76,3 +76,25 @@ def preview(request):
     TODO: This function will open a window containing a preview of the document.
     """
     return redirect(request.META.get('HTTP_REFERER'))
+
+
+def publish(request):
+    """
+    This view function abilitates the user to schedule the package for publication.
+
+    When a user clicks the "publish" button, the package state changes to "enqueued_for_publication".
+
+    TODO: This function must be a task.
+    """
+    package_id = request.GET.get("package_id", None)
+    
+    if package_id:
+        package = get_object_or_404(Package, pk=package_id)
+
+    if request.method == 'GET':
+        package.status = PackageStatus.SCHEDULED_FOR_PUBLICATION
+        package.updated_by = request.user
+        package.save()
+        messages.success(request, _("Package enqueued for publication."))
+
+    return redirect(request.META.get('HTTP_REFERER'))
