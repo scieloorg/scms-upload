@@ -67,3 +67,12 @@ def validate(request):
         messages.success(request, _("Package enqueued for validation."))
 
     return redirect(request.META.get('HTTP_REFERER'))
+
+
+def preview(request):
+    """
+    This view function abilitates the user to preview the package document in a separate window .
+
+    TODO: This function will open a window containing a preview of the document.
+    """
+    return redirect(request.META.get('HTTP_REFERER'))
