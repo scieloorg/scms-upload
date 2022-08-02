@@ -30,7 +30,6 @@ class PackageAdmin(ModelAdmin):
     add_to_settings_menu = False
     exclude_from_explorer = False
     list_display = (
-        'name',
         'file',
         'current_status',
         'creator',
@@ -40,12 +39,11 @@ class PackageAdmin(ModelAdmin):
     )
     list_filter = (
         'status',
-        'creator',
-        'updated_by',
     )
     search_fields = (
-        'name',
         'file',
+        'creator',
+        'updated_by',
     )
 
     def get_queryset(self, request):
