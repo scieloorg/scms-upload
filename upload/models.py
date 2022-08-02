@@ -20,7 +20,7 @@ class Package(CommonControlField):
     ]
 
     def __str__(self):
-        return self.file
+        return self.file.name
 
     def current_status(self):
         return PackageStatus.choices[self.status - 1][1]
