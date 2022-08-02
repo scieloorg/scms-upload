@@ -7,10 +7,8 @@ from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import (ModelAdmin, modeladmin_register)
 from wagtail.contrib.modeladmin.views import CreateView
 
-from .button_helper import UploadButtonHelper
 from .groups import QUALITY_ANALYST
 from .models import Package
-from .permission_helper import UploadPermissionHelper
 
 
 class UploadPackageCreateView(CreateView):
@@ -22,8 +20,6 @@ class UploadPackageCreateView(CreateView):
 class PackageAdmin(ModelAdmin):
     model = Package
     create_view_class = UploadPackageCreateView
-    button_helper_class = UploadButtonHelper
-    permission_helper_class = UploadPermissionHelper
     menu_label = _('Package')
     menu_icon = 'folder'
     menu_order = 200
