@@ -1,0 +1,31 @@
+{% extends "modeladmin/inspect.html" %}
+{% load wagtailadmin_tags wagtailcore_tags i18n %}
+
+{% block content %}
+    {{ block.super }}
+
+    <div class="nice-padding">
+        <h3>{% trans "Reports" %}</h3>
+        <ul>
+            <li><a href="">{% trans "XML and/or DTD formation" %}</a></li>
+            <li><a href="">{% trans "Stylesheet" %}</a></li>
+            <li><a href="">{% trans "Individual content validation" %}</a></li>
+            <li><a href="">{% trans "Grouped content validation" %}</a></li>
+            <li><a href="">{% trans "Digital assets" %}</a></li>
+            <li><a href="">{% trans "Quality analysis opinion" %}</a></li>
+        </ul>
+    </div>
+
+    <div class="nice-padding">
+        <h3>{% trans "Reports" %}</h3>
+
+        <a class="button is-small" href="">{% trans "Preview HTML" %}</a></p>
+        <a class="button" href="">{% trans "View XML" %}</a></p>
+
+        <!-- FIXME: deve ser visível apenas quando o artigo estiver publicado. -->
+        <!-- Por exemplo, pode ser condicionado a um campo is_published (package.is_published == True) -->
+        <a class="button" href="">{% trans "View published document" %}</a></p>
+        </ul>
+    </div>
+
+{% endblock %}
