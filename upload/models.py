@@ -11,18 +11,16 @@ from .forms import UploadPackageForm
 
 
 class Package(CommonControlField):
-    name = models.CharField(_('Package Name'), max_length=255, null=False, blank=False)
     file = models.FileField(_('Package File'), null=True, blank=True)
     signature = models.CharField(_('Signature'), max_length=32, null=True, blank=True)
     status = models.PositiveSmallIntegerField(_('Status'), choices=PackageStatus.choices, default=PackageStatus.SUBMITTED)
 
     panels = [
-        FieldPanel('name'),
         FieldPanel('file'),
     ]
 
     def __str__(self):
-        return self.name
+        return self.file
 
     def current_status(self):
         return PackageStatus.choices[self.status - 1][1]

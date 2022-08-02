@@ -20,7 +20,6 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('created', models.DateTimeField(auto_now_add=True, verbose_name='Creation date')),
                 ('updated', models.DateTimeField(auto_now=True, verbose_name='Last update date')),
-                ('name', models.CharField(max_length=255, verbose_name='Package Name')),
                 ('file', models.FileField(blank=True, null=True, upload_to='', verbose_name='Package File')),
                 ('signature', models.CharField(blank=True, max_length=32, null=True, verbose_name='Signature')),
                 ('status', models.PositiveSmallIntegerField(choices=[('1', 'Submetido'), ('2', 'Accepted'), ('3', 'Enqueued for validation'), ('4', 'Validated without errors'), ('5', 'Validated with errors'), ('6', 'Rejeitado'), ('7', 'Scheduled for publication'), ('8', 'Publicado')], default='1', verbose_name='Status')),
