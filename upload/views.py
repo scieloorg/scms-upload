@@ -7,31 +7,11 @@ from .choices import PackageStatus
 from .models import Package
 
 
-def accept(request):
+def finish_deposit(request):
     """
-    This view function abilitates the user to accept a package through the graphic-interface.
+    This view function abilitates the user to finish deposit of a package through the graphic-interface.
 
-    When a user clicks the "accept" button, the package state changes to "accept".
-    """
-    package_id = request.GET.get("package_id", None)
-    
-    if package_id:
-        package = get_object_or_404(Package, pk=package_id)
-
-    if request.method == 'GET':
-        package.status = PackageStatus.ACCEPTED
-        package.updated_by = request.user
-        package.save()
-        messages.success(request, _("Package was accepted."))
-
-    return redirect(request.META.get('HTTP_REFERER'))
-
-
-def reject(request):
-    """
-    This view function abilitates the user to reject a package through the graphic-interface.
-
-    When a user clicks the "reject" button, the package state changes to "reject".
+    When a user clicks the "finish deposit" button, the package state changes to "finished".
     """
     package_id = request.GET.get("package_id", None)
     
@@ -39,62 +19,9 @@ def reject(request):
         package = get_object_or_404(Package, pk=package_id)
 
     if request.method == 'GET':
-        package.status = PackageStatus.REJECTED
+        package.status = PackageStatus.FINISHED
         package.updated_by = request.user
         package.save()
-        messages.success(request, _("Package was rejected."))
-
-    return redirect(request.META.get('HTTP_REFERER'))
-
-
-def validate(request):
-    """
-    This view function abilitates the user to schedule the package validation.
-    
-    When a user clicks the "validate" button, the package state changes to "enqueued_for_validation".
-    
-    TODO: This function must be a task.
-    """
-    package_id = request.GET.get("package_id", None)
-    
-    if package_id:
-        package = get_object_or_404(Package, pk=package_id)
-
-    if request.method == 'GET':
-        package.status = PackageStatus.ENQUEUED_FOR_VALIDATION
-        package.updated_by = request.user
-        package.save()
-        messages.success(request, _("Package enqueued for validation."))
-
-    return redirect(request.META.get('HTTP_REFERER'))
-
-
-def preview(request):
-    """
-    This view function abilitates the user to preview the package document in a separate window .
-
-    TODO: This function will open a window containing a preview of the document.
-    """
-    return redirect(request.META.get('HTTP_REFERER'))
-
-
-def publish(request):
-    """
-    This view function abilitates the user to schedule the package for publication.
-
-    When a user clicks the "publish" button, the package state changes to "enqueued_for_publication".
-
-    TODO: This function must be a task.
-    """
-    package_id = request.GET.get("package_id", None)
-    
-    if package_id:
-        package = get_object_or_404(Package, pk=package_id)
-
-    if request.method == 'GET':
-        package.status = PackageStatus.SCHEDULED_FOR_PUBLICATION
-        package.updated_by = request.user
-        package.save()
-        messages.success(request, _("Package enqueued for publication."))
+        messages.success(request, _("Package was finished."))
 
     return redirect(request.META.get('HTTP_REFERER'))
