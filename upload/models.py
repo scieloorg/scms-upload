@@ -8,6 +8,7 @@ from core.models import CommonControlField
 from .permission_helper import FINISH_DEPOSIT
 from .choices import PackageStatus
 from .forms import UploadPackageForm
+from .tasks import get_files_list
 
 
 class Package(CommonControlField):
@@ -20,11 +21,14 @@ class Package(CommonControlField):
     ]
 
     def __str__(self):
-        return self.file
+        return self.file.name
 
     def current_status(self):
         return PackageStatus.choices[self.status - 1][1]
-    
+
+    def files_list(self):
+        return get_files_list(self.file)
+
     base_form_class = UploadPackageForm
 
     class Meta:
