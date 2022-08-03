@@ -6,7 +6,7 @@ from wagtail.admin.edit_handlers import FieldPanel
 from core.models import CommonControlField
 
 from .permission_helper import FINISH_DEPOSIT
-from .choices import PackageStatus
+from .choices import (PackageStatus, VALIDATION_ERROR_CATEGORY, VALIDATION_ERROR_SEVERITY,)
 from .forms import UploadPackageForm
 from .tasks import get_files_list
 
