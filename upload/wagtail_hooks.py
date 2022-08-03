@@ -66,7 +66,7 @@ class PackageAdmin(ModelAdmin):
 
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
-    menu_label = _('Validation reports')
+    menu_label = _('Validation error')
     menu_icon = 'folder'
     menu_order = 200
     add_to_settings_menu = False
