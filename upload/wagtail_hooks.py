@@ -9,7 +9,7 @@ from wagtail.contrib.modeladmin.views import CreateView
 from .button_helper import UploadButtonHelper
 from .permission_helper import UploadPermissionHelper
 from .groups import QUALITY_ANALYST
-from .models import Package
+from .models import Package, ValidationError
 
 
 class UploadPackageCreateView(CreateView):
@@ -30,6 +30,8 @@ class PackageAdmin(ModelAdmin):
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
+
+    # TODO: o campo current_status deverá ser substituído por status quando o modo de usar choices for adequado
     list_display = (
         'file',
         'current_status',
@@ -64,7 +66,32 @@ class PackageAdmin(ModelAdmin):
         return qs.filter(creator=request.user)
 
 
+class ValidationErrorAdmin(ModelAdmin):
+    model = ValidationError
+    menu_label = _('Validation error')
+    menu_icon = 'folder'
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+    list_display = (
+        'category',
+        'severity',
+        'row',
+        'column',
+        'package',
+    )
+    list_filter = (
+        'category',
+        'severity',
+    )
+    search_fields = (
+        'snippet',
+        'package',
+    )
+
+
 modeladmin_register(PackageAdmin)
+modeladmin_register(ValidationErrorAdmin)
 
 
 @hooks.register('register_admin_urls')
