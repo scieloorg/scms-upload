@@ -19,6 +19,16 @@ class UploadButtonHelper(ButtonHelper):
             "title": text,
         }
 
+    def view_published_document(self, obj):
+        # TODO: A URL deve ser configurada para ver o documento publicado
+        text = _("View published document")
+        return {
+            "url": "",
+            "label": text,
+            "classname": self.finalise_classname(self.btn_default_classnames),
+            "title": text,
+        }
+
     def get_buttons_for_obj(
         self, obj, exclude=None, classnames_add=None, classnames_exclude=None
     ):
