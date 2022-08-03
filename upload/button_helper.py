@@ -32,6 +32,7 @@ class UploadButtonHelper(ButtonHelper):
 
         ph = self.permission_helper
         usr = self.request.user
+        url_name = self.request.resolver_match.url_name
 
         if obj.status != int(PackageStatus.FINISHED) and ph.user_can_finish_deposit(usr, obj):
             btns.append(self.finish_deposit_button(obj))
