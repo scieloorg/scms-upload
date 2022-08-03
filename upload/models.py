@@ -47,7 +47,14 @@ class ValidationError(models.Model):
     position = models.PositiveIntegerField(_('Position'), null=True, blank=True)
     snippet = models.TextField(_('Affected snippet'), max_length=10240, null=True, blank=True)
 
-    package = models.ForeignKey('Package', on_delete=models.CASCADE, null=False, blank=False)   
+    package = models.ForeignKey('Package', on_delete=models.CASCADE, null=False, blank=False)
+
+    def __str__(self):
+        return '-'.join([
+            self.package.file.name,
+            self.category,
+            self.severity,
+        ])
 
     # TODO: terá uma chave estrageira para um novo modelo chamado ValidationFeedback
     
