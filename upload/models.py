@@ -27,7 +27,7 @@ class Package(CommonControlField):
         return PackageStatus.choices[self.status - 1][1]
 
     def files_list(self):
-        return get_files_list(self.file)
+        return {'files': get_files_list(self.file)}
 
     base_form_class = UploadPackageForm
 
