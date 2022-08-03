@@ -105,6 +105,9 @@ restore_data: ## Restore database into from latest.sql file $(compose)
 clean_container:  ## Remove all containers
 	@docker rm $$(docker ps -a -q --no-trunc)
 
+clean_project_containers:  ## Remove all containers
+	@docker rm $$(docker ps -a --filter='name=core_local*' -q --no-trunc)
+
 clean_dangling_images:  ## Remove all dangling images
 	@docker rmi -f $$(docker images --filter 'dangling=true' -q --no-trunc)
 
