@@ -85,7 +85,6 @@ class ValidationErrorAdmin(ModelAdmin):
         'severity',
     )
     search_fields = (
-        'position',
         'snippet',
         'package',
     )
