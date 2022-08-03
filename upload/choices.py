@@ -28,5 +28,5 @@ VALIDATION_ERROR_CATEGORY = [
     ('stylesheet', _('Stylesheet')),
     ('structure', _('Structure')),
     ('individual-content', _('Individual content')),
-    ('group content', _('Group content')),
+    ('group-content', _('Group content')),
 ]
