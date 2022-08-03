@@ -35,3 +35,35 @@ class Package(CommonControlField):
         permissions = (
             (FINISH_DEPOSIT, _("Can finish deposit")),
         )
+
+
+class ValidationError(models.Model):
+    category = models.CharField(_('Category'), max_length=128, choices=VALIDATION_ERROR_CATEGORY, null=False, blank=False)
+    severity = models.CharField(_('Severity'), max_length=128, choices=VALIDATION_ERROR_SEVERITY, null=False, blank=False)
+    
+    position = models.PositiveIntegerField(_('Position'), null=True, blank=True)
+    snippet = models.TextField(_('Affected snippet'), max_length=10240, null=True, blank=True)
+
+    package = models.ForeignKey('Package', on_delete=models.CASCADE, null=False, blank=False)   
+
+    # TODO: terá uma chave estrageira para um novo modelo chamado ValidationFeedback
+    
+    panels = [
+        MultiFieldPanel(
+            [
+                FieldPanel('package'),
+                FieldPanel('category'),
+                FieldPanel('severity'),
+                FieldPanel('position'),
+            ],
+            heading=_('Identification'),
+            classname='collapsible'
+        ),
+        MultiFieldPanel(
+            [
+                FieldPanel('snippet'),
+            ],
+            heading=_('Content'),
+            classname='collapsible'
+        )
+    ]
