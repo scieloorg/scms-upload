@@ -14,6 +14,8 @@ from .tasks import get_files_list
 class Package(CommonControlField):
     file = models.FileField(_('Package File'), null=True, blank=True)
     signature = models.CharField(_('Signature'), max_length=32, null=True, blank=True)
+
+    # FIXME: deve ser convertido para um CharField e o choices deve ser uma lista de tuplas (para melhor compatibilidade com os templates do Wagtail)
     status = models.PositiveSmallIntegerField(_('Status'), choices=PackageStatus.choices, default=PackageStatus.SUBMITTED)
 
     panels = [
@@ -23,6 +25,7 @@ class Package(CommonControlField):
     def __str__(self):
         return self.file.name
 
+    # FIXME: esse método poderá ser excluído quando o modo de usar choices for adequado
     def current_status(self):
         return PackageStatus.choices[self.status - 1][1]
 

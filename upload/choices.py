@@ -3,6 +3,7 @@ from django.utils.translation import gettext as _
 
 
 class PackageStatus(models.TextChoices):
+    # FIXME: refatorar esse jeito de usar choices que não funciona bem nos templates Wagtail
     SUBMITTED = 1, _('Submitted')
     ENQUEUED_FOR_VALIDATION = 2, _('Enqueued for validation')
     VALIDATED_WITH_ERRORS = 3, _('Validated with errors')
