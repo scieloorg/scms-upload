@@ -15,11 +15,13 @@ class PackageStatus(models.TextChoices):
 
 
 VALIDATION_ERROR_SEVERITY = [
-    ('criteria-issues', _('Criteria issues')),
-    ('warning', _('Warning')),
-    ('error', _('Error')),
-    ('fatal-error', _('Fatal error')),
-    ('blocking-error', _('Blocking error')),
+    ('criteria-issues', _('CRITERIA_ISSUES')),
+    ('warning', _('WARNING')),
+    ('error', _('ERROR')),
+    ('bibliometrics-data-error', _('BIBLIOMETRICS_DATA_ERROR')),
+    ('services-data-error', _('SERVICES_DATA_ERROR')),
+    ('data-consistency-error', _('DATA_CONSISTENCY_ERROR')),
+    ('xml-format-error', _('XML_FORMAT_ERROR')),
 ]
 
 
