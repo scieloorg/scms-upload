@@ -10,46 +10,20 @@ from .choices import PackageStatus
 class UploadButtonHelper(ButtonHelper):
     btn_default_classnames = ["button-small", "icon",]
 
-    def accept_button(self, obj):
-        text = _("Accept")
+    def finish_deposit_button(self, obj):
+        text = _("Finish deposit")
         return {
-            "url": reverse("upload:accept") + "?package_id=%s" % str(obj.id),
+            "url": reverse("upload:finish_deposit") + "?package_id=%s" % str(obj.id),
             "label": text,
             "classname": self.finalise_classname(self.btn_default_classnames),
             "title": text,
         }
 
-    def reject_button(self, obj):
-        text = _("Reject")
+    def view_published_document(self, obj):
+        # TODO: A URL deve ser configurada para ver o documento publicado
+        text = _("View published document")
         return {
-            "url": reverse("upload:reject") + "?package_id=%s" % str(obj.id),
-            "label": text,
-            "classname": self.finalise_classname(self.btn_default_classnames),
-            "title": text,
-        }
-
-    def validate_button(self, obj):
-        text = _("Validate")
-        return {
-            "url": reverse("upload:validate") + "?package_id=%s" % str(obj.id),
-            "label": text,
-            "classname": self.finalise_classname(self.btn_default_classnames),
-            "title": text,
-        }
-
-    def preview_button(self, obj):
-        text = _("Preview")
-        return {
-            "url": reverse("upload:preview") + "?package_id=%s" % str(obj.id),
-            "label": text,
-            "classname": self.finalise_classname(self.btn_default_classnames),
-            "title": text,
-        }
-
-    def publish_button(self, obj):
-        text = _("Publish")
-        return {
-            "url": reverse("upload:publish") + "?package_id=%s" % str(obj.id),
+            "url": "",
             "label": text,
             "classname": self.finalise_classname(self.btn_default_classnames),
             "title": text,
@@ -68,34 +42,12 @@ class UploadButtonHelper(ButtonHelper):
 
         ph = self.permission_helper
         usr = self.request.user
+        url_name = self.request.resolver_match.url_name
 
-        if obj.status == int(PackageStatus.SUBMITTED) and ph.user_can_accept(usr, obj):    
-            btns.append(self.accept_button(obj))
+        if obj.status == int(PackageStatus.VALIDATED_WITH_ERRORS) and ph.user_can_finish_deposit(usr, obj) and url_name == 'upload_package_modeladmin_inspect':
+            btns.append(self.finish_deposit_button(obj))
 
-        if obj.status in [
-            int(x) for x in [
-                PackageStatus.SUBMITTED, PackageStatus.ACCEPTED,
-                PackageStatus.VALIDATED_WITH_ERRORS, 
-                PackageStatus.VALIDATED_WITHOUT_ERRORS,
-                PackageStatus.SCHEDULED_FOR_PUBLICATION,
-            ]
-        ] and ph.user_can_reject(usr, obj):
-            btns.append(self.reject_button(obj))
-
-        if obj.status == int(PackageStatus.ACCEPTED) and ph.user_can_validate(usr, obj):
-            btns.append(self.validate_button(obj))
-
-        if ph.user_can_preview(usr, obj):
-            btns.append(self.preview_button(obj))
-
-        if obj.status in [
-            int(x) for x in [
-                PackageStatus.ACCEPTED,
-                PackageStatus.ENQUEUED_FOR_VALIDATION,
-                PackageStatus.VALIDATED_WITH_ERRORS,
-                PackageStatus.VALIDATED_WITHOUT_ERRORS,
-            ]
-        ] and ph.user_can_publish(usr, obj):
-            btns.append(self.publish_button(obj))          
-
+        if obj.status == int(PackageStatus.PUBLISHED):
+            btns.append(self.view_published_document(obj))
+            
         return btns

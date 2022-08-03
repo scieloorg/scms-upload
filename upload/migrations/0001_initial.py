@@ -22,12 +22,12 @@ class Migration(migrations.Migration):
                 ('updated', models.DateTimeField(auto_now=True, verbose_name='Last update date')),
                 ('file', models.FileField(blank=True, null=True, upload_to='', verbose_name='Package File')),
                 ('signature', models.CharField(blank=True, max_length=32, null=True, verbose_name='Signature')),
-                ('status', models.PositiveSmallIntegerField(choices=[('1', 'Submetido'), ('2', 'Accepted'), ('3', 'Enqueued for validation'), ('4', 'Validated without errors'), ('5', 'Validated with errors'), ('6', 'Rejeitado'), ('7', 'Scheduled for publication'), ('8', 'Publicado')], default='1', verbose_name='Status')),
+                ('status', models.PositiveSmallIntegerField(choices=[('1', 'Submetido'), ('2', 'Finished')], default='1', verbose_name='Status')),
                 ('creator', models.ForeignKey(editable=False, on_delete=django.db.models.deletion.CASCADE, related_name='package_creator', to=settings.AUTH_USER_MODEL, verbose_name='Creator')),
                 ('updated_by', models.ForeignKey(blank=True, editable=False, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='package_last_mod_user', to=settings.AUTH_USER_MODEL, verbose_name='Updater')),
             ],
             options={
-                'permissions': (('accept', 'Can accept'), ('enqueue_for_validation', 'Can enqueue for validation'), ('reject', 'Can reject'), ('preview', 'Can preview'), ('schedule_for_publication', 'Can schedule for publication')),
+                'permissions': (('finish_deposit', 'Can finish deposit'),),
             },
         ),
     ]
