@@ -76,7 +76,8 @@ class ValidationErrorAdmin(ModelAdmin):
     list_display = (
         'category',
         'severity',
-        'position',
+        'row',
+        'column',
         'package',
     )
     list_filter = (
