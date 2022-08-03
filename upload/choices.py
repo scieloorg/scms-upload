@@ -20,3 +20,12 @@ VALIDATION_ERROR_SEVERITY = [
     ('fatal-error', _('Fatal error')),
     ('blocking-error', _('Blocking error')),
 ]
+
+
+VALIDATION_ERROR_CATEGORY = [
+    ('assets', _('Assets')),
+    ('stylesheet', _('Stylesheet')),
+    ('structure', _('Structure')),
+    ('individual-content', _('Individual content')),
+    ('group content', _('Group content')),
+]
