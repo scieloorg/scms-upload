@@ -1,5 +1,27 @@
 {% extends "modeladmin/inspect.html" %}
-{% load wagtailadmin_tags wagtailcore_tags i18n %}
+{% load i18n modeladmin_tags wagtailadmin_tags %}
+
+{% block fields_output %}
+    {% if fields %}
+        <h3>{% trans "Details" %}</h3>
+        <dl>
+            {% for field in fields %}
+                <dt class="{{ field.type|lower }}">{{ field.label }}</dt>
+                <dd>
+                    {% if field.value.files %}
+                        <ul>
+                            {% for fi in field.value.files %}
+                                <li>{{ fi }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        {{ field.value }}
+                    {% endif %}
+                </dd>
+            {% endfor %}
+        </dl>
+    {% endif %}
+{% endblock %}
 
 {% block content %}
     {{ block.super }}
