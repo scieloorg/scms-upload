@@ -6,9 +6,9 @@ from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel
 from core.models import CommonControlField
 
 from . import choices
-from .choices import (PackageStatus, VALIDATION_ERROR_CATEGORY, VALIDATION_ERROR_SEVERITY,)
 from .forms import UploadPackageForm
-from .tasks import get_files_list
+from .permission_helper import FINISH_DEPOSIT
+from .utils import file_utils
 
 
 class Package(CommonControlField):
