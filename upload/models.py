@@ -72,7 +72,7 @@ class ValidationError(models.Model):
         ),
         MultiFieldPanel(
             [
-                FieldPanel('snippet'),
+                FieldPanel('message'),
             ],
             heading=_('Content'),
             classname='collapsible'
