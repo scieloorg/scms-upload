@@ -51,9 +51,9 @@ class ValidationError(models.Model):
 
     def __str__(self):
         return '-'.join([
+            self.id,
             self.package.file.name,
             self.category,
-            self.severity,
         ])
 
     # TODO: terá uma chave estrageira para um novo modelo chamado ValidationFeedback
@@ -61,6 +61,7 @@ class ValidationError(models.Model):
     panels = [
         MultiFieldPanel(
             [
+                FieldPanel('id'),
                 FieldPanel('package'),
                 FieldPanel('category'),
                 FieldPanel('severity'),
