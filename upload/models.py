@@ -41,7 +41,7 @@ class Package(CommonControlField):
 
 
 class ValidationError(models.Model):
-    category = models.CharField(_('Category'), max_length=128, choices=VALIDATION_ERROR_CATEGORY, null=False, blank=False)
+    category = models.CharField(_('Category'), max_length=32, choices=choices.VALIDATION_ERROR_CATEGORY, null=False, blank=False)
     severity = models.CharField(_('Severity'), max_length=128, choices=VALIDATION_ERROR_SEVERITY, null=False, blank=False)
     
     row = models.PositiveIntegerField(_('Row'), null=True, blank=True)
