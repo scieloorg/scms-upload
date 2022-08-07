@@ -32,10 +32,9 @@ class PackageAdmin(ModelAdmin):
     add_to_settings_menu = False
     exclude_from_explorer = False
 
-    # TODO: o campo current_status deverá ser substituído por status quando o modo de usar choices for adequado
     list_display = (
         'file',
-        'current_status',
+        'status',
         'creator',
         'created',
         'updated',
@@ -75,18 +74,18 @@ class ValidationErrorAdmin(ModelAdmin):
     add_to_settings_menu = False
     exclude_from_explorer = False
     list_display = (
+        'id',
         'category',
-        'severity',
         'row',
         'column',
         'package',
+        'message',
     )
     list_filter = (
         'category',
-        'severity',
     )
     search_fields = (
-        'snippet',
+        'message',
         'package',
     )
 
