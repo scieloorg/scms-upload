@@ -3,9 +3,7 @@ from django.utils.translation import gettext as _
 
 from wagtail.contrib.modeladmin.helpers import ButtonHelper
 
-from django.urls import reverse
-
-from .choices import PackageStatus
+from . import choices
 
 
 class UploadButtonHelper(ButtonHelper):
@@ -45,10 +43,10 @@ class UploadButtonHelper(ButtonHelper):
         usr = self.request.user
         url_name = self.request.resolver_match.url_name
 
-        if obj.status == int(PackageStatus.VALIDATED_WITH_ERRORS) and ph.user_can_finish_deposit(usr, obj) and url_name == 'upload_package_modeladmin_inspect':
+        if obj.status == choices.PS_VALIDATED_WITH_ERRORS and ph.user_can_finish_deposit(usr, obj) and url_name == 'upload_package_modeladmin_inspect':
             btns.append(self.finish_deposit_button(obj))
 
-        if obj.status == int(PackageStatus.PUBLISHED):
+        if obj.status == choices.PS_PUBLISHED:
             btns.append(self.view_published_document(obj))
             
         return btns
