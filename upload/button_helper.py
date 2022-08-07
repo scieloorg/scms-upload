@@ -1,3 +1,4 @@
+from django.urls import reverse
 from django.utils.translation import gettext as _
 
 from wagtail.contrib.modeladmin.helpers import ButtonHelper
