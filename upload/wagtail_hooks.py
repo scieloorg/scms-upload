@@ -7,9 +7,10 @@ from wagtail.contrib.modeladmin.options import (ModelAdmin, modeladmin_register)
 from wagtail.contrib.modeladmin.views import CreateView
 
 from .button_helper import UploadButtonHelper
-from .permission_helper import UploadPermissionHelper
 from .groups import QUALITY_ANALYST
 from .models import Package, ValidationError
+from .permission_helper import UploadPermissionHelper
+from .tasks import validate_xml_format
 
 
 class UploadPackageCreateView(CreateView):
