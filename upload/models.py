@@ -5,7 +5,7 @@ from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel
 
 from core.models import CommonControlField
 
-from .permission_helper import FINISH_DEPOSIT
+from . import choices
 from .choices import (PackageStatus, VALIDATION_ERROR_CATEGORY, VALIDATION_ERROR_SEVERITY,)
 from .forms import UploadPackageForm
 from .tasks import get_files_list
@@ -14,7 +14,7 @@ from .tasks import get_files_list
 class Package(CommonControlField):
     file = models.FileField(_('Package File'), null=True, blank=True)
     signature = models.CharField(_('Signature'), max_length=32, null=True, blank=True)
-
+    status = models.CharField(_('Status'), max_length=32, choices=choices.PACKAGE_STATUS, default=choices.PS_ENQUEUED_FOR_VALIDATION)
     # FIXME: deve ser convertido para um CharField e o choices deve ser uma lista de tuplas (para melhor compatibilidade com os templates do Wagtail)
     status = models.PositiveSmallIntegerField(_('Status'), choices=PackageStatus.choices, default=PackageStatus.SUBMITTED)
 
