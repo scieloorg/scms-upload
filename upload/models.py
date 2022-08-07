@@ -24,7 +24,14 @@ class Package(CommonControlField):
         return self.file.name
 
     def files_list(self):
-        return {'files': get_files_list(self.file)}
+        files = {'files': []}
+
+        try:
+            files.update({'files': file_utils.get_file_list_from_zip(self.file.path)})
+        except file_utils.BadPackageFileError:
+            ...
+
+        return files
 
     base_form_class = UploadPackageForm
 
