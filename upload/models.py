@@ -64,7 +64,6 @@ class ValidationError(models.Model):
                 FieldPanel('id'),
                 FieldPanel('package'),
                 FieldPanel('category'),
-                FieldPanel('severity'),
                 FieldPanel('column'),
                 FieldPanel('row'),
             ],
