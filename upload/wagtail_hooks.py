@@ -16,6 +16,9 @@ from .tasks import validate_xml_format
 class UploadPackageCreateView(CreateView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
+
+        validate_xml_format(self.object.file.name, self.object.id)
+                
         return HttpResponseRedirect(self.get_success_url())
 
 
