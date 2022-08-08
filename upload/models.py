@@ -29,6 +29,9 @@ class Package(CommonControlField):
         try:
             files.update({'files': file_utils.get_file_list_from_zip(self.file.path)})
         except file_utils.BadPackageFileError:
+            # É preciso capturar esta exceção para garantir que aqueles que 
+            #  usam files_list obtenham, na pior das hipóteses, um dicionário do tipo {'files': []}.
+            # Isto pode ocorrer quando o zip for inválido, por exemplo.
             ...
 
         return files
