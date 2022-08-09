@@ -27,11 +27,14 @@ def task_validate_xml_format(self, file_path, package_id):
         )
 
     except xml_utils.XMLFormatError as e:
+        xml_snippet = xml_utils.get_snippet(xml_str, e.start_row, e.end_row)
+
         controller.add_validation_error(
             choices.VE_XML_FORMAT_ERROR,
             package_id,
             choices.PS_REJECTED,
             column=e.column,
-            row=e.row,
+            row=e.start_row,
             message=e.message,
+            snippet=xml_snippet,
         )

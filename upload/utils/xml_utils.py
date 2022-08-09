@@ -17,11 +17,14 @@ def convert_xml_str_to_etree(xml_str):
         return etree.fromstring(xml_str)
 
     except etree.XMLSyntaxError as e:
-        row, col = e.position
+        end_row, col = e.position
         msg = e.msg
 
+        start_row = _extract_start_row_number(msg)
+
         raise XMLFormatError(
-            row=row,
+            start_row=start_row,
+            end_row=end_row,
             column=col,
             message=msg,
         )
