@@ -2,8 +2,9 @@ from lxml import etree
 
 
 class XMLFormatError(Exception):
-    def __init__(self, row, column, message):
-        self.row = row
+    def __init__(self, start_row, end_row, column, message):
+        self.start_row = start_row
+        self.end_row = end_row
         self.column = column
         self.message = message
 
