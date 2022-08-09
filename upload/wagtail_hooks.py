@@ -35,6 +35,18 @@ class PackageAdminInspectView(InspectView):
             data[vek].append(ValidationErrorAdmin().url_helper.get_action_url('inspect', ve.id))
 
         return super().get_context_data(**data)
+
+
+class ValidationErrorAdminInspectView(InspectView):
+    def get_context_data(self):
+        data = {'start_row': self.instance.row}
+        data.update({
+            'snippet': [x.decode('utf-8') for x in eval(self.instance.snippet)]
+            }
+        )
+        return super().get_context_data(**data)
+
+
 class PackageAdmin(ModelAdmin):
     model = Package
     button_helper_class = UploadButtonHelper
