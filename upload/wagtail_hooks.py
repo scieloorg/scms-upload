@@ -17,6 +17,7 @@ class UploadPackageCreateView(CreateView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
 
+        # FIXME: chamar método run_validations que dispara todas as validações, por ordem: 1) validate_xml_format --> 2) outras
         validate_xml_format(self.object.file.name, self.object.id)
                 
         return HttpResponseRedirect(self.get_success_url())
