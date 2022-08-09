@@ -43,3 +43,8 @@ def get_xml_content_from_zip(path):
 
     except zipfile.BadZipFile:
         raise BadPackageFileError(f'Package {file_absolute_path} is invalid')
+
+
+def numbered_lines(content):
+    for i, msg in enumerate(content.splitlines(), 1):
+        yield i, msg
