@@ -1,34 +1,38 @@
-from django.db import models
 from django.utils.translation import gettext as _
 
 
-class PackageStatus(models.TextChoices):
-    # FIXME: refatorar esse jeito de usar choices que não funciona bem nos templates Wagtail
-    SUBMITTED = 1, _('Submitted')
-    ENQUEUED_FOR_VALIDATION = 2, _('Enqueued for validation')
-    VALIDATED_WITH_ERRORS = 3, _('Validated with errors')
-    VALIDATED_WITHOUT_ERRORS = 4, _('Validated without errors')
-    REJECTED = 5, _('Rejected')
-    ACCEPTED = 6, _('Accepted')
-    SCHEDULED_FOR_PUBLICATION = 7, _('Scheduled for publication')
-    PUBLISHED = 8, _('Published')
+PS_SUBMITTED = 'submitted'
+PS_ENQUEUED_FOR_VALIDATION = 'enqueued-for-validation'
+PS_VALIDATED_WITH_ERRORS = 'validated-with-errors'
+PS_VALIDATED_WITHOUT_ERRORS = 'validated-without-errors'
+PS_REJECTED = 'rejected'
+PS_ACCEPTED = 'accepted'
+PS_SCHEDULED_FOR_PUBLICATION = 'scheduled-for-publication'
+PS_PUBLISHED = 'published'
 
+PACKAGE_STATUS = (
+    (PS_SUBMITTED, _('Submitted')),
+    (PS_ENQUEUED_FOR_VALIDATION, _('Enqueued for validation')),
+    (PS_VALIDATED_WITH_ERRORS, _('Validated with errors')),
+    (PS_VALIDATED_WITHOUT_ERRORS, _('Validated without errors')),
+    (PS_REJECTED, _('Rejected')),
+    (PS_ACCEPTED, _('Accepted')),
+    (PS_SCHEDULED_FOR_PUBLICATION, _('Scheduled for publication')),
+    (PS_PUBLISHED, _('Published')),
+)
 
-VALIDATION_ERROR_SEVERITY = [
-    ('criteria-issues', _('CRITERIA_ISSUES')),
-    ('warning', _('WARNING')),
-    ('error', _('ERROR')),
-    ('bibliometrics-data-error', _('BIBLIOMETRICS_DATA_ERROR')),
-    ('services-data-error', _('SERVICES_DATA_ERROR')),
-    ('data-consistency-error', _('DATA_CONSISTENCY_ERROR')),
-    ('xml-format-error', _('XML_FORMAT_ERROR')),
-]
+VE_PACKAGE_FILE_ERROR = 'package-file-error'
+VE_XML_FORMAT_ERROR = 'xml-format-error'
+VE_BIBLIOMETRICS_DATA_ERROR = 'bibliometrics-data-error'
+VE_SERVICES_DATA_ERROR = 'services-data-error'
+VE_DATA_CONSISTENCY_ERROR = 'data-consistency_error'
+VE_CRITERIA_ISSUES = 'criteria-issues'
 
-
-VALIDATION_ERROR_CATEGORY = [
-    ('assets', _('Assets')),
-    ('stylesheet', _('Stylesheet')),
-    ('structure', _('Structure')),
-    ('individual-content', _('Individual content')),
-    ('group-content', _('Group content')),
-]
+VALIDATION_ERROR_CATEGORY = (
+    (VE_PACKAGE_FILE_ERROR, 'PACKAGE_FILE_ERROR'),
+    (VE_XML_FORMAT_ERROR, 'XML_FORMAT_ERROR'),
+    (VE_BIBLIOMETRICS_DATA_ERROR, 'BIBLIOMETRICS_DATA_ERROR'),
+    (VE_SERVICES_DATA_ERROR, 'SERVICES_DATA_ERROR'),
+    (VE_DATA_CONSISTENCY_ERROR, 'DATA_CONSISTENCY_ERROR'),
+    (VE_CRITERIA_ISSUES, 'CRITERIA_ISSUES'),
+)
