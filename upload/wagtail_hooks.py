@@ -28,7 +28,7 @@ class PackageAdmin(ModelAdmin):
     permission_helper_class = UploadPermissionHelper
     create_view_class = UploadPackageCreateView
     inspect_view_enabled=True
-    inspect_template_name='/app/upload/templates/modeladmin/upload/package/detail.html'
+    inspect_view_class = PackageAdminInspectView
     menu_label = _('Package')
     menu_icon = 'folder'
     menu_order = 200

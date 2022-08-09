@@ -28,14 +28,16 @@
 
     <div class="nice-padding">
         <h3>{% trans "Reports" %}</h3>
-        <ul>
-            <li><a href="">{% trans "XML and/or DTD formation" %}</a></li>
+        <ol>
+            {% for xfe_url in xml_format_error %}
+                <li><a href="{{ xfe_url }}">{% trans "XML and/or DTD formation" %}</a></li>
+            {% endfor %}
             <li><a href="">{% trans "Stylesheet" %}</a></li>
             <li><a href="">{% trans "Individual content validation" %}</a></li>
             <li><a href="">{% trans "Grouped content validation" %}</a></li>
             <li><a href="">{% trans "Digital assets" %}</a></li>
             <li><a href="">{% trans "Quality analysis opinion" %}</a></li>
-        </ul>
+        </ol>
     </div>
 
     <div class="nice-padding">
