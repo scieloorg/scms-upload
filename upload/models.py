@@ -50,6 +50,7 @@ class ValidationError(models.Model):
     row = models.PositiveIntegerField(_('Row'), null=True, blank=True)
     column = models.PositiveIntegerField(_('Column'), null=True, blank=True)
     message = models.CharField(_('Message'), max_length=128, null=True, blank=True)
+    snippet = models.TextField(_('Snippet'), max_length=255, null=True, blank=True)
 
     package = models.ForeignKey('Package', on_delete=models.CASCADE, null=False, blank=False)
 
@@ -77,6 +78,7 @@ class ValidationError(models.Model):
         MultiFieldPanel(
             [
                 FieldPanel('message'),
+                FieldPanel('snippet'),
             ],
             heading=_('Content'),
             classname='collapsible'

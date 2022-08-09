@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404
 from .models import Package, ValidationError
 
 
-def add_validation_error(error_category, package_id, package_status, row=None, column=None, message=None):
+def add_validation_error(error_category, package_id, package_status, row=None, column=None, message=None, snippet=None):
     ve = ValidationError()
     ve.category = error_category
 
@@ -12,6 +12,7 @@ def add_validation_error(error_category, package_id, package_status, row=None, c
     ve.row = row
     ve.column = column
     ve.message = message
+    ve.snippet = snippet
 
     ve.package.save()
     ve.save()
