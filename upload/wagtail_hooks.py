@@ -71,13 +71,14 @@ class PackageAdmin(ModelAdmin):
 
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
-    menu_label = _('Validation error')
-    menu_icon = 'folder'
+    inspect_view_enabled=True
+    inspect_view_class=ValidationErrorAdminInspectView
+    menu_label = _('Validation errors')
+    menu_icon = 'error'
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
     list_display = (
-        'id',
         'category',
         'row',
         'column',
@@ -91,6 +92,13 @@ class ValidationErrorAdmin(ModelAdmin):
         'message',
         'package',
     )
+    inspect_view_fields = {
+        'package',
+        'category',
+        'row',
+        'column',
+        'message',
+    }
 
 
 modeladmin_register(PackageAdmin)
