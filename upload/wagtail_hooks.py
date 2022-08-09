@@ -4,7 +4,7 @@ from django.utils.translation import gettext as _
 
 from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import (ModelAdmin, modeladmin_register)
-from wagtail.contrib.modeladmin.views import CreateView
+from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
 from .button_helper import UploadButtonHelper
 from .groups import QUALITY_ANALYST
@@ -22,6 +22,19 @@ class UploadPackageCreateView(CreateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
+class PackageAdminInspectView(InspectView):
+    def get_context_data(self):
+        data = {}
+
+        for ve in self.instance.validationerror_set.all():
+            vek = ve.get_standardized_category_label()
+
+            if vek not in data:
+                data[vek] = []
+
+            data[vek].append(ValidationErrorAdmin().url_helper.get_action_url('inspect', ve.id))
+
+        return super().get_context_data(**data)
 class PackageAdmin(ModelAdmin):
     model = Package
     button_helper_class = UploadButtonHelper
