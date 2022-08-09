@@ -1,5 +1,13 @@
 from lxml import etree
 
+from .file_utils import numbered_lines
+
+import re
+
+
+PATTERN_START_END_LINE_NUMBERS = r'.* line (?P<start>\d*) and .*, line (?P<end>\d*),'
+PATTERN_START_LINE_NUMBER = r'.* line (?P<start>\d*),'
+
 
 class XMLFormatError(Exception):
     def __init__(self, start_row, end_row, column, message):
@@ -10,6 +18,16 @@ class XMLFormatError(Exception):
 
     def __str__(self):
         return self.msg
+
+
+def _extract_start_row_number(msg):
+    for ptn in [
+        PATTERN_START_END_LINE_NUMBERS,
+        PATTERN_START_LINE_NUMBER,
+    ]:
+        match = re.search(ptn, msg)
+        if match and 'start' in match.groupdict():
+            return int(match.groupdict()['start'])
 
 
 def convert_xml_str_to_etree(xml_str):
