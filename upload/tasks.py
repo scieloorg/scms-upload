@@ -10,7 +10,7 @@ User = get_user_model()
 
 
 def validate_xml_format(filename, package_id):
-    return task_validate_xml_format(filename, package_id)
+    return task_validate_xml_format.delay(filename, package_id)
 
 
 @celery_app.task(bind=True,  max_retries=3)
