@@ -29,7 +29,7 @@ class PackageAdmin(ModelAdmin):
     create_view_class = UploadPackageCreateView
     inspect_view_enabled=True
     inspect_view_class = PackageAdminInspectView
-    menu_label = _('Package')
+    menu_label = _('Packages')
     menu_icon = 'folder'
     menu_order = 200
     add_to_settings_menu = False
