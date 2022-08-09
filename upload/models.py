@@ -61,6 +61,9 @@ class ValidationError(models.Model):
             self.category,
         ])
 
+    def get_standardized_category_label(self):
+        return self.category.lower().replace('-', '_')
+
     # TODO: terá uma chave estrageira para um novo modelo chamado ValidationFeedback
     
     panels = [
