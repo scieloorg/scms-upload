@@ -56,7 +56,7 @@ class ValidationError(models.Model):
 
     def __str__(self):
         return '-'.join([
-            self.id,
+            str(self.id),
             self.package.file.name,
             self.category,
         ])
@@ -66,7 +66,6 @@ class ValidationError(models.Model):
     panels = [
         MultiFieldPanel(
             [
-                FieldPanel('id'),
                 FieldPanel('package'),
                 FieldPanel('category'),
                 FieldPanel('column'),
