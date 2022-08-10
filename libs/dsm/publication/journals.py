@@ -76,3 +76,26 @@ def add_item_to_mission(journal, input_language, input_text):
                 'description': input_text or '',
             })
         )
+
+
+def add_item_to_metrics(journal, input_total_h5_index, input_total_h5_median, input_h5_metric_year):
+    """
+    Add item to journal.metrics
+
+    Parameters
+    ----------
+    journal : Journal
+
+    total_h5_index : IntField
+    total_h5_median : IntField
+    h5_metric_year : IntField
+
+    """
+    journal.metrics = (
+        JounalMetrics(**{
+            'total_h5_index': input_total_h5_index or 0,
+            'total_h5_median': input_total_h5_median or 0,
+            'h5_metric_year': input_h5_metric_year or 0,
+        })
+    )
+
