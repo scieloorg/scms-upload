@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from . import exceptions
 
 
@@ -11,3 +13,14 @@ def fetch_record(_id, model, **kwargs):
     else:
         return obj
 
+
+def save_data(model):
+    if not hasattr(model, 'created'):
+        model.created = None
+
+    model.updated = datetime.utcnow()
+    if not model.created:
+        model.created = model.updated
+
+    model.save()
+    return model
