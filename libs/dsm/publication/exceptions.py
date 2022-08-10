@@ -1,0 +1,3 @@
+class FetchRecordError(Exception):
+    ...
+
