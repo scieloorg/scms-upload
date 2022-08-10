@@ -57,3 +57,26 @@ def add_item_to_timeline(journal, input_status, input_since, input_reason):
                 'reason': input_reason or '',
             })
         )
+
+
+def add_item_to_mission(journal, input_language, input_text):
+    """
+    Add item to journal.mission
+
+    Parameters
+    ----------
+    journal : Journal
+    input_language : StringField
+    input_text : DateTimeField
+
+    """
+    if input_language and input_text:
+        if not journal.mission:
+            journal.mission = []
+
+        journal.mission.append(
+            Mission(**{
+                'language': input_language or '',
+                'description': input_text or '',
+            })
+        )
