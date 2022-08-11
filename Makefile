@@ -35,6 +35,9 @@ build_date: ## Show build date
 ## atalhos docker-compose desenvolvimento ##
 ############################################
 
+build_nocache:  ## Build app using $(compose)
+	@docker-compose -f $(compose) build --no-cache
+
 build:  ## Build app using $(compose)
 	@docker-compose -f $(compose) build
 
