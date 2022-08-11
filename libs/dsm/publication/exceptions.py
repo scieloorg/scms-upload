@@ -1,3 +1,7 @@
+class DBConnectError(Exception):
+    ...
+
+
 class FetchRecordError(Exception):
     ...
 

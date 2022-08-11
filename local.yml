@@ -54,6 +54,10 @@ services:
   mongo:
     image: mongo
     container_name: core_local_mongo
+    environment:
+      # mongodb://my_user:my_password@127.0.0.1:27017/my_db
+      - QA_DATABASE_CONNECT_URL=mongodb://my_user:my_password@127.0.0.1:27017/qa
+      - OFFICIAL_DATABASE_CONNECT_URL=mongodb://my_user:my_password@127.0.0.1:27017/prod
     restart: always
     user: mongodb
     hostname: mongo
