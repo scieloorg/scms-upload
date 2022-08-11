@@ -9,6 +9,11 @@ FROM python as python-build-stage
 
 ENV PYTHONDONTWRITEBYTECODE 1
 
+RUN apt-get update && apt-get install  --no-install-recommends -y \
+	git
+RUN python -m pip install --upgrade pip
+
+
 RUN apt-get update && apt-get install --no-install-recommends -y \
   # dependencies for building Python packages
   build-essential \

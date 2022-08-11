@@ -12,6 +12,8 @@ ARG BUILD_ENVIRONMENT=production
 
 # Install apt packages
 RUN apt-get update && apt-get install --no-install-recommends -y \
+  # git
+  git \
   # dependencies for building Python packages
   build-essential \
   # psycopg2 dependencies
@@ -19,6 +21,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 # Requirements are installed here to ensure they will be cached.
 COPY ./requirements .
+
+# Update pip
+RUN python -m pip install --upgrade pip
 
 # Create Python Dependency and Sub-Dependency Wheels.
 RUN pip wheel --wheel-dir /usr/src/app/wheels  \
