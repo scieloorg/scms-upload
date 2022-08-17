@@ -17,6 +17,20 @@ def get_file_absolute_path(path):
     return FileSystemStorage().path(path)
 
 
+def unzip(path):
+    dirname = os.path.dirname(path)
+    basename = os.path.basename(path)
+    filename, _ = os.path.splitext(basename)
+
+    zip_content_dirname = os.path.join(dirname, filename)
+
+    if not os.path.exists(zip_content_dirname):
+        zf = zipfile.ZipFile(path)
+        zf.extractall(zip_content_dirname)
+    
+    return zip_content_dirname
+
+
 def get_file_list_from_zip(path):
     file_absolute_path = get_file_absolute_path(path)
 
