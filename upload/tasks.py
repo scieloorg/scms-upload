@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext as _
 
 from config import celery_app
+from upload.utils import package_utils
 
 from .utils import file_utils, xml_utils
 from . import choices, controller
@@ -27,14 +29,19 @@ def task_validate_xml_format(self, file_path, package_id):
         )
 
     except xml_utils.XMLFormatError as e:
-        xml_snippet = xml_utils.get_snippet(xml_str, e.start_row, e.end_row)
+        data = {
+            'column': e.column,
+            'row': e.start_row,
+            'snippet': xml_utils.get_snippet(xml_str, e.start_row, e.end_row),
+        }
 
         controller.add_validation_error(
             choices.VE_XML_FORMAT_ERROR,
             package_id,
             choices.PS_REJECTED,
-            column=e.column,
-            row=e.start_row,
             message=e.message,
-            snippet=xml_snippet,
+            data=data,
         )
+
+    return False
+
