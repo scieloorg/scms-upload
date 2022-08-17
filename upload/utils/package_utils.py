@@ -23,3 +23,7 @@ def optimise_package(source, target):
     )
 
 
+def get_assets_from_tree(xmltree):
+    return ArticleAssets(xmltree).article_assets
+
+
