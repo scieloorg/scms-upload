@@ -59,6 +59,11 @@ def get_snippet(xml_data, start_row, end_row):
 
     for line_number, content in numbered_lines(xml_data):
         if line_number >= start_row and line_number <= end_row:
-            lines.append(content.encode())
+            try:
+                decode_content = content.decode()
+            except AttributeError:
+                decode_content = content
+
+            lines.append(decode_content)
 
     return lines
