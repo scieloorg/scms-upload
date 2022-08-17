@@ -46,11 +46,8 @@ class Package(CommonControlField):
 
 class ValidationError(models.Model):
     category = models.CharField(_('Category'), max_length=32, choices=choices.VALIDATION_ERROR_CATEGORY, null=False, blank=False)
-
-    row = models.PositiveIntegerField(_('Row'), null=True, blank=True)
-    column = models.PositiveIntegerField(_('Column'), null=True, blank=True)
+    data = models.JSONField(_('Data'), null=True, blank=True)
     message = models.CharField(_('Message'), max_length=128, null=True, blank=True)
-    snippet = models.TextField(_('Snippet'), max_length=255, null=True, blank=True)
 
     package = models.ForeignKey('Package', on_delete=models.CASCADE, null=False, blank=False)
 
@@ -71,16 +68,13 @@ class ValidationError(models.Model):
             [
                 FieldPanel('package'),
                 FieldPanel('category'),
-                FieldPanel('column'),
-                FieldPanel('row'),
             ],
             heading=_('Identification'),
             classname='collapsible'
         ),
         MultiFieldPanel(
             [
-                FieldPanel('message'),
-                FieldPanel('snippet'),
+                FieldPanel('data'),
             ],
             heading=_('Content'),
             classname='collapsible'

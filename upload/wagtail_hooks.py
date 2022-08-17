@@ -106,8 +106,6 @@ class ValidationErrorAdmin(ModelAdmin):
     exclude_from_explorer = False
     list_display = (
         'category',
-        'row',
-        'column',
         'package',
         'message',
     )
@@ -121,8 +119,6 @@ class ValidationErrorAdmin(ModelAdmin):
     inspect_view_fields = {
         'package',
         'category',
-        'row',
-        'column',
         'message',
     }
 
