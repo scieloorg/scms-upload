@@ -10,15 +10,14 @@ from .button_helper import UploadButtonHelper
 from .groups import QUALITY_ANALYST
 from .models import Package, ValidationError
 from .permission_helper import UploadPermissionHelper
-from .tasks import validate_xml_format
+from .tasks import run_validations
 
 
 class UploadPackageCreateView(CreateView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
 
-        # FIXME: chamar método run_validations que dispara todas as validações, por ordem: 1) validate_xml_format --> 2) outras
-        validate_xml_format(self.object.file.name, self.object.id)
+        run_validations(self.object.file.name, self.object.id)
                 
         return HttpResponseRedirect(self.get_success_url())
 
