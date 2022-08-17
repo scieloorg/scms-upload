@@ -13,3 +13,13 @@ from .file_utils import (
 from .xml_utils import convert_xml_str_to_etree
 
 from tempfile import mkdtemp
+
+
+def optimise_package(source, target):
+    package = SPPackage.from_file(source, mkdtemp())
+    package.optimise(
+        new_package_file_path=target,
+        preserve_files=True
+    )
+
+
