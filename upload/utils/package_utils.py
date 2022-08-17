@@ -31,3 +31,20 @@ def get_assets_from_zip(path):
     xmlstr = get_xml_content_from_zip(path)
     xmltree = convert_xml_str_to_etree(xmlstr)
     return get_assets_from_tree(xmltree)
+
+
+def evaluate_assets(path, files_list):
+    for asset in get_assets_from_zip(path):
+        a_type = get_filetype(asset.name)
+        a_name = asset.name
+        a_is_present = a_name in files_list
+        a_id = asset.id
+
+        yield {
+            'type': a_type,
+            'name': a_name,
+            'is_present': a_is_present,
+            'id': a_id,
+        }
+
+
