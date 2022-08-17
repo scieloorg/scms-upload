@@ -25,7 +25,10 @@ class UploadPackageCreateView(CreateView):
 
 class PackageAdminInspectView(InspectView):
     def get_context_data(self):
-        data = {}
+        data = {
+            'package_id': self.instance.id,
+            'status': self.instance.status,
+        }
 
         for ve in self.instance.validationerror_set.all():
             vek = ve.get_standardized_category_label()
@@ -40,11 +43,11 @@ class PackageAdminInspectView(InspectView):
 
 class ValidationErrorAdminInspectView(InspectView):
     def get_context_data(self):
-        data = {'start_row': self.instance.row}
-        data.update({
-            'snippet': [x.decode('utf-8') for x in eval(self.instance.snippet)]
-            }
-        )
+        data = {}
+
+        for k, v in self.instance.data.items():
+            data[k] = v
+
         return super().get_context_data(**data)
 
 
