@@ -98,3 +98,8 @@ def task_validate_assets(file_path, package_id):
                 },
             )
 
+
+@celery_app.task()
+def task_validate_renditions(file_path, package_id):
+    ...
+    # TODO
