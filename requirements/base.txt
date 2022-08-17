@@ -43,3 +43,4 @@ wagtail-localize==1.2.1
 # website
 # ------------------------------------------------------------------------------
 -e git+https://github.com/scieloorg/opac_schema.git@v2.66#egg=opac_schema
+tenacity==8.0.1
