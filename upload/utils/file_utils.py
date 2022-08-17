@@ -63,3 +63,16 @@ def get_xml_content_from_zip(path):
 def numbered_lines(content):
     for i, msg in enumerate(content.splitlines(), 1):
         yield i, msg
+
+
+def generate_optimized_filepath(path):
+    dirname = os.path.dirname(path)
+    basename = os.path.basename(path)
+    filename, fileext = os.path.splitext(basename)
+
+    return os.path.join(
+        dirname,
+        f'{filename}.optz{fileext}'
+    )
+
+
