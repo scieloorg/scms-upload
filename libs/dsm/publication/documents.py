@@ -2,6 +2,7 @@ from opac_schema.v1.models import (
     Article,
     Journal,
     Issue,
+    AuthorMeta,
 )
 
 from . import exceptions
@@ -80,6 +81,22 @@ def publish_document(doc_data):
 
         doc.xml = doc_data["xml"]
 
+        for item in doc_data.get("authors"):
+            add_author(
+                doc,
+                item["surname"],
+                item["given_names"],
+                item.get("suffix"),
+            )
+            add_author_meta(
+                doc,
+                item["surname"],
+                item["given_names"],
+                item.get("suffix"),
+                item.get("affiliation"),
+                item.get("orcid"),
+            )
+
     except KeyError as e:
         raise exceptions.DocumentDataError(e)
 
@@ -89,3 +106,35 @@ def publish_document(doc_data):
         raise exceptions.DocumentSaveError(e)
 
     return doc
+
+
+def add_author(document, surname, given_names, suffix):
+    # authors = EmbeddedDocumentListField(Author))
+    if document.authors is None:
+        document.authors = []
+    _author = format_author_name(
+        surname, given_names, suffix,
+    )
+    document.authors.append(_author)
+
+
+def format_author_name(surname, given_names, suffix):
+    # like airflow
+    surname_and_suffix = surname
+    if suffix:
+        surname_and_suffix += " " + suffix
+    return "%s%s, %s" % (surname_and_suffix, given_names)
+
+
+def add_author_meta(document, surname, given_names, suffix, affiliation, orcid):
+    # authors_meta = EmbeddedDocumentListField(AuthorMeta))
+    if document.authors_meta is None:
+        document.authors_meta = []
+    author = AuthorMeta()
+    author.surname = surname
+    author.given_names = given_names
+    author.suffix = suffix
+    author.affiliation = affiliation
+    author.orcid = orcid
+    document.authors_meta.append(author)
+
