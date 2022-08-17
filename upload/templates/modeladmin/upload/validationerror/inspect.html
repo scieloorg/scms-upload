@@ -16,15 +16,26 @@
 {% block content %}
     {{ block.super }}
 
-    <div class="nice-padding">
-        <h3>{% trans "Snippet" %}</h3>
-        <code style="display:block">
-            <ol start="{{ start_row }}">
-                {% for line in snippet %}
-                    <li>{{ line }}</li>
-                {% endfor %}
-            </ol>
-        </code>
-    </div>
+    {% if missing_file %}
+        <div class="nice-padding">
+            <h3>{% trans "Missing file" %}</h3>
+            <div class='help-block help-critical'>
+                {{ missing_file }}
+            </div>
+        </div>
+    {% endif %}
+
+    {% if snippet %}
+        <div class="nice-padding">
+            <h3>{% trans "Snippet" %}</h3>
+            <code style="display:block">
+                <ol start="{{ row }}">
+                    {% for line in snippet %}
+                        <li>{{ line }}</li>
+                    {% endfor %}
+                </ol>
+            </code>
+        </div>
+    {% endif %}
 
 {% endblock %}
