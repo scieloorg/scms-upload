@@ -17,15 +17,15 @@ class XMLFormatError(Exception):
         self.message = message
 
     def __str__(self):
-        return self.msg
+        return self.message
 
 
-def _extract_start_row_number(msg):
+def _extract_start_row_number(message):
     for ptn in [
         PATTERN_START_END_LINE_NUMBERS,
         PATTERN_START_LINE_NUMBER,
     ]:
-        match = re.search(ptn, msg)
+        match = re.search(ptn, message)
         if match and 'start' in match.groupdict():
             return int(match.groupdict()['start'])
 
@@ -36,15 +36,15 @@ def convert_xml_str_to_etree(xml_str):
 
     except etree.XMLSyntaxError as e:
         end_row, col = e.position
-        msg = e.msg
+        message = e.msg
 
-        start_row = _extract_start_row_number(msg)
+        start_row = _extract_start_row_number(message)
 
         raise XMLFormatError(
             start_row=start_row,
             end_row=end_row,
             column=col,
-            message=msg,
+            message=message,
         )
 
 
