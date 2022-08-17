@@ -27,3 +27,7 @@ def get_assets_from_tree(xmltree):
     return ArticleAssets(xmltree).article_assets
 
 
+def get_assets_from_zip(path):
+    xmlstr = get_xml_content_from_zip(path)
+    xmltree = convert_xml_str_to_etree(xmlstr)
+    return get_assets_from_tree(xmltree)
