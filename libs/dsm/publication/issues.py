@@ -78,9 +78,9 @@ def publish_issue(issue_data):
     -------
     Issue
     """
-    issue = get_issue(issue_data.get("id"))
 
     try:
+        issue = get_issue(issue_data["id"])
         issue.journal = Journal.objects.get(_id=issue_data["journal_id"])
 
         issue._id = issue.iid = issue_data["id"]

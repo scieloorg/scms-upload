@@ -116,9 +116,10 @@ def publish_journal(journal_data):
     -------
     Journal
     """
-    journal = get_journal(journal_data.get("id"))
 
     try:
+        journal = get_journal(journal_data["id"])
+
         journal.title = journal_data["title"]
         journal.title_iso = journal_data["title_iso"]
         journal.short_title = journal_data["short_title"]
