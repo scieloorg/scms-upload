@@ -20,3 +20,11 @@ class IssueDataError(Exception):
 
 class IssueSaveError(Exception):
     ...
+
+
+class DocumentDataError(Exception):
+    ...
+
+
+class DocumentSaveError(Exception):
+    ...
