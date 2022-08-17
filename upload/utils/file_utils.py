@@ -1,4 +1,5 @@
 from django.core.files.storage import FileSystemStorage
+from django.utils.translation import gettext as _
 
 import os
 import zipfile
@@ -12,12 +13,12 @@ class BadPackageFileError(Exception):
     ...
 
 
-def _get_file_absolute_path(path):
+def get_file_absolute_path(path):
     return FileSystemStorage().path(path)
 
 
 def get_file_list_from_zip(path):
-    file_absolute_path = _get_file_absolute_path(path)
+    file_absolute_path = get_file_absolute_path(path)
 
     try:
         with zipfile.ZipFile(file_absolute_path, 'r') as zip_content:
@@ -28,13 +29,13 @@ def get_file_list_from_zip(path):
 
 
 def get_xml_content_from_zip(path):
-    file_absolute_path = _get_file_absolute_path(path)
+    file_absolute_path = get_file_absolute_path(path)
 
     try:
         with zipfile.ZipFile(file_absolute_path, 'r') as zip_content:
             for fn in zip_content.namelist():
                 fn_basename = os.path.basename(fn)
-                fn_name, fn_ext = os.path.splitext(fn_basename)
+                _, fn_ext = os.path.splitext(fn_basename)
 
                 if fn_ext.lower() == '.xml':
                     return zip_content.read(fn)
