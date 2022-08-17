@@ -48,3 +48,50 @@ def evaluate_assets(path, files_list):
         }
 
 
+def _fill_data_with_valitadion_errors(data, validation_errors):
+    for ve in validation_errors:
+        if ve.data['missing_file']:
+            ve_id = ve.data['id']
+            if ve_id not in data:
+                data[ve_id] = []
+            
+            ve_type = ve.data['type']
+
+            data[ve_id].append({
+                'name': ve.data['missing_file'], 
+                'type': ve_type,
+                'is_present': False,
+                'src': ve.data['missing_file'],
+            })
+
+
+def _fill_data_with_present_files(data, path, validation_errors):
+    missing_files = [ve.data['missing_file'] for ve in validation_errors if ve.data['missing_file']]
+
+    for a in get_assets_from_zip(path):
+        a_is_present = a.name not in missing_files
+
+        if a_is_present:
+            if a.id not in data:
+                data[a.id] = []
+
+            data[a.id].append({
+                'name': a.name, 
+                'type': get_filetype(a.name),
+                'is_present': a_is_present,
+                'src': a.name,
+            })
+
+
+def coerce_package_and_errors(package, validation_errors):
+    id_to_files = {}
+
+    source = get_file_absolute_path(package.file.name)
+    target = generate_optimized_filepath(source)
+    
+    unzip(target)
+
+    _fill_data_with_valitadion_errors(id_to_files, validation_errors)
+    _fill_data_with_present_files(id_to_files, target, validation_errors)
+
+    return id_to_files
