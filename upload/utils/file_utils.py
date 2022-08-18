@@ -20,7 +20,7 @@ def get_file_absolute_path(path):
 def unzip(path):
     dirname = os.path.dirname(path)
     basename = os.path.basename(path)
-    filename, _ = os.path.splitext(basename)
+    filename, ign = os.path.splitext(basename)
 
     zip_content_dirname = os.path.join(dirname, filename)
 
@@ -49,7 +49,7 @@ def get_xml_content_from_zip(path):
         with zipfile.ZipFile(file_absolute_path, 'r') as zip_content:
             for fn in zip_content.namelist():
                 fn_basename = os.path.basename(fn)
-                _, fn_ext = os.path.splitext(fn_basename)
+                ign, fn_ext = os.path.splitext(fn_basename)
 
                 if fn_ext.lower() == '.xml':
                     return zip_content.read(fn)
