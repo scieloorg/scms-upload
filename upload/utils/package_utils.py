@@ -44,12 +44,10 @@ def _fill_data_with_valitadion_errors(data, validation_errors):
             ve_id = ve.data['id']
             if ve_id not in data:
                 data[ve_id] = []
-            
-            ve_type = ve.data['type']
 
             data[ve_id].append({
                 'name': ve.data['missing_file'], 
-                'type': ve_type,
+                'type': ve.data['type'],
                 'is_present': False,
                 'src': ve.data['missing_file'],
             })
