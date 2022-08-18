@@ -3,6 +3,7 @@ from opac_schema.v1.models import (
     Journal,
 )
 from . import exceptions
+from . import db
 
 
 def get_issue(issue_id):
@@ -44,83 +45,82 @@ def _set_issue_type(issue):
         return
 
 
-def _get_issue_label(issue_data: dict) -> str:
-    """Produz o label esperado pelo OPAC de acordo com as regras aplicadas
-    pelo OPAC Proc e Xylose.
-    Args:
-        issue_data (dict): conteúdo de um bundle
-    Returns:
-        str: label produzido a partir de um bundle
-    """
-    prefixes = ("v", "n", "s")
-    names = ("volume", "number", "supplement")
-    return "".join(
-        f"{prefix}{issue_data.get(name)}"
-        for prefix, name in zip(prefixes, names)
-        if issue_data.get(name)
-    )
+class IssueToPublish:
+    def __init__(self, issue_id):
+        self.issue = get_issue(issue_id)
+        self._has_docs = None
 
+    def add_journal(self, journal):
+        if isinstance(journal, Journal):
+            self.issue.journal = journal
+        else:
+            self.issue.journal = Journal.objects.get(_id=journal)
 
-def publish_issue(issue_data):
-    """
-    Publishes issue data
+    def add_order(self, order):
+        self.issue.order = order
 
-    Parameters
-    ----------
-    issue_data : dict
+    def add_pid(self, pid):
+        self.issue.pid = pid
 
-    Raises
-    ------
-    IssueDataError
-    IssueSaveError
+    def add_publication_date(self, year, start_month, end_month):
+        self.issue.start_month = start_month
+        self.issue.end_month = end_month
+        self.issue.year = year
 
-    Returns
-    -------
-    Issue
-    """
+    def add_identification(self, volume, number, supplement):
+        self.issue.volume = volume
+        self.issue.suppl_text = supplement
+        if "spe" in number:
+            self.issue.spe_text = number
+        else:
+            self.issue.number = number
 
-    try:
-        issue = get_issue(issue_data["id"])
-        issue.journal = Journal.objects.get(_id=issue_data["journal_id"])
+        # set label
+        prefixes = ("v", "n", "s")
+        values = (volume, number, supplement)
+        self.issue.label = "".join(
+            f"{prefix}{value}"
+            for prefix, value in zip(prefixes, values)
+            if value
+        )
+        # set issue type
+        _set_issue_type(self.issue)
 
-        issue._id = issue.iid = issue_data["id"]
-        issue.order = issue_data["issue_order"]
-        issue.pid = issue_data["issue_pid"]
+    @property
+    def has_docs(self):
+        return self._has_docs
+
+    @has_docs.setter
+    def has_docs(self, documents):
+        self._has_docs = documents
+
+    def publish_issue(self):
+        """
+        Publishes issue data
+
+        Raises
+        ------
+        IssueSaveError
+
+        Returns
+        -------
+        opac_schema.v1.models.Issue
+        """
 
         try:
-            publication_date = issue_data["publication_date"]
-        except KeyError:
+            if self.issue.type == "ahead" and not self.has_docs:
+                """
+                Caso não haja nenhum artigo no bundle de ahead, ele é definido como
+                ``outdated_ahead``, para que não apareça na grade de fascículos
+                """
+                self.issue.type = "outdated_ahead"
+
+        except KeyError as e:
             raise exceptions.IssueDataError(e)
-        else:
-            try:
-                months = publication_date["months"]
-            except KeyError:
-                raise exceptions.IssueDataError(e)
-            else:
-                issue.start_month = months["start"]
-                issue.end_month = months["end"]
 
-        issue.year = publication_date["year"]
-        issue.volume = issue_data.get("volume")
-        issue.number = issue_data.get("number")
-        issue.spe_text = issue_data.get("spe_text")
-        issue.suppl_text = issue_data.get("supplement")
+        try:
+            db.save_data(self.issue)
+        except Exception as e:
+            raise exceptions.IssueSaveError(e)
 
-        issue.label = _get_issue_label(issue_data) or None
-
-        if issue.type == "ahead" and not issue_data.get("docs"):
-            """
-            Caso não haja nenhum artigo no bundle de ahead, ele é definido como
-            ``outdated_ahead``, para que não apareça na grade de fascículos
-            """
-            issue.type = "outdated_ahead"
-
-    except KeyError as e:
-        raise exceptions.IssueDataError(e)
-
-    try:
-        issue.save()
-    except Exception as e:
-        raise exceptions.IssueSaveError(e)
-
-    return issue
+        return issue
