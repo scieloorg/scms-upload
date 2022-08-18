@@ -17,6 +17,17 @@ def get_file_absolute_path(path):
     return FileSystemStorage().path(path)
 
 
+def get_dirname_from_filepath(path):
+    basename = os.path.basename(path)
+    dirname, ign = os.path.splitext(basename)
+    return dirname
+
+
+def get_file_url(dirname, filename):
+    filepath = os.path.join(dirname, filename)
+    return FileSystemStorage().url(filepath)
+
+
 def unzip(path):
     dirname = os.path.dirname(path)
     basename = os.path.basename(path)
