@@ -76,14 +76,12 @@ def numbered_lines(content):
         yield i, msg
 
 
-def generate_optimized_filepath(path):
+def generate_filepath_with_new_extension(path, new_extension, keep_old_extension=False):
     dirname = os.path.dirname(path)
     basename = os.path.basename(path)
     filename, fileext = os.path.splitext(basename)
 
-    return os.path.join(
-        dirname,
-        f'{filename}.optz{fileext}'
-    )
+    if keep_old_extension:
+        return os.path.join(dirname, f'{filename}{new_extension}{fileext}')
 
-
+    return os.path.join(dirname, f'{filename}{new_extension}')
