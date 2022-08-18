@@ -42,12 +42,7 @@ class PackageAdminInspectView(InspectView):
 
 class ValidationErrorAdminInspectView(InspectView):
     def get_context_data(self):
-        data = {}
-
-        for k, v in self.instance.data.items():
-            data[k] = v
-
-        return super().get_context_data(**data)
+        return super().get_context_data(**self.instance.data.copy())
 
 
 class PackageAdmin(ModelAdmin):
