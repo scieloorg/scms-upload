@@ -23,7 +23,7 @@ def run_validations(filename, package_id):
 def task_validate_xml_format(file_path, package_id):    
     try:
         xml_str = file_utils.get_xml_content_from_zip(file_path)
-        _ = xml_utils.convert_xml_str_to_etree(xml_str)
+        xml_utils.get_etree_from_xml_content(xml_str)
         return True
 
     except (file_utils.BadPackageFileError, file_utils.PackageWithoutXMLFileError):
