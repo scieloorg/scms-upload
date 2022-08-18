@@ -24,14 +24,10 @@ def optimise_package(source, target):
     )
 
 
-def get_assets_from_tree(xmltree):
-    return ArticleAssets(xmltree).article_assets
-
-
-def get_assets_from_zip(path):
+def get_article_assets_from_zipped_xml(path):
     xmlstr = get_xml_content_from_zip(path)
-    xmltree = convert_xml_str_to_etree(xmlstr)
-    return get_assets_from_tree(xmltree)
+    xmltree = get_etree_from_xml_content(xmlstr)
+    return ArticleAssets(xmltree).article_assets
 
 
 def evaluate_assets(path, files_list):
