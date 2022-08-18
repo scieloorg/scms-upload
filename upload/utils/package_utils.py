@@ -56,7 +56,9 @@ def _fill_data_with_valitadion_errors(data, validation_errors):
 def _fill_data_with_present_files(data, path, validation_errors):
     missing_files = [ve.data['missing_file'] for ve in validation_errors if ve.data['missing_file']]
 
-    for a in get_assets_from_zip(path):
+    dir_extracted_files = get_dirname_from_filepath(path)
+
+    for a in get_article_assets_from_zipped_xml(path):
         a_is_present = a.name not in missing_files
 
         if a_is_present:
@@ -65,9 +67,9 @@ def _fill_data_with_present_files(data, path, validation_errors):
 
             data[a.id].append({
                 'name': a.name, 
-                'type': get_filetype(a.name),
+                'type': a.type,
                 'is_present': a_is_present,
-                'src': a.name,
+                'src': get_file_url(dir_extracted_files, a.name),
             })
 
 
@@ -75,7 +77,7 @@ def coerce_package_and_errors(package, validation_errors):
     id_to_files = {}
 
     source = get_file_absolute_path(package.file.name)
-    target = generate_optimized_filepath(source)
+    target = generate_filepath_with_new_extension(source, '.optz', True)
     
     unzip(target)
 
