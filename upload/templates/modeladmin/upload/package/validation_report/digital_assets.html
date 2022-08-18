@@ -33,7 +33,7 @@
                                 <tr>
                                     <td class='title'><h2>{{ key }}</h2></td>
                                     <td>{{ asset.name }}</td>
-                                    <td>{{ asset.type }}</td>
+                                    <td>{{ asset.type|title }}</td>
                                     {% if asset.is_present %}
                                         <td>{% trans 'Yes' %}</td>
                                     {% else%}
