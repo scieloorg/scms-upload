@@ -52,14 +52,19 @@ def task_validate_xml_format(file_path, package_id):
 
 
 @celery_app.task()
-def task_validate_assets(file_path, package_id):
+def task_optimise_package(file_path):
     source = file_utils.get_file_absolute_path(file_path)
     target = file_utils.generate_filepath_with_new_extension(source, '.optz', True)
     package_utils.optimise_package(source, target)
     package_utils.unzip(target)
 
-    package_files = file_utils.get_file_list_from_zip(target)
-    article_assets = package_utils.get_article_assets_from_zipped_xml(target)
+    return target
+
+
+@celery_app.task()
+def task_validate_assets(file_path, package_id):
+    package_files = file_utils.get_file_list_from_zip(file_path)
+    article_assets = package_utils.get_article_assets_from_zipped_xml(file_path)
 
     for asset_result in package_utils.evaluate_assets(article_assets, package_files):
         asset, is_present = asset_result
