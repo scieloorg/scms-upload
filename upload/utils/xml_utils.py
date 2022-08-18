@@ -30,7 +30,7 @@ def _extract_start_row_number(message):
             return int(match.groupdict()['start'])
 
 
-def convert_xml_str_to_etree(xml_str):
+def get_etree_from_xml_content(xml_str):
     try:
         return etree.fromstring(xml_str)
 
