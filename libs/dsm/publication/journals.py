@@ -53,9 +53,11 @@ class JournalToPublish:
         # Issue count
         self.journal.issue_count = issue_count
 
-    def add_sponsors(self, sponsors):
+    def add_sponsor(self, sponsor):
         # Sponsors
-        self.journal.sponsors = sponsors
+        if not self.journal.sponsors:
+            self.journal.sponsors = []
+        self.journal.sponsors.append(sponsor)
 
     def add_contact(self, name, email, address, city, state, country):
         # email to contact
