@@ -87,16 +87,3 @@ def generate_optimized_filepath(path):
     )
 
 
-def get_filetype(filename):
-    filename, ext = os.path.splitext(filename)
-
-    if 'thumbnail' in filename:
-        return _('Thumbnail')
-
-    if ext == '.tif':
-        return _('Original')
-
-    if ext == '.png':
-        return _('Optimised')
-
-    return ''
