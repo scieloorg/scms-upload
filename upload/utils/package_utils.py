@@ -4,13 +4,14 @@ from packtools import SPPackage
 from packtools.sps.models.article_assets import ArticleAssets
 
 from .file_utils import (
-    generate_optimized_filepath,
+    generate_filepath_with_new_extension,
+    get_dirname_from_filepath,
     get_file_absolute_path,
-    get_filetype,
+    get_file_url,
     get_xml_content_from_zip,
     unzip,
 )
-from .xml_utils import convert_xml_str_to_etree
+from .xml_utils import get_etree_from_xml_content
 
 from tempfile import mkdtemp
 
