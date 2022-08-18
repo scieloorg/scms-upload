@@ -15,8 +15,10 @@ def run_validations(filename, package_id):
     xml_format_is_valid = task_validate_xml_format(filename, package_id)
 
     if xml_format_is_valid:
-        task_validate_assets.delay(filename, package_id)
-        task_validate_renditions.delay(filename, package_id)    
+        optimised_filepath = task_optimise_package(filename)
+
+        task_validate_assets.delay(optimised_filepath, package_id)
+        task_validate_renditions.delay(optimised_filepath, package_id)    
 
 
 @celery_app.task()
