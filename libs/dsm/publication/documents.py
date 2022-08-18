@@ -3,10 +3,10 @@ from opac_schema.v1.models import (
     Journal,
     Issue,
     AuthorMeta,
+    TranslatedTitle,
 )
 
 from . import exceptions
-
 
 
 def get_document(doc_id):
@@ -97,6 +97,12 @@ def publish_document(doc_data):
                 item.get("orcid"),
             )
 
+        # versions / languages
+        doc.languages = doc_data["languages"]
+
+        for item in doc_data.get("translated_titles"):
+            add_translated_title(doc, item["text"], item["lang"])
+
     except KeyError as e:
         raise exceptions.DocumentDataError(e)
 
@@ -137,4 +143,14 @@ def add_author_meta(document, surname, given_names, suffix, affiliation, orcid):
     author.affiliation = affiliation
     author.orcid = orcid
     document.authors_meta.append(author)
+
+
+def add_translated_title(document, text, language):
+    # translated_titles = EmbeddedDocumentListField(TranslatedTitle))
+    if document.translated_titles is None:
+        document.translated_titles = []
+    _translated_title = TranslatedTitle()
+    _translated_title.name = text
+    _translated_title.language = language
+    document.translated_titles.append(_translated_title)
 
