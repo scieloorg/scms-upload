@@ -28,3 +28,15 @@ class DocumentDataError(Exception):
 
 class DocumentSaveError(Exception):
     ...
+
+
+class PublishJournalError(Exception):
+    ...
+
+
+class MigratedJournalSaveError(Exception):
+    ...
+
+
+class JournalMigrationTrackSaveError(Exception):
+    ...
