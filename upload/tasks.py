@@ -54,7 +54,7 @@ def task_validate_xml_format(file_path, package_id):
 @celery_app.task()
 def task_validate_assets(file_path, package_id):
     source = file_utils.get_file_absolute_path(file_path)
-    target = file_utils.generate_optimized_filepath(source)
+    target = file_utils.generate_filepath_with_new_extension(source, '.optz', True)
     package_utils.optimise_package(source, target)
     package_utils.unzip(target)
 
