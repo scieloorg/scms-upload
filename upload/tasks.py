@@ -59,18 +59,21 @@ def task_validate_assets(file_path, package_id):
     package_utils.unzip(target)
 
     package_files = file_utils.get_file_list_from_zip(target)
+    article_assets = package_utils.get_article_assets_from_zipped_xml(target)
 
-    for a in package_utils.evaluate_assets(target, package_files):
-        if not a['is_present']:
+    for asset_result in package_utils.evaluate_assets(article_assets, package_files):
+        asset, is_present = asset_result
+
+        if not is_present:
             controller.add_validation_error(
                 choices.VE_ASSET_ERROR,
                 package_id,
                 choices.PS_REJECTED,
-                message=f'{a["name"]} {_("file is mentioned in the XML but not present in the package.")}',
+                message=f'{asset.name} {_("file is mentioned in the XML but not present in the package.")}',
                 data={
-                    'id': a['id'],
-                    'type': a['type'],
-                    'missing_file': a['name'],
+                    'id': asset.id,
+                    'type': asset.type,
+                    'missing_file': asset.name,
                 },
             )
 
@@ -78,11 +81,11 @@ def task_validate_assets(file_path, package_id):
                 choices.VE_ASSET_ERROR,
                 package_id,
                 choices.PS_REJECTED,
-                message=f'{a["name"]} {_("file is mentioned in the XML but its optimised version not present in the package.")}',
+                message=f'{asset.name} {_("file is mentioned in the XML but its optimised version not present in the package.")}',
                 data={
-                    'id': a['id'],
-                    'type': _('Optimised'),
-                    'missing_file': a['name'].replace('.tif', '.png'),
+                    'id': asset.id,
+                    'type': 'optimised',
+                    'missing_file': file_utils.generate_filepath_with_new_extension(asset.name, '.png'),
                 },
             )
 
@@ -90,11 +93,11 @@ def task_validate_assets(file_path, package_id):
                 choices.VE_ASSET_ERROR,
                 package_id,
                 choices.PS_REJECTED,
-                message=f'{a["name"]} {_("file is mentioned in the XML but its thumbnail version not present in the package.")}',
+                message=f'{asset.name} {_("file is mentioned in the XML but its thumbnail version not present in the package.")}',
                 data={
-                    'id': a['id'],
-                    'type': _('Thumbnail'),
-                    'missing_file': a['name'].replace('.tif', '.thumbnail.jpg'),
+                    'id': asset.id,
+                    'type': 'thumbnail',
+                    'missing_file': file_utils.generate_filepath_with_new_extension(asset.name, '.thumbnail.jpg'),
                 },
             )
 
