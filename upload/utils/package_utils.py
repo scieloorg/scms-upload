@@ -30,19 +30,12 @@ def get_article_assets_from_zipped_xml(path):
     return ArticleAssets(xmltree).article_assets
 
 
-def evaluate_assets(path, files_list):
-    for asset in get_assets_from_zip(path):
-        a_type = get_filetype(asset.name)
-        a_name = asset.name
-        a_is_present = a_name in files_list
-        a_id = asset.id
-
-        yield {
-            'type': a_type,
-            'name': a_name,
-            'is_present': a_is_present,
-            'id': a_id,
-        }
+def evaluate_assets(assets, files_list):
+    """
+    For each asset, returns a tuple that indicates whether or not the asset filename is in a file list.
+    """
+    for asset in assets:
+        yield (asset, asset.name in files_list)
 
 
 def _fill_data_with_valitadion_errors(data, validation_errors):
