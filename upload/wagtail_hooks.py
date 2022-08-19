@@ -10,22 +10,24 @@ from .button_helper import UploadButtonHelper
 from .groups import QUALITY_ANALYST
 from .models import Package, ValidationError
 from .permission_helper import UploadPermissionHelper
-from .tasks import validate_xml_format
+from .tasks import run_validations
 
 
 class UploadPackageCreateView(CreateView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
 
-        # FIXME: chamar método run_validations que dispara todas as validações, por ordem: 1) validate_xml_format --> 2) outras
-        validate_xml_format(self.object.file.name, self.object.id)
+        run_validations(self.object.file.name, self.object.id)
                 
         return HttpResponseRedirect(self.get_success_url())
 
 
 class PackageAdminInspectView(InspectView):
     def get_context_data(self):
-        data = {}
+        data = {
+            'package_id': self.instance.id,
+            'status': self.instance.status,
+        }
 
         for ve in self.instance.validationerror_set.all():
             vek = ve.get_standardized_category_label()
@@ -40,12 +42,7 @@ class PackageAdminInspectView(InspectView):
 
 class ValidationErrorAdminInspectView(InspectView):
     def get_context_data(self):
-        data = {'start_row': self.instance.row}
-        data.update({
-            'snippet': [x.decode('utf-8') for x in eval(self.instance.snippet)]
-            }
-        )
-        return super().get_context_data(**data)
+        return super().get_context_data(**self.instance.data.copy())
 
 
 class PackageAdmin(ModelAdmin):
@@ -106,8 +103,6 @@ class ValidationErrorAdmin(ModelAdmin):
     exclude_from_explorer = False
     list_display = (
         'category',
-        'row',
-        'column',
         'package',
         'message',
     )
@@ -121,8 +116,6 @@ class ValidationErrorAdmin(ModelAdmin):
     inspect_view_fields = {
         'package',
         'category',
-        'row',
-        'column',
         'message',
     }
 
