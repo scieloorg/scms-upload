@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 
 from .models import Package
-from .utils.package_utils import coerce_package_and_errors
+from .utils.package_utils import (coerce_package_and_errors, render_html)
 
 
 def finish_deposit(request):
@@ -11,6 +11,26 @@ def finish_deposit(request):
 
     TODO: 
     """
+    return redirect(request.META.get('HTTP_REFERER'))
+
+
+def preview_document(request):
+    """
+    This view function abilitates the user to see a preview of HTML
+    """
+    package_id = request.GET.get('package_id')
+
+    if package_id:
+        package = get_object_or_404(Package, pk=package_id)
+
+        document_html = render_html(package.file.name)
+
+        return render(
+                request=request,
+                template_name='modeladmin/upload/package/preview_document.html',
+                context={'document': document_html},
+            )
+
     return redirect(request.META.get('HTTP_REFERER'))
 
 
