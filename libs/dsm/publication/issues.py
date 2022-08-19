@@ -45,6 +45,37 @@ def _set_issue_type(issue):
         return
 
 
+def get_bundle_id(issn_id, year, volume=None, number=None, supplement=None):
+    """
+        Gera Id utilizado na ferramenta de migração para cadastro do documentsbundle.
+    """
+
+    if all(list(map(lambda x: x is None, [volume, number, supplement]))):
+        return issn_id + "-aop"
+
+    labels = ["issn_id", "year", "volume", "number", "supplement"]
+    values = [issn_id, year, volume, number, supplement]
+
+    data = dict([(label, value) for label, value in zip(labels, values)])
+
+    labels = ["issn_id", "year"]
+    _id = []
+    for label in labels:
+        value = data.get(label)
+        if value:
+            _id.append(value)
+
+    labels = [("volume", "v"), ("number", "n"), ("supplement", "s")]
+    for label, prefix in labels:
+        value = data.get(label)
+        if value:
+            if value.isdigit():
+                value = str(int(value))
+            _id.append(prefix + value)
+
+    return "-".join(_id)
+
+
 class IssueToPublish:
     def __init__(self, issue_id):
         self.issue = get_issue(issue_id)
