@@ -49,6 +49,16 @@ def get_rendition_expected_name(rendition, document_name):
         return f'{document_name}-{rendition.language}.pdf'
     return f'{document_name}.pdf'
 
+
+def evaluate_renditions(renditions, files_list):
+    """
+    For each rendition, returns a tuple that indicates whether or not the rendition filename is in a file list.
+    """
+    document_name = get_xml_filename(files_list)
+
+    for rendition in renditions:
+        rendition_expected_name = get_rendition_expected_name(rendition, document_name)   
+        yield (rendition, rendition_expected_name, rendition_expected_name in files_list)
     for ve in validation_errors:
         if ve.data['missing_file']:
             ve_id = ve.data['id']
