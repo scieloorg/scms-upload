@@ -1,13 +1,22 @@
 from libs.dsm.classic_ws import classic_ws
-from libs.dsm.publication.journals import JournalToPublish
+from libs.dsm.publication.journals import JournalToPublish, get_journal
+from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
 from libs.dsm.publication import db
-from libs.dsm.publication.exceptions import PublishJournalError
+from libs.dsm.publication.exceptions import (
+    PublishJournalError,
+    PublishIssueError,
+)
 
-from .models import JournalMigrationTracker, MigratedJournal
+from .models import (
+    JournalMigrationTracker, MigratedJournal,
+    IssueMigrationTracker, MigratedIssue,
+)
 from .choices import MS_MIGRATED, MS_PUBLISHED
 from .exceptions import (
     JournalMigrationTrackSaveError,
     MigratedJournalSaveError,
+    IssueMigrationTrackSaveError,
+    MigratedIssueSaveError,
 )
 
 
@@ -90,7 +99,7 @@ def publish_journal(journal_id):
     try:
         classic_ws_j = classic_ws.Journal(journal_migration.journal.record)
 
-        journal_to_publish = JournalToPublish()
+        journal_to_publish = JournalToPublish(journal_id)
 
         journal_to_publish.add_contact(
             classic_ws_j.publisher_name,
@@ -168,5 +177,110 @@ def publish_journal(journal_id):
     except Exception as e:
         raise PublishJournalError(
             "Unable to upate journal_migration status %s %s" % (journal_id, e)
+        )
+
+
+##################################################################
+# ISSUE
+
+def get_migrated_issue(**kwargs):
+    try:
+        j = MigratedIssue.objects.get(**kwargs)
+    except MigratedIssue.DoesNotExist:
+        j = MigratedIssue()
+    return j
+
+
+def get_issue_migration_tracker(scielo_issn):
+    try:
+        j = IssueMigrationTracker.objects.get(scielo_issn=scielo_issn)
+    except IssueMigrationTracker.DoesNotExist:
+        j = IssueMigrationTracker()
+        j.scielo_issn = scielo_issn
+    return j
+
+
+def migrate_issue(issue_pid, data):
+    """
+    Create/update MigratedIssue e IssueMigrationTracker
+
+    """
+    try:
+        classic_ws_j = classic_ws.Issue(data)
+        migrated = get_migrated_issue(pid=issue_pid)
+        migrated.issue_pid = issue_pid
+        migrated.record = data
+        migrated.save()
+    except Exception as e:
+        raise MigratedIssueSaveError(
+            "Unable to save migrated issue %s %s" %
+            (issue_pid, e)
+        )
+
+    try:
+        issue_migration = get_issue_migration_tracker(issue_pid)
+        issue_migration.acron = classic_ws_j.acron
+        issue_migration.isis_created_date = classic_ws_j.isis_created_date
+        issue_migration.isis_updated_date = classic_ws_j.isis_updated_date
+        issue_migration.status = MS_MIGRATED
+        issue_migration.issue = migrated
+
+        issue_migration.save()
+    except Exception as e:
+        raise IssueMigrationTrackSaveError(
+            "Unable to save issue migration track %s %s" %
+            (issue_pid, e)
+        )
+
+
+def publish_issue(issue_pid):
+    """
+    Raises
+    ------
+    PublishIssueError
+    """
+    try:
+        issue_migration = IssueMigrationTracker.objects.get(
+            pid=issue_pid)
+    except IssueMigrationTracker.DoesNotExist as e:
+        raise PublishIssueError(
+            "IssueMigrationTracker does not exists %s %s" % (issue_pid, e))
+
+    try:
+        classic_ws_i = classic_ws.Issue(issue_migration.issue.record)
+        published_id = get_bundle_id(
+            classic_ws_i.journal,
+            classic_ws_i.year,
+            classic_ws_i.volume,
+            classic_ws_i.number,
+            classic_ws_i.supplement,
+        )
+        issue_to_publish = IssueToPublish(published_id)
+
+        issue_to_publish.add_identification(
+            classic_ws_i.volume,
+            classic_ws_i.number,
+            classic_ws_i.supplement)
+        issue_to_publish.add_journal(classic_ws_i.journal)
+        issue_to_publish.add_order(int(classic_ws_i.order[4:]))
+        issue_to_publish.add_pid(classic_ws_i.pid)
+        issue_to_publish.add_publication_date(
+            classic_ws_i.year,
+            classic_ws_i.start_month,
+            classic_ws_i.end_month)
+        issue_to_publish.has_docs = []
+
+        issue_to_publish.publish_issue()
+    except Exception as e:
+        raise PublishIssueError(
+            "Unable to publish %s %s" % (issue_pid, e)
+        )
+
+    try:
+        issue_migration.status = MS_PUBLISHED
+        issue_migration.save()
+    except Exception as e:
+        raise PublishIssueError(
+            "Unable to upate issue_migration status %s %s" % (issue_pid, e)
         )
 
