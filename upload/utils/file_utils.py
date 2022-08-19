@@ -17,7 +17,7 @@ def get_file_absolute_path(path):
     return FileSystemStorage().path(path)
 
 
-def get_dirname_from_filepath(path):
+def get_filename_from_filepath(path):
     basename = os.path.basename(path)
     dirname, ign = os.path.splitext(basename)
     return dirname
@@ -30,9 +30,8 @@ def get_file_url(dirname, filename):
 
 def unzip(path):
     dirname = os.path.dirname(path)
-    basename = os.path.basename(path)
-    filename, ign = os.path.splitext(basename)
-
+    filename = get_filename_from_filepath(path)
+    
     zip_content_dirname = os.path.join(dirname, filename)
 
     if not os.path.exists(zip_content_dirname):
