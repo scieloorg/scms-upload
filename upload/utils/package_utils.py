@@ -59,13 +59,24 @@ def evaluate_renditions(renditions, files_list):
     for rendition in renditions:
         rendition_expected_name = get_rendition_expected_name(rendition, document_name)   
         yield (rendition, rendition_expected_name, rendition_expected_name in files_list)
-    for ve in validation_errors:
-        if ve.data['missing_file']:
-            ve_id = ve.data['id']
-            if ve_id not in data:
-                data[ve_id] = []
 
-            data[ve_id].append({
+
+def _fill_data_with_valitadion_errors(assets, renditions, validation_errors):
+    for ve in validation_errors:
+        if ve.category == 'rendition-error':
+            renditions.append({
+                'expected_filename': ve.data['missing_file'],
+                'is_main_language': ve.data['is_main_language'],
+                'language': ve.data['language'],
+                'is_present': False,
+            })
+
+        if ve.category == 'asset-error':
+            ve_id = ve.data['id']
+            if ve_id not in assets:
+                assets[ve_id] = []
+
+            assets[ve_id].append({
                 'name': ve.data['missing_file'], 
                 'type': ve.data['type'],
                 'is_present': False,
@@ -73,7 +84,7 @@ def evaluate_renditions(renditions, files_list):
             })
 
 
-def _fill_data_with_present_files(data, path, validation_errors):
+def _fill_data_with_present_files(assets, renditions, path, validation_errors):
     missing_files = [ve.data['missing_file'] for ve in validation_errors if ve.data['missing_file']]
 
     dir_extracted_files = get_dirname_from_filepath(path)
@@ -82,26 +93,43 @@ def _fill_data_with_present_files(data, path, validation_errors):
         a_is_present = a.name not in missing_files
 
         if a_is_present:
-            if a.id not in data:
-                data[a.id] = []
+            if a.id not in assets:
+                assets[a.id] = []
 
-            data[a.id].append({
+            assets[a.id].append({
                 'name': a.name, 
                 'type': a.type,
                 'is_present': a_is_present,
                 'src': get_file_url(dir_extracted_files, a.name),
             })
 
+    package_files = get_file_list_from_zip(path)
+    document_name = get_xml_filename(package_files)
+
+    for r in get_article_renditions_from_zipped_xml(path):
+        r_expected_filename = get_rendition_expected_name(r, document_name)
+        r_is_present = r_expected_filename not in missing_files
+
+        if r_is_present:
+            renditions.append({
+                'expected_filename': r_expected_filename,
+                'language': r.language,
+                'is_main_language': r.is_main_language,
+                'is_present': True,
+                'src': get_file_url(dir_extracted_files, r_expected_filename),
+            })
+
 
 def coerce_package_and_errors(package, validation_errors):
-    id_to_files = {}
+    assets = {}
+    renditions = []
 
     source = get_file_absolute_path(package.file.name)
     target = generate_filepath_with_new_extension(source, '.optz', True)
     
     unzip(target)
 
-    _fill_data_with_valitadion_errors(id_to_files, validation_errors)
-    _fill_data_with_present_files(id_to_files, target, validation_errors)
+    _fill_data_with_valitadion_errors(assets, renditions, validation_errors)
+    _fill_data_with_present_files(assets, renditions, target, validation_errors)
 
-    return id_to_files
+    return assets, renditions
