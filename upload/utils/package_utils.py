@@ -6,7 +6,7 @@ from packtools.sps.models.article_renditions import ArticleRenditions
 
 from .file_utils import (
     generate_filepath_with_new_extension,
-    get_dirname_from_filepath,
+    get_filename_from_filepath,
     get_file_absolute_path,
     get_file_list_from_zip,
     get_file_url,
@@ -90,7 +90,7 @@ def _fill_data_with_valitadion_errors(assets, renditions, validation_errors):
 def _fill_data_with_present_files(assets, renditions, path, validation_errors):
     missing_files = [ve.data['missing_file'] for ve in validation_errors if ve.data['missing_file']]
 
-    dir_extracted_files = get_dirname_from_filepath(path)
+    dir_extracted_files = get_filename_from_filepath(path)
 
     for a in get_article_assets_from_zipped_xml(path):
         a_is_present = a.name not in missing_files
