@@ -30,6 +30,12 @@ def get_article_assets_from_zipped_xml(path):
     return ArticleAssets(xmltree).article_assets
 
 
+def get_article_renditions_from_zipped_xml(path):
+    xmlstr = get_xml_content_from_zip(path)
+    xmltree = get_etree_from_xml_content(xmlstr)
+    return ArticleRenditions(xmltree).article_renditions
+
+
 def evaluate_assets(assets, files_list):
     """
     For each asset, returns a tuple that indicates whether or not the asset filename is in a file list.
