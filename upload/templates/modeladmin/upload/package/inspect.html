@@ -54,10 +54,10 @@
 
                 </tr>
                 <tr>
-                    <td class='title'><h2>{% trans "Digital assets" %}</h2></td>
+                    <td class='title'><h2>{% trans "Digital assets and renditions" %}</h2></td>
                     <td>
-                        {% if asset_error %}
-                            <span class='help-block help-critical'>{% trans "Digital assets validation failed." %}</span>
+                        {% if asset_error or rendition_error %}
+                            <span class='help-block help-critical'>{% trans "Digital assets and/or renditions validation failed." %}</span>
                         {% else %}
                             {% if not xml_format_error %}
                                 <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
@@ -68,7 +68,7 @@
                     </td>
                     <td>
                         {% if not xml_format_error %}
-                            <a href="{% url 'upload:validation_report' %}?package_id={{ package_id }}&category=asset-error">{% trans 'See the digital assets report.' %}</a>
+                            <a href="{% url 'upload:validation_report' %}?package_id={{ package_id }}&category=asset-and-rendition-error">{% trans 'See the Digital Assets and Renditions Report.' %}</a>
                         {% endif %}
                     </td>
                 </tr>
