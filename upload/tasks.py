@@ -111,5 +111,21 @@ def task_validate_assets(file_path, package_id):
 
 @celery_app.task()
 def task_validate_renditions(file_path, package_id):
-    ...
-    # TODO
+    package_files = file_utils.get_file_list_from_zip(file_path)
+    article_renditions = package_utils.get_article_renditions_from_zipped_xml(file_path)
+
+    for rendition_result in package_utils.evaluate_renditions(article_renditions, package_files):
+        rendition, expected_filename, is_present = rendition_result
+
+        if not is_present:
+            controller.add_validation_error(
+                choices.VE_RENDITION_ERROR,
+                package_id,
+                choices.PS_REJECTED,
+                message=f'{rendition.language} {_("language is mentioned in the XML but its PDF file not present in the package.")}',
+                data={
+                    'language': rendition.language,
+                    'is_main_language': rendition.is_main_language,
+                    'missing_file': expected_filename,
+                },
+            )
