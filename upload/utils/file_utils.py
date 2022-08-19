@@ -71,6 +71,15 @@ def get_xml_content_from_zip(path):
         raise BadPackageFileError(f'Package {file_absolute_path} is invalid')
 
 
+def get_xml_filename(files_list):
+    for fn in files_list:
+        fn_basename = os.path.basename(fn)
+        fn_name, fn_ext = os.path.splitext(fn_basename)
+
+        if fn_ext.lower() == '.xml':
+            return fn_name
+
+
 def numbered_lines(content):
     for i, msg in enumerate(content.splitlines(), 1):
         yield i, msg
