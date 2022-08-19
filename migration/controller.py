@@ -1,10 +1,12 @@
 from libs.dsm.classic_ws import classic_ws
-from libs.dsm.publication.journals import JournalToPublish, get_journal
+from libs.dsm.publication.journals import JournalToPublish
 from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
 from libs.dsm.publication import db
 from libs.dsm.publication.exceptions import (
     PublishJournalError,
     PublishIssueError,
+    JournalPublicationForbidden,
+    IssuePublicationForbidden,
 )
 
 from .models import (
@@ -38,23 +40,29 @@ def get_migrated_journal(**kwargs):
     return j
 
 
-def get_journal_migration_tracker(scielo_issn):
+def get_journal_migration_tracker(**kwargs):
     try:
-        j = JournalMigrationTracker.objects.get(scielo_issn=scielo_issn)
+        j = JournalMigrationTracker.objects.get(**kwargs)
     except JournalMigrationTracker.DoesNotExist:
         j = JournalMigrationTracker()
-        j.scielo_issn = scielo_issn
     return j
 
 
-def migrate_journal(journal_id, data):
+def migrate_journal(journal_id, data, force_update=False):
     """
     Create/update MigratedJournal e JournalMigrationTracker
 
     """
-    try:
-        classic_ws_j = classic_ws.Journal(data)
+    journal_migration = get_journal_migration_tracker(scielo_issn=journal_id)
+    classic_ws_j = classic_ws.Journal(data)
 
+    if not force_update:
+        # check if it needs to be update
+        if journal_migration.isis_updated_date == classic_ws_j.isis_updated_date:
+            # nao precisa atualizar
+            return
+
+    try:
         migrated = get_migrated_journal(scielo_issn=journal_id)
         migrated.scielo_issn = journal_id
         migrated.acron = classic_ws_j.acron
@@ -68,7 +76,6 @@ def migrate_journal(journal_id, data):
         )
 
     try:
-        journal_migration = get_journal_migration_tracker(journal_id)
         journal_migration.acron = classic_ws_j.acron
         journal_migration.isis_created_date = classic_ws_j.isis_created_date
         journal_migration.isis_updated_date = classic_ws_j.isis_updated_date
@@ -95,6 +102,12 @@ def publish_journal(journal_id):
     except JournalMigrationTracker.DoesNotExist as e:
         raise PublishJournalError(
             "JournalMigrationTracker does not exists %s %s" % (journal_id, e))
+
+    if journal_migration.status != MS_MIGRATED:
+        raise JournalPublicationForbiddenError(
+            "JournalMigrationTracker.status of %s is not MS_MIGRATED" %
+            journal_id
+        )
 
     try:
         classic_ws_j = classic_ws.Journal(journal_migration.journal.record)
@@ -191,23 +204,29 @@ def get_migrated_issue(**kwargs):
     return j
 
 
-def get_issue_migration_tracker(scielo_issn):
+def get_issue_migration_tracker(**kwargs):
     try:
-        j = IssueMigrationTracker.objects.get(scielo_issn=scielo_issn)
+        j = IssueMigrationTracker.objects.get(**kwargs)
     except IssueMigrationTracker.DoesNotExist:
         j = IssueMigrationTracker()
-        j.scielo_issn = scielo_issn
     return j
 
 
-def migrate_issue(issue_pid, data):
+def migrate_issue(issue_pid, data, force_update=False):
     """
     Create/update MigratedIssue e IssueMigrationTracker
 
     """
+    issue_migration = get_issue_migration_tracker(issue_pid=issue_pid)
+    classic_ws_i = classic_ws.Issue(data)
+
+    if not force_update:
+        # check if it needs to be update
+        if issue_migration.isis_updated_date == classic_ws_i.isis_updated_date:
+            # nao precisa atualizar
+            return
     try:
-        classic_ws_j = classic_ws.Issue(data)
-        migrated = get_migrated_issue(pid=issue_pid)
+        migrated = get_migrated_issue(issue_pid=issue_pid)
         migrated.issue_pid = issue_pid
         migrated.record = data
         migrated.save()
@@ -218,12 +237,11 @@ def migrate_issue(issue_pid, data):
         )
 
     try:
-        issue_migration = get_issue_migration_tracker(issue_pid)
-        issue_migration.acron = classic_ws_j.acron
-        issue_migration.isis_created_date = classic_ws_j.isis_created_date
-        issue_migration.isis_updated_date = classic_ws_j.isis_updated_date
+        issue_migration.acron = classic_ws_i.acron
+        issue_migration.isis_created_date = classic_ws_i.isis_created_date
+        issue_migration.isis_updated_date = classic_ws_i.isis_updated_date
         issue_migration.status = MS_MIGRATED
-        issue_migration.issue = migrated
+        issue_migration.migrated_issue = migrated
 
         issue_migration.save()
     except Exception as e:
@@ -246,8 +264,14 @@ def publish_issue(issue_pid):
         raise PublishIssueError(
             "IssueMigrationTracker does not exists %s %s" % (issue_pid, e))
 
+    if issue_migration.status != MS_MIGRATED:
+        raise IssuePublicationForbiddenError(
+            "IssueMigrationTracker.status of %s is not MS_MIGRATED" %
+            issue_pid
+        )
+
     try:
-        classic_ws_i = classic_ws.Issue(issue_migration.issue.record)
+        classic_ws_i = classic_ws.Issue(issue_migration.migrated_issue.record)
         published_id = get_bundle_id(
             classic_ws_i.journal,
             classic_ws_i.year,
