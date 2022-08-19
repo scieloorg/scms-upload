@@ -44,7 +44,11 @@ def evaluate_assets(assets, files_list):
         yield (asset, asset.name in files_list)
 
 
-def _fill_data_with_valitadion_errors(data, validation_errors):
+def get_rendition_expected_name(rendition, document_name):
+    if not rendition.is_main_language:
+        return f'{document_name}-{rendition.language}.pdf'
+    return f'{document_name}.pdf'
+
     for ve in validation_errors:
         if ve.data['missing_file']:
             ve_id = ve.data['id']
