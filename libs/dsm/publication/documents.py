@@ -231,7 +231,7 @@ class Document:
             self.doc.is_public = True
             save_data(self.doc)
         except Exception as e:
-            raise exceptions.DocumentSaveError(e)
+            raise exceptions.PublishDocumentError(e)
         return self.doc
 
 

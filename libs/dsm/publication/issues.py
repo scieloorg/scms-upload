@@ -107,20 +107,16 @@ class IssueToPublish:
         opac_schema.v1.models.Issue
         """
 
-        try:
-            if self.issue.type == "ahead" and not self.has_docs:
-                """
-                Caso não haja nenhum artigo no bundle de ahead, ele é definido como
-                ``outdated_ahead``, para que não apareça na grade de fascículos
-                """
-                self.issue.type = "outdated_ahead"
-
-        except KeyError as e:
-            raise exceptions.IssueDataError(e)
+        if self.issue.type == "ahead" and not self.has_docs:
+            """
+            Caso não haja nenhum artigo no bundle de ahead, ele é definido como
+            ``outdated_ahead``, para que não apareça na grade de fascículos
+            """
+            self.issue.type = "outdated_ahead"
 
         try:
             db.save_data(self.issue)
         except Exception as e:
-            raise exceptions.IssueSaveError(e)
+            raise exceptions.PublishIssueError(e)
 
         return issue

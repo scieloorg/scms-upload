@@ -1,10 +1,14 @@
 from libs.dsm.classic_ws import classic_ws
 from libs.dsm.publication.journals import JournalToPublish
 from libs.dsm.publication import db
+from libs.dsm.publication.exceptions import PublishJournalError
 
 from .models import JournalMigrationTracker, MigratedJournal
 from .choices import MS_MIGRATED, MS_PUBLISHED
-from . import exceptions
+from .exceptions import (
+    JournalMigrationTrackSaveError,
+    MigratedJournalSaveError,
+)
 
 
 def connect(connection):
@@ -49,7 +53,7 @@ def migrate_journal(journal_id, data):
         migrated.record = data
         migrated.save()
     except Exception as e:
-        raise exceptions.MigratedJournalSaveError(
+        raise MigratedJournalSaveError(
             "Unable to save migrated journal %s %s" %
             (journal_id, e)
         )
@@ -64,7 +68,7 @@ def migrate_journal(journal_id, data):
 
         journal_migration.save()
     except Exception as e:
-        raise exceptions.JournalMigrationTrackSaveError(
+        raise JournalMigrationTrackSaveError(
             "Unable to save journal migration track %s %s" %
             (journal_id, e)
         )
@@ -74,13 +78,13 @@ def publish_journal(journal_id):
     """
     Raises
     ------
-    exceptions.PublishJournalError
+    PublishJournalError
     """
     try:
         journal_migration = JournalMigrationTracker.objects.get(
             scielo_issn=journal_id)
     except JournalMigrationTracker.DoesNotExist as e:
-        raise exceptions.PublishJournalError(
+        raise PublishJournalError(
             "JournalMigrationTracker does not exists %s %s" % (journal_id, e))
 
     try:
@@ -154,7 +158,7 @@ def publish_journal(journal_id):
 
         journal_to_publish.publish_journal()
     except Exception as e:
-        raise exceptions.PublishJournalError(
+        raise PublishJournalError(
             "Unable to publish %s %s" % (journal_id, e)
         )
 
@@ -162,7 +166,7 @@ def publish_journal(journal_id):
         journal_migration.status = MS_PUBLISHED
         journal_migration.save()
     except Exception as e:
-        raise exceptions.PublishJournalError(
+        raise PublishJournalError(
             "Unable to upate journal_migration status %s %s" % (journal_id, e)
         )
 

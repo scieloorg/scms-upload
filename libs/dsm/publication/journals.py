@@ -166,6 +166,6 @@ class JournalToPublish:
         try:
             save_data(self.journal)
         except Exception as e:
-            raise exceptions.JournalSaveError(e)
+            raise exceptions.PublishJournalError(e)
 
         return self.journal

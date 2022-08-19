@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 
 from config import celery_app
 
-from . import controller, exceptions
+from . import controller
 
 
 User = get_user_model()
@@ -21,13 +21,13 @@ def task_migrate_journal(self, pid, data):
     try:
         controller.migrate_journal(pid, data)
     except (
-            exceptions.MigratedJournalSaveError,
-            exceptions.JournalMigrationTrackSaveError,
+            controller.MigratedJournalSaveError,
+            controller.JournalMigrationTrackSaveError,
             ) as e:
         logging.error(e)
     try:
         controller.publish_journal(pid)
     except (
-            exceptions.PublishJournalError,
+            controller.PublishJournalError,
             ) as e:
         logging.error(e)
