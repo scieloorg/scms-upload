@@ -24,19 +24,20 @@ def validation_report(request):
     if package_id:
         package = get_object_or_404(Package, pk=package_id)
 
-        validation_errors = package.validationerror_set.filter(category=report_category_name)
+        if report_category_name == 'asset-and-rendition-error':
+            validation_errors = package.validationerror_set.filter(category__in=set(['asset-error', 'rendition-error']))
 
-        assets = coerce_package_and_errors(package, validation_errors)
-    
-        if report_category_name == 'asset-error':
+            assets, renditions = coerce_package_and_errors(package, validation_errors)
+
             return render(
                 request=request,
-                template_name='modeladmin/upload/package/validation_report/digital_assets.html',
+                template_name='modeladmin/upload/package/validation_report/digital_assets_and_renditions.html',
                 context={
                     'package_inspect_url': request.META.get('HTTP_REFERER'),
-                    'report_title': _('Digital Assets Report'),
+                    'report_title': _('Digital Assets and Renditions Report'),
                     'report_subtitle': package.file.name,
                     'assets': assets,
+                    'renditions': renditions,
                 }
             )
 
