@@ -1,6 +1,11 @@
 from django.utils.translation import gettext as _
 
+from io import BytesIO
+
+from lxml import etree
+
 from packtools import SPPackage
+from packtools.domain import HTMLGenerator
 from packtools.sps.models.article_assets import ArticleAssets
 from packtools.sps.models.article_renditions import ArticleRenditions
 
@@ -136,3 +141,12 @@ def coerce_package_and_errors(package, validation_errors):
     _fill_data_with_present_files(assets, renditions, target, validation_errors)
 
     return assets, renditions
+
+
+def render_html(zip_filename):
+    xmlstr = get_xml_content_from_zip(zip_filename)
+    xmltree = BytesIO(xmlstr)
+
+    html = HTMLGenerator.parse(xmltree, valid_only=False).generate('en')
+
+    return etree.tostring(html, encoding='unicode', method='html')
