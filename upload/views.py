@@ -26,11 +26,14 @@ def preview_document(request):
 
         document_html = render_html(package.file.name)
 
-        return render(
+        if package.status != choices.PS_REJECTED:
+            return render(
                 request=request,
                 template_name='modeladmin/upload/package/preview_document.html',
-                context={'document': document_html},
+                context={'document': document_html, 'package_status': package.status},
             )
+        else:
+            messages.error(request, _('It is not possible to preview HTML of rejected packages'))
 
     return redirect(request.META.get('HTTP_REFERER'))
 
