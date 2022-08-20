@@ -1,7 +1,8 @@
+from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 
-from .models import Package
+from .models import Package, choices
 from .utils.package_utils import (coerce_package_and_errors, render_html)
 
 
