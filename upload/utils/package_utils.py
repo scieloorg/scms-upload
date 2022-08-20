@@ -143,6 +143,12 @@ def coerce_package_and_errors(package, validation_errors):
     return assets, renditions
 
 
+def get_main_language(path):
+    for rendition in get_article_renditions_from_zipped_xml(path):
+        if rendition.is_main_language:
+            return rendition.language
+
+
 def render_html(zip_filename):
     xmlstr = get_xml_content_from_zip(zip_filename)
     xmltree = BytesIO(xmlstr)
