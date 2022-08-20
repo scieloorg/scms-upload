@@ -150,9 +150,14 @@ def get_main_language(path):
 
 
 def render_html(zip_filename):
-    xmlstr = get_xml_content_from_zip(zip_filename)
+    original = get_file_absolute_path(zip_filename)
+    optimised = generate_filepath_with_new_extension(original, '.optz', True)
+    
+    main_language = get_main_language(optimised)
+    
+    xmlstr = get_xml_content_from_zip(optimised)
     xmltree = BytesIO(xmlstr)
 
-    html = HTMLGenerator.parse(xmltree, valid_only=False).generate('en')
+    html = HTMLGenerator.parse(xmltree, valid_only=False).generate(main_language)
 
     return etree.tostring(html, encoding='unicode', method='html')
