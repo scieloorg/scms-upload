@@ -1,12 +1,15 @@
 from django.utils.translation import gettext as _
 
+from lxml import etree
+
 from packtools import SPPackage
+from packtools.domain import HTMLGenerator
 from packtools.sps.models.article_assets import ArticleAssets
 from packtools.sps.models.article_renditions import ArticleRenditions
 
 from .file_utils import (
     generate_filepath_with_new_extension,
-    get_dirname_from_filepath,
+    get_filename_from_filepath,
     get_file_absolute_path,
     get_file_list_from_zip,
     get_file_url,
@@ -14,9 +17,13 @@ from .file_utils import (
     get_xml_filename,
     unzip,
 )
-from .xml_utils import get_etree_from_xml_content
+from .xml_utils import get_etree_from_xml_content, get_xml_strio_for_preview
 
 from tempfile import mkdtemp
+
+
+JS_ARTICLE = '/static/js/articles.js'
+CSS_ARTICLE = '/static/css/article-styles.css'
 
 
 def optimise_package(source, target):
@@ -90,7 +97,7 @@ def _fill_data_with_valitadion_errors(assets, renditions, validation_errors):
 def _fill_data_with_present_files(assets, renditions, path, validation_errors):
     missing_files = [ve.data['missing_file'] for ve in validation_errors if ve.data['missing_file']]
 
-    dir_extracted_files = get_dirname_from_filepath(path)
+    dir_extracted_files = get_filename_from_filepath(path)
 
     for a in get_article_assets_from_zipped_xml(path):
         a_is_present = a.name not in missing_files
@@ -136,3 +143,37 @@ def coerce_package_and_errors(package, validation_errors):
     _fill_data_with_present_files(assets, renditions, target, validation_errors)
 
     return assets, renditions
+
+
+def get_main_language(path):
+    for rendition in get_article_renditions_from_zipped_xml(path):
+        if rendition.is_main_language:
+            return rendition.language
+
+
+def get_languages(zip_filename, use_optimised_package=True):
+    path = generate_filepath_with_new_extension(zip_filename, '.optz', True) if use_optimised_package else zip_filename
+
+    langs = []
+    for rendition in get_article_renditions_from_zipped_xml(path):
+        langs.append(rendition.language)
+    return langs
+
+
+def render_html(zip_filename, language, use_optimised_package=True):
+    path = generate_filepath_with_new_extension(zip_filename, '.optz', True) if use_optimised_package else zip_filename
+
+    dir_optz = get_file_url(
+        dirname='',
+        filename=get_filename_from_filepath(path)
+    )
+    xmlstr = get_xml_content_from_zip(path)
+    xmltree_strio = get_xml_strio_for_preview(xmlstr, dir_optz)
+
+    html = HTMLGenerator.parse(
+        xmltree_strio,
+        valid_only=False,
+        js=JS_ARTICLE,
+        css=CSS_ARTICLE).generate(language)
+
+    return etree.tostring(html, encoding='unicode', method='html')

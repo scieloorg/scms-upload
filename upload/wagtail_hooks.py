@@ -1,6 +1,7 @@
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
+from upload.utils import package_utils
 
 from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import (ModelAdmin, modeladmin_register)
@@ -27,6 +28,7 @@ class PackageAdminInspectView(InspectView):
         data = {
             'package_id': self.instance.id,
             'status': self.instance.status,
+            'languages': package_utils.get_languages(self.instance.file.name),
         }
 
         for ve in self.instance.validationerror_set.all():
