@@ -23,8 +23,9 @@ def preview_document(request):
 
     if package_id:
         package = get_object_or_404(Package, pk=package_id)
+        language = request.GET.get('language')
 
-        document_html = render_html(package.file.name)
+        document_html = render_html(package.file.name, language)
 
         if package.status != choices.PS_REJECTED:
             return render(
