@@ -17,9 +17,13 @@ from .file_utils import (
     get_xml_filename,
     unzip,
 )
-from .xml_utils import get_etree_from_xml_content
+from .xml_utils import get_etree_from_xml_content, get_xml_strio_for_preview
 
 from tempfile import mkdtemp
+
+
+JS_ARTICLE = '/static/js/articles.js'
+CSS_ARTICLE = '/static/css/article-styles.css'
 
 
 def optimise_package(source, target):
