@@ -147,14 +147,15 @@ def get_main_language(path):
             return rendition.language
 
 
-def render_html(zip_filename):
-    original = get_file_absolute_path(zip_filename)
-    optimised = generate_filepath_with_new_extension(original, '.optz', True)
-    
-    main_language = get_main_language(optimised)
-    
-    xmlstr = get_xml_content_from_zip(optimised)
-    xmltree = BytesIO(xmlstr)
+def get_languages(zip_filename, use_optimised_package=True):
+    path = generate_filepath_with_new_extension(zip_filename, '.optz', True) if use_optimised_package else zip_filename
+
+    langs = []
+    for rendition in get_article_renditions_from_zipped_xml(path):
+        langs.append(rendition.language)
+    return langs
+
+
 
     html = HTMLGenerator.parse(xmltree, valid_only=False).generate(main_language)
 
