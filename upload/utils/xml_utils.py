@@ -1,8 +1,10 @@
 from lxml import etree
+from io import StringIO
 
 from .file_utils import numbered_lines
 
 import re
+import os
 
 
 PATTERN_START_END_LINE_NUMBERS = r'.* line (?P<start>\d*) and .*, line (?P<end>\d*),'
@@ -46,6 +48,32 @@ def get_etree_from_xml_content(xml_str):
             column=col,
             message=message,
         )
+
+
+def get_xml_strio_for_preview(xmlstr, dirname):
+    ASSET_TAGS = (
+        'graphic',
+        'media',
+        'inline-graphic',
+        'supplementary-material',
+        'inline-supplementary-material',
+    )
+    XPATH_FOR_IDENTIFYING_ASSETS = '|'.join([
+        './/' + at + '[@xlink:href]' for at in ASSET_TAGS
+    ])
+    xmltree = get_etree_from_xml_content(xmlstr)
+
+    for node in xmltree.xpath(
+        XPATH_FOR_IDENTIFYING_ASSETS,
+        namespaces={"xlink": "http://www.w3.org/1999/xlink"}
+    ):
+        new_link = os.path.join(
+            dirname,
+            node.attrib['{http://www.w3.org/1999/xlink}href']
+        )
+        node.set("{http://www.w3.org/1999/xlink}href", new_link)
+
+    return StringIO(etree.tostring(xmltree).decode())
 
 
 def get_snippet(xml_data, start_row, end_row):

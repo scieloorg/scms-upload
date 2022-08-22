@@ -1,7 +1,5 @@
 from django.utils.translation import gettext as _
 
-from io import BytesIO
-
 from lxml import etree
 
 from packtools import SPPackage
