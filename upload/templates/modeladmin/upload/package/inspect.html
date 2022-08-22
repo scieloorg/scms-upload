@@ -106,7 +106,9 @@
 
     <div class="nice-padding">
         <h3>{% trans "Preview" %}</h3>
-        <a class="button is-small" target="_blank" href="{% url 'upload:preview_document' %}?package_id={{ package_id }}">{% trans "Preview HTML" %}</a></p>
+        {% for language in languages %}
+            <a class="button is-small" target="_blank" href="{% url 'upload:preview_document' %}?package_id={{ package_id }}&language={{ language }}">{% trans "Preview HTML" %} ({{ language|title }})</a></p>
+        {% endfor %}
         <a class="button" href="">{% trans "View XML" %}</a></p>
     </div>
 
