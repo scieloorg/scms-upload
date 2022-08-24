@@ -112,6 +112,7 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     "core.users",
     "core_settings",
+    "journal",
     # Your stuff: custom apps go here
 ]
 
