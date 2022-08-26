@@ -61,8 +61,6 @@ class ValidationError(models.Model):
 
     def get_standardized_category_label(self):
         return self.category.lower().replace('-', '_')
-
-    # TODO: terá uma chave estrageira para um novo modelo chamado ValidationFeedback
     
     panels = [
         MultiFieldPanel(
@@ -80,4 +78,15 @@ class ValidationError(models.Model):
             heading=_('Content'),
             classname='collapsible'
         )
+    ]
+
+
+class ErrorResolution(CommonControlField):
+    validation_error = models.OneToOneField('ValidationError', to_field='id', primary_key=True, related_name='resolution', on_delete=models.CASCADE)
+    action = models.CharField(_('Action'), max_length=32, choices=choices.ERROR_RESOLUTION_ACTION, null=True, blank=True)
+    comment = models.TextField(_('Comment'), max_length=512, null=True, blank=True)
+    
+    panels = [
+        FieldPanel('action'),
+        FieldPanel('comment'),
     ]
