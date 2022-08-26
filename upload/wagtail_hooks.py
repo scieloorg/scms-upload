@@ -101,6 +101,14 @@ class PackageAdmin(ModelAdmin):
         return qs.filter(creator=request.user)
 
 
+class QualityAnalystPackageAdmin(ModelAdmin):
+    model = QAPackage
+    permission_helper_class = UploadPermissionHelper
+    menu_label = _('Waiting for QA')
+    menu_icon = 'folder'
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
     inspect_view_enabled=True
