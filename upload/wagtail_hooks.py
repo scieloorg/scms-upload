@@ -120,6 +120,11 @@ class QualityAnalystPackageAdmin(ModelAdmin):
         'stat_unknown',
     )
     list_filter = ()
+    search_fields = (
+        'file',
+        'creator',
+        'updated_by',
+    )
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
     inspect_view_enabled=True
