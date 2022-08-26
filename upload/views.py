@@ -86,7 +86,7 @@ def finish_deposit(request):
         if can_be_finished:
             messages.success(request, _('Package has been submitted to QA'))
         else:
-            messages.warning(request, _('Package could not be submitted to QA'))
+            messages.warning(request, _('Package could not be submitted to QA due to validation errors. Go to Error Resolution page for more details.'))
 
     return redirect(f'/admin/upload/package/inspect/{package_id}')
 
