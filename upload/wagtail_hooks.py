@@ -125,6 +125,15 @@ class QualityAnalystPackageAdmin(ModelAdmin):
         'creator',
         'updated_by',
     )
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
+            return qs.filter(status=choices.PS_QA)
+    
+        return qs.filter(creator=request.user)
+    
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
     inspect_view_enabled=True
