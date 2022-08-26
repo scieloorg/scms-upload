@@ -45,3 +45,17 @@
                     <button onclick="saveResolutions();" class=button>{% trans 'Send resolutions' %}</button>
                 </form>
             </div>
+
+    {% block footer %}
+        {% if buttons %}
+            <footer class="footer">
+                <div class="footer__container">
+                    {% for button in buttons %}
+                        {% include "modeladmin/includes/button.html" %}
+                    {% endfor %}
+                </div>
+            </footer>
+        {% endif %}
+    {% endblock %}
+
+{% endblock %}
