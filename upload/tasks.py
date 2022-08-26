@@ -27,7 +27,7 @@ def check_resolutions(package_id):
 
 
 @celery_app.task()
-def task_validate_xml_format(file_path, package_id):    
+def task_validate_xml_format(file_path, package_id):
     try:
         xml_str = file_utils.get_xml_content_from_zip(file_path)
         xml_utils.get_etree_from_xml_content(xml_str)
