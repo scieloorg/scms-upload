@@ -15,3 +15,25 @@
                         {% trans 'Back to package inspection' %}
                     </a>
                 </p>
+                <table class='listing'>
+                    <thead>
+                        <tr>
+                            <th>{% trans 'Category' %}</th>
+                            <th>{% trans 'Message' %}</th>
+                            <th>{% trans 'Data' %}</th>
+                            <th>{% trans 'Resolution' %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ve in validation_errors %}
+                            <tr>
+                                <td>{{ ve.get_category_display|abbrev }}</td>
+                                <td>{{ ve.message }}</td>
+                                <td><pre>{{ ve.data }}</pre></td>
+                                <td>
+                                    {% include 'modeladmin/upload/package/error_resolution/item_resolution.html' with validation_error_id=ve.id comment=ve.resolution.comment action=ve.resolution.action %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
