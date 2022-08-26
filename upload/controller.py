@@ -54,11 +54,11 @@ def update_package_check_errors(package_id):
     package = get_object_or_404(Package, pk=package_id)
 
     for category in [ve.resolution.action for ve in package.validationerror_set.all()]:
-        if category == choices.ER_ACTION_TO_FIX:
+        if category == choices.ER_ACTION_TO_FIX or category == '':
             package.status = choices.PS_PENDING_CORRECTION    
             package.save()
 
             return
 
-    package.status = choices.PS_PENDING_CORRECTION
+    package.status = choices.PS_READY_TO_BE_FINISHED
     package.save()
