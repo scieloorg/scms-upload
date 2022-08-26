@@ -119,6 +119,7 @@ class QualityAnalystPackageAdmin(ModelAdmin):
         'stat_disagree',
         'stat_unknown',
     )
+    list_filter = ()
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
     inspect_view_enabled=True
