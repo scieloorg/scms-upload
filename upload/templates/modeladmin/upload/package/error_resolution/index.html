@@ -46,6 +46,35 @@
                 </form>
             </div>
 
+            <script type="text/javascript">
+                $('#form-send-resolutions').submit(
+                    function(e){
+                        $.ajax({
+                            type: 'POST',
+                            url: "{% url 'upload:error_resolution' %}",
+                            data: {
+                                package_id: {{ package_id }},
+                                'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
+                            },
+                            success: function(){
+                                window.location = "/admin/upload/package/";
+                            },
+                        });
+                        e.preventDefault();
+                    }
+                );
+
+                function saveResolutions(){                    
+                    // Faz chamadas POST definidas em item_resolution.html para gravar cada uma das resoluções de erro
+                    error_res = document.querySelectorAll(`[id^="form-handle-error-resolution-"]`);
+                    for (var i=0; i < error_res.length; i++){
+                        error_res[i].requestSubmit();
+                    }
+                }
+            </script>
+        {% endblock %}
+    </div>
+
     {% block footer %}
         {% if buttons %}
             <footer class="footer">
