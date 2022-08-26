@@ -112,4 +112,11 @@
         <a class="button" href="" disabled>{% trans "View XML" %}</a></p>
     </div>
 
+    {% if status != 'rejected' and validation_errors %}
+        <div class="nice-padding">
+            <h3>{% trans "Actions" %}</h3>
+            <a class="button is-small" href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}">{% trans 'See Error Resolution' %}</a>
+        </div>
+    {% endif %}
+
 {% endblock %}
