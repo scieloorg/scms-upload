@@ -30,8 +30,44 @@ def ajx_error_resolution(request):
             )
 
         return JsonResponse({'status': 'success'})
+
+
+def error_resolution(request):
     """
-    return redirect(request.META.get('HTTP_REFERER'))
+    This view function enables the user to:
+     1. POST: update package status according to error resolution
+     2. GET: list error resolution objects related to a package
+    """
+    if request.method == 'POST':
+        package_id = request.POST.get('package_id')
+
+        if package_id:
+            check_resolutions(package_id)
+
+        messages.success(request, _('Thank you for submitting your resolutions.'))
+
+        return redirect(f'/admin/upload/package/inspect/{package_id}')
+
+    if request.method == 'GET':
+        package_id = request.GET.get('package_id')
+
+        if package_id:
+            package = get_object_or_404(Package, pk=package_id)
+
+            if package.status != choices.PS_REJECTED:
+                validation_errors = package.validationerror_set.all()
+
+                return render(
+                    request=request,
+                    template_name='modeladmin/upload/package/error_resolution/index.html',
+                    context={
+                        'package_id': package_id,
+                        'package_inspect_url': request.META.get('HTTP_REFERER'),
+                        'report_title': _('Errors Resolution'),
+                        'report_subtitle': package.file.name,
+                        'validation_errors': validation_errors,
+                    }
+                )
 
 
 def preview_document(request):
