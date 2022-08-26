@@ -12,3 +12,37 @@
     </select>
     <button style='margin-top:10px;' class="button" type="submit">{% trans 'Save' %}</button>
 </form>
+
+<script type="text/javascript">
+    // Botão salvar que grava resolução de erro
+    var form_error_res = $("#form-handle-error-resolution-{{ validation_error_id }}");
+    form_error_res.on('submit', function(e){
+        e.preventDefault();
+        $.ajax({
+            type: 'POST',
+            url: "{% url 'upload:ajx_error_resolution' %}",
+            data: {
+                'validation_error_id': '{{ validation_error_id }}',
+                'comment': $('textarea[id=comment-{{ validation_error_id }}]').val(),
+                'action': $('select[id=action-{{ validation_error_id }}]').val(),
+                'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
+            },
+        });
+    });
+
+    // Grava resolução de erro a cada 10 segundos de forma automática
+    setInterval(save, 10000);
+
+    function save(){
+        $.ajax({
+            type: 'POST',
+            url: "{% url 'upload:ajx_error_resolution' %}",
+            data: {
+                'validation_error_id': '{{ validation_error_id }}',
+                'comment': $('textarea[id=comment-{{ validation_error_id }}]').val(),
+                'action': $('select[id=action-{{ validation_error_id }}]').val(),
+                'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
+            },
+        });
+    }
+</script>
