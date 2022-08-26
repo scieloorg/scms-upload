@@ -18,8 +18,8 @@ def run_validations(filename, package_id):
     if xml_format_is_valid:
         optimised_filepath = task_optimise_package(filename)
 
-        task_validate_assets.delay(optimised_filepath, package_id)
-        task_validate_renditions.delay(optimised_filepath, package_id)
+        task_validate_assets.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
+        task_validate_renditions.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
 
 
 def check_resolutions(package_id):
