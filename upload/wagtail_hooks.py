@@ -134,6 +134,16 @@ class QualityAnalystPackageAdmin(ModelAdmin):
     
         return qs.filter(creator=request.user)
     
+    def _get_all_validation_errors(self, obj):
+        return [ve.resolution for ve in obj.validationerror_set.all()]
+
+    def _get_stats(self, obj, value):
+        all_objs = self._get_all_validation_errors(obj)
+        value_objs = [o for o in all_objs if o.action == value]
+        return len(value_objs), len(all_objs)
+
+    def _comput_percentage(self, numerator, denominator):
+        return float(numerator)/float(denominator) * 100
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
     inspect_view_enabled=True
