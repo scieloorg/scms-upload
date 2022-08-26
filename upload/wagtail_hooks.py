@@ -3,12 +3,11 @@ from django.urls import include, path
 from django.utils.translation import gettext as _
 
 from wagtail.core import hooks
-from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
+from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
 from .button_helper import UploadButtonHelper
-from .groups import QUALITY_ANALYST
-from .models import Package, ValidationError
+from .models import choices, Package, QAPackage, ValidationError
 from .permission_helper import UploadPermissionHelper
 from .tasks import run_validations
 from .utils import package_utils
