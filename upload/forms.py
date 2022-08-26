@@ -1,3 +1,4 @@
+from django import forms
 from wagtail.admin.forms import WagtailAdminModelForm
 
 
@@ -12,3 +13,9 @@ class UploadPackageForm(WagtailAdminModelForm):
         self.save()
 
         return upload_package
+
+
+class ValidationErrorResolutionForm(forms.Form):
+    validation_error_id = forms.IntegerField()
+    comment = forms.CharField(widget=forms.Textarea, required=False)
+    action = forms.CharField(widget=forms.Select, required=False)

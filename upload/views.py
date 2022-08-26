@@ -89,7 +89,7 @@ def finish_deposit(request):
 
 def preview_document(request):
     """
-    This view function abilitates the user to see a preview of HTML
+    This view function enables the user to see a preview of HTML
     """
     package_id = request.GET.get('package_id')
 
@@ -113,7 +113,7 @@ def preview_document(request):
 
 def validation_report(request):
     """
-    This view function abilitates the user to see a validation report.
+    This view function enables the user to see a validation report.
     """
     package_id = request.GET.get('package_id')
     report_category_name = request.GET.get('category')
