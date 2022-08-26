@@ -109,6 +109,16 @@ class QualityAnalystPackageAdmin(ModelAdmin):
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
+
+    list_display = (
+        'file',
+        'creator',
+        'created',
+        'updated',
+        'updated_by',
+        'stat_disagree',
+        'stat_unknown',
+    )
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
     inspect_view_enabled=True
