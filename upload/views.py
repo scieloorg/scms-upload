@@ -70,6 +70,23 @@ def error_resolution(request):
                 )
 
 
+def finish_deposit(request):
+    """
+    This view function enables the user to finish deposit of a package through the graphic-interface.
+    """
+    package_id = request.GET.get('package_id')
+
+    if package_id:
+        can_be_finished = update_package_check_finish(package_id)
+
+        if can_be_finished:
+            messages.success(request, _('Package has been submitted to QA'))
+        else:
+            messages.warning(request, _('Package could not be submitted to QA'))
+
+    return redirect(f'/admin/upload/package/inspect/{package_id}')
+
+
 def preview_document(request):
     """
     This view function abilitates the user to see a preview of HTML
