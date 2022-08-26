@@ -110,7 +110,7 @@ def preview_document(request):
                 context={'document': document_html, 'package_status': package.status},
             )
         else:
-            messages.error(request, _('It is not possible to preview HTML of rejected packages'))
+            messages.error(request, _('It is not possible to preview HTML of rejected packages.'))
 
     return redirect(request.META.get('HTTP_REFERER'))
 
