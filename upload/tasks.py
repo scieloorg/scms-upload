@@ -12,6 +12,7 @@ User = get_user_model()
 
 
 def run_validations(filename, package_id):
+    # TODO: It is necessary to verify if the package contains only one document (XML)
     xml_format_is_valid = task_validate_xml_format(filename, package_id)
 
     if xml_format_is_valid:
