@@ -144,6 +144,14 @@ class QualityAnalystPackageAdmin(ModelAdmin):
 
     def _comput_percentage(self, numerator, denominator):
         return float(numerator)/float(denominator) * 100
+
+    # Create dynamic field responsible for counting number of actions "disagree"
+    def stat_disagree(self, obj):
+        num, den = self._get_stats(obj, choices.ER_ACTION_DISAGREE)
+        per = self._comput_percentage(num, den)
+        return f"{num} ({per:.2f})"
+
+    stat_disagree.short_description = _('Disagree (%)')
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
     inspect_view_enabled=True
