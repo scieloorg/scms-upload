@@ -7,7 +7,7 @@ from core.models import CommonControlField
 
 from . import choices
 from .forms import UploadPackageForm
-from .permission_helper import FINISH_DEPOSIT
+from .permission_helper import ACCESS_ALL_PACKAGES, FINISH_DEPOSIT
 from .utils import file_utils
 
 
@@ -41,6 +41,7 @@ class Package(CommonControlField):
     class Meta:
         permissions = (
             (FINISH_DEPOSIT, _("Can finish deposit")),
+            (ACCESS_ALL_PACKAGES, _("Can access all packages from all users")),
         )
 
 
