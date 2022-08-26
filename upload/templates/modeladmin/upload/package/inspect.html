@@ -44,7 +44,7 @@
                         <span class='help-block help-critical'>{% trans "XML file has errors." %}</a></span>
                     {% else %}
                         {% if validation_errors.package_file_error %}
-                            <span class='help-block help-info'>{% trans 'This valiation was not performed.' %}</span>
+                            <span class='help-block help-info'>{% trans 'This validation has not been performed yet.' %}</span>
                         {% else %}
                             <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
                         {% endif %}
@@ -66,7 +66,7 @@
                             {% if not validation_errors.package_file_error and not validation_errors.xml_format_error %}
                                 <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
                             {% else %}
-                                <span class='help-block help-info'>{% trans 'This valiation was not performed.' %}</span>
+                                <span class='help-block help-info'>{% trans 'This validation has not been performed yet.' %}</span>
                             {% endif %}
                         {% endif %}
                     </td>
