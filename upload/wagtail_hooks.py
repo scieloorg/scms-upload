@@ -152,6 +152,16 @@ class QualityAnalystPackageAdmin(ModelAdmin):
         return f"{num} ({per:.2f})"
 
     stat_disagree.short_description = _('Disagree (%)')
+
+    # Create dynamic field responsible for counting number of actions "unknown"
+    def stat_unknown(self, obj):
+        num, den = self._get_stats(obj, choices.ER_ACTION_UNKNOWN)
+        per = self._comput_percentage(num, den)
+        return f"{num} ({per:.2f})"
+
+    stat_unknown.short_description = _('Unknown (%)')
+
+
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
     inspect_view_enabled=True
