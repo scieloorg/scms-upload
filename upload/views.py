@@ -68,6 +68,10 @@ def error_resolution(request):
                         'validation_errors': validation_errors,
                     }
                 )
+            else:
+                messages.warning(request, _('It is not possible to see the Error Resolution page for a rejected package.'))
+
+    return redirect(request.META.get('HTTP_REFERER'))
 
 
 def finish_deposit(request):
