@@ -1,16 +1,35 @@
+from django.http import JsonResponse
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 
+from upload.forms import ValidationErrorResolutionForm
+
+from .controller import (
+    upsert_validation_error_resolution, 
+    update_package_check_finish,
+)
 from .models import Package, choices
-from .utils.package_utils import (coerce_package_and_errors, render_html)
+from .tasks import check_resolutions
+from .utils.package_utils import coerce_package_and_errors, render_html
 
 
-def finish_deposit(request):
+def ajx_error_resolution(request):
     """
-    This view function abilitates the user to finish deposit of a package through the graphic-interface.
+    This function view enables the system to save error-resolution data through Ajax requests.
+    """
+    if request.method == 'POST':
+        resolution_data = ValidationErrorResolutionForm(request.POST)
 
-    TODO: 
+        if resolution_data.is_valid():
+            upsert_validation_error_resolution(
+                validation_error_id = resolution_data['validation_error_id'].value(),
+                user = request.user,
+                action = resolution_data['action'].value(),
+                comment = resolution_data['comment'].value(),
+            )
+
+        return JsonResponse({'status': 'success'})
     """
     return redirect(request.META.get('HTTP_REFERER'))
 
