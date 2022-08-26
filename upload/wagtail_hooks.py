@@ -190,13 +190,18 @@ class ValidationErrorAdmin(ModelAdmin):
     }
 
 
-modeladmin_register(PackageAdmin)
-modeladmin_register(ValidationErrorAdmin)
+class UploadModelAdmin(ModelAdminGroup):
+    menu_icon = 'folder'
+    menu_label = 'Upload'
+    items = (PackageAdmin, QualityAnalystPackageAdmin, ValidationErrorAdmin)
+
+
+modeladmin_register(UploadModelAdmin)
 
 
 @hooks.register('register_admin_urls')
 def register_disclosure_url():
     return [
-        path('upload/package/',
+        path('upload/',
         include('upload.urls', namespace='upload')),
     ]
