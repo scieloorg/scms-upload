@@ -48,7 +48,12 @@ class PackageAdminInspectView(InspectView):
 
 class ValidationErrorAdminInspectView(InspectView):
     def get_context_data(self):
-        return super().get_context_data(**self.instance.data.copy())
+        try:
+            data = self.instance.data.copy()
+        except AttributeError:
+            data = {}
+
+        return super().get_context_data(**data)
 
 
 class PackageAdmin(ModelAdmin):
@@ -91,11 +96,9 @@ class PackageAdmin(ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
 
-        user_groups = [g.name for g in request.user.groups.all()]
-
-        if request.user.is_superuser or request.user.is_staff or QUALITY_ANALYST in user_groups:
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
             return qs
-
+    
         return qs.filter(creator=request.user)
 
 
