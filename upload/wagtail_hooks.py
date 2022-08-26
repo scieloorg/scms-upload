@@ -1,10 +1,9 @@
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
-from upload.utils import package_utils
 
 from wagtail.core import hooks
-from wagtail.contrib.modeladmin.options import (ModelAdmin, modeladmin_register)
+from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
 from .button_helper import UploadButtonHelper
@@ -12,6 +11,7 @@ from .groups import QUALITY_ANALYST
 from .models import Package, ValidationError
 from .permission_helper import UploadPermissionHelper
 from .tasks import run_validations
+from .utils import package_utils
 
 
 class UploadPackageCreateView(CreateView):
@@ -26,6 +26,7 @@ class UploadPackageCreateView(CreateView):
 class PackageAdminInspectView(InspectView):
     def get_context_data(self):
         data = {
+            'validation_errors': {},
             'package_id': self.instance.id,
             'status': self.instance.status,
             'languages': package_utils.get_languages(self.instance.file.name),
@@ -35,9 +36,12 @@ class PackageAdminInspectView(InspectView):
             vek = ve.get_standardized_category_label()
 
             if vek not in data:
-                data[vek] = []
+                data['validation_errors'][vek] = []
 
-            data[vek].append(ValidationErrorAdmin().url_helper.get_action_url('inspect', ve.id))
+            data['validation_errors'][vek].append({
+                'id': ve.id, 
+                'inspect_url': ValidationErrorAdmin().url_helper.get_action_url('inspect', ve.id)
+            })
 
         return super().get_context_data(**data)
 
@@ -77,6 +81,7 @@ class PackageAdmin(ModelAdmin):
         'updated_by',
     )
     inspect_view_fields = (
+        'status',
         'file', 
         'created', 
         'updated',

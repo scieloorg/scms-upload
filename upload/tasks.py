@@ -18,7 +18,11 @@ def run_validations(filename, package_id):
         optimised_filepath = task_optimise_package(filename)
 
         task_validate_assets.delay(optimised_filepath, package_id)
-        task_validate_renditions.delay(optimised_filepath, package_id)    
+        task_validate_renditions.delay(optimised_filepath, package_id)
+
+
+def check_resolutions(package_id):
+    task_check_resolutions.apply_async(kwargs={'package_id': package_id}, countdown=3)
 
 
 @celery_app.task()
@@ -129,3 +133,8 @@ def task_validate_renditions(file_path, package_id):
                     'missing_file': expected_filename,
                 },
             )
+
+
+@celery_app.task()
+def task_check_resolutions(package_id):
+    controller.update_package_check_errors(package_id)

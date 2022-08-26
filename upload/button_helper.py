@@ -43,7 +43,7 @@ class UploadButtonHelper(ButtonHelper):
         usr = self.request.user
         url_name = self.request.resolver_match.url_name
 
-        if obj.status == choices.PS_VALIDATED_WITH_ERRORS and ph.user_can_finish_deposit(usr, obj) and url_name == 'upload_package_modeladmin_inspect':
+        if obj.status == choices.PS_READY_TO_BE_FINISHED and ph.user_can_finish_deposit(usr, obj) and url_name == 'upload_package_modeladmin_inspect':
             btns.append(self.finish_deposit_button(obj))
 
         if obj.status == choices.PS_PUBLISHED:
