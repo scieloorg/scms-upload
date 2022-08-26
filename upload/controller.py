@@ -49,3 +49,17 @@ def update_package_check_finish(package_id):
 
     return False
 
+
+def update_package_check_errors(package_id):
+    package = get_object_or_404(Package, pk=package_id)
+    
+    resolutions_categories = set([
+        ve.resolution.action for ve in package.validationerror_set.all()
+    ])
+
+    if choices.ER_ACTION_TO_FIX not in resolutions_categories:
+        package.status = choices.PS_READY_TO_BE_FINISHED
+    else:
+        package.status = choices.PS_PENDING_CORRECTION
+
+    package.save()
