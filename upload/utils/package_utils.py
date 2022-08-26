@@ -1,3 +1,4 @@
+from zipfile import BadZipFile
 from django.utils.translation import gettext as _
 
 from lxml import etree
@@ -17,7 +18,7 @@ from .file_utils import (
     get_xml_filename,
     unzip,
 )
-from .xml_utils import get_etree_from_xml_content, get_xml_strio_for_preview
+from .xml_utils import XMLFormatError, get_etree_from_xml_content, get_xml_strio_for_preview
 
 from tempfile import mkdtemp
 
@@ -154,10 +155,10 @@ def get_main_language(path):
 def get_languages(zip_filename, use_optimised_package=True):
     path = generate_filepath_with_new_extension(zip_filename, '.optz', True) if use_optimised_package else zip_filename
 
-    langs = []
-    for rendition in get_article_renditions_from_zipped_xml(path):
-        langs.append(rendition.language)
-    return langs
+    try:
+        return [rendition.language for rendition in get_article_renditions_from_zipped_xml(path)]
+    except (FileNotFoundError, BadZipFile, XMLFormatError):
+        return []
 
 
 def render_html(zip_filename, language, use_optimised_package=True):
