@@ -1,0 +1,14 @@
+{% load i18n modeladmin_tags wagtailadmin_tags %}
+<form method="post" id="form-handle-error-resolution-{{ validation_error_id }}">
+    {% csrf_token %}
+    <label for="comment-{{ validation_error_id }}">{% trans 'Comment' %}</label>
+    <textarea id="comment-{{ validation_error_id }}" cols="100" rows="5">{{ comment }}</textarea>
+    <label for="action-{{ validation_error_id }}">{% trans 'Action' %}</label>
+    <select aria-label="Select an action" id="action-{{ validation_error_id }}">
+        <option value="" {% if not action %}selected="selected"{% endif %}>{% trans 'Choose an option' %}</option>
+        <option value="to-fix" {% if action == "to-fix" %}selected="selected"{% endif %}>{% trans 'I will fix it' %}</option>
+        <option value="not-an-error" {% if action == "not-an-error" %}selected="selected"{% endif %}>{% trans 'I think it is not an error' %}</option>
+        <option value="unknown" {% if action == "unknown" %}selected="selected"{% endif %}>{% trans 'I do not know how to fix it' %}</option>
+    </select>
+    <button style='margin-top:10px;' class="button" type="submit">{% trans 'Save' %}</button>
+</form>
