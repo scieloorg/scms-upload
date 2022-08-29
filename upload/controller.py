@@ -2,7 +2,7 @@ from datetime import datetime
 
 from django.shortcuts import get_object_or_404
 
-from .models import ErrorResolution, Package, ValidationError, choices
+from .models import ErrorResolution, ErrorResolutionOpinion, Package, ValidationError, choices
 
 
 def add_validation_error(error_category, package_id, package_status, message=None, data=None):
