@@ -167,6 +167,7 @@ class QualityAnalystPackageAdmin(ModelAdmin):
 
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
+    permission_helper_class = UploadPermissionHelper
     inspect_view_enabled=True
     inspect_view_class=ValidationErrorAdminInspectView
     menu_label = _('Validation errors')
