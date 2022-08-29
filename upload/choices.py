@@ -56,3 +56,11 @@ ERROR_RESOLUTION_ACTION = (
     (ER_ACTION_DISAGREE, _('This is not an error')),
     (ER_ACTION_INCAPABLE_TO_FIX, _('I do not know how to fix this error'))
 )
+
+ER_OPINION_FIXED = 'fixed'
+ER_OPINION_FIX_DEMANDED = 'fix-demanded'
+
+ERROR_RESOLUTION_OPINION = (
+    (ER_OPINION_FIXED, _('Fixed')),
+    (ER_OPINION_FIX_DEMANDED, _('Error has to be fixed')),
+)
