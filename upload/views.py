@@ -20,15 +20,22 @@ def ajx_error_resolution(request):
     This function view enables the system to save error-resolution data through Ajax requests.
     """
     if request.method == 'POST':
-        resolution_data = ValidationErrorResolutionForm(request.POST)
+        scope = request.POST.get('scope')
+        data = ValidationErrorResolutionOpinionForm(request.POST) if scope == 'analyse' else ValidationErrorResolutionForm(request.POST)
 
-        if resolution_data.is_valid():
-            upsert_validation_error_resolution(
-                validation_error_id = resolution_data['validation_error_id'].value(),
-                user = request.user,
-                action = resolution_data['action'].value(),
-                comment = resolution_data['comment'].value(),
-            )
+        kwargs = {
+            'validation_error_id': data['validation_error_id'].value(),
+            'user': request.user,
+            'comment': data['comment'].value(),
+        }
+
+        if data.is_valid():
+            if scope == 'analyse':
+                kwargs.update({'opinion': data['opinion'].value()})
+                upsert_validation_error_resolution_opinion(**kwargs)
+            else: 
+                kwargs.update({'action': data['action'].value()})
+                upsert_validation_error_resolution(**kwargs)
 
         return JsonResponse({'status': 'success'})
 
