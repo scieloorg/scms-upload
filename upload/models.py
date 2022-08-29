@@ -45,6 +45,11 @@ class Package(CommonControlField):
         )
 
 
+class QAPackage(Package):
+    class Meta:
+        proxy = True
+
+
 class ValidationError(models.Model):
     id = models.AutoField(primary_key=True)
     category = models.CharField(_('Category'), max_length=32, choices=choices.VALIDATION_ERROR_CATEGORY, null=False, blank=False)

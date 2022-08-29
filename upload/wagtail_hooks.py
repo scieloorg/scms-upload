@@ -3,12 +3,11 @@ from django.urls import include, path
 from django.utils.translation import gettext as _
 
 from wagtail.core import hooks
-from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
+from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
 from .button_helper import UploadButtonHelper
-from .groups import QUALITY_ANALYST
-from .models import Package, ValidationError
+from .models import choices, Package, QAPackage, ValidationError
 from .permission_helper import UploadPermissionHelper
 from .tasks import run_validations
 from .utils import package_utils
@@ -102,6 +101,67 @@ class PackageAdmin(ModelAdmin):
         return qs.filter(creator=request.user)
 
 
+class QualityAnalystPackageAdmin(ModelAdmin):
+    model = QAPackage
+    permission_helper_class = UploadPermissionHelper
+    menu_label = _('Waiting for QA')
+    menu_icon = 'folder'
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+
+    list_display = (
+        'file',
+        'creator',
+        'created',
+        'updated',
+        'updated_by',
+        'stat_disagree',
+        'stat_incapable_to_fix',
+    )
+    list_filter = ()
+    search_fields = (
+        'file',
+        'creator',
+        'updated_by',
+    )
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
+            return qs.filter(status=choices.PS_QA)
+    
+        return qs.filter(creator=request.user)
+    
+    def _get_all_validation_errors(self, obj):
+        return [ve.resolution for ve in obj.validationerror_set.all()]
+
+    def _get_stats(self, obj, value):
+        all_objs = self._get_all_validation_errors(obj)
+        value_objs = [o for o in all_objs if o.action == value]
+        return len(value_objs), len(all_objs)
+
+    def _comput_percentage(self, numerator, denominator):
+        return float(numerator)/float(denominator) * 100
+
+    # Create dynamic field responsible for counting number of actions "disagree"
+    def stat_disagree(self, obj):
+        num, den = self._get_stats(obj, choices.ER_ACTION_DISAGREE)
+        per = self._comput_percentage(num, den)
+        return f"{num} ({per:.2f})"
+
+    stat_disagree.short_description = _('Disagree (%)')
+
+    # Create dynamic field responsible for counting number of actions "incapable_to_fix"
+    def stat_incapable_to_fix(self, obj):
+        num, den = self._get_stats(obj, choices.ER_ACTION_INCAPABLE_TO_FIX)
+        per = self._comput_percentage(num, den)
+        return f"{num} ({per:.2f})"
+
+    stat_incapable_to_fix.short_description = _('Incapable to fix (%)')
+
+
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
     inspect_view_enabled=True
@@ -130,13 +190,18 @@ class ValidationErrorAdmin(ModelAdmin):
     }
 
 
-modeladmin_register(PackageAdmin)
-modeladmin_register(ValidationErrorAdmin)
+class UploadModelAdmin(ModelAdminGroup):
+    menu_icon = 'folder'
+    menu_label = 'Upload'
+    items = (PackageAdmin, QualityAnalystPackageAdmin, ValidationErrorAdmin)
+
+
+modeladmin_register(UploadModelAdmin)
 
 
 @hooks.register('register_admin_urls')
 def register_disclosure_url():
     return [
-        path('upload/package/',
+        path('upload/',
         include('upload.urls', namespace='upload')),
     ]
