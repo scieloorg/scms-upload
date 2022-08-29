@@ -42,7 +42,7 @@
                 <form method="POST" id="form-send-resolutions">
                     {% csrf_token %}
                     <input type="hidden" name="package_id" value="{{ package_id }}"/> 
-                    <button onclick="saveResolutions();" class=button>{% trans 'Send resolutions' %}</button>
+                    <button id="btn-send-resolutions" onclick="saveResolutions();" class="button loading-mask">{% trans 'Send resolutions' %}</button>
                 </form>
             </div>
 
@@ -56,7 +56,11 @@
                                 package_id: {{ package_id }},
                                 'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
                             },
+                            beforeSend: function(){
+                                $('#btn-send-resolutions').addClass('loading');
+                            },
                             success: function(){
+                                $('#btn-send-resolutions').removeClass('loading');
                                 window.location = "/admin/upload/package/";
                             },
                         });
