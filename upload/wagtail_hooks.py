@@ -107,6 +107,9 @@ class QualityAnalystPackageAdmin(ModelAdmin):
     menu_label = _('Waiting for QA')
     menu_icon = 'folder'
     menu_order = 200
+    inspect_view_enabled=True
+    inspect_view_class = PackageAdminInspectView
+    inspect_template_name = 'modeladmin/upload/package/inspect.html'
     add_to_settings_menu = False
     exclude_from_explorer = False
 
