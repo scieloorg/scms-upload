@@ -119,7 +119,20 @@
     {% if status != 'rejected' and validation_errors %}
         <div class="nice-padding">
             <h3>{% trans "Actions" %}</h3>
-            <a class="button is-small" href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}">{% trans 'See Error Resolution' %}</a>
+            {% if perms.upload.send_validation_error_resolution %}
+                {% if status == 'validated-with-errors' %}
+                    <a class="button is-small" href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}">{% trans 'Start Error Resolution' %}</a>
+                {% endif %}
+            {% endif %}
+
+            {% if perms.upload.analyse_validation_error_resolution %}
+                {% if status == 'quality-analysis' %}
+                    <a class="button is-small" href="{% url 'upload:error_resolution' %}?scope=analyse&package_id={{ package_id }}">{% trans 'Analyse Error Resolution' %}</a>
+                {% endif %}
+                {% if status == 'accepted' %}
+                    <a class="button is-small" href="">{% trans 'Conclude opinion' %}</a>
+                {% endif %}
+            {% endif %}
         </div>
     {% endif %}
 
