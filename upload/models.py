@@ -86,6 +86,12 @@ class ValidationError(models.Model):
         )
     ]
 
+    class Meta:
+        permissions = (
+            (SEND_VALIDATION_ERROR_RESOLUTION, _("Can send error resolution")),
+            (ANALYSE_VALIDATION_ERROR_RESOLUTION, _("Can analyse error resolution")),
+        )
+
 
 class ErrorResolution(CommonControlField):
     validation_error = models.OneToOneField('ValidationError', to_field='id', primary_key=True, related_name='resolution', on_delete=models.CASCADE)
