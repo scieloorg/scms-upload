@@ -12,13 +12,14 @@ User = get_user_model()
 
 
 def run_validations(filename, package_id):
+    # TODO: It is necessary to verify if the package contains only one document (XML)
     xml_format_is_valid = task_validate_xml_format(filename, package_id)
 
     if xml_format_is_valid:
         optimised_filepath = task_optimise_package(filename)
 
-        task_validate_assets.delay(optimised_filepath, package_id)
-        task_validate_renditions.delay(optimised_filepath, package_id)
+        task_validate_assets.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
+        task_validate_renditions.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
 
 
 def check_resolutions(package_id):
@@ -26,7 +27,7 @@ def check_resolutions(package_id):
 
 
 @celery_app.task()
-def task_validate_xml_format(file_path, package_id):    
+def task_validate_xml_format(file_path, package_id):
     try:
         xml_str = file_utils.get_xml_content_from_zip(file_path)
         xml_utils.get_etree_from_xml_content(xml_str)
