@@ -3,10 +3,13 @@ from django.utils.translation import gettext_lazy as _
 
 from core.models import CommonControlField
 from .forms import OfficialJournalForm
-from wagtail.admin.edit_handlers import FieldPanel, InlinePanel
+
+from wagtail.admin.edit_handlers import FieldPanel, InlinePanel, PageChooserPanel
 from wagtail.core.models import Orderable
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
+from django import forms
+from wagtail.admin import widgets 
 
 
 class OfficialJournal(CommonControlField):
@@ -37,7 +40,7 @@ class NonOfficialJournalTitle(ClusterableModel, CommonControlField):
     def __str__(self):
         return u'%s' % (self.official_journal.title)
 
-    official_journal = models.ForeignKey('OfficialJournal', null=True, blank=False, related_name='OfficialJournal', on_delete=models.SET_NULL)
+    official_journal = models.ForeignKey('OfficialJournal', null=True, blank=False, related_name='OfficialJournal', on_delete=models.CASCADE)
 
 
     panels=[

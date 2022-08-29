@@ -75,3 +75,4 @@ class NonOfficialJournalTitleAdmin(ModelAdmin):
 
 modeladmin_register(OfficialJournalAdmin)
 modeladmin_register(NonOfficialJournalTitleAdmin)
+
