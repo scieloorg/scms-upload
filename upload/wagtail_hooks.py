@@ -117,7 +117,7 @@ class QualityAnalystPackageAdmin(ModelAdmin):
         'updated',
         'updated_by',
         'stat_disagree',
-        'stat_unknown',
+        'stat_incapable_to_fix',
     )
     list_filter = ()
     search_fields = (
@@ -153,13 +153,13 @@ class QualityAnalystPackageAdmin(ModelAdmin):
 
     stat_disagree.short_description = _('Disagree (%)')
 
-    # Create dynamic field responsible for counting number of actions "unknown"
-    def stat_unknown(self, obj):
-        num, den = self._get_stats(obj, choices.ER_ACTION_UNKNOWN)
+    # Create dynamic field responsible for counting number of actions "incapable_to_fix"
+    def stat_incapable_to_fix(self, obj):
+        num, den = self._get_stats(obj, choices.ER_ACTION_INCAPABLE_TO_FIX)
         per = self._comput_percentage(num, den)
         return f"{num} ({per:.2f})"
 
-    stat_unknown.short_description = _('Unknown (%)')
+    stat_incapable_to_fix.short_description = _('Incapable to fix (%)')
 
 
 class ValidationErrorAdmin(ModelAdmin):
