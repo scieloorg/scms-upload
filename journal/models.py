@@ -13,6 +13,13 @@ class OfficialJournal(CommonControlField):
     """
     Class that represent the Official Journal
     """
+
+    def __unicode__(self):
+        return u'%s' % (self.title)
+
+    def __str__(self):
+        return u'%s' % (self.title)
+
     title = models.CharField(_('Official Title'), max_length=256, null=True, blank=True)
     foundation_year = models.CharField(_('Foundation Year'), max_length=4, null=True, blank=True)
     ISSN_print = models.CharField(_('ISSN Print'), max_length=9, null=True, blank=True)
@@ -24,10 +31,17 @@ class OfficialJournal(CommonControlField):
 
 class NonOfficialJournalTitle(ClusterableModel, CommonControlField):
 
-    official_journal_id = models.ForeignKey('OfficialJournal', null=True, blank=False, related_name='OfficialJournal', on_delete=models.SET_NULL)
+    def __unicode__(self):
+        return u'%s' % (self.official_journal.title)
+
+    def __str__(self):
+        return u'%s' % (self.official_journal.title)
+
+    official_journal = models.ForeignKey('OfficialJournal', null=True, blank=False, related_name='OfficialJournal', on_delete=models.SET_NULL)
+
 
     panels=[
-        FieldPanel('official_journal_id'),
+        FieldPanel('official_journal'),
         InlinePanel('page_non_official_title', label=_('Non Official Journal Title'))
     ]
 
