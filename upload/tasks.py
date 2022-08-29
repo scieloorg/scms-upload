@@ -26,6 +26,10 @@ def check_resolutions(package_id):
     task_check_resolutions.apply_async(kwargs={'package_id': package_id}, countdown=3)
 
 
+def check_opinions(package_id):
+    task_check_opinions.apply_async(kwargs={'package_id': package_id}, countdown=3)
+
+
 @celery_app.task()
 def task_validate_xml_format(file_path, package_id):
     try:
@@ -139,3 +143,8 @@ def task_validate_renditions(file_path, package_id):
 @celery_app.task()
 def task_check_resolutions(package_id):
     controller.update_package_check_errors(package_id)
+
+
+@celery_app.task()
+def task_check_opinions(package_id):
+    controller.update_package_check_opinions(package_id)
