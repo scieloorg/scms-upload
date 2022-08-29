@@ -1,21 +1,50 @@
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
+from upload.utils import package_utils
 
 from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import (ModelAdmin, modeladmin_register)
-from wagtail.contrib.modeladmin.views import CreateView
+from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
 from .button_helper import UploadButtonHelper
-from .permission_helper import UploadPermissionHelper
 from .groups import QUALITY_ANALYST
 from .models import Package, ValidationError
+from .permission_helper import UploadPermissionHelper
+from .tasks import run_validations
 
 
 class UploadPackageCreateView(CreateView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
+
+        run_validations(self.object.file.name, self.object.id)
+                
         return HttpResponseRedirect(self.get_success_url())
+
+
+class PackageAdminInspectView(InspectView):
+    def get_context_data(self):
+        data = {
+            'package_id': self.instance.id,
+            'status': self.instance.status,
+            'languages': package_utils.get_languages(self.instance.file.name),
+        }
+
+        for ve in self.instance.validationerror_set.all():
+            vek = ve.get_standardized_category_label()
+
+            if vek not in data:
+                data[vek] = []
+
+            data[vek].append(ValidationErrorAdmin().url_helper.get_action_url('inspect', ve.id))
+
+        return super().get_context_data(**data)
+
+
+class ValidationErrorAdminInspectView(InspectView):
+    def get_context_data(self):
+        return super().get_context_data(**self.instance.data.copy())
 
 
 class PackageAdmin(ModelAdmin):
@@ -24,17 +53,16 @@ class PackageAdmin(ModelAdmin):
     permission_helper_class = UploadPermissionHelper
     create_view_class = UploadPackageCreateView
     inspect_view_enabled=True
-    inspect_template_name='/app/upload/templates/modeladmin/upload/package/detail.html'
-    menu_label = _('Package')
+    inspect_view_class = PackageAdminInspectView
+    menu_label = _('Packages')
     menu_icon = 'folder'
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
 
-    # TODO: o campo current_status deverá ser substituído por status quando o modo de usar choices for adequado
     list_display = (
         'file',
-        'current_status',
+        'status',
         'creator',
         'created',
         'updated',
@@ -68,26 +96,30 @@ class PackageAdmin(ModelAdmin):
 
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
-    menu_label = _('Validation error')
-    menu_icon = 'folder'
+    inspect_view_enabled=True
+    inspect_view_class=ValidationErrorAdminInspectView
+    menu_label = _('Validation errors')
+    menu_icon = 'error'
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
     list_display = (
         'category',
-        'severity',
-        'row',
-        'column',
         'package',
+        'message',
     )
     list_filter = (
         'category',
-        'severity',
     )
     search_fields = (
-        'snippet',
+        'message',
         'package',
     )
+    inspect_view_fields = {
+        'package',
+        'category',
+        'message',
+    }
 
 
 modeladmin_register(PackageAdmin)

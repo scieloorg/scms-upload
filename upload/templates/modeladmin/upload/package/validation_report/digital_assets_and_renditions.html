@@ -1,0 +1,108 @@
+{% extends "modeladmin/inspect.html" %}
+{% load i18n modeladmin_tags wagtailadmin_tags %}
+
+{% block content %}
+    {% block header %}
+        {% include "wagtailadmin/shared/header_with_locale_selector.html" with title=report_title subtitle=report_subtitle icon='doc-full' %}
+    {% endblock %}
+
+    <div>
+        {% block content_main %}
+            <div class="nice-padding">
+                <p class="back">
+                    <a href="{{ package_inspect_url }}">
+                        {% icon name="arrow-left" class_name="default" %}
+                        {% trans 'Back to package inspection' %}
+                    </a>
+                </p>
+
+                <h3>{% trans 'Digital assets' %}</h3>
+                <table class='listing'>
+                    <thead>
+                        <tr>
+                            <th>{% trans 'Identification' %}</th>
+                            <th>{% trans 'Name' %}</th>
+                            <th>{% trans 'Type' %}</th>
+                            <th>{% trans 'Is present in the package?' %}</th>
+                            <th>{% trans 'Link' %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, value in assets.items %}
+                            {% for asset in value %}
+                                <tr>
+                                    <td class='title'><h2>{{ key }}</h2></td>
+                                    <td>{{ asset.name }}</td>
+                                    <td>{{ asset.type|title }}</td>
+                                    {% if asset.is_present %}
+                                        <td>{% trans 'Yes' %}</td>
+                                    {% else%}
+                                        <td>{% trans 'No' %}</td>
+                                    {% endif %}
+                                    <td>
+                                        {% if asset.is_present %}
+                                            <a target='_blank' href="{{ asset.src }}">{{ asset.name }}</a>
+                                        {% else %}
+                                            <span class='help-block help-critical'>{% trans 'File is missing' %}.</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <h3>{% trans 'Renditions' %}</h3>
+                <table class='listing'>
+                    <thead>
+                        <tr>
+                            <th>{% trans 'Language' %}</th>
+                            <th>{% trans 'Expected filename' %}</th>
+                            <th>{% trans 'Is the main Language' %}</th>
+                            <th>{% trans 'Is present in the package?' %}</th>
+                            <th>{% trans 'Link' %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rendition in renditions %}
+                            <tr>
+                                <td class='title'><h2>{{ rendition.language|title }}</h2></td>
+                                <td>{{ rendition.expected_filename }}</td>
+                                {% if rendition.is_main_language %}
+                                    <td>{% trans 'Yes' %}</td>
+                                {% else%}
+                                    <td>{% trans 'No' %}</td>
+                                {% endif %}
+                                {% if rendition.is_present %}
+                                    <td>{% trans 'Yes' %}</td>
+                                {% else%}
+                                    <td>{% trans 'No' %}</td>
+                                {% endif %}
+                                <td>
+                                    {% if rendition.is_present %}
+                                        <a target='_blank' href="{{ rendition.src }}">{{ rendition.expected_filename }}</a>
+                                    {% else %}
+                                        <span class='help-block help-critical'>{% trans 'File is missing' %}.</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endblock %}
+    </div>
+
+    {% block footer %}
+        {% if buttons %}
+            <footer class="footer">
+                <div class="footer__container">
+                    {% for button in buttons %}
+                        {% include "modeladmin/includes/button.html" %}
+                    {% endfor %}
+                </div>
+            </footer>
+        {% endif %}
+    {% endblock %}
+
+{% endblock %}

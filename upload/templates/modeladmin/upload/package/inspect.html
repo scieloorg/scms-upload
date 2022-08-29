@@ -1,0 +1,115 @@
+{% extends "modeladmin/inspect.html" %}
+{% load i18n modeladmin_tags wagtailadmin_tags %}
+
+{% block fields_output %}
+    {% if fields %}
+        <h3>{% trans "Details" %}</h3>
+        <dl>
+            {% for field in fields %}
+                <dt class="{{ field.type|lower }}">{{ field.label }}</dt>
+                <dd>
+                    {% if field.value.files %}
+                        <ul>
+                            {% for fi in field.value.files %}
+                                <li>{{ fi }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        {{ field.value }}
+                    {% endif %}
+                </dd>
+            {% endfor %}
+        </dl>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {{ block.super }}
+
+    <div class="nice-padding">
+        <h3>{% trans "Reports" %}</h3>
+        <table class="listing">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Result</th>
+                    <th>Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class='title'><h2>{% trans "XML and/or DTD formation" %}</h2></td>
+                    <td>
+                    {% if xml_format_error %}
+                        <span class='help-block help-critical'>{% trans "XML file has errors." %}</a></span>
+                    {% else %}
+                        <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
+                    {% endif %}
+                    </td>
+                    <td>
+                        {% if xml_format_error %}
+                            <a href="{{ xml_format_error|first }}">{% trans 'See the XML and/or DTD formation report.' %}</a>
+                        {% endif %}
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class='title'><h2>{% trans "Digital assets and renditions" %}</h2></td>
+                    <td>
+                        {% if asset_error or rendition_error %}
+                            <span class='help-block help-critical'>{% trans "Digital assets and/or renditions validation failed." %}</span>
+                        {% else %}
+                            {% if not xml_format_error %}
+                                <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
+                            {% else %}
+                                <span class='help-block help-info'>{% trans 'This valiation was not performed.' %}</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not xml_format_error %}
+                            <a href="{% url 'upload:validation_report' %}?package_id={{ package_id }}&category=asset-and-rendition-error">{% trans 'See the Digital Assets and Renditions Report.' %}</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td class='title'><h2>{% trans "Stylesheet" %}</h2></td>
+                    <td>
+                        <span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span>
+                    </td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td class='title'><h2>{% trans "Individual content validation" %}</h2></td>
+                    <td>
+                        <span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span>
+                    </td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td class='title'><h2>{% trans "Grouped content validation" %}</h2></td>
+                    <td>
+                        <span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span>
+                    </td>
+                    <td></td>
+                </tr>    
+                <tr>
+                    <td class='title'><h2>{% trans "Quality analysis opinion" %}</h2></td>
+                    <td>
+                        <span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span>
+                    </td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="nice-padding">
+        <h3>{% trans "Preview" %}</h3>
+        {% for language in languages %}
+            <a class="button is-small" target="_blank" href="{% url 'upload:preview_document' %}?package_id={{ package_id }}&language={{ language }}">{% trans "Preview HTML" %} ({{ language|title }})</a></p>
+        {% endfor %}
+        <a class="button" href="">{% trans "View XML" %}</a></p>
+    </div>
+
+{% endblock %}
