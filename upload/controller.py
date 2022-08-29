@@ -72,3 +72,17 @@ def update_package_check_errors(package_id):
 
     package.status = choices.PS_READY_TO_BE_FINISHED
     package.save()
+
+
+def update_package_check_opinions(package_id):
+    package = get_object_or_404(Package, pk=package_id)
+
+    for category in [ve.analysis.opinion for ve in package.validationerror_set.all()]:
+        if category == choices.ER_OPINION_FIX_DEMANDED or category == '':
+            package.status = choices.PS_PENDING_CORRECTION
+            package.save()
+
+            return
+
+    package.status = choices.PS_ACCEPTED
+    package.save()
