@@ -19,24 +19,34 @@ def add_validation_error(error_category, package_id, package_status, message=Non
 
 
 def upsert_validation_error_resolution(validation_error_id, user, action, comment):
-    ve = ValidationError.objects.get(pk=validation_error_id)
-
-    try:
-        er = ErrorResolution.objects.get(pk=validation_error_id)
-        er.updated = datetime.now()
-        er.updated_by = user
-    except ErrorResolution.DoesNotExist:
-        er = ErrorResolution()
-        er.creator = user
-        er.created = datetime.now()
-
+    er = upsert_object(ErrorResolution, validation_error_id, user)
     er.action = action
     er.comment = comment
-    er.validation_error = ve
-    
+    er.validation_error = ValidationError.objects.get(pk=validation_error_id)
     er.save()
 
-    return er
+
+def upsert_validation_error_resolution_opinion(validation_error_id, user, opinion, comment):
+    ero = upsert_object(ErrorResolutionOpinion, validation_error_id, user)
+
+    ero.opinion = opinion
+    ero.comment = comment
+    ero.validation_error = ValidationError.objects.get(pk=validation_error_id)
+
+    ero.save()
+
+
+def upsert_object(object_class, validation_error_id, user):
+    try:
+        obj_instance = object_class.objects.get(pk=validation_error_id)
+        obj_instance.updated = datetime.now()
+        obj_instance.updated_by = user
+    except object_class.DoesNotExist:
+        obj_instance = object_class()
+        obj_instance.creator = user
+        obj_instance.created = datetime.now()
+
+    return obj_instance
 
 
 def update_package_check_finish(package_id):
