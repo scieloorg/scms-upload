@@ -48,16 +48,18 @@ def error_resolution(request):
     """
     if request.method == 'POST':
         package_id = request.POST.get('package_id')
+        scope = request.POST.get('scope', '')
 
         if package_id:
-            check_resolutions(package_id)
+            check_opinions(package_id) if scope == 'analyse' else check_resolutions(package_id)
 
-        messages.success(request, _('Thank you for submitting your resolutions.'))
+        messages.success(request, _('Thank you for submitting your responses.'))
 
         return redirect(f'/admin/upload/package/inspect/{package_id}')
 
     if request.method == 'GET':
         package_id = request.GET.get('package_id')
+        scope = request.GET.get('scope')
 
         if package_id:
             package = get_object_or_404(Package, pk=package_id)
@@ -65,9 +67,11 @@ def error_resolution(request):
             if package.status != choices.PS_REJECTED:
                 validation_errors = package.validationerror_set.all()
 
+                template_type = scope if scope == 'analyse' else 'start'
+
                 return render(
                     request=request,
-                    template_name='modeladmin/upload/package/error_resolution/index.html',
+                    template_name=f'modeladmin/upload/package/error_resolution/index/{template_type}.html',
                     context={
                         'package_id': package_id,
                         'package_inspect_url': request.META.get('HTTP_REFERER'),
