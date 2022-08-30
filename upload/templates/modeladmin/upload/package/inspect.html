@@ -100,9 +100,22 @@
                 <tr>
                     <td class='title'><h2>{% trans "Quality analysis opinion" %}</h2></td>
                     <td>
-                        <span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span>
+                        {% if perms.upload.send_validation_error_resolution or perms.upload.analyse_validation_error_resolution %}
+                            {% if status == 'pending-correction' %}
+                                <span class="help-block help-critical">{% trans 'There are pending corrections.' %}</span>
+                            {% endif %}
+                            {% if status == 'accepted' %}
+                                <span class="help-block help-info">{% trans 'Packaged has been accepted.' %}</span>
+                            {% endif %}
+                        {% endif %}
                     </td>
-                    <td></td>
+                    <td>
+                        {% if perms.upload.send_validation_error_resolution or perms.upload.analyse_validation_error_resolution %}
+                            {% if status == 'accepted' or status == 'pending-correction' %}
+                                <a href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}&scope=report">{% trans 'See Quality Analysis Report.' %}</a>
+                            {% endif %}
+                        {% endif %}
+                    </td>
                 </tr>
             </tbody>
         </table>
