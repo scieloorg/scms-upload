@@ -19,3 +19,9 @@ class ValidationErrorResolutionForm(forms.Form):
     validation_error_id = forms.IntegerField()
     comment = forms.CharField(widget=forms.Textarea, required=False)
     action = forms.CharField(widget=forms.Select, required=False)
+
+
+class ValidationErrorResolutionOpinionForm(forms.Form):
+    validation_error_id = forms.IntegerField()
+    comment = forms.CharField(widget=forms.Textarea, required=False)
+    opinion = forms.CharField(widget=forms.Select, required=False)

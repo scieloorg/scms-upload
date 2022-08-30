@@ -7,7 +7,7 @@ from core.models import CommonControlField
 
 from . import choices
 from .forms import UploadPackageForm
-from .permission_helper import ACCESS_ALL_PACKAGES, FINISH_DEPOSIT
+from .permission_helper import ACCESS_ALL_PACKAGES, ANALYSE_VALIDATION_ERROR_RESOLUTION, FINISH_DEPOSIT, SEND_VALIDATION_ERROR_RESOLUTION
 from .utils import file_utils
 
 
@@ -86,6 +86,12 @@ class ValidationError(models.Model):
         )
     ]
 
+    class Meta:
+        permissions = (
+            (SEND_VALIDATION_ERROR_RESOLUTION, _("Can send error resolution")),
+            (ANALYSE_VALIDATION_ERROR_RESOLUTION, _("Can analyse error resolution")),
+        )
+
 
 class ErrorResolution(CommonControlField):
     validation_error = models.OneToOneField('ValidationError', to_field='id', primary_key=True, related_name='resolution', on_delete=models.CASCADE)
@@ -94,5 +100,15 @@ class ErrorResolution(CommonControlField):
     
     panels = [
         FieldPanel('action'),
+        FieldPanel('comment'),
+    ]
+
+class ErrorResolutionOpinion(CommonControlField):
+    validation_error = models.OneToOneField('ValidationError', to_field='id', primary_key=True, related_name='analysis', on_delete=models.CASCADE)
+    opinion = models.CharField(_('Opinion'), max_length=32, choices=choices.ERROR_RESOLUTION_OPINION, null=True, blank=True)
+    comment = models.TextField(_('Comment'), max_length=512, null=True, blank=True)
+
+    panels = [
+        FieldPanel('opinion'),
         FieldPanel('comment'),
     ]

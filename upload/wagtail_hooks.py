@@ -107,6 +107,9 @@ class QualityAnalystPackageAdmin(ModelAdmin):
     menu_label = _('Waiting for QA')
     menu_icon = 'folder'
     menu_order = 200
+    inspect_view_enabled=True
+    inspect_view_class = PackageAdminInspectView
+    inspect_template_name = 'modeladmin/upload/package/inspect.html'
     add_to_settings_menu = False
     exclude_from_explorer = False
 
@@ -130,7 +133,7 @@ class QualityAnalystPackageAdmin(ModelAdmin):
         qs = super().get_queryset(request)
 
         if self.permission_helper.user_can_access_all_packages(request.user, None):
-            return qs.filter(status=choices.PS_QA)
+            return qs.filter(status__in=[choices.PS_QA, choices.PS_ACCEPTED])
     
         return qs.filter(creator=request.user)
     
@@ -164,6 +167,7 @@ class QualityAnalystPackageAdmin(ModelAdmin):
 
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
+    permission_helper_class = UploadPermissionHelper
     inspect_view_enabled=True
     inspect_view_class=ValidationErrorAdminInspectView
     menu_label = _('Validation errors')

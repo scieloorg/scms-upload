@@ -3,14 +3,15 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 
-from upload.forms import ValidationErrorResolutionForm
+from upload.forms import ValidationErrorResolutionForm, ValidationErrorResolutionOpinionForm
 
 from .controller import (
     upsert_validation_error_resolution, 
     update_package_check_finish,
+    upsert_validation_error_resolution_opinion,
 )
 from .models import Package, choices
-from .tasks import check_resolutions
+from .tasks import check_resolutions, check_opinions
 from .utils.package_utils import coerce_package_and_errors, render_html
 
 
@@ -19,15 +20,22 @@ def ajx_error_resolution(request):
     This function view enables the system to save error-resolution data through Ajax requests.
     """
     if request.method == 'POST':
-        resolution_data = ValidationErrorResolutionForm(request.POST)
+        scope = request.POST.get('scope')
+        data = ValidationErrorResolutionOpinionForm(request.POST) if scope == 'analyse' else ValidationErrorResolutionForm(request.POST)
 
-        if resolution_data.is_valid():
-            upsert_validation_error_resolution(
-                validation_error_id = resolution_data['validation_error_id'].value(),
-                user = request.user,
-                action = resolution_data['action'].value(),
-                comment = resolution_data['comment'].value(),
-            )
+        kwargs = {
+            'validation_error_id': data['validation_error_id'].value(),
+            'user': request.user,
+            'comment': data['comment'].value(),
+        }
+
+        if data.is_valid():
+            if scope == 'analyse':
+                kwargs.update({'opinion': data['opinion'].value()})
+                upsert_validation_error_resolution_opinion(**kwargs)
+            else: 
+                kwargs.update({'action': data['action'].value()})
+                upsert_validation_error_resolution(**kwargs)
 
         return JsonResponse({'status': 'success'})
 
@@ -40,16 +48,18 @@ def error_resolution(request):
     """
     if request.method == 'POST':
         package_id = request.POST.get('package_id')
+        scope = request.POST.get('scope', '')
 
         if package_id:
-            check_resolutions(package_id)
+            check_opinions(package_id) if scope == 'analyse' else check_resolutions(package_id)
 
-        messages.success(request, _('Thank you for submitting your resolutions.'))
+        messages.success(request, _('Thank you for submitting your responses.'))
 
         return redirect(f'/admin/upload/package/inspect/{package_id}')
 
     if request.method == 'GET':
         package_id = request.GET.get('package_id')
+        scope = request.GET.get('scope')
 
         if package_id:
             package = get_object_or_404(Package, pk=package_id)
@@ -57,9 +67,11 @@ def error_resolution(request):
             if package.status != choices.PS_REJECTED:
                 validation_errors = package.validationerror_set.all()
 
+                template_type = scope if scope == 'analyse' else 'start'
+
                 return render(
                     request=request,
-                    template_name='modeladmin/upload/package/error_resolution/index.html',
+                    template_name=f'modeladmin/upload/package/error_resolution/index/{template_type}.html',
                     context={
                         'package_id': package_id,
                         'package_inspect_url': request.META.get('HTTP_REFERER'),
