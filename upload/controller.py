@@ -63,8 +63,9 @@ def update_package_check_finish(package_id):
 def update_package_check_errors(package_id):
     package = get_object_or_404(Package, pk=package_id)
 
-    for category in [ve.resolution.action for ve in package.validationerror_set.all()]:
-        if category == choices.ER_ACTION_TO_FIX or category == '':
+    for ve in package.validationerror_set.all():
+        action = ve.resolution.action
+        if action in (choices.ER_ACTION_TO_FIX, ''):
             package.status = choices.PS_PENDING_CORRECTION    
             package.save()
 
@@ -77,8 +78,9 @@ def update_package_check_errors(package_id):
 def update_package_check_opinions(package_id):
     package = get_object_or_404(Package, pk=package_id)
 
-    for category in [ve.analysis.opinion for ve in package.validationerror_set.all()]:
-        if category == choices.ER_OPINION_FIX_DEMANDED or category == '':
+    for ve in package.validationerror_set.all():
+        opinion = ve.analysis.opinion
+        if opinion in (choices.ER_OPINION_FIX_DEMANDED, ''):
             package.status = choices.PS_PENDING_CORRECTION
             package.save()
 
