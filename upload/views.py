@@ -67,7 +67,7 @@ def error_resolution(request):
             if package.status != choices.PS_REJECTED:
                 validation_errors = package.validationerror_set.all()
 
-                template_type = scope if scope == 'analyse' else 'start'
+                template_type = 'start' if scope not in ('analyse', 'report') else scope
 
                 return render(
                     request=request,

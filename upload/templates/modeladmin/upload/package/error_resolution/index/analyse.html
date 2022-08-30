@@ -58,7 +58,7 @@
                             url: "{% url 'upload:error_resolution' %}",
                             data: {
                                 'scope': 'analyse',
-                                package_id: {{ package_id }},
+                                'package_id': "{{ package_id }}",
                                 'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
                             },
                             beforeSend: function(){
