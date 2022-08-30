@@ -1,0 +1,60 @@
+{% extends "modeladmin/inspect.html" %}
+{% load i18n modeladmin_tags wagtailadmin_tags upload_tags static %}
+
+{% block content %}
+    {% block header %}
+        {% include "wagtailadmin/shared/header_with_locale_selector.html" with title=report_title subtitle=report_subtitle icon='error' %}
+    {% endblock %}
+
+    <div>
+        {% block content_main %}
+            <div class="nice-padding">
+                <p class="back">
+                    <a href="{{ package_inspect_url }}">
+                        {% icon name="arrow-left" class_name="default" %}
+                        {% trans 'Back to package inspection' %}
+                    </a>
+                </p>
+                <table class='listing'>
+                    <thead>
+                        <tr>
+                            <th>{% trans 'Category' %}</th>
+                            <th>{% trans 'Message' %}</th>
+                            <th>{% trans 'Data' %}</th>
+                            <th>{% trans 'Resolution action' %}</th>
+                            <th>{% trans 'Resolution comment' %}</th>
+                            <th>{% trans 'Quality analyst opinion' %}</th>
+                            <th>{% trans 'Quality analyst comment' %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ve in validation_errors %}
+                            <tr>
+                                <td>{{ ve.get_category_display|abbrev }}</td>
+                                <td>{{ ve.message }}</td>
+                                <td><pre>{{ ve.data }}</pre></td>
+                                <td>{{ ve.resolution.get_action_display }}</td>
+                                <td>{{ ve.resolution.comment }}</td>
+                                <td>{{ ve.analysis.get_opinion_display }}</td>
+                                <td>{{ ve.analysis.comment }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endblock %}
+    </div>
+
+    {% block footer %}
+        {% if buttons %}
+            <footer class="footer">
+                <div class="footer__container">
+                    {% for button in buttons %}
+                        {% include "modeladmin/includes/button.html" %}
+                    {% endfor %}
+                </div>
+            </footer>
+        {% endif %}
+    {% endblock %}
+
+{% endblock %}
