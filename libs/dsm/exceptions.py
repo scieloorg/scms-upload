@@ -6,5 +6,9 @@ class PublishJournalError(Exception):
     ...
 
 
+class PublishIssueError(Exception):
+    ...
+
+
 class PublishDocumentError(Exception):
     ...
