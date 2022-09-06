@@ -48,3 +48,10 @@ minio==7.1.0
 # ------------------------------------------------------------------------------
 lxml==4.9.1 # https://github.com/lxml/lxml
 -e git+https://github.com/scieloorg/packtools@2.11.2#egg=packtools
+
+# DSM Publication
+# ------------------------------------------------------------------------------
+-e git+https://github.com/scieloorg/opac_schema.git@v2.66#egg=opac_schema
+mongoengine==0.24.2
+pymongo==3.12.0
+tenacity==8.0.1
