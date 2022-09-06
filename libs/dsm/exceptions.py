@@ -1,2 +1,6 @@
 class DBConnectError(Exception):
     ...
+
+
+class PublishDocumentError(Exception):
+    ...
