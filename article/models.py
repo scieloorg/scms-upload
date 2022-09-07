@@ -8,6 +8,7 @@ from wagtail.core.models import Orderable, ClusterableModel
 from core.models import CommonControlField
 from journal.models import OfficialJournal
 
+from .permission_helper import REQUEST_CHANGE
 from .forms import ArticleForm
 
 
@@ -74,6 +75,11 @@ class Article(ClusterableModel, CommonControlField):
 
     def __str__(self):
         return self.pid_v2
+
+    class Meta:
+        permissions = (
+            (REQUEST_CHANGE, _("Can request change")),
+        )
 
 
 class Author(models.Model):
