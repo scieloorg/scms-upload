@@ -32,3 +32,5 @@ class Article(ClusterableModel, CommonControlField):
 
     journal = models.ForeignKey(OfficialJournal, blank=True, null=True, on_delete=models.SET_NULL)
 
+    base_form_class = ArticleForm
+
