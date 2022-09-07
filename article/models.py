@@ -41,3 +41,10 @@ class Article(ClusterableModel, CommonControlField):
         FieldPanel('aop_pid'),
         InlinePanel(relation_name='doi_with_lang', label='DOI with Language'),
     ]
+
+    panel_doc_details = MultiFieldPanel(heading='Document details', classname='collapsible')
+    panel_doc_details.children = [
+        InlinePanel(relation_name='title_with_lang', label='Title with Language'),
+        InlinePanel(relation_name='author', label='Authors'),
+    ]
+
