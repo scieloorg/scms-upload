@@ -62,3 +62,13 @@ class Article(ClusterableModel, CommonControlField):
         FieldPanel('fpage'),
         FieldPanel('lpage'),
     ]
+    
+    panels = [
+        panel_doc_ids,
+        panel_doc_details,
+        InlinePanel(relation_name='related_item', label='Related item', classname='collapsible'),
+        FieldPanel('journal', classname='collapsible'),
+        panel_issue,
+        panel_page,
+    ]
+
