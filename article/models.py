@@ -29,3 +29,6 @@ class Article(ClusterableModel, CommonControlField):
     elocation_id = models.CharField(_('Elocation ID'), max_length=64, blank=True, null=True)
     fpage = models.CharField(_('First page'), max_length=16, blank=True, null=True)
     lpage = models.CharField(_('Last page'), max_length=16, blank=True, null=True)
+
+    journal = models.ForeignKey(OfficialJournal, blank=True, null=True, on_delete=models.SET_NULL)
+
