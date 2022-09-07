@@ -15,3 +15,13 @@ class ArticleCreateView(CreateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
+class ArticleModelAdmin(ModelAdmin):
+    model = Article
+    menu_label = _('Articles')
+    create_view_class = ArticleCreateView
+    inspect_view_enabled=True
+    menu_icon = 'doc-full'
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+
