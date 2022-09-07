@@ -136,3 +136,19 @@ class ArticleTitle(Orderable, Title):
     title_with_lang = ParentalKey('Article', on_delete=models.CASCADE, related_name='title_with_lang')
 
 
+class RelatedItem(models.Model):
+    item_type = models.CharField(_('Related item type'), max_length=128, null=False, blank=False) 
+
+    panel = [
+        FieldPanel('item_type'),
+    ]
+
+    def __str__(self):
+        return self.item_type
+
+    class Meta:
+        abstract = True
+
+
+class ArticleRelatedItem(Orderable, RelatedItem):
+    related_item = ParentalKey('Article', on_delete=models.CASCADE, related_name='related_item')
