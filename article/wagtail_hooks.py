@@ -9,3 +9,9 @@ from wagtail.contrib.modeladmin.views import CreateView
 from .models import Article
 
 
+class ArticleCreateView(CreateView):
+    def form_valid(self, form):
+        self.object = form.save_all(self.request.user)
+        return HttpResponseRedirect(self.get_success_url())
+
+
