@@ -34,13 +34,13 @@ class ArticleModelAdmin(ModelAdmin):
 
     list_display = (
         'pid_v2',
+        'pub_year',
         'pid_v3',
         'doi_list',
         'aop_pid',
         'journal',
         'created',
         'updated',
-        'updated_by',
     )
     list_filter = (
         'journal',
