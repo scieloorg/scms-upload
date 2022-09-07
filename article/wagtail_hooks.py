@@ -25,3 +25,6 @@ class ArticleModelAdmin(ModelAdmin):
     add_to_settings_menu = False
     exclude_from_explorer = False
 
+    def doi_list(self, obj):
+        return ', '.join([str(dl) for dl in obj.doi_with_lang.all()])
+
