@@ -6,7 +6,9 @@ from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView
 
+from .button_helper import ArticleButtonHelper
 from .models import Article
+from .permission_helper import ArticlePermissionHelper
 
 
 class ArticleCreateView(CreateView):
@@ -19,6 +21,8 @@ class ArticleModelAdmin(ModelAdmin):
     model = Article
     menu_label = _('Articles')
     create_view_class = ArticleCreateView
+    permission_helper_class = ArticlePermissionHelper
+    button_helper_class = ArticleButtonHelper
     inspect_view_enabled=True
     menu_icon = 'doc-full'
     menu_order = 200
