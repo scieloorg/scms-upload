@@ -72,3 +72,6 @@ class Article(ClusterableModel, CommonControlField):
         panel_page,
     ]
 
+    def __str__(self):
+        return self.pid_v2
+
