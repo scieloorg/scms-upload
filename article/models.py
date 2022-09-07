@@ -34,3 +34,10 @@ class Article(ClusterableModel, CommonControlField):
 
     base_form_class = ArticleForm
 
+    panel_doc_ids = MultiFieldPanel(heading='Document identifiers', classname='collapsible')
+    panel_doc_ids.children = [
+        FieldPanel('pid_v2'),
+        FieldPanel('pid_v3'),
+        FieldPanel('aop_pid'),
+        InlinePanel(relation_name='doi_with_lang', label='DOI with Language'),
+    ]
