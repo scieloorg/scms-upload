@@ -71,3 +71,13 @@ class ArticleModelAdmin(ModelAdmin):
         'journal',
     )
 
+
+modeladmin_register(ArticleModelAdmin)
+
+
+@hooks.register('register_admin_urls')
+def register_disclosure_url():
+    return [
+        path('article/',
+        include('article.urls', namespace='article')),
+    ]
