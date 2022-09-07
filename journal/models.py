@@ -17,3 +17,6 @@ class OfficialJournal(CommonControlField):
     ISSNL = models.CharField(_('ISSNL'), max_length=9, null=True, blank=True)
 
     base_form_class = OfficialJournalForm
+
+    def __str__(self):
+        return f'{self.title} ({self.ISSNL})'
