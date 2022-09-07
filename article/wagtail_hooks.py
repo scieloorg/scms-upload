@@ -44,6 +44,7 @@ class ArticleModelAdmin(ModelAdmin):
     )
     list_filter = (
         'journal',
+        'pub_year',
     )
     search_fields = (
         'pid_v2',
