@@ -48,3 +48,17 @@ class Article(ClusterableModel, CommonControlField):
         InlinePanel(relation_name='author', label='Authors'),
     ]
 
+    panel_issue = MultiFieldPanel(heading='Issue', classname='collapsible')
+    panel_issue.children = [
+        FieldPanel('pub_year'),
+        FieldPanel('volume'),
+        FieldPanel('number'),
+        FieldPanel('suppl'),
+    ]
+
+    panel_page = MultiFieldPanel(heading='Page', classname='collapsible')
+    panel_page.children = [
+        FieldPanel('elocation_id'),
+        FieldPanel('fpage'),
+        FieldPanel('lpage'),
+    ]
