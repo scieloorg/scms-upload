@@ -9,3 +9,6 @@ from core.models import CommonControlField
 from journal.models import OfficialJournal
 
 from .forms import ArticleForm
+
+
+class Article(ClusterableModel, CommonControlField):
