@@ -75,3 +75,23 @@ class Article(ClusterableModel, CommonControlField):
     def __str__(self):
         return self.pid_v2
 
+
+class Author(models.Model):
+    first_name = models.CharField(_('First name'), max_length=128, blank=False, null=False)
+    surname = models.CharField(_('Surname'), max_length=128, blank=False, null=False)
+
+    panels = [
+        FieldPanel('first_name'),
+        FieldPanel('surname'),
+    ]
+
+    def __str__(self):
+        return f'{self.first_name} {self.surname.upper()}'
+
+    class Meta:
+        abstract = True
+
+
+class ArticleAuthor(Orderable, Author):
+    author = ParentalKey('Article', on_delete=models.CASCADE, related_name='author')
+
