@@ -4,6 +4,10 @@ from django.utils.translation import gettext_lazy as _
 from core.models import CommonControlField
 from journal.models import OfficialJournal
 
+from wagtail.admin.edit_handlers import FieldPanel
+
+from .forms import IssueForm
+
 
 class Issue(CommonControlField):
     """
@@ -27,3 +31,12 @@ class Issue(CommonControlField):
     volume = models.CharField(_('Volume'), max_length=255, null=True, blank=True)
     number = models.CharField(_('Number'), max_length=255, null=True, blank=True)
     supplement = models.CharField(_('Supplement'), max_length=255, null=True, blank=True)
+
+    panels = [
+        FieldPanel('official_journal'),
+        FieldPanel('year'),
+        FieldPanel('number'),
+        FieldPanel('supplement'),
+    ]
+
+    base_form_class = IssueForm
