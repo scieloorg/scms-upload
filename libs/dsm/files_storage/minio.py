@@ -5,11 +5,10 @@ import logging
 import os
 import tempfile
 from mimetypes import guess_type
+from zipfile import ZipFile, BadZipFile
 
 from minio import Minio
 from minio.error import S3Error
-
-from dsm.utils import files
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +22,10 @@ class SHA1Error(Exception):
 
 
 class FileStorageResponseError(Exception):
+    pass
+
+
+class GetZipFileItemsError(Exception):
     pass
 
 
@@ -126,7 +129,7 @@ class MinioStorage:
             n_filename = original_name
         else:
             n_filename = sha1(file_path)
-        return f"{subdirs}/{n_filename}{file_extension}"
+        return os.path.join(subdirs, f"{n_filename}{file_extension}")
 
     def get_urls(self, media_path: str) -> str:
         url = self._client.presigned_get_object(self.bucket_root, media_path)
@@ -177,7 +180,8 @@ class MinioStorage:
 
     def remove(self, object_name: str) -> None:
         # Remove an object.
-        self._client.remove_object(self.bucket_root, object_name)
+        # https://docs.min.io/docs/python-client-api-reference.html#remove_object
+        return self._client.remove_object(self.bucket_root, object_name)
 
     def fget(self, object_name, downloaded_file_path=None):
         """
@@ -213,11 +217,15 @@ class MinioStorage:
         zip_path = self.fget(object_name)
 
         files = {}
-        with ZipFile(zip_path) as zf:
-            for filename in zf.namelist():
-                file_path = os.path.join(downloaded_folder_path, filename)
-                with open(file_path, "wb") as wfp:
-                    with zf.open(filename, "rb") as fp:
-                        wfp.write(fp.read())
-                    files[filename] = file_path
+        try:
+            with ZipFile(zip_path) as zf:
+                for filename in zf.namelist():
+                    file_path = os.path.join(downloaded_folder_path, filename)
+                    with open(file_path, "wb") as wfp:
+                        with zf.open(filename, "rb") as fp:
+                            wfp.write(fp.read())
+                        files[filename] = file_path
+        except BadZipFile as e:
+            raise GetZipFileItemsError(
+                "Unable to get items from %s %s" % (object_name, e))
         return files
