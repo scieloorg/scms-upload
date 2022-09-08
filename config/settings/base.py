@@ -106,14 +106,13 @@ THIRD_PARTY_APPS = [
     "wagtailmenus",
     "rest_framework",
     "core",
+    "upload",
 ]
 
 LOCAL_APPS = [
     "core.users",
     "core_settings",
-    "article",
     "journal",
-    "upload",
     # Your stuff: custom apps go here
 ]
 
