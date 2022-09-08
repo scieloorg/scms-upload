@@ -113,6 +113,7 @@ LOCAL_APPS = [
     "core.users",
     "core_settings",
     "journal",
+    "doi",
     # Your stuff: custom apps go here
 ]
 
