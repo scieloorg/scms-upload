@@ -106,16 +106,17 @@ THIRD_PARTY_APPS = [
     "wagtailmenus",
     "rest_framework",
     "core",
-    "upload",
 ]
 
 LOCAL_APPS = [
     "core.users",
     "core_settings",
     # Your stuff: custom apps go here
+    "doi",
+    "institution",
     "journal",
     "location",
-    "institution",
+    "upload",
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
