@@ -34,4 +34,4 @@ class ResearcherAffiliation(CommonControlField):
 
     link_begin_year = models.CharField(_('Begin Year'), max_length=4, blank=True, null=True)
     link_end_year = models.CharField(_('End Year'), max_length=4, blank=True, null=True)
-    institution = models.ManyToManyField(Institution, on_delete=models.SET_NULL)
+    institution = models.ManyToManyField(Institution)
