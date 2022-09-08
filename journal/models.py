@@ -31,9 +31,6 @@ class OfficialJournal(CommonControlField):
 
     base_form_class = OfficialJournalForm
 
-    def __str__(self):
-        return f'{self.title} ({self.ISSNL})'
-
 
 class NonOfficialJournalTitle(ClusterableModel, CommonControlField):
 
@@ -57,3 +54,4 @@ class NonOfficialJournalTitle(ClusterableModel, CommonControlField):
 class NonOfficialTitle(Orderable):
    page = ParentalKey(NonOfficialJournalTitle, related_name='page_non_official_title')
    non_official_journal_title = models.CharField(_('Non Official Journal Title'),max_length=255, null=False, blank=False)
+
