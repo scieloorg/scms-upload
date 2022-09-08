@@ -112,14 +112,15 @@ LOCAL_APPS = [
     "core.users",
     "core_settings",
     # Your stuff: custom apps go here
-    "upload",
+    "article",
     "collection",
-    "journal",
-    "issue",
-    "location",
-    "institution",
     "doi",
+    "institution",
+    "issue",
+    "journal",
+    "location",
     "researcher",
+    "upload",
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
