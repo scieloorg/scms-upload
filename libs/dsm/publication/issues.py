@@ -2,7 +2,7 @@ from opac_schema.v1.models import (
     Issue,
     Journal,
 )
-from . import exceptions
+from libs.dsm import exceptions
 from . import db
 
 

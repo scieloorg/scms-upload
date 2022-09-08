@@ -42,8 +42,8 @@ class DocumentToPublish:
         self.doc.scielo_pids["v3"] = self.doc._id
 
         if other_pids:
-			for item in other_pids:
-            	self.add_other_pid(item)
+            for item in other_pids:
+                self.add_other_pid(item)
 
         if aop_pid:
             self.doc.aop_pid = aop_pid
@@ -238,7 +238,6 @@ class DocumentToPublish:
 
 def format_author_name(surname, given_names, suffix):
     # like airflow
-    surname_and_suffix = surname
     if suffix:
-        surname_and_suffix += " " + suffix
-    return "%s%s, %s" % (surname_and_suffix, given_names)
+        suffix = " " + suffix
+    return "%s%s, %s" % (surname, suffix or '', given_names)

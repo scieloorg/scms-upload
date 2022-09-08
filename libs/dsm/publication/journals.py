@@ -139,9 +139,9 @@ class JournalToPublish:
         if all([total_h5_index, total_h5_median, h5_metric_year]):
             self.journal.metrics = (
                 JounalMetrics(**{
-                    'total_h5_index': total_h5_index or 0,
-                    'total_h5_median': total_h5_median or 0,
-                    'h5_metric_year': h5_metric_year or 0,
+                    'total_h5_index': total_h5_index or None,
+                    'total_h5_median': total_h5_median or None,
+                    'h5_metric_year': h5_metric_year or None,
                 })
             )
 
