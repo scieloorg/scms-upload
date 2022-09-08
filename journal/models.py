@@ -2,14 +2,14 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from core.models import CommonControlField
+from collection.models import Collection
 from .forms import OfficialJournalForm
 
-from wagtail.admin.edit_handlers import FieldPanel, InlinePanel, PageChooserPanel
 from wagtail.core.models import Orderable
+from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel, InlinePanel
+
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
-from django import forms
-from wagtail.admin import widgets 
 
 
 class OfficialJournal(CommonControlField):
@@ -32,21 +32,6 @@ class OfficialJournal(CommonControlField):
     base_form_class = OfficialJournalForm
 
 
-class Collection(CommonControlField):
-    """
-    Class that represent the Collection
-    """
-
-    # TODO futuramente deve ser parte de uma app collection
-    def __unicode__(self):
-        return u'%s %s' % (self.name)
-
-    def __str__(self):
-        return u'%s %s' % (self.name)
-
-    name = models.CharField(_('Collection Name'), null=False, blank=False)
-
-
 class JournalInCollection(CommonControlField):
     """
     Class that represent the Official Journal
@@ -61,7 +46,7 @@ class JournalInCollection(CommonControlField):
         return u'%s' % self.scielo_issn
 
     scielo_issn = models.CharField(_('SciELO ISSN'), max_length=9, null=False, blank=False)
-    collection = models.ForeignKey(Collection)
+    collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
 
     # TODO acrescentar
     # data de entrada
@@ -80,7 +65,7 @@ class SciELOJournal(CommonControlField):
     def __str__(self):
         return u'%s %s' % (self.official_journal.title, [c.scielo_issn for c in self.collections])
 
-    official_journal = models.ForeignKey(OfficialJournal)
+    official_journal = models.ForeignKey(OfficialJournal, on_delete=models.CASCADE)
     collections = models.ManyToManyField(JournalInCollection)
 
 
