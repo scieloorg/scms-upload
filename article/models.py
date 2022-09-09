@@ -8,7 +8,6 @@ from wagtail.core.models import Orderable, ClusterableModel
 from core.models import CommonControlField
 from doi.models import DOIWithLang
 from issue.models import Issue
-from journal.models import OfficialJournal
 from researcher.models import Researcher
 
 from .forms import ArticleForm, RelatedItemForm
