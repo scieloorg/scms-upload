@@ -106,3 +106,17 @@ class SciELODocument(CommonControlField):
     pid = models.CharField(_('PID'), max_length=17, null=True, blank=True)
     file_id = models.CharField(_('File ID'), max_length=17, null=True, blank=True)
 
+
+class DocumentInCollections(CommonControlField):
+    """
+    Class that represent a document and its collections
+    """
+
+    def __unicode__(self):
+        return u'%s %s' % ('self.offical_doc', " | ".join([str(item) for item in self.scielo_docs]))
+
+    def __str__(self):
+        return u'%s %s' % ('self.offical_doc', " | ".join([str(item) for item in self.scielo_docs]))
+
+    #official_doc = models.ForeignKey(Article, on_delete=models.CASCADE)
+    scielo_docs = models.ManyToManyField(SciELODocument)
