@@ -76,7 +76,49 @@ class ArticleModelAdmin(ModelAdmin):
     )
 
 
-modeladmin_register(ArticleModelAdmin)
+class RelatedItemModelAdmin(ModelAdmin):
+    model = RelatedItem
+    menu_label = _('Related items')
+    create_view_class = RelatedItemCreateView
+    inspect_view_enabled=True
+    menu_icon = 'doc-full'
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+
+    list_display = (
+        'item_type',
+        'source_article',
+        'target_article',
+        'created',
+        'updated',
+        'updated_by',
+    )
+    list_filter = (
+        'item_type',
+        'target_article__journal',
+    )
+    search_fields = (
+        'target_article__journal__ISSNL',
+    )
+    inspect_view_fields = (
+        'created',
+        'updated',
+        'creator',
+        'updated_by',
+        'item_type',
+        'source_article',
+        'target_article',
+    )
+
+class ArticleModelAdminGroup(ModelAdminGroup):
+    menu_label = _('Articles')
+    menu_icon = 'folder-open-inverse'
+    menu_order = 200
+    items = (ArticleModelAdmin, RelatedItemModelAdmin)
+
+
+modeladmin_register(ArticleModelAdminGroup)
 
 
 @hooks.register('register_admin_urls')
