@@ -15,6 +15,12 @@ class ArticleCreateView(CreateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
+class RelatedItemCreateView(CreateView):
+    def form_valid(self, form):
+        self.object = form.save_all(self.request.user)
+        return HttpResponseRedirect(self.get_success_url())
+
+
 class ArticleModelAdmin(ModelAdmin):
     model = Article
     menu_label = _('Articles')
