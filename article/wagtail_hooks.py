@@ -39,6 +39,7 @@ class ArticleModelAdmin(ModelAdmin):
         'pid_v3',
         'doi_list',
         'aop_pid',
+        'article_type',
         'journal',
         'issue',
         'created',
@@ -47,6 +48,7 @@ class ArticleModelAdmin(ModelAdmin):
     )
     list_filter = (
         'journal',
+        'article_type',
     )
     search_fields = (
         'pid_v2',
@@ -63,9 +65,9 @@ class ArticleModelAdmin(ModelAdmin):
         'pid_v2',
         'aop_pid',
         'doi_with_lang',
+        'article_type',
         'journal',
         'issue',
-        'related_item',
         'author',
         'title_with_lang',
         'elocation_id',
