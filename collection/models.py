@@ -28,10 +28,10 @@ class SciELOJournal(CommonControlField):
     # TODO futuramente ter um formulário para gerir os dados
 
     def __unicode__(self):
-        return u'%s' % self.scielo_issn
+        return u'%s %s' % (self.collection, self.scielo_issn)
 
     def __str__(self):
-        return u'%s' % self.scielo_issn
+        return u'%s %s' % (self.collection, self.scielo_issn)
 
     scielo_issn = models.CharField(_('SciELO ISSN'), max_length=9, null=False, blank=False)
     collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
@@ -50,10 +50,10 @@ class JournalCollections(CommonControlField):
     """
 
     def __unicode__(self):
-        return u'%s %s' % (self.official_journal, [c.scielo_issn for c in self.scielo_journals])
+        return u'%s %s' % (self.official_issue, " | ".join([str(item) for item in self.scielo_journals]))
 
     def __str__(self):
-        return u'%s %s' % (self.official_journal, [c.scielo_issn for c in self.scielo_journals])
+        return u'%s %s' % (self.official_issue, " | ".join([str(item) for item in self.scielo_journals]))
 
     official_journal = models.ForeignKey(OfficialJournal, on_delete=models.CASCADE)
     scielo_journals = models.ManyToManyField(SciELOJournal)
@@ -65,10 +65,10 @@ class SciELOIssue(CommonControlField):
     """
 
     def __unicode__(self):
-        return u'%s %s' % (self.scielo_journal, self.official_issue)
+        return u'%s %s' % (self.scielo_journal, self.issue_pid)
 
     def __str__(self):
-        return u'%s %s' % (self.scielo_journal, self.official_issue)
+        return u'%s %s' % (self.scielo_journal, self.issue_pid)
 
     scielo_journal = models.ForeignKey(SciELOJournal, on_delete=models.CASCADE)
     issue_pid = models.CharField(_('Issue PID'), max_length=17, null=False, blank=False)
@@ -81,10 +81,10 @@ class IssueInCollections(CommonControlField):
     """
 
     def __unicode__(self):
-        return u'%s %s' % (self.official_issue, [item.issue_pid for item in self.scielo_issues])
+        return u'%s %s' % (self.official_issue, " | ".join([str(item) for item in self.scielo_issues]))
 
     def __str__(self):
-        return u'%s %s' % (self.official_issue, [item.issue_pid for item in self.scielo_issues])
+        return u'%s %s' % (self.official_issue, " | ".join([str(item) for item in self.scielo_issues]))
 
     official_issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
     scielo_issues = models.ManyToManyField(SciELOIssue)
@@ -96,12 +96,13 @@ class SciELODocument(CommonControlField):
     """
 
     def __unicode__(self):
-        return u'%s %s' % (self.issue, self.official_doc)
+        return u'%s %s' % (self.scielo_issue, self.pid)
 
     def __str__(self):
-        return u'%s %s' % (self.issue, self.official_doc)
+        return u'%s %s' % (self.scielo_issue, self.pid)
 
     # official_doc = models.ForeignKey(Article, on_delete=models.CASCADE)
     scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
     pid = models.CharField(_('PID'), max_length=17, null=True, blank=True)
     file_id = models.CharField(_('File ID'), max_length=17, null=True, blank=True)
+
