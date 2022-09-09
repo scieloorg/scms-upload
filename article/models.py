@@ -34,16 +34,19 @@ class Article(ClusterableModel, CommonControlField):
     journal = models.ForeignKey(OfficialJournal, blank=True, null=True, on_delete=models.SET_NULL)
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.CASCADE)
 
-    panel_doc_ids = MultiFieldPanel(heading='Document identifiers', classname='collapsible')
-    panel_doc_ids.children = [
+    related_items = models.ManyToManyField('self', symmetrical=False, through='RelatedItem', related_name='related_to')
+
+    panel_article_ids = MultiFieldPanel(heading='Article identifiers', classname='collapsible')
+    panel_article_ids.children = [
         FieldPanel('pid_v2'),
         FieldPanel('pid_v3'),
         FieldPanel('aop_pid'),
         InlinePanel(relation_name='doi_with_lang', label='DOI with Language'),
     ]
 
-    panel_doc_details = MultiFieldPanel(heading='Document details', classname='collapsible')
-    panel_doc_details.children = [
+    panel_article_details = MultiFieldPanel(heading='Article details', classname='collapsible')
+    panel_article_details.children = [
+        FieldPanel('article_type'),
         InlinePanel(relation_name='title_with_lang', label='Title with Language'),
         InlinePanel(relation_name='author', label='Authors'),
         FieldPanel('elocation_id'),
@@ -52,15 +55,14 @@ class Article(ClusterableModel, CommonControlField):
     ]
     
     panels = [
-        panel_doc_ids,
-        panel_doc_details,
+        panel_article_ids,
+        panel_article_details,
         FieldPanel('journal', classname='collapsible'),
         FieldPanel('issue', classname='collapsible'),
-        InlinePanel(relation_name='related_item', label='Related item', classname='collapsible'),
     ]
 
     def __str__(self):
-        return self.pid_v2
+        return f'{self.pid_v3 or self.pid_v2 or self.aop_pid or self.id}'
 
     base_form_class = ArticleForm
 
