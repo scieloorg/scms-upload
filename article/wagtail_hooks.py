@@ -40,14 +40,12 @@ class ArticleModelAdmin(ModelAdmin):
         'doi_list',
         'aop_pid',
         'article_type',
-        'journal',
         'issue',
         'created',
         'updated',
         'updated_by',
     )
     list_filter = (
-        'journal',
         'article_type',
     )
     search_fields = (
@@ -66,7 +64,6 @@ class ArticleModelAdmin(ModelAdmin):
         'aop_pid',
         'doi_with_lang',
         'article_type',
-        'journal',
         'issue',
         'author',
         'title_with_lang',

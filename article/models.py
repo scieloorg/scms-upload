@@ -33,9 +33,7 @@ class Article(ClusterableModel, CommonControlField):
     lpage = models.CharField(_('Last page'), max_length=16, blank=True, null=True)
 
     # External models
-    journal = models.ForeignKey(OfficialJournal, blank=True, null=True, on_delete=models.SET_NULL)
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.CASCADE)
-
     related_items = models.ManyToManyField('self', symmetrical=False, through='RelatedItem', related_name='related_to')
 
     panel_article_ids = MultiFieldPanel(heading='Article identifiers', classname='collapsible')
@@ -59,7 +57,6 @@ class Article(ClusterableModel, CommonControlField):
     panels = [
         panel_article_ids,
         panel_article_details,
-        FieldPanel('journal', classname='collapsible'),
         FieldPanel('issue', classname='collapsible'),
     ]
 
