@@ -16,9 +16,17 @@ class ArticleForm(WagtailAdminModelForm):
         for t in article.title_with_lang.all():
             t.creator = user
 
-        for ri in article.related_item.all():
-            ri.creator = user
-
         self.save()
 
         return article
+
+
+class RelatedItemForm(WagtailAdminModelForm):
+
+    def save_all(self, user):        
+        related_item = super().save(commit=False)
+        related_item.creator = user
+
+        self.save()
+
+        return related_item
