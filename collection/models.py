@@ -70,10 +70,24 @@ class SciELOIssue(CommonControlField):
     def __str__(self):
         return u'%s %s' % (self.scielo_journal, self.official_issue)
 
-    official_issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
     scielo_journal = models.ForeignKey(SciELOJournal, on_delete=models.CASCADE)
     issue_pid = models.CharField(_('Issue PID'), max_length=17, null=False, blank=False)
     issue_folder = models.CharField(_('Issue Folder'), max_length=17, null=False, blank=False)
+
+
+class IssueInCollections(CommonControlField):
+    """
+    Class that represent an issue and its collections
+    """
+
+    def __unicode__(self):
+        return u'%s %s' % (self.official_issue, [item.issue_pid for item in self.scielo_issues])
+
+    def __str__(self):
+        return u'%s %s' % (self.official_issue, [item.issue_pid for item in self.scielo_issues])
+
+    official_issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
+    scielo_issues = models.ManyToManyField(SciELOIssue)
 
 
 class SciELODocument(CommonControlField):
