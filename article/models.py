@@ -22,6 +22,9 @@ class Article(ClusterableModel, CommonControlField):
     pid_v2 = models.CharField(_('PID v2'), max_length=23, blank=True, null=True)
     aop_pid = models.CharField(_('AOP PID'), max_length=23, blank=True, null=True)
 
+    # Article type
+    article_type = models.CharField(_('Article type'), max_length=32, choices=choices.ARTICLE_TYPE, blank=False, null=False)
+
     # Page
     elocation_id = models.CharField(_('Elocation ID'), max_length=64, blank=True, null=True)
     fpage = models.CharField(_('First page'), max_length=16, blank=True, null=True)
