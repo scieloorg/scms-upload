@@ -119,6 +119,7 @@ LOCAL_APPS = [
     "issue",
     "journal",
     "location",
+    "migration",
     "researcher",
     "upload",
 ]
