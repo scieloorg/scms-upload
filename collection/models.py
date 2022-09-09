@@ -35,6 +35,8 @@ class SciELOJournal(CommonControlField):
 
     scielo_issn = models.CharField(_('SciELO ISSN'), max_length=9, null=False, blank=False)
     collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
+    acron = models.CharField(_('Acronym'), max_length=25, null=True, blank=True)
+    title = models.CharField(_('Title'), max_length=255, null=True, blank=True)
 
     # TODO acrescentar
     # data de entrada
@@ -72,3 +74,20 @@ class SciELOIssue(CommonControlField):
     scielo_journal = models.ForeignKey(SciELOJournal, on_delete=models.CASCADE)
     issue_pid = models.CharField(_('Issue PID'), max_length=17, null=False, blank=False)
     issue_folder = models.CharField(_('Issue Folder'), max_length=17, null=False, blank=False)
+
+
+class SciELODocument(CommonControlField):
+    """
+    Class that represent a document in a SciELO Collection
+    """
+
+    def __unicode__(self):
+        return u'%s %s' % (self.issue, self.official_doc)
+
+    def __str__(self):
+        return u'%s %s' % (self.issue, self.official_doc)
+
+    # official_doc = models.ForeignKey(Article, on_delete=models.CASCADE)
+    scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
+    pid = models.CharField(_('PID'), max_length=17, null=True, blank=True)
+    file_id = models.CharField(_('File ID'), max_length=17, null=True, blank=True)
