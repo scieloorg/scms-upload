@@ -96,18 +96,17 @@ class ArticleTitle(Orderable, Title):
 
 
 class RelatedItem(CommonControlField):
-    item_type = models.CharField(_('Related item type'), max_length=128, null=False, blank=False) 
+    item_type = models.CharField(_('Related item type'), max_length=32, choices=choices.RELATED_ITEM_TYPE, blank=False, null=False)
+    source_article = models.ForeignKey('Article', related_name='source_article', on_delete=models.CASCADE, null=False, blank=False)
+    target_article = models.ForeignKey('Article', related_name='target_article', on_delete=models.CASCADE, null=False, blank=False)
 
     panel = [
         FieldPanel('item_type'),
+        FieldPanel('source_article'),
+        FieldPanel('target_article'),
     ]
 
     def __str__(self):
-        return self.item_type
+        return f'{self.source_article} - {self.target_article} ({self.item_type})'
 
-    class Meta:
-        abstract = True
-
-
-class ArticleRelatedItem(Orderable, RelatedItem):
-    related_item = ParentalKey('Article', on_delete=models.CASCADE, related_name='related_item')
+    base_form_class = RelatedItemForm
