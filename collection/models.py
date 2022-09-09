@@ -33,6 +33,7 @@ class SciELOJournal(CommonControlField):
     def __str__(self):
         return u'%s %s' % (self.collection, self.scielo_issn)
 
+    # ID na coleção
     scielo_issn = models.CharField(_('SciELO ISSN'), max_length=9, null=False, blank=False)
     collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
     acron = models.CharField(_('Acronym'), max_length=25, null=True, blank=True)
@@ -72,6 +73,7 @@ class SciELOIssue(CommonControlField):
 
     scielo_journal = models.ForeignKey(SciELOJournal, on_delete=models.CASCADE)
     issue_pid = models.CharField(_('Issue PID'), max_length=17, null=False, blank=False)
+    # v30n1 ou 2019nahead
     issue_folder = models.CharField(_('Issue Folder'), max_length=17, null=False, blank=False)
 
 
