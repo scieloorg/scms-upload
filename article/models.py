@@ -11,7 +11,9 @@ from issue.models import Issue
 from journal.models import OfficialJournal
 from researcher.models import Researcher
 
-from .forms import ArticleForm
+from .forms import ArticleForm, RelatedItemForm
+
+from . import choices
 
 
 class Article(ClusterableModel, CommonControlField):
