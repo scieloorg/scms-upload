@@ -50,13 +50,13 @@ class JournalCollections(CommonControlField):
     """
 
     def __unicode__(self):
-        return u'%s %s' % (self.official_journal.title, [c.scielo_issn for c in self.collections])
+        return u'%s %s' % (self.official_journal, [c.scielo_issn for c in self.scielo_journals])
 
     def __str__(self):
-        return u'%s %s' % (self.official_journal.title, [c.scielo_issn for c in self.collections])
+        return u'%s %s' % (self.official_journal, [c.scielo_issn for c in self.scielo_journals])
 
     official_journal = models.ForeignKey(OfficialJournal, on_delete=models.CASCADE)
-    collections = models.ManyToManyField(SciELOJournal)
+    scielo_journals = models.ManyToManyField(SciELOJournal)
 
 
 class SciELOIssue(CommonControlField):
