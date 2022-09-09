@@ -55,3 +55,20 @@ class JournalCollections(CommonControlField):
 
     official_journal = models.ForeignKey(OfficialJournal, on_delete=models.CASCADE)
     collections = models.ManyToManyField(SciELOJournal)
+
+
+class SciELOIssue(CommonControlField):
+    """
+    Class that represent an issue in a SciELO Collection
+    """
+
+    def __unicode__(self):
+        return u'%s %s' % (self.scielo_journal, self.official_issue)
+
+    def __str__(self):
+        return u'%s %s' % (self.scielo_journal, self.official_issue)
+
+    official_issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
+    scielo_journal = models.ForeignKey(SciELOJournal, on_delete=models.CASCADE)
+    issue_pid = models.CharField(_('Issue PID'), max_length=17, null=False, blank=False)
+    issue_folder = models.CharField(_('Issue Folder'), max_length=17, null=False, blank=False)
