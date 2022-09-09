@@ -19,7 +19,7 @@ from . import choices
 class Article(ClusterableModel, CommonControlField):
     # Identifiers
     pid_v3 = models.CharField(_('PID v3'), max_length=23, blank=True, null=True)
-    pid_v2 = models.CharField(_('PID v2'), primary_key=True, max_length=23, blank=False, null=False)
+    pid_v2 = models.CharField(_('PID v2'), max_length=23, blank=True, null=True)
     aop_pid = models.CharField(_('AOP PID'), max_length=23, blank=True, null=True)
 
     # Page
