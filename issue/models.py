@@ -35,6 +35,7 @@ class Issue(CommonControlField):
     panels = [
         FieldPanel('official_journal'),
         FieldPanel('year'),
+        FieldPanel('volume'),
         FieldPanel('number'),
         FieldPanel('supplement'),
     ]
