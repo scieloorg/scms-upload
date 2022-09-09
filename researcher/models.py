@@ -23,7 +23,7 @@ class Researcher(CommonControlField):
     orcid = models.CharField(_('ORCID'), max_length=128, blank=True, null=True)
     email = models.EmailField(_('E-mail'), max_length=128, blank=True, null=True)
 
-    affiliations = models.ManyToManyField('ResearcherAffiliation')
+    affiliations = models.ManyToManyField('ResearcherAffiliation', blank=True, null=True)
 
     panels = [
         FieldPanel('surname'),
