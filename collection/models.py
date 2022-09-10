@@ -12,11 +12,12 @@ class Collection(CommonControlField):
     """
 
     def __unicode__(self):
-        return u'%s' % self.name
+        return u'%s %s' % (self.name, self.acron)
 
     def __str__(self):
-        return u'%s' % self.name
+        return u'%s %s' % (self.name, self.acron)
 
+    acron = models.CharField(_('Collection Acronym'), max_length=255, null=True, blank=True)
     name = models.CharField(_('Collection Name'), max_length=255, null=False, blank=False)
 
 
