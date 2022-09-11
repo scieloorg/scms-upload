@@ -24,3 +24,15 @@ class GetOrCreateIssueInCollectionsError(Exception):
 
 class GetOrCreateScieloIssueInIssueCollectionsError(Exception):
     ...
+
+
+class GetOrCreateScieloDocumentError(Exception):
+    ...
+
+
+class GetOrCreateDocumentInCollectionsError(Exception):
+    ...
+
+
+class GetOrCreateScieloDocumentInDocumentCollectionsError(Exception):
+    ...
