@@ -163,7 +163,7 @@ def get_or_create_scielo_document_in_document_collections(official_doc, scielo_d
     return document_collections
 
 
-class JournalManager:
+class JournalController:
 
     def __init__(self, collection_acron, scielo_issn, issn_l, e_issn, print_issn):
         self._collection_acron = collection_acron
@@ -216,7 +216,7 @@ class JournalManager:
         return self._scielo_journal_in_journal_collections
 
 
-class IssueManager:
+class IssueController:
 
     def __init__(self, official_journal, scielo_journal,
                  year, volume, number, supplement,
