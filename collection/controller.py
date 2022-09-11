@@ -9,6 +9,7 @@ from .models import (
 )
 from journal.controller import get_or_create_official_journal
 from issue.controller import get_or_create_official_issue
+from article.controller import get_or_create_official_document
 
 from . import exceptions
 
@@ -115,6 +116,51 @@ def get_or_create_scielo_issue_in_issue_collections(official_issue, scielo_issue
         )
     issue_collections.scielo_issues.get_or_create(scielo_issue)
     return issue_collections
+
+
+def get_or_create_scielo_document(scielo_issue, pid, file_id):
+    try:
+        scielo_document, status = SciELODocument.objects.get_or_create(
+            scielo_issue=scielo_issue,
+            pid=pid,
+            file_id=file_id,
+        )
+    except Exception as e:
+        raise exceptions.GetOrCreateScieloDocumentError(
+            _('Unable to get_or_create_scielo_document {} {} {} {}').format(
+                scielo_issue, pid, type(e), e
+            )
+        )
+    return scielo_document
+
+
+def get_or_create_document_in_collections(official_doc, scielo_document):
+    try:
+        scielo_document, status = DocumentInCollections.objects.get_or_create(
+            official_doc=official_doc,
+        )
+    except Exception as e:
+        raise exceptions.GetOrCreateDocumentInCollectionsError(
+            _('Unable to get_or_create_document_in_collections {} {} {}').format(
+                official_doc, type(e), e
+            )
+        )
+    return scielo_document
+
+
+def get_or_create_scielo_document_in_document_collections(official_doc, scielo_document):
+
+    try:
+        document_collections = get_or_create_document_collections(official_doc)
+
+    except Exception as e:
+        raise exceptions.GetOrCreateScieloDocumentInDocumentCollectionsError(
+            _('Unable to get_or_create_scielo_document_in_document_collections {} {} {} {}').format(
+                official_doc, scielo_document, type(e), e
+            )
+        )
+    document_collections.scielo_docs.get_or_create(scielo_document)
+    return document_collections
 
 
 class JournalManager:
@@ -243,3 +289,62 @@ class IssueManager:
                 )
             )
         return self._scielo_issue_in_issue_collections
+
+
+class DocumentController:
+
+    def __init__(self, official_isue, scielo_isue,
+                 file_id,
+                 pid,
+                 document_data,
+                 ):
+        self._official_isue = official_isue
+        self._scielo_isue = scielo_isue
+        self._document_data = document_data
+        self._pid = pid
+        self._file_id = file_id
+
+    @property
+    def official_isue(self):
+        return self._official_isue
+
+    @property
+    def scielo_isue(self):
+        return self._scielo_isue
+
+    @property
+    def scielo_document(self):
+        if not hasattr(self, '_scielo_document'):
+            self._scielo_document = None
+        if not self._scielo_document:
+            self._scielo_document = get_or_create_scielo_document(
+                self.scielo_isue,
+                self._pid,
+                self._file_id,
+            )
+        return self._scielo_document
+
+    @property
+    def official_document(self):
+        if not hasattr(self, '_official_document'):
+            self._official_document = None
+        if not self._official_document:
+            self._official_document = get_or_create_official_document(
+                self.official_isue,
+                **self._document_data,
+            )
+        return self._official_document
+
+    @property
+    def scielo_document_in_document_collections(self):
+        if not hasattr(self, '_scielo_document_in_document_collections'):
+            self._scielo_document_in_document_collections = None
+
+        if not self._scielo_document_in_document_collections:
+            self._scielo_document_in_document_collections = (
+                get_or_create_scielo_document_in_document_collections(
+                    self.official_document,
+                    self.scielo_document,
+                )
+            )
+        return self._scielo_document_in_document_collections
