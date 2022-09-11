@@ -30,10 +30,10 @@ class SciELOJournal(CommonControlField):
     # TODO futuramente ter um formulário para gerir os dados
 
     def __unicode__(self):
-        return u'%s %s' % (self.collection, self.scielo_issn)
+        return u'%s %s %s' % (self.collection, self.scielo_issn, self.acron)
 
     def __str__(self):
-        return u'%s %s' % (self.collection, self.scielo_issn)
+        return u'%s %s %s' % (self.collection, self.scielo_issn, self.acron)
 
     # ID na coleção
     scielo_issn = models.CharField(_('SciELO ISSN'), max_length=9, null=False, blank=False)
@@ -68,10 +68,10 @@ class SciELOIssue(CommonControlField):
     """
 
     def __unicode__(self):
-        return u'%s %s' % (self.scielo_journal, self.issue_pid)
+        return u'%s %s %s' % (self.scielo_journal, self.issue_pid, self.issue_folder)
 
     def __str__(self):
-        return u'%s %s' % (self.scielo_journal, self.issue_pid)
+        return u'%s %s %s' % (self.scielo_journal, self.issue_pid, self.issue_folder)
 
     scielo_journal = models.ForeignKey(SciELOJournal, on_delete=models.CASCADE)
     issue_pid = models.CharField(_('Issue PID'), max_length=17, null=False, blank=False)
@@ -100,10 +100,10 @@ class SciELODocument(CommonControlField):
     """
 
     def __unicode__(self):
-        return u'%s %s' % (self.scielo_issue, self.pid)
+        return u'%s %s %s' % (self.scielo_issue, self.pid, self.file_id)
 
     def __str__(self):
-        return u'%s %s' % (self.scielo_issue, self.pid)
+        return u'%s %s %s' % (self.scielo_issue, self.pid, self.file_id)
 
     scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
     pid = models.CharField(_('PID'), max_length=17, null=True, blank=True)

@@ -28,10 +28,12 @@ def get_or_create_collection(collection_acron):
     return collection
 
 
-def get_or_create_scielo_journal(collection, scielo_issn):
+def get_or_create_scielo_journal(collection, scielo_issn, journal_acron):
     try:
         scielo_journal, status = SciELOJournal.objects.get_or_create(
-            collection=collection, scielo_issn=scielo_issn,
+            collection=collection,
+            scielo_issn=scielo_issn,
+            acron=journal_acron,
         )
     except Exception as e:
         raise exceptions.GetOrCreateScieloJournalError(
@@ -165,12 +167,13 @@ def get_or_create_scielo_document_in_document_collections(official_doc, scielo_d
 
 class JournalController:
 
-    def __init__(self, collection_acron, scielo_issn, issn_l, e_issn, print_issn):
+    def __init__(self, collection_acron, scielo_issn, issn_l, e_issn, print_issn, journal_acron):
         self._collection_acron = collection_acron
         self._scielo_issn = scielo_issn
         self._issn_l = issn_l
         self._e_issn = e_issn
         self._print_issn = print_issn
+        self._journal_acron = journal_acron
 
     @property
     def collection(self):
@@ -188,6 +191,7 @@ class JournalController:
             self._scielo_journal = get_or_create_scielo_journal(
                 self.collection,
                 self._scielo_issn,
+                self._journal_acron,
             )
         return self._scielo_journal
 
