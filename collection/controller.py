@@ -28,6 +28,21 @@ def get_or_create_collection(collection_acron):
     return collection
 
 
+def get_scielo_journal(collection_acron, scielo_issn):
+    try:
+        scielo_journal = SciELOJournal.objects.get(
+            collection__acron=collection_acron,
+            scielo_issn=scielo_issn,
+        )
+    except Exception as e:
+        raise exceptions.GetSciELOJournalError(
+            _('Unable to get_scielo_journal {} {} {} {}').format(
+                collection_acron, scielo_issn, type(e), e
+            )
+        )
+    return scielo_journal
+
+
 def get_or_create_scielo_journal(collection, scielo_issn, journal_acron):
     try:
         scielo_journal, status = SciELOJournal.objects.get_or_create(
@@ -72,7 +87,36 @@ def get_or_create_scielo_journal_in_journal_collections(official_journal, scielo
     journal_collections.scielo_journals.get_or_create(scielo_journal)
     return journal_collections
 
+
+def get_journal_collections(collection_acron, scielo_issn):
+    try:
+        scielo_journal = get_scielo_journal(collection_acron, scielo_issn)
+
+    except Exception as e:
+        raise exceptions.GetJournalCollectionsError(
+            _('Unable to get_journal_collections {} {} {} {}').format(
+                collection, scielo_issn, type(e), e
+            )
+        )
+    return JournalCollections.objects.get(scielo_journals__scielo_journal=scielo_journal)
+
+
 ###########################################################################
+
+
+def get_scielo_issue(issue_pid, issue_folder):
+    try:
+        scielo_issue = SciELOIssue.objects.get(
+            issue_pid=issue_pid,
+            issue_folder=issue_folder,
+        )
+    except Exception as e:
+        raise exceptions.GetOrCreateScieloIssueError(
+            _('Unable to get_scielo_issue {} {} {} {}').format(
+                sissue_pid, issue_folder, type(e), e
+            )
+        )
+    return scielo_issue
 
 
 def get_or_create_scielo_issue(scielo_journal, issue_pid, issue_folder):
@@ -120,6 +164,35 @@ def get_or_create_scielo_issue_in_issue_collections(official_issue, scielo_issue
     return issue_collections
 
 
+def get_issue_collections(issue_pid, issue_folder):
+    try:
+        scielo_issue = get_scielo_issue(issue_pid, issue_folder)
+
+    except Exception as e:
+        raise exceptions.GetIssueInCollectionsError(
+            _('Unable to get_issue_collections {} {} {} {}').format(
+                issue_pid, issue_folder, type(e), e
+            )
+        )
+    return IssueInCollections.objects.get(scielo_issues__scielo_issue=scielo_issue)
+
+
+############################################################################
+def get_scielo_document(pid, file_id):
+    try:
+        scielo_document = SciELODocument.objects.get(
+            pid=pid,
+            file_id=file_id,
+        )
+    except Exception as e:
+        raise exceptions.GetSciELODocumentError(
+            _('Unable to get_scielo_document {} {} {} {}').format(
+                pid, file_id, type(e), e
+            )
+        )
+    return scielo_document
+
+
 def get_or_create_scielo_document(scielo_issue, pid, file_id):
     try:
         scielo_document, status = SciELODocument.objects.get_or_create(
@@ -163,6 +236,19 @@ def get_or_create_scielo_document_in_document_collections(official_doc, scielo_d
         )
     document_collections.scielo_docs.get_or_create(scielo_document)
     return document_collections
+
+
+def get_document_collections(pid, file_id):
+    try:
+        scielo_doc = get_scielo_document(pid, file_id)
+
+    except Exception as e:
+        raise exceptions.GetDocumentInCollectionsError(
+            _('Unable to get_doc_collections {} {} {} {}').format(
+                pid, file_id, type(e), e
+            )
+        )
+    return DocumentInCollections.objects.get(scielo_docs__scielo_doc=scielo_doc)
 
 
 class JournalController:
@@ -222,12 +308,12 @@ class JournalController:
 
 class IssueController:
 
-    def __init__(self, official_journal, scielo_journal,
+    def __init__(self, collection_acron, scielo_issn,
                  year, volume, number, supplement,
                  issue_pid,
                  ):
-        self._official_journal = official_journal
-        self._scielo_journal = scielo_journal
+        self._collection_acron = collection_acron
+        self._scielo_issn = scielo_issn
         self._issue_pid = issue_pid
         self._year = year
         self._volume = volume
@@ -236,8 +322,24 @@ class IssueController:
         self._issue_pid = issue_pid
 
     @property
+    def journal_collections(self):
+        if not hasattr(self, '_journal_collections'):
+            self._journal_collections = None
+        if not self._journal_collections:
+            self._journal_collections = get_journal_collections(
+                self._collection_acron, self._scielo_issn,
+            )
+        return self._journal_collections
+
+    @property
     def official_journal(self):
-        return self._official_journal
+        return self.journal_collections.official_journal
+
+    @property
+    def scielo_journal(self):
+        return get_scielo_journal(
+            self._collection_acron, self._scielo_issn,
+        )
 
     @property
     def issue_folder(self):
@@ -249,10 +351,6 @@ class IssueController:
             f"{k}{v}"
             for k, v in zip(keys, values)
             if v])
-
-    @property
-    def scielo_journal(self):
-        return self._scielo_journal
 
     @property
     def scielo_issue(self):
@@ -297,24 +395,36 @@ class IssueController:
 
 class DocumentController:
 
-    def __init__(self, official_isue, scielo_isue,
+    def __init__(self, issue_pid, issue_folder,
                  file_id,
                  pid,
                  document_data,
                  ):
-        self._official_isue = official_isue
-        self._scielo_isue = scielo_isue
+        self._issue_pid = issue_pid
+        self._issue_folder = issue_folder
         self._document_data = document_data
         self._pid = pid
         self._file_id = file_id
 
     @property
-    def official_isue(self):
-        return self._official_isue
+    def issue_collections(self):
+        if not hasattr(self, '_issue_collections'):
+            self._issue_collections = None
+        if not self._issue_collections:
+            self._issue_collections = get_issue_collections(
+                self._issue_pid, self._issue_folder,
+            )
+        return self._issue_collections
 
     @property
-    def scielo_isue(self):
-        return self._scielo_isue
+    def official_issue(self):
+        return self.issue_collections.official_issue
+
+    @property
+    def scielo_issue(self):
+        return get_scielo_issue(
+            self._issue_pid, self._issue_folder,
+        )
 
     @property
     def scielo_document(self):
@@ -322,7 +432,7 @@ class DocumentController:
             self._scielo_document = None
         if not self._scielo_document:
             self._scielo_document = get_or_create_scielo_document(
-                self.scielo_isue,
+                self.scielo_issue,
                 self._pid,
                 self._file_id,
             )
@@ -334,7 +444,7 @@ class DocumentController:
             self._official_document = None
         if not self._official_document:
             self._official_document = get_or_create_official_document(
-                self.official_isue,
+                self.official_issue,
                 **self._document_data,
             )
         return self._official_document

@@ -36,3 +36,27 @@ class GetOrCreateDocumentInCollectionsError(Exception):
 
 class GetOrCreateScieloDocumentInDocumentCollectionsError(Exception):
     ...
+
+
+class GetJournalCollectionsError(Exception):
+    ...
+
+
+class GetIssueInCollectionsError(Exception):
+    ...
+
+
+class GetDocumentInCollectionsError(Exception):
+    ...
+
+
+class GetSciELOJournalError(Exception):
+    ...
+
+
+class GetSciELOIssueError(Exception):
+    ...
+
+
+class GetSciELODocumentError(Exception):
+    ...
