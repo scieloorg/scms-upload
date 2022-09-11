@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from core.models import CommonControlField
 from journal.models import OfficialJournal
 from issue.models import Issue
+from article.models import Article
 
 
 class Collection(CommonControlField):
@@ -104,7 +105,6 @@ class SciELODocument(CommonControlField):
     def __str__(self):
         return u'%s %s' % (self.scielo_issue, self.pid)
 
-    # official_doc = models.ForeignKey(Article, on_delete=models.CASCADE)
     scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
     pid = models.CharField(_('PID'), max_length=17, null=True, blank=True)
     file_id = models.CharField(_('File ID'), max_length=17, null=True, blank=True)
@@ -121,5 +121,5 @@ class DocumentInCollections(CommonControlField):
     def __str__(self):
         return u'%s %s' % ('self.offical_doc', " | ".join([str(item) for item in self.scielo_docs]))
 
-    #official_doc = models.ForeignKey(Article, on_delete=models.CASCADE)
+    official_doc = models.ForeignKey(Article, on_delete=models.CASCADE)
     scielo_docs = models.ManyToManyField(SciELODocument)
