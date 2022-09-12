@@ -68,6 +68,12 @@ class Article(ClusterableModel, CommonControlField):
     def __str__(self):
         return f'{self.pid_v3 or self.pid_v2 or self.aop_pid or self.id}'
 
+    class Meta:
+        permissions = (
+            (MAKE_ARTICLE_CHANGE, _('Can make article change')),
+            (REQUEST_ARTICLE_CHANGE, _('Can request article change')),
+        )
+
     base_form_class = ArticleForm
 
 
