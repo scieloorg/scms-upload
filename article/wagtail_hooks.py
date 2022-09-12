@@ -29,6 +29,18 @@ class RelatedItemCreateView(CreateView):
 
 
 class RequestArticleChangeCreateView(CreateView):
+    def get_instance(self):
+        change_request_obj = super().get_instance()
+
+        article_id = self.request.GET.get('article_id')
+        if article_id:
+            article = Article.objects.get(pk=article_id)
+
+            if article:
+                change_request_obj.article_id = article
+
+        return change_request_obj
+
 class ArticleModelAdmin(ModelAdmin):
     model = Article
     menu_label = _('Articles')
