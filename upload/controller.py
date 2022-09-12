@@ -2,6 +2,8 @@ from datetime import datetime
 
 from django.shortcuts import get_object_or_404
 
+from article.choices import RCT_CORRECTION, RCT_ERRATA
+
 from .models import ErrorResolution, ErrorResolutionOpinion, Package, ValidationError, choices
 
 
@@ -88,3 +90,28 @@ def update_package_check_opinions(package_id):
 
     package.status = choices.PS_ACCEPTED
     package.save()
+
+
+def create_package(article_id, user_id, file_name):
+    package = Package()
+    package.article_id = article_id
+    package.creator_id = user_id
+    package.created = datetime.utcnow()
+    package.file = file_name
+
+    package.save()
+
+    return package
+
+
+def update_package_check_request_change(package_id, change_type):
+    package = Package.objects.get(pk=package_id)
+
+    if change_type == RCT_ERRATA:
+        package.status = choices.PS_REQUIRED_ERRATUM
+    elif change_type == RCT_CORRECTION:
+        package.status = choices.PS_REQUIRED_UPDATE
+
+    package.save()
+
+    return package
