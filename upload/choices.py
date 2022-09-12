@@ -13,6 +13,9 @@ PS_ACCEPTED = 'accepted'
 PS_SCHEDULED_FOR_PUBLICATION = 'scheduled-for-publication'
 PS_PUBLISHED = 'published'
 
+PS_REQUIRED_ERRATUM = 'required-erratum'
+PS_REQUIRED_UPDATE = 'required-update'
+
 PACKAGE_STATUS = (
     (PS_SUBMITTED, _('Submitted')),
     (PS_ENQUEUED_FOR_VALIDATION, _('Enqueued for validation')),
@@ -25,6 +28,8 @@ PACKAGE_STATUS = (
     (PS_ACCEPTED, _('Accepted')),
     (PS_SCHEDULED_FOR_PUBLICATION, _('Scheduled for publication')),
     (PS_PUBLISHED, _('Published')),
+    (PS_REQUIRED_ERRATUM, _('Required erratum')),
+    (PS_REQUIRED_UPDATE, _('Required update')),
 )
 
 VE_PACKAGE_FILE_ERROR = 'package-file-error'
