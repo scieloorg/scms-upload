@@ -28,6 +28,7 @@ class RelatedItemCreateView(CreateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
+class RequestArticleChangeCreateView(CreateView):
 class ArticleModelAdmin(ModelAdmin):
     model = Article
     menu_label = _('Articles')
