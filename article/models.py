@@ -108,3 +108,33 @@ class RelatedItem(CommonControlField):
         return f'{self.source_article} - {self.target_article} ({self.item_type})'
 
     base_form_class = RelatedItemForm
+
+
+class RequestArticleChange(CommonControlField):
+    deadline = models.DateField(_('Deadline'), blank=False, null=False)
+    
+    change_type = models.CharField(_('Change type'), max_length=32, choices=choices.REQUEST_CHANGE_TYPE, blank=False, null=False)
+    comment = RichTextField(_('Comment'), max_length=512, blank=True, null=True)
+
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=True, null=True)
+    pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True)
+    demanded_user = models.ForeignKey(User, on_delete=models.CASCADE, blank=False, null=False)
+
+    panel_article = MultiFieldPanel(heading='Select an article from the list below or enter its PID v3 code', classname='collapsible')
+    panel_article.children = [
+        FieldPanel('article'),
+        FieldPanel('pid_v3'),
+    ]
+
+    panels = [
+        FieldPanel('deadline', classname='collapsible'),
+        panel_article,
+        FieldPanel('change_type', classname='collapsible'),
+        FieldPanel('demanded_user', classname='collapsible'),
+        FieldPanel('comment', classname='collapsible'),
+    ]
+
+    def __str__(self) -> str:
+        return f'{self.article or self.pid_v3} - {self.deadline}'
+
+    base_form_class = RequestArticleChangeForm
