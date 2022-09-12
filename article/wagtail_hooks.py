@@ -161,11 +161,53 @@ class RelatedItemModelAdmin(ModelAdmin):
         'target_article',
     )
 
+
+class RequestArticleChangeModelAdmin(ModelAdmin):
+    model = RequestArticleChange
+    menu_label = _('Request Change')
+    create_view_class = RequestArticleChangeCreateView
+    permission_helper_class = ArticlePermissionHelper
+    inspect_view_enabled=True
+    menu_icon = 'doc-full'
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+
+    list_display = (
+        'creator',
+        'created',
+        'deadline',
+        'article',
+        'pid_v3',
+        'change_type',
+        'demanded_user',
+    )
+    list_filter = (
+        'change_type',
+    )
+    search_fields = (
+        'article__pid_v2',
+        'article__pid_v3',
+        'article__doi_with_lang__doi'
+    )
+    inspect_view_fields = (
+        'creator',
+        'created',
+        'updated_by',
+        'updated',
+        'deadline',
+        'article',
+        'pid_v3',
+        'change_type',
+        'demanded_user',
+        'comment',
+    )
+
 class ArticleModelAdminGroup(ModelAdminGroup):
     menu_label = _('Articles')
     menu_icon = 'folder-open-inverse'
     menu_order = 200
-    items = (ArticleModelAdmin, RelatedItemModelAdmin)
+    items = (ArticleModelAdmin, RelatedItemModelAdmin, RequestArticleChangeModelAdmin)
 
 
 modeladmin_register(ArticleModelAdminGroup)
