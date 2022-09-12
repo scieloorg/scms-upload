@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 
 from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel
 
+from article.models import Article
 from core.models import CommonControlField
 
 from . import choices
@@ -15,9 +16,12 @@ class Package(CommonControlField):
     file = models.FileField(_('Package File'), null=True, blank=True)
     signature = models.CharField(_('Signature'), max_length=32, null=True, blank=True)
     status = models.CharField(_('Status'), max_length=32, choices=choices.PACKAGE_STATUS, default=choices.PS_ENQUEUED_FOR_VALIDATION)
+    article = models.ForeignKey(Article, blank=True, null=True, on_delete=models.SET_NULL)
 
     panels = [
+        FieldPanel('status'),
         FieldPanel('file'),
+        FieldPanel('article'),
     ]
 
     def __str__(self):
@@ -102,6 +106,7 @@ class ErrorResolution(CommonControlField):
         FieldPanel('action'),
         FieldPanel('comment'),
     ]
+
 
 class ErrorResolutionOpinion(CommonControlField):
     validation_error = models.OneToOneField('ValidationError', to_field='id', primary_key=True, related_name='analysis', on_delete=models.CASCADE)
