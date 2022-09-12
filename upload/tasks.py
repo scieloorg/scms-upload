@@ -188,7 +188,7 @@ def task_get_or_create_package(article_id, pid, user_id):
             })
 
         pkg_metadata = sps_maker.make_package_from_uris(
-            xml_uri=xml_uri.replace('https://kernel.scielo.br', 'http://192.168.0.33:6543'), 
+            xml_uri=xml_uri,
             renditions_uris_and_names=rend_uris_names, 
             zip_folder=file_utils.FileSystemStorage().base_location,
         )
