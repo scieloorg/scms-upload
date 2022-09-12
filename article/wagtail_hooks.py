@@ -41,6 +41,37 @@ class RequestArticleChangeCreateView(CreateView):
 
         return change_request_obj
 
+    def form_valid(self, form):
+        article_id = self.request.POST['article']
+        pid = self.request.POST['pid_v3']
+
+        package_id = get_or_create_package(
+            article_id=article_id, 
+            pid=pid,
+            user_id=self.request.user.id
+        )
+
+        if not package_id:
+            messages.error(
+                self.request,
+                _('It was not possible to submit the request. Check the PID v3 code.')
+            )
+            return redirect(self.request.META.get('HTTP_REFERER'))
+
+        change_request_obj = form.save_all(self.request.user)
+
+        update_package_check_request_change(
+            package_id=package_id,
+            change_type=change_request_obj.change_type
+        )
+
+        messages.success(
+            self.request, 
+            _('Change request submitted with success.')
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
 class ArticleModelAdmin(ModelAdmin):
     model = Article
     menu_label = _('Articles')
