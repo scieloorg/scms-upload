@@ -1,6 +1,15 @@
 from django.utils.translation import gettext as _
 
 
+RCT_ERRATA = 'errata'
+RCT_CORRECTION = 'correction'
+
+REQUEST_CHANGE_TYPE = (
+    (RCT_ERRATA, _('Errata')),
+    (RCT_CORRECTION, _('Correction')),
+)
+
+
 RIT_ADDENDUM = 'addendum'
 RIT_COMMENTARY_ARTICLE = 'commentary-article'
 RIT_CORRECTED_ARTICLE = 'corrected-article'
@@ -16,6 +25,7 @@ RELATED_ITEM_TYPE = (
     (RIT_PARTIAL_RETRACTION, _('Partial retraction')),
     (RIT_RETRACTED_ARTICLE, _('Retracted article')),
 )
+
 
 AT_ABSTRACT = 'abstract'
 AT_ADDENDUM = 'addendum'
