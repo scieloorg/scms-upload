@@ -76,6 +76,8 @@ class ArticleModelAdmin(ModelAdmin):
     model = Article
     menu_label = _('Articles')
     create_view_class = ArticleCreateView
+    button_helper_class = ArticleButtonHelper
+    permission_helper_class = ArticlePermissionHelper
     inspect_view_enabled=True
     menu_icon = 'doc-full'
     menu_order = 200
@@ -144,10 +146,10 @@ class RelatedItemModelAdmin(ModelAdmin):
     )
     list_filter = (
         'item_type',
-        'target_article__journal',
+        'target_article__issue',
     )
     search_fields = (
-        'target_article__journal__ISSNL',
+        'target_article__issue__journal_ISSNL',
     )
     inspect_view_fields = (
         'created',
