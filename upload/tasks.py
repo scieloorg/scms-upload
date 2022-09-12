@@ -1,14 +1,16 @@
-from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
 
+from packtools.sps import sps_maker
+
+from article.controller import create_article_from_opac
+from article.models import Article
 from config import celery_app
-from upload.utils import package_utils
+from libs.dsm.publication.db import mk_connection
+from libs.dsm.publication.documents import get_document
+from upload.models import Package
 
-from .utils import file_utils, xml_utils
+from .utils import file_utils, package_utils, xml_utils
 from . import choices, controller
-
-
-User = get_user_model()
 
 
 def run_validations(filename, package_id):
@@ -28,6 +30,11 @@ def check_resolutions(package_id):
 
 def check_opinions(package_id):
     task_check_opinions.apply_async(kwargs={'package_id': package_id}, countdown=3)
+
+
+def get_or_create_package(article_id, pid, user_id):
+    task_result = task_get_or_create_package.apply_async(kwargs={'article_id': article_id, 'pid': pid, 'user_id': user_id})
+    return task_result.get()
 
 
 @celery_app.task()
@@ -148,3 +155,48 @@ def task_check_resolutions(package_id):
 @celery_app.task()
 def task_check_opinions(package_id):
     controller.update_package_check_opinions(package_id)
+
+
+@celery_app.task()
+def task_get_or_create_package(article_id, pid, user_id):
+    mk_connection()
+
+    if article_id:
+        article_inst = Article.objects.get(pk=article_id)
+        doc = get_document(aid=article_inst.pid_v3)
+    elif pid:
+        doc = get_document(aid=pid)
+        if doc.aid is not None:
+            try:
+                article_inst = Article.objects.get(pid_v3=doc.aid)
+            except Article.DoesNotExist:
+                article_inst = create_article_from_opac(doc, user_id)
+
+    if doc.aid is None:
+        return
+
+    try:
+        pkg = Package.objects.get(article__pid_v3=article_inst.pid_v3)
+        return pkg.id
+    except Package.DoesNotExist:
+        xml_uri = doc.xml
+        rend_uris_names = []
+        for rend in doc.pdfs:
+            rend_uris_names.append({
+                'uri': rend['url'],
+                'name': rend['filename'],
+            })
+
+        pkg_metadata = sps_maker.make_package_from_uris(
+            xml_uri=xml_uri.replace('https://kernel.scielo.br', 'http://192.168.0.33:6543'), 
+            renditions_uris_and_names=rend_uris_names, 
+            zip_folder=file_utils.FileSystemStorage().base_location,
+        )
+
+        pkg = controller.create_package(
+            article_id=article_inst.id, 
+            user_id=user_id, 
+            file_name=file_utils.os.path.basename(pkg_metadata['zip']),
+        )
+
+        return pkg.id
