@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: ./compose/production/django/Dockerfile
-    image: core_production_django
+    image: upload_production_django
     platform: linux/x86_64
     depends_on:
       - postgres
@@ -32,41 +32,38 @@ services:
     build:
       context: .
       dockerfile: ./compose/production/postgres/Dockerfile
-    image: core_production_postgres
+    image: upload_production_postgres
     volumes:
       - ../scms_data/data_prod:/var/lib/postgresql/data:Z
       - ../scms_data/data_prod_backup:/backups:z
     env_file:
       - ./.envs/.production/.postgres
 
-  traefik:
-    build:
-      context: .
-      dockerfile: ./compose/production/traefik/Dockerfile
-    image: core_production_traefik
-    depends_on:
-      - django
+  mongo:
+    image: mongo
+    container_name: upload_production_mongo
+    restart: always
+    user: mongodb
+    hostname: mongo
     volumes:
-      - ../scms_data/traefik:/etc/traefik/acme:z
+      - ../scms_data/mongo:/data/db
     ports:
-      - "0.0.0.0:80:80"
-      - "0.0.0.0:443:443"
-      - "0.0.0.0:5555:5555"
+        - "27017:27017"
 
   redis:
     image: redis:6
 
   celeryworker:
     <<: *django
-    image: core_production_celeryworker
+    image: upload_production_celeryworker
     command: /start-celeryworker
 
   celerybeat:
     <<: *django
-    image: core_production_celerybeat
+    image: upload_production_celerybeat
     command: /start-celerybeat
 
   flower:
     <<: *django
-    image: core_production_flower
+    image: upload_production_flower
     command: /start-flower
