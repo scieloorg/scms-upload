@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
@@ -101,7 +102,10 @@ class PackageAdmin(ModelAdmin):
         if self.permission_helper.user_can_access_all_packages(request.user, None):
             return qs
     
-        return qs.filter(creator=request.user)
+        return qs.filter(
+            Q(creator=request.user) |
+            Q(article__requestarticlechange__demanded_user=request.user)
+        )
 
 
 class QualityAnalystPackageAdmin(ModelAdmin):
