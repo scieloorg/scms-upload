@@ -2,10 +2,10 @@ from django.utils.translation import gettext as _
 
 from packtools.sps import sps_maker
 
-from article.controller import create_article_from_opac
+from article.controller import create_article_from_etree
 from article.models import Article
 from config import celery_app
-from libs.dsm.publication.db import mk_connection
+from libs.dsm.publication.db import mk_connection, exceptions
 from libs.dsm.publication.documents import get_document
 from upload.models import Package
 
@@ -157,9 +157,13 @@ def task_check_opinions(package_id):
     controller.update_package_check_opinions(package_id)
 
 
-@celery_app.task()
+@celery_app.task(name=_('Get or create package'))
 def task_get_or_create_package(article_id, pid, user_id):
-    mk_connection()
+    try:
+        # Tries to connect to site database (opac.article)
+        mk_connection()
+    except exceptions.DBConnectError:
+        return {'error': _('Site database is unavailable.')}
 
     if article_id:
         article_inst = Article.objects.get(pk=article_id)
