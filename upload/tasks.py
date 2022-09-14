@@ -174,7 +174,9 @@ def task_get_or_create_package(article_id, pid, user_id):
             try:
                 article_inst = Article.objects.get(pid_v3=doc.aid)
             except Article.DoesNotExist:
-                article_inst = create_article_from_opac(doc, user_id)
+                xml_content = file_utils.get_xml_content_from_uri(doc.xml)
+                xml_etree = package_utils.get_etree_from_xml_content(xml_content)
+                article_inst = create_article_from_etree(xml_etree, user_id)
 
     if doc.aid is None:
         return
