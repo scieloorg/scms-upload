@@ -179,13 +179,12 @@ def task_get_or_create_package(article_id, pid, user_id):
                 article_inst = create_article_from_etree(xml_etree, user_id)
 
     if doc.aid is None:
-        return
+        return {'error': _('It was not possible to retrieve a valid article.')}
 
     try:
-        pkg = Package.objects.get(article__pid_v3=article_inst.pid_v3)
-        return pkg.id
+        return Package.objects.get(article__pid_v3=article_inst.pid_v3).id
     except Package.DoesNotExist:
-        xml_uri = doc.xml
+        # Retrieves PDF uris and names
         rend_uris_names = []
         for rend in doc.pdfs:
             rend_uris_names.append({
@@ -193,12 +192,14 @@ def task_get_or_create_package(article_id, pid, user_id):
                 'name': rend['filename'],
             })
 
+        # Creates a zip file
         pkg_metadata = sps_maker.make_package_from_uris(
-            xml_uri=xml_uri,
+            xml_uri=doc.xml,
             renditions_uris_and_names=rend_uris_names, 
             zip_folder=file_utils.FileSystemStorage().base_location,
         )
 
+        # Creates a package record
         pkg = controller.create_package(
             article_id=article_inst.id, 
             user_id=user_id, 
