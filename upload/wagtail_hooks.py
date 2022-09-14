@@ -44,6 +44,11 @@ class PackageAdminInspectView(InspectView):
                 'inspect_url': ValidationErrorAdmin().url_helper.get_action_url('inspect', ve.id)
             })
 
+        if data['status'] in (choices.PS_REQUIRED_UPDATE, choices.PS_REQUIRED_ERRATUM):
+            data['requested_changes'] = []
+            for rac in self.instance.article.requestarticlechange_set.all():
+                data['requested_changes'].append(rac)
+
         return super().get_context_data(**data)
 
 
