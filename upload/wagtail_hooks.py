@@ -30,6 +30,7 @@ class PackageAdminInspectView(InspectView):
             'package_id': self.instance.id,
             'status': self.instance.status,
             'languages': package_utils.get_languages(self.instance.file.name),
+            'package_download_link': self.instance.file.url,
         }
 
         for ve in self.instance.validationerror_set.all():
