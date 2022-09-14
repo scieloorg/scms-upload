@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from .models import Article
+from packtools.sps.models.article_ids import ArticleIds
 
+from .models import Article as dbArticle
 
 
 def create_article_from_etree(xml_tree, user_id):
