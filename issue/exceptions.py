@@ -1,0 +1,3 @@
+
+class GetOrCreateIssueError(Exception):
+    ...
