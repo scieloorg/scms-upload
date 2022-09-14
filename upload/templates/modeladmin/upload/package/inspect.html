@@ -27,6 +27,7 @@
     {{ block.super }}
 
     <div class="nice-padding">
+        {% if status != 'required-erratum' and status != 'required-update' %}
         <h3>{% trans "Reports" %}</h3>
         <table class="listing">
             <thead>
