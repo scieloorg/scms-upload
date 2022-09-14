@@ -3,20 +3,15 @@ from datetime import datetime
 from .models import Article
 
 
-def create_article_from_opac(opac_article, user_id):
-    article = Article()
-    article.aop_pid = opac_article.aop_pid
-    article.pid_v3 = opac_article.aid
-    article.pid_v2 = opac_article.pid
 
-    article.article_type = opac_article.type
+def create_article_from_etree(xml_tree, user_id):
+    article = dbArticle()
 
-    article.elocation_id = opac_article.elocation
-    article.fpage = opac_article.fpage
-    article.lpage = opac_article.lpage
+    _ids = ArticleIds(xml_tree)
 
-    # FIXME: it is necessary to populate fields issue, doi_with_lang, etc...
-    # article.issue = Issue.objects.get(opac_article.issue.pid)
+    article.aop_pid = _ids.aop_pid
+    article.pid_v3 = _ids.v3
+    article.pid_v2 = _ids.v2
 
     article.created = datetime.utcnow()
     article.creator_id = user_id
