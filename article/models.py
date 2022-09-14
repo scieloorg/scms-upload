@@ -24,8 +24,6 @@ User = get_user_model()
 class Article(ClusterableModel, CommonControlField):
     # Identifiers
     pid_v3 = models.CharField(_('PID v3'), max_length=23, blank=True, null=True)
-
-    # FIXME: remover assim que forem contemplados por SciELODocument
     pid_v2 = models.CharField(_('PID v2'), max_length=23, blank=True, null=True)
     aop_pid = models.CharField(_('AOP PID'), max_length=23, blank=True, null=True)
 
