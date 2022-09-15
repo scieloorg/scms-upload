@@ -1,25 +1,29 @@
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from modelcluster.fields import ParentalKey
 from wagtail.admin.edit_handlers import InlinePanel, FieldPanel, MultiFieldPanel
 from wagtail.core.models import Orderable, ClusterableModel
+from wagtail.core.fields import RichTextField
 
 from core.models import CommonControlField
 from doi.models import DOIWithLang
 from issue.models import Issue
 from researcher.models import Researcher
 
-from .forms import ArticleForm, RelatedItemForm
+from .forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
+from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
 
 from . import choices
+
+
+User = get_user_model()
 
 
 class Article(ClusterableModel, CommonControlField):
     # Identifiers
     pid_v3 = models.CharField(_('PID v3'), max_length=23, blank=True, null=True)
-
-    # FIXME: remover assim que forem contemplados por SciELODocument
     pid_v2 = models.CharField(_('PID v2'), max_length=23, blank=True, null=True)
     aop_pid = models.CharField(_('AOP PID'), max_length=23, blank=True, null=True)
 
@@ -61,6 +65,12 @@ class Article(ClusterableModel, CommonControlField):
 
     def __str__(self):
         return f'{self.pid_v3 or self.pid_v2 or self.aop_pid or self.id}'
+
+    class Meta:
+        permissions = (
+            (MAKE_ARTICLE_CHANGE, _('Can make article change')),
+            (REQUEST_ARTICLE_CHANGE, _('Can request article change')),
+        )
 
     base_form_class = ArticleForm
 
@@ -108,3 +118,33 @@ class RelatedItem(CommonControlField):
         return f'{self.source_article} - {self.target_article} ({self.item_type})'
 
     base_form_class = RelatedItemForm
+
+
+class RequestArticleChange(CommonControlField):
+    deadline = models.DateField(_('Deadline'), blank=False, null=False)
+    
+    change_type = models.CharField(_('Change type'), max_length=32, choices=choices.REQUEST_CHANGE_TYPE, blank=False, null=False)
+    comment = RichTextField(_('Comment'), max_length=512, blank=True, null=True)
+
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=True, null=True)
+    pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True)
+    demanded_user = models.ForeignKey(User, on_delete=models.CASCADE, blank=False, null=False)
+
+    panel_article = MultiFieldPanel(heading='Select an article from the list below or enter its PID v3 code', classname='collapsible')
+    panel_article.children = [
+        FieldPanel('article'),
+        FieldPanel('pid_v3'),
+    ]
+
+    panels = [
+        FieldPanel('deadline', classname='collapsible'),
+        panel_article,
+        FieldPanel('change_type', classname='collapsible'),
+        FieldPanel('demanded_user', classname='collapsible'),
+        FieldPanel('comment', classname='collapsible'),
+    ]
+
+    def __str__(self) -> str:
+        return f'{self.article or self.pid_v3} - {self.deadline}'
+
+    base_form_class = RequestArticleChangeForm

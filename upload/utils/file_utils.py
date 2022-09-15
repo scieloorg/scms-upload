@@ -1,6 +1,8 @@
 from django.core.files.storage import FileSystemStorage
 from django.utils.translation import gettext as _
 
+from packtools.sps.libs.reqs import requests_get_content
+
 import os
 import zipfile
 
@@ -50,6 +52,10 @@ def get_file_list_from_zip(path):
 
     except zipfile.BadZipFile:
         raise BadPackageFileError(f'Package {file_absolute_path} is invalid')
+
+
+def get_xml_content_from_uri(uri):
+    return requests_get_content(uri)
 
 
 def get_xml_content_from_zip(path):

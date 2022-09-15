@@ -69,6 +69,7 @@ class PackageAdmin(ModelAdmin):
     exclude_from_explorer = False
 
     list_display = (
+        'article',
         'file',
         'status',
         'creator',
@@ -81,10 +82,12 @@ class PackageAdmin(ModelAdmin):
     )
     search_fields = (
         'file',
-        'creator',
-        'updated_by',
+        'article__pid_v3',
+        'creator__username',
+        'updated_by__username',
     )
     inspect_view_fields = (
+        'article',
         'status',
         'file', 
         'created', 
@@ -125,8 +128,8 @@ class QualityAnalystPackageAdmin(ModelAdmin):
     list_filter = ()
     search_fields = (
         'file',
-        'creator',
-        'updated_by',
+        'creator__username',
+        'updated_by__username',
     )
     
     def get_queryset(self, request):
@@ -185,7 +188,7 @@ class ValidationErrorAdmin(ModelAdmin):
     )
     search_fields = (
         'message',
-        'package',
+        'package__file',
     )
     inspect_view_fields = {
         'package',
