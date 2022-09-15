@@ -3,6 +3,10 @@ import os
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
+from wagtail.core.fields import RichTextField
+from wagtail.admin.edit_handlers import FieldPanel
+from wagtail.snippets.models import register_snippet
+from . import choices
 
 User = get_user_model()
 
@@ -47,6 +51,19 @@ class CommonControlField(models.Model):
         blank=True,
         on_delete=models.CASCADE,
     )
+
+    class Meta:
+        abstract = True
+
+
+class RichTextWithLang(models.Model):
+    text = RichTextField(null=False, blank=False)
+    language = models.CharField(_('Language'), max_length=2, choices=choices.LANGUAGE, null=False, blank=False)
+
+    panels=[
+        FieldPanel('text'),
+        FieldPanel('language')
+    ]
 
     class Meta:
         abstract = True
