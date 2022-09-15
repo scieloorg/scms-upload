@@ -2,11 +2,14 @@ from datetime import datetime
 
 from packtools.sps.models.article_ids import ArticleIds
 
-from .models import Article as dbArticle
+from django.utils.translation import gettext_lazy as _
+
+from .models import Article
+from . import exceptions
 
 
 def create_article_from_etree(xml_tree, user_id):
-    article = dbArticle()
+    article = Article()
 
     _ids = ArticleIds(xml_tree)
 
@@ -20,3 +23,15 @@ def create_article_from_etree(xml_tree, user_id):
     article.save()
 
     return article
+
+
+def get_or_create_official_article(official_issue, **kwargs):
+    try:
+        official_article, status = Article.objects.get_or_create(**kwargs)
+    except Exception as e:
+        raise exceptions.GetOrCreateDocumentError(
+            _('Unable to get or create official article {} {} {}').format(
+                str(kwargs), type(e), e
+            )
+        )
+    return official_article
