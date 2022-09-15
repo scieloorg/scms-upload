@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
@@ -29,6 +30,7 @@ class PackageAdminInspectView(InspectView):
             'package_id': self.instance.id,
             'status': self.instance.status,
             'languages': package_utils.get_languages(self.instance.file.name),
+            'package_download_link': self.instance.file.url,
         }
 
         for ve in self.instance.validationerror_set.all():
@@ -41,6 +43,11 @@ class PackageAdminInspectView(InspectView):
                 'id': ve.id, 
                 'inspect_url': ValidationErrorAdmin().url_helper.get_action_url('inspect', ve.id)
             })
+
+        if data['status'] in (choices.PS_REQUIRED_UPDATE, choices.PS_REQUIRED_ERRATUM):
+            data['requested_changes'] = []
+            for rac in self.instance.article.requestarticlechange_set.all():
+                data['requested_changes'].append(rac)
 
         return super().get_context_data(**data)
 
@@ -101,7 +108,10 @@ class PackageAdmin(ModelAdmin):
         if self.permission_helper.user_can_access_all_packages(request.user, None):
             return qs
     
-        return qs.filter(creator=request.user)
+        return qs.filter(
+            Q(creator=request.user) |
+            Q(article__requestarticlechange__demanded_user=request.user)
+        )
 
 
 class QualityAnalystPackageAdmin(ModelAdmin):

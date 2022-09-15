@@ -1,5 +1,5 @@
 {% extends "modeladmin/inspect.html" %}
-{% load i18n modeladmin_tags wagtailadmin_tags %}
+{% load i18n modeladmin_tags wagtailadmin_tags wagtailcore_tags %}
 
 {% block fields_output %}
     {% if fields %}
@@ -27,6 +27,7 @@
     {{ block.super }}
 
     <div class="nice-padding">
+        {% if status != 'required-erratum' and status != 'required-update' %}
         <h3>{% trans "Reports" %}</h3>
         <table class="listing">
             <thead>
@@ -119,6 +120,28 @@
                 </tr>
             </tbody>
         </table>
+        {% else %}
+        <h3>{% trans "Change instructions" %}</h3>
+        {% for rac in requested_changes %}
+            <dl class='help-block help-info'>
+                <dt>{% trans 'Identifier' %}</dt>
+                <dd>{{ rac.id }}</dd>
+                <dt>{% trans 'Type' %}</dt>
+                <dd>{{ rac.get_change_type_display }}</dd>
+                <dt>{% trans 'Deadline' %}</dt>
+                <dd>{{ rac.deadline }}</dd>
+                <dt>{% trans 'Instructions' %}</dt>
+                <dd>{{ rac.comment|richtext }}</dd>
+            </dl>
+        {% endfor %}
+        <a href="{{ package_download_link }}" class="button bicolor button--icon">
+            <span class="icon-wrapper">
+                <svg class="icon icon-download-alt icon" aria-hidden="true" focusable="false">
+                    <use href="#icon-download-alt"></use>
+                </svg>
+            </span>{% trans 'Download package' %}
+        </a>
+        {% endif %}
     </div>
 
     <div class="nice-padding">
