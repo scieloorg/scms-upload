@@ -58,7 +58,7 @@ class CommonControlField(models.Model):
 
 class RichTextWithLang(models.Model):
     text = RichTextField(null=False, blank=False)
-    language = models.CharField(_('Language'), max_length=100, choices=choices.LANGUAGE, null=False, blank=False)
+    language = models.CharField(_('Language'), max_length=2, choices=choices.LANGUAGE, null=False, blank=False)
 
     panels=[
         FieldPanel('text'),
