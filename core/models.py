@@ -67,3 +67,20 @@ class RichTextWithLang(models.Model):
 
     class Meta:
         abstract = True
+
+
+class TextWithLangAndValidity(models.Model):
+    text = models.CharField(_('Text'), max_length=255, null=False, blank=False)
+    language = models.CharField(_('Language'), max_length=2, choices=choices.LANGUAGE, null=False, blank=False)
+    initial_date = models.DateField(null=True, blank=True)
+    final_date = models.DateField(null=True, blank=True)
+
+    panels=[
+        FieldPanel('text'),
+        FieldPanel('language'),
+        FieldPanel('initial_date'),
+        FieldPanel('final_date')
+    ]
+
+    class Meta:
+        abstract = True
