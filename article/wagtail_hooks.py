@@ -73,6 +73,21 @@ class RequestArticleChangeCreateView(CreateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
+class ArticleAdminInspectView(InspectView):
+    def get_context_data(self):
+        data = {
+            'status': self.instance.status, 
+            'packages': self.instance.package_set.all()
+        }
+
+        if self.instance.status in (choices.AS_REQUIRE_CORRECTION, choices.AS_REQUIRE_ERRATUM):
+            data['requested_changes'] = []
+            for rac in self.instance.requestarticlechange_set.all():
+                data['requested_changes'].append(rac)
+
+        return super().get_context_data(**data)
+
+
 class ArticleModelAdmin(ModelAdmin):
     model = Article
     menu_label = _('Articles')
@@ -80,6 +95,7 @@ class ArticleModelAdmin(ModelAdmin):
     button_helper_class = ArticleButtonHelper
     permission_helper_class = ArticlePermissionHelper
     inspect_view_enabled=True
+    inspect_view_class = ArticleAdminInspectView
     menu_icon = 'doc-full'
     menu_order = 200
     add_to_settings_menu = False
