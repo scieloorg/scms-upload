@@ -11,6 +11,7 @@ REQUEST_CHANGE_TYPE = (
 )
 
 
+# Model RelatedItem, Field item_type
 RIT_ADDENDUM = 'addendum'
 RIT_COMMENTARY_ARTICLE = 'commentary-article'
 RIT_CORRECTED_ARTICLE = 'corrected-article'
@@ -28,6 +29,7 @@ RELATED_ITEM_TYPE = (
 )
 
 
+# Model Article, Field article_type
 AT_ABSTRACT = 'abstract'
 AT_ADDENDUM = 'addendum'
 AT_ANNOUNCEMENT = 'announcement'
