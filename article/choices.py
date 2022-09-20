@@ -1,12 +1,13 @@
 from django.utils.translation import gettext as _
 
 
-RCT_ERRATA = 'errata'
+# Model RequestArticleChange, Field change_type
 RCT_CORRECTION = 'correction'
+RCT_ERRATUM = 'erratum'
 
 REQUEST_CHANGE_TYPE = (
-    (RCT_ERRATA, _('Errata')),
     (RCT_CORRECTION, _('Correction')),
+    (RCT_ERRATUM, _('Erratum')),
 )
 
 
