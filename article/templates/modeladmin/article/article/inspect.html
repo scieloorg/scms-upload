@@ -32,3 +32,36 @@
                 </dl>
             {% endfor %}
         {% endif %}
+
+        <h3>{% trans 'Available packages' %}</h3>
+        <table class="listing">
+            <thead>
+                <tr>
+                    <th>{% trans 'Creator' %}</th>
+                    <th>{% trans 'Created' %}</th>
+                    <th>{% trans 'Status' %}</th>
+                    <th>{% trans 'Link' %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pkg in packages %}
+                    <tr>
+                        <td>{{ pkg.creator }}</td>
+                        <td>{{ pkg.created }}</td>
+                        <td>{{ pkg.get_status_display }}</td>
+                        <td>
+                            <a href="{{ pkg.file.name }}" class="button bicolor button--icon">
+                                <span class="icon-wrapper">
+                                    <svg class="icon icon-download-alt icon" aria-hidden="true" focusable="false">
+                                        <use href="#icon-download-alt"></use>
+                                    </svg>
+                                </span>{% trans 'Download package' %}
+                            </a>
+                        </td>
+                    </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+{% endblock %}
