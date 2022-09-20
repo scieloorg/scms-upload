@@ -25,6 +25,23 @@ def create_article_from_etree(xml_tree, user_id):
     return article
 
 
+def update_article(article_id, **kwargs):
+    try:
+        article = Article.objects.get(pk=article_id)
+        for k, v in kwargs.items():
+            setattr(article, k, v)
+        article.save()
+    except Article.DoesNotExist:
+        raise
+    except Exception as e:
+        raise exceptions.UpdateDocumentError(
+            _('Unable to update article {} {} {}').format(
+                str(kwargs), type(e), e
+            )
+        )
+    return article
+
+
 def get_or_create_official_article(official_issue, **kwargs):
     try:
         official_article, status = Article.objects.get_or_create(**kwargs)
