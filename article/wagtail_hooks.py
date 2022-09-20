@@ -93,12 +93,14 @@ class ArticleModelAdmin(ModelAdmin):
         'doi_list',
         'aop_pid',
         'article_type',
+        'status',
         'issue',
         'created',
         'updated',
         'updated_by',
     )
     list_filter = (
+        'status',        
         'article_type',
     )
     search_fields = (
@@ -117,6 +119,7 @@ class ArticleModelAdmin(ModelAdmin):
         'aop_pid',
         'doi_with_lang',
         'article_type',
+        'status',
         'issue',
         'author',
         'title_with_lang',
@@ -202,6 +205,7 @@ class RequestArticleChangeModelAdmin(ModelAdmin):
         'demanded_user',
         'comment',
     )
+
 
 class ArticleModelAdminGroup(ModelAdminGroup):
     menu_label = _('Articles')

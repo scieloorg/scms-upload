@@ -107,3 +107,13 @@ ARTICLE_TYPE = (
     (AT_TECHNICAL_REPORT, _('Technical-Report')),
     (AT_TRANSLATION, _('Translation')),
 )
+
+
+# Model Article, Field status
+AS_REQUIRE_CORRECTION = 'required-correction'
+AS_REQUIRE_ERRATUM = 'required-erratum'
+
+ARTICLE_STATUS = (
+    (AS_REQUIRE_CORRECTION, _('Required correction')),
+    (AS_REQUIRE_ERRATUM, _('Required erratum')),
+)

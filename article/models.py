@@ -30,6 +30,9 @@ class Article(ClusterableModel, CommonControlField):
     # Article type
     article_type = models.CharField(_('Article type'), max_length=32, choices=choices.ARTICLE_TYPE, blank=False, null=False)
 
+    # Article status
+    status = models.CharField(_('Article status'), max_length=32, choices=choices.ARTICLE_STATUS, blank=True, null=True)
+
     # Page
     elocation_id = models.CharField(_('Elocation ID'), max_length=64, blank=True, null=True)
     fpage = models.CharField(_('First page'), max_length=16, blank=True, null=True)
@@ -50,6 +53,7 @@ class Article(ClusterableModel, CommonControlField):
     panel_article_details = MultiFieldPanel(heading='Article details', classname='collapsible')
     panel_article_details.children = [
         FieldPanel('article_type'),
+        FieldPanel('status'),
         InlinePanel(relation_name='title_with_lang', label='Title with Language'),
         InlinePanel(relation_name='author', label='Authors'),
         FieldPanel('elocation_id'),
