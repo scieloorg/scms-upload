@@ -30,7 +30,6 @@ class PackageAdminInspectView(InspectView):
             'package_id': self.instance.id,
             'status': self.instance.status,
             'languages': package_utils.get_languages(self.instance.file.name),
-            'package_download_link': self.instance.file.url,
         }
 
         for ve in self.instance.validationerror_set.all():
@@ -43,11 +42,6 @@ class PackageAdminInspectView(InspectView):
                 'id': ve.id, 
                 'inspect_url': ValidationErrorAdmin().url_helper.get_action_url('inspect', ve.id)
             })
-
-        if data['status'] in (choices.PS_REQUIRED_UPDATE, choices.PS_REQUIRED_ERRATUM):
-            data['requested_changes'] = []
-            for rac in self.instance.article.requestarticlechange_set.all():
-                data['requested_changes'].append(rac)
 
         return super().get_context_data(**data)
 
