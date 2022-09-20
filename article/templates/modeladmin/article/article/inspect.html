@@ -1,0 +1,14 @@
+{% extends "modeladmin/inspect.html" %}
+{% load i18n modeladmin_tags wagtailadmin_tags wagtailcore_tags %}
+
+{% block fields_output %}
+    {% if fields %}
+        <h3>{% trans "Details" %}</h3>
+        <dl>
+            {% for field in fields %}
+                <dt class="{{ field.type|lower }}">{{ field.label }}</dt>
+                <dd>{{ field.value }}</dd>
+            {% endfor %}
+        </dl>
+    {% endif %}
+{% endblock %}
