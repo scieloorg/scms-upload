@@ -19,7 +19,6 @@ class Package(CommonControlField):
     article = models.ForeignKey(Article, blank=True, null=True, on_delete=models.SET_NULL)
 
     panels = [
-        FieldPanel('status'),
         FieldPanel('file'),
         FieldPanel('article'),
     ]
