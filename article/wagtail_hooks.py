@@ -6,13 +6,13 @@ from django.utils.translation import gettext as _
 
 from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
-from wagtail.contrib.modeladmin.views import CreateView
+from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
-from upload.controller import update_package_check_request_change
 from upload.tasks import get_or_create_package
 
 from .button_helper import ArticleButtonHelper
-from .models import Article, RelatedItem, RequestArticleChange
+from .controller import update_article
+from .models import Article, RelatedItem, RequestArticleChange, choices
 from .permission_helper import ArticlePermissionHelper
 
 
@@ -60,10 +60,11 @@ class RequestArticleChangeCreateView(CreateView):
 
         change_request_obj = form.save_all(self.request.user)
 
-        update_package_check_request_change(
-            package_id=package_id,
-            change_type=change_request_obj.change_type
-        )
+        if change_request_obj.change_type == choices.RCT_ERRATUM:
+            article_status =  choices.AS_REQUIRE_ERRATUM
+        elif change_request_obj.change_type ==  choices.RCT_CORRECTION:
+            article_status = choices.AS_REQUIRE_CORRECTION
+        update_article(article_id=article_id, status=article_status)
 
         messages.success(
             self.request, 
