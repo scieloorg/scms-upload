@@ -14,7 +14,7 @@ from .tasks import run_validations
 from .utils import package_utils
 
 
-class UploadPackageCreateView(CreateView):
+class PackageCreateView(CreateView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
 
@@ -30,7 +30,6 @@ class PackageAdminInspectView(InspectView):
             'package_id': self.instance.id,
             'status': self.instance.status,
             'languages': package_utils.get_languages(self.instance.file.name),
-            'package_download_link': self.instance.file.url,
         }
 
         for ve in self.instance.validationerror_set.all():
@@ -43,11 +42,6 @@ class PackageAdminInspectView(InspectView):
                 'id': ve.id, 
                 'inspect_url': ValidationErrorAdmin().url_helper.get_action_url('inspect', ve.id)
             })
-
-        if data['status'] in (choices.PS_REQUIRED_UPDATE, choices.PS_REQUIRED_ERRATUM):
-            data['requested_changes'] = []
-            for rac in self.instance.article.requestarticlechange_set.all():
-                data['requested_changes'].append(rac)
 
         return super().get_context_data(**data)
 
@@ -66,7 +60,7 @@ class PackageAdmin(ModelAdmin):
     model = Package
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
-    create_view_class = UploadPackageCreateView
+    create_view_class = PackageCreateView
     inspect_view_enabled=True
     inspect_view_class = PackageAdminInspectView
     menu_label = _('Packages')
@@ -207,13 +201,13 @@ class ValidationErrorAdmin(ModelAdmin):
     }
 
 
-class UploadModelAdmin(ModelAdminGroup):
+class UploadModelAdminGroup(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Upload'
     items = (PackageAdmin, QualityAnalystPackageAdmin, ValidationErrorAdmin)
 
 
-modeladmin_register(UploadModelAdmin)
+modeladmin_register(UploadModelAdminGroup)
 
 
 @hooks.register('register_admin_urls')

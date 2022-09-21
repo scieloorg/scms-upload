@@ -28,8 +28,8 @@ PACKAGE_STATUS = (
     (PS_ACCEPTED, _('Accepted')),
     (PS_SCHEDULED_FOR_PUBLICATION, _('Scheduled for publication')),
     (PS_PUBLISHED, _('Published')),
-    (PS_REQUIRED_ERRATUM, _('Required erratum')),
-    (PS_REQUIRED_UPDATE, _('Required update')),
+)
+
 )
 
 VE_PACKAGE_FILE_ERROR = 'package-file-error'

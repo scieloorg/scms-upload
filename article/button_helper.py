@@ -2,6 +2,7 @@ from django.utils.translation import gettext as _
 
 from wagtail.contrib.modeladmin.helpers import ButtonHelper
 
+from .choices import AS_REQUIRE_CORRECTION, AS_REQUIRE_ERRATUM
 
 class ArticleButtonHelper(ButtonHelper):
     index_button_classnames = ["button", "button-small", "button-secondary"]
@@ -32,13 +33,12 @@ class ArticleButtonHelper(ButtonHelper):
         url_name = self.request.resolver_match.url_name
 
         classnames = []
-        if ph.user_can_request_article_change(usr, obj):
-            if url_name == 'article_article_modeladmin_inspect':
-                classnames.extend(ButtonHelper.inspect_button_classnames)
+        if url_name == 'article_article_modeladmin_inspect':
+            classnames.extend(ButtonHelper.inspect_button_classnames)
+        if url_name == 'article_article_modeladmin_index':
+            classnames.extend(ArticleButtonHelper.index_button_classnames)
 
-            if url_name == 'article_article_modeladmin_index':
-                classnames.extend(ArticleButtonHelper.index_button_classnames)
-
+        if ph.user_can_request_article_change(usr, obj) and obj.status not in (AS_REQUIRE_CORRECTION, AS_REQUIRE_ERRATUM):
             btns.append(self.request_change(obj, classnames))
 
         return btns

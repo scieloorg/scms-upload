@@ -1,15 +1,17 @@
 from django.utils.translation import gettext as _
 
 
-RCT_ERRATA = 'errata'
+# Model RequestArticleChange, Field change_type
 RCT_CORRECTION = 'correction'
+RCT_ERRATUM = 'erratum'
 
 REQUEST_CHANGE_TYPE = (
-    (RCT_ERRATA, _('Errata')),
     (RCT_CORRECTION, _('Correction')),
+    (RCT_ERRATUM, _('Erratum')),
 )
 
 
+# Model RelatedItem, Field item_type
 RIT_ADDENDUM = 'addendum'
 RIT_COMMENTARY_ARTICLE = 'commentary-article'
 RIT_CORRECTED_ARTICLE = 'corrected-article'
@@ -27,6 +29,7 @@ RELATED_ITEM_TYPE = (
 )
 
 
+# Model Article, Field article_type
 AT_ABSTRACT = 'abstract'
 AT_ADDENDUM = 'addendum'
 AT_ANNOUNCEMENT = 'announcement'
@@ -103,4 +106,16 @@ ARTICLE_TYPE = (
     (AT_REVIEW_ARTICLE, _('Review-Article')),
     (AT_TECHNICAL_REPORT, _('Technical-Report')),
     (AT_TRANSLATION, _('Translation')),
+)
+
+
+# Model Article, Field status
+AS_REQUIRE_CORRECTION = 'required-correction'
+AS_REQUIRE_ERRATUM = 'required-erratum'
+AS_PUBLISHED = 'published'
+
+ARTICLE_STATUS = (
+    (AS_REQUIRE_CORRECTION, _('Required correction')),
+    (AS_REQUIRE_ERRATUM, _('Required erratum')),
+    (AS_PUBLISHED, _('Published')),
 )
