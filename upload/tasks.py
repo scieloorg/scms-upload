@@ -8,20 +8,23 @@ from config import celery_app
 from libs.dsm.publication.db import mk_connection, exceptions
 from libs.dsm.publication.documents import get_document
 from upload.models import Package
+from upload.choices import PT_ERRATUM, PT_CORRECTION
 
 from .utils import file_utils, package_utils, xml_utils
 from . import choices, controller
 
 
-def run_validations(filename, package_id):
-    # TODO: It is necessary to verify if the package contains only one document (XML)
-    xml_format_is_valid = task_validate_xml_format(filename, package_id)
+def run_validations(filename, package_id, package_type, article_id=None):
+    if article_id is not None and package_type in (PT_CORRECTION, PT_ERRATUM):
+        task_validate_article_change(filename, package_id, package_type, article_id)
+    else:
+        xml_format_is_valid = task_validate_xml_format(filename, package_id)
 
-    if xml_format_is_valid:
-        optimised_filepath = task_optimise_package(filename)
+        if xml_format_is_valid:
+            optimised_filepath = task_optimise_package(filename)
 
-        task_validate_assets.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
-        task_validate_renditions.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
+            task_validate_assets.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
+            task_validate_renditions.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
 
 
 def check_resolutions(package_id):
