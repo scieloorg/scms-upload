@@ -8,10 +8,10 @@ from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
+from upload.models import Package
 from upload.tasks import get_or_create_package
 
 from .button_helper import ArticleButtonHelper
-from .controller import update_article
 from .models import Article, RelatedItem, RequestArticleChange, choices
 from .permission_helper import ArticlePermissionHelper
 
@@ -58,13 +58,16 @@ class RequestArticleChangeCreateView(CreateView):
             )
             return redirect(self.request.META.get('HTTP_REFERER'))
 
-        change_request_obj = form.save_all(self.request.user)
+        article = Package.objects.get(pk=package_id).article
+
+        change_request_obj = form.save_all(self.request.user, article)
 
         if change_request_obj.change_type == choices.RCT_ERRATUM:
-            article_status =  choices.AS_REQUIRE_ERRATUM
+            article.status =  choices.AS_REQUIRE_ERRATUM
         elif change_request_obj.change_type ==  choices.RCT_CORRECTION:
-            article_status = choices.AS_REQUIRE_CORRECTION
-        update_article(article_id=article_id, status=article_status)
+            article.status = choices.AS_REQUIRE_CORRECTION
+        
+        article.save()
 
         messages.success(
             self.request, 
@@ -187,7 +190,6 @@ class RequestArticleChangeModelAdmin(ModelAdmin):
     menu_label = _('Request Change')
     create_view_class = RequestArticleChangeCreateView
     permission_helper_class = ArticlePermissionHelper
-    inspect_view_enabled=True
     menu_icon = 'doc-full'
     menu_order = 200
     add_to_settings_menu = False
@@ -209,18 +211,6 @@ class RequestArticleChangeModelAdmin(ModelAdmin):
         'article__pid_v2',
         'article__pid_v3',
         'article__doi_with_lang__doi'
-    )
-    inspect_view_fields = (
-        'creator',
-        'created',
-        'updated_by',
-        'updated',
-        'deadline',
-        'article',
-        'pid_v3',
-        'change_type',
-        'demanded_user',
-        'comment',
     )
 
 
