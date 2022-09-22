@@ -71,6 +71,7 @@ class PackageAdmin(ModelAdmin):
 
     list_display = (
         'article',
+        'type',
         'file',
         'status',
         'creator',
@@ -79,6 +80,7 @@ class PackageAdmin(ModelAdmin):
         'updated_by',
     )
     list_filter = (
+        'type',
         'status',
     )
     search_fields = (
@@ -89,6 +91,7 @@ class PackageAdmin(ModelAdmin):
     )
     inspect_view_fields = (
         'article',
+        'type',
         'status',
         'file', 
         'created', 

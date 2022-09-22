@@ -15,11 +15,13 @@ from .utils import file_utils
 class Package(CommonControlField):
     file = models.FileField(_('Package File'), null=True, blank=True)
     signature = models.CharField(_('Signature'), max_length=32, null=True, blank=True)
+    type = models.CharField(_('Type'), max_length=32, choices=choices.PACKAGE_TYPE, null=False, blank=False)
     status = models.CharField(_('Status'), max_length=32, choices=choices.PACKAGE_STATUS, default=choices.PS_ENQUEUED_FOR_VALIDATION)
     article = models.ForeignKey(Article, blank=True, null=True, on_delete=models.SET_NULL)
 
     panels = [
         FieldPanel('file'),
+        FieldPanel('type'),
         FieldPanel('article'),
     ]
 
