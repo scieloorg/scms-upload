@@ -7,6 +7,8 @@ from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
+from article.models import Article
+
 from .button_helper import UploadButtonHelper
 from .models import choices, Package, QAPackage, ValidationError
 from .permission_helper import UploadPermissionHelper
@@ -15,6 +17,23 @@ from .utils import package_utils
 
 
 class PackageCreateView(CreateView):
+    def get_instance(self):
+        package_obj = super().get_instance()
+
+        pkg_type = self.request.GET.get('package_type')
+        if pkg_type:
+            package_obj.type = pkg_type
+
+        article_id = self.request.GET.get('article_id')
+        if article_id:
+            try:
+                article = Article.objects.get(pk=article_id)
+                package_obj.article_id = article
+            except Article.DoesNotExist:
+                ...              
+
+        return package_obj
+
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
 
