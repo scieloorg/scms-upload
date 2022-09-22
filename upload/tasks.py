@@ -48,6 +48,14 @@ def task_validate_article_change(file_path, package_id, package_type, article_id
     elif package_type == PT_ERRATUM:
         task_validate_article_erratum.apply_async(kwargs={'file_path': file_path, 'package_id': package_id, 'article_id': article_id})
         # TODO: comparar dados de XML corrigido com aqueles do pacote baixado para gerar a correção, task_compare_article_erratum_with_last_package()
+
+
+@celery_app.task(name='Validate article correction')
+def task_validate_article_correction(file_path, package_id, article_id):
+    # TODO: aguardar update do packtools
+    # pkg_with_correction = PackageWithCorrection(file_path)
+    # return pkg_with_correction.is_valid()
+    ...
 @celery_app.task()
 def task_validate_xml_format(file_path, package_id):
     try:
