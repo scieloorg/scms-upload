@@ -37,7 +37,8 @@ class PackageCreateView(CreateView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
 
-        run_validations(self.object.file.name, self.object.id)
+        article_id = self.request.POST['article']
+        run_validations(self.object.file.name, self.object.id, self.object.type, article_id)
                 
         return HttpResponseRedirect(self.get_success_url())
 
