@@ -48,6 +48,7 @@ class PackageAdminInspectView(InspectView):
             'validation_errors': {},
             'package_id': self.instance.id,
             'status': self.instance.status,
+            'type': self.instance.type,
             'languages': package_utils.get_languages(self.instance.file.name),
         }
 
