@@ -84,3 +84,18 @@ class TextWithLangAndValidity(models.Model):
 
     class Meta:
         abstract = True
+
+
+class RichTextWithLangAndValidity(RichTextWithLang):
+    initial_date = models.DateField(null=True, blank=True)
+    final_date = models.DateField(null=True, blank=True)
+
+    panels=[
+        FieldPanel('text'),
+        FieldPanel('language'),
+        FieldPanel('initial_date'),
+        FieldPanel('final_date')
+    ]
+
+    class Meta:
+        abstract = True
