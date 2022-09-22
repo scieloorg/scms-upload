@@ -56,6 +56,16 @@ def task_validate_article_correction(file_path, package_id, article_id):
     # pkg_with_correction = PackageWithCorrection(file_path)
     # return pkg_with_correction.is_valid()
     ...
+
+
+@celery_app.task(name='Validate article erratum')
+def task_validate_article_erratum(file_path, package_id, article_id):
+    # TODO: aguardar update do packtools
+    # pkg_with_errata = PackageWithErrata(file_path)
+    # return pkg_with_errata.is_valid()
+    ...
+
+
 @celery_app.task()
 def task_validate_xml_format(file_path, package_id):
     try:
