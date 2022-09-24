@@ -30,7 +30,6 @@ PACKAGE_STATUS = (
     (PS_PUBLISHED, _('Published')),
 )
 
-)
 
 VE_PACKAGE_FILE_ERROR = 'package-file-error'
 VE_XML_FORMAT_ERROR = 'xml-format-error'
