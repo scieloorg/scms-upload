@@ -3,6 +3,8 @@ from django.utils.translation import gettext as _
 from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView
 
+from config.menu import get_menu_order
+
 from .models import Issue
 
 
@@ -19,7 +21,7 @@ class IssueAdmin(ModelAdmin):
     menu_label = _('Issues')
     create_view_class = IssueCreateView
     menu_icon = 'folder'
-    menu_order = 200
+    menu_order = get_menu_order('issue')
     add_to_settings_menu = False
     exclude_from_explorer = False
 

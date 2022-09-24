@@ -4,6 +4,7 @@ from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView
 
 from .models import OfficialJournal, NonOfficialJournalTitle
+from config.menu import get_menu_order
 
 
 class OfficialJournalCreateView(CreateView):
@@ -19,7 +20,7 @@ class OfficialJournalAdmin(ModelAdmin):
     menu_label = _('Journals')
     create_view_class = OfficialJournalCreateView
     menu_icon = 'folder'
-    menu_order = 200
+    menu_order = get_menu_order('journal')
     add_to_settings_menu = False
     exclude_from_explorer = False
 
@@ -56,7 +57,7 @@ class NonOfficialJournalTitleAdmin(ModelAdmin):
     menu_label = _('Non Offical Journal Titles')
     create_view_class = NonOfficialJournalTitleCreateView
     menu_icon = 'folder'
-    menu_order = 200
+    menu_order = get_menu_order('journal')
     add_to_settings_menu = False
     exclude_from_explorer = False
 
