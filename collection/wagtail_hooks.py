@@ -11,7 +11,10 @@ from wagtail.contrib.modeladmin.options import (
     modeladmin_register,
 )
 
-from .models import Collection
+from .models import (
+    Collection,
+    NewWebSiteConfiguration,
+)
 
 
 class CollectionCreateView(CreateView):
@@ -25,7 +28,7 @@ class CollectionModelAdmin(ModelAdmin):
     model = Collection
     menu_label = _('Collections')
     menu_icon = 'doc-full'
-    menu_order = get_menu_order('collection')
+    menu_order = 100
     add_to_settings_menu = False
     exclude_from_explorer = False
     inspect_view_enabled = True
@@ -51,11 +54,45 @@ class CollectionModelAdmin(ModelAdmin):
     )
 
 
+class NewWebSiteConfigurationCreateView(CreateView):
+
+    def form_valid(self, form):
+        self.object = form.save_all(self.request.user)
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class NewWebSiteConfigurationModelAdmin(ModelAdmin):
+    model = NewWebSiteConfiguration
+    menu_label = _('New WebSites Configurations')
+    menu_icon = 'doc-full'
+    menu_order = 200
+    exclude_from_explorer = False
+    inspect_view_enabled = False
+
+    create_view_class = NewWebSiteConfigurationCreateView
+
+    list_display = (
+        'url',
+        'created',
+        'updated',
+        'updated_by',
+    )
+    list_filter = (
+        'url',
+    )
+    search_fields = (
+        'url',
+    )
+
+
 class CollectionModelAdminGroup(ModelAdminGroup):
     menu_label = _('Collections')
     menu_icon = 'folder-open-inverse'
     menu_order = get_menu_order('collection')
-    items = (CollectionModelAdmin, )
+    items = (
+        CollectionModelAdmin,
+        NewWebSiteConfigurationModelAdmin,
+    )
 
 
 modeladmin_register(CollectionModelAdminGroup)

@@ -2,11 +2,11 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from core.models import CommonControlField
+from core.forms import CoreAdminModelForm
+
 from journal.models import OfficialJournal
 from issue.models import Issue
 from article.models import Article
-
-from .forms import CollectionForm
 from .choices import JOURNAL_PUBLICATION_STATUS, WEBSITE_KIND
 
 
@@ -24,7 +24,7 @@ class Collection(CommonControlField):
     acron = models.CharField(_('Collection Acronym'), max_length=255, null=True, blank=True)
     name = models.CharField(_('Collection Name'), max_length=255, null=True, blank=True)
 
-    base_form_class = CollectionForm
+    base_form_class = CoreAdminModelForm
 
 
 class SciELOJournal(CommonControlField):
@@ -181,3 +181,21 @@ class DocumentInCollections(CommonControlField):
         indexes = [
             models.Index(fields=['official_document']),
         ]
+
+
+class NewWebSiteConfiguration(CommonControlField):
+    url = models.CharField(
+        _('New website url'), max_length=255, null=True, blank=True)
+    db_uri = models.CharField(
+        _('Mongodb Info'), max_length=255, null=True, blank=True,
+        help_text=_('mongodb://login:password@host:port/database'))
+
+    def __str__(self):
+        return f"{self.url}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['url']),
+        ]
+
+    base_form_class = CoreAdminModelForm
