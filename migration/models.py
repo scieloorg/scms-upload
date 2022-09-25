@@ -1,9 +1,35 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
+from collection.models import (
+    ClassicWebsiteConfiguration,
+    NewWebSiteConfiguration,
+    FilesStorageConfiguration,
+)
 
 from . import choices
+
+
+class MigrationConfiguration(CommonControlField):
+
+    classic_website_config = models.ForeignKey(
+        ClassicWebsiteConfiguration, on_delete=models.CASCADE)
+    new_website_config = models.ForeignKey(
+        NewWebSiteConfiguration, on_delete=models.CASCADE)
+    files_storage_config = models.ForeignKey(
+        FilesStorageConfiguration, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.classic_website_config}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['classic_website_config']),
+        ]
+
+    base_form_class = CoreAdminModelForm
 
 
 class MigratedData(CommonControlField):
