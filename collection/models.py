@@ -199,3 +199,40 @@ class NewWebSiteConfiguration(CommonControlField):
         ]
 
     base_form_class = CoreAdminModelForm
+
+
+class FilesStorageConfiguration(CommonControlField):
+
+    host = models.CharField(
+        _('Host'), max_length=255, null=True, blank=True)
+    bucket_root = models.CharField(
+        _('Bucket root'), max_length=255, null=True, blank=True)
+    bucket_subdir = models.CharField(
+        _('Bucket subdir'), max_length=64, null=True, blank=True)
+    bucket_public_subdir = models.CharField(
+        _('Bucket public subdir'), max_length=64, null=True, blank=True)
+    bucket_migration_subdir = models.CharField(
+        _('Bucket migration subdir'), max_length=64, null=True, blank=True)
+    bucket_temp_subdir = models.CharField(
+        _('Bucket temp subdir'), max_length=64, null=True, blank=True)
+    bucket_versions_subdir = models.CharField(
+        _('Bucket versions subdir'), max_length=64, null=True, blank=True)
+    access_key = models.CharField(
+        _('Access key'), max_length=255, null=True, blank=True)
+    secret_key = models.CharField(
+        _('Secret key'), max_length=255, null=True, blank=True)
+    secure = models.BooleanField(_('Secure'), default=True)
+
+    def __str__(self):
+        return f"{self.host} {self.bucket_root}"
+
+    class Meta:
+        unique_together = [
+            ['host', 'bucket_root'],
+        ]
+        indexes = [
+            models.Index(fields=['host']),
+            models.Index(fields=['bucket_root']),
+        ]
+
+    base_form_class = CoreAdminModelForm

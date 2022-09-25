@@ -14,10 +14,11 @@ from wagtail.contrib.modeladmin.options import (
 from .models import (
     Collection,
     NewWebSiteConfiguration,
+    FilesStorageConfiguration,
 )
 
 
-class CollectionCreateView(CreateView):
+class CoreCreateView(CreateView):
 
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
@@ -33,7 +34,7 @@ class CollectionModelAdmin(ModelAdmin):
     exclude_from_explorer = False
     inspect_view_enabled = True
 
-    create_view_class = CollectionCreateView
+    create_view_class = CoreCreateView
 
     list_display = (
         'acron',
@@ -54,13 +55,6 @@ class CollectionModelAdmin(ModelAdmin):
     )
 
 
-class NewWebSiteConfigurationCreateView(CreateView):
-
-    def form_valid(self, form):
-        self.object = form.save_all(self.request.user)
-        return HttpResponseRedirect(self.get_success_url())
-
-
 class NewWebSiteConfigurationModelAdmin(ModelAdmin):
     model = NewWebSiteConfiguration
     menu_label = _('New WebSites Configurations')
@@ -69,7 +63,7 @@ class NewWebSiteConfigurationModelAdmin(ModelAdmin):
     exclude_from_explorer = False
     inspect_view_enabled = False
 
-    create_view_class = NewWebSiteConfigurationCreateView
+    create_view_class = CoreCreateView
 
     list_display = (
         'url',
@@ -85,6 +79,33 @@ class NewWebSiteConfigurationModelAdmin(ModelAdmin):
     )
 
 
+class FilesStorageConfigurationModelAdmin(ModelAdmin):
+    model = FilesStorageConfiguration
+    menu_label = _('Files Storage Configuration')
+    menu_icon = 'doc-full'
+    menu_order = 200
+    exclude_from_explorer = False
+    inspect_view_enabled = False
+
+    create_view_class = CoreCreateView
+
+    list_display = (
+        'host',
+        'bucket_root',
+        'created',
+        'updated',
+        'updated_by',
+    )
+    list_filter = (
+        'host',
+        'bucket_root',
+    )
+    search_fields = (
+        'host',
+        'bucket_root',
+    )
+
+
 class CollectionModelAdminGroup(ModelAdminGroup):
     menu_label = _('Collections')
     menu_icon = 'folder-open-inverse'
@@ -92,6 +113,7 @@ class CollectionModelAdminGroup(ModelAdminGroup):
     items = (
         CollectionModelAdmin,
         NewWebSiteConfigurationModelAdmin,
+        FilesStorageConfigurationModelAdmin,
     )
 
 
