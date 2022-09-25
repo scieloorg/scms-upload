@@ -15,6 +15,7 @@ from .models import (
     Collection,
     NewWebSiteConfiguration,
     FilesStorageConfiguration,
+    ClassicWebsiteConfiguration,
 )
 
 
@@ -106,6 +107,25 @@ class FilesStorageConfigurationModelAdmin(ModelAdmin):
     )
 
 
+class ClassicWebsiteConfigurationModelAdmin(ModelAdmin):
+    model = ClassicWebsiteConfiguration
+    menu_label = _('Classic Website Configuration')
+    menu_icon = 'doc-full'
+    menu_order = 200
+    exclude_from_explorer = False
+    inspect_view_enabled = False
+
+    create_view_class = CoreCreateView
+
+    list_display = (
+        'collection',
+    )
+    search_fields = (
+        'collection__acron',
+        'collection__name',
+    )
+
+
 class CollectionModelAdminGroup(ModelAdminGroup):
     menu_label = _('Collections')
     menu_icon = 'folder-open-inverse'
@@ -114,6 +134,7 @@ class CollectionModelAdminGroup(ModelAdminGroup):
         CollectionModelAdmin,
         NewWebSiteConfigurationModelAdmin,
         FilesStorageConfigurationModelAdmin,
+        ClassicWebsiteConfigurationModelAdmin,
     )
 
 

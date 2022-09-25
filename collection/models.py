@@ -236,3 +236,46 @@ class FilesStorageConfiguration(CommonControlField):
         ]
 
     base_form_class = CoreAdminModelForm
+
+
+class ClassicWebsiteConfiguration(CommonControlField):
+
+    collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
+
+    title_path = models.CharField(
+        _('Title path'), max_length=255, null=True, blank=True,
+        help_text=_('Title path: title.id path or title.mst path without extension'))
+    issue_path = models.CharField(
+        _('Issue path'), max_length=255, null=True, blank=True,
+        help_text=_('Issue path: issue.id path or issue.mst path without extension'))
+    serial_path = models.CharField(
+        _('Serial path'), max_length=255, null=True, blank=True,
+        help_text=_('Serial path'))
+    cisis_path = models.CharField(
+        _('Cisis path'), max_length=255, null=True, blank=True,
+        help_text=_('Cisis path where there are CISIS utilities such as mx and i2id'))
+    bases_work_path = models.CharField(
+        _('Bases work path'), max_length=255, null=True, blank=True,
+        help_text=_('Bases work path'))
+    bases_pdf_path = models.CharField(
+        _('Bases pdf path'), max_length=255, null=True, blank=True,
+        help_text=_('Bases translation path'))
+    bases_translation_path = models.CharField(
+        _('Bases translation path'), max_length=255, null=True, blank=True,
+        help_text=_('Bases translation path'))
+    bases_xml_path = models.CharField(
+        _('Bases XML path'), max_length=255, null=True, blank=True,
+        help_text=_('Bases XML path'))
+    htdocs_img_revistas_path = models.CharField(
+        _('Htdocs img revistas path'), max_length=255, null=True, blank=True,
+        help_text=_('Htdocs img revistas path'))
+
+    def __str__(self):
+        return f"{self.collection}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['collection']),
+        ]
+
+    base_form_class = CoreAdminModelForm
