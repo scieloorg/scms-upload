@@ -79,3 +79,15 @@ class MigrationFailure(CommonControlField):
             models.Index(fields=['action_name']),
         ]
 
+
+class JournalMigration(MigratedData):
+
+    scielo_journal = models.ForeignKey(SciELOJournal, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.scielo_journal} {self.status}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['scielo_journal']),
+        ]
