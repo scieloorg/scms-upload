@@ -6,6 +6,7 @@ from journal.models import OfficialJournal
 from issue.models import Issue
 from article.models import Article
 
+from .forms import CollectionForm
 from .choices import JOURNAL_PUBLICATION_STATUS, WEBSITE_KIND
 
 
@@ -22,6 +23,8 @@ class Collection(CommonControlField):
 
     acron = models.CharField(_('Collection Acronym'), max_length=255, null=True, blank=True)
     name = models.CharField(_('Collection Name'), max_length=255, null=True, blank=True)
+
+    base_form_class = CollectionForm
 
 
 class SciELOJournal(CommonControlField):
