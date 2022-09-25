@@ -1,12 +1,15 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
+
 from collection.models import (
-    ClassicWebsiteConfiguration,
+    SciELOJournal,
+    SciELOIssue,
+    SciELODocument,
     NewWebSiteConfiguration,
     FilesStorageConfiguration,
+    ClassicWebsiteConfiguration,
 )
 
 from . import choices
@@ -29,8 +32,6 @@ class MigrationConfiguration(CommonControlField):
             models.Index(fields=['classic_website_config']),
         ]
 
-    base_form_class = CoreAdminModelForm
-
 
 class MigratedData(CommonControlField):
 
@@ -42,7 +43,7 @@ class MigratedData(CommonControlField):
         _('ISIS created date'), max_length=8, null=True, blank=True)
 
     # dados migrados
-    data = models.JSONField(blank=False, null=False)
+    data = models.JSONField(blank=True, null=True)
 
     # status da migração
     status = models.CharField(
@@ -51,15 +52,30 @@ class MigratedData(CommonControlField):
         default=choices.MS_TO_MIGRATE,
     )
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['isis_updated_date']),
+        ]
+
 
 class MigrationFailure(CommonControlField):
+    action_name = models.CharField(
+        _('Action'), max_length=255, null=False, blank=False)
+    object_name = models.CharField(
+        _('Object'), max_length=255, null=False, blank=False)
     pid = models.CharField(
         _('Item PID'), max_length=23, null=False, blank=False)
     exception_type = models.CharField(
         _('Exception Type'), max_length=255, null=False, blank=False)
     exception_msg = models.CharField(
-        _('Exception Msg'), max_length=255, null=False, blank=False)
-    action_name = models.CharField(
-        _('Action'), max_length=255, null=False, blank=False)
-    object_name = models.CharField(
-        _('Object'), max_length=255, null=False, blank=False)
+        _('Exception Msg'), max_length=555, null=False, blank=False)
+    traceback = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['object_name']),
+            models.Index(fields=['pid']),
+            models.Index(fields=['action_name']),
+        ]
+
