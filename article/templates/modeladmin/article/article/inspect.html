@@ -40,6 +40,7 @@
                     <th>{% trans 'Creator' %}</th>
                     <th>{% trans 'Created' %}</th>
                     <th>{% trans 'Status' %}</th>
+                    <th>{% trans 'Category' %}</th>
                     <th>{% trans 'Link' %}</th>
                 </tr>
             </thead>
@@ -48,6 +49,7 @@
                     <tr>
                         <td>{{ pkg.creator }}</td>
                         <td>{{ pkg.created }}</td>
+                        <td>{{ pkg.category }}</td>
                         <td>{{ pkg.get_status_display }}</td>
                         <td>
                             <a href="/media/{{ pkg.file.name }}" class="button bicolor button--icon">

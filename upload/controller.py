@@ -90,14 +90,22 @@ def update_package_check_opinions(package_id):
     package.save()
 
 
-def create_package(article_id, user_id, file_name, status=choices.PS_PUBLISHED):
+def create_package(article_id, user_id, file_name, category=choices.PC_SYSTEM_GENERATED, status=choices.PS_PUBLISHED):
     package = Package()
     package.article_id = article_id
     package.creator_id = user_id
     package.created = datetime.utcnow()
     package.file = file_name
+    package.category = category
     package.status = status
 
     package.save()
 
     return package
+
+
+def get_last_package(article_id, **kwargs):
+    try:
+        return Package.objects.filter(article=article_id, **kwargs).order_by('-created').first()
+    except Package.DoesNotExist:
+        return 

@@ -26,6 +26,7 @@
 {% block content %}
     {{ block.super }}
 
+    {% if category != 'generated-by-the-system' %}
     <div class="nice-padding">
         <h3>{% trans "Reports" %}</h3>
         <table class="listing">
@@ -120,6 +121,7 @@
             </tbody>
         </table>
     </div>
+    {% endif %}
 
     <div class="nice-padding">
         <h3>{% trans "Preview" %}</h3>

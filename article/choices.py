@@ -110,11 +110,13 @@ ARTICLE_TYPE = (
 
 
 # Model Article, Field status
+AS_CHANGE_SUBMITTED = 'change-submitted'
 AS_REQUIRE_CORRECTION = 'required-correction'
 AS_REQUIRE_ERRATUM = 'required-erratum'
 AS_PUBLISHED = 'published'
 
 ARTICLE_STATUS = (
+    (AS_CHANGE_SUBMITTED, _('Change submitted')),
     (AS_REQUIRE_CORRECTION, _('Required correction')),
     (AS_REQUIRE_ERRATUM, _('Required erratum')),
     (AS_PUBLISHED, _('Published')),
