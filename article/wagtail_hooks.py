@@ -4,6 +4,7 @@ from django.shortcuts import redirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
 
+from config.menu import get_menu_order
 from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
@@ -227,7 +228,7 @@ class RequestArticleChangeModelAdmin(ModelAdmin):
 class ArticleModelAdminGroup(ModelAdminGroup):
     menu_label = _('Articles')
     menu_icon = 'folder-open-inverse'
-    menu_order = 200
+    menu_order = get_menu_order('article')
     items = (ArticleModelAdmin, RelatedItemModelAdmin, RequestArticleChangeModelAdmin)
 
 
