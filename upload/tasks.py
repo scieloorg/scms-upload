@@ -257,8 +257,8 @@ def task_get_or_create_package(article_id, pid, user_id):
         return {'error': _('It was not possible to retrieve a valid article.')}
 
     try:
-        return Package.objects.get(article__pid_v3=article_inst.pid_v3).id
-    except Package.DoesNotExist:
+        return models.Package.objects.get(article__pid_v3=article_inst.pid_v3).id
+    except models.Package.DoesNotExist:
         # Retrieves PDF uris and names
         rend_uris_names = []
         for rend in doc.pdfs:
