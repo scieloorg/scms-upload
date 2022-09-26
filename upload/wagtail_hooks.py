@@ -20,9 +20,9 @@ class PackageCreateView(CreateView):
     def get_instance(self):
         package_obj = super().get_instance()
 
-        pkg_type = self.request.GET.get('package_type')
-        if pkg_type:
-            package_obj.type = pkg_type
+        pkg_category = self.request.GET.get('package_category')
+        if pkg_category:
+            package_obj.category = pkg_category
 
         article_id = self.request.GET.get('article_id')
         if article_id:
@@ -49,7 +49,7 @@ class PackageAdminInspectView(InspectView):
             'validation_errors': {},
             'package_id': self.instance.id,
             'status': self.instance.status,
-            'type': self.instance.type,
+            'category': self.instance.category,
             'languages': package_utils.get_languages(self.instance.file.name),
         }
 
@@ -92,7 +92,7 @@ class PackageAdmin(ModelAdmin):
 
     list_display = (
         'article',
-        'type',
+        'category',
         'file',
         'status',
         'creator',
@@ -101,7 +101,7 @@ class PackageAdmin(ModelAdmin):
         'updated_by',
     )
     list_filter = (
-        'type',
+        'category',
         'status',
     )
     search_fields = (
@@ -112,7 +112,7 @@ class PackageAdmin(ModelAdmin):
     )
     inspect_view_fields = (
         'article',
-        'type',
+        'category',
         'status',
         'file', 
         'created', 

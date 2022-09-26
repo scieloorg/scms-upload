@@ -26,7 +26,7 @@
 {% block content %}
     {{ block.super }}
 
-    {% if type != 'generated-by-the-system' %}
+    {% if category != 'generated-by-the-system' %}
     <div class="nice-padding">
         <h3>{% trans "Reports" %}</h3>
         <table class="listing">
