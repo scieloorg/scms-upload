@@ -97,11 +97,9 @@ def task_validate_article_correction(new_package_file_path, last_valid_package_f
     return packtools_article.are_similar_articles(new_pkg_xmltree, last_valid_pkg_xmltree)
 
 @celery_app.task(name='Validate article erratum')
-def task_validate_article_erratum(file_path, package_id, article_id):
-    # TODO: aguardar update do packtools
-    # pkg_with_errata = PackageWithErrata(file_path)
-    # return pkg_with_errata.is_valid()
-    ...
+def task_validate_article_erratum(file_path):
+    return packtools_package.PackageWithErrata(file_path).is_valid()
+
 
 
 @celery_app.task()
