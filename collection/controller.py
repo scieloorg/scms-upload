@@ -13,6 +13,7 @@ from .models import (
     NewWebSiteConfiguration,
 )
 from journal.controller import get_or_create_official_journal
+from journal.exceptions import GetOrCreateOfficialJournalError
 from issue.controller import get_or_create_official_issue
 from article.controller import get_or_create_official_article
 
@@ -338,9 +339,16 @@ class JournalController:
     @property
     def official_journal(self):
         if not hasattr(self, '_official_journal') or not self._official_journal:
-            self._official_journal = get_or_create_official_journal(
-                self._issn_l, self._e_issn, self._print_issn, self._user_id
-            )
+            try:
+                self._official_journal = get_or_create_official_journal(
+                    self._issn_l, self._e_issn, self._print_issn, self._user_id
+                )
+            except Exception as e:
+                raise GetOrCreateOfficialJournalError(
+                    _('Unable to get or create official journal from journal which scielo_issn={} {}').format(
+                        self._scielo_issn, e
+                        )
+                )
         return self._official_journal
 
     @property

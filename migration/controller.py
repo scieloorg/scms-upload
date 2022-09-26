@@ -237,6 +237,7 @@ def migrate_journal(user_id, collection_acron, scielo_issn, journal_data,
         print_issn=journal.print_issn,
         journal_acron=journal.acronym,
     )
+
     journal_migration = get_or_create_journal_migration(
         journal_controller.scielo_journal, creator_id=user_id)
 
@@ -246,6 +247,25 @@ def migrate_journal(user_id, collection_acron, scielo_issn, journal_data,
         if not journal_controller.scielo_journal.title:
             journal_controller.scielo_journal.title = journal.title
         journal_controller.scielo_journal.save()
+
+    try:
+        jc = journal_controller.scielo_journal_in_journal_collections
+        if not jc.official_journal.title or not jc.official_journal.foundation_date:
+            if not jc.official_journal.title:
+                jc.official_journal.title = journal.title
+            if journal.first_year and journal.first_year.isdigit():
+                if not jc.official_journal.foundation_year:
+                    jc.official_journal.foundation_year = journal.first_year and journal.first_year[:4]
+                if not jc.official_journal.foundation_date:
+                    jc.official_journal.foundation_date = journal.first_year
+            jc.official_journal.save()
+    except Exception as e:
+        _register_failure(
+            _('Updating official journal data error'),
+            collection_acron, "migrate", "journal", scielo_issn,
+            e,
+            user_id,
+        )
 
     # check if it needs to be update
     if journal_migration.isis_updated_date == journal.isis_updated_date:
