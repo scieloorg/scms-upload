@@ -24,6 +24,7 @@ class OfficialJournalAdmin(ModelAdmin):
     add_to_settings_menu = False
     exclude_from_explorer = False
 
+    list_per_page = 10
     list_display = (
         'title',
         'foundation_year',
