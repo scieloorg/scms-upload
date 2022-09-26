@@ -90,12 +90,11 @@ def task_update_article_status_by_validations(task_id_article_erratum, task_id_c
 
 
 @celery_app.task(name='Validate article correction')
-def task_validate_article_correction(file_path, package_id, article_id):
-    # TODO: aguardar update do packtools
-    # pkg_with_correction = PackageWithCorrection(file_path)
-    # return pkg_with_correction.is_valid()
-    ...
+def task_validate_article_correction(new_package_file_path, last_valid_package_file_path):
+    new_pkg_xmltree = packtools_package.PackageArticle(new_package_file_path).xmltree_article
+    last_valid_pkg_xmltree = packtools_package.PackageArticle(last_valid_package_file_path).xmltree_article
 
+    return packtools_article.are_similar_articles(new_pkg_xmltree, last_valid_pkg_xmltree)
 
 @celery_app.task(name='Validate article erratum')
 def task_validate_article_erratum(file_path, package_id, article_id):
