@@ -8,15 +8,15 @@ from config import celery_app
 from libs.dsm.publication.db import mk_connection, exceptions
 from libs.dsm.publication.documents import get_document
 from upload.models import Package
-from upload.choices import PT_ERRATUM, PT_CORRECTION
+from upload.choices import PC_ERRATUM, PC_CORRECTION
 
 from .utils import file_utils, package_utils, xml_utils
 from . import choices, controller
 
 
-def run_validations(filename, package_id, package_type, article_id=None):
-    if article_id is not None and package_type in (PT_CORRECTION, PT_ERRATUM):
-        task_validate_article_change(filename, package_id, package_type, article_id)
+def run_validations(filename, package_id, package_category, article_id=None):
+    if article_id is not None and package_category in (PC_CORRECTION, PC_ERRATUM):
+        task_validate_article_change(filename, package_id, package_category, article_id)
     else:
         xml_format_is_valid = task_validate_xml_format(filename, package_id)
 

@@ -2,7 +2,7 @@ from django.utils.translation import gettext as _
 
 from wagtail.contrib.modeladmin.helpers import ButtonHelper
 
-from upload.choices import PT_CORRECTION, PT_ERRATUM
+from upload.choices import PC_CORRECTION, PC_ERRATUM
 
 from .choices import AS_REQUIRE_CORRECTION, AS_REQUIRE_ERRATUM
 
@@ -22,12 +22,12 @@ class ArticleButtonHelper(ButtonHelper):
         text = _("Submit change")
 
         if obj.status == AS_REQUIRE_CORRECTION:
-            package_type = PT_CORRECTION
+            package_category = PC_CORRECTION
         elif obj.status == AS_REQUIRE_ERRATUM:
-            package_type = PT_ERRATUM
+            package_category = PC_ERRATUM
 
         return {
-            "url": "/admin/upload/package/create/?article_id=%s&package_type=%s" % (obj.id, package_type),
+            "url": "/admin/upload/package/create/?article_id=%s&package_category=%s" % (obj.id, package_category),
             "label": text,
             "classname": self.finalise_classname(classnames),
             "title": text,
