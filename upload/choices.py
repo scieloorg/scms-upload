@@ -31,7 +31,6 @@ PACKAGE_STATUS = (
     (PS_PUBLISHED, _('Published')),
 )
 
-
 # Model Package, Field category
 PC_ERRATUM = 'erratum'
 PC_CORRECTION = 'correction'

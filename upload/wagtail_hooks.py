@@ -4,6 +4,8 @@ from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
 
+from config.menu import get_menu_order
+
 from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
@@ -241,6 +243,7 @@ class UploadModelAdminGroup(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Upload'
     items = (PackageAdmin, QualityAnalystPackageAdmin, ValidationErrorAdmin)
+    menu_order = get_menu_order('upload')
 
 
 modeladmin_register(UploadModelAdminGroup)

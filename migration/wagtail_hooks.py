@@ -2,12 +2,21 @@ from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
 
+from config.menu import get_menu_order
 from wagtail.core import hooks
-from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
+from wagtail.contrib.modeladmin.views import CreateView
+from wagtail.contrib.modeladmin.options import (
+    ModelAdmin,
+    ModelAdminGroup,
+    modeladmin_register,
+)
 from wagtail.contrib.modeladmin.views import InspectView
 
 from .button_helper import MigrationFailureButtonHelper
-from .models import MigrationFailure
+from .models import (
+    MigrationFailure,
+    MigrationConfiguration,
+)
 from .permission_helper import MigrationFailurePermissionHelper
 
 
@@ -67,10 +76,46 @@ class MigrationFailureAdmin(ModelAdmin):
         return qs.filter(creator=request.user)
 
 
+class CoreCreateView(CreateView):
+
+    def form_valid(self, form):
+        self.object = form.save_all(self.request.user)
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class MigrationConfigurationModelAdmin(ModelAdmin):
+    model = MigrationConfiguration
+    menu_label = _('Migration Configuration')
+    menu_icon = 'doc-full'
+    menu_order = 100
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+    inspect_view_enabled = False
+
+    create_view_class = CoreCreateView
+
+    list_display = (
+        'classic_website_config',
+        'created',
+        'updated',
+        'updated_by',
+    )
+    list_filter = (
+        'classic_website_config__collection__acron',
+    )
+    search_fields = (
+        'classic_website_config__collection__acron',
+    )
+
+
 class MigrationModelAdmin(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Migration'
-    items = (MigrationFailureAdmin, )
+    items = (
+        MigrationConfigurationModelAdmin,
+        MigrationFailureAdmin,
+    )
+    menu_order = get_menu_order('migration')
 
 
 modeladmin_register(MigrationModelAdmin)

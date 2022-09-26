@@ -22,6 +22,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 # Requirements are installed here to ensure they will be cached.
 COPY ./requirements /requirements
 
+# Update pip
+RUN python -m pip install --upgrade pip
+
 # create python dependency wheels
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels  \
   -r /requirements/local.txt -r /requirements/production.txt \
