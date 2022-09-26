@@ -101,6 +101,16 @@ def task_validate_article_erratum(file_path):
     return packtools_package.PackageWithErrata(file_path).is_valid()
 
 
+@celery_app.task(name='Compare packages')
+def task_compare_packages(package1_file_path, package2_file_path):   
+    pkg1_file_path = file_utils.get_file_absolute_path(package1_file_path)
+    pkg1_xmltree = packtools_package.PackageWithErrata(pkg1_file_path).xmltree_article
+
+    pkg2_file_path = file_utils.get_file_absolute_path(package2_file_path)
+    pkg2_xmltree = packtools_package.PackageArticle(pkg2_file_path).xmltree_article
+
+    return packtools_article.are_similar_articles(pkg1_xmltree, pkg2_xmltree)
+
 
 @celery_app.task()
 def task_validate_xml_format(file_path, package_id):
