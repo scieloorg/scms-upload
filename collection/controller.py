@@ -1,3 +1,5 @@
+import logging
+
 from django.utils.translation import gettext_lazy as _
 
 from .models import (
@@ -116,7 +118,10 @@ def get_or_create_scielo_journal_in_journal_collections(official_journal, scielo
                 official_journal, scielo_journal, type(e), e
             )
         )
-    journal_collections.scielo_journals.get_or_create(scielo_journal)
+    try:
+        item = JournalCollections.objects.filter(scielo_journals__acron=scielo_journal.acron)
+    except Exception as e:
+        journal_collections.scielo_journals.add(scielo_journal)
     return journal_collections
 
 
@@ -130,7 +135,7 @@ def get_journal_collections(collection_acron, scielo_issn):
                 collection, scielo_issn, type(e), e
             )
         )
-    return JournalCollections.objects.get(scielo_journals__scielo_journal=scielo_journal)
+    return JournalCollections.objects.get(scielo_journals__scielo_issn=scielo_journal.scielo_issn)
 
 
 ###########################################################################
