@@ -46,12 +46,33 @@ def get_or_create_package(article_id, pid, user_id):
 
 
 @celery_app.task(name='Validate article change')
-def task_validate_article_change(file_path, package_id, package_type, article_id):
-    if package_type == PT_CORRECTION:
-        task_validate_article_correction.apply_async(kwargs={'file_path': file_path, 'package_id': package_id, 'article_id': article_id})
-    elif package_type == PT_ERRATUM:
-        task_validate_article_erratum.apply_async(kwargs={'file_path': file_path, 'package_id': package_id, 'article_id': article_id})
-        # TODO: comparar dados de XML corrigido com aqueles do pacote baixado para gerar a correção, task_compare_article_erratum_with_last_package()
+def task_validate_article_change(new_package_file_path, new_package_category, article_id):
+    last_valid_pkg = controller.get_last_package(
+        article_id=article_id, 
+        status=choices.PS_PUBLISHED, 
+        category=choices.PC_SYSTEM_GENERATED
+    )
+    last_valid_pkg_file_path = file_utils.get_file_absolute_path(last_valid_pkg.file.name)
+
+    if new_package_category == choices.PC_CORRECTION:
+        task_validate_article_correction.apply_async(kwargs={
+            'new_package_file_path': new_package_file_path,
+            'last_valid_package_file_path': last_valid_pkg_file_path,
+        })
+    elif new_package_category == choices.PC_ERRATUM:
+        task_result_ae = task_validate_article_erratum.apply_async(kwargs={
+            'file_path': new_package_file_path
+        })
+        task_result_cp = task_compare_packages.apply_async(kwargs={
+            'package1_file_path': new_package_file_path, 
+            'package2_file_path': last_valid_pkg_file_path
+        })
+        task_update_article_status_by_validations.apply_async(kwargs={
+            'task_id_article_erratum': task_result_ae.id, 
+            'task_id_compare_packages': task_result_cp.id,
+            'article_id': article_id
+        })
+
 
 
 @celery_app.task(name='Validate article correction')
