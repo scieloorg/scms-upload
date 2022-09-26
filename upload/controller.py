@@ -101,3 +101,10 @@ def create_package(article_id, user_id, file_name, status=choices.PS_PUBLISHED):
     package.save()
 
     return package
+
+
+def get_last_package(article_id, **kwargs):
+    try:
+        return Package.objects.filter(article=article_id, **kwargs).order_by('-created').first()
+    except Package.DoesNotExist:
+        return 
