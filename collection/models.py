@@ -69,10 +69,10 @@ class JournalCollections(CommonControlField):
     """
 
     def __unicode__(self):
-        return u'%s %s' % (self.official_issue, " | ".join([str(item) for item in self.scielo_journals]))
+        return u'%s %s' % (self.official_journal, " | ".join([str(item) for item in self.scielo_journals]))
 
     def __str__(self):
-        return u'%s %s' % (self.official_issue, " | ".join([str(item) for item in self.scielo_journals]))
+        return u'%s %s' % (self.official_journal, " | ".join([str(item) for item in self.scielo_journals]))
 
     official_journal = models.ForeignKey(OfficialJournal, on_delete=models.CASCADE)
     scielo_journals = models.ManyToManyField(SciELOJournal)
