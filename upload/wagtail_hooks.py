@@ -38,7 +38,18 @@ class PackageCreateView(CreateView):
         self.object = form.save_all(self.request.user)
 
         article_id = self.request.POST['article']
-        run_validations(self.object.file.name, self.object.id, self.object.type, article_id)
+        run_validations(self.object.file.name, self.object.id, self.object.category, article_id)
+
+        if self.object.category in (choices.PC_CORRECTION, choices.PC_ERRATUM):
+            messages.success(
+                self.request,
+                _('Package to change article has been successfully submitted.')
+            )
+        else:
+            messages.success(
+                self.request,
+                _('Package to create article has been successfully submitted.')
+            )
                 
         return HttpResponseRedirect(self.get_success_url())
 
