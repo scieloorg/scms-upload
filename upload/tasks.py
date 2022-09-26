@@ -18,8 +18,9 @@ from . import choices, controller, models
 
 
 def run_validations(filename, package_id, package_category, article_id=None):
-    if article_id is not None and package_category in (PC_CORRECTION, PC_ERRATUM):
-        task_validate_article_change(filename, package_id, package_category, article_id)
+    if article_id is not None and package_category in (choices.PC_CORRECTION, choices.PC_ERRATUM):
+        file_path = file_utils.get_file_absolute_path(filename)
+        task_validate_article_change(file_path, package_category, article_id)
     else:
         xml_format_is_valid = task_validate_xml_format(filename, package_id)
 
