@@ -74,6 +74,20 @@ def task_validate_article_change(new_package_file_path, new_package_category, ar
         })
 
 
+@celery_app.task(name='Update article status by validations')
+def task_update_article_status_by_validations(task_id_article_erratum, task_id_compare_packages, article_id):
+    ar_article_erratum = AsyncResult(task_id_article_erratum)
+    ar_compare_packages = AsyncResult(task_id_compare_packages)
+    
+    while not ar_article_erratum.ready() or not ar_compare_packages.ready():
+        ...
+
+    if ar_article_erratum.result and ar_compare_packages.result:
+        update_article(article_id, status=AS_CHANGE_SUBMITTED)
+        return True
+
+    return False
+
 
 @celery_app.task(name='Validate article correction')
 def task_validate_article_correction(file_path, package_id, article_id):
