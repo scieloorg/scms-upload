@@ -28,18 +28,26 @@ from .utils import file_utils, package_utils, xml_utils
 from . import choices, controller, models
 
 
-def run_validations(filename, package_id, package_category, article_id=None):
+def run_validations(filename, package_id, package_category, article_id=None, journal_id=None):
+    file_path = file_utils.get_file_absolute_path(filename)
+
     if article_id is not None and package_category in (choices.PC_CORRECTION, choices.PC_ERRATUM):
-        file_path = file_utils.get_file_absolute_path(filename)
         task_validate_article_change(file_path, package_category, article_id)
-    else:
-        xml_format_is_valid = task_validate_xml_format(filename, package_id)
+
+    elif journal_id is not None and package_category == choices.PC_NEW_DOCUMENT:
+        xml_format_is_valid = task_validate_xml_format(file_path, package_id)
 
         if xml_format_is_valid:
-            optimised_filepath = task_optimise_package(filename)
+            optimised_filepath = task_optimise_package(file_path)
 
             task_validate_assets.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
             task_validate_renditions.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
+            task_validate_article_and_journal_data.apply_async(kwargs={
+                'file_path': optimised_filepath,
+                'package_id': package_id,
+                'journal_id': journal_id,
+            },
+            countdown=10)
 
 
 def check_resolutions(package_id):
