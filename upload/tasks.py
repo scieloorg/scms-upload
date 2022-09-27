@@ -107,6 +107,41 @@ def task_validate_article_and_journal_compatibility(package_id, file_path, journ
         )
         return False
 
+
+@celery_app.task(name='Validate article is unpublished')
+def task_validate_article_is_unpublished(file_path, package_id):
+    xmltree = sps_package.PackageArticle(file_path).xmltree_article
+    
+    issue_data = sps_front_articlemeta_issue.ArticleMetaIssue(xmltree).data
+
+    article_type = sps_articles_and_subarticles.ArticleAndSubArticles(xmltree).main_article_type
+    article_lang = sps_articles_and_subarticles.ArticleAndSubArticles(xmltree).main_lang
+    article_titles = sps_articles_and_subarticles.ArticleAndSubArticles(xmltree).data
+
+#    fam_article_data = sps.models.front_articlemeta_article(xmltree).data
+#    fam_journal_data = sps.models.front_articlemeta_journal(xmltree).data
+
+    try:
+        # Tries to connect to site database (opac.article)
+        mk_connection()
+    except exceptions.DBConnectError:
+        return {'error': _('Site database is unavailable.')}
+
+    similar_docs = get_documents(**issue_data)
+
+    if len(similar_docs) > 1: 
+        controller.add_validation_error(
+            error_category=choices.VE_PACKAGE_ARTICLE_IS_NOT_NEW_ERROR,
+            package_id=package_id,
+            package_status=choices.PS_REJECTED,
+            message=_('XML article refers to a existant document'),
+            data={'similar_docs': similar_docs}
+        )
+        return False
+
+    return True
+
+
 @celery_app.task(name='Validate article change')
 def task_validate_article_change(new_package_file_path, new_package_category, article_id):
     last_valid_pkg = controller.get_last_package(
