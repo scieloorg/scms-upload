@@ -63,6 +63,17 @@ def get_or_create_package(article_id, pid, user_id):
     return task_result.get()
 
 
+@celery_app.task(name='Validate article and journal data')
+def task_validate_article_and_journal_data(file_path, package_id, journal_id):
+    task_validate_article_and_journal_compatibility.apply_async(kwargs={
+        'package_id': package_id,
+        'file_path': file_path,
+        'journal_id': journal_id,
+    })
+    task_validate_article_is_unpublished.apply_async(kwargs={
+        'package_id': package_id,
+        'file_path': file_path,
+    })
 
 @celery_app.task(name='Validate article change')
 def task_validate_article_change(new_package_file_path, new_package_category, article_id):
