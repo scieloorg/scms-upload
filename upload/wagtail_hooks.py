@@ -106,6 +106,7 @@ class PackageAdmin(ModelAdmin):
 
     list_display = (
         'article',
+        'journal',
         'category',
         'file',
         'status',
@@ -120,12 +121,14 @@ class PackageAdmin(ModelAdmin):
     )
     search_fields = (
         'file',
+        'journal__title',
         'article__pid_v3',
         'creator__username',
         'updated_by__username',
     )
     inspect_view_fields = (
         'article',
+        'journal',
         'category',
         'status',
         'file', 

@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from journal.models import OfficialJournal
 
 from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel
 
@@ -18,11 +19,13 @@ class Package(CommonControlField):
     category = models.CharField(_('Category'), max_length=32, choices=choices.PACKAGE_CATEGORY, null=False, blank=False)
     status = models.CharField(_('Status'), max_length=32, choices=choices.PACKAGE_STATUS, default=choices.PS_ENQUEUED_FOR_VALIDATION)
     article = models.ForeignKey(Article, blank=True, null=True, on_delete=models.SET_NULL)
+    journal = models.ForeignKey(OfficialJournal, blank=True, null=True, on_delete=models.SET_NULL)
 
     panels = [
         FieldPanel('file'),
         FieldPanel('category'),
         FieldPanel('article'),
+        FieldPanel('journal'),
     ]
 
     def __str__(self):
