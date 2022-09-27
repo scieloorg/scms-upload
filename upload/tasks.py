@@ -308,7 +308,9 @@ def task_get_or_create_package(article_id, pid, user_id):
             try:
                 article_inst = Article.objects.get(pid_v3=doc.aid)
             except Article.DoesNotExist:
+                # TODO: substituir file_utils por aquele em packtools
                 xml_content = file_utils.get_xml_content_from_uri(doc.xml)
+                # TODO: substituir package_utils por aquele em packtools
                 xml_etree = package_utils.get_etree_from_xml_content(xml_content)
                 article_inst = create_article_from_etree(xml_etree, user_id)
 
