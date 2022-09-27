@@ -41,7 +41,14 @@ class PackageCreateView(CreateView):
         self.object = form.save_all(self.request.user)
 
         article_id = self.request.POST['article']
-        run_validations(self.object.file.name, self.object.id, self.object.category, article_id)
+        journal_id = self.request.POST['journal']
+        run_validations(
+            self.object.file.name, 
+            self.object.id, 
+            self.object.category, 
+            article_id, 
+            journal_id,
+        )
 
         if self.object.category in (choices.PC_CORRECTION, choices.PC_ERRATUM):
             messages.success(
