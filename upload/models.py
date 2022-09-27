@@ -60,7 +60,7 @@ class QAPackage(Package):
 
 class ValidationError(models.Model):
     id = models.AutoField(primary_key=True)
-    category = models.CharField(_('Category'), max_length=32, choices=choices.VALIDATION_ERROR_CATEGORY, null=False, blank=False)
+    category = models.CharField(_('Category'), max_length=64, choices=choices.VALIDATION_ERROR_CATEGORY, null=False, blank=False)
     data = models.JSONField(_('Data'), null=True, blank=True)
     message = models.CharField(_('Message'), max_length=128, null=True, blank=True)
 
