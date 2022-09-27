@@ -1,15 +1,26 @@
-from celery import states
 from celery.result import AsyncResult
 from django.utils.translation import gettext as _
 
 from packtools.sps import sps_maker
-from packtools.sps.models import package as packtools_package
-from packtools.sps.validation import article as packtools_article
+
+from packtools.sps.models import (
+    article_titles as sps_article_titles,
+    article_and_subarticles as sps_articles_and_subarticles,
+    front_articlemeta_issue as sps_front_articlemeta_issue,
+    package as sps_package,
+)
+from packtools.sps import exceptions as sps_exceptions
+from packtools.sps.validation import (
+    article as sps_validation_article,
+    journal as sps_validation_journal,
+)
 
 from article.controller import create_article_from_etree, update_article
 from article.choices import AS_CHANGE_SUBMITTED
 from article.models import Article
 from config import celery_app
+from journal.controller import get_journal_dict_for_validation
+from libs.dsm.publication.documents import get_documents
 from libs.dsm.publication.db import mk_connection, exceptions
 from libs.dsm.publication.documents import get_document
 
