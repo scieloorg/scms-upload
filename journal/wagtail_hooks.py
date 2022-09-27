@@ -16,13 +16,13 @@ class OfficialJournalCreateView(CreateView):
 
 class OfficialJournalAdmin(ModelAdmin):
     model = OfficialJournal
-    inspect_view_enabled = True
     menu_label = _('Journals')
     create_view_class = OfficialJournalCreateView
     menu_icon = 'folder'
     menu_order = get_menu_order('journal')
     add_to_settings_menu = False
     exclude_from_explorer = False
+    inspect_view_enabled = True
 
     list_per_page = 10
     list_display = (
@@ -36,12 +36,11 @@ class OfficialJournalAdmin(ModelAdmin):
         'foundation_year',
     )
     search_fields = (
+        'title',
         'foundation_year',
         'ISSN_print',
         'ISSN_electronic',
         'ISSNL',
-        'creator',
-        'updated_by',
     )
 
 
