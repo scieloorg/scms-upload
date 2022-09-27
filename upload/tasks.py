@@ -75,6 +75,38 @@ def task_validate_article_and_journal_data(file_path, package_id, journal_id):
         'file_path': file_path,
     })
 
+
+@celery_app.task(name='Validate article and journal compatibility')
+def task_validate_article_and_journal_compatibility(package_id, file_path, journal_id):
+    xmltree = sps_package.PackageArticle(file_path).xmltree_article
+    journal_dict = get_journal_dict_for_validation(journal_id)
+
+    try:
+        sps_validation_journal.are_article_and_journal_data_compatible(
+            xmltree, 
+            journal_dict['issn'],
+            journal_dict['title'],
+        )
+        return True
+    except sps_exceptions.ArticleIncompatibleDataError as e:
+        if isinstance(e, sps_exceptions.ArticleHasIncompatibleJournalISSNError):
+            error_message = _('XML article has incompatible journal ISSN.')
+        elif isinstance(e, sps_exceptions.ArticleHasIncompatibleJournalTitleError):
+            error_message = _('XML article has incompatible journal title.')
+        elif isinstance(e, sps_exceptions.ArticleHasIncompatibleJournalAcronymError):
+            error_message = _('XML article has incompatible journal acronym.')
+        else:
+            error_message = _('XML article has incompatible journal data.')
+
+        controller.add_validation_error(
+            error_category=choices.VE_PACKAGE_JOURNAL_AND_ARTICLE_INCOMPATIBLE_ERROR,
+            package_id=package_id,
+            package_status=choices.PS_REJECTED,
+            message=error_message,
+            data=e.data,
+        )
+        return False
+
 @celery_app.task(name='Validate article change')
 def task_validate_article_change(new_package_file_path, new_package_category, article_id):
     last_valid_pkg = controller.get_last_package(
