@@ -25,6 +25,13 @@ def get_document(**kwargs):
     return doc
 
 
+def get_documents(**kwargs):
+    try:
+        return Article.objects.filter(**kwargs)
+    except Article.DoesNotExist:
+        return []
+
+
 class DocumentToPublish:
     # https://github.com/scieloorg/opac-airflow/blob/4103e6cab318b737dff66435650bc4aa0c794519/airflow/dags/operations/sync_kernel_to_website_operations.py#L82
 
