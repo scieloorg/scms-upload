@@ -39,6 +39,7 @@ class MigrationFailureAdmin(ModelAdmin):
         'object_name',
         'pid',
         'exception_type',
+        'exception_msg',
     )
     inspect_view_fields = (
         'action_name',
