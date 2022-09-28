@@ -54,6 +54,9 @@ def get_or_create_collection(collection_acron, user_id):
     return collection
 
 
+###########################################################################
+
+
 def get_scielo_journal(collection_acron, scielo_issn):
     try:
         scielo_journal = SciELOJournal.objects.get(

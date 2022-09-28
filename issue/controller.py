@@ -26,6 +26,7 @@ def get_or_create_official_issue(official_journal,
                                  volume,
                                  number,
                                  supplement,
+                                 creator_id,
                                  ):
     values = (official_journal, year, volume, number, supplement, )
     if not any(values):
@@ -36,7 +37,17 @@ def get_or_create_official_issue(official_journal,
 
     kwargs = _get_args(arg_names, values)
     try:
-        official_issue, status = Issue.objects.get_or_create(**kwargs)
+        try:
+            official_issue = Issue.objects.get(**kwargs)
+        except Issue.DoesNotExist:
+            official_issue = Issue()
+            official_issue.creator_id = creator_id
+            official_issue.official_journal = official_journal
+            official_issue.year = year
+            official_issue.volume = volume
+            official_issue.number = number
+            official_issue.supplement = supplement
+            official_issue.save()
     except Exception as e:
         raise exceptions.GetOrCreateIssueError(
             _('Unable to get or create official issue {} {} {}').format(

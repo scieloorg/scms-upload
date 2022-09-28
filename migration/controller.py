@@ -34,6 +34,7 @@ from libs.dsm.publication.journals import JournalToPublish
 from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
 # from libs.dsm.publication.documents import DocumentToPublish
 
+from core.controller import get_flexible_date
 from collection.choices import CURRENT
 from collection import controller as collection_controller
 from collection.exceptions import (
@@ -41,7 +42,7 @@ from collection.exceptions import (
 )
 from .models import (
     JournalMigration,
-    IssueMigration,
+    # IssueMigration,
     # DocumentMigration,
     # IssueFilesMigration,
     # DocumentFilesMigration,
@@ -273,17 +274,15 @@ def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
         official_journal_data = (
             official_journal.title,
             official_journal.foundation_date,
-            official_journal.foundation_year,
         )
         journal_data = (
             journal.title,
             journal.first_year,
-            journal.first_year[:4],
         )
         if official_journal_data != journal_data:
             official_journal.title = journal.title
-            official_journal.foundation_date = journal.first_year
-            official_journal.foundation_year = journal.first_year[:4]
+            official_journal.foundation_date = get_flexible_date(
+                journal.first_year)
             official_journal.save()
     except Exception as e:
         pass

@@ -27,17 +27,17 @@ class OfficialJournalAdmin(ModelAdmin):
     list_per_page = 10
     list_display = (
         'title',
-        'foundation_year',
+        'foundation_date',
         'ISSN_print',
         'ISSN_electronic',
         'ISSNL',
     )
-    list_filter = (
-        'foundation_year',
-    )
+    # list_filter = (
+    #     'foundation_date',
+    # )
     search_fields = (
         'title',
-        'foundation_year',
+        'foundation_date__text',
         'ISSN_print',
         'ISSN_electronic',
         'ISSNL',

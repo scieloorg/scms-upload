@@ -7,7 +7,7 @@ from core.forms import CoreAdminModelForm
 from journal.models import OfficialJournal
 from issue.models import Issue
 from article.models import Article
-from .choices import JOURNAL_PUBLICATION_STATUS, WEBSITE_KIND
+from .choices import JOURNAL_AVAILABILTY_STATUS, WEBSITE_KIND
 
 
 class Collection(CommonControlField):
@@ -57,7 +57,8 @@ class SciELOJournal(CommonControlField):
             models.Index(fields=['acron']),
             models.Index(fields=['collection']),
             models.Index(fields=['scielo_issn']),
-            models.Index(fields=['publication_status']),
+            models.Index(fields=['availability_status']),
+            models.Index(fields=['official_journal']),
         ]
 
     def __unicode__(self):
@@ -85,7 +86,6 @@ class SciELOIssue(CommonControlField):
     issue_pid = models.CharField(_('Issue PID'), max_length=17, null=False, blank=False)
     # v30n1 ou 2019nahead
     issue_folder = models.CharField(_('Issue Folder'), max_length=17, null=False, blank=False)
-    pub_year = models.CharField(_('Publicatin year'), max_length=4, null=True, blank=True)
     official_issue = models.ForeignKey(
     	Issue, on_delete=models.SET_NULL, null=True)
 
@@ -99,7 +99,7 @@ class SciELOIssue(CommonControlField):
             models.Index(fields=['scielo_journal']),
             models.Index(fields=['issue_pid']),
             models.Index(fields=['issue_folder']),
-            models.Index(fields=['pub_year']),
+            models.Index(fields=['official_issue']),
         ]
 
 
@@ -131,6 +131,7 @@ class SciELODocument(CommonControlField):
             models.Index(fields=['scielo_issue']),
             models.Index(fields=['pid']),
             models.Index(fields=['file_id']),
+            models.Index(fields=['official_document'])
         ]
 
 
