@@ -3,7 +3,7 @@ from django.utils.translation import gettext as _
 from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView
 
-from .models import OfficialJournal, NonOfficialJournalTitle
+from .models import OfficialJournal, NonOfficialJournalTitle, JournalMission
 
 
 class OfficialJournalCreateView(CreateView):
@@ -73,6 +73,29 @@ class NonOfficialJournalTitleAdmin(ModelAdmin):
     )
 
 
+class JournalMissionAdmin(ModelAdmin):
+    model = JournalMission
+    menu_label = _('Journal Mission')
+    menu_icon = 'folder'
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+
+    list_display = (
+        'official_journal_id',
+        'official_journal'
+    )
+    list_filter = (
+        'official_journal_id',
+        'official_journal'
+    )
+    search_fields = (
+        'official_journal_id',
+        'official_journal'
+    )
+
+
 modeladmin_register(OfficialJournalAdmin)
 modeladmin_register(NonOfficialJournalTitleAdmin)
+modeladmin_register(JournalMissionAdmin)
 
