@@ -2,7 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from core.models import CommonControlField
-
+from core.forms import CoreAdminModelForm
 from collection.models import (
     SciELOJournal,
     SciELOIssue,
@@ -31,7 +31,7 @@ class MigrationConfiguration(CommonControlField):
         indexes = [
             models.Index(fields=['classic_website_config']),
         ]
-
+    base_form_class = CoreAdminModelForm
 
 class MigratedData(CommonControlField):
 
