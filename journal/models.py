@@ -7,7 +7,7 @@ from wagtail.admin.edit_handlers import FieldPanel, InlinePanel
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 
-from core.models import CommonControlField
+from core.models import CommonControlField, RichTextWithLang
 
 from .forms import OfficialJournalForm
 
@@ -53,3 +53,16 @@ class NonOfficialJournalTitle(ClusterableModel, CommonControlField):
 class NonOfficialTitle(Orderable):
    page = ParentalKey(NonOfficialJournalTitle, related_name='page_non_official_title')
    non_official_journal_title = models.CharField(_('Non Official Journal Title'), max_length=255, null=False, blank=False)
+
+
+class JournalMission(ClusterableModel):
+    official_journal = models.ForeignKey('OfficialJournal', null=True, blank=True, related_name='JournalMission_OfficialJournal', on_delete=models.CASCADE)
+
+    panels=[
+        FieldPanel('official_journal'),
+        InlinePanel('mission', label=_('Mission'), classname="collapsed")
+    ]
+
+
+class FieldMission(Orderable, RichTextWithLang):
+    page = ParentalKey(JournalMission, on_delete=models.CASCADE, related_name='mission')
