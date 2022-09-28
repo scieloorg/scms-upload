@@ -10,34 +10,14 @@ from wagtail.contrib.modeladmin.options import (
     ModelAdminGroup,
     modeladmin_register,
 )
-from wagtail.contrib.modeladmin.views import InspectView
 
-from .button_helper import MigrationFailureButtonHelper
-from .models import (
-    MigrationFailure,
-    MigrationConfiguration,
-)
-from .permission_helper import MigrationFailurePermissionHelper
-
-
-class MigrationFailureAdminInspectView(InspectView):
-    def get_context_data(self):
-        try:
-            data = self.instance.data.copy()
-        except AttributeError:
-            data = {}
-
-        return super().get_context_data(**data)
+from . import models
 
 
 class MigrationFailureAdmin(ModelAdmin):
-    model = MigrationFailure
-    button_helper_class = MigrationFailureButtonHelper
-    permission_helper_class = MigrationFailurePermissionHelper
-    # create_view_class = MigrationFailureCreateView
+    model = models.MigrationFailure
     inspect_view_enabled = True
-    inspect_view_class = MigrationFailureAdminInspectView
-    menu_label = _('MigrationFailures')
+    menu_label = _('Migration Failures')
     menu_icon = 'folder'
     menu_order = 200
     add_to_settings_menu = False
@@ -59,6 +39,7 @@ class MigrationFailureAdmin(ModelAdmin):
         'object_name',
         'pid',
         'exception_type',
+        'exception_msg',
     )
     inspect_view_fields = (
         'action_name',
@@ -66,14 +47,8 @@ class MigrationFailureAdmin(ModelAdmin):
         'pid',
         'exception_type',
         'exception_msg',
+        'traceback',
     )
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-
-        if self.permission_helper.user_can_access_all_migration_failures(request.user, None):
-            return qs
-        return qs.filter(creator=request.user)
 
 
 class CoreCreateView(CreateView):
@@ -84,7 +59,7 @@ class CoreCreateView(CreateView):
 
 
 class MigrationConfigurationModelAdmin(ModelAdmin):
-    model = MigrationConfiguration
+    model = models.MigrationConfiguration
     menu_label = _('Migration Configuration')
     menu_icon = 'doc-full'
     menu_order = 100
@@ -108,12 +83,44 @@ class MigrationConfigurationModelAdmin(ModelAdmin):
     )
 
 
+class JournalMigrationModelAdmin(ModelAdmin):
+    model = models.JournalMigration
+    menu_label = _('Journal Migration')
+    menu_icon = 'doc-full'
+    menu_order = 300
+    add_to_settings_menu = False
+    exclude_from_explorer = True
+    inspect_view_enabled = True
+
+    list_per_page = 10
+    create_view_class = CoreCreateView
+
+    list_display = (
+        'scielo_journal',
+        'status',
+        'isis_updated_date',
+    )
+    list_filter = (
+        'status',
+    )
+    search_fields = (
+        'scielo_journal__acron',
+    )
+    inspect_view_fields = (
+        'scielo_journal',
+        'status',
+        'isis_updated_date',
+        'data',
+    )
+
+
 class MigrationModelAdmin(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Migration'
     items = (
         MigrationConfigurationModelAdmin,
         MigrationFailureAdmin,
+        JournalMigrationModelAdmin,
     )
     menu_order = get_menu_order('migration')
 

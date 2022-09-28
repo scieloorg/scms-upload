@@ -39,6 +39,9 @@ wagtailmenus==3.0.2
 # ------------------------------------------------------------------------------
 wagtail-localize==1.2.1
 
+# Django celery results
+# ------------------------------------------------------------------------------
+django_celery_results==2.4.0
 
 # DSM Minio
 # ------------------------------------------------------------------------------
@@ -58,3 +61,7 @@ pymongo==3.12.0
 tenacity==8.0.1
 aiohttp==3.8.1
 python-magic==0.4.27
+
+# DSM Migration
+# ------------------------------------------------------------------------------
+-e git+https://github.com/scieloorg/scielo_migration.git@0.1.3#egg=scielo_classic_website

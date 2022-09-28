@@ -30,6 +30,17 @@ def get_journal(**kwargs):
 class JournalToPublish:
     def __init__(self, journal_id):
         self.journal = get_journal(_id=journal_id)
+        self.journal.jid = journal_id
+        self.journal._id = journal_id
+        self.reset_lists()
+
+    def reset_lists(self):
+        self.journal.sponsors = []
+        self.journal.timeline = []
+        self.journal.mission = []
+
+    def add_acron(self, acron):
+        self.journal.acronym = acron
 
     def add_journal_titles(self, title, title_iso, short_title):
         self.journal.title = title
@@ -100,7 +111,7 @@ class JournalToPublish:
                 })
             )
             self.journal.current_status = (
-                self.journal.timeline[-1].get("status")
+                self.journal.timeline[-1].status
             )
 
     def add_item_to_mission(self, language, description):
@@ -163,8 +174,6 @@ class JournalToPublish:
         """
 
         try:
-            save_data(self.journal)
+            return save_data(self.journal)
         except Exception as e:
             raise exceptions.PublishJournalError(e)
-
-        return self.journal
