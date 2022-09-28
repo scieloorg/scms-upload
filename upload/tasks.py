@@ -3,12 +3,7 @@ from django.utils.translation import gettext as _
 
 from packtools.sps import sps_maker
 
-from packtools.sps.models import (
-    article_titles as sps_article_titles,
-    article_and_subarticles as sps_articles_and_subarticles,
-    front_articlemeta_issue as sps_front_articlemeta_issue,
-    package as sps_package,
-)
+from packtools.sps.models import package as sps_package
 from packtools.sps import exceptions as sps_exceptions
 from packtools.sps.validation import (
     article as sps_validation_article,
@@ -24,7 +19,7 @@ from libs.dsm.publication.documents import get_documents
 from libs.dsm.publication.db import mk_connection, exceptions
 from libs.dsm.publication.documents import get_document
 
-from .utils import file_utils, package_utils, xml_utils
+from .utils import file_utils, package_utils, site_utils, xml_utils
 from . import choices, controller, models
 
 
@@ -110,24 +105,16 @@ def task_validate_article_and_journal_compatibility(package_id, file_path, journ
 
 @celery_app.task(name='Validate article is unpublished')
 def task_validate_article_is_unpublished(file_path, package_id):
-    xmltree = sps_package.PackageArticle(file_path).xmltree_article
-    
-    issue_data = sps_front_articlemeta_issue.ArticleMetaIssue(xmltree).data
-
-    article_type = sps_articles_and_subarticles.ArticleAndSubArticles(xmltree).main_article_type
-    article_lang = sps_articles_and_subarticles.ArticleAndSubArticles(xmltree).main_lang
-    article_titles = sps_articles_and_subarticles.ArticleAndSubArticles(xmltree).data
-
-#    fam_article_data = sps.models.front_articlemeta_article(xmltree).data
-#    fam_journal_data = sps.models.front_articlemeta_journal(xmltree).data
-
     try:
         # Tries to connect to site database (opac.article)
         mk_connection()
     except exceptions.DBConnectError:
         return {'error': _('Site database is unavailable.')}
 
-    similar_docs = get_documents(**issue_data)
+    xmltree = sps_package.PackageArticle(file_path).xmltree_article
+    article_data = site_utils.get_article_data_for_comparison(xmltree)
+
+    similar_docs = get_documents(**article_data)
 
     if len(similar_docs) > 1: 
         controller.add_validation_error(
