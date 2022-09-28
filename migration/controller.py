@@ -242,7 +242,7 @@ def migrate_journal(user_id, collection_acron, scielo_issn, journal_data,
         journal_migration.isis_created_date = journal.isis_created_date
         journal_migration.isis_updated_date = journal.isis_updated_date
         journal_migration.status = MS_MIGRATED
-        if journal.publication_status != CURRENT:
+        if journal.current_status != CURRENT:
             journal_migration.status = MS_TO_IGNORE
         journal_migration.data = journal_data
         journal_migration.save()
@@ -291,19 +291,19 @@ def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
     try:
         scielo_journal_data = (
             scielo_journal.title,
-            scielo_journal.publication_status,
+            scielo_journal.availability_status,
             scielo_journal.official_journal,
             scielo_journal.acron,
         )
         journal_data = (
             journal.title,
-            journal.publication_status,
+            journal.current_status,
             official_journal,
             journal.acronym,
         )
         if scielo_journal_data != journal_data:
             scielo_journal.title = journal.title
-            scielo_journal.publication_status = journal.publication_status
+            scielo_journal.availability_status = journal.current_status
             scielo_journal.official_journal = official_journal
             scielo_journal.acron = journal.acronym
             scielo_journal.save()
@@ -318,7 +318,7 @@ def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
 
 def publish_migrated_journal(journal_migration):
     journal = classic_ws.Journal(journal_migration.data)
-    if journal.publication_status != CURRENT:
+    if journal.current_status != CURRENT:
         # journal must not be published
         return
 

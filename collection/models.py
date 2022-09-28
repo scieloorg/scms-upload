@@ -37,9 +37,9 @@ class SciELOJournal(CommonControlField):
     scielo_issn = models.CharField(_('SciELO ISSN'), max_length=9, null=False, blank=False)
     acron = models.CharField(_('Acronym'), max_length=25, null=True, blank=True)
     title = models.CharField(_('Title'), max_length=255, null=True, blank=True)
-    publication_status = models.CharField(
-        _('Publication Status'), max_length=10, null=True, blank=True,
-        choices=JOURNAL_PUBLICATION_STATUS)
+    availability_status = models.CharField(
+        _('Availability Status'), max_length=10, null=True, blank=True,
+        choices=JOURNAL_AVAILABILTY_STATUS)
     official_journal = models.ForeignKey(
     	OfficialJournal, on_delete=models.SET_NULL, null=True)
 
