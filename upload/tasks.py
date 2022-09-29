@@ -78,9 +78,10 @@ def task_validate_article_and_journal_compatibility(package_id, file_path, journ
 
     try:
         sps_validation_journal.are_article_and_journal_data_compatible(
-            xmltree, 
-            journal_dict['issn'],
-            journal_dict['title'],
+            xml_article=xmltree, 
+            journal_print_issn=journal_dict['print_issn'], 
+            journal_electronic_issn=journal_dict['electronic_issn'],
+            journal_titles=journal_dict['titles'],
         )
         return True
     except sps_exceptions.ArticleIncompatibleDataError as e:
