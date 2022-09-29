@@ -43,8 +43,9 @@ def get_journal_dict_for_validation(journal_id):
 
     try:
         journal = OfficialJournal.objects.get(pk=journal_id)
-        data['title'] = [journal.title, ]
-        data['issn'] = [journal.ISSN_print, journal.ISSN_electronic]
+        data['titles'] = [journal.title,]
+        data['print_issn'] = journal.ISSN_print
+        data['electronic_issn'] = journal.ISSN_electronic
     except OfficialJournal.DoesNotExist:
         ...
 
