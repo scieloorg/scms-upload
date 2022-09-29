@@ -95,11 +95,11 @@ def task_validate_article_and_journal_compatibility(package_id, file_path, journ
             error_message = _('XML article has incompatible journal data.')
 
         controller.add_validation_error(
-            error_category=choices.VE_PACKAGE_JOURNAL_AND_ARTICLE_INCOMPATIBLE_ERROR,
+            error_category=choices.VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR,
             package_id=package_id,
             package_status=choices.PS_REJECTED,
             message=error_message,
-            data=e.data,
+            data={'errors': e.data},
         )
         return False
 
@@ -115,15 +115,16 @@ def task_validate_article_is_unpublished(file_path, package_id):
     xmltree = sps_package.PackageArticle(file_path).xmltree_article
     article_data = site_utils.get_article_data_for_comparison(xmltree)
 
+    # FIXME: alterar para método mais robusto ainda a ser desenvolvido
     similar_docs = get_documents(**article_data)
 
     if len(similar_docs) > 1: 
         controller.add_validation_error(
-            error_category=choices.VE_PACKAGE_ARTICLE_IS_NOT_NEW_ERROR,
+            error_category=choices.VE_ARTICLE_IS_NOT_NEW_ERROR,
             package_id=package_id,
             package_status=choices.PS_REJECTED,
             message=_('XML article refers to a existant document'),
-            data={'similar_docs': similar_docs}
+            data={'similar_docs': [s.aid for s in similar_docs]},
         )
         return False
 
