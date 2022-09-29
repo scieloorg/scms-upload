@@ -42,11 +42,13 @@ def get_article_data_for_comparison(xmltree, remove_null_values=True):
     # ArticleTitles
     obj_titles = sps_article_titles.ArticleTitles(xmltree)
     article_data['title'] = obj_titles.article_title['text']
-    article_data['translated_titles'] = []
-    for t in obj_titles.trans_titles:
-        article_data['translated_titles'].append(
-            {'name': t['text'], 'lang': t['lang']},
-        )
+
+    # FIXME: alguns registros não possuem estes dados. é preciso refatorar este método para que seja mais robusto e flexivel
+    # article_data['translated_titles'] = []
+    # for t in obj_titles.trans_titles:
+    #     article_data['translated_titles'].append(
+    #         {'name': t['text'], 'lang': t['lang']},
+    #     )
 
     # ArticleAuthors
     obj_authors = sps_article_authors.Authors(xmltree)
@@ -65,15 +67,16 @@ def get_article_data_for_comparison(xmltree, remove_null_values=True):
             f'{c.get("surname")}, {c.get("given_names")}'
         )
 
+    # FIXME: descomentar quando este registro estiver preenchido em todos os documentos de opac.article
     # DoiWithLang
-    obj_dwl = sps_article_doi_with_lang.DoiWithLang(xmltree)
-    article_data['doi'] = obj_dwl.main_doi
-    article_data['doi_with_lang'] = []
-    for lv in obj_dwl.data:
-        article_data['doi_with_lang'].append({
-            'doi': lv['value'],
-            'language': lv['lang'],
-        })
+    # obj_dwl = sps_article_doi_with_lang.DoiWithLang(xmltree)
+    # article_data['doi'] = obj_dwl.main_doi
+    # article_data['doi_with_lang'] = []
+    # for lv in obj_dwl.data:
+    #     article_data['doi_with_lang'].append({
+    #         'doi': lv['value'],
+    #         'language': lv['lang'],
+    #     })
 
     # ArticleAndSubArticles
     obj_asa = sps_articles_and_subarticles.ArticleAndSubArticles(xmltree)
