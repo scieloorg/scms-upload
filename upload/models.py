@@ -73,8 +73,36 @@ class ValidationError(models.Model):
             self.category,
         ])
 
-    def get_standardized_category_label(self):
-        return self.category.lower().replace('-', '_')
+    def report_name(self):
+        if self.category in [
+            choices.VE_PACKAGE_FILE_ERROR,
+        ]:
+            return choices.VR_PACKAGE_FILE
+
+        if self.category.lower() in [
+            choices.VE_XML_FORMAT_ERROR,
+        ]:
+            return choices.VR_XML_OR_DTD
+            
+        if self.category.lower() in [
+            choices.VE_ASSET_ERROR,
+            choices.VE_RENDITION_ERROR,
+        ]:
+            return choices.VR_ASSET_AND_RENDITION
+
+        if self.category.lower() in [
+            choices.VE_ARTICLE_IS_NOT_NEW_ERROR,
+            choices.VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR,
+            choices.VE_BIBLIOMETRICS_DATA_ERROR,
+            choices.VE_DATA_CONSISTENCY_ERROR,
+        ]:
+            return choices.VR_INDIVIDUAL_CONTENT
+
+        if self.category.lower() in [
+            choices.VE_CRITERIA_ISSUES,
+            choices.VE_SERVICES_DATA_ERROR,
+        ]:
+            return choices.VR_GROUPED_CONTENT
     
     panels = [
         MultiFieldPanel(
