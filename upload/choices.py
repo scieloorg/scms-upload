@@ -70,6 +70,37 @@ VALIDATION_ERROR_CATEGORY = (
     (VE_RENDITION_ERROR, 'RENDITION_ERROR'),
 )
 
+# Model ValidationError, campo dinâmico que agrupo tipos de erro
+VR_XML_OR_DTD = 'xml_or_dtd'
+VR_ASSET_AND_RENDITION = 'asset_and_rendition'
+VR_INDIVIDUAL_CONTENT = 'individual_content'
+VR_GROUPED_CONTENT = 'grouped_content'
+VR_STYLESHEET = 'stylesheet'
+VR_PACKAGE_FILE = 'package_file'
+
+VALIDATION_REPORT_ITEMS = {
+    VR_XML_OR_DTD: set([
+        VE_XML_FORMAT_ERROR,
+    ]),
+    VR_ASSET_AND_RENDITION: set([
+        VE_ASSET_ERROR, 
+        VE_RENDITION_ERROR,
+    ]),
+    VR_INDIVIDUAL_CONTENT: set([
+        VE_ARTICLE_IS_NOT_NEW_ERROR,
+        VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR,
+        VE_BIBLIOMETRICS_DATA_ERROR, 
+        VE_DATA_CONSISTENCY_ERROR, 
+    ]),
+    VR_GROUPED_CONTENT: set[
+        VE_CRITERIA_ISSUES,
+        VE_SERVICES_DATA_ERROR,
+    ],
+    VR_PACKAGE_FILE: set[
+        VE_PACKAGE_FILE_ERROR,
+    ]
+}
+
 
 # Model ErrorResolution, Field action
 ER_ACTION_TO_FIX = 'to-fix'
