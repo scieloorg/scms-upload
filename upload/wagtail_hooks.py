@@ -11,6 +11,7 @@ from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, mode
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
 from article.models import Article
+from journal.models import OfficialJournal
 
 from .button_helper import UploadButtonHelper
 from .models import choices, Package, QAPackage, ValidationError
@@ -33,7 +34,7 @@ class PackageCreateView(CreateView):
                 article = Article.objects.get(pk=article_id)
                 package_obj.article_id = article
             except Article.DoesNotExist:
-                ...              
+                ...
 
         return package_obj
 
@@ -55,7 +56,7 @@ class PackageCreateView(CreateView):
                 self.request,
                 _('Package to change article has been successfully submitted.')
             )
-        else:
+        elif self.object.category == choices.PC_NEW_DOCUMENT:
             messages.success(
                 self.request,
                 _('Package to create article has been successfully submitted.')
@@ -75,8 +76,7 @@ class PackageAdminInspectView(InspectView):
         }
 
         for ve in self.instance.validationerror_set.all():
-            vek = ve.get_standardized_category_label()
-
+            vek = ve.report_name()
             if vek not in data:
                 data['validation_errors'][vek] = []
 
