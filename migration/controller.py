@@ -34,7 +34,7 @@ from libs.dsm.publication.journals import JournalToPublish
 from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
 # from libs.dsm.publication.documents import DocumentToPublish
 
-from core.controller import get_flexible_date
+from core.controller import get_or_create_flexible_date
 from collection.choices import CURRENT
 from collection import controller as collection_controller
 from collection.exceptions import (
@@ -42,7 +42,7 @@ from collection.exceptions import (
 )
 from .models import (
     JournalMigration,
-    # IssueMigration,
+    IssueMigration,
     # DocumentMigration,
     # IssueFilesMigration,
     # DocumentFilesMigration,
@@ -273,19 +273,14 @@ def migrate_journal(user_id, collection_acron, scielo_issn, journal_data,
 
 def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
 
-    # cria ou obtém official_journal
-    official_journal = collection_controller.get_or_create_official_journal(
-        issn_l=None,
-        e_issn=journal.electronic_issn,
-        print_issn=journal.print_issn,
-        creator_id=user_id,
-    )
-
-    # cria ou obtém scielo_journal
-    scielo_journal = collection_controller.get_or_create_scielo_journal(
-        collection_acron, scielo_issn, user_id
-    )
     try:
+        # cria ou obtém official_journal
+        official_journal = collection_controller.get_or_create_official_journal(
+            issn_l=None,
+            e_issn=journal.electronic_issn,
+            print_issn=journal.print_issn,
+            creator_id=user_id,
+        )
         official_journal_data = (
             official_journal.title,
             official_journal.foundation_date,
@@ -296,12 +291,16 @@ def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
         )
         if official_journal_data != journal_data:
             official_journal.title = journal.title
-            official_journal.foundation_date = get_flexible_date(
+            official_journal.foundation_date = get_or_create_flexible_date(
                 journal.first_year)
             official_journal.save()
     except Exception as e:
-        pass
+        official_journal = None
 
+    # cria ou obtém scielo_journal
+    scielo_journal = collection_controller.get_or_create_scielo_journal(
+        collection_acron, scielo_issn, user_id
+    )
     try:
         scielo_journal_data = (
             scielo_journal.title,
@@ -427,4 +426,196 @@ def publish_migrated_journal(journal_migration):
         raise exceptions.PublishJournalError(
             _("Unable to publish {} {} {}").format(
                 journal_migration, type(e), e)
+        )
+
+
+def get_or_create_issue_migration(scielo_issue, creator_id):
+    """
+    Returns a IssueMigration (registered or new)
+    """
+    try:
+        try:
+            item = IssueMigration.objects.get(
+                scielo_issue=scielo_issue,
+            )
+        except IssueMigration.DoesNotExist:
+            item = IssueMigration()
+            item.creator_id = creator_id
+            item.scielo_issue = scielo_issue
+            item.save()
+    except Exception as e:
+        raise exceptions.GetOrCreateIssueMigrationError(
+            _('Unable to get_or_create_issue_migration {} {} {}').format(
+                scielo_issue, type(e), e
+            )
+        )
+    return item
+
+
+def migrate_and_publish_issues(
+        user_id,
+        collection_acron,
+        force_update=False,
+        ):
+    try:
+        mcc = MigrationConfigurationController(collection_acron)
+        mcc.connect_db()
+        source_file_path = mcc.get_source_file_path("issue")
+
+        for issue_pid, issue_data in classic_ws.get_records_by_source_path("issue", source_file_path):
+            try:
+                action = "migrate"
+                issue_migration = migrate_issue(
+                    user_id=user_id,
+                    collection_acron=collection_acron,
+                    scielo_issn=issue_pid[:9],
+                    issue_pid=issue_pid,
+                    issue_data=issue_data[0],
+                    force_update=force_update,
+                )
+                publish_migrated_issue(issue_migration, force_update)
+            except Exception as e:
+                _register_failure(
+                    _("Error migrating issue {} {}").format(collection_acron, issue_pid),
+                    collection_acron, action, "issue", issue_pid,
+                    e,
+                    user_id,
+                )
+    except Exception as e:
+        _register_failure(
+            _("Error migrating issue {}").format(collection_acron),
+            collection_acron, action, "issue", "GENERAL",
+            e,
+            user_id,
+        )
+
+
+def migrate_issue(
+        user_id,
+        collection_acron,
+        scielo_issn,
+        issue_pid,
+        issue_data,
+        force_update=False,
+        ):
+    """
+    Create/update IssueMigration
+    """
+    issue = classic_ws.Issue(issue_data)
+
+    scielo_issue = get_scielo_issue(
+        issue, collection_acron, scielo_issn, issue_pid, user_id)
+
+    issue_migration = get_or_create_issue_migration(
+        scielo_issue, creator_id=user_id)
+
+    # check if it needs to be update
+    if issue_migration.isis_updated_date == issue.isis_updated_date:
+        if not force_update:
+            # nao precisa atualizar
+            return issue_migration
+    try:
+        issue_migration.isis_created_date = issue.isis_created_date
+        issue_migration.isis_updated_date = issue.isis_updated_date
+        issue_migration.status = MS_MIGRATED
+        if issue.is_press_release:
+            issue_migration.status = MS_TO_IGNORE
+        issue_migration.data = issue_data
+
+        issue_migration.save()
+        return issue_migration
+    except Exception as e:
+        logging.error(_("Error migrating issue {} {}").format(collection_acron, issue_pid))
+        logging.exception(e)
+        raise exceptions.IssueMigrationSaveError(
+            _("Unable to save {} migration {} {} {}").format(
+                "issue", collection_acron, issue_pid, e
+            )
+        )
+
+
+def get_scielo_issue(issue, collection_acron, scielo_issn, issue_pid, user_id):
+    # obtém scielo_journal para obter ou criar scielo_issue
+    scielo_journal = collection_controller.get_scielo_journal(
+        collection_acron, scielo_issn)
+
+    # cria ou obtém scielo_issue
+    scielo_issue = collection_controller.get_or_create_scielo_issue(
+        scielo_journal,
+        issue_pid,
+        issue.issue_label,
+        user_id,
+    )
+
+    official_issue = None
+    # obtém official_issue
+    if not issue.is_press_release:
+        try:
+            official_issue = collection_controller.get_or_create_official_issue(
+                scielo_journal.official_journal,
+                issue.publication_year,
+                issue.volume,
+                issue.number,
+                issue.suppl,
+                user_id,
+            )
+            # atualiza dados de scielo_issue
+            scielo_issue.official_issue = official_issue
+        except:
+            pass
+    scielo_issue.publication_date = get_or_create_flexible_date(
+        issue.publication_year)
+    scielo_issue.save()
+    return scielo_issue
+
+
+def publish_migrated_issue(issue_migration, force_update):
+    """
+    Raises
+    ------
+    PublishIssueError
+    """
+    issue = classic_ws.Issue(issue_migration.data)
+
+    if issue_migration.status != MS_MIGRATED and not force_update:
+        return
+    try:
+        published_id = get_bundle_id(
+            issue.journal,
+            issue.publication_year,
+            issue.volume,
+            issue.number,
+            issue.supplement,
+        )
+        issue_to_publish = IssueToPublish(published_id)
+
+        issue_to_publish.add_identification(
+            issue.volume,
+            issue.number,
+            issue.supplement)
+        issue_to_publish.add_journal(issue.journal)
+        issue_to_publish.add_order(int(issue.order[4:]))
+        issue_to_publish.add_pid(issue.pid)
+        issue_to_publish.add_publication_date(
+            issue.publication_year,
+            issue.start_month,
+            issue.end_month)
+        # FIXME indica se há artigos / documentos
+        # para uso de indicação fascículo aop "desativado"
+        issue_to_publish.has_docs = []
+
+        issue_to_publish.publish_issue()
+    except Exception as e:
+        raise exceptions.PublishIssueError(
+            _("Unable to publish {} {}").format(
+                issue_migration.scielo_issue.issue_pid, e)
+        )
+
+    try:
+        issue_migration.status = MS_PUBLISHED
+        issue_migration.save()
+    except Exception as e:
+        raise exceptions.PublishIssueError(
+            _("Unable to upate issue_migration status {} {}").format(
+                issue_migration.scielo_issue.issue_pid, e)
         )
