@@ -22,7 +22,6 @@ def get_issue(**kwargs):
         issue = Issue.objects.get(**kwargs)
     except Issue.DoesNotExist:
         issue = Issue()
-        issue._id = issue_id
     return issue
 
 
@@ -79,6 +78,9 @@ def get_bundle_id(issn_id, year, volume=None, number=None, supplement=None):
 class IssueToPublish:
     def __init__(self, issue_id):
         self.issue = get_issue(_id=issue_id)
+        self.issue._id = issue_id
+        self.issue.iid = issue_id
+
         self._has_docs = None
 
     def add_journal(self, journal):
@@ -94,17 +96,19 @@ class IssueToPublish:
         self.issue.pid = pid
 
     def add_publication_date(self, year, start_month, end_month):
-        self.issue.start_month = start_month
-        self.issue.end_month = end_month
+        # nao está sendo usado
+        # self.issue.start_month = start_month
+        # self.issue.end_month = end_month
         self.issue.year = year
 
     def add_identification(self, volume, number, supplement):
         self.issue.volume = volume
         self.issue.suppl_text = supplement
-        if "spe" in number:
-            self.issue.spe_text = number
-        else:
-            self.issue.number = number
+        if number:
+            if "spe" in number:
+                self.issue.spe_text = number
+            else:
+                self.issue.number = number
 
         # set label
         prefixes = ("v", "n", "s")
@@ -146,8 +150,6 @@ class IssueToPublish:
             self.issue.type = "outdated_ahead"
 
         try:
-            db.save_data(self.issue)
+            return db.save_data(self.issue)
         except Exception as e:
             raise exceptions.PublishIssueError(e)
-
-        return issue
