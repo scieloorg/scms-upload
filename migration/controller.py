@@ -59,6 +59,21 @@ from . import exceptions
 User = get_user_model()
 
 
+def start():
+    try:
+        classic_website, files_storage_config, new_website_config = collection_controller.start()
+        migration_configuration = MigrationConfiguration()
+        migration_configuration.creator_id = creator_id
+        migration_configuration.classic_website_config = classic_website
+        migration_configuration.new_website_config = new_website_config
+        migration_configuration.files_storage_config = files_storage_config
+        migration_configuration.creator_id = 1
+        migration_configuration.save()
+
+    except Exception as e:
+        raise OSError("Unable to start system %s" % e)
+
+
 def insert_hyphen_in_YYYYMMMDD(YYYYMMMDD):
     if YYYYMMMDD[4:6] == "00":
         return f"{YYYYMMMDD[:4]}"
