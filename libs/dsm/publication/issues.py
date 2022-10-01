@@ -62,7 +62,7 @@ def get_bundle_id(issn_id, year, volume=None, number=None, supplement=None):
     for label in labels:
         value = data.get(label)
         if value:
-            _id.append(value)
+            _id.append(str(value))
 
     labels = [("volume", "v"), ("number", "n"), ("supplement", "s")]
     for label, prefix in labels:
@@ -99,7 +99,7 @@ class IssueToPublish:
         # nao está sendo usado
         # self.issue.start_month = start_month
         # self.issue.end_month = end_month
-        self.issue.year = year
+        self.issue.year = str(year)
 
     def add_identification(self, volume, number, supplement):
         self.issue.volume = volume

@@ -27,17 +27,17 @@ class IssueAdmin(ModelAdmin):
 
     list_display = (
         'official_journal',
-        'year',
+        'publication_date',
         'volume',
         'number',
         'supplement',
     )
     list_filter = (
         'official_journal',
-        'year',
+        'publication_date',
     )
     search_fields = (
-        'year,'
+        'publication_date__year,'
     )
 
 modeladmin_register(IssueAdmin)

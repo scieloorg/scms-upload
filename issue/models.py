@@ -1,7 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from core.controller import get_flexible_date
 from core.models import CommonControlField, FlexibleDate
 from journal.models import OfficialJournal
 

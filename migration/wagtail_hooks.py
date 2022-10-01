@@ -137,7 +137,7 @@ class IssueMigrationModelAdmin(ModelAdmin):
     search_fields = (
         'scielo_issue__scielo_journal__title',
         'scielo_issue__scielo_journal__acron',
-        'scielo_issue__pub_year',
+        'scielo_issue__publication_date__year',
         'scielo_issue__issue_folder',
     )
     inspect_view_fields = (
