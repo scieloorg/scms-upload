@@ -60,18 +60,78 @@ User = get_user_model()
 
 
 def start():
+    user_id = 1
     try:
         classic_website, files_storage_config, new_website_config = collection_controller.start()
         migration_configuration = MigrationConfiguration()
-        migration_configuration.creator_id = creator_id
         migration_configuration.classic_website_config = classic_website
         migration_configuration.new_website_config = new_website_config
         migration_configuration.files_storage_config = files_storage_config
-        migration_configuration.creator_id = 1
+        migration_configuration.creator_id = user_id
         migration_configuration.save()
 
     except Exception as e:
         raise OSError("Unable to start system %s" % e)
+
+    schedule_journals_and_issues_migrations(classic_website.collection.acron, user_id)
+
+
+def schedule_journals_and_issues_migrations(collection_acron, user_id):
+    """
+    Agenda tarefas para migrar e publicar dados de title e issue
+    """
+    items = (
+        ("title", _("Migrate and publish journals"), 'migration & publication', 1, 0, 0),
+        ("issue", _("Migrate and publish issues"), 'migration & publication', 3, 0, 2),
+    )
+
+    for db_name, task, action, hours_after_now, minutes_after_now, priority in items:
+        for kind in ("full", "incremental"):
+            name = f'{collection_acron} | {db_name} | {action} | {kind}'
+            try:
+                periodic_task = PeriodicTask.objects.get(name=name)
+            except PeriodicTask.DoesNotExist:
+                now = datetime.utcnow()
+                periodic_task = PeriodicTask()
+                periodic_task.name = name
+                periodic_task.task = task
+                periodic_task.kwargs = json.dumps(dict(
+                    collection_acron=collection_acron,
+                    user_id=user_id,
+                    force_update=(kind == "full"),
+                ))
+                if kind == "full":
+                    periodic_task.priority = priority
+                    periodic_task.enabled = True
+                    periodic_task.one_off = True
+                    periodic_task.crontab = get_or_create_crontab_schedule(
+                        hour=(now.hour + hours_after_now) % 24,
+                        minute=now.minute,
+                    )
+                else:
+                    periodic_task.priority = priority
+                    periodic_task.enabled = True
+                    periodic_task.one_off = False
+                    periodic_task.crontab = get_or_create_crontab_schedule(
+                        minute=(now.minute + minutes_after_now) % 60,
+                    )
+                periodic_task.save()
+
+
+def get_or_create_crontab_schedule(day_of_week=None, hour=None, minute=None):
+    try:
+        crontab_schedule, status = CrontabSchedule.objects.get_or_create(
+            day_of_week=day_of_week or '*',
+            hour=hour or '*',
+            minute=minute or '*',
+        )
+    except Exception as e:
+        raise exceptions.GetOrCreateCrontabScheduleError(
+            _('Unable to get_or_create_crontab_schedule {} {} {} {} {}').format(
+                day_of_week, hour, minute, type(e), e
+            )
+        )
+    return crontab_schedule
 
 
 def insert_hyphen_in_YYYYMMMDD(YYYYMMMDD):

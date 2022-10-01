@@ -103,7 +103,6 @@ def start():
             new_website_config.save()
 
         return (
-            collection,
             classic_website,
             files_storage_config,
             new_website_config,
