@@ -1,11 +1,11 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from journal.models import OfficialJournal
 
 from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel
 
 from article.models import Article
 from core.models import CommonControlField
+from journal.models import OfficialJournal
 
 from . import choices
 from .forms import UploadPackageForm
