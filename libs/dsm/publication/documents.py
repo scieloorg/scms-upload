@@ -1,3 +1,4 @@
+from scielo_scholarly_data import standardizer
 from opac_schema.v1.models import (
     Abstract,
     AOPUrlSegments,
@@ -17,12 +18,40 @@ from libs.dsm import exceptions
 from libs.dsm.publication.db import save_data
 
 
+
 def get_document(**kwargs):
     try:
         doc = Article.objects.get(**kwargs)
     except Article.DoesNotExist:
         doc = Article()
     return doc
+
+
+def get_similar_documents(article_title, journal_print_issn, journal_electronic_issn, authors):
+    docs = Article.objects(
+        title=article_title,
+        journal__in=[
+            journal_print_issn, 
+            journal_electronic_issn
+        ],
+    ).only("authors", "aid")
+
+    if len(docs) == 0:
+        return docs
+
+    filtered_docs_authors_surnames = []
+    for doc in docs:
+        for doc_author in doc.authors:
+            filtered_docs_authors_surnames.append(
+                standardizer.document_author_for_deduplication(doc_author).split(',')[0]
+            )
+
+    for a in authors:
+        a_surname_std = standardizer.document_author_for_deduplication(a).split(',')[0]
+        if a_surname_std not in filtered_docs_authors_surnames:
+            return []
+    
+    return docs
 
 
 def get_documents(**kwargs):
