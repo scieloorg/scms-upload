@@ -12,14 +12,7 @@ from . import controller
 def start(
         self,
         ):
-    controller.start()
-
-
-@celery_app.task(bind=True, name=_('Start'))
-def start(
-        self,
-        ):
-    controller.start()
+    controller.start(user_id=self.request.user.id)
 
 
 @celery_app.task(bind=True, name=_('Schedule journals and issues migrations'))
