@@ -15,11 +15,11 @@ from article.choices import AS_CHANGE_SUBMITTED
 from article.models import Article
 from config import celery_app
 from journal.controller import get_journal_dict_for_validation
-from libs.dsm.publication.documents import get_documents
+from libs.dsm.publication.documents import get_similar_documents
 from libs.dsm.publication.db import mk_connection, exceptions
 from libs.dsm.publication.documents import get_document
 
-from .utils import file_utils, package_utils, site_utils, xml_utils
+from .utils import file_utils, package_utils, xml_utils
 from . import choices, controller, models
 
 
@@ -29,6 +29,7 @@ def run_validations(filename, package_id, package_category, article_id=None, jou
     if article_id is not None and package_category in (choices.PC_CORRECTION, choices.PC_ERRATUM):
         task_validate_article_change(file_path, package_category, article_id)
 
+    # FIXME: adicionar suporte à validação de pacotes errata/correction
     elif journal_id is not None and package_category == choices.PC_NEW_DOCUMENT:
         xml_format_is_valid = task_validate_xml_format(file_path, package_id)
 
@@ -113,10 +114,13 @@ def task_validate_article_is_unpublished(file_path, package_id):
         return {'error': _('Site database is unavailable.')}
 
     xmltree = sps_package.PackageArticle(file_path).xmltree_article
-    article_data = site_utils.get_article_data_for_comparison(xmltree)
-
-    # FIXME: alterar para método mais robusto ainda a ser desenvolvido
-    similar_docs = get_documents(**article_data)
+    article_data = package_utils.get_article_data_for_comparison(xmltree)
+    similar_docs = get_similar_documents(
+        article_title=article_data["title"],
+        journal_electronic_issn=article_data["journal_electronic_issn"],
+        journal_print_issn=article_data["journal_print_issn"],
+        authors=article_data["authors"],
+    )
 
     if len(similar_docs) > 1: 
         controller.add_validation_error(
@@ -181,6 +185,7 @@ def task_validate_article_correction(new_package_file_path, last_valid_package_f
     last_valid_pkg_xmltree = sps_package.PackageArticle(last_valid_package_file_path).xmltree_article
 
     return sps_validation_article.are_similar_articles(new_pkg_xmltree, last_valid_pkg_xmltree)
+
 
 @celery_app.task(name='Validate article erratum')
 def task_validate_article_erratum(file_path):
@@ -358,6 +363,8 @@ def task_get_or_create_package(article_id, pid, user_id):
             renditions_uris_and_names=rend_uris_names, 
             zip_folder=file_utils.FileSystemStorage().base_location,
         )
+
+        # TODO: trocar nomes dos assets pelos nomes canônicos
 
         # Creates a package record
         pkg = controller.create_package(
