@@ -16,8 +16,8 @@
 	"BASES_PDF_PATH": "/app/collection/fixtures/bases/pdf",
 	"HTDOCS_IMG_REVISTAS_PATH": "/app/collection/fixtures/htdocs/img/revistas",
 	"BASES_XML_PATH": "/app/collection/fixtures/bases/xml",
-	"title_path": "/app/collection/fixtures/title.id",
-	"issue_path": "/app/collection/fixtures/issue.id",
+	"title_path": "/app/collection/fixtures/bases/title/title.id",
+	"issue_path": "/app/collection/fixtures/bases/issue/issue.id",
 	"SERIAL_PATH": "/app/collection/fixtures/serial"
 	}
 }

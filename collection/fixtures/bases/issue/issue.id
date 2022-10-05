@@ -1,0 +1,970 @@
+!ID 0000001
+!v030!Rev. Microbiol.
+!v031!29
+!v032!3
+!v035!0001-3714
+!v036!19983
+!v042!1
+!v043!^lpt^tRev. Microbiol.^vv. 29^nn. 3^cSão Paulo^mSet.^a1998
+!v043!^len^tRev. Microbiol.^vvol. 29^nn. 3^cSão Paulo^mSept.^a1998
+!v043!^les^tRev. Microbiol.^vv. 29^nn. 3^cSão Paulo^mSept.^a1998
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v048!^les^hSumario
+!v049!^len^cRM110^tSoil and Environmental Microbiology
+!v049!^len^cRM090^tMedical Microbiology
+!v049!^len^cRM060^tMicology
+!v049!^len^cRM020^tIndustrial Microbiology
+!v049!^len^cRM080^tVirology
+!v049!^len^cRM120^tFood Microbiology
+!v049!^len^cRM030^tVeterinarian Microbiology
+!v049!^len^cRM100^tErrata
+!v064!^a1998^m09
+!v065!19980900
+!v091!19990226
+!v122!16
+!v130!Revista de Microbiologia
+!v230!Journal of the Brazilian Society for Microbiology
+!v700!0
+!v701!1
+!v706!i
+!v930!RM
+!v006!001
+!v200!1
+!v541!BY-NC
+!ID 0023588
+!v991!1
+!v700!0
+!v706!i
+!v701!1
+!v091!20181203
+!v130!Acta Amazonica
+!v151!Acta Amaz
+!v035!0044-5967
+!v480!Instituto Nacional de Pesquisas da Amazônia
+!v030!Acta Amaz.
+!v930!AA
+!v117!other
+!v085!nd
+!v435!0044-5967^tPRINT
+!v435!1809-4392^tONLIN
+!v935!1809-4392
+!v031!49
+!v032!1
+!v036!20191
+!v042!1
+!v200!0
+!v065!20190300
+!v122!12
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cAA012^tTecnologia de Materiais
+!v049!^len^cAA012^tMaterials Technology
+!v049!^lpt^cAA941^tCiências da Saúde
+!v049!^len^cAA941^tHealth Sciences
+!v049!^lpt^cAA950^tCiências Agrárias e Florestais
+!v049!^len^cAA950^tAgronomy and Forestry
+!v049!^lpt^cAA960^tZootecnia e Recursos Pesqueiros
+!v049!^len^cAA960^tAnimal and Fisheries Sciences
+!v049!^lpt^cAA970^tBiodiversidade e Conservação
+!v049!^len^cAA970^tBiodiversity and Conservation
+!v049!^lpt^cAA980^tQuímica e Farmacologia
+!v049!^len^cAA980^tChemistry and Pharmacology
+!v049!^lpt^cAA991^tCiências de Alimentos
+!v049!^len^cAA991^tFood Sciences
+!v049!^lpt^cAA992^tCiências Ambientais
+!v049!^len^cAA992^tEnvironmental sciences
+!v043!^les^tActa Amaz.^vvol.49^nno.1^cManaus^menero/marzo^a2019
+!v043!^lpt^tActa Amaz.^vvol.49^nno.1^cManaus^mjan./mar.^a2019
+!v043!^len^tActa Amaz.^vvol.49^nno.1^cManaus^mJan./Mar.^a2019
+!v541!BY
+!ID 0009915
+!v991!1
+!v700!0
+!v706!i
+!v701!1
+!v091!20120531
+!v130!Revista de Saúde Pública
+!v421!Rev Saude Publica
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v035!0034-8910
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v030!Rev. Saúde Pública
+!v930!RSP
+!v117!vancouv
+!v085!decs
+!v935!0034-8910
+!v031!45
+!v032!1
+!v036!20111
+!v042!1
+!v200!1
+!v065!20110200
+!v122!26
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^lpt^cRSP090^tArtigo Especial
+!v049!^len^cRSP090^tSpecial Article
+!v049!^lpt^cRSP140^tRevisão
+!v049!^len^cRSP140^tReview
+!v049!^lpt^cRSP310^tRevisão
+!v049!^len^cRSP310^tReviews
+!v049!^lpt^cRSP340^tAgradecimentos
+!v049!^len^cRSP340^tAcknowledgements
+!v049!^lpt^cRSP410^tComunicação Breve
+!v049!^len^cRSP410^tBrief Communications
+!v049!^lpt^cRSP670^tComentários
+!v049!^len^cRSP670^tComments
+!v049!^lpt^cRSP690^tComunicação Breve
+!v049!^len^cRSP690^tBrief Communication
+!v049!^lpt^cRSP760^tCarta ao Editor
+!v049!^len^cRSP760^tLetter to the Editor
+!v049!^len^cRSP770^tCorrigendum
+!v043!^les^tRev. Saúde Pública^vvol.45^nno.1^cSão Paulo^mfeb.^a2011
+!v043!^lpt^tRev. Saúde Pública^vvol.45^nno.1^cSão Paulo^mfev.^a2011
+!v043!^len^tRev. Saúde Pública^vvol.45^nno.1^cSão Paulo^mFeb.^a2011
+!v541!BY-NC
+!ID 0027693
+!v991!1
+!v700!0
+!v706!i
+!v701!1
+!v091!20220701
+!v130!Revista Latino-Americana de Enfermagem
+!v421!Rev Lat Am Enfermagem
+!v151!Rev. latinoam. enfermagem
+!v035!0104-1169
+!v480!Escola de Enfermagem de Ribeirão Preto / Universidade de São Paulo
+!v030!Rev. Latino-Am. Enfermagem
+!v930!RLAE
+!v117!other
+!v085!nd
+!v435!1518-8345^tONLIN
+!v935!1518-8345
+!v031!30
+!v036!20221
+!v042!1
+!v200!0
+!v065!20220000
+!v122!27
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^les^cRLAE010^tEditorial
+!v049!^lpt^cRLAE010^tEditorial
+!v049!^len^cRLAE010^tEditorial
+!v049!^les^cRLAE020^tArtículo Originales
+!v049!^lpt^cRLAE020^tArtigos Originais
+!v049!^len^cRLAE020^tOriginal Articles
+!v049!^les^cRLAE100^tArtículo de Revisión
+!v049!^lpt^cRLAE100^tArtigo de Revisão
+!v049!^len^cRLAE100^tReview Articles
+!v049!^les^cRLAE320^tFe de Erratas
+!v049!^lpt^cRLAE320^tErrata
+!v049!^len^cRLAE320^tErratum
+!v043!^les^tRev. Latino-Am. Enfermagem^vvol.30^cRibeirão Preto^a2022
+!v043!^lpt^tRev. Latino-Am. Enfermagem^vvol.30^cRibeirão Preto^a2022
+!v043!^len^tRev. Latino-Am. Enfermagem^vvol.30^cRibeirão Preto^a2022
+!v541!BY
+!ID 0000710
+!v030!Rev. Saúde Pública
+!v031!1
+!v032!1
+!v035!0034-8910
+!v036!19671
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.1^nn.1^cSão Paulo^mjun.^a1967
+!v043!^lpt^tRev. Saúde Pública^vv.1^nn.1^cSão Paulo^mjun.^a1967
+!v043!^len^tRev. Saúde Pública^vvol.1^nno.1^cSão Paulo^mJune^a1967
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP060^tEditorial
+!v049!^lpt^cRSP640^tComunicação
+!v049!^lpt^cRSP650^tNota Técnica
+!v049!^lpt^cRSP520^tResumo
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP060^tEditorial
+!v049!^len^cRSP640^tCommunication
+!v049!^len^cRSP650^tTechnical Note
+!v049!^len^cRSP520^tAbstract
+!v065!19670600
+!v085!decs
+!v091!20060919
+!v117!vancouv
+!v122!14
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!001
+!v200!1
+!v541!BY-NC
+!ID 0000711
+!v030!Rev. Saúde Pública
+!v031!1
+!v032!2
+!v035!0034-8910
+!v036!19672
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.1^nn.2^cSão Paulo^mdic.^a1967
+!v043!^lpt^tRev. Saúde Pública^vv.1^nn.2^cSão Paulo^mdez.^a1967
+!v043!^len^tRev. Saúde Pública^vvol.1^nno.2^cSão Paulo^mDec.^a1967
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP630^tArtigos
+!v049!^lpt^cRSP570^tResumos
+!v049!^len^cRSP630^tArticles
+!v049!^len^cRSP570^tAbstracts
+!v065!19671200
+!v085!decs
+!v091!20060919
+!v117!vancouv
+!v122!10
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!002
+!v200!1
+!v541!BY-NC
+!ID 0000712
+!v030!Rev. Saúde Pública
+!v031!2
+!v032!1
+!v035!0034-8910
+!v036!19681
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.2^nn.1^cSão Paulo^mjun.^a1968
+!v043!^lpt^tRev. Saúde Pública^vv.2^nn.1^cSão Paulo^mjun.^a1968
+!v043!^len^tRev. Saúde Pública^vvol.2^nno.1^cSão Paulo^mJune^a1968
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP520^tResumo
+!v049!^lpt^cRSP630^tArtigos
+!v049!^len^cRSP520^tAbstract
+!v049!^len^cRSP630^tArticles
+!v065!19680600
+!v085!decs
+!v091!20060919
+!v117!vancouv
+!v122!7
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!003
+!v200!1
+!v541!BY-NC
+!ID 0000713
+!v030!Rev. Saúde Pública
+!v031!2
+!v032!2
+!v035!0034-8910
+!v036!19682
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.2^nn.2^cSão Paulo^mdic.^a1968
+!v043!^lpt^tRev. Saúde Pública^vv.2^nn.2^cSão Paulo^mdez.^a1968
+!v043!^len^tRev. Saúde Pública^vvol.2^nno.2^cSão Paulo^mDec.^a1968
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^les^cRSP060^tEditorial
+!v049!^lpt^cRSP060^tEditorial
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP620^tRevisões e divulgação
+!v049!^lpt^cRSP510^tNoticiário
+!v049!^lpt^cRSP570^tResumos
+!v049!^len^cRSP060^tEditorial
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP620^tReviews and lectures
+!v049!^len^cRSP510^tNews
+!v049!^len^cRSP570^tAbstracts
+!v065!19681200
+!v085!decs
+!v091!20060919
+!v117!vancouv
+!v122!10
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!004
+!v200!1
+!v541!BY-NC
+!ID 0000714
+!v030!Rev. Saúde Pública
+!v031!3
+!v032!1
+!v035!0034-8910
+!v036!19691
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.3^nn.1^cSão Paulo^mjun.^a1969
+!v043!^lpt^tRev. Saúde Pública^vv.3^nn.1^cSão Paulo^mjun.^a1969
+!v043!^len^tRev. Saúde Pública^vvol.3^nno.1^cSão Paulo^mJune^a1969
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP570^tResumos
+!v049!^lpt^cRSP590^tAtualização
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP570^tAbstracts
+!v049!^len^cRSP590^tReviews and Lectures
+!v065!19690600
+!v085!decs
+!v091!20060918
+!v117!vancouv
+!v122!13
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!005
+!v200!1
+!v541!BY-NC
+!ID 0000715
+!v030!Rev. Saúde Pública
+!v031!3
+!v032!2
+!v035!0034-8910
+!v036!19692
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.3^nn.2^cSão Paulo^mdic.^a1969
+!v043!^lpt^tRev. Saúde Pública^vv.3^nn.2^cSão Paulo^mdez.^a1969
+!v043!^len^tRev. Saúde Pública^vvol.3^nno.2^cSão Paulo^mDec.^a1969
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP570^tResumos
+!v049!^lpt^cRSP610^tConferências e Seminários
+!v049!^lpt^cRSP600^tComunicações
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP570^tAbstracts
+!v049!^len^cRSP610^tLectures and Seminars
+!v049!^len^cRSP600^tComunications
+!v065!19691200
+!v085!decs
+!v091!20060918
+!v117!vancouv
+!v122!15
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!006
+!v200!1
+!v541!BY-NC
+!ID 0000716
+!v030!Rev. Saúde Pública
+!v031!4
+!v032!1
+!v035!0034-8910
+!v036!19701
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.4^nn.1^cSão Paulo^mjun.^a1970
+!v043!^lpt^tRev. Saúde Pública^vv.4^nn.1^cSão Paulo^mjun.^a1970
+!v043!^len^tRev. Saúde Pública^vvol.4^nno.1^cSão Paulo^mJune^a1970
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP020^tNotas e Informações
+!v049!^lpt^cRSP570^tResumos
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP020^tNotes and Information
+!v049!^len^cRSP570^tAbstracts
+!v065!19700600
+!v085!decs
+!v091!20060918
+!v117!vancouv
+!v122!17
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!007
+!v200!1
+!v541!BY-NC
+!ID 0000717
+!v030!Rev. Saúde Pública
+!v031!4
+!v032!2
+!v035!0034-8910
+!v036!19702
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.4^nn.2^cSão Paulo^mdic.^a1970
+!v043!^lpt^tRev. Saúde Pública^vv.4^nn.2^cSão Paulo^mdez.^a1970
+!v043!^len^tRev. Saúde Pública^vvol.4^nno.2^cSão Paulo^mDec.^a1970
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP020^tNotas e Informações
+!v049!^lpt^cRSP570^tResumos
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP020^tNotes and Information
+!v049!^len^cRSP570^tAbstracts
+!v065!19701200
+!v085!decs
+!v091!20060915
+!v117!vancouv
+!v122!10
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!008
+!v200!1
+!v541!BY-NC
+!ID 0000718
+!v030!Rev. Saúde Pública
+!v031!5
+!v032!1
+!v035!0034-8910
+!v036!19711
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.5^nn.1^cSão Paulo^mjun.^a1971
+!v043!^lpt^tRev. Saúde Pública^vv.5^nn.1^cSão Paulo^mjun.^a1971
+!v043!^len^tRev. Saúde Pública^vvol.5^nno.1^cSão Paulo^mJune^a1971
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP490^tAtualizações
+!v049!^lpt^cRSP020^tNotas e Informações
+!v049!^lpt^cRSP570^tResumos
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP490^tCurrent Comments
+!v049!^len^cRSP020^tNotes and Information
+!v049!^len^cRSP570^tAbstracts
+!v065!19710600
+!v085!decs
+!v091!20060914
+!v117!vancouv
+!v122!18
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!009
+!v200!1
+!v541!BY-NC
+!ID 0000719
+!v030!Rev. Saúde Pública
+!v031!5
+!v032!2
+!v035!0034-8910
+!v036!19712
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.5^nn.2^cSão Paulo^mdic.^a1971
+!v043!^lpt^tRev. Saúde Pública^vv.5^nn.2^cSão Paulo^mdez.^a1971
+!v043!^len^tRev. Saúde Pública^vvol.5^nno.2^cSão Paulo^mDec.^a1971
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP490^tAtualizações
+!v049!^lpt^cRSP020^tNotas e Informações
+!v049!^lpt^cRSP510^tNoticiário
+!v049!^lpt^cRSP570^tResumos
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP490^tCurrent Comments
+!v049!^len^cRSP020^tNotes and Information
+!v049!^len^cRSP510^tNews
+!v049!^len^cRSP570^tAbstracts
+!v065!19711200
+!v085!decs
+!v091!20060913
+!v117!vancouv
+!v122!14
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!010
+!v200!1
+!v541!BY-NC
+!ID 0000720
+!v030!Rev. Saúde Pública
+!v031!6
+!v032!1
+!v035!0034-8910
+!v036!19721
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.6^nn.1^cSão Paulo^mmar.^a1972
+!v043!^lpt^tRev. Saúde Pública^vv.6^nn.1^cSão Paulo^mmar.^a1972
+!v043!^len^tRev. Saúde Pública^vvol.6^nno.1^cSão Paulo^mMar.^a1972
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^les^cRSP060^tEditorial
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP490^tAtualizações
+!v049!^lpt^cRSP020^tNotas e Informações
+!v049!^lpt^cRSP060^tEditorial
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP490^tCurrent Comments
+!v049!^len^cRSP020^tNotes and Information
+!v049!^len^cRSP060^tEditorial
+!v065!19720300
+!v085!decs
+!v091!20060918
+!v117!vancouv
+!v122!13
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!011
+!v200!1
+!v541!BY-NC
+!ID 0000721
+!v030!Rev. Saúde Pública
+!v031!6
+!v032!2
+!v035!0034-8910
+!v036!19722
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.6^nn.2^cSão Paulo^mjun.^a1972
+!v043!^lpt^tRev. Saúde Pública^vv.6^nn.2^cSão Paulo^mjun.^a1972
+!v043!^len^tRev. Saúde Pública^vvol.6^nno.2^cSão Paulo^mJune^a1972
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP490^tAtualizações
+!v049!^lpt^cRSP020^tNotas e Informações
+!v049!^lpt^cRSP570^tResumos
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP490^tCurrent Comments
+!v049!^len^cRSP020^tNotes and Information
+!v049!^len^cRSP570^tAbstracts
+!v065!19720600
+!v085!decs
+!v091!20060911
+!v117!vancouv
+!v122!14
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!012
+!v200!1
+!v541!BY-NC
+!ID 0000722
+!v030!Rev. Saúde Pública
+!v031!6
+!v032!3
+!v035!0034-8910
+!v036!19723
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.6^nn.3^cSão Paulo^msep.^a1972
+!v043!^lpt^tRev. Saúde Pública^vv.6^nn.3^cSão Paulo^mset.^a1972
+!v043!^len^tRev. Saúde Pública^vvol.6^nno.3^cSão Paulo^mSept.^a1972
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP020^tNotas e Informações
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP020^tNotes and Information
+!v065!19720900
+!v085!decs
+!v091!20060911
+!v117!vancouv
+!v122!10
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!013
+!v200!1
+!v541!BY-NC
+!ID 0000723
+!v030!Rev. Saúde Pública
+!v031!6
+!v032!4
+!v035!0034-8910
+!v036!19724
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.6^nn.4^cSão Paulo^mdic.^a1972
+!v043!^lpt^tRev. Saúde Pública^vv.6^nn.4^cSão Paulo^mdez.^a1972
+!v043!^len^tRev. Saúde Pública^vvol.6^nno.4^cSão Paulo^mDec.^a1972
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP490^tAtualizações
+!v049!^lpt^cRSP020^tNotas e Informações
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP490^tCurrent Comments
+!v049!^len^cRSP020^tNotes and Information
+!v065!19721200
+!v085!decs
+!v091!20060831
+!v117!vancouv
+!v122!11
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!014
+!v200!1
+!v541!BY-NC
+!ID 0000724
+!v030!Rev. Saúde Pública
+!v031!7
+!v032!1
+!v035!0034-8910
+!v036!19731
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.7^nn.1^cSão Paulo^mmar.^a1973
+!v043!^lpt^tRev. Saúde Pública^vv.7^nn.1^cSão Paulo^mmar.^a1973
+!v043!^len^tRev. Saúde Pública^vvol.7^nno.1^cSão Paulo^mMar.^a1973
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP030^tAtualização
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP030^tCurrent Comments
+!v065!19730300
+!v085!decs
+!v091!20060828
+!v117!vancouv
+!v122!5
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!015
+!v200!1
+!v541!BY-NC
+!ID 0000725
+!v030!Rev. Saúde Pública
+!v031!7
+!v032!2
+!v035!0034-8910
+!v036!19732
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.7^nn.2^cSão Paulo^mjun.^a1973
+!v043!^lpt^tRev. Saúde Pública^vv.7^nn.2^cSão Paulo^mjun.^a1973
+!v043!^len^tRev. Saúde Pública^vvol.7^nno.2^cSão Paulo^mJune^a1973
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP490^tAtualizações
+!v049!^lpt^cRSP020^tNotas e Informações
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP490^tCurrent Comments
+!v049!^len^cRSP020^tNotes and Information
+!v065!19730600
+!v085!decs
+!v091!20060828
+!v117!vancouv
+!v122!10
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!016
+!v200!1
+!v541!BY-NC
+!ID 0000726
+!v030!Rev. Saúde Pública
+!v031!7
+!v032!3
+!v035!0034-8910
+!v036!19733
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.7^nn.3^cSão Paulo^mjul./sep.^a1973
+!v043!^lpt^tRev. Saúde Pública^vv.7^nn.3^cSão Paulo^mjul./set.^a1973
+!v043!^len^tRev. Saúde Pública^vvol.7^nno.3^cSão Paulo^mJuly/Sept.^a1973
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP030^tAtualização
+!v049!^lpt^cRSP020^tNotas e Informações
+!v049!^lpt^cRSP580^tResumos de teses
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP030^tCurrent Comments
+!v049!^len^cRSP020^tNotes and Information
+!v049!^len^cRSP580^tAbstracts of thesis
+!v065!19730900
+!v085!decs
+!v091!20060828
+!v117!vancouv
+!v122!14
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!017
+!v200!1
+!v541!BY-NC
+!ID 0000727
+!v030!Rev. Saúde Pública
+!v031!7
+!v032!4
+!v035!0034-8910
+!v036!19734
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.7^nn.4^cSão Paulo^moct./dic.^a1973
+!v043!^lpt^tRev. Saúde Pública^vv.7^nn.4^cSão Paulo^mout./dez.^a1973
+!v043!^len^tRev. Saúde Pública^vvol.7^nno.4^cSão Paulo^mOct./Dec.^a1973
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP490^tAtualizações
+!v049!^lpt^cRSP390^tNotas e Informações
+!v049!^lpt^cRSP360^tCatálogo
+!v049!^lpt^cRSP510^tNoticiário
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP490^tCurrent Comments
+!v049!^len^cRSP390^tNotes and Informations
+!v049!^len^cRSP360^tCatalogue
+!v049!^len^cRSP510^tNews
+!v065!19731200
+!v085!decs
+!v091!20060904
+!v117!vancouv
+!v122!14
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!018
+!v200!1
+!v541!BY-NC
+!ID 0000728
+!v030!Rev. Saúde Pública
+!v031!8
+!v032!1
+!v035!0034-8910
+!v036!19741
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.8^nn.1^cSão Paulo^mene./mar.^a1974
+!v043!^lpt^tRev. Saúde Pública^vv.8^nn.1^cSão Paulo^mjan./mar.^a1974
+!v043!^len^tRev. Saúde Pública^vvol.8^nno.1^cSão Paulo^mJan./Mar.^a1974
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP490^tAtualizações
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP490^tCurrent Comments
+!v065!19740300
+!v085!decs
+!v091!20060824
+!v117!vancouv
+!v122!14
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v200!1
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!019
+!v541!BY-NC
+!ID 0000729
+!v030!Rev. Saúde Pública
+!v031!8
+!v032!2
+!v035!0034-8910
+!v036!19742
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.8^nn.2^cSão Paulo^mabr./jun.^a1974
+!v043!^lpt^tRev. Saúde Pública^vv.8^nn.2^cSão Paulo^mabr./jun.^a1974
+!v043!^len^tRev. Saúde Pública^vvol.8^nno.2^cSão Paulo^mApr./June^a1974
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP300^tNecrológio
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP030^tAtualização
+!v049!^lpt^cRSP570^tResumos
+!v049!^len^cRSP300^tNecrology
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP030^tCurrent Comments
+!v049!^len^cRSP570^tAbstracts
+!v065!19740600
+!v085!decs
+!v091!20060825
+!v117!vancouv
+!v122!10
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!020
+!v200!1
+!v541!BY-NC
+!ID 0000730
+!v030!Rev. Saúde Pública
+!v031!8
+!v032!3
+!v035!0034-8910
+!v036!19743
+!v042!1
+!v043!^les^tRev. Saúde Pública^vv.8^nn.3^cSão Paulo^msep.^a1974
+!v043!^lpt^tRev. Saúde Pública^vv.8^nn.3^cSão Paulo^mset.^a1974
+!v043!^len^tRev. Saúde Pública^vvol.8^nno.3^cSão Paulo^mSept.^a1974
+!v048!^les^hSumario
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP490^tAtualizações
+!v049!^lpt^cRSP520^tResumo
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP490^tCurrent Comments
+!v049!^len^cRSP520^tAbstract
+!v065!19740900
+!v085!decs
+!v091!20060824
+!v117!vancouv
+!v122!10
+!v130!Revista de Saúde Pública
+!v151!Rev. saúde pública
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saúde Pública da Universidade de São Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!021
+!v200!1
+!v541!BY-NC

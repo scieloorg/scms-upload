@@ -12,21 +12,17 @@ from . import controller
 def start(
         self,
         ):
-    controller.start()
+    controller.start(user_id=self.request.user.id)
 
 
-@celery_app.task(bind=True, name=_('Migrate and publish journals'))
-def task_migrate_and_publish_journals(
+@celery_app.task(bind=True, name=_('Schedule journals and issues migrations'))
+def task_schedule_journals_and_issues_migrations(
         self,
         user_id,
         collection_acron,
         force_update=False,
         ):
-    controller.migrate_and_publish_journals(
-        user_id,
-        collection_acron,
-        force_update,
-    )
+    controller.schedule_journals_and_issues_migrations(collection_acron, user_id)
 
 
 @celery_app.task(bind=True, name=_('Migrate and publish issues'))
