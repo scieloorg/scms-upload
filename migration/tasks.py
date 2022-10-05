@@ -8,6 +8,13 @@ from celery.exceptions import SoftTimeLimitExceeded
 from . import controller
 
 
+@celery_app.task(bind=True, name=_('Start'))
+def start(
+        self,
+        ):
+    controller.start()
+
+
 @celery_app.task(bind=True, name=_('Migrate and publish journals'))
 def task_migrate_and_publish_journals(
         self,

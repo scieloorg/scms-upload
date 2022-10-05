@@ -24,7 +24,6 @@ from defusedxml.ElementTree import tostring as defusedxml_tostring
 #     ArticleRenditions,
 # )
 
-# from scielo_classic_website import migration as classic_ws
 from scielo_classic_website import classic_ws
 
 from django_celery_beat.models import PeriodicTask, CrontabSchedule
@@ -32,19 +31,12 @@ from django_celery_beat.models import PeriodicTask, CrontabSchedule
 from libs.dsm.files_storage.minio import MinioStorage
 from libs.dsm.publication.db import mk_connection
 from libs.dsm.publication.journals import JournalToPublish
-# from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
+from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
 # from libs.dsm.publication.documents import DocumentToPublish
 
+from core.controller import get_flexible_date
 from collection.choices import CURRENT
-from collection.controller import (
-    JournalController,
-    IssueController,
-    DocumentController,
-    get_scielo_journal_by_title,
-    get_or_create_scielo_journal,
-    # get_scielo_issue_by_collection,
-    get_classic_website_configuration,
-)
+from collection import controller as collection_controller
 from collection.exceptions import (
     GetSciELOJournalError,
 )
@@ -65,6 +57,21 @@ from . import exceptions
 
 
 User = get_user_model()
+
+
+def start():
+    try:
+        classic_website, files_storage_config, new_website_config = collection_controller.start()
+        migration_configuration = MigrationConfiguration()
+        migration_configuration.creator_id = creator_id
+        migration_configuration.classic_website_config = classic_website
+        migration_configuration.new_website_config = new_website_config
+        migration_configuration.files_storage_config = files_storage_config
+        migration_configuration.creator_id = 1
+        migration_configuration.save()
+
+    except Exception as e:
+        raise OSError("Unable to start system %s" % e)
 
 
 def insert_hyphen_in_YYYYMMMDD(YYYYMMMDD):
@@ -113,17 +120,22 @@ def get_or_create_journal_migration(scielo_journal, creator_id):
     Returns a JournalMigration (registered or new)
     """
     try:
-        jm, created = JournalMigration.objects.get_or_create(
-            scielo_journal=scielo_journal,
-            creator_id=creator_id,
-        )
+        try:
+            item = JournalMigration.objects.get(
+                scielo_journal=scielo_journal,
+            )
+        except JournalMigration.DoesNotExist:
+            item = JournalMigration()
+            item.creator_id = creator_id
+            item.scielo_journal = scielo_journal
+            item.save()
     except Exception as e:
         raise exceptions.GetOrCreateJournalMigrationError(
             _('Unable to get_or_create_journal_migration {} {} {}').format(
                 scielo_journal, type(e), e
             )
         )
-    return jm
+    return item
 
 
 def get_journal_migration_status(scielo_issn):
@@ -228,44 +240,14 @@ def migrate_journal(user_id, collection_acron, scielo_issn, journal_data,
     Create/update JournalMigration
     """
     journal = classic_ws.Journal(journal_data)
-    journal_controller = JournalController(
-        user_id=user_id,
-        collection_acron=collection_acron,
-        scielo_issn=scielo_issn,
-        issn_l=None,
-        e_issn=journal.electronic_issn,
-        print_issn=journal.print_issn,
-        journal_acron=journal.acronym,
+
+    scielo_journal = get_scielo_journal(
+        journal, collection_acron, scielo_issn, user_id
     )
 
+    # cria ou obtém journal_migration
     journal_migration = get_or_create_journal_migration(
-        journal_controller.scielo_journal, creator_id=user_id)
-
-    if not journal_controller.scielo_journal.publication_status or not journal_controller.scielo_journal.title:
-        if not journal_controller.scielo_journal.publication_status:
-            journal_controller.scielo_journal.publication_status = journal.publication_status
-        if not journal_controller.scielo_journal.title:
-            journal_controller.scielo_journal.title = journal.title
-        journal_controller.scielo_journal.save()
-
-    try:
-        jc = journal_controller.scielo_journal_in_journal_collections
-        if not jc.official_journal.title or not jc.official_journal.foundation_date:
-            if not jc.official_journal.title:
-                jc.official_journal.title = journal.title
-            if journal.first_year and journal.first_year.isdigit():
-                if not jc.official_journal.foundation_year:
-                    jc.official_journal.foundation_year = journal.first_year and journal.first_year[:4]
-                if not jc.official_journal.foundation_date:
-                    jc.official_journal.foundation_date = journal.first_year
-            jc.official_journal.save()
-    except Exception as e:
-        _register_failure(
-            _('Updating official journal data error'),
-            collection_acron, "migrate", "journal", scielo_issn,
-            e,
-            user_id,
-        )
+        scielo_journal, creator_id=user_id)
 
     # check if it needs to be update
     if journal_migration.isis_updated_date == journal.isis_updated_date:
@@ -276,7 +258,7 @@ def migrate_journal(user_id, collection_acron, scielo_issn, journal_data,
         journal_migration.isis_created_date = journal.isis_created_date
         journal_migration.isis_updated_date = journal.isis_updated_date
         journal_migration.status = MS_MIGRATED
-        if journal.publication_status != CURRENT:
+        if journal.current_status != CURRENT:
             journal_migration.status = MS_TO_IGNORE
         journal_migration.data = journal_data
         journal_migration.save()
@@ -289,9 +271,68 @@ def migrate_journal(user_id, collection_acron, scielo_issn, journal_data,
         )
 
 
+def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
+
+    # cria ou obtém official_journal
+    official_journal = collection_controller.get_or_create_official_journal(
+        issn_l=None,
+        e_issn=journal.electronic_issn,
+        print_issn=journal.print_issn,
+        creator_id=user_id,
+    )
+
+    # cria ou obtém scielo_journal
+    scielo_journal = collection_controller.get_or_create_scielo_journal(
+        collection_acron, scielo_issn, user_id
+    )
+    try:
+        official_journal_data = (
+            official_journal.title,
+            official_journal.foundation_date,
+        )
+        journal_data = (
+            journal.title,
+            journal.first_year,
+        )
+        if official_journal_data != journal_data:
+            official_journal.title = journal.title
+            official_journal.foundation_date = get_flexible_date(
+                journal.first_year)
+            official_journal.save()
+    except Exception as e:
+        pass
+
+    try:
+        scielo_journal_data = (
+            scielo_journal.title,
+            scielo_journal.availability_status,
+            scielo_journal.official_journal,
+            scielo_journal.acron,
+        )
+        journal_data = (
+            journal.title,
+            journal.current_status,
+            official_journal,
+            journal.acronym,
+        )
+        if scielo_journal_data != journal_data:
+            scielo_journal.title = journal.title
+            scielo_journal.availability_status = journal.current_status
+            scielo_journal.official_journal = official_journal
+            scielo_journal.acron = journal.acronym
+            scielo_journal.save()
+    except Exception as e:
+        raise exceptions.JournalMigrationSaveError(
+            _("Unable to save scielo_journal {} {}").format(
+                scielo_journal, e
+            )
+        )
+    return scielo_journal
+
+
 def publish_migrated_journal(journal_migration):
     journal = classic_ws.Journal(journal_migration.data)
-    if journal.publication_status != CURRENT:
+    if journal.current_status != CURRENT:
         # journal must not be published
         return
 
@@ -387,4 +428,3 @@ def publish_migrated_journal(journal_migration):
             _("Unable to publish {} {} {}").format(
                 journal_migration, type(e), e)
         )
-

@@ -99,3 +99,19 @@ class RichTextWithLangAndValidity(RichTextWithLang):
 
     class Meta:
         abstract = True
+
+
+class FlexibleDate(models.Model):
+    year = models.IntegerField(_('Year'), null=True)
+    month = models.IntegerField(_('Month Number'), null=True)
+    day = models.IntegerField(_('Day'), null=True)
+    text = models.CharField(_('Date'), max_length=30, null=False)
+
+    def __str__(self):
+        return f"{self.text} ({self.year}-{self.month}-{self.day})"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['year']),
+            models.Index(fields=['text']),
+        ]
