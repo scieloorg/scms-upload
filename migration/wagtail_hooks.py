@@ -114,6 +114,40 @@ class JournalMigrationModelAdmin(ModelAdmin):
     )
 
 
+class IssueMigrationModelAdmin(ModelAdmin):
+    model = models.IssueMigration
+    menu_label = _('Issue Migration')
+    menu_icon = 'doc-full'
+    menu_order = 300
+    add_to_settings_menu = False
+    exclude_from_explorer = True
+    inspect_view_enabled = True
+
+    list_per_page = 10
+    create_view_class = CoreCreateView
+
+    list_display = (
+        'scielo_issue',
+        'status',
+        'isis_updated_date',
+    )
+    list_filter = (
+        'status',
+    )
+    search_fields = (
+        'scielo_issue__scielo_journal__title',
+        'scielo_issue__scielo_journal__acron',
+        'scielo_issue__publication_date__year',
+        'scielo_issue__issue_folder',
+    )
+    inspect_view_fields = (
+        'scielo_issue',
+        'status',
+        'isis_updated_date',
+        'data',
+    )
+
+
 class MigrationModelAdmin(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Migration'
@@ -121,6 +155,7 @@ class MigrationModelAdmin(ModelAdminGroup):
         MigrationConfigurationModelAdmin,
         MigrationFailureAdmin,
         JournalMigrationModelAdmin,
+        IssueMigrationModelAdmin,
     )
     menu_order = get_menu_order('migration')
 

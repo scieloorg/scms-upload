@@ -1,13 +1,14 @@
 from django.utils.translation import gettext_lazy as _
 
 from issue.models import Issue
+from core.controller import get_or_create_flexible_date
 
 from . import exceptions
 
 
 arg_names = (
     'official_journal',
-    'year',
+    'publication_date__year',
     'volume',
     'number',
     'supplement',
@@ -43,7 +44,8 @@ def get_or_create_official_issue(official_journal,
             official_issue = Issue()
             official_issue.creator_id = creator_id
             official_issue.official_journal = official_journal
-            official_issue.year = year
+            official_issue.publication_date = get_or_create_flexible_date(
+                year)
             official_issue.volume = volume
             official_issue.number = number
             official_issue.supplement = supplement

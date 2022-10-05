@@ -27,3 +27,17 @@ def task_migrate_and_publish_journals(
         collection_acron,
         force_update,
     )
+
+
+@celery_app.task(bind=True, name=_('Migrate and publish issues'))
+def task_migrate_and_publish_issues(
+        self,
+        user_id,
+        collection_acron,
+        force_update=False,
+        ):
+    controller.migrate_and_publish_issues(
+        user_id,
+        collection_acron,
+        force_update,
+    )

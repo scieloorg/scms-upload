@@ -33,6 +33,7 @@ class MigrationConfiguration(CommonControlField):
         ]
     base_form_class = CoreAdminModelForm
 
+
 class MigratedData(CommonControlField):
 
     # datas no registro da base isis para identificar
@@ -90,4 +91,17 @@ class JournalMigration(MigratedData):
     class Meta:
         indexes = [
             models.Index(fields=['scielo_journal']),
+        ]
+
+
+class IssueMigration(MigratedData):
+
+    scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.scielo_issue} {self.status}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['scielo_issue']),
         ]
