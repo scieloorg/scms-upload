@@ -132,26 +132,40 @@ def validation_report(request):
     This view function enables the user to see a validation report.
     """
     package_id = request.GET.get('package_id')
-    report_category_name = request.GET.get('category')
+    report_name = request.GET.get('report')
 
     if package_id:
         package = get_object_or_404(Package, pk=package_id)
 
-        if report_category_name == 'asset-and-rendition-error':
-            validation_errors = package.validationerror_set.filter(category__in=set(['asset-error', 'rendition-error']))
+        context = {
+            'package_inspect_url': request.META.get('HTTP_REFERER'),
+            'report_subtitle': package.file.name,
+        }
 
-            assets, renditions = coerce_package_and_errors(package, validation_errors)
+        ves = package.validationerror_set.filter(category__in=choices.VALIDATION_REPORT_ITEMS[report_name])
 
+        if report_name == choices.VR_INDIVIDUAL_CONTENT:
+            context.update({
+                'report_title': _('Individual Content Report'),
+                'content_errors':  ves,
+            })
+            return render(
+                request=request,
+                template_name='modeladmin/upload/package/validation_report/individual_content.html',
+                context=context
+            )
+
+        if report_name == choices.VR_ASSET_AND_RENDITION:
+            assets, renditions = coerce_package_and_errors(package, ves)
+            context.update({
+                'report_title': _('Digital Assets and Renditions Report'),
+                'assets': assets,
+                'renditions': renditions,
+            })
             return render(
                 request=request,
                 template_name='modeladmin/upload/package/validation_report/digital_assets_and_renditions.html',
-                context={
-                    'package_inspect_url': request.META.get('HTTP_REFERER'),
-                    'report_title': _('Digital Assets and Renditions Report'),
-                    'report_subtitle': package.file.name,
-                    'assets': assets,
-                    'renditions': renditions,
-                }
+                context=context
             )
 
     return redirect(request.META.get('HTTP_REFERER'))

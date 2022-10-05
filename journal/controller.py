@@ -37,3 +37,17 @@ def get_or_create_official_journal(issn_l, e_issn, print_issn, creator_id):
             )
         )
     return official_journal
+
+
+def get_journal_dict_for_validation(journal_id):
+    data = {}
+
+    try:
+        journal = OfficialJournal.objects.get(pk=journal_id)
+        data['titles'] = [journal.title,]
+        data['print_issn'] = journal.ISSN_print
+        data['electronic_issn'] = journal.ISSN_electronic
+    except OfficialJournal.DoesNotExist:
+        ...
+
+    return data

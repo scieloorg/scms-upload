@@ -5,6 +5,7 @@ from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel
 
 from article.models import Article
 from core.models import CommonControlField
+from journal.models import OfficialJournal
 
 from . import choices
 from .forms import UploadPackageForm
@@ -18,11 +19,13 @@ class Package(CommonControlField):
     category = models.CharField(_('Category'), max_length=32, choices=choices.PACKAGE_CATEGORY, null=False, blank=False)
     status = models.CharField(_('Status'), max_length=32, choices=choices.PACKAGE_STATUS, default=choices.PS_ENQUEUED_FOR_VALIDATION)
     article = models.ForeignKey(Article, blank=True, null=True, on_delete=models.SET_NULL)
+    journal = models.ForeignKey(OfficialJournal, blank=True, null=True, on_delete=models.SET_NULL)
 
     panels = [
         FieldPanel('file'),
         FieldPanel('category'),
         FieldPanel('article'),
+        FieldPanel('journal'),
     ]
 
     def __str__(self):
@@ -57,9 +60,9 @@ class QAPackage(Package):
 
 class ValidationError(models.Model):
     id = models.AutoField(primary_key=True)
-    category = models.CharField(_('Category'), max_length=32, choices=choices.VALIDATION_ERROR_CATEGORY, null=False, blank=False)
+    category = models.CharField(_('Category'), max_length=64, choices=choices.VALIDATION_ERROR_CATEGORY, null=False, blank=False)
     data = models.JSONField(_('Data'), null=True, blank=True)
-    message = models.CharField(_('Message'), max_length=128, null=True, blank=True)
+    message = models.CharField(_('Message'), max_length=512, null=True, blank=True)
 
     package = models.ForeignKey('Package', on_delete=models.CASCADE, null=False, blank=False)
 
@@ -70,8 +73,8 @@ class ValidationError(models.Model):
             self.category,
         ])
 
-    def get_standardized_category_label(self):
-        return self.category.lower().replace('-', '_')
+    def report_name(self):
+        return choices.VALIDATION_DICT_CATEGORY_TO_REPORT[self.category]
     
     panels = [
         MultiFieldPanel(

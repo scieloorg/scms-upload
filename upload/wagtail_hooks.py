@@ -33,7 +33,7 @@ class PackageCreateView(CreateView):
                 article = Article.objects.get(pk=article_id)
                 package_obj.article_id = article
             except Article.DoesNotExist:
-                ...              
+                ...
 
         return package_obj
 
@@ -41,14 +41,21 @@ class PackageCreateView(CreateView):
         self.object = form.save_all(self.request.user)
 
         article_id = self.request.POST['article']
-        run_validations(self.object.file.name, self.object.id, self.object.category, article_id)
+        journal_id = self.request.POST['journal']
+        run_validations(
+            self.object.file.name, 
+            self.object.id, 
+            self.object.category, 
+            article_id, 
+            journal_id,
+        )
 
         if self.object.category in (choices.PC_CORRECTION, choices.PC_ERRATUM):
             messages.success(
                 self.request,
                 _('Package to change article has been successfully submitted.')
             )
-        else:
+        elif self.object.category == choices.PC_NEW_DOCUMENT:
             messages.success(
                 self.request,
                 _('Package to create article has been successfully submitted.')
@@ -68,8 +75,7 @@ class PackageAdminInspectView(InspectView):
         }
 
         for ve in self.instance.validationerror_set.all():
-            vek = ve.get_standardized_category_label()
-
+            vek = ve.report_name()
             if vek not in data:
                 data['validation_errors'][vek] = []
 
@@ -106,6 +112,7 @@ class PackageAdmin(ModelAdmin):
 
     list_display = (
         'article',
+        'journal',
         'category',
         'file',
         'status',
@@ -120,12 +127,14 @@ class PackageAdmin(ModelAdmin):
     )
     search_fields = (
         'file',
+        'journal__title',
         'article__pid_v3',
         'creator__username',
         'updated_by__username',
     )
     inspect_view_fields = (
         'article',
+        'journal',
         'category',
         'status',
         'file', 
