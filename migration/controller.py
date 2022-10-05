@@ -59,8 +59,7 @@ from . import exceptions
 User = get_user_model()
 
 
-def start():
-    user_id = 1
+def start(user_id):
     try:
         classic_website, files_storage_config, new_website_config = collection_controller.start()
         migration_configuration = MigrationConfiguration()
