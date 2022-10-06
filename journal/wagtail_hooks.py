@@ -81,17 +81,19 @@ class JournalMissionAdmin(ModelAdmin):
     add_to_settings_menu = False
     exclude_from_explorer = False
 
+    def all_missions(self, obj):
+        return " | ".join([c.language for c in obj.mission.all()])
+
     list_display = (
-        'official_journal_id',
-        'official_journal'
+        'official_journal',
+        'all_missions',
     )
     list_filter = (
-        'official_journal_id',
-        'official_journal'
+        'mission__language',
     )
     search_fields = (
-        'official_journal_id',
-        'official_journal'
+        'official_journal__title',
+        'mission__text'
     )
 
 

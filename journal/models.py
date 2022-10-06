@@ -66,3 +66,8 @@ class JournalMission(ClusterableModel):
 
 class FieldMission(Orderable, RichTextWithLang):
     page = ParentalKey(JournalMission, on_delete=models.CASCADE, related_name='mission')
+    def __unicode__(self):
+        return u'%s %s' % (self.text, self.language)
+
+    def __str__(self):
+        return u'%s %s' % (self.text, self.language)
