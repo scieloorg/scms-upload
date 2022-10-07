@@ -17,11 +17,10 @@ from config import celery_app
 from issue.models import Issue
 from journal.controller import get_journal_dict_for_validation
 from libs.dsm.publication.documents import get_similar_documents
-from libs.dsm.publication.db import mk_connection, exceptions
 from libs.dsm.publication.documents import get_document
 
 from .utils import file_utils, package_utils, xml_utils
-from . import choices, controller, models
+from . import choices, controller, exceptions, models
 
 
 def run_validations(filename, package_id, package_category, article_id=None, issue_id=None):
@@ -57,17 +56,21 @@ def get_or_create_package(pid_v3, user_id):
     return task_get_or_create_package(pid_v3, user_id)
 
 
-@celery_app.task(name='Validate article and issue data')
-def task_validate_article_and_issue_data(file_path, package_id, issue_id):
+@celery_app.task(bind=True, name='Validate article and issue data')
+def task_validate_article_and_issue_data(self, file_path, package_id, issue_id):
     task_validate_article_and_journal_issue_compatibility.apply_async(kwargs={
         'package_id': package_id,
         'file_path': file_path,
         'issue_id': issue_id,
     })
-    task_validate_article_is_unpublished.apply_async(kwargs={
-        'package_id': package_id,
-        'file_path': file_path,
-    })
+    try:
+        task_validate_article_is_unpublished.apply_async(kwargs={
+            'package_id': package_id,
+            'file_path': file_path,
+        })
+    except exceptions.SiteDatabaseIsUnavailableError:
+        ...
+        # TODO: usar alguma app que suporte mensagem assíncrona (https://pypi.org/project/django-async-messages/)
 
 
 @celery_app.task(name='Validate article and journal issue compatibility')
@@ -309,14 +312,20 @@ def task_validate_renditions(file_path, package_id):
             )
 
 
-@celery_app.task()
-def task_check_resolutions(package_id):
-    controller.update_package_check_errors(package_id)
+@celery_app.task(bind=True, name='Check validation error resolutions')
+def task_check_resolutions(self, package_id):
+    pkg_status = controller.update_package_check_errors(package_id)
+    if pkg_status == choices.PS_PENDING_CORRECTION:
+        ...
+        # TODO: usar alguma app que suporte mensagem assíncrona (https://pypi.org/project/django-async-messages/)
 
 
-@celery_app.task()
-def task_check_opinions(package_id):
-    controller.update_package_check_opinions(package_id)
+@celery_app.task(bind=True, name='Check validation error resolutions opinions')
+def task_check_opinions(self, package_id):
+    pkg_status = controller.update_package_check_opinions(package_id)
+    if pkg_status == choices.PS_PENDING_CORRECTION:
+        ...
+        # TODO: usar alguma app que suporte mensagem assíncrona (https://pypi.org/project/django-async-messages/)
 
 
 @celery_app.task(name='Get or create package')
