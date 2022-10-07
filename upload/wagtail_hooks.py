@@ -41,13 +41,13 @@ class PackageCreateView(CreateView):
         self.object = form.save_all(self.request.user)
 
         article_id = self.request.POST['article']
-        journal_id = self.request.POST['journal']
+        issue_id = self.request.POST['issue']
         run_validations(
             self.object.file.name, 
             self.object.id, 
             self.object.category, 
             article_id, 
-            journal_id,
+            issue_id,
         )
 
         if self.object.category in (choices.PC_CORRECTION, choices.PC_ERRATUM):
@@ -112,7 +112,7 @@ class PackageAdmin(ModelAdmin):
 
     list_display = (
         'article',
-        'journal',
+        'issue',
         'category',
         'file',
         'status',
@@ -127,14 +127,14 @@ class PackageAdmin(ModelAdmin):
     )
     search_fields = (
         'file',
-        'journal__title',
+        'issue__officialjournal__title',
         'article__pid_v3',
         'creator__username',
         'updated_by__username',
     )
     inspect_view_fields = (
         'article',
-        'journal',
+        'issue',
         'category',
         'status',
         'file', 

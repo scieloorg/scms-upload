@@ -14,6 +14,7 @@ from article.controller import create_article_from_etree, update_article
 from article.choices import AS_CHANGE_SUBMITTED
 from article.models import Article
 from config import celery_app
+from issue.models import Issue
 from journal.controller import get_journal_dict_for_validation
 from libs.dsm.publication.documents import get_similar_documents
 from libs.dsm.publication.db import mk_connection, exceptions
@@ -23,27 +24,25 @@ from .utils import file_utils, package_utils, xml_utils
 from . import choices, controller, models
 
 
-def run_validations(filename, package_id, package_category, article_id=None, journal_id=None):
+def run_validations(filename, package_id, package_category, article_id=None, issue_id=None):
     file_path = file_utils.get_file_absolute_path(filename)
 
-    if article_id is not None and package_category in (choices.PC_CORRECTION, choices.PC_ERRATUM):
+    xml_format_is_valid = task_validate_xml_format(file_path, package_id)
+
+    if xml_format_is_valid:
+        optimised_filepath = task_optimise_package(file_path)
+
+        task_validate_assets.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
+        task_validate_renditions.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
+        task_validate_article_and_issue_data.apply_async(kwargs={
+            'file_path': optimised_filepath,
+            'package_id': package_id,
+            'issue_id': issue_id,
+        },
+        countdown=10)
+
+    if article_id is not None and package_category in (choices.PC_CORRECTION,  choices.PC_ERRATUM):
         task_validate_article_change(file_path, package_category, article_id)
-
-    # FIXME: adicionar suporte à validação de pacotes errata/correction
-    elif journal_id is not None and package_category == choices.PC_NEW_DOCUMENT:
-        xml_format_is_valid = task_validate_xml_format(file_path, package_id)
-
-        if xml_format_is_valid:
-            optimised_filepath = task_optimise_package(file_path)
-
-            task_validate_assets.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
-            task_validate_renditions.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
-            task_validate_article_and_journal_data.apply_async(kwargs={
-                'file_path': optimised_filepath,
-                'package_id': package_id,
-                'journal_id': journal_id,
-            },
-            countdown=10)
 
 
 def check_resolutions(package_id):
@@ -59,12 +58,12 @@ def get_or_create_package(article_id, pid, user_id):
     return task_result.get()
 
 
-@celery_app.task(name='Validate article and journal data')
-def task_validate_article_and_journal_data(file_path, package_id, journal_id):
-    task_validate_article_and_journal_compatibility.apply_async(kwargs={
+@celery_app.task(name='Validate article and issue data')
+def task_validate_article_and_issue_data(file_path, package_id, issue_id):
+    task_validate_article_and_journal_issue_compatibility.apply_async(kwargs={
         'package_id': package_id,
         'file_path': file_path,
-        'journal_id': journal_id,
+        'issue_id': issue_id,
     })
     task_validate_article_is_unpublished.apply_async(kwargs={
         'package_id': package_id,
@@ -72,10 +71,11 @@ def task_validate_article_and_journal_data(file_path, package_id, journal_id):
     })
 
 
-@celery_app.task(name='Validate article and journal compatibility')
-def task_validate_article_and_journal_compatibility(package_id, file_path, journal_id):
+@celery_app.task(name='Validate article and journal issue compatibility')
+def task_validate_article_and_journal_issue_compatibility(package_id, file_path, issue_id):
     xmltree = sps_package.PackageArticle(file_path).xmltree_article
-    journal_dict = get_journal_dict_for_validation(journal_id)
+    issue = Issue.objects.get(pk=issue_id)
+    journal_dict = get_journal_dict_for_validation(issue.official_journal.id)
 
     try:
         sps_validation_journal.are_article_and_journal_data_compatible(

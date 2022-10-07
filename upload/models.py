@@ -5,7 +5,7 @@ from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel
 
 from article.models import Article
 from core.models import CommonControlField
-from journal.models import OfficialJournal
+from issue.models import Issue
 
 from . import choices
 from .forms import UploadPackageForm
@@ -19,13 +19,13 @@ class Package(CommonControlField):
     category = models.CharField(_('Category'), max_length=32, choices=choices.PACKAGE_CATEGORY, null=False, blank=False)
     status = models.CharField(_('Status'), max_length=32, choices=choices.PACKAGE_STATUS, default=choices.PS_ENQUEUED_FOR_VALIDATION)
     article = models.ForeignKey(Article, blank=True, null=True, on_delete=models.SET_NULL)
-    journal = models.ForeignKey(OfficialJournal, blank=True, null=True, on_delete=models.SET_NULL)
+    issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.SET_NULL)
 
     panels = [
         FieldPanel('file'),
         FieldPanel('category'),
         FieldPanel('article'),
-        FieldPanel('journal'),
+        FieldPanel('issue'),
     ]
 
     def __str__(self):
