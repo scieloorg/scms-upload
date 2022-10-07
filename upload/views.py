@@ -115,14 +115,16 @@ def preview_document(request):
 
         document_html = render_html(package.file.name, language)
 
-        if package.status != choices.PS_REJECTED:
-            return render(
-                request=request,
-                template_name='modeladmin/upload/package/preview_document.html',
-                context={'document': document_html, 'package_status': package.status},
-            )
-        else:
-            messages.error(request, _('It is not possible to preview HTML of rejected packages.'))
+        for ve in package.validationerror_set.all():
+            if ve.report_name() == choices.VR_XML_OR_DTD:
+                messages.error(request, _('It is not possible to preview HTML of rejected packages.'))
+                return redirect(request.META.get('HTTP_REFERER'))
+
+        return render(
+            request=request,
+            template_name='modeladmin/upload/package/preview_document.html',
+            context={'document': document_html, 'package_status': package.status},
+        )
 
     return redirect(request.META.get('HTTP_REFERER'))
 
