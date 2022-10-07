@@ -9,6 +9,7 @@ from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
+from upload import exceptions as upload_exceptions
 from upload.models import Package
 from upload.tasks import get_or_create_package
 
@@ -38,13 +39,12 @@ class RequestArticleChangeCreateView(CreateView):
             article = Article.objects.get(pk=article_id)
 
             if article:
-                change_request_obj.article_id = article
+                change_request_obj.pid_v3 = article.pid_v3
 
         return change_request_obj
 
     def form_valid(self, form):
-        article_id = self.request.POST['article']
-        pid = self.request.POST['pid_v3']
+        pid_v3 = self.request.POST['pid_v3']
 
         package_id = get_or_create_package(
             article_id=article_id, 

@@ -53,9 +53,8 @@ def check_opinions(package_id):
     task_check_opinions.apply_async(kwargs={'package_id': package_id}, countdown=3)
 
 
-def get_or_create_package(article_id, pid, user_id):
-    task_result = task_get_or_create_package.apply_async(kwargs={'article_id': article_id, 'pid': pid, 'user_id': user_id})
-    return task_result.get()
+def get_or_create_package(pid_v3, user_id):
+    return task_get_or_create_package(pid_v3, user_id)
 
 
 @celery_app.task(name='Validate article and issue data')
@@ -320,31 +319,25 @@ def task_check_opinions(package_id):
     controller.update_package_check_opinions(package_id)
 
 
-@celery_app.task(name=_('Get or create package'))
-def task_get_or_create_package(article_id, pid, user_id):
-    try:
-        # Tries to connect to site database (opac.article)
-        mk_connection()
-    except exceptions.DBConnectError:
-        return {'error': _('Site database is unavailable.')}
+@celery_app.task(name='Get or create package')
+def task_get_or_create_package(pid_v3, user_id):
+    if not controller.establish_site_connection():
+        raise exceptions.SiteDatabaseIsUnavailableError()
 
-    if article_id:
-        article_inst = Article.objects.get(pk=article_id)
-        doc = get_document(aid=article_inst.pid_v3)
-    elif pid:
-        doc = get_document(aid=pid)
-        if doc.aid is not None:
-            try:
-                article_inst = Article.objects.get(pid_v3=doc.aid)
-            except Article.DoesNotExist:
-                # TODO: substituir file_utils por aquele em packtools
-                xml_content = file_utils.get_xml_content_from_uri(doc.xml)
-                # TODO: substituir package_utils por aquele em packtools
-                xml_etree = package_utils.get_etree_from_xml_content(xml_content)
-                article_inst = create_article_from_etree(xml_etree, user_id)
-
+    doc = get_document(aid=pid_v3)
     if doc.aid is None:
-        return {'error': _('It was not possible to retrieve a valid article.')}
+        raise exceptions.PIDv3DoesNotExistInSiteDatabase()
+
+    try:
+        article_inst = Article.objects.get(pid_v3=doc.aid)
+    except Article.DoesNotExist:
+        try:
+            xml_content = file_utils.get_xml_content_from_uri(doc.xml)
+        except sps_exceptions.SPSHTTPResourceNotFoundError:
+            raise exceptions.XMLUriIsUnavailableError(uri=doc.xml)
+
+        xml_etree = package_utils.get_etree_from_xml_content(xml_content)
+        article_inst = create_article_from_etree(xml_etree, user_id)
 
     try:
         return models.Package.objects.get(article__pid_v3=article_inst.pid_v3).id
