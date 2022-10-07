@@ -2,6 +2,9 @@ from datetime import datetime
 
 from django.shortcuts import get_object_or_404
 
+from collection.models import NewWebSiteConfiguration
+from libs.dsm.publication.db import mk_connection, exceptions
+
 from .models import ErrorResolution, ErrorResolutionOpinion, Package, ValidationError, choices
 
 
@@ -109,3 +112,17 @@ def get_last_package(article_id, **kwargs):
         return Package.objects.filter(article=article_id, **kwargs).order_by('-created').first()
     except Package.DoesNotExist:
         return 
+
+
+def establish_site_connection(url='scielo.br'):
+    try:
+        host = NewWebSiteConfiguration.objects.get(url__icontains=url).db_uri
+    except NewWebSiteConfiguration.DoesNotExist:
+        return False
+
+    try:
+        mk_connection(host=host)
+    except exceptions.DBConnectError:
+        return False
+
+    return True
