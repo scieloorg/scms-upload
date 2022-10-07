@@ -46,16 +46,27 @@ class RequestArticleChangeCreateView(CreateView):
     def form_valid(self, form):
         pid_v3 = self.request.POST['pid_v3']
 
-        package_id = get_or_create_package(
-            article_id=article_id, 
-            pid=pid,
-            user_id=self.request.user.id
-        )
-
-        if not package_id:
+        try:
+            package_id = get_or_create_package(
+                pid_v3=pid_v3,
+                user_id=self.request.user.id
+            )
+        except upload_exceptions.XMLUriIsUnavailableError as e:
             messages.error(
                 self.request,
-                _('It was not possible to submit the request. Check the PID v3 code.')
+                _('It was not possible to submit the request. XML Uri is unavailable: %s.') % e.uri,
+            )
+            return redirect(self.request.META.get('HTTP_REFERER'))
+        except upload_exceptions.PIDv3DoesNotExistInSiteDatabase:
+            messages.error(
+                self.request,
+                _('It was not possible to submit the request. PIDv3 does not exist in the site database.'),
+            )
+            return redirect(self.request.META.get('HTTP_REFERER'))
+        except upload_exceptions.SiteDatabaseIsUnavailableError:
+            messages.error(
+                self.request,
+                _('It was not possible to submit the request. Site database is unavailable.'),
             )
             return redirect(self.request.META.get('HTTP_REFERER'))
 
