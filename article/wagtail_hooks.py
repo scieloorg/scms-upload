@@ -120,8 +120,8 @@ class ArticleModelAdmin(ModelAdmin):
         return ', '.join([str(dl) for dl in obj.doi_with_lang.all()])
 
     list_display = (
-        'pid_v2',
         'pid_v3',
+        'pid_v2',
         'doi_list',
         'aop_pid',
         'article_type',
