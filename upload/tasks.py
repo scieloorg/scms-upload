@@ -109,11 +109,8 @@ def task_validate_article_and_journal_issue_compatibility(package_id, file_path,
 
 @celery_app.task(name='Validate article is unpublished')
 def task_validate_article_is_unpublished(file_path, package_id):
-    try:
-        # Tries to connect to site database (opac.article)
-        mk_connection()
-    except exceptions.DBConnectError:
-        return {'error': _('Site database is unavailable.')}
+    if not controller.establish_site_connection():
+        raise exceptions.SiteDatabaseIsUnavailableError()
 
     xmltree = sps_package.PackageArticle(file_path).xmltree_article
     article_data = package_utils.get_article_data_for_comparison(xmltree)
