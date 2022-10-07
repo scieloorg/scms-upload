@@ -72,10 +72,12 @@ def update_package_check_errors(package_id):
             package.status = choices.PS_PENDING_CORRECTION    
             package.save()
 
-            return
+            return package.status
 
     package.status = choices.PS_READY_TO_BE_FINISHED
     package.save()
+
+    return package.status
 
 
 def update_package_check_opinions(package_id):
@@ -87,10 +89,12 @@ def update_package_check_opinions(package_id):
             package.status = choices.PS_PENDING_CORRECTION
             package.save()
 
-            return
+            return package.status
 
     package.status = choices.PS_ACCEPTED
     package.save()
+
+    return package.status
 
 
 def create_package(article_id, user_id, file_name, category=choices.PC_SYSTEM_GENERATED, status=choices.PS_PUBLISHED):
