@@ -31,18 +31,56 @@ class PackageCreateView(CreateView):
         article_id = self.request.GET.get('article_id')
         if article_id:
             try:
-                article = Article.objects.get(pk=article_id)
-                package_obj.article_id = article
+                package_obj.article = Article.objects.get(pk=article_id)
             except Article.DoesNotExist:
                 ...
 
         return package_obj
 
     def form_valid(self, form):
-        self.object = form.save_all(self.request.user)
+        article_id = self.request.POST.get('article')
+        try:
+            article = Article.objects.get(pk=article_id)
+        except Article.DoesNotExist:
+            article = None
 
-        article_id = self.request.POST['article']
-        issue_id = self.request.POST['issue']
+        issue_id = self.request.POST.get('issue')
+        try:
+            issue = Issue.objects.get(pk=issue_id)
+        except Issue.DoesNotExist:
+            issue = None
+
+        self.object = form.save_all(self.request.user, article, issue)
+
+        if self.object.category in (
+            choices.PC_CORRECTION, 
+            choices.PC_ERRATUM
+        ):
+            if self.object.article is None:
+                messages.error(
+                    self.request,
+                    _('It is necessary to select an Article.'),
+                )
+                return HttpResponseRedirect(self.request.META['HTTP_REFERER'])
+            else:
+                messages.success(
+                self.request,
+                _('Package to change article has been successfully submitted.')
+            )
+
+        if self.object.category == choices.PC_NEW_DOCUMENT:
+            if self.object.issue is None:
+                messages.error(
+                    self.request,
+                    _('It is necessary to select an Issue.')
+                )
+                return HttpResponseRedirect(self.request.META['HTTP_REFERER'])
+            else:
+                messages.success(
+                self.request,
+                _('Package to create article has been successfully submitted.')
+            )
+
         run_validations(
             self.object.file.name, 
             self.object.id, 
@@ -50,17 +88,6 @@ class PackageCreateView(CreateView):
             article_id, 
             issue_id,
         )
-
-        if self.object.category in (choices.PC_CORRECTION, choices.PC_ERRATUM):
-            messages.success(
-                self.request,
-                _('Package to change article has been successfully submitted.')
-            )
-        elif self.object.category == choices.PC_NEW_DOCUMENT:
-            messages.success(
-                self.request,
-                _('Package to create article has been successfully submitted.')
-            )
                 
         return HttpResponseRedirect(self.get_success_url())
 
