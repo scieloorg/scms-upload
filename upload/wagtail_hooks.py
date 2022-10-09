@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth.models import Permission
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import include, path
@@ -6,6 +7,7 @@ from django.utils.translation import gettext as _
 
 from config.menu import get_menu_order
 
+from wagtail.admin.menu import MenuItem
 from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
@@ -14,7 +16,7 @@ from article.models import Article
 from issue.models import Issue
 
 from .button_helper import UploadButtonHelper
-from .models import choices, Package, QAPackage, ValidationError
+from .models import choices, Package, ValidationError
 from .permission_helper import UploadPermissionHelper
 from .tasks import run_validations
 from .utils import package_utils
@@ -224,6 +226,17 @@ class ValidationErrorAdmin(ModelAdmin):
     }
 
 
+class QAMenuItem(MenuItem):
+    def is_shown(self, request):
+        if request.user.is_superuser:
+            return True
+            
+        for p in Permission.objects.filter(group__user=request.user):
+            if p.name == _('Can access all packages from all users'):
+                return True
+        return False
+
+
 class UploadModelAdminGroup(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Upload'
@@ -240,3 +253,22 @@ def register_disclosure_url():
         path('upload/',
         include('upload.urls', namespace='upload')),
     ]
+
+@hooks.register('construct_main_menu')
+def add_packages_waiting_for_qa_menu_item(request, menu_items):
+    qam = QAMenuItem(
+        _('Waiting for quality analysis'), 
+        '/admin/upload/package?status__exact=quality-analysis',
+        icon_name='folder',
+        order=300,
+    )
+    
+    mupload = None
+    for m in menu_items:
+        if m.name == 'upload':
+            mupload = m
+            break
+
+    if mupload is not None:
+        if _('waiting-for-quality-analysis') not in [rmi.name for rmi in m.menu.registered_menu_items]:
+            m.menu.registered_menu_items.append(qam)
