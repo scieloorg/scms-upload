@@ -21,6 +21,11 @@ class Package(CommonControlField):
     article = models.ForeignKey(Article, blank=True, null=True, on_delete=models.SET_NULL)
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.SET_NULL)
 
+    stat_disagree_n = models.IntegerField(_('Disagree (n)'), null=True, blank=True)
+    stat_disagree_p = models.FloatField(_('Disagree (%)'), null=True, blank=True)
+    stat_incapable_to_fix_n = models.IntegerField(_('Incapable to fix (n)'), null=True, blank=True)
+    stat_incapable_to_fix_p = models.FloatField(_('Incapable fo fix (%)'), null=True, blank=True)
+
     panels = [
         FieldPanel('file'),
         FieldPanel('category'),
@@ -53,9 +58,9 @@ class Package(CommonControlField):
         )
 
 
-class QAPackage(Package):
-    class Meta:
-        proxy = True
+# class QAPackage(Package):
+#     class Meta:
+#         proxy = True
 
 
 class ValidationError(models.Model):

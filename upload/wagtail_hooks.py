@@ -144,6 +144,8 @@ class PackageAdmin(ModelAdmin):
         'category',
         'file',
         'status',
+        'stat_disagree',
+        'stat_incapable_to_fix',
         'creator',
         'created',
         'updated',
@@ -170,6 +172,16 @@ class PackageAdmin(ModelAdmin):
         'updated',
         'files_list',
     )
+
+    def stat_incapable_to_fix(self, obj):
+        if obj.stat_incapable_to_fix_n:
+            return f"{obj.stat_incapable_to_fix_n} ({obj.stat_incapable_to_fix_p}%)"
+        return '-'
+
+    def stat_disagree(self, obj):
+        if obj.stat_disagree_n:
+            return f"{obj.stat_disagree_n} ({obj.stat_disagree_p}%)"
+        return '-'
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
