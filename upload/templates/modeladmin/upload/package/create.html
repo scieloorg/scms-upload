@@ -1,0 +1,68 @@
+{% extends "modeladmin/create.html" %}
+{% load i18n modeladmin_tags wagtailadmin_tags wagtailcore_tags %}
+
+{% block content %}
+
+    {% block header %}
+        {% include "wagtailadmin/shared/header_with_locale_selector.html" with title=view.get_page_title subtitle=view.get_page_subtitle icon=view.header_icon merged=1 %}
+    {% endblock %}
+
+    <form action="{% block form_action %}{{ view.create_url }}{% endblock %}{% if locale %}?locale={{ locale.language_code }}{% endif %}"{% if is_multipart %} enctype="multipart/form-data"{% endif %} method="POST" novalidate>
+        {% csrf_token %}
+
+        <div class="nice-padding">
+            {% block form %}{{ edit_handler.render_form_content }}{% endblock %}
+        </div>
+
+        {% block footer %}
+            <footer class="footer">
+                <ul>
+                    <li class="actions footer__container">
+                        {% block form_actions %}
+                            <div class="dropdown dropup dropdown-button match-width">
+                                <button type="submit" class="button action-save button-longrunning" data-clicked-text="{% trans 'Saving…' %}">
+                                    {% icon name="spinner" %}<em>{% trans 'Save' %}</em>
+                                </button>
+                            </div>
+                        {% endblock %}
+                    </li>
+                </ul>
+            </footer>
+        {% endblock %}
+    </form>
+
+    <script>
+        $('#id_article').prop('disabled', true);
+        $('#id_issue').prop('disabled', true);
+
+        var category = document.getElementById('id_category');
+        var selected_category = category.options[category.selectedIndex].value
+        
+        if (selected_category == 'new-document') {
+            document.getElementById('id_issue').removeAttribute('disabled');
+        }
+        if (selected_category == 'erratum' || selected_category == 'correction') {
+            document.getElementById('id_article').removeAttribute('disabled');
+        }
+
+        category.onchange = (event) => {
+            var inputText = event.target.value;
+
+            if (inputText == 'new-document'){
+                document.getElementById('id_issue').removeAttribute('disabled');
+                $('#id_article').prop('disabled', true);
+            }
+
+            if (inputText === 'erratum' || inputText === 'correction'){
+                document.getElementById('id_article').removeAttribute('disabled');
+                $('#id_issue').prop('disabled', true);
+            }
+
+            if (inputText === '') {
+                $('#id_article').prop('disabled', true);
+                $('#id_issue').prop('disabled', true);
+            }
+        }
+    </script>
+
+{% endblock %}
