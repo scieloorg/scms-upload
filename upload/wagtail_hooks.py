@@ -195,70 +195,6 @@ class PackageAdmin(ModelAdmin):
         )
 
 
-class QualityAnalystPackageAdmin(ModelAdmin):
-    model = QAPackage
-    permission_helper_class = UploadPermissionHelper
-    menu_label = _('Waiting for QA')
-    menu_icon = 'folder'
-    menu_order = 200
-    inspect_view_enabled=True
-    inspect_view_class = PackageAdminInspectView
-    inspect_template_name = 'modeladmin/upload/package/inspect.html'
-    add_to_settings_menu = False
-    exclude_from_explorer = False
-
-    list_display = (
-        'file',
-        'creator',
-        'created',
-        'updated',
-        'updated_by',
-        'stat_disagree',
-        'stat_incapable_to_fix',
-    )
-    list_filter = ()
-    search_fields = (
-        'file',
-        'creator__username',
-        'updated_by__username',
-    )
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-
-        if self.permission_helper.user_can_access_all_packages(request.user, None):
-            return qs.filter(status__in=[choices.PS_QA, choices.PS_ACCEPTED])
-    
-        return qs.filter(creator=request.user)
-    
-    def _get_all_validation_errors(self, obj):
-        return [ve.resolution for ve in obj.validationerror_set.all()]
-
-    def _get_stats(self, obj, value):
-        all_objs = self._get_all_validation_errors(obj)
-        value_objs = [o for o in all_objs if o.action == value]
-        return len(value_objs), len(all_objs)
-
-    def _comput_percentage(self, numerator, denominator):
-        return float(numerator)/float(denominator) * 100
-
-    # Create dynamic field responsible for counting number of actions "disagree"
-    def stat_disagree(self, obj):
-        num, den = self._get_stats(obj, choices.ER_ACTION_DISAGREE)
-        per = self._comput_percentage(num, den)
-        return f"{num} ({per:.2f})"
-
-    stat_disagree.short_description = _('Disagree (%)')
-
-    # Create dynamic field responsible for counting number of actions "incapable_to_fix"
-    def stat_incapable_to_fix(self, obj):
-        num, den = self._get_stats(obj, choices.ER_ACTION_INCAPABLE_TO_FIX)
-        per = self._comput_percentage(num, den)
-        return f"{num} ({per:.2f})"
-
-    stat_incapable_to_fix.short_description = _('Incapable to fix (%)')
-
-
 class ValidationErrorAdmin(ModelAdmin):
     model = ValidationError
     permission_helper_class = UploadPermissionHelper
@@ -291,7 +227,7 @@ class ValidationErrorAdmin(ModelAdmin):
 class UploadModelAdminGroup(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Upload'
-    items = (PackageAdmin, QualityAnalystPackageAdmin, ValidationErrorAdmin)
+    items = (PackageAdmin, ValidationErrorAdmin)
     menu_order = get_menu_order('upload')
 
 
