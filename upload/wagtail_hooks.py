@@ -11,6 +11,7 @@ from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, mode
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
 from article.models import Article
+from issue.models import Issue
 
 from .button_helper import UploadButtonHelper
 from .models import choices, Package, QAPackage, ValidationError

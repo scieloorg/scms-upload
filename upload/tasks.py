@@ -33,6 +33,8 @@ def run_validations(filename, package_id, package_category, article_id=None, iss
 
         task_validate_assets.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
         task_validate_renditions.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
+
+    if issue_id is not None and package_category:
         task_validate_article_and_issue_data.apply_async(kwargs={
             'file_path': optimised_filepath,
             'package_id': package_id,
