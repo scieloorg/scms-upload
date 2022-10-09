@@ -117,7 +117,7 @@ def preview_document(request):
 
         for ve in package.validationerror_set.all():
             if ve.report_name() == choices.VR_XML_OR_DTD:
-                messages.error(request, _('It is not possible to preview HTML of rejected packages.'))
+                messages.error(request, _('It is not possible to preview HTML of an invalid XML.'))
                 return redirect(request.META.get('HTTP_REFERER'))
 
         return render(
