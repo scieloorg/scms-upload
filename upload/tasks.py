@@ -314,6 +314,8 @@ def task_validate_renditions(file_path, package_id):
 @celery_app.task(bind=True, name='Check validation error resolutions')
 def task_check_resolutions(self, package_id):
     pkg_status = controller.update_package_check_errors(package_id)
+    controller.compute_package_validation_error_resolution_stats(package_id)
+    
     if pkg_status == choices.PS_PENDING_CORRECTION:
         ...
         # TODO: usar alguma app que suporte mensagem assíncrona (https://pypi.org/project/django-async-messages/)
