@@ -134,16 +134,9 @@ class RequestArticleChange(CommonControlField):
     pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True)
     demanded_user = models.ForeignKey(User, on_delete=models.CASCADE, blank=False, null=False)
 
-    # panel_article = MultiFieldPanel(heading='Select an article from the list below or enter its PID v3 code', classname='collapsible')
-    # panel_article.children = [
-    #     FieldPanel('article'),
-    #     FieldPanel('pid_v3'),
-    # ]
-
     panels = [
         FieldPanel('pid_v3', classname='collapsible'),
         FieldPanel('deadline', classname='collapsible'),
-        # panel_article,
         FieldPanel('change_type', classname='collapsible'),
         FieldPanel('demanded_user', classname='collapsible'),
         FieldPanel('comment', classname='collapsible'),
