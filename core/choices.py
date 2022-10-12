@@ -1,3 +1,6 @@
+from django.utils.translation import gettext_lazy as _
+
+
 LANGUAGE = [
     ('aa', 'Afar'),
     ('af', 'Afrikaans'),
@@ -182,3 +185,32 @@ LANGUAGE = [
     ('za', 'Zhuang, Chuang'),
     ('zu', 'Zulu'),
 ]
+
+
+MONTH_01 = 1
+MONTH_02 = 2
+MONTH_03 = 3
+MONTH_04 = 4
+MONTH_05 = 5
+MONTH_06 = 6
+MONTH_07 = 7
+MONTH_08 = 8
+MONTH_09 = 9
+MONTH_10 = 10
+MONTH_11 = 11
+MONTH_12 = 12
+
+MONTHS = (
+    (MONTH_01, _('JANUARY')),
+    (MONTH_02, _('FEBRUARY')),
+    (MONTH_03, _('MARCH')),
+    (MONTH_04, _('APRIL')),
+    (MONTH_05, _('MAY')),
+    (MONTH_06, _('JUNE')),
+    (MONTH_07, _('JULY')),
+    (MONTH_08, _('AUGUST')),
+    (MONTH_09, _('SEPTEMBER')),
+    (MONTH_10, _('OCTOBER')),
+    (MONTH_11, _('NOVEMBER')),
+    (MONTH_12, _('DECEMBER')),
+)
