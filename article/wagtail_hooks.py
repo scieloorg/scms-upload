@@ -226,6 +226,14 @@ class RequestArticleChangeModelAdmin(ModelAdmin):
         'article__doi_with_lang__doi'
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+
+        if self.permission_helper.user_can_make_article_change(request.user, None): 
+            return qs.filter(demanded_user=request.user)
+    
+        return qs
+
 
 class ArticleModelAdminGroup(ModelAdminGroup):
     menu_label = _('Articles')

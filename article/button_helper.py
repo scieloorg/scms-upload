@@ -117,6 +117,9 @@ class ArticleButtonHelper(ButtonHelper):
             btns.append(self.request_change(obj, classnames))
 
         if ph.user_can_make_article_change(usr, obj) and obj.status in (AS_REQUIRE_ERRATUM, AS_REQUIRE_CORRECTION):
-            btns.append(self.submit_change(obj, classnames))
+            for rac in obj.requestarticlechange_set.all():
+                if rac.demanded_user == usr:
+                    btns.append(self.submit_change(obj, classnames))
+                    break
 
         return btns
