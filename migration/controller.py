@@ -52,7 +52,7 @@ from .models import (
     # SciELOHTMLFile,
     MigrationConfiguration,
 )
-from .choices import MS_MIGRATED, MS_PUBLISHED, MS_TO_IGNORE
+from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
 from . import exceptions
 
 
@@ -82,11 +82,11 @@ def start(user_id):
 
 def schedule_journals_and_issues_migrations(collection_acron, user_id):
     """
-    Agenda tarefas para migrar e publicar dados de title e issue
+    Agenda tarefas para importar e publicar dados de title e issue
     """
     items = (
-        ("title", _("Migrate and publish journals"), 'migration & publication', 1, 0, 0),
-        ("issue", _("Migrate and publish issues"), 'migration & publication', 3, 0, 2),
+        ("title", _("Migrate journals"), 'migration', 1, 0, 0),
+        ("issue", _("Migrate issues"), 'migration', 3, 0, 2),
     )
 
     for db_name, task, action, hours_after_now, minutes_after_now, priority in items:
@@ -261,7 +261,7 @@ class MigrationConfigurationController:
             )
 
 
-def migrate_and_publish_journals(
+def migrate_journals(
         user_id,
         collection_acron,
         force_update=False,
@@ -274,15 +274,15 @@ def migrate_and_publish_journals(
 
         for scielo_issn, journal_data in classic_ws.get_records_by_source_path("title", source_file_path):
             try:
-                action = "migrate"
-                journal_migration = migrate_journal(
+                action = "import"
+                journal_migration = import_data_from_title_database(
                     user_id, collection_acron,
                     scielo_issn, journal_data[0], force_update)
                 action = "publish"
-                publish_migrated_journal(journal_migration)
+                publish_imported_journal(journal_migration)
             except Exception as e:
                 _register_failure(
-                    _("Error migrating and publishing journal {} {}").format(
+                    _("Error migrating journal {} {}").format(
                         collection_acron, scielo_issn),
                     collection_acron, action, "journal", scielo_issn,
                     e,
@@ -290,7 +290,7 @@ def migrate_and_publish_journals(
                 )
     except Exception as e:
         _register_failure(
-            _("Error migrating and publishing journal {} {}").format(
+            _("Error migrating journal {} {}").format(
                 collection_acron, _("GENERAL")),
             collection_acron, action, "journal", _("GENERAL"),
             e,
@@ -298,8 +298,8 @@ def migrate_and_publish_journals(
         )
 
 
-def migrate_journal(user_id, collection_acron, scielo_issn, journal_data,
-                    force_update=False):
+def import_data_from_title_database(user_id, collection_acron, scielo_issn,
+                                    journal_data, force_update=False):
     """
     Create/update JournalMigration
     """
@@ -321,7 +321,7 @@ def migrate_journal(user_id, collection_acron, scielo_issn, journal_data,
     try:
         journal_migration.isis_created_date = journal.isis_created_date
         journal_migration.isis_updated_date = journal.isis_updated_date
-        journal_migration.status = MS_MIGRATED
+        journal_migration.status = MS_IMPORTED
         if journal.current_status != CURRENT:
             journal_migration.status = MS_TO_IGNORE
         journal_migration.data = journal_data
@@ -393,13 +393,13 @@ def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
     return scielo_journal
 
 
-def publish_migrated_journal(journal_migration):
+def publish_imported_journal(journal_migration):
     journal = classic_ws.Journal(journal_migration.data)
     if journal.current_status != CURRENT:
         # journal must not be published
         return
 
-    if journal_migration.status != MS_MIGRATED:
+    if journal_migration.status != MS_IMPORTED:
         return
 
     try:
@@ -516,7 +516,7 @@ def get_or_create_issue_migration(scielo_issue, creator_id):
     return item
 
 
-def migrate_and_publish_issues(
+def migrate_issues(
         user_id,
         collection_acron,
         force_update=False,
@@ -528,8 +528,8 @@ def migrate_and_publish_issues(
 
         for issue_pid, issue_data in classic_ws.get_records_by_source_path("issue", source_file_path):
             try:
-                action = "migrate"
-                issue_migration = migrate_issue(
+                action = "import"
+                issue_migration = import_data_from_issue_database(
                     user_id=user_id,
                     collection_acron=collection_acron,
                     scielo_issn=issue_pid[:9],
@@ -537,7 +537,7 @@ def migrate_and_publish_issues(
                     issue_data=issue_data[0],
                     force_update=force_update,
                 )
-                publish_migrated_issue(issue_migration, force_update)
+                publish_imported_issue(issue_migration, force_update)
             except Exception as e:
                 _register_failure(
                     _("Error migrating issue {} {}").format(collection_acron, issue_pid),
@@ -548,13 +548,13 @@ def migrate_and_publish_issues(
     except Exception as e:
         _register_failure(
             _("Error migrating issue {}").format(collection_acron),
-            collection_acron, action, "issue", "GENERAL",
+            collection_acron, "migrate", "issue", "GENERAL",
             e,
             user_id,
         )
 
 
-def migrate_issue(
+def import_data_from_issue_database(
         user_id,
         collection_acron,
         scielo_issn,
@@ -581,7 +581,7 @@ def migrate_issue(
     try:
         issue_migration.isis_created_date = issue.isis_created_date
         issue_migration.isis_updated_date = issue.isis_updated_date
-        issue_migration.status = MS_MIGRATED
+        issue_migration.status = MS_IMPORTED
         if issue.is_press_release:
             issue_migration.status = MS_TO_IGNORE
         issue_migration.data = issue_data
@@ -589,7 +589,7 @@ def migrate_issue(
         issue_migration.save()
         return issue_migration
     except Exception as e:
-        logging.error(_("Error migrating issue {} {}").format(collection_acron, issue_pid))
+        logging.error(_("Error importing issue {} {}").format(collection_acron, issue_pid))
         logging.exception(e)
         raise exceptions.IssueMigrationSaveError(
             _("Unable to save {} migration {} {} {}").format(
@@ -633,7 +633,7 @@ def get_scielo_issue(issue, collection_acron, scielo_issn, issue_pid, user_id):
     return scielo_issue
 
 
-def publish_migrated_issue(issue_migration, force_update):
+def publish_imported_issue(issue_migration, force_update):
     """
     Raises
     ------
@@ -641,7 +641,7 @@ def publish_migrated_issue(issue_migration, force_update):
     """
     issue = classic_ws.Issue(issue_migration.data)
 
-    if issue_migration.status != MS_MIGRATED and not force_update:
+    if issue_migration.status != MS_IMPORTED and not force_update:
         return
     try:
         published_id = get_bundle_id(
