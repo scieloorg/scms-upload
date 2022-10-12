@@ -14,6 +14,18 @@ class GetFilesStorageError(Exception):
     ...
 
 
+class GetJournalMigratioStatusError(Exception):
+    ...
+
+
+class GetMigrationConfigurationError(Exception):
+    ...
+
+
+class GetOrCreateCrontabScheduleError(Exception):
+    ...
+
+
 class GetOrCreateDocumentFilesMigrationError(Exception):
     ...
 
@@ -73,14 +85,3 @@ class PublishIssueError(Exception):
 class PublishJournalError(Exception):
     ...
 
-
-class GetMigrationConfigurationError(Exception):
-    ...
-
-
-class GetOrCreateCrontabScheduleError(Exception):
-    ...
-
-
-class GetJournalMigratioStatusError(Exception):
-    ...
