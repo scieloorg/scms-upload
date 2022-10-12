@@ -1,44 +1,4 @@
-class GetOrCreateScieloJournalError(Exception):
-    ...
-
-
-class GetOrCreateCollectionError(Exception):
-    ...
-
-
-class GetOrCreateJournalCollectionsError(Exception):
-    ...
-
-
-class GetOrCreateScieloJournalInJournalCollectionsError(Exception):
-    ...
-
-
-class GetOrCreateScieloIssueError(Exception):
-    ...
-
-
-class GetOrCreateIssueInCollectionsError(Exception):
-    ...
-
-
-class GetOrCreateScieloIssueInIssueCollectionsError(Exception):
-    ...
-
-
-class GetOrCreateScieloDocumentError(Exception):
-    ...
-
-
-class GetOrCreateDocumentInCollectionsError(Exception):
-    ...
-
-
-class GetOrCreateScieloDocumentInDocumentCollectionsError(Exception):
-    ...
-
-
-class GetJournalCollectionsError(Exception):
+class GetDocumentInCollectionsError(Exception):
     ...
 
 
@@ -46,11 +6,51 @@ class GetIssueInCollectionsError(Exception):
     ...
 
 
-class GetDocumentInCollectionsError(Exception):
+class GetJournalCollectionsError(Exception):
     ...
 
 
-class GetSciELOJournalError(Exception):
+class GetOrCreateCollectionError(Exception):
+    ...
+
+
+class GetOrCreateDocumentInCollectionsError(Exception):
+    ...
+
+
+class GetOrCreateIssueInCollectionsError(Exception):
+    ...
+
+
+class GetOrCreateJournalCollectionsError(Exception):
+    ...
+
+
+class GetOrCreateScieloDocumentError(Exception):
+    ...
+
+
+class GetOrCreateScieloDocumentInDocumentCollectionsError(Exception):
+    ...
+
+
+class GetOrCreateScieloIssueError(Exception):
+    ...
+
+
+class GetOrCreateScieloIssueInIssueCollectionsError(Exception):
+    ...
+
+
+class GetOrCreateScieloJournalError(Exception):
+    ...
+
+
+class GetOrCreateScieloJournalInJournalCollectionsError(Exception):
+    ...
+
+
+class GetSciELODocumentError(Exception):
     ...
 
 
@@ -58,5 +58,6 @@ class GetSciELOIssueError(Exception):
     ...
 
 
-class GetSciELODocumentError(Exception):
+class GetSciELOJournalError(Exception):
     ...
+
