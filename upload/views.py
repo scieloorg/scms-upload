@@ -171,3 +171,32 @@ def validation_report(request):
             )
 
     return redirect(request.META.get('HTTP_REFERER'))
+
+
+def assign(request):
+    package_id = request.GET.get('package_id')
+    user = request.user
+
+    if not user.has_perm('upload.assign_package'):
+        messages.error(
+            request,
+            _('You do have permission to assign packages.')
+        )
+    elif package_id:
+        package = get_object_or_404(Package, pk=package_id)
+
+        if package.assignee is None:
+            package.assignee = user
+            package.save()
+
+            messages.success(
+                request,
+                _('Package has been assigned with success.')
+            )
+        else:
+            messages.error(
+                request,
+                _('It was not possible to assign the package because it already has an assinee.')
+            )
+
+    return redirect(request.META.get('HTTP_REFERER'))
