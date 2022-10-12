@@ -63,9 +63,9 @@ class Package(CommonControlField):
         )
 
 
-# class QAPackage(Package):
-#     class Meta:
-#         proxy = True
+class QAPackage(Package):
+    class Meta:
+        proxy = True
 
 
 class ValidationError(models.Model):

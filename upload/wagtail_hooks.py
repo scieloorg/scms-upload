@@ -1,22 +1,19 @@
 from django.contrib import messages
-from django.contrib.auth.models import Permission
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
 
-from config.menu import get_menu_order
-
-from wagtail.admin.menu import MenuItem
 from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
 from article.models import Article
+from config.menu import get_menu_order
 from issue.models import Issue
 
 from .button_helper import UploadButtonHelper
-from .models import choices, Package, ValidationError
+from .models import QAPackage, choices, Package, ValidationError
 from .permission_helper import UploadPermissionHelper
 from .tasks import run_validations
 from .utils import package_utils
@@ -174,26 +171,13 @@ class PackageAdmin(ModelAdmin):
         'files_list',
     )
 
-    def stat_incapable_to_fix(self, obj):
-        if obj.stat_incapable_to_fix_n:
-            return f"{obj.stat_incapable_to_fix_n} ({obj.stat_incapable_to_fix_p}%)"
-        return '-'
-
-    def stat_disagree(self, obj):
-        if obj.stat_disagree_n:
-            return f"{obj.stat_disagree_n} ({obj.stat_disagree_p}%)"
-        return '-'
-
     def get_queryset(self, request):
         qs = super().get_queryset(request)
 
         if self.permission_helper.user_can_access_all_packages(request.user, None):
             return qs
     
-        return qs.filter(
-            Q(creator=request.user) |
-            Q(article__requestarticlechange__demanded_user=request.user)
-        )
+        return qs.filter(creator=request.user)
 
 
 class ValidationErrorAdmin(ModelAdmin):
@@ -225,21 +209,64 @@ class ValidationErrorAdmin(ModelAdmin):
     }
 
 
-class QAMenuItem(MenuItem):
-    def is_shown(self, request):
-        if request.user.is_superuser:
-            return True
-            
-        for p in Permission.objects.filter(group__user=request.user):
-            if p.name == _('Can access all packages from all users'):
-                return True
-        return False
+class QualityAnalysisPackageAdmin(ModelAdmin):
+    model = QAPackage
+    button_helper_class = UploadButtonHelper
+    permission_helper_class = UploadPermissionHelper
+    menu_label = _('Waiting for QA')
+    menu_icon = 'folder'
+    menu_order = 200
+    inspect_view_enabled=True
+    inspect_view_class = PackageAdminInspectView
+    inspect_template_name = 'modeladmin/upload/package/inspect.html'
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+
+    list_display = (
+        'file',
+        'assignee',
+        'creator',
+        'created',
+        'updated',
+        'updated_by',
+        'stat_disagree',
+        'stat_incapable_to_fix',
+    )
+    list_filter = ()
+    search_fields = (
+        'file',
+        'creator__username',
+        'updated_by__username',
+    )
+
+    def stat_incapable_to_fix(self, obj):
+        if obj.stat_incapable_to_fix_n:
+            return f"{obj.stat_incapable_to_fix_n} ({obj.stat_incapable_to_fix_p}%)"
+        return '-'
+
+    def stat_disagree(self, obj):
+        if obj.stat_disagree_n:
+            return f"{obj.stat_disagree_n} ({obj.stat_disagree_p}%)"
+        return '-'
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
+            return qs.filter(
+                Q(status=choices.PS_QA) & (
+                    Q(assignee=request.user) | 
+                    Q(assignee=None)
+                )
+            )
+    
+        return qs.none()
 
 
 class UploadModelAdminGroup(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Upload'
-    items = (PackageAdmin, ValidationErrorAdmin)
+    items = (PackageAdmin, ValidationErrorAdmin, QualityAnalysisPackageAdmin)
     menu_order = get_menu_order('upload')
 
 
@@ -252,22 +279,3 @@ def register_disclosure_url():
         path('upload/',
         include('upload.urls', namespace='upload')),
     ]
-
-@hooks.register('construct_main_menu')
-def add_packages_waiting_for_qa_menu_item(request, menu_items):
-    qam = QAMenuItem(
-        _('Waiting for quality analysis'), 
-        '/admin/upload/package?status__exact=quality-analysis',
-        icon_name='folder',
-        order=300,
-    )
-    
-    mupload = None
-    for m in menu_items:
-        if m.name == 'upload':
-            mupload = m
-            break
-
-    if mupload is not None:
-        if _('waiting-for-quality-analysis') not in [rmi.name for rmi in m.menu.registered_menu_items]:
-            m.menu.registered_menu_items.append(qam)
