@@ -13,7 +13,7 @@ from upload import exceptions as upload_exceptions
 from upload.models import Package
 from upload.tasks import get_or_create_package
 
-from .button_helper import ArticleButtonHelper
+from .button_helper import ArticleButtonHelper, RequestArticleChangeButtonHelper
 from .models import Article, RelatedItem, RequestArticleChange, choices
 from .permission_helper import ArticlePermissionHelper
 
@@ -200,6 +200,7 @@ class RelatedItemModelAdmin(ModelAdmin):
 class RequestArticleChangeModelAdmin(ModelAdmin):
     model = RequestArticleChange
     menu_label = _('Request Change')
+    button_helper_class = RequestArticleChangeButtonHelper
     create_view_class = RequestArticleChangeCreateView
     permission_helper_class = ArticlePermissionHelper
     menu_icon = 'doc-full'
