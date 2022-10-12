@@ -471,6 +471,7 @@ def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
     try:
         # cria ou obtém official_journal
         official_journal = collection_controller.get_or_create_official_journal(
+            title=journal.title,
             issn_l=None,
             e_issn=journal.electronic_issn,
             print_issn=journal.print_issn,
@@ -486,8 +487,7 @@ def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
         )
         if official_journal_data != journal_data:
             official_journal.title = journal.title
-            official_journal.foundation_date = get_or_create_flexible_date(
-                journal.first_year)
+            official_journal.foundation_date = journal.first_year
             official_journal.save()
     except Exception as e:
         official_journal = None
