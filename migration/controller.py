@@ -127,6 +127,134 @@ def schedule_journals_and_issues_migrations(collection_acron, user_id):
     logging.info(_("Scheduled journals and issues migrations tasks"))
 
 
+def schedule_issues_documents_migration(collection_acron, user_id):
+    """
+    Agenda tarefas para migrar e publicar todos os documentos
+    """
+    for issue_migration in IssueMigration.objects.filter(
+            scielo_issue__scielo_journal__collection__acron=collection_acron):
+
+        journal_acron = issue_migration.scielo_issue.scielo_journal.acron
+        scielo_issn = issue_migration.scielo_issue.scielo_journal.scielo_issn
+        publication_year = issue_migration.scielo_issue.official_issue.publication_year
+
+        schedule_issue_documents_migration(
+            issue_migration, journal_acron,
+            scielo_issn, publication_year, user_id)
+
+
+def schedule_issue_documents_migration(collection_acron,
+                                       journal_acron,
+                                       scielo_issn,
+                                       publication_year,
+                                       user_id):
+    """
+    Agenda tarefas para migrar e publicar um conjunto de documentos por:
+
+        - ano
+        - periódico
+        - periódico e ano
+    """
+    logging.info(_("Schedule issue documents migration {} {} {} {}").format(
+        collection_acron,
+        journal_acron,
+        scielo_issn,
+        publication_year,
+    ))
+    action = 'migrate'
+    task = _('Migrate documents')
+
+    params_list = (
+        {"scielo_issn": scielo_issn, "publication_year": publication_year},
+        {"scielo_issn": scielo_issn},
+        {"publication_year": publication_year},
+    )
+    documents_group_ids = (
+        f"{journal_acron} {publication_year}",
+        f"{journal_acron}",
+        f"{publication_year}",
+    )
+
+    count = 0
+    for group_id, params in zip(documents_group_ids, params_list):
+        count += 1
+        if len(params) == 2:
+            modes = ("full", "incremental")
+        else:
+            modes = ("incremental", )
+
+        for mode in modes:
+
+            name = f'{collection_acron} | {group_id} | {action} | {mode}'
+
+            kwargs = dict(
+                collection_acron=collection_acron,
+                user_id=user_id,
+                force_update=(mode == "full"),
+            )
+            kwargs.update(params)
+
+            try:
+                periodic_task = PeriodicTask.objects.get(name=name, task=task)
+            except PeriodicTask.DoesNotExist:
+                now = datetime.utcnow()
+                periodic_task = PeriodicTask()
+                periodic_task.name = name
+                periodic_task.task = task
+                periodic_task.kwargs = json.dumps(kwargs)
+                if mode == "full":
+                    # full: force_update = True
+                    # modo full está programado para ser executado manualmente
+                    # ou seja, a task fica disponível para que o usuário
+                    # apenas clique em RUN e rodará na sequência,
+                    # não dependente dos atributos: enabled, one_off, crontab
+
+                    # prioridade alta
+                    periodic_task.priority = 1
+                    # desabilitado para rodar automaticamente
+                    periodic_task.enabled = False
+                    # este parâmetro não é relevante devido à execução manual
+                    periodic_task.one_off = True
+                    # este parâmetro não é relevante devido à execução manual
+                    hours, minutes = sum_hours_and_minutes(0, 1)
+                    periodic_task.crontab = get_or_create_crontab_schedule(
+                        hour=hours,
+                        minute=minutes,
+                    )
+                else:
+                    # modo incremental está programado para ser executado
+                    # automaticamente
+                    # incremental: force_update = False
+
+                    # prioridade 3, exceto se houver ano de publicação
+                    periodic_task.priority = 3
+                    if publication_year:
+                        # estabelecer prioridade maior para os mais recentes
+                        periodic_task.priority = (
+                            datetime.now().year - int(publication_year)
+                        )
+
+                    # deixa habilitado para rodar frequentemente
+                    periodic_task.enabled = True
+
+                    # programado para rodar automaticamente 1 vez se o ano de
+                    # publicação não é o atual
+                    periodic_task.one_off = (
+                        publication_year and
+                        publication_year != datetime.now().year
+                    )
+
+                    # distribui as tarefas para executarem dentro de 1h
+                    # e elas executarão a cada 1h
+                    hours, minutes = sum_hours_and_minutes(0, count % 100)
+                    periodic_task.crontab = get_or_create_crontab_schedule(
+                        # hour=hours,
+                        minute=minutes,
+                    )
+                periodic_task.save()
+    logging.info(_("Scheduled {} tasks to migrate documents").format(count))
+
+
 def sum_hours_and_minutes(hours_after_now, minutes_after_now, now=None):
     """
     Retorna a soma dos minutos / horas a partir da hora atual
