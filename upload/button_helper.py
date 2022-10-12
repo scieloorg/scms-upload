@@ -54,9 +54,9 @@ class UploadButtonHelper(ButtonHelper):
         url_name = self.request.resolver_match.url_name
 
         classnames = []
-        if url_name == 'upload_package_modeladmin_inspect':
+        if url_name.endswith('_modeladmin_inspect'):
             classnames.extend(ButtonHelper.inspect_button_classnames)
-        if url_name == 'upload_package_modeladmin_index':
+        if url_name.endswith('_modeladmin_index'):
             classnames.extend(UploadButtonHelper.index_button_classnames)
 
         if obj.status == choices.PS_READY_TO_BE_FINISHED and ph.user_can_finish_deposit(usr, obj) and url_name == 'upload_package_modeladmin_inspect':
