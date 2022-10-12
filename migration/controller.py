@@ -240,19 +240,18 @@ def get_journal_migration_status(scielo_issn):
 class MigrationConfigurationController:
 
     def __init__(self, collection_acron):
-        try:
-            self._config = MigrationConfiguration.objects.get(
-                classic_website_config__collection__acron=collection_acron)
-        except Exception as e:
-            raise exceptions.GetMigrationConfigurationError(
-                _('Unable to get_migration_configuration {} {} {}').format(
-                    collection_acron, type(e), e
-                )
-            )
+        self._collection_acron = collection_acron
+
+    @property
+    def config(self):
+        return (
+            MigrationConfiguration.objects.get(
+                classic_website_config__collection__acron=self._collection_acron)
+        )
 
     def connect_db(self):
         try:
-            return mk_connection(self._config.new_website_config.db_uri)
+            return mk_connection(self.config.new_website_config.db_uri)
 
         except Exception as e:
             raise exceptions.GetMigrationConfigurationError(
@@ -262,7 +261,7 @@ class MigrationConfigurationController:
     @property
     def classic_website(self):
         try:
-            return self._config.classic_website_config
+            return self.config.classic_website_config
 
         except Exception as e:
             raise exceptions.GetMigrationConfigurationError(
@@ -278,6 +277,119 @@ class MigrationConfigurationController:
                 _("Unable to get path of {} {} {}").format(
                     db_name, type(e), e)
             )
+
+    def get_artigo_source_files_paths(self, journal_acron, issue_folder):
+        """
+        Apesar de fornecer `issue_folder` o retorno pode ser a base de dados
+        inteira do `journal_acron`
+        """
+        logging.info("Harvest classic website records {} {}".format(journal_acron, issue_folder))
+        try:
+            artigo_source_files_paths = classic_ws.get_artigo_db_path(
+                journal_acron, issue_folder, self.classic_website)
+        except Exception as e:
+            raise exceptions.IssueFilesStoreError(
+                _("Unable to get artigo db paths from classic website {} {} {}").format(
+                    journal_acron, issue_folder, e,
+                )
+            )
+        logging.info(artigo_source_files_paths)
+        return artigo_source_files_paths
+
+    @property
+    def classic_website_paths(self):
+        try:
+            return {
+                "BASES_TRANSLATION_PATH": self.classic_website.bases_translation_path,
+                "BASES_PDF_PATH": self.classic_website.bases_pdf_path,
+                "HTDOCS_IMG_REVISTAS_PATH": self.classic_website.htdocs_img_revistas_path,
+                "BASES_XML_PATH": self.classic_website.bases_xml_path,
+            }
+        except Exception as e:
+            raise exceptions.GetMigrationConfigurationError(
+                _("Unable to get classic website paths {} {}").format(
+                    type(e), e)
+            )
+
+    @property
+    def bucket_public_subdir(self):
+        try:
+            return self.config.files_storage_config.bucket_public_subdir
+        except Exception as e:
+            raise exceptions.GetMigrationConfigurationError(
+                _("Unable to get bucket_public_subdir {} {}").format(
+                    type(e), e)
+            )
+
+    @property
+    def bucket_migration_subdir(self):
+        try:
+            return self.config.files_storage_config.bucket_migration_subdir
+        except Exception as e:
+            raise exceptions.GetMigrationConfigurationError(
+                _("Unable to get bucket_migration_subdir {} {}").format(
+                    type(e), e)
+            )
+
+    @property
+    def files_storage(self):
+        try:
+            files_storage_config = self.config.files_storage_config
+            self._bucket_public_subdir = files_storage_config.bucket_public_subdir
+            self._bucket_migration_subdir = files_storage_config.bucket_migration_subdir
+            return MinioStorage(
+                minio_host=files_storage_config.host,
+                minio_access_key=files_storage_config.access_key,
+                minio_secret_key=files_storage_config.secret_key,
+                bucket_root=files_storage_config.bucket_root,
+                bucket_subdir=(
+                    files_storage_config.bucket_app_subdir or
+                    files_storage_config.bucket_public_subdir),
+                minio_secure=files_storage_config.secure,
+                minio_http_client=None,
+            )
+        except Exception as e:
+            raise exceptions.GetFilesStorageError(
+                _("Unable to get MinioStorage {} {} {}").format(
+                    files_storage_config, type(e), e)
+            )
+
+    def store_issue_files(self, journal_acron, issue_folder):
+        try:
+            issue_files = classic_ws.get_issue_files(
+                journal_acron, issue_folder, self.classic_website_paths)
+        except Exception as e:
+            raise exceptions.IssueFilesStoreError(
+                _("Unable to get issue files from classic website {} {} {}").format(
+                    journal_acron, issue_folder, e,
+                )
+            )
+
+        for info in issue_files:
+            try:
+                mimetype = None
+                name, ext = os.path.splitext(info['path'])
+                if ext in (".xml", ".html", ".htm"):
+                    subdir = self.bucket_migration_subdir
+                    mimetype = "text/xml" if ext == ".xml" else "html"
+                else:
+                    subdir = self.bucket_public_subdir
+                subdirs = os.path.join(
+                    subdir, journal_acron, issue_folder,
+                )
+                response = self.files_storage.register(
+                    info['path'], subdirs=subdirs, preserve_name=True)
+                info['relative_path'] = _get_classic_website_rel_path(info['path'])
+                info.update(response)
+                logging.info("Stored {} in files storage".format(info))
+                yield info
+
+            except Exception as e:
+                raise exceptions.IssueFilesStoreError(
+                    _("Unable to store issue files {} {} {}").format(
+                        journal_acron, issue_folder, e,
+                    )
+                )
 
 
 def migrate_journals(
