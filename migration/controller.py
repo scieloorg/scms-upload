@@ -84,42 +84,61 @@ def schedule_journals_and_issues_migrations(collection_acron, user_id):
     """
     Agenda tarefas para importar e publicar dados de title e issue
     """
+    logging.info(_("Schedule journals and issues migrations tasks"))
     items = (
-        ("title", _("Migrate journals"), 'migration', 1, 0, 0),
-        ("issue", _("Migrate issues"), 'migration', 3, 0, 2),
+        ("title", _("Migrate journals"), 'migration', 0, 2, 0),
+        ("issue", _("Migrate issues"), 'migration', 0, 7, 2),
     )
 
     for db_name, task, action, hours_after_now, minutes_after_now, priority in items:
-        for kind in ("full", "incremental"):
-            name = f'{collection_acron} | {db_name} | {action} | {kind}'
+        for mode in ("full", "incremental"):
+            name = f'{collection_acron} | {db_name} | {action} | {mode}'
+            kwargs = dict(
+                collection_acron=collection_acron,
+                user_id=user_id,
+                force_update=(mode == "full"),
+            )
             try:
                 periodic_task = PeriodicTask.objects.get(name=name)
             except PeriodicTask.DoesNotExist:
-                now = datetime.utcnow()
+                hours, minutes = sum_hours_and_minutes(
+                    hours_after_now, minutes_after_now)
+
                 periodic_task = PeriodicTask()
                 periodic_task.name = name
                 periodic_task.task = task
-                periodic_task.kwargs = json.dumps(dict(
-                    collection_acron=collection_acron,
-                    user_id=user_id,
-                    force_update=(kind == "full"),
-                ))
-                if kind == "full":
+                periodic_task.kwargs = json.dumps(kwargs)
+                if mode == "full":
                     periodic_task.priority = priority
-                    periodic_task.enabled = True
+                    periodic_task.enabled = False
                     periodic_task.one_off = True
                     periodic_task.crontab = get_or_create_crontab_schedule(
-                        hour=(now.hour + hours_after_now) % 24,
-                        minute=now.minute,
+                        hour=hours,
+                        minute=minutes,
                     )
                 else:
                     periodic_task.priority = priority
                     periodic_task.enabled = True
                     periodic_task.one_off = False
                     periodic_task.crontab = get_or_create_crontab_schedule(
-                        minute=(now.minute + minutes_after_now) % 60,
+                        minute=minutes,
                     )
                 periodic_task.save()
+    logging.info(_("Scheduled journals and issues migrations tasks"))
+
+
+def sum_hours_and_minutes(hours_after_now, minutes_after_now, now=None):
+    """
+    Retorna a soma dos minutos / horas a partir da hora atual
+    """
+    now = now or datetime.utcnow()
+    hours = now.hour + hours_after_now
+    minutes = now.minute + minutes_after_now
+    if minutes > 59:
+        hours += 1
+    hours = hours % 24
+    minutes = minutes % 60
+    return hours, minutes
 
 
 def get_or_create_crontab_schedule(day_of_week=None, hour=None, minute=None):
