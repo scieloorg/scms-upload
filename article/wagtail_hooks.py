@@ -199,7 +199,7 @@ class RelatedItemModelAdmin(ModelAdmin):
 
 class RequestArticleChangeModelAdmin(ModelAdmin):
     model = RequestArticleChange
-    menu_label = _('Request Change')
+    menu_label = _('Changes request')
     button_helper_class = RequestArticleChangeButtonHelper
     create_view_class = RequestArticleChangeCreateView
     permission_helper_class = ArticlePermissionHelper
