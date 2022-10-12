@@ -61,18 +61,23 @@ User = get_user_model()
 
 def start(user_id):
     try:
+        logging.info(_("Get or create migration configuration"))
         classic_website, files_storage_config, new_website_config = collection_controller.start()
-        migration_configuration = MigrationConfiguration()
-        migration_configuration.classic_website_config = classic_website
-        migration_configuration.new_website_config = new_website_config
-        migration_configuration.files_storage_config = files_storage_config
-        migration_configuration.creator_id = user_id
-        migration_configuration.save()
+        try:
+            migration_configuration = MigrationConfiguration.objects.get(
+                classic_website_config=classic_website)
+        except MigrationConfiguration.DoesNotExist:
+            migration_configuration = MigrationConfiguration()
+            migration_configuration.classic_website_config = classic_website
+            migration_configuration.new_website_config = new_website_config
+            migration_configuration.files_storage_config = files_storage_config
+            migration_configuration.creator_id = user_id
+            migration_configuration.save()
+
+        schedule_journals_and_issues_migrations(classic_website.collection.acron, user_id)
 
     except Exception as e:
-        raise OSError("Unable to start system %s" % e)
-
-    schedule_journals_and_issues_migrations(classic_website.collection.acron, user_id)
+        raise exceptions.MigrationStartError("Unable to start system %s" % e)
 
 
 def schedule_journals_and_issues_migrations(collection_acron, user_id):
