@@ -1,15 +1,18 @@
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from journal.models import OfficialJournal
 
 from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel
 
 from article.models import Article
+from article.choices import AS_REQUIRE_CORRECTION, AS_REQUIRE_ERRATUM
 from core.models import CommonControlField
 from issue.models import Issue
 
 from . import choices
 from .forms import UploadPackageForm
-from .permission_helper import ACCESS_ALL_PACKAGES, ANALYSE_VALIDATION_ERROR_RESOLUTION, FINISH_DEPOSIT, SEND_VALIDATION_ERROR_RESOLUTION
+from .permission_helper import ACCESS_ALL_PACKAGES, ASSIGN_PACKAGE, ANALYSE_VALIDATION_ERROR_RESOLUTION, FINISH_DEPOSIT, SEND_VALIDATION_ERROR_RESOLUTION
 from .utils import file_utils
 
 
@@ -20,6 +23,7 @@ class Package(CommonControlField):
     status = models.CharField(_('Status'), max_length=32, choices=choices.PACKAGE_STATUS, default=choices.PS_ENQUEUED_FOR_VALIDATION)
     article = models.ForeignKey(Article, blank=True, null=True, on_delete=models.SET_NULL)
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.SET_NULL)
+    assignee = models.OneToOneField(User, blank=True, null=True, on_delete=models.SET_NULL)
 
     stat_disagree_n = models.IntegerField(_('Disagree (n)'), null=True, blank=True)
     stat_disagree_p = models.FloatField(_('Disagree (%)'), null=True, blank=True)
@@ -55,6 +59,7 @@ class Package(CommonControlField):
         permissions = (
             (FINISH_DEPOSIT, _("Can finish deposit")),
             (ACCESS_ALL_PACKAGES, _("Can access all packages from all users")),
+            (ASSIGN_PACKAGE, _("Can assign package")),
         )
 
 
