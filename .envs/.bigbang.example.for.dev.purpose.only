@@ -1,0 +1,27 @@
+{"user_id":1,
+ "collection_acron": "scl",
+ "collection_name": "SciELO Brasil",
+ "db_uri": "mongodb://192.168.1.19:27017/scielo_qa",
+ "url": "new.scielo.br",
+ "files_storage_config": {"host": "192.168.1.19:9000",
+    "access_key": "HSytHT1hg2sihNnS",
+    "secret_key": "ngALz7J0hHevNjux4fPgwqyxNdr1tedj", 
+    "bucket_app": "upload", 
+    "bucket_public_subdir": "publication", 
+    "bucket_migration_subdir": "migration",
+    "bucket_versions_subdir": "versions",
+    "bucket_temp_subdir": "temp",
+    "bucket_root": "root",
+    "secure": false
+    },
+"classic_ws_config": {
+    "BASES_TRANSLATION_PATH": "/app/collection/fixtures/classic_website/bases/translation",
+    "BASES_WORK_PATH": "/app/collection/fixtures/classic_website/bases-work",
+    "BASES_PDF_PATH": "/app/collection/fixtures/classic_website/bases/pdf",
+    "HTDOCS_IMG_REVISTAS_PATH": "/app/collection/fixtures/classic_website/htdocs/img/revistas",
+    "BASES_XML_PATH": "/app/collection/fixtures/classic_website/bases/xml",
+    "title_path": "/app/collection/fixtures/classic_website/bases/title/title.id",
+    "issue_path": "/app/collection/fixtures/classic_website/bases/issue/issue.id",
+    "SERIAL_PATH": "/app/collection/fixtures/classic_website/serial"
+    }
+}
