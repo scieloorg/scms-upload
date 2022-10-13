@@ -10,8 +10,11 @@ class UploadPackageForm(WagtailAdminModelForm):
         if self.instance.pk is None:
             upload_package.creator = user
 
-        upload_package.article = article
-        upload_package.issue = issue
+        if article is not None:
+            upload_package.article = article
+
+        if issue is not None:
+            upload_package.issue = issue
         
         self.save()
 
