@@ -1,8 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from journal.models import OfficialJournal
 
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel
 
 from article.models import Article
@@ -50,8 +50,10 @@ class Package(CommonControlField):
     panels = [
         FieldPanel('file'),
         FieldPanel('category'),
-        RestrictedArticleFieldPanel('article'),
-        RestrictedIssueFieldPanel('issue'),
+        AutocompletePanel('article'),
+        AutocompletePanel('issue'),
+        # RestrictedArticleFieldPanel('article'),
+        # RestrictedIssueFieldPanel('issue'),
     ]
 
     def get_articles_with_required_change(self):

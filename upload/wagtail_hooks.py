@@ -18,6 +18,8 @@ from .permission_helper import UploadPermissionHelper
 from .tasks import run_validations
 from .utils import package_utils
 
+import json
+
 
 class PackageCreateView(CreateView):
     def get_instance(self):
@@ -37,16 +39,20 @@ class PackageCreateView(CreateView):
         return package_obj
 
     def form_valid(self, form):
-        article_id = self.request.POST.get('article')
+        article_data = self.request.POST.get('article')
+        article_json = json.loads(article_data) or {}
+        article_id = article_json.get('pk')
         try:
             article = Article.objects.get(pk=article_id)
-        except Article.DoesNotExist:
+        except (Article.DoesNotExist, ValueError):
             article = None
 
-        issue_id = self.request.POST.get('issue')
+        issue_data = self.request.POST.get('issue')
+        issue_json = json.loads(issue_data) or {}
+        issue_id = issue_json.get('pk')
         try:
             issue = Issue.objects.get(pk=issue_id)
-        except Issue.DoesNotExist:
+        except (Issue.DoesNotExist, ValueError):
             issue = None
 
         self.object = form.save_all(self.request.user, article, issue)

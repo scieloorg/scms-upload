@@ -42,6 +42,11 @@ class Article(ClusterableModel, CommonControlField):
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.CASCADE)
     related_items = models.ManyToManyField('self', symmetrical=False, through='RelatedItem', related_name='related_to')
 
+    autocomplete_search_field = 'pid_v3'
+
+    def autocomplete_label(self):
+        return self.pid_v3
+
     panel_article_ids = MultiFieldPanel(heading='Article identifiers', classname='collapsible')
     panel_article_ids.children = [
         FieldPanel('pid_v2'),
