@@ -214,6 +214,12 @@ class ValidationErrorAdmin(ModelAdmin):
         'message',
     }
 
+    def get_queryset(self, request):
+        if request.user.is_superuser or self.permission_helper.user_can_access_all_packages(request.user, None):
+            return super().get_queryset(request)
+
+        return super().get_queryset(request).filter(package__creator=request.user)
+
 
 class QualityAnalysisPackageAdmin(ModelAdmin):
     model = QAPackage
