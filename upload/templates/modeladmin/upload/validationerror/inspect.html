@@ -1,16 +1,32 @@
 {% extends "modeladmin/inspect.html" %}
 {% load i18n modeladmin_tags wagtailadmin_tags %}
 
-{% block fields_output %}
-    {% if fields %}
-        <h3>{% trans "Details" %}</h3>
-        <dl>
-            {% for field in fields %}
-                <dt class="{{ field.type|lower }}">{{ field.label }}</dt>
-                <dd>{{ field.value }}</dd>
-            {% endfor %}
-        </dl>
-    {% endif %}
+{% block content_main %}
+<div class="nice-padding">
+    <p class="back">
+        <a href="{{ view.index_url }}">
+            {% icon name="arrow-left" class_name="default" %}
+            {% blocktrans trimmed with view.verbose_name as model_name %}Back to {{ model_name }} list{% endblocktrans %}
+        </a>
+    </p>
+    <p class="back">
+        <a href="{{ package_url }}">
+            {% icon name="arrow-up" class_name="default" %}
+            {%trans 'See related package' %}
+        </a>
+    </p>
+    {% block fields_output %}
+        {% if fields %}
+            <h3>{% trans "Details" %}</h3>
+            <dl>
+                {% for field in fields %}
+                    <dt class="{{ field.type|lower }}">{{ field.label }}</dt>
+                    <dd>{{ field.value }}</dd>
+                {% endfor %}
+            </dl>
+        {% endif %}
+    {% endblock %}
+</div>
 {% endblock %}
 
 {% block content %}

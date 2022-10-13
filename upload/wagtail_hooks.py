@@ -124,6 +124,7 @@ class ValidationErrorAdminInspectView(InspectView):
     def get_context_data(self):
         try:
             data = self.instance.data.copy()
+            data['package_url'] = f'/admin/upload/package/inspect/{self.instance.package.id}'
         except AttributeError:
             data = {}
 
