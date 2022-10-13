@@ -19,18 +19,18 @@ from .utils import file_utils
 User = get_user_model()
 
 
-class RestrictedArticleFieldPanel(FieldPanel):
-    def on_form_bound(self):
-        articles = self.model.get_articles_with_required_change(self.model)
-        self.form.fields['article'].queryset = articles
-        super().on_form_bound()
+# class RestrictedArticleFieldPanel(FieldPanel):
+#     def on_form_bound(self):
+#         articles = self.model.get_articles_with_required_change(self.model)
+#         self.form.fields['article'].queryset = articles
+#         super().on_form_bound()
 
 
-class RestrictedIssueFieldPanel(FieldPanel):
-    def on_form_bound(self):
-        issues = self.model.get_issues(self.model)
-        self.form.fields['issue'].queryset = issues
-        super().on_form_bound()
+# class RestrictedIssueFieldPanel(FieldPanel):
+#     def on_form_bound(self):
+#         issues = self.model.get_issues(self.model)
+#         self.form.fields['issue'].queryset = issues
+#         super().on_form_bound()
 
 
 class Package(CommonControlField):
@@ -56,14 +56,14 @@ class Package(CommonControlField):
         # RestrictedIssueFieldPanel('issue'),
     ]
 
-    def get_articles_with_required_change(self):
-        return Article.objects.filter(status__in=(AS_REQUIRE_CORRECTION, AS_REQUIRE_ERRATUM))
+    # def get_articles_with_required_change(self):
+    #     return Article.objects.filter(status__in=(AS_REQUIRE_CORRECTION, AS_REQUIRE_ERRATUM))
 
-    def get_issues(self):
-        aop_issues = Issue.objects.filter(models.Q(volume=None) & models.Q(number=None))
-        not_aop_issues = Issue.objects.exclude(models.Q(volume=None) & models.Q(number=None)).order_by('official_journal', '-volume',)
-        last_issues = not_aop_issues.distinct('official_journal')
-        return aop_issues.union(last_issues)
+    # def get_issues(self):
+    #     aop_issues = Issue.objects.filter(models.Q(volume=None) & models.Q(number=None))
+    #     not_aop_issues = Issue.objects.exclude(models.Q(volume=None) & models.Q(number=None)).order_by('official_journal', '-volume',)
+    #     last_issues = not_aop_issues.distinct('official_journal')
+    #     return aop_issues.union(last_issues)
 
     def __str__(self):
         return self.file.name
