@@ -1,0 +1,5 @@
+TYPE = [
+    ('DATABASE', 'DATABASE'),
+    ('DIRECTORY', 'DIRECTORY'),
+    ('OTHER', 'OTHER')
+]
