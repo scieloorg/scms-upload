@@ -41,11 +41,33 @@ def run_validations(filename, package_id, package_category, article_id=None, iss
         xml_validation_success.append(
             task_validate_xml_format(file_path, xml_path, package_id)
         )
+        
+    # Caso nenhum arquivo XML seja inválido, aciona outras validações
+    if False not in xml_validation_success:
+        # Gera versão otimizada do pacote
         optimised_filepath = task_optimise_package(file_path)
 
-        task_validate_assets.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
-        task_validate_renditions.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
-    
+        # Para cada XML no pacote
+        for xml_path in xml_files:
+            # Aciona validação de Assets
+            task_validate_assets.apply_async(
+                kwargs={
+                    'file_path': optimised_filepath, 
+                    'xml_path': xml_path,
+                    'package_id': package_id,
+                },
+                countdown=10,
+            )
+
+            # Aciona validação de Renditions
+            task_validate_renditions.apply_async(
+                kwargs={
+                    'file_path': optimised_filepath, 
+                    'xml_path': xml_path,
+                    'package_id': package_id,
+                }, 
+                countdown=10,
+            )
         if issue_id is not None and package_category:
             task_validate_article_and_issue_data.apply_async(kwargs={
                 'file_path': optimised_filepath,
