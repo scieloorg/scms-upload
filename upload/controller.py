@@ -24,27 +24,41 @@ def add_validation_result(error_category, package_id, status=None, message=None,
     val_res.save()
     return val_res
 
-def upsert_validation_error_resolution(validation_error_id, user, action, comment):
-    er = upsert_object(ErrorResolution, validation_error_id, user)
+
+def update_validation_result(validation_result_id, **kwargs):
+    try:
+        val_res = ValidationResult.objects.get(pk=validation_result_id)
+        for k, v in kwargs.items():
+            setattr(val_res, k, v)
+
+        if val_res.status == choices.VS_DISAPPROVED:
+            val_res.package.status = choices.PS_REJECTED
+            val_res.package.save()
+
+        val_res.save()
+    except ValidationResult.DoesNotExist:
+        ...
+
+
+def upsert_validation_result_error_resolution(validation_result_id, user, action, comment):
+    er = upsert_object(ErrorResolution, validation_result_id, user)
     er.action = action
     er.comment = comment
-    er.validation_error = ValidationError.objects.get(pk=validation_error_id)
+    er.validation_result = ValidationResult.objects.get(pk=validation_result_id)
     er.save()
 
 
-def upsert_validation_error_resolution_opinion(validation_error_id, user, opinion, comment):
-    ero = upsert_object(ErrorResolutionOpinion, validation_error_id, user)
-
+def upsert_validation_result_error_resolution_opinion(validation_result_id, user, opinion, comment):
+    ero = upsert_object(ErrorResolutionOpinion, validation_result_id, user)
     ero.opinion = opinion
     ero.comment = comment
-    ero.validation_error = ValidationError.objects.get(pk=validation_error_id)
-
+    ero.validation_result = ValidationResult.objects.get(pk=validation_result_id)
     ero.save()
 
 
-def upsert_object(object_class, validation_error_id, user):
+def upsert_object(object_class, validation_result_id, user):
     try:
-        obj_instance = object_class.objects.get(pk=validation_error_id)
+        obj_instance = object_class.objects.get(pk=validation_result_id)
         obj_instance.updated = datetime.now()
         obj_instance.updated_by = user
     except object_class.DoesNotExist:
@@ -69,8 +83,8 @@ def update_package_check_finish(package_id):
 def update_package_check_errors(package_id):
     package = get_object_or_404(Package, pk=package_id)
 
-    for ve in package.validationerror_set.all():
-        action = ve.resolution.action
+    for vr in package.validationresult_set.all():
+        action = vr.resolution.action
         if action in (choices.ER_ACTION_TO_FIX, ''):
             package.status = choices.PS_PENDING_CORRECTION    
             package.save()
@@ -86,8 +100,8 @@ def update_package_check_errors(package_id):
 def update_package_check_opinions(package_id):
     package = get_object_or_404(Package, pk=package_id)
 
-    for ve in package.validationerror_set.all():
-        opinion = ve.analysis.opinion
+    for vr in package.validationresult_set.all():
+        opinion = vr.analysis.opinion
         if opinion in (choices.ER_OPINION_FIX_DEMANDED, ''):
             package.status = choices.PS_PENDING_CORRECTION
             package.save()
@@ -135,7 +149,7 @@ def establish_site_connection(url='scielo.br'):
     return True
 
 
-def compute_package_validation_error_resolution_stats(package_id):
+def compute_package_validation_result_error_resolution_stats(package_id):
     try:
         obj = Package.objects.get(pk=package_id)
     except Package.DoesNotExist:
@@ -144,18 +158,18 @@ def compute_package_validation_error_resolution_stats(package_id):
     def _get_percentage(numerator, denominator):
         return float(numerator)/float(denominator) * 100
 
-    def _get_n(value, validation_error_resolution_list):
-        return len([o for o in validation_error_resolution_list if o.action == value])
+    def _get_n(value, validation_result_error_resolution_list):
+        return len([o for o in validation_result_error_resolution_list if o.action == value])
 
-    ver_list = [ve.resolution for ve in obj.validationerror_set.all()]
-    den = len(ver_list)
+    vr_list = [ve.resolution for ve in obj.validationresult_set.all()]
+    den = len(vr_list)
 
-    disagree_num = _get_n(choices.ER_ACTION_DISAGREE, ver_list)
+    disagree_num = _get_n(choices.ER_ACTION_DISAGREE, vr_list)
     disagree_per = _get_percentage(disagree_num, den)
     obj.stat_disagree_n = disagree_num
     obj.stat_disagree_p = disagree_per
 
-    incapable_num = _get_n(choices.ER_ACTION_INCAPABLE_TO_FIX, ver_list)
+    incapable_num = _get_n(choices.ER_ACTION_INCAPABLE_TO_FIX, vr_list)
     incapable_per = _get_percentage(incapable_num, den)
     obj.stat_incapable_to_fix_n = incapable_num
     obj.stat_incapable_to_fix_p = incapable_per
