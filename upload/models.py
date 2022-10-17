@@ -116,7 +116,7 @@ class ValidationResult(models.Model):
 
 
 class ErrorResolution(CommonControlField):
-    validation_error = models.OneToOneField('ValidationError', to_field='id', primary_key=True, related_name='resolution', on_delete=models.CASCADE)
+    validation_result = models.OneToOneField('ValidationResult', to_field='id', primary_key=True, related_name='resolution', on_delete=models.CASCADE)
     action = models.CharField(_('Action'), max_length=32, choices=choices.ERROR_RESOLUTION_ACTION, null=True, blank=True)
     comment = models.TextField(_('Comment'), max_length=512, null=True, blank=True)
     
@@ -127,7 +127,7 @@ class ErrorResolution(CommonControlField):
 
 
 class ErrorResolutionOpinion(CommonControlField):
-    validation_error = models.OneToOneField('ValidationError', to_field='id', primary_key=True, related_name='analysis', on_delete=models.CASCADE)
+    validation_result = models.OneToOneField('ValidationResult', to_field='id', primary_key=True, related_name='analysis', on_delete=models.CASCADE)
     opinion = models.CharField(_('Opinion'), max_length=32, choices=choices.ERROR_RESOLUTION_OPINION, null=True, blank=True)
     comment = models.TextField(_('Comment'), max_length=512, null=True, blank=True)
 
