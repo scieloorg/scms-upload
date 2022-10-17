@@ -115,3 +115,16 @@ class FlexibleDate(models.Model):
             models.Index(fields=['year']),
             models.Index(fields=['text']),
         ]
+
+
+class TextWithLang(models.Model):
+    text = models.CharField(_('Text'), max_length=255, null=False, blank=False)
+    language = models.CharField(_('Language'), max_length=2, choices=choices.LANGUAGE, null=False, blank=False)
+
+    panels=[
+        FieldPanel('text'),
+        FieldPanel('language')
+    ]
+
+    class Meta:
+        abstract = True
