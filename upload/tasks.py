@@ -323,9 +323,9 @@ def task_optimise_package(file_path):
 
 
 @celery_app.task()
-def task_validate_assets(file_path, package_id):
+def task_validate_assets(file_path, xml_path, package_id):
     package_files = file_utils.get_file_list_from_zip(file_path)
-    article_assets = package_utils.get_article_assets_from_zipped_xml(file_path)
+    article_assets = package_utils.get_article_assets_from_zipped_xml(file_path, xml_path)
 
     has_errors = False
 
@@ -340,6 +340,7 @@ def task_validate_assets(file_path, package_id):
                 status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but not present in the package.")}',
                 data={
+                    'xml_path': xml_path,
                     'id': asset.id,
                     'type': asset.type,
                     'missing_file': asset.name,
@@ -352,6 +353,7 @@ def task_validate_assets(file_path, package_id):
                 status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but its optimised version not present in the package.")}',
                 data={
+                    'xml_path': xml_path,
                     'id': asset.id,
                     'type': 'optimised',
                     'missing_file': file_utils.generate_filepath_with_new_extension(asset.name, '.png'),
@@ -364,17 +366,19 @@ def task_validate_assets(file_path, package_id):
                 status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but its thumbnail version not present in the package.")}',
                 data={
+                    'xml_path': xml_path,
                     'id': asset.id,
                     'type': 'thumbnail',
                     'missing_file': file_utils.generate_filepath_with_new_extension(asset.name, '.thumbnail.jpg'),
                 },
             )
-        
+
     if not has_errors:
         controller.add_validation_result(
             choices.VE_ASSET_ERROR,
             package_id,
             status=choices.VS_APPROVED,
+            data={'xml_path': xml_path},
         )
         return True
 
