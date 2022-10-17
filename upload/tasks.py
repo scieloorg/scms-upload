@@ -4,7 +4,8 @@ from lxml import etree
 from celery.result import AsyncResult
 from django.utils.translation import gettext as _
 
-from packtools.sps.libs.async_download import download_files
+from packtools.sps.utils import file_utils as sps_file_utils
+from packtools.sps.libs.async_download import download_files as sps_libs_download_files
 from packtools.sps import sps_maker
 
 from packtools.sps.models import package as sps_package
