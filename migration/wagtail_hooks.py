@@ -28,6 +28,7 @@ class MigrationFailureAdmin(ModelAdmin):
         'object_name',
         'pid',
         'exception_type',
+        'updated',
     )
     list_filter = (
         'action_name',
@@ -48,6 +49,7 @@ class MigrationFailureAdmin(ModelAdmin):
         'exception_type',
         'exception_msg',
         'traceback',
+        'updated',
     )
 
 
@@ -148,6 +150,40 @@ class IssueMigrationModelAdmin(ModelAdmin):
     )
 
 
+class DocumentMigrationModelAdmin(ModelAdmin):
+    model = models.DocumentMigration
+    menu_label = _('Document Migration')
+    menu_icon = 'doc-full'
+    menu_order = 300
+    add_to_settings_menu = False
+    exclude_from_explorer = True
+    inspect_view_enabled = True
+
+    list_per_page = 10
+    create_view_class = CoreCreateView
+
+    list_display = (
+        'scielo_document',
+        'status',
+        'isis_updated_date',
+    )
+    list_filter = (
+        'status',
+    )
+    search_fields = (
+        'scielo_document__scielo_issue__scielo_journal__title',
+        'scielo_document__scielo_issue__scielo_journal__acron',
+        'scielo_document__scielo_issue__publication_date__year',
+        'scielo_document__scielo_issue__issue_folder',
+        'scielo_document__pid',
+    )
+    inspect_view_fields = (
+        'scielo_document',
+        'status',
+        'isis_updated_date',
+    )
+
+
 class MigrationModelAdmin(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Migration'
@@ -156,6 +192,7 @@ class MigrationModelAdmin(ModelAdminGroup):
         MigrationFailureAdmin,
         JournalMigrationModelAdmin,
         IssueMigrationModelAdmin,
+        DocumentMigrationModelAdmin,
     )
     menu_order = get_menu_order('migration')
 

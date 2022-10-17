@@ -64,4 +64,5 @@ python-magic==0.4.27
 
 # DSM Migration
 # ------------------------------------------------------------------------------
--e git+https://github.com/scieloorg/scielo_migration.git@0.1.3#egg=scielo_classic_website
+-e git+https://github.com/scieloorg/scielo_migration.git@0.1.6#egg=scielo_classic_website
+python-dateutil==2.8.2

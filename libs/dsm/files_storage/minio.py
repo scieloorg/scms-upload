@@ -194,7 +194,7 @@ class MinioStorage:
         try:
             self._client.fget_object(
                 self.bucket_root, object_name, downloaded_file_path)
-        except ResponseError as err:
+        except Exception as err:
             raise FileStorageResponseError(err)
 
         return downloaded_file_path

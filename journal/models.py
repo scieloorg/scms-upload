@@ -7,7 +7,7 @@ from wagtail.admin.edit_handlers import FieldPanel, InlinePanel
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 
-from core.models import CommonControlField, FlexibleDate
+from core.models import CommonControlField
 
 from .forms import OfficialJournalForm
 
@@ -24,9 +24,9 @@ class OfficialJournal(CommonControlField):
         return u'%s' % (self.title)
 
     title = models.CharField(_('Official Title'), max_length=256, null=True, blank=True)
-    foundation_date = models.ForeignKey(FlexibleDate, on_delete=models.SET_NULL, null=True)
+    foundation_date = models.CharField(_('Foundation Date'), max_length=25, null=True, blank=True)
     ISSN_print = models.CharField(_('ISSN Print'), max_length=9, null=True, blank=True)
-    ISSN_electronic = models.CharField(_('ISSN Eletronic'), max_length=9, null=True, blank=True)
+    ISSN_electronic = models.CharField(_('ISSN Electronic'), max_length=9, null=True, blank=True)
     ISSNL = models.CharField(_('ISSNL'), max_length=9, null=True, blank=True)
 
     base_form_class = OfficialJournalForm

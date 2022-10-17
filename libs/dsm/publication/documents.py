@@ -18,7 +18,6 @@ from libs.dsm import exceptions
 from libs.dsm.publication.db import save_data
 
 
-
 def get_document(**kwargs):
     try:
         doc = Article.objects.get(**kwargs)
@@ -50,7 +49,6 @@ def get_similar_documents(article_title, journal_print_issn, journal_electronic_
         a_surname_std = standardizer.document_author_for_deduplication(a).split(',')[0]
         if a_surname_std not in filtered_docs_authors_surnames:
             return []
-    
     return docs
 
 
@@ -175,21 +173,21 @@ class DocumentToPublish:
 
     def add_keywords(self, lang, keywords):
         # kwd_groups = EmbeddedDocumentListField(ArticleKeyword))
-        if self.doc.kwd_groups is None:
-            self.doc.kwd_groups = []
+        if self.doc.keywords is None:
+            self.doc.keywords = []
         _kwd_group = ArticleKeyword()
-        _kwd_group.lang = lang
+        _kwd_group.language = lang
         _kwd_group.keywords = keywords
-        self.doc.kwd_groups.append(_kwd_group)
+        self.doc.keywords.append(_kwd_group)
 
     def add_doi_with_lang(self, language, doi):
         # doi_with_lang = EmbeddedDocumentListField(DOIWithLang))
-        if self.doc.doi_with_lang_items is None:
-            self.doc.doi_with_lang_items = []
+        if self.doc.doi_with_lang is None:
+            self.doc.doi_with_lang = []
         _doi_with_lang_item = DOIWithLang()
         _doi_with_lang_item.doi = doi
         _doi_with_lang_item.language = language
-        self.doc.doi_with_lang_items.append(_doi_with_lang_item)
+        self.doc.doi_with_lang.append(_doi_with_lang_item)
 
     def add_related_article(self, doi, ref_id, related_type):
         # related_article = EmbeddedDocumentListField(RelatedArticle))

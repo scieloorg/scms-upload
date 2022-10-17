@@ -81,6 +81,9 @@ def start():
             files_storage_config.secret_key = (
                 data['files_storage_config']['secret_key']
             )
+            files_storage_config.secure = (
+                data['files_storage_config']['secure'] == 'true'
+            )
             files_storage_config.bucket_public_subdir = (
                 data['files_storage_config']['bucket_public_subdir']
             )
@@ -108,7 +111,7 @@ def start():
             new_website_config,
         )
     except Exception as e:
-        raise OSError("Unable to start system %s" % e)
+        raise exceptions.StartCollectionConfigurationError("Unable to start system %s" % e)
 
 
 def get_classic_website_configuration(collection_acron):
@@ -167,21 +170,22 @@ def get_scielo_journal(collection_acron, scielo_issn):
 def get_or_create_scielo_journal(collection_acron, scielo_issn, user_id):
     try:
         try:
-            logging.info("Create or Get SciELOJournal {}".format(collection_acron))
+            logging.info("Create or Get SciELOJournal {} {}".format(
+                collection_acron, scielo_issn))
             scielo_journal = SciELOJournal.objects.get(
                 collection__acron=collection_acron,
                 scielo_issn=scielo_issn,
             )
+            logging.info("Got {}".format(scielo_journal))
         except SciELOJournal.DoesNotExist:
-            logging.info("Create SciELOJournal {}".format(collection_acron))
             scielo_journal = SciELOJournal()
-            logging.info("Collection {}".format(collection_acron))
             scielo_journal.collection = get_or_create_collection(
                 collection_acron, user_id
             )
             scielo_journal.scielo_issn = scielo_issn
             scielo_journal.creator_id = user_id
             scielo_journal.save()
+            logging.info("Created SciELOJournal {}".format(scielo_journal))
     except Exception as e:
         raise exceptions.GetOrCreateScieloJournalError(
             _('Unable to get_or_create_scielo_journal {} {} {} {}').format(
@@ -211,11 +215,13 @@ def get_scielo_issue(issue_pid, issue_folder):
 def get_or_create_scielo_issue(scielo_journal, issue_pid, issue_folder, user_id):
     try:
         try:
+            logging.info("Get or create SciELOIssue {} {} {}".format(scielo_journal, issue_pid, issue_folder))
             scielo_issue = SciELOIssue.objects.get(
                 scielo_journal=scielo_journal,
                 issue_pid=issue_pid,
                 issue_folder=issue_folder,
             )
+            logging.info("Got {}".format(scielo_issue))
         except SciELOIssue.DoesNotExist:
             scielo_issue = SciELOIssue()
             scielo_issue.scielo_journal = scielo_journal
@@ -223,6 +229,7 @@ def get_or_create_scielo_issue(scielo_journal, issue_pid, issue_folder, user_id)
             scielo_issue.issue_pid = issue_pid
             scielo_issue.creator_id = user_id
             scielo_issue.save()
+            logging.info("Created {}".format(scielo_issue))
     except Exception as e:
         raise exceptions.GetOrCreateScieloIssueError(
             _('Unable to get_or_create_scielo_issue {} {} {} {}').format(
@@ -253,11 +260,15 @@ def get_scielo_document(pid, file_id):
 def get_or_create_scielo_document(scielo_issue, pid, file_id, user_id):
     try:
         try:
+            logging.info("Get or create SciELODocument {} {} {}".format(
+                scielo_issue, pid, file_id
+            ))
             scielo_document = SciELODocument.objects.get(
                 scielo_issue=scielo_issue,
                 pid=pid,
                 file_id=file_id,
             )
+            logging.info("Got {}".format(scielo_document))
         except SciELODocument.DoesNotExist:
             scielo_document = SciELODocument()
             scielo_document.scielo_issue = scielo_issue
@@ -265,6 +276,7 @@ def get_or_create_scielo_document(scielo_issue, pid, file_id, user_id):
             scielo_document.file_id = file_id
             scielo_document.creator_id = user_id
             scielo_document.save()
+            logging.info("Created {}".format(scielo_document))
     except Exception as e:
         raise exceptions.GetOrCreateScieloDocumentError(
             _('Unable to get_or_create_scielo_document {} {} {} {}').format(

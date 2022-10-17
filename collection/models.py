@@ -41,12 +41,7 @@ class SciELOJournal(CommonControlField):
         _('Availability Status'), max_length=10, null=True, blank=True,
         choices=JOURNAL_AVAILABILTY_STATUS)
     official_journal = models.ForeignKey(
-    	OfficialJournal, on_delete=models.SET_NULL, null=True)
-
-    # TODO acrescentar
-    # data de entrada
-    # data de saída
-    # motivo da saída
+        OfficialJournal, on_delete=models.SET_NULL, null=True)
 
     class Meta:
         unique_together = [
@@ -82,12 +77,12 @@ class SciELOIssue(CommonControlField):
         return u'%s %s' % (self.scielo_journal, self.issue_pid)
 
     scielo_journal = models.ForeignKey(
-    	SciELOJournal, on_delete=models.SET_NULL, null=True)
-    issue_pid = models.CharField(_('Issue PID'), max_length=17, null=False, blank=False)
+        SciELOJournal, on_delete=models.SET_NULL, null=True)
+    issue_pid = models.CharField(_('Issue PID'), max_length=23, null=False, blank=False)
     # v30n1 ou 2019nahead
-    issue_folder = models.CharField(_('Issue Folder'), max_length=17, null=False, blank=False)
+    issue_folder = models.CharField(_('Issue Folder'), max_length=23, null=False, blank=False)
     official_issue = models.ForeignKey(
-    	Issue, on_delete=models.SET_NULL, null=True)
+        Issue, on_delete=models.SET_NULL, null=True)
 
     class Meta:
         unique_together = [
@@ -118,8 +113,12 @@ class SciELODocument(CommonControlField):
 
     scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
     pid = models.CharField(_('PID'), max_length=23, null=True, blank=True)
-    file_id = models.CharField(_('File ID'), max_length=17, null=True, blank=True)
+    file_id = models.CharField(_('File ID'), max_length=50, null=True, blank=True)
     official_document = models.ForeignKey(Article, on_delete=models.SET_NULL, null=True, blank=True)
+
+    xml_files = models.ManyToManyField('XMLFile', null=True, related_name='xml_files')
+    renditions_files = models.ManyToManyField('FileWithLang', null=True, related_name='renditions_files')
+    html_files = models.ManyToManyField('SciELOHTMLFile', null=True, related_name='html_files')
 
     class Meta:
         unique_together = [
@@ -131,7 +130,83 @@ class SciELODocument(CommonControlField):
             models.Index(fields=['scielo_issue']),
             models.Index(fields=['pid']),
             models.Index(fields=['file_id']),
-            models.Index(fields=['official_document'])
+            models.Index(fields=['official_document']),
+        ]
+
+
+class SciELOFile(models.Model):
+    scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
+    file_id = models.CharField(_('ID'), max_length=255, null=True, blank=True)
+    relative_path = models.CharField(_('Relative Path'), max_length=255, null=True, blank=True)
+    name = models.CharField(_('Filename'), max_length=255, null=False, blank=False)
+    uri = models.URLField(_('URI'), max_length=255, null=True)
+    object_name = models.CharField(_('Object name'), max_length=255, null=True)
+
+    def __str__(self):
+        return f"{self.scielo_issue} {self.name}"
+
+    class Meta:
+
+        indexes = [
+            models.Index(fields=['file_id']),
+            models.Index(fields=['relative_path']),
+            models.Index(fields=['name']),
+            models.Index(fields=['object_name']),
+            models.Index(fields=['scielo_issue']),
+        ]
+
+
+class FileWithLang(SciELOFile):
+
+    lang = models.CharField(
+        _('Language'), max_length=4, null=False, blank=False)
+
+    def __str__(self):
+        return f"{self.scielo_issue} {self.name} {self.lang}"
+
+    class Meta:
+
+        indexes = [
+            models.Index(fields=['lang']),
+        ]
+
+
+class AssetFile(SciELOFile):
+    is_supplementary_material = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.scielo_issue} {self.name} {self.is_supplementary_material}"
+
+    class Meta:
+
+        indexes = [
+            models.Index(fields=['is_supplementary_material']),
+        ]
+
+
+class XMLFile(FileWithLang):
+    assets_files = models.ManyToManyField('AssetFile')
+    languages = models.JSONField(null=True)
+
+    public_uri = models.URLField(_('Public URI'), max_length=255, null=True)
+    public_object_name = models.CharField(_('Public object name'), max_length=255, null=True)
+
+    def __str__(self):
+        return f"{self.scielo_issue} {self.name} {self.lang} {self.languages}"
+
+
+class SciELOHTMLFile(FileWithLang):
+    part = models.CharField(
+        _('Part'), max_length=6, null=False, blank=False)
+    assets_files = models.ManyToManyField('AssetFile')
+
+    def __str__(self):
+        return f"{self.scielo_issue} {self.name} {self.lang} {self.part}"
+
+    class Meta:
+
+        indexes = [
+            models.Index(fields=['part']),
         ]
 
 
@@ -159,8 +234,8 @@ class FilesStorageConfiguration(CommonControlField):
         _('Host'), max_length=255, null=True, blank=True)
     bucket_root = models.CharField(
         _('Bucket root'), max_length=255, null=True, blank=True)
-    bucket_subdir = models.CharField(
-        _('Bucket subdir'), max_length=64, null=True, blank=True)
+    bucket_app_subdir = models.CharField(
+        _('Bucket app subdir'), max_length=64, null=True, blank=True)
     bucket_public_subdir = models.CharField(
         _('Bucket public subdir'), max_length=64, null=True, blank=True)
     bucket_migration_subdir = models.CharField(

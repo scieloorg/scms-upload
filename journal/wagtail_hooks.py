@@ -37,7 +37,6 @@ class OfficialJournalAdmin(ModelAdmin):
     # )
     search_fields = (
         'title',
-        'foundation_date__text',
         'ISSN_print',
         'ISSN_electronic',
         'ISSNL',

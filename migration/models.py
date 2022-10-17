@@ -97,11 +97,34 @@ class JournalMigration(MigratedData):
 class IssueMigration(MigratedData):
 
     scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
+    files_status = models.CharField(
+        _('Status'), max_length=20,
+        choices=choices.MIGRATION_STATUS,
+        default=choices.MS_TO_MIGRATE,
+    )
 
     def __str__(self):
-        return f"{self.scielo_issue} {self.status}"
+        return f"{self.scielo_issue} | data: {self.status} | files: {self.files_status}"
 
     class Meta:
         indexes = [
             models.Index(fields=['scielo_issue']),
+        ]
+
+
+class DocumentMigration(MigratedData):
+
+    scielo_document = models.ForeignKey(SciELODocument, on_delete=models.CASCADE)
+    files_status = models.CharField(
+        _('Status'), max_length=20,
+        choices=choices.MIGRATION_STATUS,
+        default=choices.MS_TO_MIGRATE,
+    )
+
+    def __str__(self):
+        return f"{self.scielo_document} | data: {self.status} | files: {self.files_status}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['scielo_document']),
         ]
