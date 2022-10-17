@@ -34,7 +34,13 @@ def run_validations(filename, package_id, package_category, article_id=None, iss
 
     # Obtém lista de paths de arquivos XML disponíveis no pacote
     xml_files = sps_file_utils.get_files_list_filtered(file_path, ['.xml'])
-    if xml_format_is_valid:
+
+    # Valida arquivos XML do pacote
+    xml_validation_success = []
+    for xml_path in xml_files:
+        xml_validation_success.append(
+            task_validate_xml_format(file_path, xml_path, package_id)
+        )
         optimised_filepath = task_optimise_package(file_path)
 
         task_validate_assets.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
