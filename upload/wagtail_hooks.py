@@ -112,8 +112,12 @@ class PackageAdminInspectView(InspectView):
             if vr_name not in data['validation_results']:
                 data['validation_results'][vr_name] = {'status': vr.status}
 
-            if vr.status == choices.VS_DISAPPROVED and data['validation_results'][vr_name] != choices.VS_DISAPPROVED:
-                data['validation_results'][vr_name].update({'status': vr.status})
+            if vr.status == choices.VS_DISAPPROVED:
+                if data['validation_results'][vr_name] != choices.VS_DISAPPROVED:
+                    data['validation_results'][vr_name].update({'status': vr.status})
+
+                if hasattr(vr, 'analysis'):
+                    data['validation_results']['qa'] = self.instance.status
 
             if vr_name == choices.VR_XML_OR_DTD:
                 data['validation_results'][vr_name].update({'uri': ValidationResultAdmin().url_helper.get_action_url('inspect', vr.id)})
