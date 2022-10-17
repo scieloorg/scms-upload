@@ -269,19 +269,20 @@ def task_compare_packages(package1_file_path, package2_file_path):
 
 
 @celery_app.task()
-def task_validate_xml_format(file_path, package_id):
+def task_validate_xml_format(file_path, xml_path, package_id):
     val = controller.add_validation_result(
         error_category=choices.VE_XML_FORMAT_ERROR,
         package_id=package_id,
         status=choices.VS_CREATED,
+        data={'xml_path': xml_path},
     )
 
     try:
-        xml_str = file_utils.get_xml_content_from_zip(file_path)
+        xml_str = file_utils.get_xml_content_from_zip(file_path, xml_path)
         xml_utils.get_etree_from_xml_content(xml_str)
         controller.update_validation_result(
             validation_result_id=val.id,
-            status=choices.VS_APPROVED
+            status=choices.VS_APPROVED,
         )
         return True
 
@@ -294,6 +295,7 @@ def task_validate_xml_format(file_path, package_id):
 
     except xml_utils.XMLFormatError as e:
         data = {
+            'xml_path': xml_path,
             'column': e.column,
             'row': e.start_row,
             'snippet': xml_utils.get_snippet(xml_str, e.start_row, e.end_row),
