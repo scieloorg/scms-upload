@@ -1,9 +1,14 @@
+from tempfile import NamedTemporaryFile
+from lxml import etree
+
 from celery.result import AsyncResult
 from django.utils.translation import gettext as _
 
+from packtools.sps.libs.async_download import download_files
 from packtools.sps import sps_maker
 
 from packtools.sps.models import package as sps_package
+from packtools.sps.models import article_assets as sps_article_assets
 from packtools.sps import exceptions as sps_exceptions
 from packtools.sps.validation import (
     article as sps_validation_article,
@@ -33,17 +38,17 @@ def run_validations(filename, package_id, package_category, article_id=None, iss
 
         task_validate_assets.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
         task_validate_renditions.apply_async(kwargs={'file_path': optimised_filepath, 'package_id': package_id}, countdown=10)
+    
+        if issue_id is not None and package_category:
+            task_validate_article_and_issue_data.apply_async(kwargs={
+                'file_path': optimised_filepath,
+                'package_id': package_id,
+                'issue_id': issue_id,
+            },
+            countdown=10)
 
-    if issue_id is not None and package_category:
-        task_validate_article_and_issue_data.apply_async(kwargs={
-            'file_path': optimised_filepath,
-            'package_id': package_id,
-            'issue_id': issue_id,
-        },
-        countdown=10)
-
-    if article_id is not None and package_category in (choices.PC_CORRECTION,  choices.PC_ERRATUM):
-        task_validate_article_change(file_path, package_category, article_id)
+        if article_id is not None and package_category in (choices.PC_CORRECTION,  choices.PC_ERRATUM):
+            task_validate_article_change(file_path, package_category, article_id)
 
 
 def check_resolutions(package_id):
@@ -65,14 +70,10 @@ def task_validate_article_and_issue_data(self, file_path, package_id, issue_id):
         'file_path': file_path,
         'issue_id': issue_id,
     })
-    try:
-        task_validate_article_is_unpublished.apply_async(kwargs={
-            'package_id': package_id,
-            'file_path': file_path,
-        })
-    except exceptions.SiteDatabaseIsUnavailableError:
-        ...
-        # TODO: usar alguma app que suporte mensagem assíncrona (https://pypi.org/project/django-async-messages/)
+    task_validate_article_is_unpublished.apply_async(kwargs={
+        'package_id': package_id,
+        'file_path': file_path,
+    })
 
 
 @celery_app.task(name='Validate article and journal issue compatibility')
@@ -81,12 +82,22 @@ def task_validate_article_and_journal_issue_compatibility(package_id, file_path,
     issue = Issue.objects.get(pk=issue_id)
     journal_dict = get_journal_dict_for_validation(issue.official_journal.id)
 
+    val = controller.add_validation_result(
+        error_category=choices.VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR,
+        package_id=package_id,
+        status=choices.VS_CREATED,
+    )
+
     try:
         sps_validation_journal.are_article_and_journal_data_compatible(
             xml_article=xmltree, 
             journal_print_issn=journal_dict['print_issn'], 
             journal_electronic_issn=journal_dict['electronic_issn'],
             journal_titles=journal_dict['titles'],
+        )
+        controller.update_validation_result(
+            validation_result_id=val.id,
+            status=choices.VS_APPROVED
         )
         return True
     except sps_exceptions.ArticleIncompatibleDataError as e:
@@ -99,10 +110,9 @@ def task_validate_article_and_journal_issue_compatibility(package_id, file_path,
         else:
             error_message = _('XML article has incompatible journal data.')
 
-        controller.add_validation_error(
-            error_category=choices.VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR,
-            package_id=package_id,
-            package_status=choices.PS_REJECTED,
+        controller.update_validation_result(
+            validation_result_id=val.id,
+            status=choices.VS_DISAPPROVED,
             message=error_message,
             data={'errors': e.data},
         )
@@ -111,28 +121,44 @@ def task_validate_article_and_journal_issue_compatibility(package_id, file_path,
 
 @celery_app.task(name='Validate article is unpublished')
 def task_validate_article_is_unpublished(file_path, package_id):
-    if not controller.establish_site_connection():
-        raise exceptions.SiteDatabaseIsUnavailableError()
-
     xmltree = sps_package.PackageArticle(file_path).xmltree_article
     article_data = package_utils.get_article_data_for_comparison(xmltree)
-    similar_docs = get_similar_documents(
-        article_title=article_data["title"],
-        journal_electronic_issn=article_data["journal_electronic_issn"],
-        journal_print_issn=article_data["journal_print_issn"],
-        authors=article_data["authors"],
+
+    val = controller.add_validation_result(
+        error_category=choices.VE_ARTICLE_IS_NOT_NEW_ERROR,
+        package_id=package_id,
+        status=choices.VS_CREATED,
     )
 
+    try:
+        controller.establish_site_connection()
+        similar_docs = get_similar_documents(
+            article_title=article_data["title"],
+            journal_electronic_issn=article_data["journal_electronic_issn"],
+            journal_print_issn=article_data["journal_print_issn"],
+            authors=article_data["authors"],
+        )
+    except Exception:
+        controller.update_validation_result(
+            validation_result_id=val.id,
+            status=choices.VS_DISAPPROVED,
+            message=_('It was not possible to connect to the site database.'),
+        )
+        return False
+
     if len(similar_docs) > 1: 
-        controller.add_validation_error(
-            error_category=choices.VE_ARTICLE_IS_NOT_NEW_ERROR,
-            package_id=package_id,
-            package_status=choices.PS_REJECTED,
-            message=_('XML article refers to a existant document'),
+        controller.update_validation_result(
+            validation_result_id=val.id,
+            status=choices.VS_DISAPPROVED,
+            message=_('XML article refers to a existant document.'),
             data={'similar_docs': [s.aid for s in similar_docs]},
         )
         return False
 
+    controller.update_validation_result(
+        validation_result_id=val.id,
+        status=choices.VS_APPROVED,
+    )
     return True
 
 
@@ -194,7 +220,7 @@ def task_validate_article_erratum(file_path):
 
 
 @celery_app.task(name='Compare packages')
-def task_compare_packages(package1_file_path, package2_file_path):   
+def task_compare_packages(package1_file_path, package2_file_path):
     pkg1_xmltree = sps_package.PackageWithErrata(package1_file_path).xmltree_article
     pkg2_xmltree = sps_package.PackageArticle(package2_file_path).xmltree_article
 
@@ -203,16 +229,26 @@ def task_compare_packages(package1_file_path, package2_file_path):
 
 @celery_app.task()
 def task_validate_xml_format(file_path, package_id):
+    val = controller.add_validation_result(
+        error_category=choices.VE_XML_FORMAT_ERROR,
+        package_id=package_id,
+        status=choices.VS_CREATED,
+    )
+
     try:
         xml_str = file_utils.get_xml_content_from_zip(file_path)
         xml_utils.get_etree_from_xml_content(xml_str)
+        controller.update_validation_result(
+            validation_result_id=val.id,
+            status=choices.VS_APPROVED
+        )
         return True
 
     except (file_utils.BadPackageFileError, file_utils.PackageWithoutXMLFileError):
-        controller.add_validation_error(
-            choices.VE_PACKAGE_FILE_ERROR,
-            package_id,
-            choices.PS_REJECTED
+        controller.update_validation_result(
+            validation_result_id=val.id,
+            error_category=choices.VE_PACKAGE_FILE_ERROR,
+            status=choices.VS_DISAPPROVED,
         )
 
     except xml_utils.XMLFormatError as e:
@@ -222,12 +258,12 @@ def task_validate_xml_format(file_path, package_id):
             'snippet': xml_utils.get_snippet(xml_str, e.start_row, e.end_row),
         }
 
-        controller.add_validation_error(
-            choices.VE_XML_FORMAT_ERROR,
-            package_id,
-            choices.PS_REJECTED,
+        controller.update_validation_result(
+            validation_result_id=val.id,
+            error_category=choices.VE_XML_FORMAT_ERROR,
             message=e.message,
             data=data,
+            status=choices.VS_DISAPPROVED,
         )
 
     return False
@@ -248,14 +284,17 @@ def task_validate_assets(file_path, package_id):
     package_files = file_utils.get_file_list_from_zip(file_path)
     article_assets = package_utils.get_article_assets_from_zipped_xml(file_path)
 
+    has_errors = False
+
     for asset_result in package_utils.evaluate_assets(article_assets, package_files):
         asset, is_present = asset_result
 
         if not is_present:
-            controller.add_validation_error(
+            has_errors = True
+            controller.add_validation_result(
                 choices.VE_ASSET_ERROR,
                 package_id,
-                choices.PS_REJECTED,
+                status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but not present in the package.")}',
                 data={
                     'id': asset.id,
@@ -264,10 +303,10 @@ def task_validate_assets(file_path, package_id):
                 },
             )
 
-            controller.add_validation_error(
+            controller.add_validation_result(
                 choices.VE_ASSET_ERROR,
                 package_id,
-                choices.PS_REJECTED,
+                status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but its optimised version not present in the package.")}',
                 data={
                     'id': asset.id,
@@ -276,10 +315,10 @@ def task_validate_assets(file_path, package_id):
                 },
             )
 
-            controller.add_validation_error(
+            controller.add_validation_result(
                 choices.VE_ASSET_ERROR,
                 package_id,
-                choices.PS_REJECTED,
+                status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but its thumbnail version not present in the package.")}',
                 data={
                     'id': asset.id,
@@ -287,6 +326,14 @@ def task_validate_assets(file_path, package_id):
                     'missing_file': file_utils.generate_filepath_with_new_extension(asset.name, '.thumbnail.jpg'),
                 },
             )
+        
+    if not has_errors:
+        controller.add_validation_result(
+            choices.VE_ASSET_ERROR,
+            package_id,
+            status=choices.VS_APPROVED,
+        )
+        return True
 
 
 @celery_app.task()
@@ -294,14 +341,18 @@ def task_validate_renditions(file_path, package_id):
     package_files = file_utils.get_file_list_from_zip(file_path)
     article_renditions = package_utils.get_article_renditions_from_zipped_xml(file_path)
 
+    has_errors = False
+
     for rendition_result in package_utils.evaluate_renditions(article_renditions, package_files):
         rendition, expected_filename, is_present = rendition_result
 
         if not is_present:
-            controller.add_validation_error(
-                choices.VE_RENDITION_ERROR,
-                package_id,
-                choices.PS_REJECTED,
+            has_errors = True
+
+            controller.add_validation_result(
+                package_id=package_id,
+                error_category=choices.VE_RENDITION_ERROR,
+                status=choices.VS_DISAPPROVED,
                 message=f'{rendition.language} {_("language is mentioned in the XML but its PDF file not present in the package.")}',
                 data={
                     'language': rendition.language,
@@ -310,23 +361,24 @@ def task_validate_renditions(file_path, package_id):
                 },
             )
 
+    if not has_errors:
+        controller.add_validation_result(
+           error_category=choices.VE_RENDITION_ERROR,
+            package_id=package_id,
+            status=choices.VS_APPROVED,
+        )
+        return True
+
 
 @celery_app.task(bind=True, name='Check validation error resolutions')
 def task_check_resolutions(self, package_id):
-    pkg_status = controller.update_package_check_errors(package_id)
-    controller.compute_package_validation_error_resolution_stats(package_id)
-    
-    if pkg_status == choices.PS_PENDING_CORRECTION:
-        ...
-        # TODO: usar alguma app que suporte mensagem assíncrona (https://pypi.org/project/django-async-messages/)
+    controller.update_package_check_errors(package_id)
+    return controller.compute_package_validation_result_error_resolution_stats(package_id)
 
 
 @celery_app.task(bind=True, name='Check validation error resolutions opinions')
 def task_check_opinions(self, package_id):
-    pkg_status = controller.update_package_check_opinions(package_id)
-    if pkg_status == choices.PS_PENDING_CORRECTION:
-        ...
-        # TODO: usar alguma app que suporte mensagem assíncrona (https://pypi.org/project/django-async-messages/)
+    return controller.update_package_check_opinions(package_id)
 
 
 @celery_app.task(name='Get or create package')
