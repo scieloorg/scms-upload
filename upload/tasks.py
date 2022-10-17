@@ -131,8 +131,8 @@ def task_validate_article_and_journal_issue_compatibility(package_id, file_path,
 
     try:
         sps_validation_journal.are_article_and_journal_data_compatible(
-            xml_article=xmltree, 
-            journal_print_issn=journal_dict['print_issn'], 
+            xml_article=xmltree,
+            journal_print_issn=journal_dict['print_issn'],
             journal_electronic_issn=journal_dict['electronic_issn'],
             journal_titles=journal_dict['titles'],
         )
@@ -187,7 +187,7 @@ def task_validate_article_is_unpublished(file_path, package_id):
         )
         return False
 
-    if len(similar_docs) > 1: 
+    if len(similar_docs) > 1:
         controller.update_validation_result(
             validation_result_id=val.id,
             status=choices.VS_DISAPPROVED,
@@ -206,8 +206,8 @@ def task_validate_article_is_unpublished(file_path, package_id):
 @celery_app.task(name='Validate article change')
 def task_validate_article_change(new_package_file_path, new_package_category, article_id):
     last_valid_pkg = controller.get_last_package(
-        article_id=article_id, 
-        status=choices.PS_PUBLISHED, 
+        article_id=article_id,
+        status=choices.PS_PUBLISHED,
         category=choices.PC_SYSTEM_GENERATED
     )
     last_valid_pkg_file_path = file_utils.get_file_absolute_path(last_valid_pkg.file.name)
@@ -222,11 +222,11 @@ def task_validate_article_change(new_package_file_path, new_package_category, ar
             'file_path': new_package_file_path
         })
         task_result_cp = task_compare_packages.apply_async(kwargs={
-            'package1_file_path': new_package_file_path, 
+            'package1_file_path': new_package_file_path,
             'package2_file_path': last_valid_pkg_file_path
         })
         task_update_article_status_by_validations.apply_async(kwargs={
-            'task_id_article_erratum': task_result_ae.id, 
+            'task_id_article_erratum': task_result_ae.id,
             'task_id_compare_packages': task_result_cp.id,
             'article_id': article_id
         })
@@ -236,7 +236,7 @@ def task_validate_article_change(new_package_file_path, new_package_category, ar
 def task_update_article_status_by_validations(task_id_article_erratum, task_id_compare_packages, article_id):
     ar_article_erratum = AsyncResult(task_id_article_erratum)
     ar_compare_packages = AsyncResult(task_id_compare_packages)
-    
+
     while not ar_article_erratum.ready() or not ar_compare_packages.ready():
         ...
 
