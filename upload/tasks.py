@@ -68,16 +68,28 @@ def run_validations(filename, package_id, package_category, article_id=None, iss
                 }, 
                 countdown=10,
             )
-        if issue_id is not None and package_category:
-            task_validate_article_and_issue_data.apply_async(kwargs={
-                'file_path': optimised_filepath,
-                'package_id': package_id,
-                'issue_id': issue_id,
-            },
-            countdown=10)
 
-        if article_id is not None and package_category in (choices.PC_CORRECTION,  choices.PC_ERRATUM):
-            task_validate_article_change(file_path, package_category, article_id)
+        # Aciona validação de compatibilidade entre dados do pacote e o Issue selecionado
+        if issue_id is not None and package_category:
+            task_validate_article_and_issue_data.apply_async(
+                kwargs={
+                    'file_path': optimised_filepath,
+                    'package_id': package_id,
+                    'issue_id': issue_id,
+                },
+                countdown=10,
+            )
+
+        # Aciona validação de compatibilidade entre dados do pacote e o Article selecionado
+        if article_id is not None and package_category in (
+            choices.PC_CORRECTION, 
+            choices.PC_ERRATUM
+        ):
+            task_validate_article_change(
+                file_path,
+                package_category, 
+                article_id,
+            )
 
 
 def check_resolutions(package_id):
