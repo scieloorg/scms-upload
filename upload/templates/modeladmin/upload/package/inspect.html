@@ -125,23 +125,19 @@
                 
                 <tr>
                     <td class='title'><h2>{% trans "Quality analysis opinion" %}</h2></td>
-                    <td>
-                        {% if perms.upload.send_validation_error_resolution or perms.upload.analyse_validation_error_resolution %}
+                    {% if not validation_results.qa %}
+                        <td><span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span></td>
+                        <td></td>
+                    {% else %}
+                        <td>
                             {% if status == 'pending-correction' %}
-                                <span class="help-block help-critical">{% trans 'There are pending corrections.' %}</span>
+                                <span class='help-block help-critical'>{% trans "There are pending corrections." %}</span>
+                            {% else %}
+                                <span class='help-block help-info'>{% trans 'Package has been accepted.' %}</span>
                             {% endif %}
-                            {% if status == 'accepted' %}
-                                <span class="help-block help-info">{% trans 'Packaged has been accepted.' %}</span>
-                            {% endif %}
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if perms.upload.send_validation_error_resolution or perms.upload.analyse_validation_error_resolution %}
-                            {% if status == 'accepted' or status == 'pending-correction' %}
-                                <a href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}&scope=report">{% trans 'See Quality Analysis Report.' %}</a>
-                            {% endif %}
-                        {% endif %}
-                    </td>
+                        </td>
+                        <td><a href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}&scope=report">{% trans 'See Quality Analysis Report.' %}</a></td>
+                    {% endif %}
                 </tr>
             </tbody>
         </table>
@@ -156,21 +152,14 @@
         <a class="button" href="" disabled>{% trans "View XML" %}</a></p>
     </div>
 
-    {% if status != 'rejected' and validation_errors %}
+    {% if status == 'validated-with-errors' or status == 'quality-analysis' %}
         <div class="nice-padding">
             <h3>{% trans "Actions" %}</h3>
-            {% if perms.upload.send_validation_error_resolution %}
-                {% if status == 'validated-with-errors' %}
-                    <a class="button is-small" href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}">{% trans 'Start Error Resolution' %}</a>
-                {% endif %}
-            {% endif %}
-
-            {% if perms.upload.analyse_validation_error_resolution %}
-                {% if status == 'quality-analysis' %}
+            {% if status == 'validated-with-errors' and perms.upload.send_validation_error_resolution %}
+                <a class="button is-small" href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}">{% trans 'Start Error Resolution' %}</a>
+            {% else %}
+                {% if status == 'quality-analysis' and perms.upload.analyse_validation_error_resolution %}
                     <a class="button is-small" href="{% url 'upload:error_resolution' %}?scope=analyse&package_id={{ package_id }}">{% trans 'Analyse Error Resolution' %}</a>
-                {% endif %}
-                {% if status == 'accepted' %}
-                    <a class="button is-small" href="">{% trans 'Conclude opinion' %}</a>
                 {% endif %}
             {% endif %}
         </div>
