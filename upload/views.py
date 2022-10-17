@@ -65,7 +65,7 @@ def error_resolution(request):
             package = get_object_or_404(Package, pk=package_id)
 
             if package.status != choices.PS_REJECTED:
-                validation_results = package.validationresult_set.all()
+                validation_results = package.validationresult_set.filter(status=choices.VS_DISAPPROVED)
 
                 template_type = 'start' if scope not in ('analyse', 'report') else scope
 
