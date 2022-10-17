@@ -13,7 +13,7 @@ from config.menu import get_menu_order
 from issue.models import Issue
 
 from .button_helper import UploadButtonHelper
-from .models import QAPackage, choices, Package, ValidationError
+from .models import QAPackage, choices, Package, ValidationResult
 from .permission_helper import UploadPermissionHelper
 from .tasks import run_validations
 from .utils import package_utils
@@ -100,34 +100,34 @@ class PackageCreateView(CreateView):
 class PackageAdminInspectView(InspectView):
     def get_context_data(self):
         data = {
-            'validation_errors': {},
+            'validation_results': {},
             'package_id': self.instance.id,
             'status': self.instance.status,
             'category': self.instance.category,
             'languages': package_utils.get_languages(self.instance.file.name),
         }
 
-        for ve in self.instance.validationerror_set.all():
-            vek = ve.report_name()
-            if vek not in data:
-                data['validation_errors'][vek] = []
+        for vr in self.instance.validationresult_set.all():
+            vr_name = vr.report_name()
+            if vr_name not in data['validation_results']:
+                data['validation_results'][vr_name] = {'status': vr.status}
 
-            data['validation_errors'][vek].append({
-                'id': ve.id, 
-                'inspect_url': ValidationErrorAdmin().url_helper.get_action_url('inspect', ve.id)
-            })
+            if vr.status == choices.VS_DISAPPROVED and data['validation_results'][vr_name] != choices.VS_DISAPPROVED:
+                data['validation_results'][vr_name].update({'status': vr.status})
+
+            if vr_name == choices.VR_XML_OR_DTD:
+                data['validation_results'][vr_name].update({'uri': ValidationResultAdmin().url_helper.get_action_url('inspect', vr.id)})
 
         return super().get_context_data(**data)
 
 
-class ValidationErrorAdminInspectView(InspectView):
+class ValidationResultAdminInspectView(InspectView):
     def get_context_data(self):
         try:
             data = self.instance.data.copy()
-            data['package_url'] = f'/admin/upload/package/inspect/{self.instance.package.id}'
         except AttributeError:
             data = {}
-
+        data['package_url'] = f'/admin/upload/package/inspect/{self.instance.package.id}'
         return super().get_context_data(**data)
 
 
@@ -187,23 +187,26 @@ class PackageAdmin(ModelAdmin):
         return qs.filter(creator=request.user)
 
 
-class ValidationErrorAdmin(ModelAdmin):
-    model = ValidationError
+class ValidationResultAdmin(ModelAdmin):
+    model = ValidationResult
     permission_helper_class = UploadPermissionHelper
     inspect_view_enabled=True
-    inspect_view_class=ValidationErrorAdminInspectView
-    menu_label = _('Validation errors')
+    inspect_view_class=ValidationResultAdminInspectView
+    menu_label = _('Validation results')
     menu_icon = 'error'
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
     list_display = (
+        'report_name',
         'category',
+        'status',
         'package',
         'message',
     )
     list_filter = (
         'category',
+        'status',
     )
     search_fields = (
         'message',
@@ -213,6 +216,7 @@ class ValidationErrorAdmin(ModelAdmin):
         'package',
         'category',
         'message',
+        'status',
     }
 
     def get_queryset(self, request):
@@ -279,7 +283,7 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
 class UploadModelAdminGroup(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Upload'
-    items = (PackageAdmin, ValidationErrorAdmin, QualityAnalysisPackageAdmin)
+    items = (PackageAdmin, ValidationResultAdmin, QualityAnalysisPackageAdmin)
     menu_order = get_menu_order('upload')
 
 
