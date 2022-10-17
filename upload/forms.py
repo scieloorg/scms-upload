@@ -21,13 +21,13 @@ class UploadPackageForm(WagtailAdminModelForm):
         return upload_package
 
 
-class ValidationErrorResolutionForm(forms.Form):
-    validation_error_id = forms.IntegerField()
+class ValidationResultErrorResolutionForm(forms.Form):
+    validation_result_id = forms.IntegerField()
     comment = forms.CharField(widget=forms.Textarea, required=False)
     action = forms.CharField(widget=forms.Select, required=False)
 
 
-class ValidationErrorResolutionOpinionForm(forms.Form):
-    validation_error_id = forms.IntegerField()
+class ValidationResultErrorResolutionOpinionForm(forms.Form):
+    validation_result_id = forms.IntegerField()
     comment = forms.CharField(widget=forms.Textarea, required=False)
     opinion = forms.CharField(widget=forms.Select, required=False)
