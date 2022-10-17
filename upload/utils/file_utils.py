@@ -58,19 +58,22 @@ def get_xml_content_from_uri(uri):
     return requests_get_content(uri)
 
 
-def get_xml_content_from_zip(path):
+def get_xml_content_from_zip(path, xml_path=None):
     file_absolute_path = get_file_absolute_path(path)
 
     try:
         with zipfile.ZipFile(file_absolute_path, 'r') as zip_content:
-            for fn in zip_content.namelist():
-                fn_basename = os.path.basename(fn)
-                ign, fn_ext = os.path.splitext(fn_basename)
+            if xml_path:
+                return zip_content.read(xml_path)
+            else:
+                for fn in zip_content.namelist():
+                    fn_basename = os.path.basename(fn)
+                    ign, fn_ext = os.path.splitext(fn_basename)
 
-                if fn_ext.lower() == '.xml':
-                    return zip_content.read(fn)
+                    if fn_ext.lower() == '.xml':
+                        return zip_content.read(fn)
 
-            raise PackageWithoutXMLFileError(f'Package {file_absolute_path} does not contain a XML file')
+                raise PackageWithoutXMLFileError(f'Package {file_absolute_path} does not contain a XML file')
 
     except zipfile.BadZipFile:
         raise BadPackageFileError(f'Package {file_absolute_path} is invalid')
