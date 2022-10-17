@@ -70,11 +70,12 @@ class QAPackage(Package):
         proxy = True
 
 
-class ValidationError(models.Model):
+class ValidationResult(models.Model):
     id = models.AutoField(primary_key=True)
-    category = models.CharField(_('Category'), max_length=64, choices=choices.VALIDATION_ERROR_CATEGORY, null=False, blank=False)
-    data = models.JSONField(_('Data'), null=True, blank=True)
-    message = models.CharField(_('Message'), max_length=512, null=True, blank=True)
+    category = models.CharField(_('Error category'), max_length=64, choices=choices.VALIDATION_ERROR_CATEGORY, null=False, blank=False)
+    data = models.JSONField(_('Error data'), null=True, blank=True)
+    message = models.CharField(_('Error message'), max_length=512, null=True, blank=True)
+    status = models.CharField(_('Status'), max_length=16, choices=choices.VALIDATION_STATUS, null=True, blank=True)
 
     package = models.ForeignKey('Package', on_delete=models.CASCADE, null=False, blank=False)
 
@@ -83,10 +84,11 @@ class ValidationError(models.Model):
             str(self.id),
             self.package.file.name,
             self.category,
+            self.status,
         ])
 
     def report_name(self):
-        return choices.VALIDATION_DICT_CATEGORY_TO_REPORT[self.category]
+        return choices.VALIDATION_DICT_ERROR_CATEGORY_TO_REPORT[self.category]
     
     panels = [
         MultiFieldPanel(
