@@ -27,15 +27,15 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for ve in validation_errors %}
+                        {% for vr in validation_results %}
                             <tr>
-                                <td>{{ ve.get_category_display|abbrev }}</td>
-                                <td>{{ ve.message }}</td>
-                                <td><pre>{{ ve.data }}</pre></td>
-                                <td>{{ ve.resolution.get_action_display }}</td>
-                                <td>{{ ve.resolution.comment }}</td>
+                                <td>{{ vr.get_category_display }}</td>
+                                <td>{{ vr.message }}</td>
+                                <td><pre>{{ vr.data }}</pre></td>
+                                <td>{{ vr.resolution.get_action_display }}</td>
+                                <td>{{ vr.resolution.comment }}</td>
                                 <td>
-                                    {% include 'modeladmin/upload/package/error_resolution/item_resolution_opinion.html' with validation_error_id=ve.id comment=ve.analysis.comment opinion=ve.analysis.opinion %}
+                                    {% include 'modeladmin/upload/package/error_resolution/item_resolution_opinion.html' with validation_result_id=vr.id comment=vr.analysis.comment opinion=vr.analysis.opinion %}
                                 </td>
                             </tr>
                         {% endfor %}
