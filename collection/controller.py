@@ -276,7 +276,7 @@ def get_or_create_scielo_document(scielo_issue, pid, file_id, user_id):
             scielo_document.file_id = file_id
             scielo_document.creator_id = user_id
             scielo_document.save()
-            logging.info("Created {} {} {}".format(scielo_document))
+            logging.info("Created {}".format(scielo_document))
     except Exception as e:
         raise exceptions.GetOrCreateScieloDocumentError(
             _('Unable to get_or_create_scielo_document {} {} {} {}').format(
