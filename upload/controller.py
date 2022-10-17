@@ -5,21 +5,24 @@ from django.shortcuts import get_object_or_404
 from collection.models import NewWebSiteConfiguration
 from libs.dsm.publication.db import mk_connection, exceptions
 
-from .models import ErrorResolution, ErrorResolutionOpinion, Package, ValidationError, choices
+from .models import ErrorResolution, ErrorResolutionOpinion, Package, ValidationResult, choices
 
 
-def add_validation_error(error_category, package_id, package_status, message=None, data=None):
-    ve = ValidationError()
-    ve.category = error_category
+def add_validation_result(error_category, package_id, status=None, message=None, data=None):
+    val_res = ValidationResult()
+    val_res.category = error_category
 
-    ve.package = get_object_or_404(Package, pk=package_id)
-    ve.package.status = package_status
-    ve.message = message
-    ve.data = data
+    val_res.package = get_object_or_404(Package, pk=package_id)
+    val_res.status = status
+    val_res.message = message
+    val_res.data = data
 
-    ve.package.save()
-    ve.save()
+    if val_res.status == choices.VS_DISAPPROVED:
+        val_res.package.status = choices.PS_REJECTED
+        val_res.package.save()
 
+    val_res.save()
+    return val_res
 
 def upsert_validation_error_resolution(validation_error_id, user, action, comment):
     er = upsert_object(ErrorResolution, validation_error_id, user)
