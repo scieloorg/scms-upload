@@ -20,6 +20,7 @@
                     <thead>
                         <tr>
                             <th>{% trans 'Category' %}</th>
+                            <th>{% trans 'Status' %}</th>
                             <th>{% trans 'Message' %}</th>
                             <th>{% trans 'Data' %}</th>
                         </tr>
@@ -28,8 +29,9 @@
                         {% for v in content_errors %}
                             <tr>
                                 <td class='title'><h2>{{ v.category }}</h2></td>
-                                <td>{{ v.message }}</td>
-                                <td><pre>{{ v.data }}</pre></td>
+                                <td>{{ v.status }}</td>
+                                <td>{{ v.message|default_if_none:'' }}</td>
+                                <td><pre>{{ v.data|default_if_none:'' }}</pre></td>
                             </tr>
                         {% endfor %}
                     </tbody>
