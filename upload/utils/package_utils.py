@@ -38,14 +38,14 @@ def optimise_package(source, target):
     )
 
 
-def get_article_assets_from_zipped_xml(path):
-    xmlstr = get_xml_content_from_zip(path)
+def get_article_assets_from_zipped_xml(path, xml_path=None):
+    xmlstr = get_xml_content_from_zip(path, xml_path)
     xmltree = get_etree_from_xml_content(xmlstr)
     return ArticleAssets(xmltree).article_assets
 
 
-def get_article_renditions_from_zipped_xml(path):
-    xmlstr = get_xml_content_from_zip(path)
+def get_article_renditions_from_zipped_xml(path, xml_path=None):
+    xmlstr = get_xml_content_from_zip(path, xml_path)
     xmltree = get_etree_from_xml_content(xmlstr)
     return ArticleRenditions(xmltree).article_renditions
 
