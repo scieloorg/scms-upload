@@ -220,6 +220,7 @@ class ValidationResultAdmin(ModelAdmin):
         'package',
         'category',
         'message',
+        'data',
         'status',
     }
 
