@@ -83,9 +83,8 @@ def update_package_check_finish(package_id):
 def update_package_check_errors(package_id):
     package = get_object_or_404(Package, pk=package_id)
 
-    for vr in package.validationresult_set.all():
-        action = vr.resolution.action
-        if action in (choices.ER_ACTION_TO_FIX, ''):
+    for vr in package.validationresult_set.filter(status=choices.VS_DISAPPROVED):
+        if vr.resolution.action in (choices.ER_ACTION_TO_FIX, ''):
             package.status = choices.PS_PENDING_CORRECTION    
             package.save()
 
@@ -100,7 +99,7 @@ def update_package_check_errors(package_id):
 def update_package_check_opinions(package_id):
     package = get_object_or_404(Package, pk=package_id)
 
-    for vr in package.validationresult_set.all():
+    for vr in package.validationresult_set.filter(status=choices.VS_DISAPPROVED):
         opinion = vr.analysis.opinion
         if opinion in (choices.ER_OPINION_FIX_DEMANDED, ''):
             package.status = choices.PS_PENDING_CORRECTION
@@ -161,7 +160,7 @@ def compute_package_validation_result_error_resolution_stats(package_id):
     def _get_n(value, validation_result_error_resolution_list):
         return len([o for o in validation_result_error_resolution_list if o.action == value])
 
-    vr_list = [ve.resolution for ve in obj.validationresult_set.all()]
+    vr_list = [ve.resolution for ve in obj.validationresult_set.filter(status=choices.VS_DISAPPROVED)]
     den = len(vr_list)
 
     disagree_num = _get_n(choices.ER_ACTION_DISAGREE, vr_list)
