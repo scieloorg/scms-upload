@@ -32,8 +32,8 @@ from . import choices, controller, exceptions, models
 def run_validations(filename, package_id, package_category, article_id=None, issue_id=None):
     file_path = file_utils.get_file_absolute_path(filename)
 
-    xml_format_is_valid = task_validate_xml_format(file_path, package_id)
-
+    # Obtém lista de paths de arquivos XML disponíveis no pacote
+    xml_files = sps_file_utils.get_files_list_filtered(file_path, ['.xml'])
     if xml_format_is_valid:
         optimised_filepath = task_optimise_package(file_path)
 
