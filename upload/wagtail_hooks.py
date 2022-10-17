@@ -120,7 +120,14 @@ class PackageAdminInspectView(InspectView):
                     data['validation_results']['qa'] = self.instance.status
 
             if vr_name == choices.VR_XML_OR_DTD:
-                data['validation_results'][vr_name].update({'uri': ValidationResultAdmin().url_helper.get_action_url('inspect', vr.id)})
+                if 'xmls' not in data['validation_results'][vr_name]:
+                    data['validation_results'][vr_name]['xmls'] = []
+
+                if vr.data and isinstance(vr.data, dict):
+                    data['validation_results'][vr_name]['xmls'].append({
+                        'xml_path': vr.data.get('xml_path'),
+                        'uri': ValidationResultAdmin().url_helper.get_action_url('inspect', vr.id)
+                    })
 
         return super().get_context_data(**data)
 

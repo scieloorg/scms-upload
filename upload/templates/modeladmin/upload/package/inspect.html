@@ -51,7 +51,13 @@
                                 <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
                             {% endif %}
                         </td>
-                        <td><a href="{{ validation_results.xml_or_dtd.uri }}">{% trans 'See the XML and/or DTD Formation Report.' %}</a></td>
+                        <td>
+                            {% trans 'See the XML and/or DTD Formation Report: ' %}
+                            {% for x in validation_results.xml_or_dtd.xmls %}
+                                <a href="{{ x.uri }}">XML {{ forloop.counter }}</a>
+                                {% if not forloop.last %} | {% endif %}
+                            {% endfor %}
+                        </td>
                     {% endif %}
                 </tr>
 
@@ -146,8 +152,10 @@
 
     <div class="nice-padding">
         <h3>{% trans "Preview" %}</h3>
-        {% for language in languages %}
-            <a class="button is-small" target="_blank" href="{% url 'upload:preview_document' %}?package_id={{ package_id }}&language={{ language }}">{% trans "Preview HTML" %} ({{ language|title }})</a></p>
+        {% for x in validation_results.xml_or_dtd.xmls %}
+            {% for language in languages %}
+                <a class="button is-small" target="_blank" href="{% url 'upload:preview_document' %}?package_id={{ package_id }}&xml_path={{ x.xml_path }}&language={{ language }}">{% trans "Preview HTML " %} {{ forloop.parentloop.counter }} {{ language|title }}</a></p>
+            {% endfor %}
         {% endfor %}
         <a class="button" href="" disabled>{% trans "View XML" %}</a></p>
     </div>

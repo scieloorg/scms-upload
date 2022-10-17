@@ -164,14 +164,14 @@ def get_languages(zip_filename, use_optimised_package=True):
         return []
 
 
-def render_html(zip_filename, language, use_optimised_package=True):
+def render_html(zip_filename, xml_path, language, use_optimised_package=True):
     path = generate_filepath_with_new_extension(zip_filename, '.optz', True) if use_optimised_package else zip_filename
 
     dir_optz = get_file_url(
         dirname='',
         filename=get_filename_from_filepath(path)
     )
-    xmlstr = get_xml_content_from_zip(path)
+    xmlstr = get_xml_content_from_zip(path, xml_path)
     xmltree_strio = get_xml_strio_for_preview(xmlstr, dir_optz)
 
     html = HTMLGenerator.parse(

@@ -112,8 +112,9 @@ def preview_document(request):
     if package_id:
         package = get_object_or_404(Package, pk=package_id)
         language = request.GET.get('language')
+        xml_path = request.GET.get('xml_path')
 
-        document_html = render_html(package.file.name, language)
+        document_html = render_html(package.file.name, xml_path, language)
 
         for vr in package.validationresult_set.all():
             if vr.report_name() == choices.VR_XML_OR_DTD and vr.status == choices.VS_DISAPPROVED:
