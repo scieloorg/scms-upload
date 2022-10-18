@@ -1,5 +1,7 @@
+from django.utils.translation import gettext as _
+
 TYPE = [
-    ('DATABASE', 'DATABASE'),
-    ('DIRECTORY', 'DIRECTORY'),
-    ('OTHER', 'OTHER')
+    ('DATABASE', _('DATABASE')),
+    ('DIRECTORY', _('DIRECTORY')),
+    ('OTHER', _('OTHER'))
 ]

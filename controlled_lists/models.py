@@ -10,9 +10,9 @@ from . import choices
 class IndexedAt(models.Model):
     name = models.CharField(_("Name"), max_length=255, null=True, blank=False)
     acronym = models.CharField(_("Acronym"), max_length=255, null=True, blank=False)
-    url = models.CharField(_("URL"), max_length=255, null=True, blank=False)
+    url = models.URLField(_("URL"), max_length=255, null=True, blank=False)
     description = models.CharField(_("Description"), max_length=255, null=True, blank=False)
-    type = models.CharField(_('Type'), max_length=20, choices=choices.TYPE, null=True, blank=False)
+    type = models.CharField(_("Type"), max_length=20, choices=choices.TYPE, null=True, blank=False)
 
     panels = [
         FieldPanel('name'),

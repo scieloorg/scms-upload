@@ -69,7 +69,7 @@ def import_file(request):
                 ed = IndexedAt()
                 ed.name = row['Name']
                 ed.acronym = row['Acronym']
-                ed.URL = row['URL']
+                ed.url = row['URL']
                 ed.description = row['Description']
                 ed.type = row['Type']
                 ed.save()
