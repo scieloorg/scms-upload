@@ -52,16 +52,16 @@ services:
     env_file:
       - ./.envs/.local/.postgres
 
-  mongo:
-    image: mongo
-    container_name: core_local_mongo
-    restart: always
-    user: mongodb
-    hostname: mongo
-    volumes:
-      - ../scms_data/mongo:/data/db
-    ports:
-        - "27017:27017"
+  # mongo:
+  #   image: mongo
+  #   container_name: core_local_mongo
+  #   restart: always
+  #   user: mongodb
+  #   hostname: mongo
+  #   volumes:
+  #     - ../scms_data/mongo:/data/db
+  #   ports:
+  #       - "27017:27017"
 
   adminer:
     image: adminer
@@ -69,21 +69,21 @@ services:
     ports:
         - "8080:8080"
 
-  docs:
-    image: core_local_docs
-    container_name: core_local_docs
-    build:
-      context: .
-      dockerfile: ./compose/local/docs/Dockerfile
-    env_file:
-      - ./.envs/.local/.django
-    volumes:
-      - ./docs:/docs:z
-      - ./config:/app/config:z
-      - ./core:/app/core:z
-    ports:
-      - "9000:9000"
-    command: /start-docs
+  # docs:
+  #   image: core_local_docs
+  #   container_name: core_local_docs
+  #   build:
+  #     context: .
+  #     dockerfile: ./compose/local/docs/Dockerfile
+  #   env_file:
+  #     - ./.envs/.local/.django
+  #   volumes:
+  #     - ./docs:/docs:z
+  #     - ./config:/app/config:z
+  #     - ./core:/app/core:z
+  #   ports:
+  #     - "9000:9000"
+  #   command: /start-docs
 
   mailhog:
     image: mailhog/mailhog:v1.0.0
@@ -94,6 +94,8 @@ services:
   redis:
     image: redis:6
     container_name: core_local_redis
+    ports:
+      - "6379:6379"
 
   celeryworker:
     <<: *django
@@ -117,10 +119,10 @@ services:
     ports: []
     command: /start-celerybeat
 
-  flower:
-    <<: *django
-    image: core_local_flower
-    container_name: core_local_flower
-    ports:
-      - "5555:5555"
-    command: /start-flower
+  # flower:
+  #   <<: *django
+  #   image: core_local_flower
+  #   container_name: core_local_flower
+  #   ports:
+  #     - "5555:5555"
+  #   command: /start-flower

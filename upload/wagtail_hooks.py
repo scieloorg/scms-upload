@@ -1,11 +1,16 @@
+from django.contrib import messages
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
 
+from config.menu import get_menu_order
+
 from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
+
+from article.models import Article
 
 from .button_helper import UploadButtonHelper
 from .models import choices, Package, QAPackage, ValidationError
@@ -14,11 +19,47 @@ from .tasks import run_validations
 from .utils import package_utils
 
 
-class UploadPackageCreateView(CreateView):
+class PackageCreateView(CreateView):
+    def get_instance(self):
+        package_obj = super().get_instance()
+
+        pkg_category = self.request.GET.get('package_category')
+        if pkg_category:
+            package_obj.category = pkg_category
+
+        article_id = self.request.GET.get('article_id')
+        if article_id:
+            try:
+                article = Article.objects.get(pk=article_id)
+                package_obj.article_id = article
+            except Article.DoesNotExist:
+                ...
+
+        return package_obj
+
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
 
-        run_validations(self.object.file.name, self.object.id)
+        article_id = self.request.POST['article']
+        journal_id = self.request.POST['journal']
+        run_validations(
+            self.object.file.name, 
+            self.object.id, 
+            self.object.category, 
+            article_id, 
+            journal_id,
+        )
+
+        if self.object.category in (choices.PC_CORRECTION, choices.PC_ERRATUM):
+            messages.success(
+                self.request,
+                _('Package to change article has been successfully submitted.')
+            )
+        elif self.object.category == choices.PC_NEW_DOCUMENT:
+            messages.success(
+                self.request,
+                _('Package to create article has been successfully submitted.')
+            )
                 
         return HttpResponseRedirect(self.get_success_url())
 
@@ -29,13 +70,12 @@ class PackageAdminInspectView(InspectView):
             'validation_errors': {},
             'package_id': self.instance.id,
             'status': self.instance.status,
+            'category': self.instance.category,
             'languages': package_utils.get_languages(self.instance.file.name),
-            'package_download_link': self.instance.file.url,
         }
 
         for ve in self.instance.validationerror_set.all():
-            vek = ve.get_standardized_category_label()
-
+            vek = ve.report_name()
             if vek not in data:
                 data['validation_errors'][vek] = []
 
@@ -43,11 +83,6 @@ class PackageAdminInspectView(InspectView):
                 'id': ve.id, 
                 'inspect_url': ValidationErrorAdmin().url_helper.get_action_url('inspect', ve.id)
             })
-
-        if data['status'] in (choices.PS_REQUIRED_UPDATE, choices.PS_REQUIRED_ERRATUM):
-            data['requested_changes'] = []
-            for rac in self.instance.article.requestarticlechange_set.all():
-                data['requested_changes'].append(rac)
 
         return super().get_context_data(**data)
 
@@ -66,7 +101,7 @@ class PackageAdmin(ModelAdmin):
     model = Package
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
-    create_view_class = UploadPackageCreateView
+    create_view_class = PackageCreateView
     inspect_view_enabled=True
     inspect_view_class = PackageAdminInspectView
     menu_label = _('Packages')
@@ -77,6 +112,8 @@ class PackageAdmin(ModelAdmin):
 
     list_display = (
         'article',
+        'journal',
+        'category',
         'file',
         'status',
         'creator',
@@ -85,16 +122,20 @@ class PackageAdmin(ModelAdmin):
         'updated_by',
     )
     list_filter = (
+        'category',
         'status',
     )
     search_fields = (
         'file',
+        'journal__title',
         'article__pid_v3',
         'creator__username',
         'updated_by__username',
     )
     inspect_view_fields = (
         'article',
+        'journal',
+        'category',
         'status',
         'file', 
         'created', 
@@ -207,13 +248,14 @@ class ValidationErrorAdmin(ModelAdmin):
     }
 
 
-class UploadModelAdmin(ModelAdminGroup):
+class UploadModelAdminGroup(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Upload'
     items = (PackageAdmin, QualityAnalystPackageAdmin, ValidationErrorAdmin)
+    menu_order = get_menu_order('upload')
 
 
-modeladmin_register(UploadModelAdmin)
+modeladmin_register(UploadModelAdminGroup)
 
 
 @hooks.register('register_admin_urls')

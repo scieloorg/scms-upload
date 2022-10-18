@@ -39,6 +39,9 @@ wagtailmenus==3.0.2
 # ------------------------------------------------------------------------------
 wagtail-localize==1.2.1
 
+# Django celery results
+# ------------------------------------------------------------------------------
+django_celery_results==2.4.0
 
 # DSM Minio
 # ------------------------------------------------------------------------------
@@ -47,7 +50,8 @@ minio==7.1.0
 # Upload
 # ------------------------------------------------------------------------------
 lxml==4.9.1 # https://github.com/lxml/lxml
--e git+https://github.com/scieloorg/packtools@2.11.2#egg=packtools
+-e git+https://github.com/scieloorg/packtools@2.14#egg=packtools
+-e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
 
 # DSM Publication
 # ------------------------------------------------------------------------------
@@ -57,3 +61,8 @@ pymongo==3.12.0
 tenacity==8.0.1
 aiohttp==3.8.1
 python-magic==0.4.27
+
+# DSM Migration
+# ------------------------------------------------------------------------------
+-e git+https://github.com/scieloorg/scielo_migration.git@0.1.6#egg=scielo_classic_website
+python-dateutil==2.8.2

@@ -1,0 +1,69 @@
+{% extends "modeladmin/inspect.html" %}
+{% load i18n modeladmin_tags wagtailadmin_tags wagtailcore_tags %}
+
+{% block fields_output %}
+    {% if fields %}
+        <h3>{% trans "Details" %}</h3>
+        <dl>
+            {% for field in fields %}
+                <dt class="{{ field.type|lower }}">{{ field.label }}</dt>
+                <dd>{{ field.value }}</dd>
+            {% endfor %}
+        </dl>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {{ block.super }}
+    
+    <div class="nice-padding">
+        {% if status == 'required-erratum' or status == 'required-correction' %}
+            <h3>{% trans "Article change instructions" %}</h3>
+            {% for rac in requested_changes %}
+                <dl class='help-block help-info'>
+                    <dt>{% trans 'Identifier' %}</dt>
+                    <dd>{{ rac.id }}</dd>
+                    <dt>{% trans 'Type' %}</dt>
+                    <dd>{{ rac.get_change_type_display }}</dd>
+                    <dt>{% trans 'Deadline' %}</dt>
+                    <dd>{{ rac.deadline }}</dd>
+                    <dt>{% trans 'Instructions' %}</dt>
+                    <dd>{{ rac.comment|richtext }}</dd>
+                </dl>
+            {% endfor %}
+        {% endif %}
+
+        <h3>{% trans 'Available packages' %}</h3>
+        <table class="listing">
+            <thead>
+                <tr>
+                    <th>{% trans 'Creator' %}</th>
+                    <th>{% trans 'Created' %}</th>
+                    <th>{% trans 'Status' %}</th>
+                    <th>{% trans 'Category' %}</th>
+                    <th>{% trans 'Link' %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pkg in packages %}
+                    <tr>
+                        <td>{{ pkg.creator }}</td>
+                        <td>{{ pkg.created }}</td>
+                        <td>{{ pkg.category }}</td>
+                        <td>{{ pkg.get_status_display }}</td>
+                        <td>
+                            <a href="/media/{{ pkg.file.name }}" class="button bicolor button--icon">
+                                <span class="icon-wrapper">
+                                    <svg class="icon icon-download-alt icon" aria-hidden="true" focusable="false">
+                                        <use href="#icon-download-alt"></use>
+                                    </svg>
+                                </span>{% trans 'Download package' %}
+                            </a>
+                        </td>
+                    </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+{% endblock %}

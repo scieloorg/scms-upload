@@ -2,6 +2,9 @@ from django.utils.translation import gettext as _
 
 from wagtail.contrib.modeladmin.helpers import ButtonHelper
 
+from upload.choices import PC_CORRECTION, PC_ERRATUM
+
+from .choices import AS_REQUIRE_CORRECTION, AS_REQUIRE_ERRATUM
 
 class ArticleButtonHelper(ButtonHelper):
     index_button_classnames = ["button", "button-small", "button-secondary"]
@@ -10,6 +13,21 @@ class ArticleButtonHelper(ButtonHelper):
         text = _("Request change")
         return {
             "url": "/admin/article/requestarticlechange/create/?article_id=%s" % obj.id,
+            "label": text,
+            "classname": self.finalise_classname(classnames),
+            "title": text,
+        }
+
+    def submit_change(self, obj, classnames):
+        text = _("Submit change")
+
+        if obj.status == AS_REQUIRE_CORRECTION:
+            package_category = PC_CORRECTION
+        elif obj.status == AS_REQUIRE_ERRATUM:
+            package_category = PC_ERRATUM
+
+        return {
+            "url": "/admin/upload/package/create/?article_id=%s&package_category=%s" % (obj.id, package_category),
             "label": text,
             "classname": self.finalise_classname(classnames),
             "title": text,
@@ -32,13 +50,15 @@ class ArticleButtonHelper(ButtonHelper):
         url_name = self.request.resolver_match.url_name
 
         classnames = []
-        if ph.user_can_request_article_change(usr, obj):
-            if url_name == 'article_article_modeladmin_inspect':
-                classnames.extend(ButtonHelper.inspect_button_classnames)
+        if url_name == 'article_article_modeladmin_inspect':
+            classnames.extend(ButtonHelper.inspect_button_classnames)
+        if url_name == 'article_article_modeladmin_index':
+            classnames.extend(ArticleButtonHelper.index_button_classnames)
 
-            if url_name == 'article_article_modeladmin_index':
-                classnames.extend(ArticleButtonHelper.index_button_classnames)
-
+        if ph.user_can_request_article_change(usr, obj) and obj.status not in (AS_REQUIRE_CORRECTION, AS_REQUIRE_ERRATUM):
             btns.append(self.request_change(obj, classnames))
+
+        if ph.user_can_make_article_change(usr, obj) and obj.status in (AS_REQUIRE_ERRATUM, AS_REQUIRE_CORRECTION):
+            btns.append(self.submit_change(obj, classnames))
 
         return btns

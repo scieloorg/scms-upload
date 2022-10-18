@@ -34,9 +34,10 @@ class RelatedItemForm(WagtailAdminModelForm):
 
 class RequestArticleChangeForm(WagtailAdminModelForm):
 
-    def save_all(self, user):
+    def save_all(self, user, article):
         request_article_change = super().save(commit=False)
         request_article_change.creator = user
+        request_article_change.article = article
 
         self.save()
 

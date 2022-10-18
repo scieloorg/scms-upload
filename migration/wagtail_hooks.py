@@ -2,33 +2,22 @@ from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
 
+from config.menu import get_menu_order
 from wagtail.core import hooks
-from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
-from wagtail.contrib.modeladmin.views import InspectView
+from wagtail.contrib.modeladmin.views import CreateView
+from wagtail.contrib.modeladmin.options import (
+    ModelAdmin,
+    ModelAdminGroup,
+    modeladmin_register,
+)
 
-from .button_helper import MigrationFailureButtonHelper
-from .models import MigrationFailure
-from .permission_helper import MigrationFailurePermissionHelper
-
-
-class MigrationFailureAdminInspectView(InspectView):
-    def get_context_data(self):
-        try:
-            data = self.instance.data.copy()
-        except AttributeError:
-            data = {}
-
-        return super().get_context_data(**data)
+from . import models
 
 
 class MigrationFailureAdmin(ModelAdmin):
-    model = MigrationFailure
-    button_helper_class = MigrationFailureButtonHelper
-    permission_helper_class = MigrationFailurePermissionHelper
-    # create_view_class = MigrationFailureCreateView
+    model = models.MigrationFailure
     inspect_view_enabled = True
-    inspect_view_class = MigrationFailureAdminInspectView
-    menu_label = _('MigrationFailures')
+    menu_label = _('Migration Failures')
     menu_icon = 'folder'
     menu_order = 200
     add_to_settings_menu = False
@@ -39,6 +28,7 @@ class MigrationFailureAdmin(ModelAdmin):
         'object_name',
         'pid',
         'exception_type',
+        'updated',
     )
     list_filter = (
         'action_name',
@@ -50,6 +40,7 @@ class MigrationFailureAdmin(ModelAdmin):
         'object_name',
         'pid',
         'exception_type',
+        'exception_msg',
     )
     inspect_view_fields = (
         'action_name',
@@ -57,20 +48,153 @@ class MigrationFailureAdmin(ModelAdmin):
         'pid',
         'exception_type',
         'exception_msg',
+        'traceback',
+        'updated',
     )
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
 
-        if self.permission_helper.user_can_access_all_migration_failures(request.user, None):
-            return qs
-        return qs.filter(creator=request.user)
+class CoreCreateView(CreateView):
+
+    def form_valid(self, form):
+        self.object = form.save_all(self.request.user)
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class MigrationConfigurationModelAdmin(ModelAdmin):
+    model = models.MigrationConfiguration
+    menu_label = _('Migration Configuration')
+    menu_icon = 'doc-full'
+    menu_order = 100
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+    inspect_view_enabled = False
+
+    create_view_class = CoreCreateView
+
+    list_display = (
+        'classic_website_config',
+        'created',
+        'updated',
+        'updated_by',
+    )
+    list_filter = (
+        'classic_website_config__collection__acron',
+    )
+    search_fields = (
+        'classic_website_config__collection__acron',
+    )
+
+
+class JournalMigrationModelAdmin(ModelAdmin):
+    model = models.JournalMigration
+    menu_label = _('Journal Migration')
+    menu_icon = 'doc-full'
+    menu_order = 300
+    add_to_settings_menu = False
+    exclude_from_explorer = True
+    inspect_view_enabled = True
+
+    list_per_page = 10
+    create_view_class = CoreCreateView
+
+    list_display = (
+        'scielo_journal',
+        'status',
+        'isis_updated_date',
+    )
+    list_filter = (
+        'status',
+    )
+    search_fields = (
+        'scielo_journal__acron',
+    )
+    inspect_view_fields = (
+        'scielo_journal',
+        'status',
+        'isis_updated_date',
+        'data',
+    )
+
+
+class IssueMigrationModelAdmin(ModelAdmin):
+    model = models.IssueMigration
+    menu_label = _('Issue Migration')
+    menu_icon = 'doc-full'
+    menu_order = 300
+    add_to_settings_menu = False
+    exclude_from_explorer = True
+    inspect_view_enabled = True
+
+    list_per_page = 10
+    create_view_class = CoreCreateView
+
+    list_display = (
+        'scielo_issue',
+        'status',
+        'isis_updated_date',
+    )
+    list_filter = (
+        'status',
+    )
+    search_fields = (
+        'scielo_issue__scielo_journal__title',
+        'scielo_issue__scielo_journal__acron',
+        'scielo_issue__publication_date__year',
+        'scielo_issue__issue_folder',
+    )
+    inspect_view_fields = (
+        'scielo_issue',
+        'status',
+        'isis_updated_date',
+        'data',
+    )
+
+
+class DocumentMigrationModelAdmin(ModelAdmin):
+    model = models.DocumentMigration
+    menu_label = _('Document Migration')
+    menu_icon = 'doc-full'
+    menu_order = 300
+    add_to_settings_menu = False
+    exclude_from_explorer = True
+    inspect_view_enabled = True
+
+    list_per_page = 10
+    create_view_class = CoreCreateView
+
+    list_display = (
+        'scielo_document',
+        'status',
+        'isis_updated_date',
+    )
+    list_filter = (
+        'status',
+    )
+    search_fields = (
+        'scielo_document__scielo_issue__scielo_journal__title',
+        'scielo_document__scielo_issue__scielo_journal__acron',
+        'scielo_document__scielo_issue__publication_date__year',
+        'scielo_document__scielo_issue__issue_folder',
+        'scielo_document__pid',
+    )
+    inspect_view_fields = (
+        'scielo_document',
+        'status',
+        'isis_updated_date',
+    )
 
 
 class MigrationModelAdmin(ModelAdminGroup):
     menu_icon = 'folder'
     menu_label = 'Migration'
-    items = (MigrationFailureAdmin, )
+    items = (
+        MigrationConfigurationModelAdmin,
+        MigrationFailureAdmin,
+        JournalMigrationModelAdmin,
+        IssueMigrationModelAdmin,
+        DocumentMigrationModelAdmin,
+    )
+    menu_order = get_menu_order('migration')
 
 
 modeladmin_register(MigrationModelAdmin)

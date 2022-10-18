@@ -24,12 +24,21 @@ class OfficialJournal(CommonControlField):
         return u'%s' % (self.title)
 
     title = models.CharField(_('Official Title'), max_length=256, null=True, blank=True)
-    foundation_year = models.CharField(_('Foundation Year'), max_length=4, null=True, blank=True)
+    foundation_date = models.CharField(_('Foundation Date'), max_length=25, null=True, blank=True)
     ISSN_print = models.CharField(_('ISSN Print'), max_length=9, null=True, blank=True)
-    ISSN_electronic = models.CharField(_('ISSN Eletronic'), max_length=9, null=True, blank=True)
+    ISSN_electronic = models.CharField(_('ISSN Electronic'), max_length=9, null=True, blank=True)
     ISSNL = models.CharField(_('ISSNL'), max_length=9, null=True, blank=True)
 
     base_form_class = OfficialJournalForm
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['title']),
+            models.Index(fields=['foundation_date']),
+            models.Index(fields=['ISSN_print']),
+            models.Index(fields=['ISSN_electronic']),
+            models.Index(fields=['ISSNL']),
+        ]
 
 
 class NonOfficialJournalTitle(ClusterableModel, CommonControlField):

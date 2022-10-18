@@ -1,0 +1,6 @@
+{% load i18n modeladmin_tags wagtailadmin_tags wagtailcore_tags %}
+{% if validation_error_package_file %}
+    <span class='help-block help-info'>{% trans 'This validation has not been performed yet.' %}</span>
+{% else %}
+    <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
+{% endif %}

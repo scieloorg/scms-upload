@@ -1,0 +1,2187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE article PUBLIC "-//NLM//DTD JATS (Z39.96) Journal Publishing DTD v1.1 20151215//EN" "JATS-journalpublishing1.dtd">
+<article article-type="research-article" dtd-version="1.1" specific-use="sps-1.9" xml:lang="en" xmlns:mml="http://www.w3.org/1998/Math/MathML" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<front>
+		<journal-meta>
+			<journal-id journal-id-type="nlm-ta">Rev Saude Publica</journal-id>
+			<journal-id journal-id-type="publisher-id">rsp</journal-id>
+			<journal-title-group>
+				<journal-title>Revista de Saúde Pública</journal-title>
+				<abbrev-journal-title abbrev-type="publisher">Rev. Saúde Pública</abbrev-journal-title>
+			</journal-title-group>
+			<issn pub-type="ppub">0034-8910</issn>
+			<issn pub-type="epub">1518-8787</issn>
+			<publisher>
+				<publisher-name>Faculdade de Saúde Pública da Universidade de São Paulo</publisher-name>
+			</publisher>
+		</journal-meta>
+		<article-meta>
+			<article-id pub-id-type="other">00207</article-id>
+			<article-id pub-id-type="doi">10.11606/s1518-8787.2022056003636</article-id>
+			<article-categories>
+				<subj-group subj-group-type="heading">
+					<subject>Original Article</subject>
+				</subj-group>
+			</article-categories>
+			<title-group>
+				<article-title>Fluoride toothpaste, sanitary surveillance and the SUS: the case of Manaus-AM, Brazil</article-title>
+			</title-group>
+			<contrib-group>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0003-2917-5229</contrib-id>
+					<name>
+						<surname>Ramos</surname>
+						<given-names>Mayara Costa Carneiro</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff1"><sup>I</sup></xref>
+				</contrib>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0002-0099-9868</contrib-id>
+					<name>
+						<surname>Rebelo</surname>
+						<given-names>Maria Augusta Bessa</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff1"><sup>I</sup></xref>
+				</contrib>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0002-7125-9082</contrib-id>
+					<name>
+						<surname>Rebelo Vieira</surname>
+						<given-names>Janete Maria</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff1"><sup>I</sup></xref>
+				</contrib>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0001-5336-1959</contrib-id>
+					<name>
+						<surname>Miranda</surname>
+						<given-names>Luís Fernando Bandeira</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff2"><sup>II</sup></xref>
+				</contrib>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0002-7660-5685</contrib-id>
+					<name>
+						<surname>Tabchoury</surname>
+						<given-names>Cinthia Pereira Machado</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff2"><sup>II</sup></xref>
+				</contrib>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0003-1046-5605</contrib-id>
+					<name>
+						<surname>Cury</surname>
+						<given-names>Jaime Aparecido</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff2"><sup>II</sup></xref>
+				</contrib>
+			</contrib-group>
+			<aff id="aff1">
+				<label>I</label>
+				<institution content-type="orgname">Universidade Federal do Amazonas</institution>
+				<institution content-type="orgdiv1">Faculdade de Odontologia</institution>
+				<institution content-type="orgdiv2">Programa de Pós-Graduação em Odontologia</institution>
+				<addr-line>
+					<named-content content-type="city">Manaus</named-content>
+					<named-content content-type="state">AM</named-content>
+				</addr-line>
+				<country country="BR">Brasil</country>
+				<institution content-type="original">Universidade Federal do Amazonas. Faculdade de Odontologia. Programa de Pós-Graduação em Odontologia. Manaus, AM, Brasil</institution>
+			</aff>
+			<aff id="aff2">
+				<label>II</label>
+				<institution content-type="orgname">Universidade Estadual de Campinas</institution>
+				<institution content-type="orgdiv1">Faculdade de Odontologia de Piracicaba</institution>
+				<institution content-type="orgdiv2">Departamento de Biociências</institution>
+				<addr-line>
+					<named-content content-type="city">Piracicaba</named-content>
+					<named-content content-type="state">SP</named-content>
+				</addr-line>
+				<country country="BR">Brasil</country>
+				<institution content-type="original">Universidade Estadual de Campinas. Faculdade de Odontologia de Piracicaba. Departamento de Biociências. Piracicaba, SP, Brasil</institution>
+			</aff>
+			<author-notes>
+				<corresp id="c01"> Correspondence: Maria Augusta Bessa Rebelo Avenida Ministro Waldemar Pedrosa, 1.539 69.025-005 Manaus, AM, Brasil E-mail: <email>augusta@ufam.edu.br</email>
+				</corresp>
+				<fn fn-type="con">
+					<p><bold>Authors’ Contribution:</bold> Study design and planning: JAC, MABR, JMRV. Data collection, analysis and interpretation: MCCR, LFBM, JAC. Writing or review of manuscript: MCCR, MABR, JMRV, LFBM, CPMT, JAC. Approval of the final version: MCCR, MABR, JMRV, LFBM, CPMT, JAC. Public responsibility for the content of the article: MABR.</p>
+				</fn>
+				<fn fn-type="conflict">
+					<p><bold>Conflict of Interest:</bold> The authors declare no conflict of interest.</p>
+				</fn>
+			</author-notes>
+			<pub-date date-type="pub" publication-format="electronic">
+				<day>21</day>
+				<month>03</month>
+				<year>2022</year>
+			</pub-date>
+			<pub-date date-type="collection" publication-format="electronic">
+				<year>2022</year>
+			</pub-date>
+			<volume>56</volume>
+			<elocation-id>9</elocation-id>
+			<history>
+				<date date-type="received">
+					<day>2</day>
+					<month>03</month>
+					<year>2021</year>
+				</date>
+				<date date-type="accepted">
+					<day>28</day>
+					<month>04</month>
+					<year>2021</year>
+				</date>
+			</history>
+			<permissions>
+				<license license-type="open-access" xlink:href="https://creativecommons.org/licenses/by/4.0/" xml:lang="en">
+					<license-p> This is an Open Access article distributed under the terms of the Creative Commons Attribution License, which permits unrestricted use, distribution, and reproduction in any medium, provided the original work is properly cited. </license-p>
+				</license>
+			</permissions>
+			<abstract>
+				<title>ABSTRACT</title>
+				<sec>
+					<title>OBJECTIVE</title>
+					<p> To determine the anticaries potential of toothpastes distributed by the primary health care public clinics (UBS) of Manaus, AM.</p>
+				</sec>
+				<sec>
+					<title>METHODS</title>
+					<p> Ninety-nine tubes of toothpaste from four commercial brands were collected from October 7, 2019 to October 11, 2019 in 16 UBS. They were assigned a code by brand and source UBS. According to the information on the packaging, the four brands and their batches were formulated with sodium monofluorophosphate (Na<sub>2</sub>FPO<sub>3</sub>) and most (91%) had calcium carbonate (CaCO<sub>3</sub>) as an abrasive. We determined the concentrations of total fluoride (TF = TSF + InsF) and total soluble fluoride (TSF = F ions<sup>-</sup> or FPO<sub>3</sub><sup>2-</sup>), to certify whether they were in compliance with resolution ANVISA RDC No. 530 (maximum of 1,500 ppm TF) and whether they had anticaries potential (minimum of 1,000 ppm TSF). The analyses were performed with a ion- specific electrode.</p>
+				</sec>
+				<sec>
+					<title>RESULTS</title>
+					<p> The concentrations (ppm F) of TF [mean; standard deviation (SD); n] found in toothpaste brands A (1,502.3; SD = 45.6; n = 33), B (1,135.5; SD = 52.7; n = 48) and D (936.8; SD = 20.5; N = 8) were close to those stated on the package, 1,500, 1,100 and 1,000 ppm F, respectively. In toothpaste C, we found a mean of 274.1 ppm (SD = 219.7; n = 10) of TF, which diverges from the declared concentration of 1,500 ppm F. In addition, the five tubes of lot no. 11681118 of toothpaste C did not contain fluoride. Regarding TSF, with the exception of toothpaste D (937.9; SD = 40.29), the others had a lower concentration than their respective TF.</p>
+				</sec>
+				<sec>
+					<title>CONCLUSION</title>
+					<p> We found serious problems of quantity and quality of fluoride in toothpaste distributed by the SUS in Manaus, which shows the need for surveillance of these products and confirms the urgency of revising resolution RDC No. 530.</p>
+				</sec>
+			</abstract>
+			<kwd-group xml:lang="en">
+				<kwd>Toothpastes, supply &amp; distribution</kwd>
+				<kwd>Dentifrices, chemistry</kwd>
+				<kwd>Fluorides, standards</kwd>
+				<kwd>Dental Caries, prevention &amp; control</kwd>
+				<kwd>Dental Health Services</kwd>
+			</kwd-group>
+			<funding-group>
+				<award-group>
+					<funding-source>Capes</funding-source>
+					<award-id>001</award-id>
+				</award-group>
+				<award-group>
+					<funding-source>Capes</funding-source>
+					<award-id>88881.200487/2018-1</award-id>
+				</award-group>
+				<funding-statement>Funding: Programa Nacional de Cooperação Acadêmica na Amazônia (PROCAD). Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (Capes 001 - Funding code: 88881.200487/2018-1).</funding-statement>
+			</funding-group>
+			<counts>
+				<fig-count count="2"/>
+				<table-count count="8"/>
+				<equation-count count="0"/>
+				<ref-count count="30"/>
+			</counts>
+		</article-meta>
+	</front>
+	<body>
+		<sec sec-type="intro">
+			<title>INTRODUCTION</title>
+			<p>Fluoride toothpaste is recommended for preventing tooth decay because it is associated with its decline, which has been observed both in developed<sup><xref ref-type="bibr" rid="B1">1</xref></sup> and developing countries, such as Brazil<sup><xref ref-type="bibr" rid="B2">2</xref></sup>. Toothpaste is also considered the most rational means of using fluoride because, simultaneously with the disorganization of the dental biofilm by brushing, fluoride is released into the oral cavity to interfere with the development of caries lesions or to repair existing lesions<sup><xref ref-type="bibr" rid="B3">3</xref>,<xref ref-type="bibr" rid="B4">4</xref></sup>. However, it is essential that fluoride be chemically soluble in the formulation<sup><xref ref-type="bibr" rid="B5">5</xref></sup>in order to be bioavailable in the mouth during brushing<sup><xref ref-type="bibr" rid="B6">6</xref></sup>. The effect of fluoride present in toothpaste on reduction of caries is based on evidence<sup><xref ref-type="bibr" rid="B7">7</xref></sup>and the minimum concentration of 1,000 ppm F is still recommended<sup><xref ref-type="bibr" rid="B10">10</xref></sup>. Therefore, there is a need not only for toothpaste to contain fluoride, but also to have a minimum concentration of soluble fluoride so that the population can benefit from caries control<sup><xref ref-type="bibr" rid="B11">11</xref></sup>.</p>
+			<p>In Brazil, 90% of the population uses toothpaste formulated with the combination of calcium carbonate (CaCO<sub>3</sub>) as an abrasive and sodium monofluorophosphate (Na<sub>2</sub>FPO<sub>3</sub>) as a fluoride source salt<sup><xref ref-type="bibr" rid="B2">2</xref>,<xref ref-type="bibr" rid="B12">12</xref></sup>. This type of formulation (CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub>) is relatively stable since the fluoride is bound to the phosphate, therefore it does not immediately react with the Ca<sup>++</sup> in the abrasive. However, due to the storage time, the MFP (FPO<sub>3</sub><sup>2-</sup>) undergoes hydrolysis and the released fluoride ion is insolubilized by the Ca<sup>++</sup> in the abrasive<sup><xref ref-type="bibr" rid="B4">4</xref>,<xref ref-type="bibr" rid="B13">13</xref></sup>. On the other hand, hydrated silica (SiO<sub>2</sub>) is chemically compatible with all fluoride salts (NaF, SnF<sub>2</sub>, AmF, Na<sub>2</sub>FPO<sub>3</sub>) used in toothpaste. However, formulations with CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub> have social impact especially for developing countries<sup><xref ref-type="bibr" rid="B14">14</xref></sup> like Brazil. First, because they cost 2 to 3 times less than formulations with SiO<sub>2</sub>; second, and most importantly, they are widely distributed to underprivileged populations, as is done in Brazil by the Unified Health System (SUS). Thus, bids from small Brazilian manufacturers of toothpaste with CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub> win the tenders for purchases made by city halls<sup><xref ref-type="bibr" rid="B11">11</xref></sup>.</p>
+			<p>The quality of the fluoride in toothpaste brands available in the Brazilian market is regulated by the updated resolution RDC No. 530, of August 4, 2021<sup><xref ref-type="bibr" rid="B15">15</xref></sup> of ANVISA, but like the regulations of the Southern Common Market (Mercosur)<sup><xref ref-type="bibr" rid="B16">16</xref></sup> and the European Union (EU)<sup><xref ref-type="bibr" rid="B17">17</xref></sup>, the resolution only establishes the maximum concentration of total fluoride (TF), which is 0.15% (1,500 ppm F; mg F/kg), but not how much of this fluoride must be soluble in the formulation for anticaries efficacy<sup><xref ref-type="bibr" rid="B18">18</xref></sup>. As a result, in toothpaste brands sold in the Brazilian market<sup><xref ref-type="bibr" rid="B12">12</xref></sup> and distributed by the SUS<sup><xref ref-type="bibr" rid="B11">11</xref></sup>, we found that the concentration of chemically soluble fluoride is much lower than the minimum required for anticaries potential.</p>
+			<p>The Health Department of Manaus, the capital city of Amazonas State, has the task of promoting universal access to health services according to the principles established by the SUS, which includes supplying toothpaste to underprivileged populations. Since the quality of the fluoride in toothpaste consumed by the population of Manaus is not known, the aim of this study was to evaluate whether these toothpaste brands were in compliance with resolution RDC No. 530<sup><xref ref-type="bibr" rid="B15">15</xref></sup> of ANVISA in terms of TF, and whether they also had enough concentration of soluble fluoride to have anticaries potential<sup><xref ref-type="bibr" rid="B19">19</xref></sup>.</p>
+		</sec>
+		<sec sec-type="methods">
+			<title>METHODS</title>
+			<sec>
+				<title>Sampling</title>
+				<p>The toothpaste samples were obtained in primary health care public clinics (UBS) in the city of Manaus AM, Brazil, with the agreement of the Health Department (agreement no. 48/2019). We chose 16 UBS (<xref ref-type="table" rid="t3">Table 3</xref>) which had dental surgeons who are internship preceptors of the School of Dentistry at Universidade Federal do Amazonas. Ninety-nine tubes of fluoride toothpaste were collected, one tube of each batch of toothpaste available at the UBS. The toothpastes were assigned a code by brand and source UBS. The information on the packaging of the toothpaste collected is described in <xref ref-type="table" rid="t1">Table 1</xref>. The toothpaste tubes were collected between October 7, 2019 and October 11, 2019, and chemical analysis was performed between October 18, 2019 and November 7, 2019 in the laboratory of Oral Biochemistry at FOP-Unicamp, as an activity of the PROCAD/Amazon agreement 88881.200487/2018-1.</p>
+				<p>
+					<table-wrap id="t3">
+						<label>Table 3</label>
+						<caption>
+							<title>Concentration (ppm F) of total soluble fluoride (TSF) found in the lots of toothpaste brands distributed at each UBS in Manaus. Amazonas State. range (Min–Max). and anticaries potential. considering the mean concentrations.</title>
+						</caption>
+						<table frame="hsides" rules="groups">
+							<colgroup>
+								<col/>
+								<col/>
+								<col/>
+								<col/>
+							</colgroup>
+							<thead>
+								<tr>
+									<th align="left" rowspan="3">UBS</th>
+									<th colspan="2">TSF (ppm F)</th>
+									<th rowspan="3">Anticaries potential</th>
+								</tr>
+								<tr>
+									<th colspan="2">
+										<hr/>
+									</th>
+								</tr>
+								<tr>
+									<th>Average; SD (n)</th>
+									<th>Min-Max</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td>Ajuricaba</td>
+									<td align="center">536.4; 225.8 (8)</td>
+									<td align="center">335.8–960.9</td>
+									<td align="center">Very low to good</td>
+								</tr>
+								<tr>
+									<td>Arthur Virgílio</td>
+									<td align="center">259.6; 201.0 (3)</td>
+									<td align="center">27.4–378.0</td>
+									<td align="center">Null to very low</td>
+								</tr>
+								<tr>
+									<td>Áugias Gadelha</td>
+									<td align="center">625.8;175.4 (7)</td>
+									<td align="center">323.9–866.0</td>
+									<td align="center">Very low to good</td>
+								</tr>
+								<tr>
+									<td>Avelino Pereira</td>
+									<td align="center">443.9; 162.2 (6)</td>
+									<td align="center">334.4–652.9</td>
+									<td align="center">Very low to low</td>
+								</tr>
+								<tr>
+									<td>Balbina Mestrinho</td>
+									<td align="center">322.3; 205.8 (8)</td>
+									<td align="center">87.4–738.9</td>
+									<td align="center">Null to low</td>
+								</tr>
+								<tr>
+									<td>Fátima de Andrade</td>
+									<td align="center">595.1; 263.7 (5)</td>
+									<td align="center">327.4–950.1</td>
+									<td align="center">Very low to good</td>
+								</tr>
+								<tr>
+									<td>Ivone Lima</td>
+									<td align="center">503.8; 298.9 (9)</td>
+									<td align="center">44.9–956.7</td>
+									<td align="center">Null to good</td>
+								</tr>
+								<tr>
+									<td>Josephina de Melo</td>
+									<td align="center">342.6; 326.0 (3)</td>
+									<td align="center">24.4–675.9</td>
+									<td align="center">Null to low</td>
+								</tr>
+								<tr>
+									<td>Mansour Bulbol</td>
+									<td align="center">506.4;138.8 (12)</td>
+									<td align="center">345.3–677.3</td>
+									<td align="center">Very low to low</td>
+								</tr>
+								<tr>
+									<td>N-53</td>
+									<td align="center">350.1; 16.8 (2)</td>
+									<td align="center">338.2–362.0</td>
+									<td align="center">Very low</td>
+								</tr>
+								<tr>
+									<td>N-58</td>
+									<td align="center">487.3; 179.0 (19)</td>
+									<td align="center">315.0–959.1</td>
+									<td align="center">Very low to good</td>
+								</tr>
+								<tr>
+									<td>O-18</td>
+									<td align="center">432.9; 236.0 (2)</td>
+									<td align="center">266.0–599.8</td>
+									<td align="center">Very low to low</td>
+								</tr>
+								<tr>
+									<td>S-04</td>
+									<td align="center">417.0; 166.5 (6)</td>
+									<td align="center">266.0–640.0</td>
+									<td align="center">Very low to low</td>
+								</tr>
+								<tr>
+									<td>Theodomiro Garrido</td>
+									<td align="center">599.2; 307.0 (4)</td>
+									<td align="center">293.9–967.5</td>
+									<td align="center">Very low to good</td>
+								</tr>
+								<tr>
+									<td>Vicente Palotti</td>
+									<td align="center">185.2; 223.4 (2)</td>
+									<td align="center">27.2–343.2</td>
+									<td align="center">Null to very low</td>
+								</tr>
+								<tr>
+									<td>Vila da Prata</td>
+									<td align="center">549.3; 357.6 (3)</td>
+									<td align="center">340.6–962.2</td>
+									<td align="center">Very low to good</td>
+								</tr>
+							</tbody>
+						</table>
+						<table-wrap-foot>
+							<fn id="TFN3">
+								<p>Min: minimum value; Max: maximum value.</p>
+							</fn>
+						</table-wrap-foot>
+					</table-wrap>
+				</p>
+				<p>
+					<table-wrap id="t1">
+						<label>Table 1</label>
+						<caption>
+							<title>Toothpaste (code), number of tubes/brand, lots and number (n) of tubes collected, fluoride salt, fluoride concentration (ppm F), abrasive, and expiration date stated on packaging.</title>
+						</caption>
+						<table frame="hsides" rules="groups">
+							<colgroup>
+								<col/>
+								<col/>
+								<col/>
+								<col/>
+								<col/>
+								<col/>
+								<col/>
+							</colgroup>
+							<thead>
+								<tr>
+									<th align="left">Toothpastes (Code)</th>
+									<th>Number of tubes/brand</th>
+									<th>Lots (n)</th>
+									<th>Fluoride salt</th>
+									<th>ppm F</th>
+									<th>Abrasive</th>
+									<th>Expiration date</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td rowspan="6">A</td>
+									<td align="center" rowspan="6">33</td>
+									<td align="center">388 (4); 389 (2);</td>
+									<td align="center" rowspan="6">Na<sub>2</sub>FPO<sub>3</sub></td>
+									<td align="center" rowspan="6">1,500</td>
+									<td align="center" rowspan="6">CaCO<sub>3</sub></td>
+									<td align="center" rowspan="6">oct/20 to oct/21</td>
+								</tr>
+								<tr>
+									<td align="center">390 (5); 391 (2);</td>
+								</tr>
+								<tr>
+									<td align="center">392 (3); 393 (2);</td>
+								</tr>
+								<tr>
+									<td align="center">394 (5); 395 (4);</td>
+								</tr>
+								<tr>
+									<td align="center">396(3);397(2);</td>
+								</tr>
+								<tr>
+									<td align="center">398(1)</td>
+								</tr>
+								<tr>
+									<td rowspan="10">B</td>
+									<td align="center" rowspan="10">48</td>
+									<td align="center">99(1); 102(1);</td>
+									<td align="center" rowspan="10">Na<sub>2</sub>FPO<sub>3</sub></td>
+									<td align="center" rowspan="10">1,100</td>
+									<td align="center" rowspan="10">CaCO<sub>3</sub></td>
+									<td align="center" rowspan="10">apr/19 to oct/21</td>
+								</tr>
+								<tr>
+									<td align="center">139(5); 140(4);</td>
+								</tr>
+								<tr>
+									<td align="center">141(6); 142(2);</td>
+								</tr>
+								<tr>
+									<td align="center">143(2); 145(2);</td>
+								</tr>
+								<tr>
+									<td align="center">146(1); 147(4);</td>
+								</tr>
+								<tr>
+									<td align="center">148(4); 149(1);</td>
+								</tr>
+								<tr>
+									<td align="center">150(4); 151(1);</td>
+								</tr>
+								<tr>
+									<td align="center">152(2);153(2);</td>
+								</tr>
+								<tr>
+									<td align="center">154(3); 156(2);</td>
+								</tr>
+								<tr>
+									<td align="center">157(1)</td>
+								</tr>
+								<tr>
+									<td rowspan="2">C</td>
+									<td align="center" rowspan="2">10</td>
+									<td align="center">11681118 (5);</td>
+									<td align="center" rowspan="2">Na<sub>2</sub>FPO<sub>3</sub></td>
+									<td align="center" rowspan="2">1,500</td>
+									<td align="center" rowspan="2">CaCO<sub>3</sub></td>
+									<td align="center">aug/21</td>
+								</tr>
+								<tr>
+									<td align="center">11684118 (5)</td>
+									<td align="center">sept/21</td>
+								</tr>
+								<tr>
+									<td>D</td>
+									<td align="center">8</td>
+									<td align="center">C030(2); D031(6)</td>
+									<td align="center">Na<sub>2</sub>FPO<sub>3</sub></td>
+									<td align="center">1,000</td>
+									<td align="center">Silica</td>
+									<td align="center">Feb. 2021</td>
+								</tr>
+							</tbody>
+						</table>
+						<table-wrap-foot>
+							<fn id="TFN1">
+								<p>Na<sub>2</sub>FPO<sub>3</sub> = sodium monofluorophosphate; CaCO<sub>3</sub> = calcium carbonate.</p>
+							</fn>
+						</table-wrap-foot>
+					</table-wrap>
+				</p>
+			</sec>
+			<sec>
+				<title>Determining Fluoride Concentration</title>
+				<p>Fluoride concentration was measured with a ion-specific electrode through the direct technique, using a validated methodology<sup><xref ref-type="bibr" rid="B20">20</xref>,<xref ref-type="bibr" rid="B21">21</xref></sup>. The concentrations (ppm F = mg F/Kg) of total fluoride (TF = TSF + InsF), total soluble fluoride (TSF = fluoride as FPO<sub>3</sub><sup>2-</sup> + IF) and ionic fluoride (IF) were determined and the concentration of fluoride as an FPO<sub>3</sub><sup>2-</sup> ion (= TSF - IF) and as insoluble fluoride (InsF = TF found - TSF found) were estimated. Summarily, between 90 and 110 mg of toothpaste from each tube were weighed and homogenized in 10 mL of purified water. Duplicates of 0.25 mL of the toothpaste suspension were transferred to tubes marked TF. The remainder of the toothpaste suspension was centrifuged and 0.25 mL duplicates of the supernatant were transferred to tubes marked TSF and IF. We added 0.25 mL of 2 M HCl to the TF and TSF tubes, and after one hour at 45°C, the samples were neutralized with 0.50 mL of 1 M NaOH and buffered with 1.0 mL of TISAB II (1 M acetate buffer, pH 5.0, containing 1 M NaCl and 0.4% CDTA). We added sequentially to the IF tubes 0.50 mL of 1 M NaOH, 1.0 mL of TISAB II and 0.25 mL of 2 M HCl.</p>
+				<p>The analyses were performed with a fluoride ion-specific electrode (Thermo Scientific Orion 96-09, Orion Research, Cambridge, MA, USA) coupled to an ion analyzer (Thermo Scientific Orion Star A214, Orion Research). The electrode was calibrated in triplicate, with standard fluoride solutions of 0.0625 to 4 µg F/mL prepared in 0.25 M HCl, 0.25 M NaOH and TISAB II 50% (v/v). The logarithm data of the fluoride concentrations of the standards and the respective mV values were analyzed by linear regression, using Microsoft Excel software (Microsoft<sup>®</sup>, Redmond, USA). The mean linear regression coefficient obtained was R<sup><xref ref-type="bibr" rid="B2">2</xref></sup> = 0.9998 (n = 14) and the mathematical regression equation was used to estimate the fluoride concentration in each analytical mixture (µg F/mL). The average percentage of the coefficient of variation of duplicates was less than 2.5%. The fluoride concentration in each brand of toothpaste was estimated based on the weight of the toothpaste in the analysis tube and expressed in ppm of F (mg F/Kg).</p>
+			</sec>
+			<sec>
+				<title>Data Analysis</title>
+				<p>The means of the dosage duplicates were calculated and used to estimate the mean and standard deviation of the TF, TSF and InsF concentrations for each brand of toothpaste, using the Microsoft Excel software (Microsoft<sup>®</sup>). We estimated the anticaries potential of the concentration of TSF in the distributed toothpastes<sup><xref ref-type="bibr" rid="B19">19</xref></sup>.</p>
+			</sec>
+		</sec>
+		<sec sec-type="results">
+			<title>RESULTS</title>
+			<p>
+				<xref ref-type="table" rid="t1">Table 1</xref> shows that of the 99 toothpastes collected, 33 tubes (12 lots) were of Brand A, 48 (19 lots) of brand B, 10 (two lots) of brand C and 8 (two lots) of brand D. All were formulated with sodium monofluorophosphate (Na<sub>2</sub>FPO<sub>3</sub>) at concentrations between 1,000 and 1,500 ppm F. With the exception of toothpaste D, which was formulated with SiO<sub>2</sub>, the toothpastes contained CaCO<sub>3</sub> as an abrasive. With the exception of sample lot 099 of brand B, all toothpastes collected were within the specified expiration date. Toothpaste samples C (n = 10) and D (N = 8) were not available at all 16 UBS. The fact that there were only two batches of toothpastes C and D reflected in the results for fluoride concentration of the products distributed by the UBS and districts.</p>
+			<p>The <xref ref-type="fig" rid="f01">figure</xref> shows the fluoride concentrations found in all tubes of each brand of toothpaste distributed at the UBS. With the exception of toothpaste C, the mean concentration (ppm F) (±SD; n) of TF found in brands D (936.8 ± 20.5; 8), A (1,502.3 ± 45.6; 33) and B (1,135.5 ± 52.7; 48) was very close to the manufacturers’ specifications. Regarding the analysis of toothpaste C, besides the concentration of TF being much lower than the 1,500 ppm F specified (274.1 ± 219.7; 10), the SD was extremely high (80% of the mean), reflecting the difference in concentration of the two batches of this product.</p>
+			<p>
+				<fig id="f01">
+					<label>Figure</label>
+					<caption>
+						<title>Concentration (ppm F; mg F/kg) of total fluoride (TF) declared on the package, mean and SD (bars) of the concentrations of TF found, total soluble fluoride (TSF), and insoluble fluoride (insF) in toothpaste brands distributed by the UBS of Manaus, AM.</title>
+					</caption>
+					<graphic xlink:href="1518-8787-rsp-56-9-gf01.tif"/>
+				</fig>
+			</p>
+			<p>As for the values (mean ± SD; n) of TSF found (<xref ref-type="fig" rid="f01">figure</xref> and <xref ref-type="table" rid="t2">Table 2</xref>), only toothpaste D exhibited a concentration (937.9 ± 40.3; 8) close to the TF found; insoluble fluoride (InsF) was not found in this product (<xref ref-type="fig" rid="f01">Figure</xref>). In the other brands, much of the TF found (<xref ref-type="fig" rid="f01">figure</xref>) was not soluble as TSF (FPO<sub>3</sub><sup>2-</sup> + F<sup>-</sup>), with 36, 57 and 70% of InsF in toothpastes C, A and B, respectively. The case of toothpaste C is totally anomalous.</p>
+			<p>
+				<table-wrap id="t2">
+					<label>Table 2</label>
+					<caption>
+						<title>Concentration (ppm F) of total soluble fluoride (TSF) found in the lots of toothpaste brands distributed at the UBS in Manaus. Amazonas State. range (Min–Max). and anticaries potential. considering the mean concentrations.</title>
+					</caption>
+					<table frame="hsides" rules="groups">
+						<colgroup>
+							<col/>
+							<col/>
+							<col/>
+							<col/>
+							<col/>
+						</colgroup>
+						<thead>
+							<tr>
+								<th align="left" rowspan="3">Toothpaste (Code)</th>
+								<th rowspan="3">Lots</th>
+								<th colspan="2">TSF (ppm F)</th>
+								<th rowspan="3">Anticaries potential</th>
+							</tr>
+							<tr>
+								<th colspan="2">
+									<hr/>
+								</th>
+							</tr>
+							<tr>
+								<th>Average; SD (n)</th>
+								<th>Min-Max</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>A</td>
+								<td align="center">All (388 to 398)</td>
+								<td align="center">642.4; 51.3 (33)</td>
+								<td align="center">525.4–777.0</td>
+								<td align="center">Low</td>
+							</tr>
+							<tr>
+								<td>B</td>
+								<td align="center">All (99 to 157)</td>
+								<td align="center">339.9; 50.5 (48)</td>
+								<td align="center">108.9–427.7</td>
+								<td align="center">Very low</td>
+							</tr>
+							<tr>
+								<td rowspan="2">C</td>
+								<td align="center">11681118</td>
+								<td align="center">42.3; 28.4 (5)</td>
+								<td align="center">24.4–87.4</td>
+								<td align="center">Null</td>
+							</tr>
+							<tr>
+								<td align="center">11684118</td>
+								<td align="center">324.1; 18.6 (5)</td>
+								<td align="center">293.0–345.1</td>
+								<td align="center">Very low</td>
+							</tr>
+							<tr>
+								<td>D</td>
+								<td align="center">All (C030 and D031)</td>
+								<td align="center">937.9; 40.3 (8)</td>
+								<td align="center">866.0–967.5</td>
+								<td align="center">Good</td>
+							</tr>
+						</tbody>
+					</table>
+					<table-wrap-foot>
+						<fn id="TFN2">
+							<p>Min: minimum value; Max: maximum value.</p>
+						</fn>
+					</table-wrap-foot>
+				</table-wrap>
+			</p>
+			<p>As for the anticaries potential<sup><xref ref-type="bibr" rid="B19">19</xref></sup> of the toothpaste brands distributed in Manaus, <xref ref-type="table" rid="t2">Table 2</xref> took into account the average TSF concentration of all toothpaste lots of each brand, <xref ref-type="table" rid="t3">Table 3</xref> the average concentration of brands that were being distributed at each UBS, and <xref ref-type="table" rid="t4">Table 4</xref> the location of the UBS according to the health district of Manaus. According to <xref ref-type="table" rid="t2">Table 2</xref>, the toothpaste brands analyzed can be grouped into the following descending order of anticaries potential (Good to Null): D &gt; A &gt; B = C (lot 11684118) &gt; C (lot 11681118).</p>
+			<p>
+				<table-wrap id="t4">
+					<label>Table 4</label>
+					<caption>
+						<title>Concentration (ppm F) of total soluble fluoride (TSF) found in toothpaste brands distributed at the Health Districts of Manaus. Amazonas State. and anticaries potential. considering the interval of concentrations.</title>
+					</caption>
+					<table frame="hsides" rules="groups">
+						<colgroup>
+							<col/>
+							<col/>
+							<col/>
+							<col/>
+						</colgroup>
+						<thead>
+							<tr>
+								<th align="left" rowspan="3">Districts</th>
+								<th colspan="2">TSF (ppm F)</th>
+								<th rowspan="3">Anticaries potential</th>
+							</tr>
+							<tr>
+								<th colspan="2">
+									<hr/>
+								</th>
+							</tr>
+							<tr>
+								<th>Average; SD (n)</th>
+								<th>Min-Max</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>North</td>
+								<td align="center">465.3; 315.3 (44)</td>
+								<td align="center">27.4–959.1</td>
+								<td align="center">Null to good</td>
+							</tr>
+							<tr>
+								<td>South</td>
+								<td align="center">439.1; 253.3 (12)</td>
+								<td align="center">27.2–967.4</td>
+								<td align="center">Null to good</td>
+							</tr>
+							<tr>
+								<td>East</td>
+								<td align="center">457.0; 256.6 (18)</td>
+								<td align="center">24.4–956.7</td>
+								<td align="center">Null to good</td>
+							</tr>
+							<tr>
+								<td>West</td>
+								<td align="center">515.3; 193.8 (25)</td>
+								<td align="center">266.0–962.2</td>
+								<td align="center">Very low to good</td>
+							</tr>
+						</tbody>
+					</table>
+				</table-wrap>
+			</p>
+			<p>
+				<xref ref-type="table" rid="t3">Table 3</xref> shows that no UBS were distributing toothpaste with exclusively good or null anticaries potential, the best result ranging from very low to good in six of the 16 UBS, which was reflected in the assisted populations living in the four health districts of Manaus (<xref ref-type="table" rid="t4">Table 4</xref>). Thus, only the Western District distributed toothpaste with very low to good anticaries potential, while the other districts had toothpastes with null to good potential.</p>
+		</sec>
+		<sec sec-type="discussion">
+			<title>DISCUSSION</title>
+			<p>The WHO has recommended affordable fluoride toothpaste for populations as one of the strategies for reducing tooth decay<sup><xref ref-type="bibr" rid="B14">14</xref></sup> since this disease affects more than 2.5 billion people around the world<sup><xref ref-type="bibr" rid="B22">22</xref></sup>. Toothpaste brands with CaCO<sub>3</sub> as the abrasive has lower cost (2-3x&lt;) than those formulated with SiO<sub>2</sub><sup><xref ref-type="bibr" rid="B3">3</xref>,<xref ref-type="bibr" rid="B14">14</xref></sup>, and there are fluoride toothpastes in the Brazilian market formulated with CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub> of acceptable quality in terms of the concentration of potentially active fluoride against caries<sup><xref ref-type="bibr" rid="B12">12</xref>,<xref ref-type="bibr" rid="B13">13</xref>,<xref ref-type="bibr" rid="B23">23</xref></sup>. Although toothpaste based on CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub> is affordable in Brazil (R$ 0.028/g), 50% of the population would have to work approximately one hour a day just to buy a 90 g tube of toothpaste. Therefore, due to social inequality in Brazil, the Brazilian government runs a preventive action program for SUS users as an action to promote oral health<sup><xref ref-type="bibr" rid="B24">24</xref></sup>. Toothpaste is bought through a public bidding process and the winning firms are usually from local manufacturers of toothpaste based on CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub><sup><xref ref-type="bibr" rid="B11">11</xref></sup>. The quality of this toothpaste in terms of anticaries potential could be guaranteed not only in Brazil, but worldwide, if there were support for government regulations on the sale of toothpaste<sup><xref ref-type="bibr" rid="B18">18</xref></sup>.</p>
+			<p>Our results showed that the total fluoride concentration (TF) found in the toothpaste distributed by the SUS in Manaus (<xref ref-type="fig" rid="f01">Figure</xref>) matches the specifications on the packaging of three of the four brands analyzed (<xref ref-type="table" rid="t1">Table 1</xref>). The exception was toothpaste C, in which we expected to find 1,500 ppm TF (<xref ref-type="table" rid="t1">Table 1</xref>), but the value found was 82% lower. In addition to the low mean value found, of 274.1 ppm TF in this product, another relevant aspect was the high standard deviation from the mean (80%) of the 10 tubes analyzed. This is easily explained by the difference in TF concentration found between the two batches of this brand. While in the 5 tubes of toothpaste C of batch 11684118, we found a mean of 479.6 ppm F TF, in batch 11681118 we only found 68.4 ppm F TF. Thus, the toothpaste of batch 11684118 had an amount of Na<sub>2</sub>FPO<sub>3</sub> three times lower than stated on the packaging, while lot 11684118 did not contain any fluoride at all. The mean value of 68.4 ppm F TF in the tubes of this batch can be attributed to the residual fluoride of the ingredients used in its formulation. Thus, this toothpaste violates Brazilian<sup><xref ref-type="bibr" rid="B15">15</xref></sup> and Mercosur regulations<sup><xref ref-type="bibr" rid="B16">16</xref></sup> since it was not formulated as stated on the labeling. It is also admissible that the supplier of the product for the SUS in Manaus failed to comply with the tender because the standardized specification for such products is that toothpaste must contain fluoride in the concentration of 1,000 to 1,500 ppm F. This blatant aberration of not finding the stated TF concentration in toothpaste is rare in our 40 years evaluating toothpaste worldwide, and it has only been observed in two brands of toothpaste from China, one being sold in Chile<sup><xref ref-type="bibr" rid="B25">25</xref></sup> and the other in Peru<sup><xref ref-type="bibr" rid="B19">19</xref></sup>. On the other hand, the most important aspect in terms of health is how much of the TF in toothpaste is chemically soluble to have anticaries potential<sup><xref ref-type="bibr" rid="B3">3</xref>-<xref ref-type="bibr" rid="B5">5</xref></sup>.</p>
+			<p>Thus, of the four brands of toothpaste analyzed that were being distributed by the SUS in Manaus, only brand D would have a good anticaries potential (<xref ref-type="table" rid="t2">Table 2</xref>) because it exhibited an average of 937.9 ppm F of total soluble fluoride (TSF), very close to the minimum value of 1,000 ppm F necessary for anticaries efficacy<sup><xref ref-type="bibr" rid="B4">4</xref></sup>. In addition, all fluoride in this toothpaste is soluble (<xref ref-type="fig" rid="f01">figure</xref>) since it was formulated with SiO<sub>2</sub>, an abrasive compatible with all fluoride salts, including Na<sub>2</sub>FPO<sub>3</sub>, used in this formulation (<xref ref-type="table" rid="t1">Table 1</xref>). On the other hand, the concentration of TSF found in the other brands of toothpaste was very low. The low concentration of TSF found in brands A, B and C (<xref ref-type="table" rid="t2">Table 2</xref>) is explained not only because they contain CaCO<sub>3</sub> as an abrasive (<xref ref-type="table" rid="t1">Table 1</xref>), since it inactivates fluoride<sup><xref ref-type="bibr" rid="B3">3</xref>,<xref ref-type="bibr" rid="B4">4</xref></sup>, but also by the fact that, with the exception of brand A, these toothpaste brands were formulated with less than 1,500 ppm TF.</p>
+			<p>As 57% of the TF in brand A was insoluble (<xref ref-type="fig" rid="f01">Figure</xref>), 642.3 ppm remained as TSF, which gives it low anticaries potential (<xref ref-type="table" rid="t2">Table 2</xref>). Brand B, on the other hand, in addition to being formulated with 1,100 ppm F TF (<xref ref-type="table" rid="t1">Table 1</xref>), has 70% insoluble fluoride, meaning only 339.9 ppm of TSF, which gives it very low anticaries potential. Compared to product A, the higher percentage of InsF in B can be explained by the fact that their expiration date is close (<xref ref-type="table" rid="t1">Table 1</xref>), including batch 99 toothpaste of Brand B, distributed at UBS Balbina Mestrinho, which had expired (April 2019) six months before collection. In the toothpaste of this batch, of the 1,100 ppm of TF added, only 108.9 ppm were soluble (<xref ref-type="table" rid="t2">Table 2</xref>), that is, 90% of its TF of was insoluble, therefore not exhibiting any anticaries effect. This result of decreased concentration of TSF in toothpaste brands formulated with CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub> according to the time elapsed since manufacture is well known in the literature<sup><xref ref-type="bibr" rid="B13">13</xref></sup>, but the percentage values found in this study were much higher.</p>
+			<p>On the other hand, the case of toothpaste C is totally atypical because the very low average concentration of 42.3 ppm of TSF found in the tubes of lot 11681118 is due to the fact that it has not even been fluoridated, which gives it zero anticaries potential. In toothpastes C of batch 11684118, a mean of 324.1 ppm of TSF was found, since 32% of the 479.7 ppm of the TF found was insoluble, which gives it a very low anticaries potential (<xref ref-type="table" rid="t2">Table 2</xref>).</p>
+			<p>Considering that of the 99 toothpaste tubes analyzed, only the eight of brand D can be considered to have good anticaries potential (<xref ref-type="table" rid="t2">Table 2</xref>), which represents only 8% of the sample, it is very unlikely that any UBS of Manaus was distributing only good quality toothpaste to its users, as the data in <xref ref-type="table" rid="t3">Table 3</xref> show. Thus, if at one end there were people receiving toothpaste with good anticaries potential, in the case of brand D, at the other there were people receiving toothpaste with no protection against caries (Null), as was the case of batch 11681118 of toothpaste C. Similarly, no health district of the city of Manaus had benefited from the quality of fluoride toothpaste distributed, as shown in <xref ref-type="table" rid="t4">Table 4</xref>.</p>
+			<p>This problem of low-quality fluoride toothpaste is not exclusive to Brazil and has been reported in other countries<sup><xref ref-type="bibr" rid="B26">26</xref>,<xref ref-type="bibr" rid="B27">27</xref></sup>. With the exception of the regulations of the US<sup><xref ref-type="bibr" rid="B28">28</xref></sup> and Madagascar<sup><xref ref-type="bibr" rid="B29">29</xref></sup>, most of the world’s regulations<sup><xref ref-type="bibr" rid="B16">16</xref>,<xref ref-type="bibr" rid="B17">17</xref></sup> do not set forth that toothpaste have soluble fluoride for anticaries efficacy, but the FDI has recently signaled that this needs to change<sup><xref ref-type="bibr" rid="B30">30</xref></sup>.</p>
+			<p>Our results corroborate previous publications<sup><xref ref-type="bibr" rid="B11">11</xref>,<xref ref-type="bibr" rid="B18">18</xref></sup>and clearly show the need for a revision of the Brazilian regulation ANVISA RDC No. 530<sup><xref ref-type="bibr" rid="B15">15</xref></sup> to ensure that the population, especially the one assisted by the SUS, receives fluoride toothpaste with a minimum concentration of soluble fluoride with anticaries potential. As Brazil is part of the Mercosur, there may be multilateral interests that need to be agreed between the countries of this common market for changes in legislation. While this does not happen, the alternative would be for SUS managers to draft tender notices with the following terms<sup><xref ref-type="bibr" rid="B11">11</xref></sup>:</p>
+			<list list-type="order">
+				<list-item>
+					<p>Toothpaste must contain no more than 1,500 ppm (mg/kg) of total fluoride (TF);</p>
+				</list-item>
+				<list-item>
+					<p>At least 1,000 ppm of TF must be chemically soluble (TSF) in a fresh (newly manufactured) sample;</p>
+				</list-item>
+				<list-item>
+					<p>Toothpaste must keep at least 800 ppm of chemically soluble fluoride (TSF) for 2 years after manufacture.</p>
+				</list-item>
+			</list>
+			<p>The reason for the maximum amount of 1,500 ppm of TF is product safety for free sale, the requirement of 1,000 ppm of soluble fluoride aims to ensure a minimum anticaries effect, and 800 soluble ppm for 2 years aims to ensure a feasible concentration<sup><xref ref-type="bibr" rid="B13">13</xref></sup> even for small Brazilian toothpaste manufacturers, so as not to sideline them from the competition with multinational companies, considering that they are the ones that win the bids made by the Brazilian Public Health System<sup><xref ref-type="bibr" rid="B11">11</xref></sup>.</p>
+		</sec>
+		<sec sec-type="conclusions">
+			<title>CONCLUSION</title>
+			<p>Considering the serious problems of quantity and quality of fluoride in toothpaste brands distributed by the SUS in Manaus, the main conclusion of this article is that a revision of ANVISA RDC No. 530 and world regulations would ensure that not only Brazilians, but also citizens of other developing countries, no longer run the risk of using fluoride toothpaste that is potentially ineffective in controlling dental caries.</p>
+		</sec>
+	</body>
+	<back>
+		<ack>
+			<title>Acknowledgements</title>
+			<p>To technician at the Laboratory of Oral Biochemistry at FOP-Unicamp, Mr. José Alfredo Silva, for his technical support.</p>
+		</ack>
+		<ref-list>
+			<title>REFERENCES</title>
+			<ref id="B1">
+				<label>1</label>
+				<mixed-citation>1. Bratthall D, Hänsel-Petersson G, Sundberg H. Reasons for the caries decline: what do the experts believe? Eur J Oral Sci. 1996;104(4 Pt 2):416-22. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1111/j.1600-0722.1996.tb00104.x">https://doi.org/10.1111/j.1600-0722.1996.tb00104.x</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Bratthall</surname>
+							<given-names>D</given-names>
+						</name>
+						<name>
+							<surname>Hänsel-Petersson</surname>
+							<given-names>G</given-names>
+						</name>
+						<name>
+							<surname>Sundberg</surname>
+							<given-names>H</given-names>
+						</name>
+					</person-group>
+					<article-title>Reasons for the caries decline: what do the experts believe?</article-title>
+					<source>Eur J Oral Sci</source>
+					<year>1996</year>
+					<volume>104</volume>
+					<issue>4</issue>
+					<comment>Pt 2</comment>
+					<fpage>416</fpage>
+					<lpage>422</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1111/j.1600-0722.1996.tb00104.x">https://doi.org/10.1111/j.1600-0722.1996.tb00104.x</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B2">
+				<label>2</label>
+				<mixed-citation>2. Cury JA, Tenuta LMA, Ribeiro CCC, Paes Leme AF. The importance of fluoride dentifrices to the current dental caries prevalence in Brazil. Braz Dent J. 2004;15(3):167-74. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/s0103-64402004000300001">https://doi.org/10.1590/s0103-64402004000300001</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+						<name>
+							<surname>Tenuta</surname>
+							<given-names>LMA</given-names>
+						</name>
+						<name>
+							<surname>Ribeiro</surname>
+							<given-names>CCC</given-names>
+						</name>
+						<name>
+							<surname>Paes Leme</surname>
+							<given-names>AF</given-names>
+						</name>
+					</person-group>
+					<article-title>The importance of fluoride dentifrices to the current dental caries prevalence in Brazil</article-title>
+					<source>Braz Dent J</source>
+					<year>2004</year>
+					<volume>15</volume>
+					<issue>3</issue>
+					<fpage>167</fpage>
+					<lpage>174</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/s0103-64402004000300001">https://doi.org/10.1590/s0103-64402004000300001</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B3">
+				<label>3</label>
+				<mixed-citation>3. Cury JA, Tenuta LMA. Evidence-based recommendation on toothpaste use. Braz Oral Res. 2014;28 Spec Nº:1-7. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/S1806-83242014.50000001">https://doi.org/10.1590/S1806-83242014.50000001</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+						<name>
+							<surname>Tenuta</surname>
+							<given-names>LMA</given-names>
+						</name>
+					</person-group>
+					<article-title>Evidence-based recommendation on toothpaste use</article-title>
+					<source>Braz Oral Res</source>
+					<year>2014</year>
+					<volume>28</volume>
+					<issue>Spec</issue>
+					<fpage>1</fpage>
+					<lpage>7</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/S1806-83242014.50000001">https://doi.org/10.1590/S1806-83242014.50000001</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B4">
+				<label>4</label>
+				<mixed-citation>4. Tenuta LMA, Cury JA. Laboratory and human studies to estimate anticaries efficacy of fluoride toothpastes. Monogr Oral Sci. 2013;23:108-24. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1159/000350479">https://doi.org/10.1159/000350479</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Tenuta</surname>
+							<given-names>LMA</given-names>
+						</name>
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+					</person-group>
+					<article-title>Laboratory and human studies to estimate anticaries efficacy of fluoride toothpastes</article-title>
+					<source>Monogr Oral Sci</source>
+					<year>2013</year>
+					<volume>23</volume>
+					<fpage>108</fpage>
+					<lpage>124</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1159/000350479">https://doi.org/10.1159/000350479</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B5">
+				<label>5</label>
+				<mixed-citation>5. Stookey GK. Are all fluoride dentifrices the same? In: Wei SH, editor. Clinical uses of fluorides. Philadelphia, PA: Lea &amp; Febiger; 1985. p. 105-31.</mixed-citation>
+				<element-citation publication-type="book">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Stookey</surname>
+							<given-names>GK</given-names>
+						</name>
+					</person-group>
+					<chapter-title>Are all fluoride dentifrices the same?</chapter-title>
+					<person-group person-group-type="editor">
+						<name>
+							<surname>Wei</surname>
+							<given-names>SH</given-names>
+						</name>
+						<role>editor</role>
+					</person-group>
+					<source>Clinical uses of fluorides</source>
+					<publisher-loc>Philadelphia, PA</publisher-loc>
+					<publisher-name>Lea &amp; Febiger</publisher-name>
+					<year>1985</year>
+					<fpage>105</fpage>
+					<lpage>131</lpage>
+				</element-citation>
+			</ref>
+			<ref id="B6">
+				<label>6</label>
+				<mixed-citation>6. Coelho CSS, Cury JA, Tabchoury CPM. Chemically soluble fluoride in Na<sub>2</sub>FPO<sub>3</sub>/CaCO<sub>3</sub>-based toothpaste as an indicator of fluoride bioavailability in saliva during and after toothbrushing. Caries Res. 2020;54(2):185-93. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1159/000506439">https://doi.org/10.1159/000506439</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Coelho</surname>
+							<given-names>CSS</given-names>
+						</name>
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+						<name>
+							<surname>Tabchoury</surname>
+							<given-names>CPM</given-names>
+						</name>
+					</person-group>
+					<article-title>Chemically soluble fluoride in Na<sub>2</sub>FPO<sub>3</sub>/CaCO<sub>3</sub>-based toothpaste as an indicator of fluoride bioavailability in saliva during and after toothbrushing</article-title>
+					<source>Caries Res</source>
+					<year>2020</year>
+					<volume>54</volume>
+					<issue>2</issue>
+					<fpage>185</fpage>
+					<lpage>193</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1159/000506439">https://doi.org/10.1159/000506439</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B7">
+				<label>7</label>
+				<mixed-citation>7. Marinho VC, Higgins JP, Sheiham A, Logan S. Fluoride toothpastes for preventing dental caries in children and adolescents. Cochrane Database Syst Rev. 2003;(1):CD002278. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1002/14651858.CD002278">https://doi.org/10.1002/14651858.CD002278</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Marinho</surname>
+							<given-names>VC</given-names>
+						</name>
+						<name>
+							<surname>Higgins</surname>
+							<given-names>JP</given-names>
+						</name>
+						<name>
+							<surname>Sheiham</surname>
+							<given-names>A</given-names>
+						</name>
+						<name>
+							<surname>Logan</surname>
+							<given-names>S</given-names>
+						</name>
+					</person-group>
+					<article-title>Fluoride toothpastes for preventing dental caries in children and adolescents</article-title>
+					<source>Cochrane Database Syst Rev</source>
+					<year>2003</year>
+					<issue>1</issue>
+					<size units="pages">CD002278</size>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1002/14651858.CD002278">https://doi.org/10.1002/14651858.CD002278</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B8">
+				<label>8</label>
+				<mixed-citation>8. Walsh T, Worthington HV, Glenny AM, Marinho VCC, Jeroncic A. Fluoride toothpastes of different concentrations for preventing dental caries. Cochrane Database Syst Rev. 2019;3(3):CD007868. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1002/14651858.CD007868.pub3">https://doi.org/10.1002/14651858.CD007868.pub3</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Walsh</surname>
+							<given-names>T</given-names>
+						</name>
+						<name>
+							<surname>Worthington</surname>
+							<given-names>HV</given-names>
+						</name>
+						<name>
+							<surname>Glenny</surname>
+							<given-names>AM</given-names>
+						</name>
+						<name>
+							<surname>Marinho</surname>
+							<given-names>VCC</given-names>
+						</name>
+						<name>
+							<surname>Jeroncic</surname>
+							<given-names>A</given-names>
+						</name>
+					</person-group>
+					<article-title>Fluoride toothpastes of different concentrations for preventing dental caries</article-title>
+					<source>Cochrane Database Syst Rev</source>
+					<year>2019</year>
+					<volume>3</volume>
+					<issue>3</issue>
+					<size units="pages">CD007868</size>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1002/14651858.CD007868.pub3">https://doi.org/10.1002/14651858.CD007868.pub3</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B9">
+				<label>9</label>
+				<mixed-citation>9. Santos APP, Nadanovsky P, Oliveira BH. A systematic review and meta-analysis of the effects of fluoride toothpastes on the prevention of dental caries in the primary dentition of preschool children. Community Dent Oral Epidemiol. 2013;41(1):1-12. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1111/j.1600-0528.2012.00708.x">https://doi.org/10.1111/j.1600-0528.2012.00708.x</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Santos</surname>
+							<given-names>APP</given-names>
+						</name>
+						<name>
+							<surname>Nadanovsky</surname>
+							<given-names>P</given-names>
+						</name>
+						<name>
+							<surname>Oliveira</surname>
+							<given-names>BH</given-names>
+						</name>
+					</person-group>
+					<article-title>A systematic review and meta-analysis of the effects of fluoride toothpastes on the prevention of dental caries in the primary dentition of preschool children</article-title>
+					<source>Community Dent Oral Epidemiol</source>
+					<year>2013</year>
+					<volume>41</volume>
+					<issue>1</issue>
+					<fpage>1</fpage>
+					<lpage>12</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1111/j.1600-0528.2012.00708.x">https://doi.org/10.1111/j.1600-0528.2012.00708.x</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B10">
+				<label>10</label>
+				<mixed-citation>10. Splieth CH, Banerjee A, Bottenberg P, Breschi L, Campus G, Ekstrand KR, et al. How to intervene in the caries process in children: A Joint ORCA and EFCD Expert Delphi Consensus Statement. Caries Res. 2020;54(4):297-305. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1159/000507692">https://doi.org/10.1159/000507692</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Splieth</surname>
+							<given-names>CH</given-names>
+						</name>
+						<name>
+							<surname>Banerjee</surname>
+							<given-names>A</given-names>
+						</name>
+						<name>
+							<surname>Bottenberg</surname>
+							<given-names>P</given-names>
+						</name>
+						<name>
+							<surname>Breschi</surname>
+							<given-names>L</given-names>
+						</name>
+						<name>
+							<surname>Campus</surname>
+							<given-names>G</given-names>
+						</name>
+						<name>
+							<surname>Ekstrand</surname>
+							<given-names>KR</given-names>
+						</name>
+						<etal>et al</etal>
+					</person-group>
+					<article-title>How to intervene in the caries process in children: A Joint ORCA and EFCD Expert Delphi Consensus Statement</article-title>
+					<source>Caries Res</source>
+					<year>2020</year>
+					<volume>54</volume>
+					<issue>4</issue>
+					<fpage>297</fpage>
+					<lpage>305</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1159/000507692">https://doi.org/10.1159/000507692</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B11">
+				<label>11</label>
+				<mixed-citation>11. Cury JA, Miranda LFB, Caldarelli PG, Tabchoury CPM. Dentifrícios fluoretados e o SUS-Brasil: o que precisa ser mudado? Tempus Actas Saude Coletiva. 2020;14(1):9-27. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.18569/tempus.v14i1.2631">https://doi.org/10.18569/tempus.v14i1.2631</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+						<name>
+							<surname>Miranda</surname>
+							<given-names>LFB</given-names>
+						</name>
+						<name>
+							<surname>Caldarelli</surname>
+							<given-names>PG</given-names>
+						</name>
+						<name>
+							<surname>Tabchoury</surname>
+							<given-names>CPM</given-names>
+						</name>
+					</person-group>
+					<article-title>Dentifrícios fluoretados e o SUS-Brasil: o que precisa ser mudado?</article-title>
+					<source>Tempus Actas Saude Coletiva</source>
+					<year>2020</year>
+					<volume>14</volume>
+					<issue>1</issue>
+					<fpage>9</fpage>
+					<lpage>27</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.18569/tempus.v14i1.2631">https://doi.org/10.18569/tempus.v14i1.2631</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B12">
+				<label>12</label>
+				<mixed-citation>12. Ricomini Filho AP, Tenuta LMA, Fernandes FSF, Calvo AFB, Kusano SC, Cury JA. Fluoride concentration in the top-selling Brazilian toothpastes purchased at different regions. Braz Dent J. 2012;23(1):45-8. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/s0103-64402012000100008">https://doi.org/10.1590/s0103-64402012000100008</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Ricomini</surname>
+							<given-names>AP</given-names>
+							<suffix>Filho</suffix>
+						</name>
+						<name>
+							<surname>Tenuta</surname>
+							<given-names>LMA</given-names>
+						</name>
+						<name>
+							<surname>Fernandes</surname>
+							<given-names>FSF</given-names>
+						</name>
+						<name>
+							<surname>Calvo</surname>
+							<given-names>AFB</given-names>
+						</name>
+						<name>
+							<surname>Kusano</surname>
+							<given-names>SC</given-names>
+						</name>
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+					</person-group>
+					<article-title>Fluoride concentration in the top-selling Brazilian toothpastes purchased at different regions</article-title>
+					<source>Braz Dent J</source>
+					<year>2012</year>
+					<volume>23</volume>
+					<issue>1</issue>
+					<fpage>45</fpage>
+					<lpage>48</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/s0103-64402012000100008">https://doi.org/10.1590/s0103-64402012000100008</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B13">
+				<label>13</label>
+				<mixed-citation>13. Cury JA, Dantas EDV, Tenuta LMA, Romão DA, Tabchoury CPM, Nóbrega DF, et al. Concentração de fluoreto nos dentifrícios a base de MFP/CaCO<sub>3</sub> mais vendidos no Brasil, ao final dos seus prazos de validade. Rev Assoc Paul Cir Dent. 2015;69(3):248-51.</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+						<name>
+							<surname>Dantas</surname>
+							<given-names>EDV</given-names>
+						</name>
+						<name>
+							<surname>Tenuta</surname>
+							<given-names>LMA</given-names>
+						</name>
+						<name>
+							<surname>Romão</surname>
+							<given-names>DA</given-names>
+						</name>
+						<name>
+							<surname>Tabchoury</surname>
+							<given-names>CPM</given-names>
+						</name>
+						<name>
+							<surname>Nóbrega</surname>
+							<given-names>DF</given-names>
+						</name>
+						<etal>et al</etal>
+					</person-group>
+					<article-title>Concentração de fluoreto nos dentifrícios a base de MFP/CaCO<sub>3</sub> mais vendidos no Brasil, ao final dos seus prazos de validade</article-title>
+					<source>Rev Assoc Paul Cir Dent</source>
+					<year>2015</year>
+					<volume>69</volume>
+					<issue>3</issue>
+					<fpage>248</fpage>
+					<lpage>251</lpage>
+				</element-citation>
+			</ref>
+			<ref id="B14">
+				<label>14</label>
+				<mixed-citation>14. Goldman AS, Yee R, Holmgren CJ, Benzian H. Global affordability of fluoride toothpaste. Global Health. 2008;4:7. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1186/1744-8603-4-7">https://doi.org/10.1186/1744-8603-4-7</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Goldman</surname>
+							<given-names>AS</given-names>
+						</name>
+						<name>
+							<surname>Yee</surname>
+							<given-names>R</given-names>
+						</name>
+						<name>
+							<surname>Holmgren</surname>
+							<given-names>CJ</given-names>
+						</name>
+						<name>
+							<surname>Benzian</surname>
+							<given-names>H</given-names>
+						</name>
+					</person-group>
+					<article-title>Global affordability of fluoride toothpaste</article-title>
+					<source>Global Health</source>
+					<year>2008</year>
+					<volume>4</volume>
+					<size units="pages">7</size>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1186/1744-8603-4-7">https://doi.org/10.1186/1744-8603-4-7</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B15">
+				<label>15</label>
+				<mixed-citation>15. Ministério da Saúde (BR), Agência Nacional de Vigilância Sanitária. RDC Nº 530, de 4 de agosto de 2021. Publicado em: 11/08/2021 | Edição: 151 | Seção: 1 | Página: 119.</mixed-citation>
+				<element-citation publication-type="report">
+					<person-group person-group-type="author">
+						<collab>Ministério da Saúde (BR)</collab>
+						<collab>Agência Nacional de Vigilância Sanitária</collab>
+					</person-group>
+					<source>RDC Nº 530, de 4 de agosto de 2021. Publicado em: 11/08/2021 | Edição: 151 | Seção: 1 | Página: 119</source>
+				</element-citation>
+			</ref>
+			<ref id="B16">
+				<label>16</label>
+				<mixed-citation>16. MERCOSUL. MERCOSUL/GMC/RES Nº 48/02. Regulamento técnico MERCOSUL sobre lista de substâncias que os produtos de higiene pessoal, cosméticos e perfumes não devem conter, exceto nas condições e com as restrições estabelecidas. Brasília (DF): Sistema de Informação do Comércio Exterior; 2002 [cited 2020 Sep 4]. Available from: <ext-link ext-link-type="uri" xlink:href="http://www.sice.oas.org/trade/mrcsrs/resolutions/res4802p.as">http://www.sice.oas.org/trade/mrcsrs/resolutions/res4802p.as</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="report">
+					<person-group person-group-type="author">
+						<collab>MERCOSUL</collab>
+					</person-group>
+					<source>MERCOSUL/GMC/RES Nº 48/02. Regulamento técnico MERCOSUL sobre lista de substâncias que os produtos de higiene pessoal, cosméticos e perfumes não devem conter, exceto nas condições e com as restrições estabelecidas</source>
+					<publisher-loc>Brasília (DF)</publisher-loc>
+					<publisher-name>Sistema de Informação do Comércio Exterior</publisher-name>
+					<year>2002</year>
+					<date-in-citation content-type="cited-date">cited 2020 Sep 4</date-in-citation>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="http://www.sice.oas.org/trade/mrcsrs/resolutions/res4802p.as">http://www.sice.oas.org/trade/mrcsrs/resolutions/res4802p.as</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B17">
+				<label>17</label>
+				<mixed-citation>17. European Union. Statutory Instruments. Consumer Protection: The Cosmetic Products (Safety) Regulations 2008: Nº 1284. London (UK: Stationery Office; 2008 [cited 2020 Sep 4]. Available from: <ext-link ext-link-type="uri" xlink:href="http://www.legislation.gov.uk/uksi/2008/1284/pdfs/uksi_20081284_en.pdf">http://www.legislation.gov.uk/uksi/2008/1284/pdfs/uksi_20081284_en.pdf</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="webpage">
+					<person-group person-group-type="author">
+						<collab>European Union</collab>
+						<collab>Statutory Instruments</collab>
+					</person-group>
+					<source>Consumer Protection: The Cosmetic Products (Safety) Regulations 2008: Nº 1284</source>
+					<publisher-loc>London (UK</publisher-loc>
+					<publisher-name>Stationery Office</publisher-name>
+					<year>2008</year>
+					<date-in-citation content-type="cited-date">cited 2020 Sep 4</date-in-citation>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="http://www.legislation.gov.uk/uksi/2008/1284/pdfs/uksi_20081284_en.pdf">http://www.legislation.gov.uk/uksi/2008/1284/pdfs/uksi_20081284_en.pdf</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B18">
+				<label>18</label>
+				<mixed-citation>18. Cury JA, Caldarelli PG, Tenuta LMA. Necessity to review the Brazilian regulation about fluoride toothpastes. Rev Saude Publica. 2015;49:74. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/S0034-8910.2015049005768">https://doi.org/10.1590/S0034-8910.2015049005768</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+						<name>
+							<surname>Caldarelli</surname>
+							<given-names>PG</given-names>
+						</name>
+						<name>
+							<surname>Tenuta</surname>
+							<given-names>LMA</given-names>
+						</name>
+					</person-group>
+					<article-title>Necessity to review the Brazilian regulation about fluoride toothpastes</article-title>
+					<source>Rev Saude Publica</source>
+					<year>2015</year>
+					<volume>49</volume>
+					<size units="pages">74</size>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/S0034-8910.2015049005768">https://doi.org/10.1590/S0034-8910.2015049005768</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B19">
+				<label>19</label>
+				<mixed-citation>19. Chávez BA, Vergel GB, Cáceres CP, Perazzo MF, Vieira-Andrade RG, Cury JA. Fluoride content in children’s dentifrices marketed in Lima, Peru. Braz Oral Res. 2019;33:e051. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/1807-3107bor-2019.vol33.0051">https://doi.org/10.1590/1807-3107bor-2019.vol33.0051</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Chávez</surname>
+							<given-names>BA</given-names>
+						</name>
+						<name>
+							<surname>Vergel</surname>
+							<given-names>GB</given-names>
+						</name>
+						<name>
+							<surname>Cáceres</surname>
+							<given-names>CP</given-names>
+						</name>
+						<name>
+							<surname>Perazzo</surname>
+							<given-names>MF</given-names>
+						</name>
+						<name>
+							<surname>Vieira-Andrade</surname>
+							<given-names>RG</given-names>
+						</name>
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+					</person-group>
+					<article-title>Fluoride content in children’s dentifrices marketed in Lima, Peru</article-title>
+					<source>Braz Oral Res</source>
+					<year>2019</year>
+					<volume>33</volume>
+					<elocation-id>e051</elocation-id>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/1807-3107bor-2019.vol33.0051">https://doi.org/10.1590/1807-3107bor-2019.vol33.0051</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B20">
+				<label>20</label>
+				<mixed-citation>20. Cury JA, Oliveira MJL, Martins CC, Tenuta LMA, Paiva SM. Available fluoride in toothpastes used by Brazilian children. Braz Dent J. 2010;21(5):396-400. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/s0103-64402010000500003">https://doi.org/10.1590/s0103-64402010000500003</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+						<name>
+							<surname>Oliveira</surname>
+							<given-names>MJL</given-names>
+						</name>
+						<name>
+							<surname>Martins</surname>
+							<given-names>CC</given-names>
+						</name>
+						<name>
+							<surname>Tenuta</surname>
+							<given-names>LMA</given-names>
+						</name>
+						<name>
+							<surname>Paiva</surname>
+							<given-names>SM</given-names>
+						</name>
+					</person-group>
+					<article-title>Available fluoride in toothpastes used by Brazilian children</article-title>
+					<source>Braz Dent J</source>
+					<year>2010</year>
+					<volume>21</volume>
+					<issue>5</issue>
+					<fpage>396</fpage>
+					<lpage>400</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/s0103-64402010000500003">https://doi.org/10.1590/s0103-64402010000500003</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B21">
+				<label>21</label>
+				<mixed-citation>21. Martinez-Mier EA, Tenuta LMA, Carey CM, Cury JA, Loveren C, Ekstrand KR, et al.; ORCA Fluoride in Toothpaste Analysis Work Group. European Organization for Caries Research Workshop: methodology for determination of potentially available fluoride in toothpastes. Caries Res. 2019;53(2):119-36. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1159/000490196">https://doi.org/10.1159/000490196</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Martinez-Mier</surname>
+							<given-names>EA</given-names>
+						</name>
+						<name>
+							<surname>Tenuta</surname>
+							<given-names>LMA</given-names>
+						</name>
+						<name>
+							<surname>Carey</surname>
+							<given-names>CM</given-names>
+						</name>
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+						<name>
+							<surname>Loveren</surname>
+							<given-names>C</given-names>
+						</name>
+						<name>
+							<surname>Ekstrand</surname>
+							<given-names>KR</given-names>
+						</name>
+						<etal>et al</etal>
+						<collab>ORCA Fluoride in Toothpaste Analysis Work Group</collab>
+					</person-group>
+					<article-title>European Organization for Caries Research Workshop: methodology for determination of potentially available fluoride in toothpastes</article-title>
+					<source>Caries Res</source>
+					<year>2019</year>
+					<volume>53</volume>
+					<issue>2</issue>
+					<fpage>119</fpage>
+					<lpage>136</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1159/000490196">https://doi.org/10.1159/000490196</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B22">
+				<label>22</label>
+				<mixed-citation>22. Kassebaum NJ, Smith AGC, Bernabé E, Fleming TD, Reynolds AE, Vos T, et al.; GBD 2015 Oral Health Collaborators. Global, Regional, and National Prevalence, Incidence, and Disability-Adjusted Life Years for Oral Conditions for 195 Countries, 1990-2015: a systematic analysis for the global burden of diseases, injuries, and risk factors. J Dent Res. 2017;96(4):380-7. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1177/0022034517693566">https://doi.org/10.1177/0022034517693566</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Kassebaum</surname>
+							<given-names>NJ</given-names>
+						</name>
+						<name>
+							<surname>Smith</surname>
+							<given-names>AGC</given-names>
+						</name>
+						<name>
+							<surname>Bernabé</surname>
+							<given-names>E</given-names>
+						</name>
+						<name>
+							<surname>Fleming</surname>
+							<given-names>TD</given-names>
+						</name>
+						<name>
+							<surname>Reynolds</surname>
+							<given-names>AE</given-names>
+						</name>
+						<name>
+							<surname>Vos</surname>
+							<given-names>T</given-names>
+						</name>
+						<etal>et al</etal>
+						<collab>GBD 2015 Oral Health Collaborators</collab>
+					</person-group>
+					<article-title>Global, Regional, and National Prevalence, Incidence, and Disability-Adjusted Life Years for Oral Conditions for 195 Countries, 1990-2015: a systematic analysis for the global burden of diseases, injuries, and risk factors</article-title>
+					<source>J Dent Res</source>
+					<year>2017</year>
+					<volume>96</volume>
+					<issue>4</issue>
+					<fpage>380</fpage>
+					<lpage>387</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1177/0022034517693566">https://doi.org/10.1177/0022034517693566</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B23">
+				<label>23</label>
+				<mixed-citation>23. Marin LM, Vieira W, Tenuta LMA, Tabchoury COM, Cury JA. Fluoride concentration in local dentifrices from Brazilian regions. Rev Assoc Paul Cir Dent. 2017;71(1):60-5.</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Marin</surname>
+							<given-names>LM</given-names>
+						</name>
+						<name>
+							<surname>Vieira</surname>
+							<given-names>W</given-names>
+						</name>
+						<name>
+							<surname>Tenuta</surname>
+							<given-names>LMA</given-names>
+						</name>
+						<name>
+							<surname>Tabchoury</surname>
+							<given-names>COM</given-names>
+						</name>
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+					</person-group>
+					<article-title>Fluoride concentration in local dentifrices from Brazilian regions</article-title>
+					<source>Rev Assoc Paul Cir Dent</source>
+					<year>2017</year>
+					<volume>71</volume>
+					<issue>1</issue>
+					<fpage>60</fpage>
+					<lpage>65</lpage>
+				</element-citation>
+			</ref>
+			<ref id="B24">
+				<label>24</label>
+				<mixed-citation>24. Antunes JLF, Narvai PC. Políticas de saúde bucal no Brasil e seu impacto sobre as desigualdades em saúde. Rev Saude Publica. 2010;44(2):360-5. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/S0034-89102010005000002">https://doi.org/10.1590/S0034-89102010005000002</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Antunes</surname>
+							<given-names>JLF</given-names>
+						</name>
+						<name>
+							<surname>Narvai</surname>
+							<given-names>PC</given-names>
+						</name>
+					</person-group>
+					<article-title>Políticas de saúde bucal no Brasil e seu impacto sobre as desigualdades em saúde</article-title>
+					<source>Rev Saude Publica</source>
+					<year>2010</year>
+					<volume>44</volume>
+					<issue>2</issue>
+					<fpage>360</fpage>
+					<lpage>365</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1590/S0034-89102010005000002">https://doi.org/10.1590/S0034-89102010005000002</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B25">
+				<label>25</label>
+				<mixed-citation>25. Giacaman RA, Carrera CA, Muñoz-Sandoval C, Fernandez C, Cury JA. Fluoride content in toothpastes commercialized for children in Chile and discussion on professional recommendations of use. Int J Paediatr Dent. 2013;23(2):77-83. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1111/j.1365-263X.2012.01226.x">https://doi.org/10.1111/j.1365-263X.2012.01226.x</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Giacaman</surname>
+							<given-names>RA</given-names>
+						</name>
+						<name>
+							<surname>Carrera</surname>
+							<given-names>CA</given-names>
+						</name>
+						<name>
+							<surname>Muñoz-Sandoval</surname>
+							<given-names>C</given-names>
+						</name>
+						<name>
+							<surname>Fernandez</surname>
+							<given-names>C</given-names>
+						</name>
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+					</person-group>
+					<article-title>Fluoride content in toothpastes commercialized for children in Chile and discussion on professional recommendations of use</article-title>
+					<source>Int J Paediatr Dent</source>
+					<year>2013</year>
+					<volume>23</volume>
+					<issue>2</issue>
+					<fpage>77</fpage>
+					<lpage>83</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1111/j.1365-263X.2012.01226.x">https://doi.org/10.1111/j.1365-263X.2012.01226.x</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B26">
+				<label>26</label>
+				<mixed-citation>26. Benzian H, Holmgren C, Buijs M, Loveren C, Weijden F, Palenstein Helderman W. Total and free available fluoride in toothpastes in Brunei, Cambodia, Laos, the Netherlands and Suriname. Int Dent J. 2012;62(4):213-21. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1111/j.1875-595X.2012.00116.x">https://doi.org/10.1111/j.1875-595X.2012.00116.x</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Benzian</surname>
+							<given-names>H</given-names>
+						</name>
+						<name>
+							<surname>Holmgren</surname>
+							<given-names>C</given-names>
+						</name>
+						<name>
+							<surname>Buijs</surname>
+							<given-names>M</given-names>
+						</name>
+						<name>
+							<surname>Loveren</surname>
+							<given-names>C</given-names>
+						</name>
+						<name>
+							<surname>Weijden</surname>
+							<given-names>F</given-names>
+						</name>
+						<name>
+							<surname>Palenstein Helderman</surname>
+							<given-names>W</given-names>
+						</name>
+					</person-group>
+					<article-title>Total and free available fluoride in toothpastes in Brunei, Cambodia, Laos, the Netherlands and Suriname</article-title>
+					<source>Int Dent J</source>
+					<year>2012</year>
+					<volume>62</volume>
+					<issue>4</issue>
+					<fpage>213</fpage>
+					<lpage>221</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1111/j.1875-595X.2012.00116.x">https://doi.org/10.1111/j.1875-595X.2012.00116.x</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B27">
+				<label>27</label>
+				<mixed-citation>27. Fernández CE, Carrera CA, Muñoz-Sandoval C, Cury JA, Giacaman RA. Stability of chemically available fluoride in Chilean toothpastes. Int J Paediatr Dent. 2017;27(6):496-505. <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1111/ipd.12288">https://doi.org/10.1111/ipd.12288</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="journal">
+					<person-group person-group-type="author">
+						<name>
+							<surname>Fernández</surname>
+							<given-names>CE</given-names>
+						</name>
+						<name>
+							<surname>Carrera</surname>
+							<given-names>CA</given-names>
+						</name>
+						<name>
+							<surname>Muñoz-Sandoval</surname>
+							<given-names>C</given-names>
+						</name>
+						<name>
+							<surname>Cury</surname>
+							<given-names>JA</given-names>
+						</name>
+						<name>
+							<surname>Giacaman</surname>
+							<given-names>RA</given-names>
+						</name>
+					</person-group>
+					<article-title>Stability of chemically available fluoride in Chilean toothpastes</article-title>
+					<source>Int J Paediatr Dent</source>
+					<year>2017</year>
+					<volume>27</volume>
+					<issue>6</issue>
+					<fpage>496</fpage>
+					<lpage>505</lpage>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1111/ipd.12288">https://doi.org/10.1111/ipd.12288</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B28">
+				<label>28</label>
+				<mixed-citation>28. US Food and Drug Administration. CFR – Code of Federal Regulations. Title 21: Food and drugs. Washington (DC): FDA; 2013 [cited 2019 Feb 20]. Chapter I, Food and Drug Administration Department of Health and Human Services, Subchapter D, Drugs from human use (part 355): anticaries drugs products for over the counter human use. Disponível em: Available from: <ext-link ext-link-type="uri" xlink:href="https://www.govinfo.gov/content/pkg/CFR-2013-title21-vol5/pdf/CFR-2013-title21-vol5-chapI.pdf">https://www.govinfo.gov/content/pkg/CFR-2013-title21-vol5/pdf/CFR-2013-title21-vol5-chapI.pdf</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="webpage">
+					<person-group person-group-type="author">
+						<collab>US Food and Drug Administration</collab>
+						<collab>CFR – Code of Federal Regulations</collab>
+					</person-group>
+					<source>Title 21: Food and drugs. Washington (DC): FDA; 2013 [cited 2019 Feb 20]. Chapter I, Food and Drug Administration Department of Health and Human Services, Subchapter D, Drugs from human use (part 355): anticaries drugs products for over the counter human use</source>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://www.govinfo.gov/content/pkg/CFR-2013-title21-vol5/pdf/CFR-2013-title21-vol5-chapI.pdf">https://www.govinfo.gov/content/pkg/CFR-2013-title21-vol5/pdf/CFR-2013-title21-vol5-chapI.pdf</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B29">
+				<label>29</label>
+				<mixed-citation>29. Bureau des Normes de Madagascar. Norme Malagasy. NMG/ISO 11609:2017. Medecine bucco-dentaire – dentifrices: exigences, methodes d’essai et marquage. Madagascar: BNM; 2018 [cited 2020 Oct 30]. Available from: <ext-link ext-link-type="uri" xlink:href="http://blog.aoi-fr.org/wp-content/uploads/2018/11/Normes-Dentifrice-Madagascra-aout-2018.pdf">http://blog.aoi-fr.org/wp-content/uploads/2018/11/Normes-Dentifrice-Madagascra-aout-2018.pdf</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="webpage">
+					<person-group person-group-type="author">
+						<collab>Bureau des Normes de Madagascar</collab>
+					</person-group>
+					<source>Norme Malagasy. NMG/ISO 11609:2017. Medecine bucco-dentaire – dentifrices: exigences, methodes d’essai et marquage</source>
+					<publisher-loc>Madagascar</publisher-loc>
+					<publisher-name>BNM</publisher-name>
+					<year>2018</year>
+					<date-in-citation content-type="cited-date">cited 2020 Oct 30</date-in-citation>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="http://blog.aoi-fr.org/wp-content/uploads/2018/11/Normes-Dentifrice-Madagascra-aout-2018.pdf">http://blog.aoi-fr.org/wp-content/uploads/2018/11/Normes-Dentifrice-Madagascra-aout-2018.pdf</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+			<ref id="B30">
+				<label>30</label>
+				<mixed-citation>30. FDI World Dental Federation. Promoting dental health through fluoride toothpaste. Geneva (CH): FDI; 2018 [cited 2019 Sep 4]. Available from: <ext-link ext-link-type="uri" xlink:href="https://www.fdiworlddental.org/resources/policy-statements/promoting-dental-health-through-fluoride-toothpaste">https://www.fdiworlddental.org/resources/policy-statements/promoting-dental-health-through-fluoride-toothpaste</ext-link>
+				</mixed-citation>
+				<element-citation publication-type="webpage">
+					<person-group person-group-type="author">
+						<collab>FDI World Dental Federation</collab>
+					</person-group>
+					<source>Promoting dental health through fluoride toothpaste</source>
+					<publisher-loc>Geneva (CH)</publisher-loc>
+					<publisher-name>FDI</publisher-name>
+					<year>2018</year>
+					<date-in-citation content-type="cited-date">cited 2019 Sep 4</date-in-citation>
+					<comment>
+						<ext-link ext-link-type="uri" xlink:href="https://www.fdiworlddental.org/resources/policy-statements/promoting-dental-health-through-fluoride-toothpaste">https://www.fdiworlddental.org/resources/policy-statements/promoting-dental-health-through-fluoride-toothpaste</ext-link>
+					</comment>
+				</element-citation>
+			</ref>
+		</ref-list>
+		<fn-group>
+			<fn fn-type="financial-disclosure" id="fn2">
+				<p><bold>Funding:</bold> <italic>Programa Nacional de Cooperação Acadêmica na Amazônia</italic> (PROCAD). <italic>Coordenação de Aperfeiçoamento de Pessoal de Nível Superior</italic> (Capes 001 - Funding code: 88881.200487/2018-1).</p>
+			</fn>
+		</fn-group>
+	</back>
+	<sub-article article-type="translation" id="TRpt" xml:lang="pt">
+		<front-stub>
+			<article-categories>
+				<subj-group subj-group-type="heading">
+					<subject>Artigo Original</subject>
+				</subj-group>
+			</article-categories>
+			<title-group>
+				<article-title>Dentifrício fluoretado, vigilância sanitária e o SUS: o caso de Manaus-AM</article-title>
+			</title-group>
+			<contrib-group>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0003-2917-5229</contrib-id>
+					<name>
+						<surname>Ramos</surname>
+						<given-names>Mayara Costa Carneiro</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff1002"><sup>I</sup></xref>
+				</contrib>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0002-0099-9868</contrib-id>
+					<name>
+						<surname>Rebelo</surname>
+						<given-names>Maria Augusta Bessa</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff1002"><sup>I</sup></xref>
+				</contrib>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0002-7125-9082</contrib-id>
+					<name>
+						<surname>Rebelo Vieira</surname>
+						<given-names>Janete Maria</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff1002"><sup>I</sup></xref>
+				</contrib>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0001-5336-1959</contrib-id>
+					<name>
+						<surname>Miranda</surname>
+						<given-names>Luís Fernando Bandeira</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff2002"><sup>II</sup></xref>
+				</contrib>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0002-7660-5685</contrib-id>
+					<name>
+						<surname>Tabchoury</surname>
+						<given-names>Cinthia Pereira Machado</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff2002"><sup>II</sup></xref>
+				</contrib>
+				<contrib contrib-type="author">
+					<contrib-id contrib-id-type="orcid">0000-0003-1046-5605</contrib-id>
+					<name>
+						<surname>Cury</surname>
+						<given-names>Jaime Aparecido</given-names>
+					</name>
+					<xref ref-type="aff" rid="aff2002"><sup>II</sup></xref>
+				</contrib>
+			</contrib-group>
+			<aff id="aff1002">
+				<label>I</label>
+				<country country="BR">Brasil</country>
+				<institution content-type="original">Universidade Federal do Amazonas. Faculdade de Odontologia. Programa de Pós-Graduação em Odontologia. Manaus, AM, Brasil</institution>
+			</aff>
+			<aff id="aff2002">
+				<label>II</label>
+				<country country="BR">Brasil</country>
+				<institution content-type="original">Universidade Estadual de Campinas. Faculdade de Odontologia de Piracicaba. Departamento de Biociências. Piracicaba, SP, Brasil</institution>
+			</aff>
+			<author-notes>
+				<corresp id="c01002"> Correspondência: Maria Augusta Bessa Rebelo Avenida Ministro Waldemar Pedrosa, 1.539 69.025-005 Manaus, AM, Brasil E-mail: augusta@ufam.edu.br </corresp>
+				<fn fn-type="con">
+					<p><bold>Contribuição dos Autores:</bold> Concepção e planejamento do estudo: JAC, MABR, JMRV. Coleta, análise e interpretação dos dados: MCCR, LFBM, JAC. Elaboração ou revisão do manuscrito: MCCR, MABR, JMRV, LFBM, CPMT, JAC. Aprovação da versão final: MCCR, MABR, JMRV, LFBM, CPMT, JAC. Responsabilidade pública pelo conteúdo do artigo: MABR.</p>
+				</fn>
+				<fn fn-type="conflict">
+					<p><bold>Conflito de Interesses:</bold> Os autores declaram não haver conflito de interesses.</p>
+				</fn>
+			</author-notes>
+			<abstract>
+				<title>RESUMO</title>
+				<sec>
+					<title>OBJETIVO</title>
+					<p> Determinar o potencial anticárie dos dentifrícios distribuídos pelas unidades básicas de saúde (UBS) de Manaus-AM.</p>
+				</sec>
+				<sec>
+					<title>MÉTODOS</title>
+					<p> Noventa e nove bisnagas de dentifrícios de quatro marcas comerciais foram coletadas de 7 de outubro de 2019 a 11 de outubro de 2019 em 16 UBS, que foram codificados por marca e UBS de origem. De acordo com a embalagem, os dentifrícios das quatro marcas e seus lotes foram formulados com monofluorofosfato de sódio (Na<sub>2</sub>FPO<sub>3</sub>) e a maioria (91%) tinha carbonato de cálcio (CaCO<sub>3</sub>) como abrasivo. Foram determinadas as concentrações de fluoreto total (FT = FST + Fins) e de fluoreto solúvel total (FST = íons F<sup>-</sup> ou FPO<sub>3</sub><sup>2-</sup>), para certificar se atendiam à resolução ANVISA RDC Nº 530 (máximo de 1.500 ppm de FT) e se tinham potencial anticárie (mínimo de 1.000 ppm de FST). As análises foram feitas com eletrodo íon específico.</p>
+				</sec>
+				<sec>
+					<title>RESULTADOS</title>
+					<p> As concentrações (ppm F) de FT [média; desvio padrão (DP); n] encontradas nos dentifrícios A (1.502,3; DP = 45,6; n = 33), B (1.135,5; DP = 52,7; n = 48) e D (936,8; DP = 20,5; n = 8) foram próximas ao descrito na embalagem, 1.500, 1.100 e 1.000 ppm F, respectivamente. No dentifrício C, foi encontrada média de 274,1 ppm (DP = 219,7; n = 10) de FT, divergindo da concentração declarada de 1.500 ppm F. Em acréscimo, as cinco bisnagas do lote n<sup>o</sup> 11681118 do dentifrício C não foram fluoretadas. Quanto ao FST, à exceção do dentifrício D (937,9; DP = 40,29), os demais apresentaram concentração inferior ao seu respectivo FT.</p>
+				</sec>
+				<sec>
+					<title>CONCLUSÃO</title>
+					<p> Observou-se problemas graves de quantidade e qualidade do fluoreto nos dentifrícios distribuídos pelo SUS em Manaus, mostrando a necessidade de vigilância desses produtos e ratificando a urgência da revisão da resolução ANVISA RDC Nº 530.</p>
+				</sec>
+			</abstract>
+			<kwd-group xml:lang="pt">
+				<kwd>Cremes Dentais, provisão &amp; distribuição</kwd>
+				<kwd>Dentifrícios, química</kwd>
+				<kwd>Fluoretos, normas</kwd>
+				<kwd>Cárie Dentária, prevenção &amp; controle</kwd>
+				<kwd>Serviços de Saúde Bucal</kwd>
+			</kwd-group>
+		</front-stub>
+		<body>
+			<sec sec-type="intro">
+				<title>INTRODUÇÃO</title>
+				<p>Dentifrício fluoretado é recomendado no combate à cárie dentária por estar relacionado ao seu declínio, o qual foi observado tanto em países desenvolvidos<sup><xref ref-type="bibr" rid="B1">1</xref></sup> como em desenvolvimento, como o Brasil<sup><xref ref-type="bibr" rid="B2">2</xref></sup>. Dentifrício é também considerado o meio mais racional de uso de fluoreto, porque simultaneamente à desorganização do biofilme dental pela escovação, o fluoreto é liberado na cavidade bucal para interferir no desenvolvimento de lesões de cárie ou reparar as lesões existentes<sup><xref ref-type="bibr" rid="B3">3</xref>,<xref ref-type="bibr" rid="B4">4</xref></sup>. Entretanto, para tal é imprescindível que o fluoreto esteja quimicamente solúvel na formulação<sup><xref ref-type="bibr" rid="B5">5</xref></sup>para ser biodisponibilizado na boca durante a escovação<sup><xref ref-type="bibr" rid="B6">6</xref></sup>. O efeito do fluoreto presente nos dentifrícios na redução de cárie está baseado em evidências<sup><xref ref-type="bibr" rid="B7">7</xref></sup>e a concentração de no mínimo 1.000 ppm F continua sendo recomendada<sup><xref ref-type="bibr" rid="B10">10</xref></sup>. Portanto, há necessidade de não só o dentifrício ser fluoretado como também possuir uma concentração mínima de fluoreto solúvel para que a população seja beneficiada em termos de controle de cárie<sup><xref ref-type="bibr" rid="B11">11</xref></sup>.</p>
+				<p>No Brasil, 90% da população utiliza dentifrícios formulados com a combinação de carbonato de cálcio (CaCO<sub>3</sub>) como abrasivo e monofluorofosfato de sódio (Na<sub>2</sub>FPO<sub>3</sub>) como sal de fonte de fluoreto<sup><xref ref-type="bibr" rid="B2">2</xref>,<xref ref-type="bibr" rid="B12">12</xref></sup>. Esse tipo de formulação (CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub>) apresenta relativa estabilidade, pois o fluoreto está ligado ao fosfato, logo não reage imediatamente com o Ca<sup>++</sup> do abrasivo. No entanto, em razão do tempo de armazenamento, o íon MFP (FPO<sub>3</sub><sup>2-</sup>) sofre hidrólise e o íon fluoreto liberado é insolubilizado pelo Ca<sup>++</sup> do abrasivo<sup><xref ref-type="bibr" rid="B4">4</xref>,<xref ref-type="bibr" rid="B13">13</xref></sup>. Por outro lado, a sílica hidratada (SiO<sub>2</sub>) é quimicamente compatível com todos os sais de fluoreto (NaF, SnF<sub>2</sub>, AmF, Na<sub>2</sub>FPO<sub>3</sub>) usados em dentifrícios. Entretanto, formulações com CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub> têm impacto social principalmente para países em desenvolvimento<sup><xref ref-type="bibr" rid="B14">14</xref></sup> como o Brasil. Primeiro porque custam 2-3 vezes menos que as formulações com SiO<sub>2</sub>; segundo e mais importante, são amplamente distribuídos para populações com menor condição socioeconômica, como é feito no Brasil pelo Sistema Único de Saúde (SUS). Assim, propostas de pequenos produtores brasileiros de dentifrício com CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub> vencem os processos de licitação de compras realizadas pelas prefeituras<sup><xref ref-type="bibr" rid="B11">11</xref></sup>.</p>
+				<p>A qualidade do fluoreto dos dentifrícios disponíveis no mercado brasileiro é regulamentada pela atualizada resolução ANVISA RDC Nº 530, de 4 de agosto de 2021<sup><xref ref-type="bibr" rid="B15">15</xref></sup>, mas, à semelhança das regulamentações do Mercado Comum do Sul (Mercosul)<sup><xref ref-type="bibr" rid="B16">16</xref></sup> e da União Europeia (EUR)<sup><xref ref-type="bibr" rid="B17">17</xref></sup>, a resolução apenas estabelece a concentração máxima de fluoreto total (FT), que é 0,15% (1.500 ppm F; mg F/kg), mas não o quanto desse fluoreto deve estar solúvel na formulação para ter efeito anticárie<sup><xref ref-type="bibr" rid="B18">18</xref></sup>. Assim, tanto nos dentifrícios à venda no mercado brasileiro<sup><xref ref-type="bibr" rid="B12">12</xref></sup> como naqueles que são distribuídos pelo SUS<sup><xref ref-type="bibr" rid="B11">11</xref></sup>, encontra-se concentração de fluoreto quimicamente solúvel muito inferior ao mínimo necessário para ter potencial anticárie.</p>
+				<p>A Secretaria Municipal de Saúde de Manaus, capital do estado do Amazonas, possui a função de promover o acesso universal aos serviços de saúde de acordo com os princípios estabelecidos no SUS, o que inclui a oferta de dentifrícios à população menos favorecida. Como a qualidade do fluoreto dos dentifrícios consumidos pela população manauara não é conhecida, o objetivo desse trabalho foi avaliar se esses dentifrícios atendiam à resolução ANVISA RDC Nº 530<sup><xref ref-type="bibr" rid="B15">15</xref></sup> em termos de FT e se também tinham concentração de fluoreto solúvel para ter potencial anticárie<sup><xref ref-type="bibr" rid="B19">19</xref></sup>.</p>
+			</sec>
+			<sec sec-type="methods">
+				<title>MÉTODOS</title>
+				<sec>
+					<title>Amostragem</title>
+					<p>As amostras de dentifrícios foram obtidas em Unidades Básicas de Saúde (UBS) da cidade de Manaus, AM, Brasil, após concordância da Secretaria de Saúde (termo de compromisso nº 48/2019). Foram escolhidas 16 UBS (<xref ref-type="table" rid="t3002">Tabela 3</xref>), nas quais havia cirurgiões-dentistas preceptores do estágio curricular da Faculdade de Odontologia da Universidade Federal do Amazonas. Noventa e nove bisnagas de dentifrícios fluoretados foram coletadas, sendo uma bisnaga de cada lote de dentifrício disponível nas UBS. Os dentifrícios foram codificados por marca e UBS de origem. As informações sobre os dentifrícios coletados encontradas nas embalagens estão descritas na <xref ref-type="table" rid="t1002">Tabela 1</xref>. Os dentifrícios foram coletados entre o dia 7 de outubro de 2019 e 11 de outubro de 2019, e realizou-se as análises químicas entre os dias 18 de outubro de 2019 e 7 de novembro de 2019, no laboratório de Bioquímica Oral da FOP-Unicamp, como atividade do convênio PROCAD/Amazônia 88881.200487/2018-1.</p>
+					<p>
+						<table-wrap id="t3002">
+							<label>Tabela 3</label>
+							<caption>
+								<title>Concentração (ppm F) de fluoreto solúvel total (FST) encontrada nos lotes de dentifrícios distribuídos em cada UBS de Manaus, AM, intervalo (Min–Max) e potencial anticárie, considerando a média das concentrações.</title>
+							</caption>
+							<table frame="hsides" rules="groups">
+								<colgroup>
+									<col/>
+									<col/>
+									<col/>
+									<col/>
+								</colgroup>
+								<thead>
+									<tr>
+										<th align="left" rowspan="3">UBS</th>
+										<th colspan="2">FST (ppm F)</th>
+										<th rowspan="3">Potencial anticárie</th>
+									</tr>
+									<tr>
+										<th colspan="2">
+											<hr/>
+										</th>
+									</tr>
+									<tr>
+										<th>Média; DP (n)</th>
+										<th>Min–Max</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr>
+										<td>Ajuricaba</td>
+										<td align="center">536,4; 225,8 (8)</td>
+										<td align="center">335,8–960,9</td>
+										<td align="center">Muito baixo a bom</td>
+									</tr>
+									<tr>
+										<td>Arthur Virgílio</td>
+										<td align="center">259,6; 201,0 (3)</td>
+										<td align="center">27,4–378,0</td>
+										<td align="center">Nulo a muito baixo</td>
+									</tr>
+									<tr>
+										<td>Áugias Gadelha</td>
+										<td align="center">625,8;175,4 (7)</td>
+										<td align="center">323,9–866,0</td>
+										<td align="center">Muito baixo a bom</td>
+									</tr>
+									<tr>
+										<td>Avelino Pereira</td>
+										<td align="center">443,9; 162,2 (6)</td>
+										<td align="center">334,4–652,9</td>
+										<td align="center">Muito baixo a baixo</td>
+									</tr>
+									<tr>
+										<td>Balbina Mestrinho</td>
+										<td align="center">322,3; 205,8 (8)</td>
+										<td align="center">87,4–738,9</td>
+										<td align="center">Nulo a baixo</td>
+									</tr>
+									<tr>
+										<td>Fátima de Andrade</td>
+										<td align="center">595,1; 263,7 (5)</td>
+										<td align="center">327,4–950,1</td>
+										<td align="center">Muito baixo a bom</td>
+									</tr>
+									<tr>
+										<td>Ivone Lima</td>
+										<td align="center">503,8; 298,9 (9)</td>
+										<td align="center">44,9–956,7</td>
+										<td align="center">Nulo a bom</td>
+									</tr>
+									<tr>
+										<td>Josephina de Melo</td>
+										<td align="center">342,6; 326,0 (3)</td>
+										<td align="center">24,4–675,9</td>
+										<td align="center">Nulo a baixo</td>
+									</tr>
+									<tr>
+										<td>Mansour Bulbol</td>
+										<td align="center">506,4;138,8 (12)</td>
+										<td align="center">345,3–677,3</td>
+										<td align="center">Muito baixo a baixo</td>
+									</tr>
+									<tr>
+										<td>N-53</td>
+										<td align="center">350,1; 16,8 (2)</td>
+										<td align="center">338,2–362,0</td>
+										<td align="center">Muito baixo</td>
+									</tr>
+									<tr>
+										<td>N-58</td>
+										<td align="center">487,3; 179,0 (19)</td>
+										<td align="center">315,0–959,1</td>
+										<td align="center">Muito baixo a bom</td>
+									</tr>
+									<tr>
+										<td>O-18</td>
+										<td align="center">432,9; 236,0 (2)</td>
+										<td align="center">266,0–599,8</td>
+										<td align="center">Muito baixo a baixo</td>
+									</tr>
+									<tr>
+										<td>S-04</td>
+										<td align="center">417,0; 166,5 (6)</td>
+										<td align="center">266,0–640,0</td>
+										<td align="center">Muito baixo a baixo</td>
+									</tr>
+									<tr>
+										<td>Theodomiro Garrido</td>
+										<td align="center">599,2; 307,0 (4)</td>
+										<td align="center">293,9–967,5</td>
+										<td align="center">Muito baixo a bom</td>
+									</tr>
+									<tr>
+										<td>Vicente Palotti</td>
+										<td align="center">185,2; 223,4 (2)</td>
+										<td align="center">27,2–343,2</td>
+										<td align="center">Nulo a muito baixo</td>
+									</tr>
+									<tr>
+										<td>Vila da Prata</td>
+										<td align="center">549,3; 357,6 (3)</td>
+										<td align="center">340,6–962,2</td>
+										<td align="center">Muito baixo a bom</td>
+									</tr>
+								</tbody>
+							</table>
+							<table-wrap-foot>
+								<fn id="TFN3002">
+									<p>Min: valor mínimo; Max: valor máximo.</p>
+								</fn>
+							</table-wrap-foot>
+						</table-wrap>
+					</p>
+					<p>
+						<table-wrap id="t1002">
+							<label>Tabela 1</label>
+							<caption>
+								<title>Dentifrícios (código), quantidade de tubos/marca, lotes e quantidade (n) de tubos coletados, sal de fluoreto, concentração de fluoreto (ppm F), abrasivo e validade declaradas nas embalagens.</title>
+							</caption>
+							<table frame="hsides" rules="groups">
+								<colgroup>
+									<col/>
+									<col/>
+									<col/>
+									<col/>
+									<col/>
+									<col/>
+									<col/>
+								</colgroup>
+								<thead>
+									<tr>
+										<th align="left">Dentifrícios (Código)</th>
+										<th>Quantidade tubos/marca</th>
+										<th>Lotes (n)</th>
+										<th>Sal de fluoreto</th>
+										<th>ppm F</th>
+										<th>Abrasivo</th>
+										<th>Validade</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr>
+										<td rowspan="6">A</td>
+										<td align="center" rowspan="6">33</td>
+										<td align="center">388 (4); 389 (2);</td>
+										<td align="center" rowspan="6">Na<sub>2</sub>FPO<sub>3</sub></td>
+										<td align="center" rowspan="6">1.500</td>
+										<td align="center" rowspan="6">CaCO<sub>3</sub></td>
+										<td align="center" rowspan="6">out/20 a out/21</td>
+									</tr>
+									<tr>
+										<td align="center">390 (5); 391 (2);</td>
+									</tr>
+									<tr>
+										<td align="center">392 (3); 393 (2);</td>
+									</tr>
+									<tr>
+										<td align="center">394 (5); 395 (4);</td>
+									</tr>
+									<tr>
+										<td align="center">396(3);397(2);</td>
+									</tr>
+									<tr>
+										<td align="center">398(1)</td>
+									</tr>
+									<tr>
+										<td rowspan="10">B</td>
+										<td align="center" rowspan="10">48</td>
+										<td align="center">99(1); 102(1);</td>
+										<td align="center" rowspan="10">Na<sub>2</sub>FPO<sub>3</sub></td>
+										<td align="center" rowspan="10">1.100</td>
+										<td align="center" rowspan="10">CaCO<sub>3</sub></td>
+										<td align="center" rowspan="10">abr/19 a out/21</td>
+									</tr>
+									<tr>
+										<td align="center">139(5); 140(4);</td>
+									</tr>
+									<tr>
+										<td align="center">141(6); 142(2);</td>
+									</tr>
+									<tr>
+										<td align="center">143(2); 145(2);</td>
+									</tr>
+									<tr>
+										<td align="center">146(1); 147(4);</td>
+									</tr>
+									<tr>
+										<td align="center">148(4); 149(1);</td>
+									</tr>
+									<tr>
+										<td align="center">150(4); 151(1);</td>
+									</tr>
+									<tr>
+										<td align="center">152(2);153(2);</td>
+									</tr>
+									<tr>
+										<td align="center">154(3); 156(2);</td>
+									</tr>
+									<tr>
+										<td align="center">157(1)</td>
+									</tr>
+									<tr>
+										<td rowspan="2">C</td>
+										<td align="center" rowspan="2">10</td>
+										<td align="center">11681118 (5);</td>
+										<td align="center" rowspan="2">Na<sub>2</sub>FPO<sub>3</sub></td>
+										<td align="center" rowspan="2">1.500</td>
+										<td align="center" rowspan="2">CaCO<sub>3</sub></td>
+										<td align="center">ago/21</td>
+									</tr>
+									<tr>
+										<td align="center">11684118 (5)</td>
+										<td align="center">set/21</td>
+									</tr>
+									<tr>
+										<td>D</td>
+										<td align="center">8</td>
+										<td align="center">C030(2); D031(6)</td>
+										<td align="center">Na<sub>2</sub>FPO<sub>3</sub></td>
+										<td align="center">1.000</td>
+										<td align="center">Sílica</td>
+										<td align="center">fev/21</td>
+									</tr>
+								</tbody>
+							</table>
+							<table-wrap-foot>
+								<fn id="TFN1002">
+									<p>Na<sub>2</sub>FPO<sub>3</sub> = monofluorofosfato de sódio; CaCO<sub>3</sub> = carbonato de cálcio.</p>
+								</fn>
+							</table-wrap-foot>
+						</table-wrap>
+					</p>
+				</sec>
+				<sec>
+					<title>Determinação da Concentração de Fluoreto</title>
+					<p>Foi realizada com eletrodo íon específico pela técnica direta, usando metodologia validada<sup><xref ref-type="bibr" rid="B20">20</xref>,<xref ref-type="bibr" rid="B21">21</xref></sup>. As concentrações (ppm F = mg F/Kg) de fluoreto total (FT = FST + Fins), fluoreto solúvel total (FST = fluoreto como íon FPO<sub>3</sub><sup>2-</sup> + FI) e fluoreto iônico (FI) foram determinadas, sendo que a concentração de fluoreto como íon FPO<sub>3</sub><sup>2-</sup> (= FST – FI) e como fluoreto insolúvel (Fins = FT encontrado – FST encontrado) foram calculadas. Sumariamente, entre 90 e 110 mg de dentifrício de cada tubo foi pesado e homogeneizado em 10 mL de água purificada. Duplicatas de 0,25 mL da suspensão foram transferidas para tubos marcados FT. O restante da suspensão foi centrifugado e duplicatas de 0,25 mL do sobrenadante foram transferidas para tubos marcados FST e FI. Aos tubos FT e FST, 0,25 mL de HCl 2 M foram acrescentados e após uma hora a 45°C, as amostras foram neutralizadas com 0,50 mL de NaOH 1 M e tamponadas com 1,0 mL de TISAB II (tampão acetato 1 M, pH 5,0, contendo NaCl 1 M e CDTA 0,4%). Aos tubos FI foram adicionadas sequencialmente 0,50 mL de NaOH 1 M, 1,0 mL de TISAB II e 0,25 mL de HCl 2 M.</p>
+					<p>As análises foram feitas com eletrodo íon específico para fluoreto (Thermo Scientific Orion 96-09, Orion Research, Cambridge, MA, EUA) acoplado a um analisador de íons (Thermo Scientific Orion Star A214, Orion Research). O eletrodo foi calibrado, em triplicata, com soluções padrões de fluoreto de 0,0625 a 4 μg F/mL preparados em HCl 0,25 M, NaOH 0,25 M e TISAB II 50% (v/v). Os dados do logaritmo das concentrações de fluoreto dos padrões e os respectivos valores de mV foram analisados por regressão linear, utilizando o software Microsoft Excel (Microsoft<sup>®</sup>, Redmond, EUA). O coeficiente de regressão linear médio obtido foi de R<sup>2</sup> = 0,9998 (n = 14) e a equação da regressão matemática foi utilizada para estimar a concentração de fluoreto em cada mistura analítica (µg F/mL). A média da porcentagem do coeficiente de variação das duplicatas foi menor que 2,5%. A concentração de fluoreto em cada marca de dentifrício foi calculada com base no peso de dentifrício no tubo de análise e expressa em ppm de F (mg F/Kg).</p>
+				</sec>
+				<sec>
+					<title>Análise de Dados</title>
+					<p>As médias das duplicatas de dosagem foram calculadas e utilizadas para calcular a média e o desvio padrão das concentrações de FT, FST e Fins para cada marca de dentifrício, utilizando o software Microsoft Excel (Microsoft<sup>®</sup>). O potencial anticárie da concentração de FST nos dentifrícios distribuídos foi estimado<sup><xref ref-type="bibr" rid="B19">19</xref></sup>.</p>
+				</sec>
+			</sec>
+			<sec sec-type="results">
+				<title>RESULTADOS</title>
+				<p>A <xref ref-type="table" rid="t1002">Tabela 1</xref> mostra que, dos 99 dentifrícios coletados, 33 tubos (12 lotes) eram da marca A, 48 (19 lotes) da marca B, 10 (dois lotes) da marca C e 8 (dois lotes) da marca D. Todos foram formulados com monofluorofosfato de sódio (Na<sub>2</sub>FPO<sub>3</sub>) nas concentrações entre 1.000 e 1.500 ppm F. Com exceção do dentifrício D, que foi formulado com SiO<sub>2</sub>, os dentifrícios continham CaCO<sub>3</sub> como abrasivo. Com exceção da amostra lote 099 da marca B, todos os dentifrícios coletados estavam dentro do prazo de validade especificado. As amostras dos dentifrícios C (n = 10) e D (n = 8) não estavam disponíveis em todas as 16 UBS. O fato de haver apenas dois lotes dos dentifrícios C e D refletiu nos resultados encontrados de concentração de fluoreto dos produtos distribuídos pelas UBS e distritos.</p>
+				<p>A <xref ref-type="fig" rid="f01002">Figura</xref> mostra as concentrações de fluoreto encontradas em todos os tubos de cada marca de dentifrício distribuídos nas UBS. À exceção do dentifrício C, a concentração (ppm F) média (±dp;n) de FT encontrada nos dentifrícios D (936,8 ± 20,5;8), A (1.502,3 ± 45,6; 33) e B (1.135,5 ± 52,7;48) foi muito próxima à declarada pelos fabricantes. Quanto à análise do dentifrício C, além da concentração de FT estar muito abaixo dos 1.500 ppm F declarados (274,1 ± 219,7;10), o dp foi extremamente alto (80% da média), refletindo a diferença de concentração dos dois lotes desse produto.</p>
+				<p>
+					<fig id="f01002">
+						<label>Figura</label>
+						<caption>
+							<title>Concentração (ppm F; mg F/kg) de fluoreto total (FT) declarada na embalagem, média e dp (barras) das concentrações encontradas de FT, fluoreto solúvel total (FST), e de fluoreto insolúvel (Fins) nos dentifrícios distribuídos pelas UBS de Manaus, AM.</title>
+						</caption>
+						<graphic xlink:href="1518-8787-rsp-56-9-gf01-pt.tif"/>
+					</fig>
+				</p>
+				<p>Quanto aos valores (média ± dp;n) de FST encontrados (<xref ref-type="fig" rid="f01002">Figura</xref> e <xref ref-type="table" rid="t2002">Tabela 2</xref>), apenas o dentifrício D apresentou concentração (937,9 ± 40,3;8) próxima do FT encontrado; fluoreto insolúvel (Fins) não foi encontrado nesse produto (<xref ref-type="fig" rid="f01002">Figura</xref>). Nos demais dentifrícios, grande parte do FT encontrado (<xref ref-type="fig" rid="f01002">Figura</xref>) não estava solúvel como FST (íons FPO<sub>3</sub><sup>2-</sup> + F<sup>-</sup>), havendo 36, 57 e 70% de Fins nos dentifrícios C, A e B, respectivamente. O caso do dentifrício C é totalmente anômalo.</p>
+				<p>
+					<table-wrap id="t2002">
+						<label>Tabela 2</label>
+						<caption>
+							<title>Concentração (ppm F) de fluoreto solúvel total (FST) encontrada nos lotes de dentifrícios distribuídos nas UBS de Manaus, AM, intervalo (Min–Max) e potencial anticárie, considerando a média das concentrações.</title>
+						</caption>
+						<table frame="hsides" rules="groups">
+							<colgroup>
+								<col/>
+								<col/>
+								<col/>
+								<col/>
+								<col/>
+							</colgroup>
+							<thead>
+								<tr>
+									<th align="left" rowspan="3">Dentifrícios (Código)</th>
+									<th rowspan="3">Lotes</th>
+									<th colspan="2">FST (ppm F)</th>
+									<th rowspan="3">Potencial anticárie</th>
+								</tr>
+								<tr>
+									<th colspan="2">
+										<hr/>
+									</th>
+								</tr>
+								<tr>
+									<th>média; DP (n)</th>
+									<th>Min–Max</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td>A</td>
+									<td align="center">Todos (388 a 398)</td>
+									<td align="center">642,4; 51,3 (33)</td>
+									<td align="center">525,4–777,0</td>
+									<td align="center">Baixo</td>
+								</tr>
+								<tr>
+									<td>B</td>
+									<td align="center">Todos (99 a 157)</td>
+									<td align="center">339,9; 50,5 (48)</td>
+									<td align="center">108,9–427,7</td>
+									<td align="center">Muito baixo</td>
+								</tr>
+								<tr>
+									<td rowspan="2">C</td>
+									<td align="center">11681118</td>
+									<td align="center">42,3; 28,4 (5)</td>
+									<td align="center">24,4–87,4</td>
+									<td align="center">Nulo</td>
+								</tr>
+								<tr>
+									<td align="center">11684118</td>
+									<td align="center">324,1; 18,6 (5)</td>
+									<td align="center">293,0–345,1</td>
+									<td align="center">Muito baixo</td>
+								</tr>
+								<tr>
+									<td>D</td>
+									<td align="center">Todos (C030 e D031)</td>
+									<td align="center">937,9; 40,3 (8)</td>
+									<td align="center">866,0–967,5</td>
+									<td align="center">Bom</td>
+								</tr>
+							</tbody>
+						</table>
+						<table-wrap-foot>
+							<fn id="TFN2002">
+								<p>Min: valor mínimo; Max: valor máximo.</p>
+							</fn>
+						</table-wrap-foot>
+					</table-wrap>
+				</p>
+				<p>Quanto ao potencial anticárie<sup><xref ref-type="bibr" rid="B19">19</xref></sup> dos dentifrícios distribuídos em Manaus, a <xref ref-type="table" rid="t2002">Tabela 2</xref> levou em consideração a média da concentração de FST de todos os dentifrícios de cada marca, a <xref ref-type="table" rid="t3002">Tabela 3</xref> da concentração daqueles que estavam sendo distribuídos em cada UBS e a <xref ref-type="table" rid="t4002">Tabela 4</xref>, a localização das UBS pelos Distritos de Saúde de Manaus. De acordo com a <xref ref-type="table" rid="t2002">Tabela 2</xref>, os dentifrícios analisados podem ser classificados na seguinte ordem decrescente de potencial anticárie (Bom a Nulo): D &gt; A &gt; B = C (lote 11684118) &gt; C (lote 11681118).</p>
+				<p>
+					<table-wrap id="t4002">
+						<label>Tabela 4</label>
+						<caption>
+							<title>Concentração (ppm F) de fluoreto solúvel total (FST) encontrada nos dentifrícios distribuídos nos Distritos de Saúde de Manaus, AM, e potencial anticárie, considerando o intervalo das concentrações.</title>
+						</caption>
+						<table frame="hsides" rules="groups">
+							<colgroup>
+								<col/>
+								<col/>
+								<col/>
+								<col/>
+							</colgroup>
+							<thead>
+								<tr>
+									<th align="left" rowspan="3">Distritos</th>
+									<th colspan="2">FST (ppm F)</th>
+									<th rowspan="3">Potencial anticárie</th>
+								</tr>
+								<tr>
+									<th colspan="2">
+										<hr/>
+									</th>
+								</tr>
+								<tr>
+									<th>Média; DP (n)</th>
+									<th>Min–Max</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td>Norte</td>
+									<td align="center">465,3; 315,3 (44)</td>
+									<td align="center">27,4–959,1</td>
+									<td align="center">Nulo a bom</td>
+								</tr>
+								<tr>
+									<td>Sul</td>
+									<td align="center">439,1; 253,3 (12)</td>
+									<td align="center">27,2–967,4</td>
+									<td align="center">Nulo a bom</td>
+								</tr>
+								<tr>
+									<td>Leste</td>
+									<td align="center">457,0; 256,6 (18)</td>
+									<td align="center">24,4–956,7</td>
+									<td align="center">Nulo a bom</td>
+								</tr>
+								<tr>
+									<td>Oeste</td>
+									<td align="center">515,3; 193,8 (25)</td>
+									<td align="center">266,0–962,2</td>
+									<td align="center">Muito baixo a bom</td>
+								</tr>
+							</tbody>
+						</table>
+					</table-wrap>
+				</p>
+				<p>A <xref ref-type="table" rid="t3002">Tabela 3</xref> mostra que não havia nenhuma UBS distribuindo dentifrício de potencial anticárie exclusivamente Bom ou Nulo, sendo o melhor resultado de Muito Baixo a Bom em seis das 16 UBS, o que se refletiu nas populações beneficiadas vivendo nos quatro distritos de saúde de Manaus (<xref ref-type="table" rid="t4002">Tabela 4</xref>). Assim, somente no distrito Oeste estavam sendo distribuídos dentifrícios de Muito Baixo a Bom potencial anticárie, enquanto nos demais foi de Nulo a Bom.</p>
+			</sec>
+			<sec sec-type="discussion">
+				<title>DISCUSSÃO</title>
+				<p>A OMS tem recomendado dentifrício fluoretado de custo acessível às populações como uma das estratégias para redução de cárie dentária<sup><xref ref-type="bibr" rid="B14">14</xref></sup>, uma vez que essa doença acomete mais de 2,5 bilhões de pessoas ao redor do mundo<sup><xref ref-type="bibr" rid="B22">22</xref></sup>. Dentifrícios com CaCO<sub>3</sub> como abrasivo são de menor custo (2-3x&lt;) que os formulados com SiO<sub>2</sub><sup><xref ref-type="bibr" rid="B3">3</xref>,<xref ref-type="bibr" rid="B14">14</xref></sup> e, no mercado brasileiro, há dentifrícios fluoretados formulados com CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub> de qualidade aceitável quanto à concentração de fluoreto potencialmente ativo contra cárie<sup><xref ref-type="bibr" rid="B12">12</xref>,<xref ref-type="bibr" rid="B13">13</xref>,<xref ref-type="bibr" rid="B23">23</xref></sup>. Embora no Brasil o custo de um creme dental à base de CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub> seja acessível (R$ 0,028/g), 50% da população teria que trabalhar aproximadamente uma hora por dia só para comprar um tubo de 90 g de creme dental. Assim, devido à desigualdade social no Brasil, o governo brasileiro mantém um programa de ações preventivas aos usuários do SUS, como ação de promoção de saúde bucal<sup><xref ref-type="bibr" rid="B24">24</xref></sup>. Os dentifrícios são adquiridos por um processo de licitação pública e as firmas vencedoras geralmente são de produtores locais de dentifrícios à base de CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub><sup><xref ref-type="bibr" rid="B11">11</xref></sup>. A qualidade desses dentifrícios em termos de potencial anticárie poderia ser garantida não só no Brasil, como no mundo inteiro, se houvesse respaldo nas regulamentações governamentais sobre a venda de dentifrícios<sup><xref ref-type="bibr" rid="B18">18</xref></sup>.</p>
+				<p>Nossos resultados mostraram que a concentração de fluoreto total (FT) encontrada nos dentifrícios distribuídos pelo SUS em Manaus (<xref ref-type="fig" rid="f01002">Figura</xref>) está de acordo com a declarada na embalagem de três dos quatro dentifrícios analisados (<xref ref-type="table" rid="t1002">Tabela 1</xref>). A exceção foi o dentifrício C, no qual se esperaria encontrar 1.500 ppm de FT (<xref ref-type="table" rid="t1002">Tabela 1</xref>), mas o valor encontrado foi 82% menor. Em acréscimo ao baixo valor médio encontrado, de 274,1 ppm de FT neste produto, outro aspecto que chamou a atenção foi o alto desvio padrão da média (80%) dos 10 tubos analisados. Isso é facilmente explicado pela diferença da concentração de FT encontrada entre os dois lotes desse dentifrício. Enquanto nos 5 tubos do dentifrício C do lote 11684118 foi encontrada média de 479,6 ppm F de FT, no lote 11681118 foi encontrado apenas 68,4 ppm F de FT. Assim, nos dentifrícios do lote 11684118 foi adicionada uma quantidade de Na<sub>2</sub>FPO<sub>3</sub> três vezes menor que o declarado na embalagem, enquanto o lote 11684118 sequer foi fluoretado. O valor médio de 68,4 ppm F de FT nos tubos desse lote deve ser atribuído ao fluoreto residual dos ingredientes usados na formulação do mesmo. Assim, esse dentifrício viola a regulamentação brasileira<sup><xref ref-type="bibr" rid="B15">15</xref></sup> e do Mercosul<sup><xref ref-type="bibr" rid="B16">16</xref></sup>, pois o dentifrício não foi formulado como declarado na rotulagem. É admissível, também, o descumprimento do edital de licitação pelo fornecedor do produto ao SUS em Manaus, pois a especificação padronizada para tais produtos é de que o dentifrício deve ser fluoretado na concentração de 1.000 a 1.500 ppm F. Essa flagrante aberração de não encontrar no dentifrício a concentração de FT declarada é rara nos nossos 40 anos de avaliação de dentifrícios do mundo inteiro e só foi verificada para dois dentifrícios de origem chinesa, um que estava sendo vendido no Chile<sup><xref ref-type="bibr" rid="B25">25</xref></sup> e outro no Peru<sup><xref ref-type="bibr" rid="B19">19</xref></sup>. Por outro lado, o mais importante em termos de saúde é quanto do FT de um dentifrício está quimicamente solúvel para ter potencial anticárie<sup><xref ref-type="bibr" rid="B3">3</xref>-<xref ref-type="bibr" rid="B5">5</xref></sup>.</p>
+				<p>Assim, dos quatro dentifrícios analisados que estavam sendo distribuídos pelo SUS em Manaus, somente o da marca D teria um bom potencial anticárie (<xref ref-type="table" rid="t2002">Tabela 2</xref>), pois apresentou média de 937,9 ppm F de fluoreto solúvel total (FST), muito próximo de 1.000 ppm F, o valor mínimo necessário para ter eficácia anticárie<sup><xref ref-type="bibr" rid="B4">4</xref></sup>. Em acréscimo, todo o fluoreto desse dentifrício está solúvel (<xref ref-type="fig" rid="f01002">Figura</xref>) visto que foi formulado com SiO<sub>2</sub>, um abrasivo compatível com todos os sais de fluoreto, incluindo o Na<sub>2</sub>FPO<sub>3</sub> usado nessa formulação (<xref ref-type="table" rid="t1002">Tabela 1</xref>). Em contrapartida, a concentração de FST encontrada nos demais dentifrícios foi muito baixa. A baixa concentração de FST encontrada nos dentifrícios A, B e C (<xref ref-type="table" rid="t2002">Tabela 2</xref>) não é apenas explicada por que eles contêm CaCO<sub>3</sub> como abrasivo (<xref ref-type="table" rid="t1002">Tabela 1</xref>) e este inativa o fluoreto<sup><xref ref-type="bibr" rid="B3">3</xref>,<xref ref-type="bibr" rid="B4">4</xref></sup>, mas também pelo fato que, à exceção do A, estes dentifrícios foram formulados com menos de 1.500 ppm de FT.</p>
+				<p>Como 57% do FT do A estava insolúvel (<xref ref-type="fig" rid="f01002">Figura</xref>), ainda sobraram 642,3 ppm como FST, o que lhe confere um baixo potencial anticárie (<xref ref-type="table" rid="t2002">Tabela 2</xref>). Já o B, além de ter sido formulado com 1.100 ppm F de FT (<xref ref-type="table" rid="t1002">Tabela 1</xref>), 70% desse fluoreto estava insolúvel, restando apenas 339,9 ppm como FST, o que lhe confere um potencial anticárie muito baixo. Comparado ao produto A, a maior porcentagem de Fins no B pode ser explicada pela proximidade desses dentifrícios do prazo de validade (<xref ref-type="table" rid="t1002">Tabela 1</xref>), inclusive o dentifrício de lote 99 da marca B, distribuído na UBS Balbina Mestrinho, estava com o prazo de validade expirado (abril de 2019) há seis meses da coleta. No dentifrício desse lote, dos 1.100 ppm de FT adicionado, apenas 108,9 ppm estavam solúveis (<xref ref-type="table" rid="t2002">Tabela 2</xref>), isto é, 90% do FT dele estava insolúvel, não apresentando efeito anticárie. Esse resultado de diminuição da concentração de FST em dentifrícios formulados com CaCO<sub>3</sub>/Na<sub>2</sub>FPO<sub>3</sub> de acordo com o tempo de fabricação é bem conhecido da literatura<sup><xref ref-type="bibr" rid="B13">13</xref></sup>, mas os valores porcentuais encontrados no presente trabalho foram bem maiores.</p>
+				<p>Por outro lado, o caso do dentifrício C é totalmente atípico, pois a baixíssima concentração média de 42,3 ppm de FST encontrada nos tubos do lote 11681118 é devido ao fato de sequer ter sido fluoretado, o que lhe confere um potencial anticárie nulo. Nos dentifrícios C do lote 11684118, foi encontrada uma média de 324,1 ppm de FST, uma vez que 32% dos 479,7 ppm do FT encontrado estava insolúvel, o que lhe confere um potencial anticárie muito baixo (<xref ref-type="table" rid="t2002">Tabela 2</xref>).</p>
+				<p>Considerando que dos 99 tubos de dentifrícios analisados somente os oito da marca D podem ser considerados com bom potencial anticárie (<xref ref-type="table" rid="t2002">Tabela 2</xref>), o que representa apenas 8% da amostra, muito dificilmente alguma UBS de Manaus estaria distribuindo para seus usuários só dentifrício de boa qualidade, como de fato mostram os dados da <xref ref-type="table" rid="t3002">Tabela 3</xref>. Assim, se em um extremo havia pessoas recebendo um dentifrício com bom potencial anticárie, caso do D, no outro havia pessoas recebendo um dentifrício sem proteção contra cárie (Nulo), caso do lote 11681118 do dentifrício C. Do mesmo modo, nenhum distrito de saúde da cidade de Manaus fora beneficiado pela qualidade do dentifrício fluoretado distribuído, como demonstrado na <xref ref-type="table" rid="t4002">Tabela 4</xref>.</p>
+				<p>Esse problema de baixa qualidade do fluoreto de dentifrícios não é exclusividade do Brasil e tem sido relatado em outros países<sup><xref ref-type="bibr" rid="B26">26</xref>,<xref ref-type="bibr" rid="B27">27</xref></sup>. Com exceção das regulamentações dos EUA<sup><xref ref-type="bibr" rid="B28">28</xref></sup> e de Madagascar<sup><xref ref-type="bibr" rid="B29">29</xref></sup>, a maioria das regulamentações mundiais<sup><xref ref-type="bibr" rid="B16">16</xref>,<xref ref-type="bibr" rid="B17">17</xref></sup> não estabelece que o dentifrício apresente fluoreto solúvel para ter eficácia anticárie, mas recentemente a FDI sinalizou que isso precisa mudar<sup><xref ref-type="bibr" rid="B30">30</xref></sup>.</p>
+				<p>Nossos resultados ratificam publicações anteriores<sup><xref ref-type="bibr" rid="B11">11</xref>,<xref ref-type="bibr" rid="B18">18</xref></sup>e mostram claramente a necessidade de revisão da regulamentação brasileira resolução ANVISA RDC Nº 530<sup><xref ref-type="bibr" rid="B15">15</xref></sup> para garantir que, principalmente a população assistida pelo SUS, receba dentifrício fluoretado com concentração mínima de fluoreto solúvel com potencial anticárie. Como o Brasil faz parte do MERCOSUL, pode haver interesses multilaterais que precisam ser acordados entre os países desse mercado comum para mudanças nas legislações. Enquanto isso não ocorre, a alternativa seria os gestores do SUS elaborarem editais de licitação em que conste<sup><xref ref-type="bibr" rid="B11">11</xref></sup>:</p>
+				<list list-type="order">
+					<list-item>
+						<p>Que o dentifrício não contenha mais que 1.500 ppm (mg/kg) de fluoreto total (FT);</p>
+					</list-item>
+					<list-item>
+						<p>Que pelo menos 1.000 ppm do FT esteja quimicamente solúvel (FST) na amostra fresca (recém-fabricada);</p>
+					</list-item>
+					<list-item>
+						<p>Que o dentifrício mantenha pelo menos 800 ppm de fluoreto quimicamente solúvel (FST) pelo prazo de 2 anos de fabricação do produto.</p>
+					</list-item>
+				</list>
+				<p>A razão para o máximo de 1.500 ppm de FT é por questão de segurança de produto de livre venda, a de 1.000 ppm de fluoreto solúvel é para garantir um efeito mínimo anticárie e 800 ppm solúvel por 2 anos é por ser uma concentração factível de ser obtida<sup><xref ref-type="bibr" rid="B13">13</xref></sup> até pelos pequenos produtores brasileiros de creme dental, não os alijando da competição com as multinacionais, mesmo porque, são eles que ganham as licitações feitas pelo sistema público de saúde brasileiro<sup><xref ref-type="bibr" rid="B11">11</xref></sup>.</p>
+			</sec>
+			<sec sec-type="conclusions">
+				<title>CONCLUSÃO</title>
+				<p>Considerando os problemas graves de quantidade e qualidade do fluoreto nos dentifrícios distribuídos pelo SUS em Manaus, a conclusão principal deste trabalho é que a revisão da resolução ANVISA RDC Nº 530 e das regulamentações mundiais garantiria que não só os brasileiros, mas também cidadãos de outros países em desenvolvimento, não mais corressem o risco de usar um dentifrício fluoretado potencialmente ineficaz no controle da cárie dentária.</p>
+			</sec>
+		</body>
+		<back>
+			<ack>
+				<title>Agradecimentos</title>
+				<p>Ao técnico do Laboratório de Bioquímica Oral da FOP-Unicamp, Sr. José Alfredo Silva, pela colaboração técnica.</p>
+			</ack>
+			<fn-group>
+				<fn fn-type="financial-disclosure" id="fn2002">
+					<p><bold>Financiamento:</bold> Programa Nacional de Cooperação Acadêmica na Amazônia (PROCAD). Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (Capes 001 - Código de financiamento: 88881.200487/2018-1).</p>
+				</fn>
+			</fn-group>
+		</back>
+	</sub-article>
+</article>

@@ -1,0 +1,1880 @@
+!ID 000001
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v091!20221005
+!v092!0826
+!v093!20221005
+!v700!1
+!v701!1
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v703!69
+!v705!S
+!v706!o
+!v708!1
+!ID 000002
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^1aff1^k0000-0001-8590-6212^nMaria Yury^rND^sIchihara
+!v010!^1aff1 aff2^k0000-0002-6884-3624^nAndrêa J.F.^rND^sFerreira
+!v010!^1aff1 aff2^k0000-0001-6340-7957^nCamila S. S.^rND^sTeixeira
+!v010!^1aff1 aff2^k0000-0003-1613-2270^nFlávia Jôse O.^rND^sAlves
+!v010!^1aff1 aff3^k0000-0003-3806-6446^nAline Santos^rND^sRocha
+!v010!^1aff4 aff5^k0000-0002-4010-2699^nVictor Hugo Dias^rND^sDiógenes
+!v010!^1aff1 aff2^k0000-0001-9162-0456^nDandara Oliveira^rND^sRamos
+!v010!^1aff1^k0000-0002-6977-2071^nElzo Pereira^rND^sPinto Júnior
+!v010!^1aff1^k0000-0001-7639-2627^nRenzo^rND^sFlores-Ortiz
+!v010!^1aff1^k0000-0001-9056-2928^nLeila^rND^sRameh
+!v010!^1aff6^k0000-0001-5107-2723^nLilia Carolina C. da^rND^sCosta
+!v010!^1aff4^k0000-0002-6088-3453^nMarcos Roberto^rND^sGonzaga
+!v010!^1aff7^k0000-0001-6275-9854^nEverton E. C.^rND^sLima
+!v010!^1aff8^k0000-0002-3836-4286^nRuth^rND^sDundas
+!v010!^1aff8^k0000-0003-3741-7099^nAlastair^rND^sLeyland
+!v010!^1aff1 aff2^k0000-0002-0215-4930^nMaurício L.^rND^sBarreto
+!v012!Mortality inequalities measured by socioeconomic indicators in Brazil: a scoping review^len
+!v014!^e85
+!v030!Rev. Saúde Pública
+!v031!56
+!v035!0034-8910
+!v038!TAB
+!v038!GRA
+!v040!en
+!v042!1
+!v049!RSP910
+!v058!National Institute for Health Research
+!v058!Fundação Bill e Melinda Gates Brasil
+!v058!Fundação Bill e Melinda Gates Brasil
+!v058!CNPq
+!v060!NIHR-GHRG/16/137/99
+!v060!OPP1142172
+!v060!202912/Z/16/Z
+!v060!307467/2018-0
+!v062!Faculdade de Saúde Pública da Universidade de São Paulo
+!v065!20220000
+!v070!Fundação Oswaldo Cruz^1Centro de Integração de Dados e Conhecimentos para Saúde^cSalvador^iaff1^lI^pBrasil^sBA
+!v070!Universidade Federal da Bahia^1Instituto de Saúde Coletiva^cSalvador^iaff2^lII^pBrasil^sBA
+!v070!Universidade Federal da Bahia^1Escola de Nutrição^cSalvador^iaff3^lIII^pBrasil^sBA
+!v070!Universidade Federal do Rio Grande do Norte^1Programa de Pós-Graduação em Demografia^cNatal^iaff4^lIV^pBrasil^sRN
+!v070!Universidade Federal da Paraíba^1Departamento de Finanças e Contabilidade^cJoão Pessoa^iaff5^lV^pBrasil^sPB
+!v070!Universidade Federal da Bahia^1Instituto de Matemática e Estatística^cSalvador^iaff6^lVI^pBrasil^sBA
+!v070!Universidade Estadual de Campinas^1Departamento de Demografia^cCampinas^iaff7^lVII^pBrasil^sSP
+!v070!University of Glasgow^1Medical Research Council^cGlasgow^iaff8^lVIII^pScotland
+!v071!ra
+!v072!65
+!v083!^aABSTRACT  OBJECTIVE  Summarize the literature on the relationship between composite socioeconomic indicators and mortality in different geographical areas of Brazil.  METHODS  This scoping review included articles published between January 1, 2000, and August 31, 2020, retrieved by means of a bibliographic search carried out in the Medline, Scopus, Web of Science, and Lilacs databases. Studies reporting on the association between composite socioeconomic indicators and all-cause, or specific cause of death in any age group in different geographical areas were selected. The review summarized the measures constructed, their associations with the outcomes, and potential study limitations.  RESULTS  Of the 77 full texts that met the inclusion criteria, the study reviewed 24. The area level of composite socioeconomic indicators analyzed comprised municipalities (n = 6), districts (n = 5), census tracts (n = 4), state (n = 2), country (n = 2), and other areas (n = 5). Six studies used composite socioeconomic indicators such as the Human Development Index, Gross Domestic Product, and the Gini Index; the remaining 18 papers created their own socioeconomic measures based on sociodemographic and health indicators. Socioeconomic status was inversely associated with higher rates of all-cause mortality, external cause mortality, suicide, homicide, fetal and infant mortality, respiratory and circulatory diseases, stroke, infectious and parasitic diseases, malnutrition, gastroenteritis, and oropharyngeal cancer. Higher mortality rates due to colorectal cancer, leukemia, a general group of neoplasms, traffic accident, and suicide, in turn, were observed in less deprived areas and/or those with more significant socioeconomic development. Underreporting of death and differences in mortality coverage in Brazilian areas were cited as the main limitation.  CONCLUSIONS  Studies analyzed mortality inequalities in different geographical areas by means of composite socioeconomic indicators, showing that the association directions vary according to the mortality outcome. But studies on all-cause mortality and at the census tract level remain scarce. The results may guide the development of new composite socioeconomic indicators for use in mortality inequality analysis.^len
+!v085!^kMortality, trends^len
+!v085!^kGeographic Locations, epidemiology^len
+!v085!^kSocioeconomic Factors^len
+!v085!^kHealth Status Disparities^len
+!v085!^kReview^len
+!v100!Revista de Saúde Pública
+!v102!Funding: National Institute for Health Research (NIHR-GHRG/16/137/99). Fundação Bill e Melinda Gates Brasil (OPP1142172). Wellcome Trust (202912/Z/16/Z). Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (Capes - doctoral scholarship for AJFF, CSST, ASR). Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq - Processs 307467/2018-0 - research scholarship for MRG).
+!v112!20210827
+!v114!20211110
+!v120!XML_1.1
+!v121!00507
+!v223!20221010
+!v237!10.11606/s1518-8787.2022056004178
+!v240!University of Glasgow^cGlasgow^iaff8^pGB
+!v240!Universidade Estadual de Campinas^cCampinas^iaff7^pBR^sSão Paulo
+!v240!Universidade Federal da Bahia^cSalvador^iaff6^pBR^sBahia
+!v240!Universidade Federal da Paraíba^iaff5^pBR
+!v240!Universidade Federal do Rio Grande do Norte^cNatal^iaff4^pBR^sRio Grande do Norte
+!v240!Universidade Federal da Bahia^cSalvador^iaff3^pBR^sBahia
+!v240!Universidade Federal da Bahia^cSalvador^iaff2^pBR^sBahia
+!v240!Fundação Oswaldo Cruz^iaff1^pBR
+!v265!^kreal^sxml^v20221010
+!v265!^kexpected^sxml^v202200
+!v337!^d10.11606/s1518-8787.2022056004178^len
+!v421!Rev Saude Publica
+!v435!0034-8910^tppub
+!v435!1518-8787^tepub
+!v700!2
+!v701!1
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!h
+!v708!1
+!v709!article
+!ID 000003
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^1aff1^k0000-0001-8590-6212^nMaria Yury^rND^sIchihara
+!v010!^1aff1 aff2^k0000-0002-6884-3624^nAndrêa J.F.^rND^sFerreira
+!v010!^1aff1 aff2^k0000-0001-6340-7957^nCamila S. S.^rND^sTeixeira
+!v010!^1aff1 aff2^k0000-0003-1613-2270^nFlávia Jôse O.^rND^sAlves
+!v010!^1aff1 aff3^k0000-0003-3806-6446^nAline Santos^rND^sRocha
+!v010!^1aff4 aff5^k0000-0002-4010-2699^nVictor Hugo Dias^rND^sDiógenes
+!v010!^1aff1 aff2^k0000-0001-9162-0456^nDandara Oliveira^rND^sRamos
+!v010!^1aff1^k0000-0002-6977-2071^nElzo Pereira^rND^sPinto Júnior
+!v010!^1aff1^k0000-0001-7639-2627^nRenzo^rND^sFlores-Ortiz
+!v010!^1aff1^k0000-0001-9056-2928^nLeila^rND^sRameh
+!v010!^1aff6^k0000-0001-5107-2723^nLilia Carolina C. da^rND^sCosta
+!v010!^1aff4^k0000-0002-6088-3453^nMarcos Roberto^rND^sGonzaga
+!v010!^1aff7^k0000-0001-6275-9854^nEverton E. C.^rND^sLima
+!v010!^1aff8^k0000-0002-3836-4286^nRuth^rND^sDundas
+!v010!^1aff8^k0000-0003-3741-7099^nAlastair^rND^sLeyland
+!v010!^1aff1 aff2^k0000-0002-0215-4930^nMaurício L.^rND^sBarreto
+!v012!Mortality inequalities measured by socioeconomic indicators in Brazil: a scoping review^len
+!v014!^e85
+!v030!Rev. Saúde Pública
+!v031!56
+!v035!0034-8910
+!v038!TAB
+!v038!GRA
+!v040!en
+!v042!1
+!v049!RSP910
+!v058!National Institute for Health Research
+!v058!Fundação Bill e Melinda Gates Brasil
+!v058!Fundação Bill e Melinda Gates Brasil
+!v058!CNPq
+!v060!NIHR-GHRG/16/137/99
+!v060!OPP1142172
+!v060!202912/Z/16/Z
+!v060!307467/2018-0
+!v062!Faculdade de Saúde Pública da Universidade de São Paulo
+!v065!20220000
+!v070!Fundação Oswaldo Cruz^1Centro de Integração de Dados e Conhecimentos para Saúde^cSalvador^iaff1^lI^pBrasil^sBA
+!v070!Universidade Federal da Bahia^1Instituto de Saúde Coletiva^cSalvador^iaff2^lII^pBrasil^sBA
+!v070!Universidade Federal da Bahia^1Escola de Nutrição^cSalvador^iaff3^lIII^pBrasil^sBA
+!v070!Universidade Federal do Rio Grande do Norte^1Programa de Pós-Graduação em Demografia^cNatal^iaff4^lIV^pBrasil^sRN
+!v070!Universidade Federal da Paraíba^1Departamento de Finanças e Contabilidade^cJoão Pessoa^iaff5^lV^pBrasil^sPB
+!v070!Universidade Federal da Bahia^1Instituto de Matemática e Estatística^cSalvador^iaff6^lVI^pBrasil^sBA
+!v070!Universidade Estadual de Campinas^1Departamento de Demografia^cCampinas^iaff7^lVII^pBrasil^sSP
+!v070!University of Glasgow^1Medical Research Council^cGlasgow^iaff8^lVIII^pScotland
+!v071!ra
+!v072!65
+!v083!^a<title>ABSTRACT</title> <sec> <title>OBJECTIVE</title> <p> Summarize the literature on the relationship between composite socioeconomic indicators and mortality in different geographical areas of Brazil.</p></sec> <sec> <title>METHODS</title> <p> This scoping review included articles published between January 1, 2000, and August 31, 2020, retrieved by means of a bibliographic search carried out in the Medline, Scopus, Web of Science, and Lilacs databases. Studies reporting on the association between composite socioeconomic indicators and all-cause, or specific cause of death in any age group in different geographical areas were selected. The review summarized the measures constructed, their associations with the outcomes, and potential study limitations.</p></sec> <sec> <title>RESULTS</title> <p> Of the 77 full texts that met the inclusion criteria, the study reviewed 24. The area level of composite socioeconomic indicators analyzed comprised municipalities (n = 6), districts (n = 5), census tracts (n = 4), state (n = 2), country (n = 2), and other areas (n = 5). Six studies used composite socioeconomic indicators such as the Human Development Index, Gross Domestic Product, and the Gini Index; the remaining 18 papers created their own socioeconomic measures based on sociodemographic and health indicators. Socioeconomic status was inversely associated with higher rates of all-cause mortality, external cause mortality, suicide, homicide, fetal and infant mortality, respiratory and circulatory diseases, stroke, infectious and parasitic diseases, malnutrition, gastroenteritis, and oropharyngeal cancer. Higher mortality rates due to colorectal cancer, leukemia, a general group of neoplasms, traffic accident, and suicide, in turn, were observed in less deprived areas and/or those with more significant socioeconomic development. Underreporting of death and differences in mortality coverage in Brazilian areas were cited as the main limitation.</p></sec> <sec> <title>CONCLUSIONS</title> <p> Studies analyzed mortality inequalities in different geographical areas by means of composite socioeconomic indicators, showing that the association directions vary according to the mortality outcome. But studies on all-cause mortality and at the census tract level remain scarce. The results may guide the development of new composite socioeconomic indicators for use in mortality inequality analysis.</p></sec>^len
+!v085!^kMortality, trends^len
+!v085!^kGeographic Locations, epidemiology^len
+!v085!^kSocioeconomic Factors^len
+!v085!^kHealth Status Disparities^len
+!v085!^kReview^len
+!v100!Revista de Saúde Pública
+!v102!Funding: National Institute for Health Research (NIHR-GHRG/16/137/99). Fundação Bill e Melinda Gates Brasil (OPP1142172). Wellcome Trust (202912/Z/16/Z). Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (Capes - doctoral scholarship for AJFF, CSST, ASR). Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq - Processs 307467/2018-0 - research scholarship for MRG).
+!v112!20210827
+!v114!20211110
+!v120!XML_1.1
+!v121!00507
+!v223!20221010
+!v237!10.11606/s1518-8787.2022056004178
+!v240!University of Glasgow^cGlasgow^iaff8^pGB
+!v240!Universidade Estadual de Campinas^cCampinas^iaff7^pBR^sSão Paulo
+!v240!Universidade Federal da Bahia^cSalvador^iaff6^pBR^sBahia
+!v240!Universidade Federal da Paraíba^iaff5^pBR
+!v240!Universidade Federal do Rio Grande do Norte^cNatal^iaff4^pBR^sRio Grande do Norte
+!v240!Universidade Federal da Bahia^cSalvador^iaff3^pBR^sBahia
+!v240!Universidade Federal da Bahia^cSalvador^iaff2^pBR^sBahia
+!v240!Fundação Oswaldo Cruz^iaff1^pBR
+!v265!^kreal^sxml^v20221010
+!v265!^kexpected^sxml^v202200
+!v337!^d10.11606/s1518-8787.2022056004178^len
+!v421!Rev Saude Publica
+!v435!0034-8910^tppub
+!v435!1518-8787^tepub
+!v700!3
+!v701!1
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!f
+!v708!1
+!v709!article
+!ID 000004
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^1aff1^k0000-0001-8590-6212^nMaria Yury^rND^sIchihara
+!v010!^1aff1 aff2^k0000-0002-6884-3624^nAndrêa J.F.^rND^sFerreira
+!v010!^1aff1 aff2^k0000-0001-6340-7957^nCamila S. S.^rND^sTeixeira
+!v010!^1aff1 aff2^k0000-0003-1613-2270^nFlávia Jôse O.^rND^sAlves
+!v010!^1aff1 aff3^k0000-0003-3806-6446^nAline Santos^rND^sRocha
+!v010!^1aff4 aff5^k0000-0002-4010-2699^nVictor Hugo Dias^rND^sDiógenes
+!v010!^1aff1 aff2^k0000-0001-9162-0456^nDandara Oliveira^rND^sRamos
+!v010!^1aff1^k0000-0002-6977-2071^nElzo Pereira^rND^sPinto Júnior
+!v010!^1aff1^k0000-0001-7639-2627^nRenzo^rND^sFlores-Ortiz
+!v010!^1aff1^k0000-0001-9056-2928^nLeila^rND^sRameh
+!v010!^1aff6^k0000-0001-5107-2723^nLilia Carolina C. da^rND^sCosta
+!v010!^1aff4^k0000-0002-6088-3453^nMarcos Roberto^rND^sGonzaga
+!v010!^1aff7^k0000-0001-6275-9854^nEverton E. C.^rND^sLima
+!v010!^1aff8^k0000-0002-3836-4286^nRuth^rND^sDundas
+!v010!^1aff8^k0000-0003-3741-7099^nAlastair^rND^sLeyland
+!v010!^1aff1 aff2^k0000-0002-0215-4930^nMaurício L.^rND^sBarreto
+!v012!Mortality inequalities measured by socioeconomic indicators in Brazil: a scoping review^len
+!v014!^e85
+!v030!Rev. Saúde Pública
+!v031!56
+!v035!0034-8910
+!v038!TAB
+!v038!GRA
+!v040!en
+!v042!1
+!v049!RSP910
+!v058!National Institute for Health Research
+!v058!Fundação Bill e Melinda Gates Brasil
+!v058!Fundação Bill e Melinda Gates Brasil
+!v058!CNPq
+!v060!NIHR-GHRG/16/137/99
+!v060!OPP1142172
+!v060!202912/Z/16/Z
+!v060!307467/2018-0
+!v062!Faculdade de Saúde Pública da Universidade de São Paulo
+!v065!20220000
+!v070!Fundação Oswaldo Cruz^1Centro de Integração de Dados e Conhecimentos para Saúde^cSalvador^iaff1^lI^pBrasil^sBA
+!v070!Universidade Federal da Bahia^1Instituto de Saúde Coletiva^cSalvador^iaff2^lII^pBrasil^sBA
+!v070!Universidade Federal da Bahia^1Escola de Nutrição^cSalvador^iaff3^lIII^pBrasil^sBA
+!v070!Universidade Federal do Rio Grande do Norte^1Programa de Pós-Graduação em Demografia^cNatal^iaff4^lIV^pBrasil^sRN
+!v070!Universidade Federal da Paraíba^1Departamento de Finanças e Contabilidade^cJoão Pessoa^iaff5^lV^pBrasil^sPB
+!v070!Universidade Federal da Bahia^1Instituto de Matemática e Estatística^cSalvador^iaff6^lVI^pBrasil^sBA
+!v070!Universidade Estadual de Campinas^1Departamento de Demografia^cCampinas^iaff7^lVII^pBrasil^sSP
+!v070!University of Glasgow^1Medical Research Council^cGlasgow^iaff8^lVIII^pScotland
+!v071!ra
+!v072!65
+!v083!^a<title>ABSTRACT</title> <sec> <title>OBJECTIVE</title> <p> Summarize the literature on the relationship between composite socioeconomic indicators and mortality in different geographical areas of Brazil.</p></sec> <sec> <title>METHODS</title> <p> This scoping review included articles published between January 1, 2000, and August 31, 2020, retrieved by means of a bibliographic search carried out in the Medline, Scopus, Web of Science, and Lilacs databases. Studies reporting on the association between composite socioeconomic indicators and all-cause, or specific cause of death in any age group in different geographical areas were selected. The review summarized the measures constructed, their associations with the outcomes, and potential study limitations.</p></sec> <sec> <title>RESULTS</title> <p> Of the 77 full texts that met the inclusion criteria, the study reviewed 24. The area level of composite socioeconomic indicators analyzed comprised municipalities (n = 6), districts (n = 5), census tracts (n = 4), state (n = 2), country (n = 2), and other areas (n = 5). Six studies used composite socioeconomic indicators such as the Human Development Index, Gross Domestic Product, and the Gini Index; the remaining 18 papers created their own socioeconomic measures based on sociodemographic and health indicators. Socioeconomic status was inversely associated with higher rates of all-cause mortality, external cause mortality, suicide, homicide, fetal and infant mortality, respiratory and circulatory diseases, stroke, infectious and parasitic diseases, malnutrition, gastroenteritis, and oropharyngeal cancer. Higher mortality rates due to colorectal cancer, leukemia, a general group of neoplasms, traffic accident, and suicide, in turn, were observed in less deprived areas and/or those with more significant socioeconomic development. Underreporting of death and differences in mortality coverage in Brazilian areas were cited as the main limitation.</p></sec> <sec> <title>CONCLUSIONS</title> <p> Studies analyzed mortality inequalities in different geographical areas by means of composite socioeconomic indicators, showing that the association directions vary according to the mortality outcome. But studies on all-cause mortality and at the census tract level remain scarce. The results may guide the development of new composite socioeconomic indicators for use in mortality inequality analysis.</p></sec>^len
+!v085!^kMortality, trends^len
+!v085!^kGeographic Locations, epidemiology^len
+!v085!^kSocioeconomic Factors^len
+!v085!^kHealth Status Disparities^len
+!v085!^kReview^len
+!v100!Revista de Saúde Pública
+!v102!Funding: National Institute for Health Research (NIHR-GHRG/16/137/99). Fundação Bill e Melinda Gates Brasil (OPP1142172). Wellcome Trust (202912/Z/16/Z). Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (Capes - doctoral scholarship for AJFF, CSST, ASR). Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq - Processs 307467/2018-0 - research scholarship for MRG).
+!v112!20210827
+!v114!20211110
+!v120!XML_1.1
+!v121!00507
+!v223!20221010
+!v237!10.11606/s1518-8787.2022056004178
+!v240!University of Glasgow^cGlasgow^iaff8^pGB
+!v240!Universidade Estadual de Campinas^cCampinas^iaff7^pBR^sSão Paulo
+!v240!Universidade Federal da Bahia^cSalvador^iaff6^pBR^sBahia
+!v240!Universidade Federal da Paraíba^iaff5^pBR
+!v240!Universidade Federal do Rio Grande do Norte^cNatal^iaff4^pBR^sRio Grande do Norte
+!v240!Universidade Federal da Bahia^cSalvador^iaff3^pBR^sBahia
+!v240!Universidade Federal da Bahia^cSalvador^iaff2^pBR^sBahia
+!v240!Fundação Oswaldo Cruz^iaff1^pBR
+!v265!^kreal^sxml^v20221010
+!v265!^kexpected^sxml^v202200
+!v337!^d10.11606/s1518-8787.2022056004178^len
+!v421!Rev Saude Publica
+!v435!0034-8910^tppub
+!v435!1518-8787^tepub
+!v700!4
+!v701!1
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!l
+!v708!1
+!v709!article
+!ID 000005
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v016!^nSMR^rND^sRocha
+!v018!Pobreza no Brasil: afinal, de que se trata?
+!v062!Editora FGV
+!v063!3
+!v064!2007
+!v065!20070000
+!v066!Rio de Janeiro
+!v071!book
+!v118!1
+!v700!5
+!v701!1
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000006
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v016!^nSL^rND^sGonçalves
+!v018!Vulnerabilidade das famílias à pobreza: uma análise empírica para seis regiões metropolitanas: 2002 to 2011
+!v062!Banco Nacional de Desenvolvimento Econômico
+!v064!2015
+!v065!20150000
+!v066!Rio de Janeiro
+!v071!book
+!v118!2
+!v700!6
+!v701!2
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000007
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nN^rND^sRibas-Fitó
+!v010!^nM^rND^sSala
+!v010!^nM^rND^sKogevinas
+!v010!^nJ^rND^sSunyer
+!v012!Polychlorinated biphenyls (PCBs) and neurological development in children: a systematic review
+!v014!537-46
+!v030!J Epidemiol Community Health
+!v031!55
+!v032!8
+!v037!https://doi.org/10.1136/jech.55.8.537
+!v061!https://doi.org/10.1136/jech.55.8.537
+!v064!2001
+!v065!20010000
+!v071!journal
+!v118!3
+!v514!^f537^l546
+!v700!7
+!v701!3
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000008
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nB^rND^sBosworth
+!v012!Increasing disparities in mortality by socioeconomic status
+!v014!237-51
+!v030!Annu Rev Public Health
+!v031!39
+!v037!https://doi.org/10.1146/annurev-publhealth-040617-014615
+!v061!https://doi.org/10.1146/annurev-publhealth-040617-014615
+!v064!2018
+!v065!20180000
+!v071!journal
+!v118!4
+!v514!^f237^l251
+!v700!8
+!v701!4
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000009
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nJ^rND^sWilliams
+!v010!^nL^rND^sAllen
+!v010!^nK^rND^sWickramasinghe
+!v010!^nB^rND^sMikkelsen
+!v010!^nN^rND^sRoberts
+!v010!^nN^rND^sTownsend
+!v012!A systematic review of associations between non-communicable diseases and socioeconomic status within low- and lower-middle-income countries
+!v020!020409^upages
+!v030!J Gob Health
+!v031!8
+!v032!2
+!v037!https://doi.org/10.7189/jogh.08.020409
+!v061!https://doi.org/10.7189/jogh.08.020409
+!v064!2018
+!v065!20180000
+!v071!journal
+!v118!5
+!v700!9
+!v701!5
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000010
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nJI^rND^sRuiz
+!v010!^nK^rND^sNuhu
+!v010!^nJT^rND^sMcDaniel
+!v010!^nF^rND^sPopoff
+!v010!^nA^rND^sIzcovich
+!v010!^nJM^rND^sCriniti
+!v012!Inequality as a powerful predictor of infant and maternal mortality around the world
+!v030!PloS One
+!v031!10
+!v032!10
+!v037!https://doi.org/10.1371/journal.pone.0140796
+!v061!https://doi.org/10.1371/journal.pone.0140796
+!v064!2015
+!v065!20150000
+!v071!journal
+!v118!6
+!v514!^ee0140796
+!v700!10
+!v701!6
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000011
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nN^rND^sSánchez-Garrido
+!v010!^nSG^rND^sAguilar-Navarro
+!v010!^nJA^rND^sÁvila-Funes
+!v010!^nO^rND^sTheou
+!v010!^nM^rND^sAndrew
+!v010!^nMU^rND^sPérez-Zepeda
+!v012!The Social Vulnerability Index, mortality and disability in Mexican middle-aged and older adults
+!v020!24^upages
+!v030!Geriatrics
+!v031!6
+!v032!1
+!v037!https://doi.org/10.3390/geriatrics6010024
+!v061!https://doi.org/10.3390/geriatrics6010024
+!v064!2021
+!v065!20210000
+!v071!journal
+!v118!7
+!v700!11
+!v701!7
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000012
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nG^rND^sMcCartney
+!v010!^nF^rND^sPopham
+!v010!^nSV^rND^sKatikireddi
+!v010!^nD^rND^sWalsh
+!v010!^nL^rND^sSchofield
+!v012!How do trends in mortality inequalities by deprivation and education in Scotland and England &amp; Wales compare? A repeat cross-sectional study
+!v030!BMJ Open
+!v031!7
+!v032!7
+!v037!https://doi.org/10.1136/bmjopen-2017-017590
+!v061!https://doi.org/10.1136/bmjopen-2017-017590
+!v064!2017
+!v065!20170000
+!v071!journal
+!v118!8
+!v514!^ee017590
+!v700!12
+!v701!8
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000013
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nCR^rND^sAnele
+!v010!^nVN^rND^sHirakata
+!v010!^nMZ^rND^sGoldani
+!v010!^nCH^rND^sSilva
+!v012!The influence of the municipal human development index and maternal education on infant mortality: an investigation in a retrospective cohort study in the extreme south of Brazil
+!v020!194^upages
+!v030!BMC Public Health
+!v031!21
+!v037!https://doi.org/10.1186/s12889-021-10226-9
+!v061!https://doi.org/10.1186/s12889-021-10226-9
+!v064!2021
+!v065!20210000
+!v071!journal
+!v118!9
+!v700!13
+!v701!9
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000014
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nD^rND^sJaen-Varas
+!v010!^nJJ^rND^sMari
+!v010!^nE^rND^sAsevedo
+!v010!^nR^rND^sBorschmann
+!v010!^nE^rND^sDiniz
+!v010!^nC^rND^sZiebold
+!v012!The association between adolescent suicide rates and socioeconomic indicators in Brazil: a 10-year retrospective ecological study
+!v014!389-95
+!v030!Braz J Psychiatry
+!v031!41
+!v032!5
+!v037!https://doi.org/10.1590/1516-4446-2018-0223
+!v061!https://doi.org/10.1590/1516-4446-2018-0223
+!v064!2019
+!v065!20190000
+!v071!journal
+!v118!10
+!v514!^f389^l395
+!v700!14
+!v701!10
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000015
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nAG^rND^sRibeiro
+!v010!^nGS^rND^sDownward
+!v010!^nCU^rND^sFreitas
+!v010!^nF^rND^sChiaravalloti Neto
+!v010!^nMRA^rND^sCardoso
+!v010!^nMRDO^rND^sLatorre
+!v012!Incidence and mortality for respiratory cancer and traffic-related air pollution in São Paulo, Brazil
+!v014!243-51
+!v030!Environ Res
+!v031!170
+!v037!https://doi.org/10.1016/j.envres.2018.12.034
+!v061!https://doi.org/10.1016/j.envres.2018.12.034
+!v064!2019
+!v065!20190000
+!v071!journal
+!v118!11
+!v514!^f243^l251
+!v700!15
+!v701!11
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000016
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v017!Instituto de Pesquisa Econômica Aplicada
+!v018!Atlas da vulnerabilidade social
+!v037!https://dados.gov.br/dataset/ivs
+!v061!https://dados.gov.br/dataset/ivs
+!v064!2021
+!v065!20210000
+!v071!webpage
+!v109!last access on 05/21/2021
+!v118!12
+!v700!16
+!v701!12
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000017
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v016!^nUnited Nations Development^rND^sProgramme
+!v018!Atlas of human development in Brazil
+!v037!http://www.atlasbrasil.org.br/
+!v061!http://www.atlasbrasil.org.br/
+!v062!UNDP
+!v064!2021
+!v065!20210000
+!v066!New York
+!v071!book
+!v118!13
+!v700!17
+!v701!13
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000018
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nCP^rND^sSchmertmann
+!v010!^nMR^rND^sGonzaga
+!v012!Bayesian estimation of age-specific mortality and life expectancy for small areas with defective vital records
+!v014!1363-88
+!v030!Demography
+!v031!55
+!v032!4
+!v037!https://doi.org/10.1007/s13524-018-0695-2
+!v061!https://doi.org/10.1007/s13524-018-0695-2
+!v064!2018
+!v065!20180000
+!v071!journal
+!v118!14
+!v514!^f1363^l1388
+!v700!18
+!v701!14
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000019
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nMYT^rND^sIchihara
+!v010!^nD^rND^sRamos
+!v010!^nP^rND^sRebouças
+!v010!^nFJ^rND^sOliveira
+!v010!^nAJF^rND^sFerreira
+!v010!^nC^rND^sTeixeira
+!v012!Area deprivation measures used in Brazil: a scoping review
+!v020!83^upages
+!v030!Rev Saude Publica
+!v031!52
+!v037!https://doi.org/10.11606/S1518-8787.2018052000933
+!v061!https://doi.org/10.11606/S1518-8787.2018052000933
+!v064!2018
+!v065!20180000
+!v071!journal
+!v118!15
+!v700!19
+!v701!15
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000020
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nDJ^rND^sExeter
+!v010!^nJ^rND^sZhao
+!v010!^nS^rND^sCrengle
+!v010!^nA^rND^sLee
+!v010!^nM^rND^sBrowne
+!v012!The New Zealand Indices of Multiple Deprivation (IMD): a new suite of indicators for social and health research in Aotearoa, New Zealand
+!v030!PloS One
+!v031!12
+!v032!8
+!v037!https://doi.org/10.1371/journal.pone.0181260
+!v061!https://doi.org/10.1371/journal.pone.0181260
+!v064!2017
+!v065!20170000
+!v071!journal
+!v118!16
+!v514!^ee0181260
+!v700!20
+!v701!16
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000021
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nAH^rND^sLeyland
+!v010!^nR^rND^sDundas
+!v010!^nP^rND^sMcLoone
+!v010!^nFA^rND^sBoddy
+!v012!Cause-specific inequalities in mortality in Scotland: two decades of change. A population-based study
+!v020!172^upages
+!v030!BMC Public Health
+!v031!7
+!v037!https://doi.org/10.1186/1471-2458-7-172
+!v061!https://doi.org/10.1186/1471-2458-7-172
+!v064!2007
+!v065!20070000
+!v071!journal
+!v118!17
+!v700!21
+!v701!17
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000022
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nAC^rND^sTricco
+!v010!^nE^rND^sLillie
+!v010!^nW^rND^sZarin
+!v010!^nKK^rND^sO&#8217;Brien
+!v010!^nH^rND^sColquho
+!v010!^nD^rND^sLevac
+!v010!^nD^rND^sMoher
+!v012!PRISMA Extension for Scoping Reviews (PRISMA-ScR): checklist and explanation
+!v014!467-73
+!v030!Ann Intern Med
+!v031!169
+!v032!7
+!v037!https://doi.org/10.7326/M18-0850
+!v061!https://doi.org/10.7326/M18-0850
+!v064!2018
+!v065!20180000
+!v071!journal
+!v118!18
+!v514!^f467^l473
+!v700!22
+!v701!18
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000023
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v016!^nE^rND^sAromataris
+!v016!^nZ^rND^sMunn
+!v018!JBI manual for evidence synthesis
+!v062!Joanna Briggs Institute
+!v064!2020
+!v065!20200000
+!v066!Adelaide (AU)
+!v071!book
+!v118!19
+!v700!23
+!v701!19
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000024
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v016!^nJ^rND^sPopay
+!v016!^nH^rND^sRoberts
+!v016!^nA^rND^sSowden
+!v016!^nM^rND^sPetticrew
+!v016!^nL^rND^sArai
+!v016!^nM^rND^sRodgers
+!v018!Guidance on the conduct of narrative synthesis in systematic reviews: A product from the ESRC Methods Programme. Version 1
+!v037!https://www.lancaster.ac.uk/media/lancaster-university/content-assets/documents/fhm/dhr/chir/NSsynthesisguidanceVersion1-April2006.pdf
+!v061!https://www.lancaster.ac.uk/media/lancaster-university/content-assets/documents/fhm/dhr/chir/NSsynthesisguidanceVersion1-April2006.pdf
+!v062!Lancaster University
+!v064!2006
+!v065!20060000
+!v066!Lancaster (UK)
+!v071!webpage
+!v118!20
+!v700!24
+!v701!20
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000025
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nMFT^rND^sPeres
+!v010!^nD^rND^sVicentin
+!v010!^nMB^rND^sNery
+!v010!^nRS^rND^sLima
+!v010!^nER^rND^sSouza
+!v010!^nM^rND^sCerda
+!v012!Queda dos homicídios em São Paulo, Brasil: uma análise descritiva
+!v014!17-26
+!v030!Rev Panam Salud Publica
+!v031!29
+!v032!1
+!v037!https://doi.org/10.1590/s1020-49892011000100003
+!v061!https://doi.org/10.1590/s1020-49892011000100003
+!v064!2011
+!v065!20110000
+!v071!journal
+!v118!21
+!v514!^f17^l26
+!v700!25
+!v701!21
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000026
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nMBR^rND^sVilela
+!v010!^nC^rND^sBonfim
+!v010!^nZ^rND^sMedeiros
+!v012!Mortalidade infantil por doenças infecciosas e parasitárias: reflexo das desigualdades sociais em um município do Nordeste do Brasil
+!v014!445-61
+!v030!Rev Bras Saude Mater Infant
+!v031!8
+!v032!4
+!v037!https://doi.org/10.1590/S1519-38292008000400011
+!v061!https://doi.org/10.1590/S1519-38292008000400011
+!v064!2008
+!v065!20080000
+!v071!journal
+!v118!22
+!v514!^f445^l461
+!v700!26
+!v701!22
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000027
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nJLF^rND^sAntunes
+!v010!^nC^rND^sBorrell
+!v010!^nG^rND^sPérez
+!v010!^nAF^rND^sBoing
+!v010!^nV^rND^sWünsch-Filho
+!v012!Inequalities in mortality of men by oral and pharyngeal cancer in Barcelona, Spain and São Paulo, Brazil, 1995-2003
+!v020!14^upages
+!v030!Int J Equity Health
+!v031!7
+!v037!https://doi.org/10.1186/1475-9276-7-14
+!v061!https://doi.org/10.1186/1475-9276-7-14
+!v064!2008
+!v065!20080000
+!v071!journal
+!v118!23
+!v700!27
+!v701!23
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000028
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nIH^rND^sSilveira
+!v010!^nWL^rND^sJunger
+!v012!Green spaces and mortality due to cardiovascular diseases in the city of Rio de Janeiro
+!v020!49^upages
+!v030!Rev Saude Publica
+!v031!52
+!v037!https://doi.org/10.11606/S1518-8787.2018052000290
+!v061!https://doi.org/10.11606/S1518-8787.2018052000290
+!v064!2018
+!v065!20180000
+!v071!journal
+!v118!24
+!v700!28
+!v701!24
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000029
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nMG^rND^sTeixeira
+!v010!^nMA^rND^sMeyer
+!v010!^nMCN^rND^sCosta
+!v010!^nJS^rND^sPaim
+!v010!^nLMV^rND^sSilva
+!v012!Mortalidade por doenças infecciosas e parasitárias em Salvador - Bahia: evolução e diferenciais intra-urbanos segundo condições de vida
+!v014!491-7
+!v030!Rev Soc Bras Med Trop
+!v031!35
+!v032!5
+!v037!https://doi.org/10.1590/S0037-86822002000500012
+!v061!https://doi.org/10.1590/S0037-86822002000500012
+!v064!2002
+!v065!20020000
+!v071!journal
+!v118!25
+!v514!^f491^l497
+!v700!29
+!v701!25
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000030
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nAC^rND^sMacedo
+!v010!^nJS^rND^sPaim
+!v010!^nLMV^rND^sSilva
+!v010!^nMCN^rND^sCosta
+!v012!Violência e desigualdade social: mortalidade por homicídios e condições de vida em Salvador, Brasil
+!v014!515-22
+!v030!Rev Saude Publica
+!v031!35
+!v032!6
+!v037!https://doi.org/10.1590/S0034-89102001000600004
+!v061!https://doi.org/10.1590/S0034-89102001000600004
+!v064!2001
+!v065!20010000
+!v071!journal
+!v118!26
+!v514!^f515^l522
+!v700!30
+!v701!26
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000031
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nKB^rND^sRibeiro
+!v010!^nLF^rND^sLopes
+!v010!^nB^rND^sCamargo
+!v012!Trends in childhood leukemia mortality in Brazil and correlation with social inequalities
+!v014!1823-31
+!v030!Cancer
+!v031!10
+!v032!8
+!v037!https://doi.org/10.1002/cncr.22982
+!v061!https://doi.org/10.1002/cncr.22982
+!v064!2007
+!v065!20070000
+!v071!journal
+!v118!27
+!v514!^f1823^l1831
+!v700!31
+!v701!27
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000032
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nCRG^rND^sMedeiros
+!v010!^nSN^rND^sMeneghel
+!v010!^nTE^rND^sGerhardt
+!v012!Desigualdades na mortalidade por doenças cardiovasculares em pequenos municípios
+!v014!2953-62
+!v030!Cienc Saude Colet
+!v031!17
+!v032!11
+!v037!https://doi.org/10.1590/S1413-81232012001100012
+!v061!https://doi.org/10.1590/S1413-81232012001100012
+!v064!2012
+!v065!20120000
+!v071!journal
+!v118!28
+!v514!^f2953^l2962
+!v700!32
+!v701!28
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000033
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nVL^rND^sSilva
+!v010!^nMCC^rND^sLeal
+!v010!^nJG^rND^sMarino
+!v010!^nAPO^rND^sMarques
+!v012!Associação entre carência social e causas de morte entre idosos residentes no Município de Recife, Pernambuco, Brasil
+!v014!1013-23
+!v030!Cad Saude Publica
+!v031!24
+!v032!5
+!v037!https://doi.org/10.1590/S0102-311X2008000500008
+!v061!https://doi.org/10.1590/S0102-311X2008000500008
+!v064!2008
+!v065!20080000
+!v071!journal
+!v118!29
+!v514!^f1013^l1023
+!v700!33
+!v701!29
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000034
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nSL^rND^sBassanesi
+!v010!^nMI^rND^sAzambuja
+!v010!^nA^rND^sAchutti
+!v012!Premature mortality due to cardiovascular disease and social inequalities in Porto Alegre: from evidence to action
+!v014!370-9
+!v030!Arq Bras Cardiol
+!v031!90
+!v032!6
+!v037!https://doi.org/10.1590/s0066-782x2008000600004
+!v061!https://doi.org/10.1590/s0066-782x2008000600004
+!v064!2008
+!v065!20080000
+!v071!journal
+!v118!30
+!v514!^f370^l379
+!v700!34
+!v701!30
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000035
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v016!^nATR^rND^sOliveira
+!v018!Sistemas de estatísticas vitais no Brasil: avanços, perspectivas e desafios
+!v037!https://biblioteca.ibge.gov.br/visualizacao/livros/liv101575.pdf
+!v061!Estudos e análises. Informação demográfica e socioeconômica; nº 7
+!v062!IBGE
+!v064!2018
+!v065!20180000
+!v066!Rio de Janeiro
+!v071!webpage
+!v118!31
+!v700!35
+!v701!31
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000036
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nMJRP^rND^sBastos
+!v010!^nPereira^rND^sJdA
+!v010!^nDC^rND^sSmarzaro
+!v012!Ecological analysis of accidents and lethal violence in Vitória, Southeastern Brazil
+!v014!123-32
+!v030!Rev Saude Publica
+!v031!43
+!v032!1
+!v037!https://doi.org/10.1590/S0034-89102009000100016
+!v061!https://doi.org/10.1590/S0034-89102009000100016
+!v064!2009
+!v065!20090000
+!v071!journal
+!v118!32
+!v514!^f123^l132
+!v700!36
+!v701!32
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000037
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nAP^rND^sBelon
+!v010!^nMBA^rND^sBarros
+!v012!Reduction of social inequalities in life expectancy in a city of Southeastern Brazil
+!v020!36^upages
+!v030!Int J Equity Health
+!v031!10
+!v037!https://doi.org/10.1186/1475-9276-10-36
+!v061!https://doi.org/10.1186/1475-9276-10-36
+!v064!2011
+!v065!20110000
+!v071!journal
+!v118!33
+!v700!37
+!v701!33
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000038
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nML^rND^sDrachler
+!v010!^nMAO^rND^sLobato
+!v010!^nJI^rND^sLermen
+!v010!^nS^rND^sFagundes
+!v010!^nAA^rND^sFerla
+!v010!^nCW^rND^sDrachler
+!v012!Desenvolvimento e validação de um índice de vulnerabilidade social aplicado a políticas públicas do SUS
+!v014!3849-58
+!v030!Cienc Saude Colet
+!v031!19
+!v032!9
+!v037!https://doi.org/10.1590/1413-81232014199.12012013
+!v061!https://doi.org/10.1590/1413-81232014199.12012013
+!v064!2014
+!v065!20140000
+!v071!journal
+!v118!34
+!v514!^f3849^l3858
+!v700!38
+!v701!34
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000039
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nR^rND^sFaria
+!v010!^nP^rND^sSantana
+!v012!Variações espaciais e desigualdades regionais no indicador de mortalidade infantil do estado de Minas Gerais, Brasil
+!v014!736-49
+!v030!Saude Soc
+!v031!25
+!v032!3
+!v037!https://doi.org/10.1590/S0104-12902016147609
+!v061!https://doi.org/10.1590/S0104-12902016147609
+!v064!2016
+!v065!20160000
+!v071!journal
+!v118!35
+!v514!^f736^l749
+!v700!39
+!v701!35
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000040
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nCV^rND^sBonfim
+!v010!^nAPSC^rND^sSilva
+!v010!^nCM^rND^sOliveira
+!v010!^nMBR^rND^sVilela
+!v010!^nNCF^rND^sFreire
+!v012!Spatial analysis of inequalities in fetal and infant mortality due to avoidable causes
+!v030!Rev Bras Enferm
+!v031!73
+!v032!^sSuppl 4
+!v037!https://doi.org/10.1590/0034-7167-2019-0088
+!v061!https://doi.org/10.1590/0034-7167-2019-0088
+!v064!2020
+!v065!20200000
+!v071!journal
+!v118!36
+!v514!^ee20190088
+!v700!40
+!v701!36
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000041
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nDB^rND^sMachado
+!v010!^nJM^rND^sPescarini
+!v010!^nLFSC^rND^sAraújo
+!v010!^nML^rND^sBarreto
+!v012!Austerity policies in Brazil may affect violence related outcomes
+!v014!4385-94
+!v030!Cienc Saude Colet
+!v031!24
+!v032!12
+!v037!https://doi.org/10.1590/1413-812320182412.07422019
+!v061!https://doi.org/10.1590/1413-812320182412.07422019
+!v064!2019
+!v065!20190000
+!v071!journal
+!v118!37
+!v514!^f4385^l4394
+!v700!41
+!v701!37
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000042
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nC^rND^sSchuck-Paim
+!v010!^nRJ^rND^sTaylor
+!v010!^nWJ^rND^sAlonso
+!v010!^nDM^rND^sWeinberger
+!v010!^nL^rND^sSimonsen
+!v012!Effect of pneumococcal conjugate vaccine introduction on childhood pneumonia mortality in Brazil: a retrospective observational study
+!v014!e249-56
+!v030!Lancet Glob Health
+!v031!7
+!v032!2
+!v037!https://doi.org/10.1016/S2214-109X(18)30455-8
+!v061!https://doi.org/10.1016/S2214-109X(18)30455-8
+!v064!2019
+!v065!20190000
+!v071!journal
+!v118!38
+!v514!^fe249^le256
+!v700!42
+!v701!38
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000043
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nACJ^rND^sAlarcão
+!v010!^nCM^rND^sDell&#8217; Agnolo
+!v010!^nJR^rND^sVissoci
+!v010!^nECA^rND^sCarvalho
+!v010!^nCA^rND^sStaton
+!v010!^nL^rND^sAndrade
+!v012!Suicide mortality among youth in southern Brazil: a spatiotemporal evaluation of socioeconomic vulnerability
+!v014!46-53
+!v030!Braz J Psychiatry
+!v031!42
+!v032!1
+!v037!https://doi.org/10.1590/1516-4446-2018-0352
+!v061!https://doi.org/10.1590/1516-4446-2018-0352
+!v064!2020
+!v065!20200000
+!v071!journal
+!v118!39
+!v514!^f46^l53
+!v700!43
+!v701!39
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000044
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nRM^rND^sGuimarães
+!v010!^nPGM^rND^sRocha
+!v010!^nCD^rND^sMuzi
+!v010!^nRS^rND^sRamos
+!v012!Increase income and mortality of colorrectal cancer in Brazil, 2001-2009
+!v014!64-9
+!v030!Arq Gastroenterol
+!v031!50
+!v032!1
+!v037!https://doi.org/10.1590/s0004-28032013000100012
+!v061!https://doi.org/10.1590/s0004-28032013000100012
+!v064!2013
+!v065!20130000
+!v071!journal
+!v118!40
+!v514!^f64^l69
+!v700!44
+!v701!40
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000045
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nJD^rND^sAlves
+!v010!^nLH^rND^sArroyo
+!v010!^nMAM^rND^sArcoverde
+!v010!^nD^rND^sCartagena-Ramos
+!v010!^nTZ^rND^sBerra
+!v010!^nLS^rND^sAlves
+!v012!Magnitud de los determinantes sociales en el riesgo de mortalidad por tuberculosis en el Centro-Oeste de Brasil
+!v014!171-8
+!v030!Gac Sanit
+!v031!34
+!v032!2
+!v037!https://doi.org/10.1016/j.gaceta.2019.01.004
+!v061!https://doi.org/10.1016/j.gaceta.2019.01.004
+!v064!2020
+!v065!20200000
+!v071!journal
+!v118!41
+!v514!^f171^l178
+!v700!45
+!v701!41
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000046
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nTP^rND^sCampos
+!v010!^nMS^rND^sCarvalho
+!v010!^nCC^rND^sBarcellos
+!v012!Mortalidade infantil no Rio de Janeiro, Brasil: áreas de risco e trajetória dos pacientes até os serviços de saúde
+!v014!164-71
+!v030!Rev Panam Salud Publica
+!v031!8
+!v032!3
+!v037!https://www.scielosp.org/pdf/rpsp/2000.v8n3/164-171/pt
+!v061!https://www.scielosp.org/pdf/rpsp/2000.v8n3/164-171/pt
+!v064!2000
+!v065!20000000
+!v071!journal
+!v118!42
+!v514!^f164^l171
+!v700!46
+!v701!42
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000047
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nDC^rND^sOliveira
+!v010!^nÁS^rND^sBarreira
+!v010!^nMT^rND^sTrunk
+!v010!^nAF^rND^sGuzmán
+!v012!Efecto de las desigualdades socioeconómicas en la mortalidad de la ciudad de Fortaleza, Ceará, Brasil durante el año 2007
+!v014!441-500
+!v030!Rev Esp Salud Publica
+!v031!84
+!v032!4
+!v037!https://scielo.isciii.es/pdf/resp/v84n4/breve4.pdf
+!v061!https://scielo.isciii.es/pdf/resp/v84n4/breve4.pdf
+!v064!2010
+!v065!20100000
+!v071!journal
+!v118!43
+!v514!^f441^l500
+!v700!47
+!v701!43
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000048
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nPA^rND^sLotufo
+!v010!^nIM^rND^sBenseñor
+!v012!Stroke mortality in Brazil: one example of delayed epidemiological cardiovascular transition
+!v014!40-1
+!v030!Int J Stroke
+!v031!4
+!v032!1
+!v037!https://doi.org/10.1111/j.1747-4949.2009.00240.x
+!v061!https://doi.org/10.1111/j.1747-4949.2009.00240.x
+!v064!2009
+!v065!20090000
+!v071!journal
+!v118!44
+!v514!^f40^l41
+!v700!48
+!v701!44
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000049
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nEM^rND^sAraújo
+!v010!^nTM^rND^sAraújo
+!v010!^nF^rND^sSantana
+!v012!Distribuição desigual da mortalidade por causas externas: avaliação de aspectos socioeconômicos
+!v014!262-72
+!v030!Rev Baiana Saude Publica
+!v031!29
+!v032!2
+!v037!https://doi.org/10.22278/2318-2660.2005.v29.n2.a1007
+!v061!https://doi.org/10.22278/2318-2660.2005.v29.n2.a1007
+!v064!2005
+!v065!20050000
+!v071!journal
+!v118!45
+!v514!^f262^l272
+!v700!49
+!v701!45
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000050
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v016!^nEA^rND^sGuimarães
+!v018!O processo de implementação do Programa Minha Casa Minha Vida para a população de baixa renda: o caso de Viçosa, MG
+!v061!dissertação
+!v062!Universidade Federal de Viçosa
+!v064!2013
+!v065!20130000
+!v066!Viçosa, MG
+!v071!thesis
+!v118!46
+!v700!50
+!v701!46
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000051
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nRM^rND^sSilva
+!v010!^nGS^rND^sSousa
+!v010!^nLJES^rND^sVieira
+!v010!^nJMP^rND^sCaldas
+!v010!^nMCS^rND^sMinayo
+!v012!Suicidal ideation and attempts of older women in Northeastern Brazil
+!v014!755-62
+!v030!Rev Bras Enferm
+!v031!71
+!v032!^sSuppl 2
+!v037!https://doi.org/10.1590/0034-7167-2017-0413
+!v061!https://doi.org/10.1590/0034-7167-2017-0413
+!v064!2018
+!v065!20180000
+!v071!journal
+!v118!47
+!v514!^f755^l762
+!v700!51
+!v701!47
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000052
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nF^rND^sRibeiro
+!v010!^nA^rND^sLeist
+!v012!Who is going to pay the price of Covid-19? Reflections about an unequal Brazil
+!v020!91^upages
+!v030!Int J Equity Health
+!v031!19
+!v037!https://doi.org/10.1186/s12939-020-01207-2
+!v061!https://doi.org/10.1186/s12939-020-01207-2
+!v064!2020
+!v065!20200000
+!v071!journal
+!v118!48
+!v700!52
+!v701!48
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000053
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v017!Ministério da Saude (BR)
+!v017!Secretaria de Vigilância em Saúde
+!v017!Departamento de Análise da Situação de Saúde
+!v018!Manual para investigação do óbito com causa mal definida
+!v037!https://bvsms.saude.gov.br/bvs/publicacoes/manual_investigacao_obito.pdf
+!v061!Série A. Normas e Manuais Técnicos
+!v064!2009
+!v065!20090000
+!v066!Brasília, DF
+!v071!webpage
+!v118!49
+!v700!53
+!v701!49
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000054
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nI^rND^sDutta
+!v010!^nJ^rND^sFoster
+!v010!^nA^rND^sMishra
+!v012!On measuring vulnerability to poverty
+!v014!743-61
+!v030!Soc Choice Welf
+!v031!37
+!v032!4
+!v037!https://doi.org;10.1007/s00355-011-0570-1
+!v061!https://doi.org;10.1007/s00355-011-0570-1
+!v064!2011
+!v065!20110000
+!v071!journal
+!v118!50
+!v514!^f743^l761
+!v700!54
+!v701!50
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000055
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nP^rND^sTownsend
+!v012!Deprivation
+!v014!125-46
+!v030!J Soc Policy
+!v031!16
+!v032!2
+!v037!https://doi.org/10.1017/S0047279400020341
+!v061!https://doi.org/10.1017/S0047279400020341
+!v064!1987
+!v065!19870000
+!v071!journal
+!v118!51
+!v514!^f125^l146
+!v700!55
+!v701!51
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000056
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nMSG^rND^sBenedetti
+!v010!^nSB^rND^sSaraty
+!v010!^nAG^rND^sMartins
+!v010!^nMJ^rND^sMiranda
+!v010!^nDMX^rND^sAbreu
+!v012!Evaluation study of the garbage codes research project in the northern region of Brazil
+!v030!Rev Bras Epidemiol
+!v031!22
+!v032!^sSuppl 3
+!v037!https://doi.org/10.1590/1980-549720190006.supl.3
+!v061!https://doi.org/10.1590/1980-549720190006.supl.3
+!v064!2019
+!v065!20190000
+!v071!journal
+!v118!52
+!v514!^ee19006
+!v700!56
+!v701!52
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000057
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v016!^nEEC^rND^sLima
+!v016!^nMR^rND^sGonzaga
+!v016!^nFHMA^rND^sFreire
+!v016!^nBL^rND^sQueiroz
+!v018!Alternative information sources on deaths in Brazil in the context of the COVID-19 pandemic
+!v037!https://idl-bnc-idrc.dspacedirect.org/bitstream/handle/10625/60088/IDL%20-%2060088.pdf?sequence=2
+!v061!https://idl-bnc-idrc.dspacedirect.org/bitstream/handle/10625/60088/IDL%20-%2060088.pdf?sequence=2
+!v062!Centre of Excellence for CRVS Systems
+!v064!2021
+!v065!20210000
+!v066!Ottawa (CA)
+!v071!webpage
+!v118!53
+!v700!57
+!v701!53
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000058
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nE^rND^sFrança
+!v010!^nR^rND^sTeixeira
+!v010!^nL^rND^sIshitani
+!v010!^nBB^rND^sDuncan
+!v010!^nJJ^rND^sCortez-Escalante
+!v010!^nOL^rND^sMorais Neto
+!v012!Ill-defined causes of death in Brazil: a redistribution method based on the investigation of such causes
+!v014!671-81
+!v030!Rev Saude Publica
+!v031!48
+!v032!4
+!v037!https://doi.org/10.1590/S0034-8910.2014048005146
+!v061!https://doi.org/10.1590/S0034-8910.2014048005146
+!v064!2014
+!v065!20140000
+!v071!journal
+!v118!54
+!v514!^f671^l681
+!v700!58
+!v701!54
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000059
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nBL^rND^sQueiroz
+!v010!^nEEC^rND^sLima
+!v010!^nFHMA^rND^sFreire
+!v010!^nMR^rND^sGonzaga
+!v012!Temporal and spatial trends of adult mortality in small areas of Brazil, 1980-2010
+!v020!36^upages
+!v030!Genus
+!v031!76
+!v037!https://doi.org/10.1186/s41118-020-00105-3
+!v061!https://doi.org/10.1186/s41118-020-00105-3
+!v064!2020
+!v065!20200000
+!v071!journal
+!v118!55
+!v700!59
+!v701!55
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000060
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nBL^rND^sQueiroz
+!v010!^nMR^rND^sGonzaga
+!v010!^nAMN^rND^sVasconcelos
+!v010!^nBT^rND^sLopes
+!v010!^nDMX^rND^sAbreu
+!v012!Comparative analysis of completeness of death registration, adult mortality and life expectancy at birth in Brazil at the subnational level
+!v020!11^upages
+!v030!Popul Health Metrics
+!v031!18
+!v037!https://doi.org/10.1186/s12963-020-00213-4
+!v061!https://doi.org/10.1186/s12963-020-00213-4
+!v064!2020
+!v065!20200000
+!v071!journal
+!v118!56
+!v700!60
+!v701!56
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000061
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nRA^rND^sTeixeira
+!v010!^nM^rND^sNaghavi
+!v010!^nMDC^rND^sGuimarães
+!v010!^nLH^rND^sIshitani
+!v010!^nEB^rND^sFrança
+!v012!Quality of cause-of-death data in Brazil: Garbage codes among registered deaths in 2000 and 2015
+!v030!Rev Bras Epidemiol
+!v031!22
+!v032!^sSuppl 3
+!v037!https://doi.org/10.1590/1980-549720190002.supl.3
+!v061!e19002
+!v064!2019
+!v065!20190000
+!v071!journal
+!v118!57
+!v700!61
+!v701!57
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000062
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nEEC^rND^sLima
+!v010!^nBL^rND^sQueiroz
+!v012!Evolution of the death registry system in Brazil: associations with changes in the mortality profile, under-registration of death counts, and ill-defined causes of death
+!v014!1721-30
+!v030!Cad Saude Publica
+!v031!30
+!v032!8
+!v037!https://doi.org/10.1590/0102-311X00131113
+!v061!https://doi.org/10.1590/0102-311X00131113
+!v064!2014
+!v065!20140000
+!v071!journal
+!v118!58
+!v514!^f1721^l1730
+!v700!62
+!v701!58
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000063
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nCL^rND^sSzwarcwald
+!v010!^nMC^rND^sLeal
+!v010!^nAP^rND^sEsteves-Pereira
+!v010!^nWS^rND^sAlmeida
+!v010!^nPG^rND^sFrias
+!v010!^nGN^rND^sDamacena
+!v012!Avaliação das informações do Sistema de Informações sobre Nascidos Vivos (SINASC), Brasil
+!v030!Cad Saude Publica
+!v031!35
+!v032!10
+!v037!https://doi.org/10.1590/0102-311X00214918
+!v061!https://doi.org/10.1590/0102-311X00214918
+!v064!2019
+!v065!20190000
+!v071!journal
+!v118!59
+!v514!^ee00214918
+!v700!63
+!v701!59
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000064
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nM^rND^sEzzati
+!v010!^nJ^rND^sPearson-Stuttard
+!v010!^nJE^rND^sBennett
+!v010!^nCD^rND^sMathers
+!v012!Acting on non-communicable diseases in low-and middle-income tropical countries
+!v014!507-16
+!v030!Nature
+!v031!559
+!v032!7715
+!v037!https://doi.org/10.1038/s41586-018-0306-9
+!v061!https://doi.org/10.1038/s41586-018-0306-9
+!v064!2018
+!v065!20180000
+!v071!journal
+!v118!60
+!v514!^f507^l516
+!v700!64
+!v701!60
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000065
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nX^rND^sWang
+!v010!^nAH^rND^sAuchincloss
+!v010!^nS^rND^sBarber
+!v010!^nSL^rND^sMayne
+!v010!^nME^rND^sGriswold
+!v010!^nM^rND^sSims
+!v012!Neighborhood social environment as risk factors to health behavior among African Americans: The Jackson Heart Study
+!v014!199-207
+!v030!Health Place
+!v031!45
+!v037!https://doi.org/10.1016/j.healthplace.2017.04.002
+!v061!https://doi.org/10.1016/j.healthplace.2017.04.002
+!v064!2017
+!v065!20170000
+!v071!journal
+!v118!61
+!v514!^f199^l207
+!v700!65
+!v701!61
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v810!et al
+!v865!20220000
+!ID 000066
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nP^rND^sBraveman
+!v010!^nL^rND^sGottlieb
+!v012!The social determinants of health: it&#8217;s time to consider the causes of the causes
+!v014!19-31
+!v030!Public Health Rep
+!v031!129
+!v032!^sSuppl 2
+!v037!https://www.jstor.org/stable/23646782
+!v061!https://www.jstor.org/stable/23646782
+!v064!2014
+!v065!20140000
+!v071!journal
+!v118!62
+!v514!^f19^l31
+!v700!66
+!v701!62
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000067
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nVL^rND^sSilva
+!v010!^nEAP^rND^sCesse
+!v010!^nMFPM^rND^sAlbuquerque
+!v012!Social determinants of death among the elderly: a systematic literature review
+!v014!178-93
+!v030!Rev Bras Epidemiol
+!v031!17
+!v032!^sSupp 2
+!v037!https://doi.org/10.1590/1809-4503201400060015
+!v061!https://doi.org/10.1590/1809-4503201400060015
+!v064!2014
+!v065!20140000
+!v071!journal
+!v118!63
+!v514!^f178^l193
+!v700!67
+!v701!63
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000068
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v010!^nV^rND^sSkalická
+!v010!^nK^rND^sRingdal
+!v010!^nMI^rND^sWitvliet
+!v012!Socioeconomic inequalities in mortality and repeated measurement of explanatory risk factors in a 25 year follow-up
+!v030!PloS One
+!v031!10
+!v032!4
+!v037!https://doi.org/10.1371/journal.pone.0124690
+!v061!https://doi.org/10.1371/journal.pone.0124690
+!v064!2015
+!v065!20150000
+!v071!journal
+!v118!64
+!v514!^ee0124690
+!v700!68
+!v701!64
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000
+!ID 000069
+!v002!1518-8787-rsp-56-85.xml
+!v004!v56
+!v016!^nD^rND^sAcheson
+!v018!Independent inquiry into inequalities in health report
+!v037!https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/265503/ih.pdf
+!v061!https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/265503/ih.pdf
+!v062!The Stationery Office
+!v064!1998
+!v065!19980000
+!v066!Richmond (UK)
+!v071!webpage
+!v118!65
+!v700!69
+!v701!65
+!v702!rsp/v56/1518-8787-rsp-56-85.xml
+!v705!S
+!v706!c
+!v708!65
+!v865!20220000

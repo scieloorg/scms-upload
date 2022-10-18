@@ -7,24 +7,25 @@ from . import choices
 
 
 class UploadButtonHelper(ButtonHelper):
+    index_button_classnames = ["button", "button-small", "button-secondary"]
     btn_default_classnames = ["button-small", "icon",]
 
-    def finish_deposit_button(self, obj):
+    def finish_deposit_button(self, obj, classnames):
         text = _("Finish deposit")
         return {
             "url": reverse("upload:finish_deposit") + "?package_id=%s" % str(obj.id),
             "label": text,
-            "classname": self.finalise_classname(self.btn_default_classnames),
+            "classname": self.finalise_classname(classnames),
             "title": text,
         }
 
-    def view_published_document(self, obj):
+    def view_published_document(self, obj, classnames):
         # TODO: A URL deve ser configurada para ver o documento publicado
-        text = _("View published document")
+        text = _("View document")
         return {
             "url": "",
             "label": text,
-            "classname": self.finalise_classname(self.btn_default_classnames),
+            "classname": self.finalise_classname(classnames),
             "title": text,
         }
 
@@ -43,10 +44,16 @@ class UploadButtonHelper(ButtonHelper):
         usr = self.request.user
         url_name = self.request.resolver_match.url_name
 
+        classnames = []
+        if url_name == 'upload_package_modeladmin_inspect':
+            classnames.extend(ButtonHelper.inspect_button_classnames)
+        if url_name == 'upload_package_modeladmin_index':
+            classnames.extend(UploadButtonHelper.index_button_classnames)
+
         if obj.status == choices.PS_READY_TO_BE_FINISHED and ph.user_can_finish_deposit(usr, obj) and url_name == 'upload_package_modeladmin_inspect':
-            btns.append(self.finish_deposit_button(obj))
+            btns.append(self.finish_deposit_button(obj, classnames))
 
         if obj.status == choices.PS_PUBLISHED:
-            btns.append(self.view_published_document(obj))
+            btns.append(self.view_published_document(obj, classnames))
             
         return btns

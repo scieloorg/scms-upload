@@ -5,8 +5,11 @@ from lxml import etree
 
 from packtools import SPPackage
 from packtools.domain import HTMLGenerator
+from packtools.sps.models.article_authors import Authors
 from packtools.sps.models.article_assets import ArticleAssets
 from packtools.sps.models.article_renditions import ArticleRenditions
+from packtools.sps.models.article_titles import ArticleTitles
+from packtools.sps.models.front_journal_meta import ISSN
 
 from .file_utils import (
     generate_filepath_with_new_extension,
@@ -178,3 +181,45 @@ def render_html(zip_filename, language, use_optimised_package=True):
         css=CSS_ARTICLE).generate(language)
 
     return etree.tostring(html, encoding='unicode', method='html')
+
+
+def get_article_data_for_comparison(xmltree):
+    """
+    A partir do xmltree (ElementTree) informado, retorna um dicinonário nos moldes de:
+        {
+            'journal_print_issn': '0103-5053',
+            'journal_electronic_issn': '1678-4790',
+            'title': 'InCl3/NaClO: a reagent for allylic chlorination of terminal olefins',
+            'authors': [
+                'Pisoni, Diego S.',
+                'Gamba, Douglas',
+                'Fonseca, Carlos V.',
+                'Costa, Jessie S. da',
+                'Petzhold, Cesar L.',
+                'Oliveira, Eduardo R. de',
+                'Ceschi, Marco A.'
+            ]
+        }
+    """
+    article_data = {}
+
+    # ISSN (front_journal_meta)
+    obj_journal_issn = ISSN(xmltree)
+
+    article_data['journal_print_issn'] = obj_journal_issn.ppub
+    article_data['journal_electronic_issn'] = obj_journal_issn.epub
+
+    # ArticleTitles
+    obj_titles = ArticleTitles(xmltree)
+    article_data['title'] = obj_titles.article_title['text']
+
+    # ArticleAuthors
+    obj_authors = Authors(xmltree)
+
+    article_data['authors'] = []
+    for c in obj_authors.contribs:
+        article_data['authors'].append(
+            f'{c.get("surname")}, {c.get("given_names")}'
+        )
+
+    return article_data

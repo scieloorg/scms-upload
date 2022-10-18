@@ -4,6 +4,7 @@ from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView
 
 from .models import OfficialJournal, NonOfficialJournalTitle, JournalMission
+from config.menu import get_menu_order
 
 
 class OfficialJournalCreateView(CreateView):
@@ -15,31 +16,30 @@ class OfficialJournalCreateView(CreateView):
 
 class OfficialJournalAdmin(ModelAdmin):
     model = OfficialJournal
-    inspect_view_enabled = True
     menu_label = _('Journals')
     create_view_class = OfficialJournalCreateView
     menu_icon = 'folder'
-    menu_order = 200
+    menu_order = get_menu_order('journal')
     add_to_settings_menu = False
     exclude_from_explorer = False
+    inspect_view_enabled = True
 
+    list_per_page = 10
     list_display = (
         'title',
-        'foundation_year',
+        'foundation_date',
         'ISSN_print',
         'ISSN_electronic',
         'ISSNL',
     )
-    list_filter = (
-        'foundation_year',
-    )
+    # list_filter = (
+    #     'foundation_date',
+    # )
     search_fields = (
-        'foundation_year',
+        'title',
         'ISSN_print',
         'ISSN_electronic',
         'ISSNL',
-        'creator',
-        'updated_by',
     )
 
 
@@ -56,7 +56,7 @@ class NonOfficialJournalTitleAdmin(ModelAdmin):
     menu_label = _('Non Offical Journal Titles')
     create_view_class = NonOfficialJournalTitleCreateView
     menu_icon = 'folder'
-    menu_order = 200
+    menu_order = get_menu_order('journal')
     add_to_settings_menu = False
     exclude_from_explorer = False
 

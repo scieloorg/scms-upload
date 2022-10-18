@@ -26,8 +26,8 @@
 {% block content %}
     {{ block.super }}
 
+    {% if category != 'generated-by-the-system' %}
     <div class="nice-padding">
-        {% if status != 'required-erratum' and status != 'required-update' %}
         <h3>{% trans "Reports" %}</h3>
         <table class="listing">
             <thead>
@@ -41,19 +41,15 @@
                 <tr>
                     <td class='title'><h2>{% trans "XML and/or DTD formation" %}</h2></td>
                     <td>
-                    {% if validation_errors.xml_format_error %}
+                    {% if validation_errors.xml_or_dtd %}
                         <span class='help-block help-critical'>{% trans "XML file has errors." %}</a></span>
                     {% else %}
-                        {% if validation_errors.package_file_error %}
-                            <span class='help-block help-info'>{% trans 'This validation has not been performed yet.' %}</span>
-                        {% else %}
-                            <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
-                        {% endif %}
+                        {% include 'modeladmin/upload/package/inspect_validation_check.html' with validation_error_package_file=validation_errors.package_file %}
                     {% endif %}
                     </td>
                     <td>
-                        {% if validation_errors.xml_format_error %}
-                            <a href="{{ validation_errors.xml_format_error.0.inspect_url }}">{% trans 'See the XML and/or DTD Formation Report.' %}</a>
+                        {% if validation_errors.xml_or_dtd %}
+                            <a href="{{ validation_errors.xml_or_dtd.0.inspect_url }}">{% trans 'See the XML and/or DTD Formation Report.' %}</a>
                         {% endif %}
                     </td>
 
@@ -61,19 +57,15 @@
                 <tr>
                     <td class='title'><h2>{% trans "Digital assets and renditions" %}</h2></td>
                     <td>
-                        {% if validation_errors.asset_error or validation_errors.rendition_error %}
+                        {% if validation_errors.asset_and_rendition %}
                             <span class='help-block help-critical'>{% trans "Digital assets and/or renditions validation failed." %}</span>
                         {% else %}
-                            {% if not validation_errors.package_file_error and not validation_errors.xml_format_error %}
-                                <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
-                            {% else %}
-                                <span class='help-block help-info'>{% trans 'This validation has not been performed yet.' %}</span>
-                            {% endif %}
+                            {% include 'modeladmin/upload/package/inspect_validation_check.html' with validation_error_package_file=validation_errors.package_file %}
                         {% endif %}
                     </td>
                     <td>
-                        {% if not validation_errors.package_file_error and not validation_errors.xml_format_error %}
-                            <a href="{% url 'upload:validation_report' %}?package_id={{ package_id }}&category=asset-and-rendition-error">{% trans 'See the Digital Assets and Renditions Report.' %}</a>
+                        {% if not validation_errors.asset_or_rendition and not validation_errors.package_file %}
+                            <a href="{% url 'upload:validation_report' %}?package_id={{ package_id }}&report=asset_and_rendition">{% trans 'See the Digital Assets and Renditions Report.' %}</a>
                         {% endif %}
                     </td>
                 </tr>
@@ -87,9 +79,17 @@
                 <tr>
                     <td class='title'><h2>{% trans "Individual content validation" %}</h2></td>
                     <td>
-                        <span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span>
+                        {% if validation_errors.individual_content %}
+                            <span class='help-block help-critical'>{% trans "Individual content validation failed." %}</span>
+                        {% else %}
+                            {% include 'modeladmin/upload/package/inspect_validation_check.html' with validation_error_package_file=validation_errors.package_file %}
+                        {% endif %}
                     </td>
-                    <td></td>
+                    <td>
+                        {% if validation_errors.individual_content %}
+                            <a href="{% url 'upload:validation_report' %}?package_id={{ package_id }}&report=individual_content">{% trans 'See the Individual Content Report.' %}</a>
+                        {% endif %}
+                    </td>
                 </tr>
                 <tr>
                     <td class='title'><h2>{% trans "Grouped content validation" %}</h2></td>
@@ -120,29 +120,8 @@
                 </tr>
             </tbody>
         </table>
-        {% else %}
-        <h3>{% trans "Change instructions" %}</h3>
-        {% for rac in requested_changes %}
-            <dl class='help-block help-info'>
-                <dt>{% trans 'Identifier' %}</dt>
-                <dd>{{ rac.id }}</dd>
-                <dt>{% trans 'Type' %}</dt>
-                <dd>{{ rac.get_change_type_display }}</dd>
-                <dt>{% trans 'Deadline' %}</dt>
-                <dd>{{ rac.deadline }}</dd>
-                <dt>{% trans 'Instructions' %}</dt>
-                <dd>{{ rac.comment|richtext }}</dd>
-            </dl>
-        {% endfor %}
-        <a href="{{ package_download_link }}" class="button bicolor button--icon">
-            <span class="icon-wrapper">
-                <svg class="icon icon-download-alt icon" aria-hidden="true" focusable="false">
-                    <use href="#icon-download-alt"></use>
-                </svg>
-            </span>{% trans 'Download package' %}
-        </a>
-        {% endif %}
     </div>
+    {% endif %}
 
     <div class="nice-padding">
         <h3>{% trans "Preview" %}</h3>
