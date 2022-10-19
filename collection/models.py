@@ -230,6 +230,8 @@ class NewWebSiteConfiguration(CommonControlField):
 
 class FilesStorageConfiguration(CommonControlField):
 
+    name = models.CharField(
+        _('Name'), max_length=255, null=True, blank=False)
     host = models.CharField(
         _('Host'), max_length=255, null=True, blank=True)
     bucket_root = models.CharField(

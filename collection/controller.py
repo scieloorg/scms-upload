@@ -12,12 +12,53 @@ from .models import (
     FilesStorageConfiguration,
     NewWebSiteConfiguration,
 )
+from libs.dsm.files_storage.minio import MinioStorage
 from journal.controller import get_or_create_official_journal
 from journal.exceptions import GetOrCreateOfficialJournalError
 from issue.controller import get_or_create_official_issue
 from article.controller import get_or_create_official_article
 
 from . import exceptions
+
+
+def update_files_storage_configuration(
+        files_storage,
+        name, host, access_key, secret_key, secure,
+        bucket_root, bucket_public_subdir,
+        user_id,
+        ):
+    files_storage = files_storage or FilesStorageConfiguration()
+    files_storage.host = host
+    files_storage.secure = secure
+    files_storage.access_key = access_key
+    files_storage.secret_key = secret_key
+    files_storage.bucket_root = bucket_root
+    files_storage.bucket_public_subdir = bucket_public_subdir
+    files_storage.creator_id = user_id
+    files_storage.save()
+    return files_storage
+
+
+def get_files_storage_configuration(name):
+    return FilesStorageConfiguration.objects.get(name=name)
+
+
+def get_files_storage(files_storage_config):
+    try:
+        return MinioStorage(
+            minio_host=files_storage_config.host,
+            minio_access_key=files_storage_config.access_key,
+            minio_secret_key=files_storage_config.secret_key,
+            bucket_root=files_storage_config.bucket_root,
+            bucket_subdir=files_storage_config.bucket_public_subdir,
+            minio_secure=files_storage_config.secure,
+            minio_http_client=None,
+        )
+    except Exception as e:
+        raise exceptions.GetFilesStorageError(
+            _("Unable to get MinioStorage {} {} {}").format(
+                files_storage_config, type(e), e)
+        )
 
 
 def start():
