@@ -9,6 +9,9 @@ from django.utils.translation import gettext as _
 
 import requests
 
+from libs.dsm.publication import documents as publication_documents
+
+from upload.utils import package_utils
 from collection import controller as collection_controller
 from . import (
     models,
@@ -20,11 +23,6 @@ from . import (
 
 LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-
-
-files_storage = collection_controller.get_files_storage(
-    collection_controller.get_files_storage_configuration(name='pid_provider')
-)
 
 
 def get_registered_xml(xmltree):
@@ -41,9 +39,9 @@ def get_registered_xml(xmltree):
 
     Raises
     ------
+    exceptions.FoundAOPPublishedInAnIssueError
     exceptions.GetRegisteredXMLError
     exceptions.RegisteredXMLDoesNotExistError
-
     """
     try:
         # obtém o registro do documento
@@ -83,7 +81,7 @@ def request_document_ids_for_zip(xml_zip_file_path, user_id):
 
     Returns
     -------
-        new_xml_uri or None
+        dict which keys are v3 and xml_uri if applicable
 
     Raises
     ------
@@ -121,7 +119,7 @@ def request_document_ids_for_xml_uri(xml_uri, user_id):
 
     Returns
     -------
-        new_xml_uri or None
+        dict which keys are v3 and xml_uri if applicable
 
     Raises
     ------
@@ -161,6 +159,10 @@ def _get_xml(xml_uri, timeout=30):
 def _put_xml(xml_content, object_name):
     LOGGER.debug("Put XML {}".format(object_name))
     try:
+        files_storage = collection_controller.get_files_storage(
+            collection_controller.get_files_storage_configuration(name='pid_provider')
+        )
+
         return files_storage.fput_content(
             xml_content,
             mimetype="application/xml",
@@ -189,7 +191,7 @@ def _request_document_ids(xml_adapter, user_id):
 
     Returns
     -------
-        new_xml_uri or None
+        dict which keys are v3 and xml_uri if applicable
 
     Raises
     ------
@@ -198,6 +200,7 @@ def _request_document_ids(xml_adapter, user_id):
 
     """
     try:
+        response = {}
         # obtém o registro do documento
         registered = _get_registered_xml(xml_adapter)
 
@@ -241,7 +244,8 @@ def _request_document_ids(xml_adapter, user_id):
                 _update_registered_document(registered, xml_file, user_id)
             else:
                 _register_new_document(xml_adapter, xml_file, user_id)
-            return xml_uri
+            response['xml_uri'] = xml_uri
+        response['v3'] = xml_adapter.v3
     except Exception as e:
         raise exceptions.RequestDocumentIDsError(
             "Unable to request document IDs for {}".format(xml_adapter.v3)
@@ -612,4 +616,48 @@ def _register_new_document(xml_adapter, xml_file, user_id):
     except Exception as e:
         raise exceptions.SavingError(
             "Register new document error: %s %s %s" % (type(e), e, data)
+        )
+
+
+def sync_new_website_to_pid_provider_system(xmltree, user_id):
+    """
+    Busca documento em Pid Provider
+    Se não o encontrar, tenta buscar no site novo e faz sincronização dos
+    dados do site novo e do pid provider
+    Retorna o item registrado em Pid Provider
+    """
+    try:
+        try:
+            # consulta pid provider
+            return get_registered_xml(xmltree)
+        except pid_provider_exceptions.RegisteredXMLDoesNotExistError:
+            # tentar recuperar documento do site novo
+            data = package_utils.get_article_data_for_comparison(xmltree)
+            similar_docs = publication_documents.get_similar_documents(
+                article_title=data["title"],
+                journal_electronic_issn=data["journal_electronic_issn"],
+                journal_print_issn=data["journal_print_issn"],
+                authors=data["authors"],
+            )
+
+            for found_doc in similar_docs:
+                try:
+                    # obtém doc do site novo
+                    doc = publication_documents.get_document(_id=found_doc.aid)
+
+                    # registra dados do documento no pid provider system
+                    registered = request_document_ids_for_xml_uri(
+                        xml_uri=doc.xml, user_id=user_id,
+                    )
+                except Exception as e:
+                    # TODO ???
+                    pass
+            # consulta novemente pid provider,
+            # após inserção dos documentos similares em pid provider
+            return get_registered_xml(xmltree)
+    except Exception as e:
+        # TODO ???
+        raise exceptions.SyncNewWebsiteToPidProviderSystemError(
+            _("Unable to sync new website to pid provider system {}").format(
+                xmltree)
         )
