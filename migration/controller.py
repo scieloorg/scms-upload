@@ -5,7 +5,6 @@ import traceback
 import sys
 from datetime import datetime
 from random import randint
-from copy import deepcopy
 from io import StringIO
 
 from django.utils.translation import gettext_lazy as _
@@ -29,12 +28,15 @@ from scielo_classic_website import classic_ws
 
 from django_celery_beat.models import PeriodicTask, CrontabSchedule
 
+from libs.xml_sps_utils import get__xml__from_uri
 from libs.dsm.files_storage.minio import MinioStorage
 from libs.dsm.publication.db import mk_connection
 from libs.dsm.publication.journals import JournalToPublish
 from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
 from libs.dsm.publication.documents import DocumentToPublish
-
+from pid_provider.controller import (
+    request_document_ids,
+)
 from core.controller import parse_non_standard_date, parse_months_names
 
 from collection.choices import CURRENT
@@ -42,6 +44,7 @@ from collection import controller as collection_controller
 from collection.exceptions import (
     GetSciELOJournalError,
 )
+
 from .models import (
     JournalMigration,
     IssueMigration,
@@ -1238,7 +1241,9 @@ def migrate_documents(
                     files_storage=files_storage,
                     bucket_public_subdir=bucket_public_subdir,
                 )
-                document_files_controller.add_scielo_document_to_files()
+                document_files_controller.link_scielo_document_to_its_files(
+                    user_id
+                )
                 document_files_controller.info()
 
                 import_document(
@@ -1246,10 +1251,10 @@ def migrate_documents(
                     journal_issue_and_document_data,
                     force_update,
                 )
-
                 publish_document(
                     pid, document, document_migration,
                     document_files_controller,
+                    user_id,
                 )
 
             except Exception as e:
@@ -1296,7 +1301,7 @@ def import_document(pid, document, document_migration,
         )
 
 
-def publish_document(pid, document, document_migration, document_files_controller):
+def publish_document(pid, document, document_migration, document_files_controller, user_id):
     """
     Raises
     ------
@@ -1318,9 +1323,8 @@ def publish_document(pid, document, document_migration, document_files_controlle
 
     try:
         # IDS
-        # TODO v3 depende do pid manager
         doc_to_publish.add_identifiers(
-            document.scielo_pid_v3,
+            document_files_controller.v3,
             document.scielo_pid_v2,
             document.publisher_ahead_id,
         )
@@ -1392,7 +1396,7 @@ def publish_document(pid, document, document_migration, document_files_controlle
 
         # ARQUIVOS
         # xml
-        for xml in document_files_controller.xml_files:
+        for xml in document_files_controller.xml_files.iterator():
             doc_to_publish.add_xml(xml.public_uri)
             break
 
@@ -1401,7 +1405,7 @@ def publish_document(pid, document, document_migration, document_files_controlle
             doc_to_publish.add_html(item['lang'], uri=None)
 
         # pdfs
-        for item in document_files_controller.rendition_files:
+        for item in document_files_controller.rendition_files.iterator():
             doc_to_publish.add_pdf(
                 lang=item.lang,
                 url=item.uri,
@@ -1444,7 +1448,7 @@ def publish_document(pid, document, document_migration, document_files_controlle
         document_migration.save()
     except Exception as e:
         raise exceptions.PublishDocumentError(
-            _("Unable to upate document_migration status {} {}").format(
+            _("Unable to update document_migration status {} {}").format(
                 pid, e
             )
         )
@@ -1470,122 +1474,127 @@ class DocumentFilesController:
 
     def info(self):
         logging.info("DocumentFilesController {}".format(self.scielo_document))
-        for item in self.xml_files:
+        for item in self.xml_files.iterator():
             logging.info("xmlfile: {} {}".format(self.scielo_document, item))
             logging.info("public: {} {}".format(item.public_uri, item.public_object_name))
             logging.info("xml file asset: {} {}".format(self.scielo_document, item))
-            for asset in item.assets_files.all():
+            for asset in item.assets_files.iterator():
                 logging.info("{} {} {}".format(self.scielo_document, item, asset))
-        for item in self.rendition_files:
+        for item in self.rendition_files.iterator():
             logging.info("rendition file: {} {}".format(self.scielo_document, item))
-        for item in self.html_files:
+        for item in self.html_files.iterator():
             logging.info("html file: {} {}".format(self.scielo_document, item))
-            for asset in item.assets_files.all():
+            for asset in item.assets_files.iterator():
                 logging.info("html file asset: {} {} {}".format(self.scielo_document, item, asset))
 
-    def add_scielo_document_to_files(self):
+    @property
+    def main_xml_uri(self):
+        for item in self.scielo_document.xml_files.iterator():
+            if item.lang == self._main_language:
+                return item.uri
+
+    @property
+    def v3(self):
+        for item in self.scielo_document.xml_files.iterator():
+            return item.v3
+
+    def link_scielo_document_to_its_files(self, user_id):
         self.add_rendition_files()
         self.add_xml_files()
-        self.add_langs_to_xml_files()
         self.add_html_files()
         self.add_supplementary_material_flag_to_assets()
-        self.add_public_xml_files()
+        self.add_public_xml_files(user_id)
 
     def add_xml_files(self):
         logging.info("Add xml files to {}".format(self.scielo_document))
-        self._xml_files = XMLFile.objects.filter(
-            scielo_issue=self.scielo_document.scielo_issue,
-            file_id=self.scielo_document.file_id,
+        self.scielo_document.xml_files.set(
+            XMLFile.objects.filter(
+                scielo_issue=self.scielo_document.scielo_issue,
+                file_id=self.scielo_document.file_id,
+            )
         )
-        self.scielo_document.xml_files.set(self._xml_files)
         self.scielo_document.save()
-        logging.info("Added xml files to {}".format(self.scielo_document))
-
-    def add_langs_to_xml_files(self):
-        logging.info("Add langs to xml files of {}".format(self.scielo_document))
-        self._xmltree = {}
-        for item in self.xml_files:
-            try:
-                xmltree = read_xml_file(self.files_storage.fget(item.object_name))
-            except Exception as e:
-                raise exceptions.AddLangsToXMLFilesError(
-                    _("Unable get xml file {} object_name: {} {} {}").format(
-                        self.scielo_document, item.object_name, type(e), e
-                    )
-                )
-            try:
-                article = ArticleRenditions(xmltree)
-                article_renditions = article.article_renditions
-                item.lang = article_renditions[0].language
-                item.languages = [
-                    {"lang": rendition.language}
-                    for rendition in article_renditions
-                ]
-                item.save()
-                logging.info(item)
-                self._xmltree[item.lang] = xmltree
-            except Exception as e:
-                raise exceptions.AddLangsToXMLFilesError(
-                    _("Unable to add langs to xml files {} {} {} {}").format(
-                        self.scielo_document, item, type(e), e
-                    )
-                )
-        logging.info("Added langs to xml files of {}".format(self.scielo_document))
-        return self._xmltree
+        logging.info("Added to xml files of {}".format(self.scielo_document))
 
     def add_rendition_files(self):
         logging.info("Add rendition files to {}".format(self.scielo_document))
         try:
+            # busca o pdf que tem o idioma == 'main'
             main_pdf = FileWithLang.objects.get(
                 scielo_issue=self.scielo_document.scielo_issue,
                 file_id=self.scielo_document.file_id,
                 lang='main'
             )
+            # atualiza com o valor de main_language
             main_pdf.lang = self._main_language
             main_pdf.save()
         except FileWithLang.DoesNotExist:
             pass
-        self._rendition_files = FileWithLang.objects.filter(
-            scielo_issue=self.scielo_document.scielo_issue,
-            file_id=self.scielo_document.file_id,
+
+        # atualiza rendition files do scielo_document
+        self.scielo_document.renditions_files.set(
+            FileWithLang.objects.filter(
+                scielo_issue=self.scielo_document.scielo_issue,
+                file_id=self.scielo_document.file_id,
+            )
         )
-        self.scielo_document.renditions_files.set(self._rendition_files)
         self.scielo_document.save()
         logging.info("Added rendition files to {}".format(self.scielo_document))
 
     def add_html_files(self):
         logging.info("Add html files to {}".format(self.scielo_document))
-        self._html_files = SciELOHTMLFile.objects.filter(
-            scielo_issue=self.scielo_document.scielo_issue,
-            file_id=self.scielo_document.file_id,
+        self.scielo_document.html_files.set(
+            SciELOHTMLFile.objects.filter(
+                scielo_issue=self.scielo_document.scielo_issue,
+                file_id=self.scielo_document.file_id,
+            )
         )
-        self.scielo_document.html_files.set(self._html_files)
         self.scielo_document.save()
         logging.info("Added html files to {}".format(self.scielo_document))
 
     @property
     def rendition_files(self):
-        if not hasattr(self, '_rendition_files') or not self._rendition_files:
-            self.add_rendition_files()
-        return self._rendition_files
+        return self.scielo_document.renditions_files
 
     @property
     def html_files(self):
-        if not hasattr(self, '_html_files') or not self._html_files:
-            self.add_html_files()
-        return self._html_files
+        return self.scielo_document.html_files
 
     @property
     def xml_files(self):
-        if not hasattr(self, '_xml_files') or not self._xml_files:
-            self.add_xml_files()
-        return self._xml_files
+        return self.scielo_document.xml_files
 
     @property
-    def xmltree(self):
-        if not hasattr(self, '_xmltree') or not self._xmltree:
-            self.add_langs_to_xml_files()
-        return self._xmltree
+    def xmls(self):
+        if not hasattr(self, '_xmls') or not self._xmls:
+            self._xmls = {}
+            for xml_file in self.scielo_document.xml_files.iterator():
+                try:
+                    xml = get__xml__from_uri(xml_file.uri)
+                except Exception as e:
+                    raise exceptions.AddLangsToXMLFilesError(
+                        _("Unable get xml {} from {}: {} {}").format(
+                            self.scielo_document, xml_file.uri, type(e), e
+                        )
+                    )
+                try:
+                    article = ArticleRenditions(xml.xmltree)
+                    renditions = article.article_renditions
+                    xml_file.lang = renditions[0].language
+                    xml_file.languages = [
+                        {"lang": rendition.language}
+                        for rendition in renditions
+                    ]
+                    xml_file.save()
+                    logging.info(xml_file)
+                    self._xmls[xml_file.lang] = xml
+                except Exception as e:
+                    raise exceptions.AddLangsToXMLFilesError(
+                        _("Unable to add langs to xml files {} {} {} {}").format(
+                            self.scielo_document, xml_file, type(e), e
+                        )
+                    )
+        return self._xmls
 
     @property
     def issue_assets_uri(self):
@@ -1610,11 +1619,11 @@ class DocumentFilesController:
     @property
     def text_langs(self):
         if not hasattr(self, '_text_langs') or not self._text_langs:
-            if self.xmltree:
-                self._text_langs = []
-                for lang, xmltree in self.xmltree.items():
-                    for rendition in ArticleRenditions(xmltree).article_renditions:
-                        self._text_langs.append({"lang": rendition.language})
+            if self.xmls:
+                self._text_langs = [
+                    {"lang": lang}
+                    for lang in self.xmls.keys()
+                ]
             else:
                 self._text_langs = [{"lang": self._main_language}] + [
                     {"lang": html.lang}
@@ -1627,8 +1636,8 @@ class DocumentFilesController:
     def related_items(self):
         if not hasattr(self, '_related_items') or not self._related_items:
             items = []
-            for lang, xmltree in self.xmltree.items():
-                related = RelatedItems(xmltree)
+            for lang, xml in self.xmls.items():
+                related = RelatedItems(xml.xmltree)
                 items.extend(related.related_articles)
             self._related_items = items
         return self._related_items
@@ -1643,14 +1652,14 @@ class DocumentFilesController:
             self.scielo_document
         ))
         self._supplementary_materials = []
-        for lang, xmltree in self.xmltree.items():
-            try:
-                suppl_mats = SupplementaryMaterials(xmltree)
+        try:
+            for lang, xml in self.xmls.items():
+                suppl_mats = SupplementaryMaterials(xml.xmltree)
                 for sm in suppl_mats.items:
                     try:
                         asset_file = self.issue_assets_dict.get(sm.name)
                         if asset_file:
-                            # FIXME tratar asset_file nao encontrado 
+                            # TODO tratar asset_file nao encontrado
                             asset_file.is_supplementary_material = True
                             asset_file.save()
                             self._supplementary_materials.append({
@@ -1661,13 +1670,14 @@ class DocumentFilesController:
                             })
                     except Exception as e:
                         raise exceptions.AddSupplementaryMaterialFlagToAssetError(
-                            _("Unable to add supplentary material flag to asset {} {} {} {}").format(self.scielo_document, lang, type(e), e)
+                            _("Unable to add supplementary material flag to asset {} {} {} {}").format(self.scielo_document, lang, type(e), e)
                         )
 
-            except Exception as e:
-                raise exceptions.AddSupplementaryMaterialFlagToAssetError(
-                    _("Unable to add supplentary material flag to asset {} {} {} {}").format(self.scielo_document, lang, type(e), e)
-                )
+        except Exception as e:
+            raise exceptions.AddSupplementaryMaterialFlagToAssetError(
+                _("Unable to add supplementary material flag to asset {} {} {}").format(
+                    self.scielo_document, type(e), e)
+            )
         logging.info(_("Added supplementary material flag to assets {}").format(
             self.scielo_document
         ))
@@ -1678,47 +1688,70 @@ class DocumentFilesController:
             self.add_supplementary_material_flag_to_assets()
         return self._supplementary_materials
 
-    def add_public_xml_files(self):
-        if not self.xmltree:
+    def add_public_xml_files(self, user_id):
+        """
+        Obtém os XML do site clássico (href com conteúdo "local"),
+        - troca o conteúdo de href pelos links respectivos dos ativos digitais
+        registrados no minio
+        - atualiza os pids v3, v2, aop_pid
+        """
+        if not self.xmls:
             return
 
         logging.info(_("Add public xml files to {}").format(
             self.scielo_document
         ))
-        from_to = self.issue_assets_uri
 
-        for xml_file in self.xml_files:
+        for xml_file in self.xml_files.iterator():
             try:
-                # copia de xml
-                xmltree = deepcopy(self.xmltree[xml_file.lang])
-
                 # obtém os assets do XML
-                article_assets = ArticleAssets(xmltree)
-                for asset_in_xml in article_assets.article_assets:
-                    asset = self.issue_assets_dict.get(asset_in_xml.name)
-                    if asset:
-                        # FIXME tratar asset_file nao encontrado
-                        xml_file.assets_files.add(asset)
-                xml_file.save()
+                self._add_assets_to_public_xml(xml_file)
 
-                # substitui name por uri
-                article_assets.replace_names(from_to)
-
-                # registra XML modificado no Files Storage
+                xml = self.xmls[xml_file.lang]
+                # cria object_name
                 object_name = self.get_object_name(xml_file.name)
-
-                #
-                uri = self.files_storage.fput_content(
-                    tostring(article_assets.xmltree),
-                    mimetype="text/xml",
-                    object_name=object_name
+                # verificar pids em pid_provider
+                registered_in_pid_provider = (
+                    request_document_ids(
+                        xml,
+                        user_id,
+                        self.files_storage.fput_content,
+                        object_name,
+                    )
                 )
-                xml_file.public_uri = uri
+                # registra XML modificado no Files Storage
+                xml_file.v3 = registered_in_pid_provider.v3
+                xml_file.public_uri = registered_in_pid_provider.lastest.uri
                 xml_file.public_object_name = object_name
                 xml_file.save()
-                logging.info(_("Registered {} {}").format(xml_file, uri))
+
+                logging.info(
+                    _("Registered {} {}").format(xml_file, xml_file.uri))
+
             except Exception as e:
                 raise exceptions.AddPublicXMLError(
                     _("Unable to add public XML to {} {} {})").format(
                         xml_file, type(e), e
                     ))
+
+    def _add_assets_to_public_xml(self, xml_file):
+        """
+        Obtém os XML do site clássico (href com conteúdo "local"),
+        - troca o conteúdo de href pelos links respectivos dos ativos digitais
+        registrados no minio
+        """
+        try:
+            # obtém os assets do XML
+            article_assets = ArticleAssets(self.xmls[xml_file.lang].xmltree)
+            for asset_in_xml in article_assets.article_assets:
+                asset = self.issue_assets_dict.get(asset_in_xml.name)
+                if asset:
+                    # FIXME tratar asset_file nao encontrado
+                    xml_file.assets_files.add(asset)
+            xml_file.save()
+            article_assets.replace_names(self.issue_assets_uri)
+        except Exception as e:
+            raise exceptions.AddPublicXMLError(
+                _("Unable to add assets to public XML to {} {} {})").format(
+                    xml_file, type(e), e
+                ))

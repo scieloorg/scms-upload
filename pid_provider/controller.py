@@ -5,14 +5,15 @@ from datetime import datetime
 from http import HTTPStatus
 from shutil import copyfile
 
-from django.utils.translation import gettext as _
-
 import requests
+
+from django.utils.translation import gettext as _
+from django.contrib.auth import get_user_model
 
 from libs.dsm.publication import documents as publication_documents
 
 from upload.utils import package_utils
-from collection import controller as collection_controller
+from libs import xml_sps_utils as libs_xml_sps_utils
 from . import (
     models,
     exceptions,
@@ -20,33 +21,39 @@ from . import (
     xml_sps_utils,
 )
 
+User = get_user_model()
 
 LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
-def get_registered_xml(xmltree):
+def get_registered_xml(xml, user_id, fput_content):
     """
     Get registered XML
 
     Parameters
     ----------
-    xmltree
+    xml : XMLPre
 
     Returns
     -------
-        models.XMLAOPArticle or models.XMLArticle
+        None or models.XMLAOPArticle or models.XMLArticle
 
     Raises
     ------
     exceptions.FoundAOPPublishedInAnIssueError
     exceptions.GetRegisteredXMLError
-    exceptions.RegisteredXMLDoesNotExistError
     """
     try:
         # obtém o registro do documento
-        xml_adapter = xml_sps_utils.XMLAdapter(XML("", xmltree))
-        registered = _get_registered_xml(xml_adapter)
+        xml_adapter = xml_sps_utils.XMLAdapter(xml)
+        logging.info("ADAPT")
+        logging.info(xml_adapter)
+        registered = _query_document(xml_adapter)
+        if not registered:
+            _sync_new_website_to_pid_provider_system(
+                xml_adapter.xmltree, user_id, fput_content)
+            registered = _query_document(xml_adapter)
 
         if registered and xml_adapter.is_aop and not registered.is_aop:
             # levanta exceção se está sendo ingressada uma versão aop de
@@ -56,19 +63,14 @@ def get_registered_xml(xmltree):
                   "but the document {} is already published in an issue"
                   ).format(registered)
             )
-        if registered:
-            return registered
-        else:
-            raise exceptions.RegisteredXMLDoesNotExistError(
-                _("XML is not registered")
-            )
+        return registered
     except Exception as e:
         raise exceptions.GetRegisteredXMLError(
-            _("Unable to request document IDs for {}".format(xml_zip_file_path))
+            _("Unable to get registered XML {}").format(xml)
         )
 
 
-def request_document_ids_for_zip(xml_zip_file_path, user_id):
+def request_document_ids_for_zip(xml_zip_file_path, user_id, fput_content):
     """
     Request PID v3
 
@@ -81,18 +83,20 @@ def request_document_ids_for_zip(xml_zip_file_path, user_id):
 
     Returns
     -------
-        dict which keys are v3 and xml_uri if applicable
+        models.XMLAOPArticle or models.XMLArticle
 
     Raises
     ------
     exceptions.RequestDocumentIDsForXMLZipFileError
     """
     try:
-        for item in xml_sps_utils.get_xml_items(xml_zip_file_path):
+        for item in libs_xml_sps_utils.get_xml_items(xml_zip_file_path):
             try:
                 # {"filename": item: "xml": xml}
-                xml_adapter = xml_sps_utils.XMLAdapter(item['xml'])
-                item['new_xml_uri'] = _request_document_ids(xml_adapter, user_id)
+                registered = request_document_ids(
+                    item['xml'], user_id, fput_content, item["filename"])
+                if registered:
+                    item.update({"registered": registered})
                 yield item
             except Exception as e:
                 raise exceptions.RequestDocumentIDsForXMLZipFileError(
@@ -102,96 +106,24 @@ def request_document_ids_for_zip(xml_zip_file_path, user_id):
                 )
     except Exception as e:
         raise exceptions.RequestDocumentIDsForXMLZipFileError(
-            _("Unable to request document IDs for {}".format(xml_zip_file_path))
+            _("Unable to request document IDs for {}").format(
+                xml_zip_file_path)
         )
 
 
-def request_document_ids_for_xml_uri(xml_uri, user_id):
+def request_document_ids(xml, user_id, fput_content, object_name):
     """
     Request PID v3
 
     Parameters
     ----------
-    xml_uri : str
-        XML URI
+    xml : XMLPre
     user_id : str
         requester
 
     Returns
     -------
-        dict which keys are v3 and xml_uri if applicable
-
-    Raises
-    ------
-    exceptions.RequestDocumentIDsForXMLUriError
-
-    """
-    try:
-        xml_adapter = _get_xml(xml_uri)
-        return _request_document_ids(xml_adapter, user_id)
-    except Exception as e:
-        raise exceptions.RequestDocumentIDsForXMLUriError(
-            _("Unable to request document IDs for XML URI {}".format(xml_uri))
-        )
-
-
-#############################################################################
-
-def _get_content(uri, timeout=30):
-    response = requests.get(uri, timeout=timeout)
-    return response.content.decode("utf-8")
-
-
-def _get_xml(xml_uri, timeout=30):
-    LOGGER.debug("Get XML from {}".format(xml_uri))
-    try:
-        return xml_sps_utils.XMLAdapter(
-            _get_content(xml_uri, timeout=timeout)
-        )
-    except Exception as e:
-        logging.exception(e)
-        raise exceptions.GetXMLFromURIError(
-            _("Unable to get XML {} to request its PIDs: {} {}").format(
-                xml_uri, type(e), e)
-        )
-
-
-def _put_xml(xml_content, object_name):
-    LOGGER.debug("Put XML {}".format(object_name))
-    try:
-        files_storage = collection_controller.get_files_storage(
-            collection_controller.get_files_storage_configuration(name='pid_provider')
-        )
-
-        return files_storage.fput_content(
-            xml_content,
-            mimetype="application/xml",
-            object_name=object_name,
-        )
-    except Exception as e:
-        logging.exception(e)
-        raise exceptions.PutXMLError(
-            _("Unable to put XML {}: {} {}").format(
-                object_name, type(e), e)
-        )
-
-
-def _request_document_ids(xml_adapter, user_id):
-    """
-    Request PID v3
-
-    Parameters
-    ----------
-    xml_adapter : XMLAdapter
-        XMLAdapter
-    user_id : str
-        requester
-    fput_content : callable
-        store file by its content
-
-    Returns
-    -------
-        dict which keys are v3 and xml_uri if applicable
+        None or models.XMLAOPArticle or models.XMLArticle
 
     Raises
     ------
@@ -200,39 +132,73 @@ def _request_document_ids(xml_adapter, user_id):
 
     """
     try:
-        response = {}
         # obtém o registro do documento
-        registered = _get_registered_xml(xml_adapter)
+        logging.info("Inicio request_document_ids {}".format(object_name))
+        registered = get_registered_xml(xml, user_id, fput_content)
 
-        if registered and xml_adapter.is_aop and not registered.is_aop:
-            # levanta exceção se está sendo ingressada uma versão aop de
-            # artigo já publicado em fascículo
-            raise exceptions.NotAllowedIngressingAOPVersionOfArticlePublishedInAnIssueError(
-                _("Not allowed to ingress document {} as ahead of print, "
-                  "because it is already published in an issue").format(registered)
-            )
+        xml_adapter = xml_sps_utils.XMLAdapter(xml)
 
         # verfica os PIDs encontrados no XML / atualiza-os se necessário
         pids_updated = _check_xml_pids(xml_adapter, registered)
 
-        xml_content = xml_adapter.tostring()
-        xml_content_64_char = xml_sps_utils._str_with_64_char(xml_content)
+        if not registered:
+            # cria registro
+            registered = _register_new_document(xml_adapter, user_id)
 
-        stored_xml = None
-        if registered and registered.versions:
-            # verifica se o xml já está registrado
-            for stored_xml in registered.versions.filter(content=xml_content_64_char):
-                break
-
-        if not stored_xml:
-            # registrar XML no files storage
-            object_name = os.path.join(
-                xml_adapter.v3,
-                xml_content_64_char,
-                xml_adapter.v3 + ".xml",
+        if registered:
+            xml_content = xml.tostring()
+            xml_uri = fput_content(
+                xml_content,
+                mimetype="text/xml",
+                object_name=object_name
             )
-            xml_uri = _put_xml(xml_content, object_name=object_name)
+            _update_xml_versions(registered, user_id, xml_uri, xml_content)
 
+        return registered
+
+    except exceptions.FoundAOPPublishedInAnIssueError:
+        raise exceptions.NotAllowedIngressingAOPVersionOfArticlePublishedInAnIssueError(
+            _("Not allowed to ingress document {} as ahead of print, "
+              "because it is already published in an issue").format(registered)
+        )
+
+    except Exception as e:
+        raise exceptions.RequestDocumentIDsError(
+            "Unable to request document IDs for {}".format(xml)
+        )
+
+
+def _update_xml_versions(registered, user_id, xml_uri, xml_content):
+    """
+    Adiciona xml_uri no registro de pid_provider
+
+    Parameters
+    ----------
+    registered : models.XMLAOPArticle or models.XMLArticle
+    user_id : str
+        requester
+    xml_uri : str
+
+    Returns
+    -------
+        None or models.XMLAOPArticle or models.XMLArticle
+
+    Raises
+    ------
+    exceptions.SaveXMLFileError
+
+    """
+    try:
+        # verifica se o xml já está registrado
+        exist = False
+        xml_content_64_char = xml_sps_utils._str_with_64_char(xml_content)
+        try:
+            current = registered.versions.latest('created')
+        except models.XMLFile.DoesNotExist:
+            pass
+        else:
+            exist = (current.content == xml_content_64_char)
+        if not exist:
             xml_file = models.XMLFile(
                 uri=xml_uri,
                 created=datetime.utcnow(),
@@ -240,19 +206,16 @@ def _request_document_ids(xml_adapter, user_id):
             )
             xml_file.save()
 
-            if registered:
-                _update_registered_document(registered, xml_file, user_id)
-            else:
-                _register_new_document(xml_adapter, xml_file, user_id)
-            response['xml_uri'] = xml_uri
-        response['v3'] = xml_adapter.v3
+            return _add_xml_file(registered, xml_file, user_id)
+
     except Exception as e:
-        raise exceptions.RequestDocumentIDsError(
-            "Unable to request document IDs for {}".format(xml_adapter.v3)
+        raise exceptions.SaveXMLFileError(
+            "Unable to save xml file {} in pid provider".format(xml_uri)
         )
 
+
 # DONE
-def _get_registered_xml(xml_adapter):
+def _query_document(xml_adapter):
     """
     Get registered document
 
@@ -301,7 +264,7 @@ def _get_registered_xml(xml_adapter):
                 return None
 
 
-def _get_query_params(kwargs):
+def _set_isnull_parameters(kwargs):
     _kwargs = {}
     for k, v in kwargs.items():
         if v:
@@ -338,7 +301,6 @@ def _query_document_args(xml_adapter, filter_by_issue=False, aop_version=False):
                 "No attribute to use for disambiguations"
             )
         _params["partial_body"] = xml_adapter.partial_body
-    # journal
     if aop_version:
         _params['journal__issn_print'] = xml_adapter.journal_issn_print
         _params['journal__issn_electronic'] = xml_adapter.journal_issn_electronic
@@ -347,10 +309,13 @@ def _query_document_args(xml_adapter, filter_by_issue=False, aop_version=False):
         _params['issue__journal__issn_electronic'] = xml_adapter.journal_issn_electronic
 
         if filter_by_issue:
-            for k, v in xml_adapter.article_in_issue['issue'].items():
+            for k, v in xml_adapter.issue.items():
                 _params[f"issue__{k}"] = v
+            _params.update(xml_adapter.pages)
 
-    return _query_params(_params)
+    params = _set_isnull_parameters(_params)
+    logging.info(params)
+    return params
 
 
 ###############################################################################
@@ -413,20 +378,36 @@ def _get_unique_v3():
             return generated
 
 
-def _is_registered(v2=None, v3=None):
-    if v3:
-        kwargs = {"v3": v3}
-    try:
-        if v2:
-            kwargs = {"v2": v2}
-        return models.XMLArticle.objects.get(**kwargs)
-    except models.XMLArticle.DoesNotExist:
+def _is_registered(v2=None, v3=None, aop_pid=None):
+    params = dict(v2=v2, v3=v3, aop_pid=aop_pid)
+    kwargs = {k: v for k, v in params.items() if v}
+
+    if kwargs.get("v3"):
         try:
-            if aop_pid:
-                kwargs = {"aop_pid": aop_pid}
-            return models.XMLAOPArticle.objects.get(**kwargs)
-        except models.XMLAOPArticle.DoesNotExist:
-            return None
+            found = models.XMLArticle.objects.filter(**kwargs)[0]
+        except IndexError:
+            try:
+                found = models.XMLAOPArticle.objects.filter(**kwargs)[0]
+            except IndexError:
+                return False
+            else:
+                return True
+        else:
+            return True
+    if kwargs.get("v2"):
+        try:
+            found = models.XMLArticle.objects.filter(**kwargs)[0]
+        except IndexError:
+            return False
+        else:
+            return True
+    if kwargs.get("aop_pid"):
+        try:
+            found = models.XMLAOPArticle.objects.filter(**kwargs)[0]
+        except IndexError:
+            return False
+        else:
+            return True
 
 ##############################################
 
@@ -485,10 +466,11 @@ def _get_unique_v2(xml_adapter):
 def _v2_generates(xml_adapter):
     # '2022-10-19T13:51:33.830085'
     utcnow = datetime.utcnow()
-    yyyymmddtime = "".join([item for item in utcnow.isoformat() if item.isdigit()])
+    yyyymmddtime = "".join(
+        [item for item in utcnow.isoformat() if item.isdigit()])
     mmdd = yyyymmddtime[4:8]
     nnnnn = str(utcnow.timestamp()).split(".")[0][-5:]
-    return f"S{xml_adapter.v2_prefix}{mmdd}{nnnnn}"
+    return f"{xml_adapter.v2_prefix}{mmdd}{nnnnn}"
 
 
 ###############################################################################
@@ -522,21 +504,24 @@ def _add_aop_pid(xml_adapter, registered):
 ###############################################################################
 
 
-def get_or_create_xml_journal(issn_electronic, issn_print):
+def _get_or_create_xml_journal(issn_electronic, issn_print):
     try:
         params = {
             "issn_electronic": issn_electronic,
             "issn_print": issn_print,
         }
-        kwargs = _query_params(params)
+        kwargs = _set_isnull_parameters(params)
+        logging.info("Search {}".format(kwargs))
         return models.XMLJournal.objects.get(**kwargs)
     except models.XMLJournal.DoesNotExist:
+        params = {k: v for k, v in params.items() if v}
+        logging.info("Create {}".format(params))
         journal = models.XMLJournal(**params)
         journal.save()
         return journal
 
 
-def get_or_create_xml_issue(journal, volume, number, suppl, pub_year):
+def _get_or_create_xml_issue(journal, volume, number, suppl, pub_year):
     try:
         params = {
             "volume": volume,
@@ -545,116 +530,114 @@ def get_or_create_xml_issue(journal, volume, number, suppl, pub_year):
             "journal": journal,
             "pub_year": pub_year and int(pub_year) or None,
         }
-        kwargs = _query_params(params)
+        kwargs = _set_isnull_parameters(params)
+        logging.info("Search {}".format(kwargs))
         return models.XMLIssue.objects.get(**kwargs)
     except models.XMLIssue.DoesNotExist:
+        params = {k: v for k, v in params.items() if v}
+        logging.info("Create {}".format(params))
         issue = models.XMLIssue(**params)
         issue.save()
         return issue
 
 
-def _update_registered_document(registered, xml_file, user_id):
+def _add_xml_file(registered, xml_file, user_id):
     try:
         if registered:
             registered.versions.add(xml_file)
-            registered.updated_by = user_id
+            registered.updated_by = User.objects.get(pk=user_id)
             registered.updated = datetime.utcnow()
             registered.save()
-            return
+            return registered
     except Exception as e:
         raise exceptions.SavingError(
-            "Updating registered document error: %s %s %s" %
+            "Add XML file to registered document error: %s %s %s" %
             (type(e), e, registered)
         )
 
 
-def _register_new_document(xml_adapter, xml_file, user_id):
+def _register_new_document(xml_adapter, user_id):
     try:
         if xml_adapter.is_aop:
             data = models.XMLAOPArticle()
-            data.creator = user_id
+            data.creator = User.objects.get(pk=user_id)
             data.save()
             data.aop_pid = xml_adapter.v2
-            data.journal = get_or_create_xml_journal(
+            data.journal = _get_or_create_xml_journal(
                 xml_adapter.journal_issn_electronic,
                 xml_adapter.journal_issn_print,
             )
         else:
             data = models.XMLArticle()
-            data.creator = user_id
+            data.creator = User.objects.get(pk=user_id)
             data.save()
             data.v2 = xml_adapter.v2
-            journal = get_or_create_xml_journal(
+            journal = _get_or_create_xml_journal(
                 xml_adapter.journal_issn_electronic,
                 xml_adapter.journal_issn_print,
             )
-            data.issue = get_or_create_xml_issue(
+            data.issue = _get_or_create_xml_issue(
                 journal,
-                xml_adapter.article_in_issue.get("volume"),
-                xml_adapter.article_in_issue.get("number"),
-                xml_adapter.article_in_issue.get("suppl"),
-                xml_adapter.pub_year,
+                xml_adapter.issue.get("volume"),
+                xml_adapter.issue.get("number"),
+                xml_adapter.issue.get("suppl"),
+                xml_adapter.issue.get("pub_year"),
             )
-            data.fpage = xml_adapter.article_in_issue.get("fpage")
-            data.fpage_seq = xml_adapter.article_in_issue.get("fpage_seq")
-            data.lpage = xml_adapter.article_in_issue.get("lpage")
+            data.fpage = xml_adapter.pages.get("fpage")
+            data.fpage_seq = xml_adapter.pages.get("fpage_seq")
+            data.lpage = xml_adapter.pages.get("lpage")
+            data.elocation_id = xml_adapter.pages.get("elocation_id")
 
-        data.versions.add(xml_file)
         data.v3 = xml_adapter.v3
         data.main_doi = xml_adapter.main_doi
-        data.elocation_id = xml_adapter.elocation_id
         data.article_titles_texts = xml_adapter.article_titles_texts
         data.surnames = xml_adapter.surnames
         data.collab = xml_adapter.collab
         data.links = xml_adapter.links
         data.partial_body = xml_adapter.partial_body
-
-        data.creator = user_id
-
         data.save()
+        return data
 
     except Exception as e:
+        logging.info(f"{data.v3} {len(data.v3)}")
+        if hasattr(data, 'v2'):
+            logging.info(f"{data.v2} {len(data.v2)}")
+        if hasattr(data, 'aop_pid'):
+            logging.info(f"{data.aop_pid} {len(data.aop_pid)}")
+
         raise exceptions.SavingError(
             "Register new document error: %s %s %s" % (type(e), e, data)
         )
 
 
-def sync_new_website_to_pid_provider_system(xmltree, user_id):
+def _sync_new_website_to_pid_provider_system(xmltree, user_id, fput_content):
     """
-    Busca documento em Pid Provider
-    Se não o encontrar, tenta buscar no site novo e faz sincronização dos
-    dados do site novo e do pid provider
+    Faz sincronização dos dados do site novo e do pid provider
     Retorna o item registrado em Pid Provider
     """
     try:
-        try:
-            # consulta pid provider
-            return get_registered_xml(xmltree)
-        except pid_provider_exceptions.RegisteredXMLDoesNotExistError:
-            # tentar recuperar documento do site novo
-            data = package_utils.get_article_data_for_comparison(xmltree)
-            similar_docs = publication_documents.get_similar_documents(
-                article_title=data["title"],
-                journal_electronic_issn=data["journal_electronic_issn"],
-                journal_print_issn=data["journal_print_issn"],
-                authors=data["authors"],
-            )
+        # tentar recuperar documento do site novo
+        data = package_utils.get_article_data_for_comparison(xmltree)
+        new_website_docs = publication_documents.get_similar_documents(
+            article_title=data["title"],
+            journal_electronic_issn=data["journal_electronic_issn"],
+            journal_print_issn=data["journal_print_issn"],
+            authors=data["authors"],
+        )
 
-            for found_doc in similar_docs:
-                try:
-                    # obtém doc do site novo
-                    doc = publication_documents.get_document(_id=found_doc.aid)
-
-                    # registra dados do documento no pid provider system
-                    registered = request_document_ids_for_xml_uri(
-                        xml_uri=doc.xml, user_id=user_id,
-                    )
-                except Exception as e:
-                    # TODO ???
-                    pass
-            # consulta novemente pid provider,
-            # após inserção dos documentos similares em pid provider
-            return get_registered_xml(xmltree)
+        for found_doc in new_website_docs:
+            try:
+                # registra dados do documento no pid provider system
+                xml = libs_xml_sps_utils.get__xml__from_uri(
+                    found_doc.xml)
+                registered = request_document_ids(
+                    xml, user_id, fput_content, found_doc._id)
+            except Exception as e:
+                # TODO ???
+                raise exceptions.SyncNewWebsiteToPidProviderSystemError(
+                    _("Unable to register {} in pid provider system").format(
+                        found_doc.xml)
+                )
     except Exception as e:
         # TODO ???
         raise exceptions.SyncNewWebsiteToPidProviderSystemError(
