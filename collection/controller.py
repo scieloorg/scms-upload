@@ -40,7 +40,10 @@ def update_files_storage_configuration(
 
 
 def get_files_storage_configuration(name):
-    return FilesStorageConfiguration.objects.get(name=name)
+    try:
+        return FilesStorageConfiguration.objects.get(name=name)
+    except FilesStorageConfiguration.DoesNotExist:
+        return FilesStorageConfiguration(name=name)
 
 
 def get_files_storage(files_storage_config):

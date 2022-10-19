@@ -260,6 +260,7 @@ class FilesStorageConfiguration(CommonControlField):
             ['host', 'bucket_root'],
         ]
         indexes = [
+            models.Index(fields=['name']),
             models.Index(fields=['host']),
             models.Index(fields=['bucket_root']),
         ]

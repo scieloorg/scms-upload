@@ -7,7 +7,6 @@ from django.utils.translation import gettext as _
 from wagtail.admin.edit_handlers import FieldPanel
 
 from core.models import CommonControlField
-from . import choices
 
 
 LOGGER = logging.getLogger(__name__)
@@ -55,10 +54,10 @@ class XMLIssue(models.Model):
     number = models.CharField(_("number"), max_length=10, null=True, blank=False)
     suppl = models.CharField(_("suppl"), max_length=10, null=True, blank=False)
     pub_year = models.IntegerField(_("pub_year"), null=False)
-    journal = models.ForeignKey('XMLJournal', on_delete=models.SET_NULL)
+    journal = models.ForeignKey('XMLJournal', on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
-        return f'{self.journal} {self.volume} {self.number} {self.suppl}'
+        return f'{self.journal} {self.volume or ""} {self.number or ""} {self.suppl or ""}'
 
     class Meta:
         unique_together = [
@@ -113,21 +112,20 @@ class BaseArticle(CommonControlField):
             models.Index(fields=['links']),
             models.Index(fields=['partial_body']),
             models.Index(fields=['elocation_id']),
-            models.Index(fields=['versions']),
         ]
 
 
 class XMLAOPArticle(BaseArticle):
-    journal = models.ForeignKey('XMLJournal', on_delete=models.SET_NULL)
+    journal = models.ForeignKey('XMLJournal', on_delete=models.SET_NULL, null=True)
     aop_pid = models.CharField(_("aop_pid"), max_length=23, null=True, blank=False)
-    published_in_issue = models.ForeignKey('XMLArticle', on_delete=models.SET_NULL)
+    published_in_issue = models.ForeignKey('XMLArticle', on_delete=models.SET_NULL, null=True)
 
     @property
     def is_aop(self):
         return True
 
     def __str__(self):
-        return f'{self.journal} {self.v3 or ''} {self.uri or ''}'
+        return f'{self.journal} {self.v3 or ""} {self.uri or ""}'
 
     class Meta:
         indexes = [
@@ -139,7 +137,7 @@ class XMLAOPArticle(BaseArticle):
 
 class XMLArticle(BaseArticle):
     v2 = models.CharField(_("v2"), max_length=23, null=True, blank=False)
-    issue = models.ForeignKey('XMLIssue', on_delete=models.SET_NULL)
+    issue = models.ForeignKey('XMLIssue', on_delete=models.SET_NULL, null=True)
     fpage = models.CharField(_("fpage"), max_length=10, null=True, blank=False)
     fpage_seq = models.CharField(_("fpage_seq"), max_length=10, null=True, blank=False)
     lpage = models.CharField(_("lpage"), max_length=10, null=True, blank=False)
@@ -149,7 +147,7 @@ class XMLArticle(BaseArticle):
         return False
 
     def __str__(self):
-        return f'{self.issue.journal} {self.v3 or ''} {self.uri or ''}'
+        return f'{self.issue.journal} {self.v3 or ""} {self.uri or ""}'
 
     class Meta:
         indexes = [

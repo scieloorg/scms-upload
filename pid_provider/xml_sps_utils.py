@@ -47,7 +47,7 @@ def get_xml_items(xml_sps_file_path, filenames=None):
         if ext == ".xml":
             xml = get_xml_from_xml_file(xml_sps_file_path)
             item = os.path.basename(xml_sps_file_path)
-            yield {"filename": item: "xml": xml}
+            yield {"filename": item, "xml": xml}
 
     except Exception as e:
         raise GetXMLItemsError(
@@ -197,18 +197,6 @@ class XML:
             self._article_ids = ArticleIds(self.xmltree)
         return self._article_ids
 
-    @v3.setter
-    def v3(self, value):
-        self.article_ids.v3 = value
-
-    @v2.setter
-    def v2(self, value):
-        self.article_ids.v2 = value
-
-    @aop_pid.setter
-    def aop_pid(self, value):
-        self.article_ids.aop_pid = value
-
     @property
     def v3(self):
         return self._article_ids.v3
@@ -220,6 +208,18 @@ class XML:
     @property
     def aop_pid(self):
         return self._article_ids.aop_pid
+
+    @v3.setter
+    def v3(self, value):
+        self.article_ids.v3 = value
+
+    @v2.setter
+    def v2(self, value):
+        self.article_ids.v2 = value
+
+    @aop_pid.setter
+    def aop_pid(self, value):
+        self.article_ids.aop_pid = value
 
     @property
     def article_doi_with_lang(self):
@@ -343,6 +343,18 @@ class XMLAdapter:
     @property
     def v2_prefix(self):
         return f"S{self.journal_issn_electronic or self.journal_issn_print}{self.pub_year}"
+
+    @property
+    def v3(self):
+        return self.xml.v3
+
+    @property
+    def v2(self):
+        return self.xml.v2
+
+    @property
+    def aop_pid(self):
+        return self.xml.aop_pid
 
     @v3.setter
     def v3(self, value):
