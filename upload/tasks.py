@@ -425,16 +425,20 @@ def task_check_opinions(self, package_id):
 
 @celery_app.task(name='Get or create package')
 def task_get_or_create_package(pid_v3, user_id):
+    # Estabelece conexão com base de dados de artigos do site
     if not controller.establish_site_connection():
         raise exceptions.SiteDatabaseIsUnavailableError()
 
+    # Obtém dados de artigo do site
     doc = get_document(aid=pid_v3)
     if doc.aid is None:
         raise exceptions.PIDv3DoesNotExistInSiteDatabase()
 
     try:
+        # Obtém dados de artigo no sistema de upload a partir de PIDv3
         article_inst = Article.objects.get(pid_v3=doc.aid)
     except Article.DoesNotExist:
+        # Cria artigo no sistema de upload com base no que existe no site
         try:
             xml_content = file_utils.get_xml_content_from_uri(doc.xml)
         except sps_exceptions.SPSHTTPResourceNotFoundError:
@@ -442,8 +446,8 @@ def task_get_or_create_package(pid_v3, user_id):
 
         xml_etree = package_utils.get_etree_from_xml_content(xml_content)
         article_inst = create_article_from_etree(xml_etree, user_id)
-
     try:
+        # Obtém pacote relacionado ao PIDv3, caso exista
         return models.Package.objects.get(article__pid_v3=article_inst.pid_v3).id
     except models.Package.DoesNotExist:
         # Retrieves PDF uris and names
