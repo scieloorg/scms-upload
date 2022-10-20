@@ -1,15 +1,8 @@
-from tempfile import NamedTemporaryFile
-from lxml import etree
-
 from celery.result import AsyncResult
 from django.utils.translation import gettext as _
 
 from packtools.sps.utils import file_utils as sps_file_utils
-from packtools.sps.libs.async_download import download_files as sps_libs_download_files
-from packtools.sps import sps_maker
-
 from packtools.sps.models import package as sps_package
-from packtools.sps.models import article_assets as sps_article_assets
 from packtools.sps import exceptions as sps_exceptions
 from packtools.sps.validation import (
     article as sps_validation_article,
