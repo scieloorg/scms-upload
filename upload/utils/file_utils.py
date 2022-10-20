@@ -1,6 +1,10 @@
+from lxml import etree
+from tempfile import NamedTemporaryFile
+
 from django.core.files.storage import FileSystemStorage
 from django.utils.translation import gettext as _
 
+from packtools import file_utils as packtools_file_utils
 from packtools.sps.libs.reqs import requests_get_content
 
 import os
@@ -102,3 +106,35 @@ def generate_filepath_with_new_extension(path, new_extension, keep_old_extension
         return os.path.join(dirname, f'{filename}{new_extension}{fileext}')
 
     return os.path.join(dirname, f'{filename}{new_extension}')
+
+
+def create_file_for_xml_etree(xml_etree, package_name):
+    tmp_fixed_xml = NamedTemporaryFile(mode='w+b')
+    tmp_fixed_xml.write(etree.tostring(xml_etree))
+
+    xml_name_canonical = f'{package_name}.xml'
+    xml_path = os.path.join(
+        os.path.dirname(tmp_fixed_xml.name),
+        xml_name_canonical,
+    )
+
+    if os.path.exists(xml_path):
+        os.remove(xml_path)
+
+    os.link(tmp_fixed_xml.name, xml_path)
+
+    return xml_path
+
+
+def create_file_for_zip_package(package_files, package_name):
+    # Cria nome de arquivo zip para representar o pacote
+    package_file_name = f'{package_name}.zip'
+    package_path = get_file_absolute_path(package_file_name)
+
+    # Cria arquivo zip em disco com o conteúdo dos arquivos coletados e o XML canônico
+    packtools_file_utils.create_zip_file(
+        package_files,
+        package_path,
+    )
+
+    return os.path.basename(package_path)
