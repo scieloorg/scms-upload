@@ -36,6 +36,36 @@ JS_ARTICLE = '/static/js/articles.js'
 CSS_ARTICLE = '/static/css/article-styles.css'
 
 
+def generate_xml_canonical(xml_uri):
+    # Obtém conteúdo do XML
+    xml_content = get_xml_content_from_uri(xml_uri)
+    xml_etree = get_etree_from_xml_content(xml_content)
+    aa = ArticleAssets(xml_etree)
+
+    assets_dict = {}
+    assets_uris_and_names = []
+
+    # Obtém nome do pacote
+    package_name = PackageName(xml_etree).name
+
+    # Gera dicionário de substituição de nomes de assets e lista de uris e nomes novos
+    for i in aa.article_assets:
+        assets_dict[i.name] = i.name_canonical(package_name)
+        assets_uris_and_names.append({
+            'uri': i.name,
+            'name': i.name_canonical(package_name),
+        })
+
+    # Substitui nomes de assets no XMLTree
+    aa.replace_names(assets_dict)
+
+    return {
+        'xml_etree': aa.xmltree, 
+        'assets_uris_and_names': assets_uris_and_names, 
+        'package_name': package_name
+    }
+
+
 def get_renditions_uris_and_names(doc):
     renditions_uris_and_names = []
     for rend in doc.pdfs:
