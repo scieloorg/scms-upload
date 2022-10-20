@@ -450,28 +450,12 @@ def task_get_or_create_package(pid_v3, user_id):
         # Obtém pacote relacionado ao PIDv3, caso exista
         return models.Package.objects.get(article__pid_v3=article_inst.pid_v3).id
     except models.Package.DoesNotExist:
-        # Retrieves PDF uris and names
-        rend_uris_names = []
-        for rend in doc.pdfs:
-            rend_uris_names.append({
-                'uri': rend['url'],
-                'name': rend['filename'],
-            })
+        # Cria pacote novo, caso nenhum exista para o PIDv3 informado
+        package_file_name = package_utils.create_package_file_from_site_doc(doc)
 
-        # Creates a zip file
-        pkg_metadata = sps_maker.make_package_from_uris(
-            xml_uri=doc.xml,
-            renditions_uris_and_names=rend_uris_names, 
-            zip_folder=file_utils.FileSystemStorage().base_location,
-        )
-
-        # TODO: trocar nomes dos assets pelos nomes canônicos
-
-        # Creates a package record
-        pkg = controller.create_package(
-            article_id=article_inst.id, 
-            user_id=user_id, 
-            file_name=file_utils.os.path.basename(pkg_metadata['zip']),
-        )
-
-        return pkg.id
+        # Cria registro de pacote em base de dados do sistema de upload e retorna seu id
+        return controller.create_package(
+            article_id=article_inst.id,
+            user_id=user_id,
+            file_name=package_file_name,
+        ).id
