@@ -81,6 +81,35 @@ def get_renditions_uris_and_names(doc):
 def get_package_name(xmltree):
     return PackageName(xmltree).name
 
+
+def create_package_file_from_site_doc(doc):
+    # Obtém uris e nomes de renditions
+    renditions_uris_and_names = get_renditions_uris_and_names(doc)
+
+    # Cria versão canônica de XML e dados acessórios
+    _data = generate_xml_canonical(doc.xml)
+
+    # Obtém dados de _data relacionados ao xml canônico gerado e outros dados acessórios
+    xml_etree_canonical = _data['xml_etree']
+    assets_uris_and_names = _data['assets_uris_and_names']
+    package_name = _data['package_name']
+
+    # Gera arquivo de dados de xml_etree_canonical e armazena path em lista de arquivos
+    package_files = [
+        create_file_for_xml_etree(
+            xml_etree=xml_etree_canonical,
+            package_name=package_name,
+        )
+    ]   
+
+    # Baixa assets e renditions e armazena paths em lista de arquivos
+    package_files.extend(download_files(assets_uris_and_names))
+    package_files.extend(download_files(renditions_uris_and_names))
+
+    # Cria arquivo zip em disco com o conteúdo dos arquivos coletados e o XML canônico
+    return create_file_for_zip_package(package_files, package_name)
+
+
 def optimise_package(source, target):
     package = SPPackage.from_file(source, mkdtemp())
     package.optimise(
