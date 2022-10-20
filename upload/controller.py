@@ -157,18 +157,15 @@ def compute_package_validation_result_error_resolution_stats(package_id):
     def _get_percentage(numerator, denominator):
         return float(numerator)/float(denominator) * 100
 
-    def _get_n(value, validation_result_error_resolution_list):
-        return len([o for o in validation_result_error_resolution_list if o.action == value])
+    actions = [ve.resolution.action for ve in obj.validationresult_set.filter(status=choices.VS_DISAPPROVED)]
+    den = len(actions)
 
-    vr_list = [ve.resolution for ve in obj.validationresult_set.filter(status=choices.VS_DISAPPROVED)]
-    den = len(vr_list)
-
-    disagree_num = _get_n(choices.ER_ACTION_DISAGREE, vr_list)
+    disagree_num = actions.count(choices.ER_ACTION_DISAGREE)
     disagree_per = _get_percentage(disagree_num, den)
     obj.stat_disagree_n = disagree_num
     obj.stat_disagree_p = disagree_per
 
-    incapable_num = _get_n(choices.ER_ACTION_INCAPABLE_TO_FIX, vr_list)
+    incapable_num = actions.count(choices.ER_ACTION_INCAPABLE_TO_FIX)
     incapable_per = _get_percentage(incapable_num, den)
     obj.stat_incapable_to_fix_n = incapable_num
     obj.stat_incapable_to_fix_p = incapable_per
