@@ -36,6 +36,17 @@ JS_ARTICLE = '/static/js/articles.js'
 CSS_ARTICLE = '/static/css/article-styles.css'
 
 
+def get_renditions_uris_and_names(doc):
+    renditions_uris_and_names = []
+    for rend in doc.pdfs:
+        renditions_uris_and_names.append(
+            {
+                'uri': rend['url'], 
+                'name': rend['filename'],
+            }
+        )
+    return renditions_uris_and_names
+
 
 def get_package_name(xmltree):
     return PackageName(xmltree).name
