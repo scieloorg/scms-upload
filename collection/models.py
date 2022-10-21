@@ -187,12 +187,17 @@ class AssetFile(SciELOFile):
 class XMLFile(FileWithLang):
     assets_files = models.ManyToManyField('AssetFile')
     languages = models.JSONField(null=True)
-
+    v3 = models.CharField(_('V3'), max_length=23, null=True, blank=True)
     public_uri = models.URLField(_('Public URI'), max_length=255, null=True)
     public_object_name = models.CharField(_('Public object name'), max_length=255, null=True)
 
     def __str__(self):
         return f"{self.scielo_issue} {self.name} {self.lang} {self.languages}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['v3']),
+        ]
 
 
 class SciELOHTMLFile(FileWithLang):
