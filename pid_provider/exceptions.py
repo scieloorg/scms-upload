@@ -42,8 +42,13 @@ class RequestDocumentIDsForXMLZipFileError(Exception):
     ...
 
 
-
 class SavingError(Exception):
     ...
 
 
+class RequestDocumentIDsForXMLPreError(Exception):
+    ...
+
+
+class SaveXMLFileError(Exception):
+    ...
