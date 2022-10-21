@@ -27,13 +27,14 @@ def get_document(**kwargs):
 
 
 def get_similar_documents(article_title, journal_print_issn, journal_electronic_issn, authors):
+    # TODO usar publication_date
     docs = Article.objects(
         title=article_title,
         journal__in=[
-            journal_print_issn, 
+            journal_print_issn,
             journal_electronic_issn
         ],
-    ).only("authors", "aid")
+    ).only("authors", "aid", "xml")
 
     if len(docs) == 0:
         return docs
