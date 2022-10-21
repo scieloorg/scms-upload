@@ -99,6 +99,10 @@ class BaseArticle(CommonControlField):
     links = models.CharField(_("links"), max_length=64, null=True, blank=False)
     partial_body = models.CharField(_("partial_body"), max_length=64, null=True, blank=False)
 
+    @property
+    def lastest(self):
+        return self.versions.latest('created')
+
     def __str__(self):
         return f'{self.v3}'
 
@@ -147,7 +151,7 @@ class XMLArticle(BaseArticle):
         return False
 
     def __str__(self):
-        return f'{self.issue.journal} {self.v3 or ""} {self.uri or ""}'
+        return f'{self.issue and self.issue.journal or ""} {self.v3 or ""}'
 
     class Meta:
         indexes = [
