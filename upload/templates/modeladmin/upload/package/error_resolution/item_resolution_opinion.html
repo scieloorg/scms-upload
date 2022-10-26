@@ -1,20 +1,20 @@
 {% load i18n modeladmin_tags wagtailadmin_tags %}
-<form method="post" id="form-handle-error-resolution-opinion-{{ validation_error_id }}">
+<form method="post" id="form-handle-error-resolution-opinion-{{ validation_result_id }}">
     {% csrf_token %}
-    <label for="comment-{{ validation_error_id }}">{% trans 'Comment' %}</label>
-    <textarea id="comment-{{ validation_error_id }}" cols="100" rows="5">{{ comment }}</textarea>
-    <label for="opinion-{{ validation_error_id }}">{% trans 'Opinion' %}</label>
-    <select aria-label="Select an opinion" id="opinion-{{ validation_error_id }}">
+    <label for="opinion-{{ validation_result_id }}">{% trans 'Opinion' %}</label>
+    <select aria-label="Select an opinion" id="opinion-{{ validation_result_id }}">
         <option value="" {% if not opinion %}selected="selected"{% endif %}>{% trans 'Choose an option' %}</option>
         <option value="fixed" {% if opinion == "fixed" %}selected="selected"{% endif %}>{% trans 'This is not an error' %}</option>
         <option value="fix-demanded" {% if opinion == "fix-demanded" %}selected="selected"{% endif %}>{% trans 'This error has to be fixed' %}</option>
     </select>
-    <button id="btn-send-opinion-{{ validation_error_id }}" style='margin-top:10px;' class="button loading-mask" type="submit">{% trans 'Save' %}</button>
+    <label for="comment-{{ validation_result_id }}">{% trans 'Comment' %}</label>
+    <textarea id="comment-{{ validation_result_id }}" cols="100" rows="5">{{ comment }}</textarea>
+    <button id="btn-send-opinion-{{ validation_result_id }}" style='margin-top:10px;' class="button loading-mask" type="submit">{% trans 'Save' %}</button>
 </form>
 
 <script type="text/javascript">
     // Botão salvar que grava resolução de erro
-    var form_error_res = $("#form-handle-error-resolution-opinion-{{ validation_error_id }}");
+    var form_error_res = $("#form-handle-error-resolution-opinion-{{ validation_result_id }}");
     form_error_res.on('submit', function(e){
         e.preventDefault();
         $.ajax({
@@ -22,16 +22,16 @@
             url: "{% url 'upload:ajx_error_resolution' %}",
             data: {
                 'scope': 'analyse',
-                'validation_error_id': '{{ validation_error_id }}',
-                'comment': $('textarea[id=comment-{{ validation_error_id }}]').val(),
-                'opinion': $('select[id=opinion-{{ validation_error_id }}]').val(),
+                'validation_result_id': '{{ validation_result_id }}',
+                'comment': $('textarea[id=comment-{{ validation_result_id }}]').val(),
+                'opinion': $('select[id=opinion-{{ validation_result_id }}]').val(),
                 'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
             },
             beforeSend: function(){
-                $('#btn-send-opinion-{{ validation_error_id }}').addClass('loading');
+                $('#btn-send-opinion-{{ validation_result_id }}').addClass('loading');
             },
             success: function(){
-                $('#btn-send-opinion-{{ validation_error_id }}').removeClass('loading');
+                $('#btn-send-opinion-{{ validation_result_id }}').removeClass('loading');
             }
         });
     });
@@ -45,9 +45,9 @@
             url: "{% url 'upload:ajx_error_resolution' %}",
             data: {
                 'scope': 'analyse',
-                'validation_error_id': '{{ validation_error_id }}',
-                'comment': $('textarea[id=comment-{{ validation_error_id }}]').val(),
-                'opinion': $('select[id=opinion-{{ validation_error_id }}]').val(),
+                'validation_result_id': '{{ validation_result_id }}',
+                'comment': $('textarea[id=comment-{{ validation_result_id }}]').val(),
+                'opinion': $('select[id=opinion-{{ validation_result_id }}]').val(),
                 'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
             },
         });

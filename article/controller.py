@@ -4,11 +4,11 @@ from packtools.sps.models.article_ids import ArticleIds
 
 from django.utils.translation import gettext_lazy as _
 
-from .models import Article
+from .models import Article, choices
 from . import exceptions
 
 
-def create_article_from_etree(xml_tree, user_id):
+def create_article_from_etree(xml_tree, user_id, status=choices.AS_PUBLISHED):
     article = Article()
 
     _ids = ArticleIds(xml_tree)
@@ -16,6 +16,8 @@ def create_article_from_etree(xml_tree, user_id):
     article.aop_pid = _ids.aop_pid
     article.pid_v3 = _ids.v3
     article.pid_v2 = _ids.v2
+
+    article.status = status
 
     article.created = datetime.utcnow()
     article.creator_id = user_id

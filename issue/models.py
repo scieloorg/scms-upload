@@ -31,6 +31,11 @@ class Issue(CommonControlField, IssuePublicationDate):
     number = models.CharField(_('Number'), max_length=255, null=True, blank=True)
     supplement = models.CharField(_('Supplement'), max_length=255, null=True, blank=True)
 
+    autocomplete_search_field = 'official_journal__title'
+
+    def autocomplete_label(self):
+        return self.__str__()
+
     panels = [
         FieldPanel('official_journal'),
         FieldPanel('publication_date_text'),

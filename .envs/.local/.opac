@@ -1,3 +1,0 @@
-# OPAC
-# ------------------------------------------------------------------------------
-OPAC_STRING_CONNECTION=mongodb://user@pass:host:port/database.collection

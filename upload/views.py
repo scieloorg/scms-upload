@@ -3,12 +3,12 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 
-from upload.forms import ValidationErrorResolutionForm, ValidationErrorResolutionOpinionForm
+from upload.forms import ValidationResultErrorResolutionForm, ValidationResultErrorResolutionOpinionForm
 
 from .controller import (
-    upsert_validation_error_resolution, 
+    upsert_validation_result_error_resolution, 
     update_package_check_finish,
-    upsert_validation_error_resolution_opinion,
+    upsert_validation_result_error_resolution_opinion,
 )
 from .models import Package, choices
 from .tasks import check_resolutions, check_opinions
@@ -21,10 +21,10 @@ def ajx_error_resolution(request):
     """
     if request.method == 'POST':
         scope = request.POST.get('scope')
-        data = ValidationErrorResolutionOpinionForm(request.POST) if scope == 'analyse' else ValidationErrorResolutionForm(request.POST)
+        data = ValidationResultErrorResolutionOpinionForm(request.POST) if scope == 'analyse' else ValidationResultErrorResolutionForm(request.POST)
 
         kwargs = {
-            'validation_error_id': data['validation_error_id'].value(),
+            'validation_result_id': data['validation_result_id'].value(),
             'user': request.user,
             'comment': data['comment'].value(),
         }
@@ -32,10 +32,10 @@ def ajx_error_resolution(request):
         if data.is_valid():
             if scope == 'analyse':
                 kwargs.update({'opinion': data['opinion'].value()})
-                upsert_validation_error_resolution_opinion(**kwargs)
+                upsert_validation_result_error_resolution_opinion(**kwargs)
             else: 
                 kwargs.update({'action': data['action'].value()})
-                upsert_validation_error_resolution(**kwargs)
+                upsert_validation_result_error_resolution(**kwargs)
 
         return JsonResponse({'status': 'success'})
 
@@ -65,7 +65,7 @@ def error_resolution(request):
             package = get_object_or_404(Package, pk=package_id)
 
             if package.status != choices.PS_REJECTED:
-                validation_errors = package.validationerror_set.all()
+                validation_results = package.validationresult_set.filter(status=choices.VS_DISAPPROVED)
 
                 template_type = 'start' if scope not in ('analyse', 'report') else scope
 
@@ -77,7 +77,7 @@ def error_resolution(request):
                         'package_inspect_url': request.META.get('HTTP_REFERER'),
                         'report_title': _('Errors Resolution'),
                         'report_subtitle': package.file.name,
-                        'validation_errors': validation_errors,
+                        'validation_results': validation_results,
                     }
                 )
             else:
@@ -112,17 +112,20 @@ def preview_document(request):
     if package_id:
         package = get_object_or_404(Package, pk=package_id)
         language = request.GET.get('language')
+        xml_path = request.GET.get('xml_path')
 
-        document_html = render_html(package.file.name, language)
+        document_html = render_html(package.file.name, xml_path, language)
 
-        if package.status != choices.PS_REJECTED:
-            return render(
-                request=request,
-                template_name='modeladmin/upload/package/preview_document.html',
-                context={'document': document_html, 'package_status': package.status},
-            )
-        else:
-            messages.error(request, _('It is not possible to preview HTML of rejected packages.'))
+        for vr in package.validationresult_set.all():
+            if vr.report_name() == choices.VR_XML_OR_DTD and vr.status == choices.VS_DISAPPROVED:
+                messages.error(request, _('It is not possible to preview HTML of an invalid XML.'))
+                return redirect(request.META.get('HTTP_REFERER'))
+
+        return render(
+            request=request,
+            template_name='modeladmin/upload/package/preview_document.html',
+            context={'document': document_html, 'package_status': package.status},
+        )
 
     return redirect(request.META.get('HTTP_REFERER'))
 
@@ -142,12 +145,12 @@ def validation_report(request):
             'report_subtitle': package.file.name,
         }
 
-        ves = package.validationerror_set.filter(category__in=choices.VALIDATION_REPORT_ITEMS[report_name])
+        vrs = package.validationresult_set.filter(category__in=choices.VALIDATION_REPORT_ITEMS[report_name])
 
         if report_name == choices.VR_INDIVIDUAL_CONTENT:
             context.update({
                 'report_title': _('Individual Content Report'),
-                'content_errors':  ves,
+                'content_errors':  vrs,
             })
             return render(
                 request=request,
@@ -156,7 +159,7 @@ def validation_report(request):
             )
 
         if report_name == choices.VR_ASSET_AND_RENDITION:
-            assets, renditions = coerce_package_and_errors(package, ves)
+            assets, renditions = coerce_package_and_errors(package, vrs.filter(status=choices.VS_DISAPPROVED))
             context.update({
                 'report_title': _('Digital Assets and Renditions Report'),
                 'assets': assets,
@@ -166,6 +169,35 @@ def validation_report(request):
                 request=request,
                 template_name='modeladmin/upload/package/validation_report/digital_assets_and_renditions.html',
                 context=context
+            )
+
+    return redirect(request.META.get('HTTP_REFERER'))
+
+
+def assign(request):
+    package_id = request.GET.get('package_id')
+    user = request.user
+
+    if not user.has_perm('upload.assign_package'):
+        messages.error(
+            request,
+            _('You do have permission to assign packages.')
+        )
+    elif package_id:
+        package = get_object_or_404(Package, pk=package_id)
+
+        if package.assignee is None:
+            package.assignee = user
+            package.save()
+
+            messages.success(
+                request,
+                _('Package has been assigned with success.')
+            )
+        else:
+            messages.error(
+                request,
+                _('It was not possible to assign the package because it already has an assinee.')
             )
 
     return redirect(request.META.get('HTTP_REFERER'))
