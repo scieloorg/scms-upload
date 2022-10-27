@@ -46,6 +46,10 @@ class Issue(CommonControlField, IssuePublicationDate):
     panels = [
         FieldPanel('official_journal'),
         FieldPanel('publication_year'),
+        FieldPanel('publication_initial_month_number'),
+        FieldPanel('publication_initial_month_name'),
+        FieldPanel('publication_final_month_number'),
+        FieldPanel('publication_final_month_name'),
         FieldPanel('volume'),
         FieldPanel('number'),
         FieldPanel('supplement'),
