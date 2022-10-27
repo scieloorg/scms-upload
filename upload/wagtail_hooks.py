@@ -285,12 +285,7 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         qs = super().get_queryset(request)
 
         if self.permission_helper.user_can_access_all_packages(request.user, None):
-            return qs.filter(
-                Q(status=choices.PS_QA) & (
-                    Q(assignee=request.user) | 
-                    Q(assignee=None)
-                )
-            )
+            return qs.filter(status=choices.PS_QA)
     
         return qs.none()
 
