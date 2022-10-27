@@ -15,16 +15,22 @@ class Issue(CommonControlField, IssuePublicationDate):
     """
 
     def __unicode__(self):
-        return (u'%s %s %s %s %s' %
-                (self.official_journal, self.publication_year,
-                 self.volume, self.number, self.supplement,
-                 ))
+        return (u'%s %s %s %s %s' % (
+            self.official_journal,
+            self.publication_year,
+            self.volume or '',
+            self.number or '',
+            self.supplement or '',
+        ))
 
     def __str__(self):
-        return (u'%s %s %s %s %s' %
-                (self.official_journal, self.publication_year,
-                 self.volume, self.number, self.supplement,
-                 ))
+        return (u'%s %s %s %s %s' % (
+            self.official_journal, 
+            self.publication_year,
+            self.volume or '',
+            self.number or '',
+            self.supplement or '',
+        ))
 
     official_journal = models.ForeignKey(OfficialJournal, on_delete=models.CASCADE)
     volume = models.CharField(_('Volume'), max_length=255, null=True, blank=True)
