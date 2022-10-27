@@ -65,7 +65,10 @@ class UploadButtonHelper(ButtonHelper):
         if obj.status == choices.PS_PUBLISHED:
             btns.append(self.view_published_document(obj, classnames))
 
-        if obj.assignee is None and obj.status == choices.PS_QA and ph.user_can_assign_package(usr, obj):
-            btns.append(self.assign(obj, classnames))
+        if obj.assignee is None:
+            if obj.status == choices.PS_QA and ph.user_can_assign_package(usr, obj):
+                btns.append(self.assign(obj, classnames))
+        elif obj.assignee != usr:
+            btns.append(self.assign(obj, classnames, _('Reassign')))
             
         return btns
