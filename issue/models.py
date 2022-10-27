@@ -55,12 +55,19 @@ class Issue(CommonControlField, IssuePublicationDate):
 
     class Meta:
         unique_together = [
-            ['official_journal', 'publication_year',
-             'volume', 'number', 'supplement'],
-            ['official_journal', 'publication_year',
-             ],
-            ['official_journal',
-             'volume', 'number', 'supplement'],
+            [
+                'official_journal', 
+                'publication_year',
+                'volume',
+                'number',
+                'supplement'
+            ],
+            [
+                'official_journal',
+                'volume',
+                'number',
+                'supplement'
+            ],
         ]
         indexes = [
             models.Index(fields=['official_journal']),
