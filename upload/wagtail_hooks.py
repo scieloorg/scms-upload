@@ -261,9 +261,12 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         'stat_disagree',
         'stat_incapable_to_fix',
     )
-    list_filter = ()
+    list_filter = (
+        'assignee',
+    )
     search_fields = (
         'file',
+        'assignee__username',
         'creator__username',
         'updated_by__username',
     )
