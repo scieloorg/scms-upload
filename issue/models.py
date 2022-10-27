@@ -34,6 +34,10 @@ class Issue(CommonControlField, IssuePublicationDate):
 
     official_journal = models.ForeignKey(OfficialJournal, on_delete=models.CASCADE)
     publication_year = models.IntegerField(_('Publication year'), max_length=4, null=False, blank=False)
+    publication_initial_month_number = models.CharField('Initial month number', max_length=2, null=True, blank=True)
+    publication_initial_month_name = models.CharField('Initial month name', max_length=32, null=True, blank=True)
+    publication_final_month_number = models.CharField('Initial month number', max_length=2, null=True, blank=True)
+    publication_final_month_name = models.CharField('Final month name', max_length=32, null=True, blank=True)
     volume = models.CharField(_('Volume'), max_length=255, null=True, blank=True)
     number = models.CharField(_('Number'), max_length=255, null=True, blank=True)
     supplement = models.CharField(_('Supplement'), max_length=255, null=True, blank=True)
