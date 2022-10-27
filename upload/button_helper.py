@@ -10,8 +10,8 @@ class UploadButtonHelper(ButtonHelper):
     index_button_classnames = ["button", "button-small", "button-secondary"]
     btn_default_classnames = ["button-small", "icon",]
 
-    def assign(self, obj, classnames):
-        text = _("Assign")
+    def assign(self, obj, classnames, label=None):
+        text = label or _("Assign")
         return {
             "url": reverse("upload:assign") + "?package_id=%s" % str(obj.id),
             "label": text,
