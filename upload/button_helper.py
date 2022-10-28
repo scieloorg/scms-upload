@@ -10,8 +10,8 @@ class UploadButtonHelper(ButtonHelper):
     index_button_classnames = ["button", "button-small", "button-secondary"]
     btn_default_classnames = ["button-small", "icon",]
 
-    def assign(self, obj, classnames):
-        text = _("Assign")
+    def assign(self, obj, classnames, label=None):
+        text = label or _("Assign")
         return {
             "url": reverse("upload:assign") + "?package_id=%s" % str(obj.id),
             "label": text,
@@ -65,7 +65,10 @@ class UploadButtonHelper(ButtonHelper):
         if obj.status == choices.PS_PUBLISHED:
             btns.append(self.view_published_document(obj, classnames))
 
-        if obj.assignee is None and obj.status == choices.PS_QA and ph.user_can_assign_package(usr, obj):
-            btns.append(self.assign(obj, classnames))
+        if obj.assignee is None:
+            if obj.status == choices.PS_QA and ph.user_can_assign_package(usr, obj):
+                btns.append(self.assign(obj, classnames))
+        elif obj.assignee != usr:
+            btns.append(self.assign(obj, classnames, _('Reassign')))
             
         return btns

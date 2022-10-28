@@ -261,9 +261,12 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         'stat_disagree',
         'stat_incapable_to_fix',
     )
-    list_filter = ()
+    list_filter = (
+        'assignee',
+    )
     search_fields = (
         'file',
+        'assignee__username',
         'creator__username',
         'updated_by__username',
     )
@@ -282,12 +285,7 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         qs = super().get_queryset(request)
 
         if self.permission_helper.user_can_access_all_packages(request.user, None):
-            return qs.filter(
-                Q(status=choices.PS_QA) & (
-                    Q(assignee=request.user) | 
-                    Q(assignee=None)
-                )
-            )
+            return qs.filter(status=choices.PS_QA)
     
         return qs.none()
 

@@ -185,19 +185,20 @@ def assign(request):
         )
     elif package_id:
         package = get_object_or_404(Package, pk=package_id)
-
-        if package.assignee is None:
-            package.assignee = user
-            package.save()
-
+        is_reassign = package.assignee is not None
+        
+        package.assignee = user
+        package.save()
+        
+        if not is_reassign:
             messages.success(
                 request,
                 _('Package has been assigned with success.')
             )
         else:
-            messages.error(
+            messages.warning(
                 request,
-                _('It was not possible to assign the package because it already has an assinee.')
+                _('Package has been reassigned with success.')
             )
 
     return redirect(request.META.get('HTTP_REFERER'))

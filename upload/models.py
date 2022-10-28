@@ -25,7 +25,7 @@ class Package(CommonControlField):
     status = models.CharField(_('Status'), max_length=32, choices=choices.PACKAGE_STATUS, default=choices.PS_ENQUEUED_FOR_VALIDATION)
     article = models.ForeignKey(Article, blank=True, null=True, on_delete=models.SET_NULL)
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.SET_NULL)
-    assignee = models.OneToOneField(User, blank=True, null=True, on_delete=models.SET_NULL)
+    assignee = models.ForeignKey(User, blank=True, null=True, on_delete=models.SET_NULL)
 
     stat_disagree_n = models.IntegerField(_('Disagree (n)'), null=True, blank=True)
     stat_disagree_p = models.FloatField(_('Disagree (%)'), null=True, blank=True)
