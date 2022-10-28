@@ -62,3 +62,16 @@ class NonOfficialJournalTitle(ClusterableModel, CommonControlField):
 class NonOfficialTitle(Orderable):
    page = ParentalKey(NonOfficialJournalTitle, related_name='page_non_official_title')
    non_official_journal_title = models.CharField(_('Non Official Journal Title'), max_length=255, null=False, blank=False)
+
+
+class SocialNetwork(models.Model):
+    name = models.CharField(_('Name'), max_length=255, choices=choices.SOCIAL_NETWORK_NAMES, null=False, blank=False)
+    url = models.URLField(_("URL"), max_length=255, null=True, blank=False)
+
+    panels=[
+        FieldPanel('name'),
+        FieldPanel('url')
+    ]
+
+    class Meta:
+        abstract = True
