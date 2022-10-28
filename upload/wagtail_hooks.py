@@ -114,6 +114,19 @@ class PackageAdminInspectView(InspectView):
             filename=file_utils.get_filename_from_filepath(_path)
         )
 
+    def set_pdf_paths(self, data, dir_optz):
+        try:
+            for rendition in package_utils.get_article_renditions_from_zipped_xml(self.instance.file.name):
+                package_files = file_utils.get_file_list_from_zip(self.instance.file.name)
+                document_name = package_utils.get_xml_filename(package_files)
+                rendition_name = package_utils.get_rendition_expected_name(rendition, document_name)
+                data['pdfs'].append({
+                    'base_uri': file_utils.os.path.join(dir_optz, rendition_name),
+                    'language': rendition.language,
+                })
+        except XMLFormatError:
+            data['pdfs'] = []
+
     def get_context_data(self):
         data = {
             'validation_results': {},
