@@ -185,12 +185,12 @@ def assign(request):
         )
     elif package_id:
         package = get_object_or_404(Package, pk=package_id)
-        is_reassign = package.assignee is None
+        is_reassign = package.assignee is not None
         
         package.assignee = user
         package.save()
         
-        if is_reassign:
+        if not is_reassign:
             messages.success(
                 request,
                 _('Package has been assigned with success.')
