@@ -134,7 +134,12 @@ class PackageAdminInspectView(InspectView):
             'status': self.instance.status,
             'category': self.instance.category,
             'languages': package_utils.get_languages(self.instance.file.name),
+            'pdfs': []
         }
+
+        dir_optz = self.discover_dir_optz()
+ 
+        self.set_pdf_paths(data, dir_optz)
 
         for vr in self.instance.validationresult_set.all():
             vr_name = vr.report_name()
