@@ -155,15 +155,17 @@
     {% endif %}
 
     {% if status == 'validated-with-errors' or status == 'quality-analysis' %}
-        <div class="nice-padding">
+        <div class="nice-padding row">
             <h3>{% trans "Actions" %}</h3>
-            {% if status == 'validated-with-errors' and perms.upload.send_validation_error_resolution %}
-                <a class="button is-small" href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}">{% trans 'Start Error Resolution' %}</a>
-            {% else %}
-                {% if status == 'quality-analysis' and perms.upload.analyse_validation_error_resolution %}
-                    <a class="button is-small" href="{% url 'upload:error_resolution' %}?scope=analyse&package_id={{ package_id }}">{% trans 'Analyse Error Resolution' %}</a>
+            <div class="col2">
+                {% if status == 'validated-with-errors' and perms.upload.send_validation_error_resolution %}
+                    <a class="button is-small" href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}">{% trans 'Start Error Resolution' %}</a>
+                {% else %}
+                    {% if status == 'quality-analysis' and perms.upload.analyse_validation_error_resolution %}
+                        <a class="button is-small" href="{% url 'upload:error_resolution' %}?scope=analyse&package_id={{ package_id }}">{% trans 'Analyse Error Resolution' %}</a>
+                    {% endif %}
                 {% endif %}
-            {% endif %}
+            </div>
         </div>
     {% endif %}
 
