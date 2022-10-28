@@ -54,7 +54,7 @@
                         <td>
                             {% trans 'See the XML and/or DTD Formation Report: ' %}
                             {% for x in validation_results.xml_or_dtd.xmls %}
-                                <a href="{{ x.uri }}">XML {{ forloop.counter }}</a>
+                                <a href="{{ x.inspect_uri }}">XML {{ forloop.counter }}</a>
                                 {% if not forloop.last %} | {% endif %}
                             {% endfor %}
                         </td>

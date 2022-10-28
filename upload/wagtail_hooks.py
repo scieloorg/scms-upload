@@ -159,8 +159,9 @@ class PackageAdminInspectView(InspectView):
 
                 if vr.data and isinstance(vr.data, dict):
                     data['validation_results'][vr_name]['xmls'].append({
-                        'xml_path': vr.data.get('xml_path'),
-                        'uri': ValidationResultAdmin().url_helper.get_action_url('inspect', vr.id)
+                        'xml_name': vr.data.get('xml_path'),
+                        'base_uri': file_utils.os.path.join(dir_optz, vr.data.get('xml_path')),
+                        'inspect_uri': ValidationResultAdmin().url_helper.get_action_url('inspect', vr.id)
                     })
 
         return super().get_context_data(**data)
