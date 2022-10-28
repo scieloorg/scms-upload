@@ -1,0 +1,56 @@
+{% load i18n modeladmin_tags wagtailadmin_tags wagtailcore_tags %}
+
+<div class="nice-padding">
+    <h3>{% trans "Preview" %}</h3>
+    <div class="col2">
+        <div class="dropdown dropup dropdown-button match-width">
+            <button value="drop up" class="button icon icon-doc-full">{% trans 'HTML' %}</button>
+            <div class="dropdown-toggle">
+                <svg class="icon icon-arrow-up icon" aria-hidden="true" focusable="false">
+                    <use href="#icon-arrow-up"></use>
+                </svg>
+            </div>
+            <ul>
+                {% for x in validation_results.xml_or_dtd.xmls %}
+                    {% for language in languages %}
+                        <li>
+                            <a class="button is-small" target="_blank" href="{% url 'upload:preview_document' %}?package_id={{ package_id }}&xml_path={{ x.xml_name }}&language={{ language }}">{% trans "Preview HTML " %} - {{ language|title }}</a>
+                        </li>
+                    {% endfor %}
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="col2">
+        <div class="dropdown dropup dropdown-button match-width">
+            <button value="drop up" class="button icon icon-doc-full">{% trans 'XML' %}</button>
+            <div class="dropdown-toggle">
+                <svg class="icon icon-arrow-up icon" aria-hidden="true" focusable="false">
+                    <use href="#icon-arrow-up"></use>
+                </svg>
+            </div>
+            <ul>
+                {% for x in validation_results.xml_or_dtd.xmls %}
+                    <li><a class="button is-small" target="_blank" href="{{ x.base_uri }}">{% trans "View XML " %}{{ forloop.counter }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% if pdfs %}
+    <div class="col2">
+        <div class="dropdown dropup dropdown-button match-width">
+            <button value="drop up" class="button icon icon-download">{% trans 'PDF' %}</button>
+            <div class="dropdown-toggle">
+                <svg class="icon icon-arrow-up icon" aria-hidden="true" focusable="false">
+                    <use href="#icon-arrow-up"></use>
+                </svg>
+            </div>
+            <ul>
+                {% for pdf in pdfs %}
+                    <li><a class="button is-small" target="_blank" href="{{ pdf.base_uri }}">{% trans 'Download PDF' %} - {{ pdf.language|title }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endif %}
+</div>
