@@ -3,6 +3,8 @@ from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
+from upload.utils import file_utils
+from upload.utils.xml_utils import XMLFormatError
 
 from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
@@ -98,6 +100,20 @@ class PackageCreateView(CreateView):
 
 
 class PackageAdminInspectView(InspectView):
+    def discover_dir_optz(self):
+        # Obtém caminho do pacote otimzado
+        _path = package_utils.generate_filepath_with_new_extension(
+            self.instance.file.name, 
+            '.optz',
+            True,
+        )
+
+        # Obtém diretório em que o pacote otimizado foi extraído
+        return file_utils.get_file_url(
+            dirname='',
+            filename=file_utils.get_filename_from_filepath(_path)
+        )
+
     def get_context_data(self):
         data = {
             'validation_results': {},
