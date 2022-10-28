@@ -149,16 +149,10 @@
         </table>
     </div>
     {% endif %}
-
-    <div class="nice-padding">
-        <h3>{% trans "Preview" %}</h3>
-        {% for x in validation_results.xml_or_dtd.xmls %}
-            {% for language in languages %}
-                <a class="button is-small" target="_blank" href="{% url 'upload:preview_document' %}?package_id={{ package_id }}&xml_path={{ x.xml_path }}&language={{ language }}">{% trans "Preview HTML " %} {{ forloop.parentloop.counter }} {{ language|title }}</a></p>
-            {% endfor %}
-        {% endfor %}
-        <a class="button" href="" disabled>{% trans "View XML" %}</a></p>
-    </div>
+    
+    {% if validation_results.xml_or_dtd.status == 'approved' %}
+        {% include 'modeladmin/upload/package/inspect_buttons.html' %}
+    {% endif %}
 
     {% if status == 'validated-with-errors' or status == 'quality-analysis' %}
         <div class="nice-padding">
