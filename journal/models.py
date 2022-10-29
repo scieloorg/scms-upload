@@ -29,6 +29,11 @@ class OfficialJournal(CommonControlField):
     ISSN_electronic = models.CharField(_('ISSN Electronic'), max_length=9, null=True, blank=True)
     ISSNL = models.CharField(_('ISSNL'), max_length=9, null=True, blank=True)
 
+    autocomplete_search_field = 'title'
+
+    def autocomplete_label(self):
+        return self.title
+
     base_form_class = OfficialJournalForm
 
     class Meta:
