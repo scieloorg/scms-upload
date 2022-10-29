@@ -154,6 +154,8 @@
         {% include 'modeladmin/upload/package/inspect_buttons.html' %}
     {% endif %}
 
+    {% include 'modeladmin/upload/package/inspect_buttons_download.html' %}
+
     {% if status == 'validated-with-errors' or status == 'quality-analysis' %}
         <div class="nice-padding row">
             <h3>{% trans "Actions" %}</h3>
