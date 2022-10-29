@@ -32,6 +32,11 @@ class Package(CommonControlField):
     stat_incapable_to_fix_n = models.IntegerField(_('Incapable to fix (n)'), null=True, blank=True)
     stat_incapable_to_fix_p = models.FloatField(_('Incapable fo fix (%)'), null=True, blank=True)
 
+    autocomplete_search_field = 'file'
+
+    def autocomplete_label(self):
+        return f'{self.file.name} - {self.category} - {self.article or self.issue} ({self.status})'
+
     panels = [
         FieldPanel('file'),
         FieldPanel('category'),
@@ -73,7 +78,7 @@ class QAPackage(Package):
 class ValidationResult(models.Model):
     id = models.AutoField(primary_key=True)
     category = models.CharField(_('Error category'), max_length=64, choices=choices.VALIDATION_ERROR_CATEGORY, null=False, blank=False)
-    data = models.JSONField(_('Error data'), null=True, blank=True)
+    data = models.JSONField(_('Error data'), default=dict, null=True, blank=True)
     message = models.CharField(_('Error message'), max_length=512, null=True, blank=True)
     status = models.CharField(_('Status'), max_length=16, choices=choices.VALIDATION_STATUS, null=True, blank=True)
 
@@ -93,7 +98,7 @@ class ValidationResult(models.Model):
     panels = [
         MultiFieldPanel(
             [
-                FieldPanel('package'),
+                AutocompletePanel('package'),
                 FieldPanel('category'),
             ],
             heading=_('Identification'),
@@ -101,11 +106,13 @@ class ValidationResult(models.Model):
         ),
         MultiFieldPanel(
             [
+                FieldPanel('status'),
                 FieldPanel('data'),
+                FieldPanel('message'),
             ],
             heading=_('Content'),
             classname='collapsible'
-        )
+        ),
     ]
 
     class Meta:

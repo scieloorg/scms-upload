@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from core.models import CommonControlField, IssuePublicationDate
 from journal.models import OfficialJournal
 
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 from wagtail.admin.edit_handlers import FieldPanel
 
 from .forms import IssueForm
@@ -43,7 +44,7 @@ class Issue(CommonControlField, IssuePublicationDate):
         return self.__str__()
 
     panels = [
-        FieldPanel('official_journal'),
+        AutocompletePanel('official_journal'),
         FieldPanel('publication_date_text'),
         FieldPanel('publication_year'),
         FieldPanel('publication_initial_month_number'),

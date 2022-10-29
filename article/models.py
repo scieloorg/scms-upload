@@ -3,6 +3,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from modelcluster.fields import ParentalKey
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 from wagtail.admin.edit_handlers import InlinePanel, FieldPanel, MultiFieldPanel
 from wagtail.core.models import Orderable, ClusterableModel
 from wagtail.core.fields import RichTextField
@@ -143,7 +144,7 @@ class RequestArticleChange(CommonControlField):
         FieldPanel('pid_v3', classname='collapsible'),
         FieldPanel('deadline', classname='collapsible'),
         FieldPanel('change_type', classname='collapsible'),
-        FieldPanel('demanded_user', classname='collapsible'),
+        AutocompletePanel('demanded_user', classname='collapsible'),
         FieldPanel('comment', classname='collapsible'),
     ]
 
