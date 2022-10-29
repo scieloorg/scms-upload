@@ -3,6 +3,8 @@ from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
+from upload.utils import file_utils
+from upload.utils.xml_utils import XMLFormatError
 
 from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
@@ -98,14 +100,49 @@ class PackageCreateView(CreateView):
 
 
 class PackageAdminInspectView(InspectView):
+    def get_optimized_package_filepath_and_directory(self):
+        # Obtém caminho do pacote otimizado
+        _path = package_utils.generate_filepath_with_new_extension(
+            self.instance.file.name, 
+            '.optz',
+            True,
+        )
+
+        # Obtém diretório em que o pacote otimizado foi extraído
+        _directory = file_utils.get_file_url(
+            dirname='',
+            filename=file_utils.get_filename_from_filepath(_path)
+        )
+
+        return _path, _directory
+
+    def set_pdf_paths(self, data, optz_dir):
+        try:
+            for rendition in package_utils.get_article_renditions_from_zipped_xml(self.instance.file.name):
+                package_files = file_utils.get_file_list_from_zip(self.instance.file.name)
+                document_name = package_utils.get_xml_filename(package_files)
+                rendition_name = package_utils.get_rendition_expected_name(rendition, document_name)
+                data['pdfs'].append({
+                    'base_uri': file_utils.os.path.join(optz_dir, rendition_name),
+                    'language': rendition.language,
+                })
+        except XMLFormatError:
+            data['pdfs'] = []
+
     def get_context_data(self):
         data = {
             'validation_results': {},
             'package_id': self.instance.id,
+            'original_pkg': self.instance.file.name,
             'status': self.instance.status,
             'category': self.instance.category,
             'languages': package_utils.get_languages(self.instance.file.name),
+            'pdfs': []
         }
+
+        optz_file_path, optz_dir = self.get_optimized_package_filepath_and_directory()
+        data['optimized_pkg'] = optz_file_path
+        self.set_pdf_paths(data, optz_dir)
 
         for vr in self.instance.validationresult_set.all():
             vr_name = vr.report_name()
@@ -125,8 +162,9 @@ class PackageAdminInspectView(InspectView):
 
                 if vr.data and isinstance(vr.data, dict):
                     data['validation_results'][vr_name]['xmls'].append({
-                        'xml_path': vr.data.get('xml_path'),
-                        'uri': ValidationResultAdmin().url_helper.get_action_url('inspect', vr.id)
+                        'xml_name': vr.data.get('xml_path'),
+                        'base_uri': file_utils.os.path.join(optz_dir, vr.data.get('xml_path')),
+                        'inspect_uri': ValidationResultAdmin().url_helper.get_action_url('inspect', vr.id)
                     })
 
         return super().get_context_data(**data)

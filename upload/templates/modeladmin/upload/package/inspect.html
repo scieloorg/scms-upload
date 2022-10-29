@@ -54,7 +54,7 @@
                         <td>
                             {% trans 'See the XML and/or DTD Formation Report: ' %}
                             {% for x in validation_results.xml_or_dtd.xmls %}
-                                <a href="{{ x.uri }}">XML {{ forloop.counter }}</a>
+                                <a href="{{ x.inspect_uri }}">XML {{ forloop.counter }}</a>
                                 {% if not forloop.last %} | {% endif %}
                             {% endfor %}
                         </td>
@@ -149,27 +149,25 @@
         </table>
     </div>
     {% endif %}
+    
+    {% if validation_results.xml_or_dtd.status == 'approved' %}
+        {% include 'modeladmin/upload/package/inspect_buttons.html' %}
+    {% endif %}
 
-    <div class="nice-padding">
-        <h3>{% trans "Preview" %}</h3>
-        {% for x in validation_results.xml_or_dtd.xmls %}
-            {% for language in languages %}
-                <a class="button is-small" target="_blank" href="{% url 'upload:preview_document' %}?package_id={{ package_id }}&xml_path={{ x.xml_path }}&language={{ language }}">{% trans "Preview HTML " %} {{ forloop.parentloop.counter }} {{ language|title }}</a></p>
-            {% endfor %}
-        {% endfor %}
-        <a class="button" href="" disabled>{% trans "View XML" %}</a></p>
-    </div>
+    {% include 'modeladmin/upload/package/inspect_buttons_download.html' %}
 
     {% if status == 'validated-with-errors' or status == 'quality-analysis' %}
-        <div class="nice-padding">
+        <div class="nice-padding row">
             <h3>{% trans "Actions" %}</h3>
-            {% if status == 'validated-with-errors' and perms.upload.send_validation_error_resolution %}
-                <a class="button is-small" href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}">{% trans 'Start Error Resolution' %}</a>
-            {% else %}
-                {% if status == 'quality-analysis' and perms.upload.analyse_validation_error_resolution %}
-                    <a class="button is-small" href="{% url 'upload:error_resolution' %}?scope=analyse&package_id={{ package_id }}">{% trans 'Analyse Error Resolution' %}</a>
+            <div class="col2">
+                {% if status == 'validated-with-errors' and perms.upload.send_validation_error_resolution %}
+                    <a class="button is-small" href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}">{% trans 'Start Error Resolution' %}</a>
+                {% else %}
+                    {% if status == 'quality-analysis' and perms.upload.analyse_validation_error_resolution %}
+                        <a class="button is-small" href="{% url 'upload:error_resolution' %}?scope=analyse&package_id={{ package_id }}">{% trans 'Analyse Error Resolution' %}</a>
+                    {% endif %}
                 {% endif %}
-            {% endif %}
+            </div>
         </div>
     {% endif %}
 
