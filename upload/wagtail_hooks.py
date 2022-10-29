@@ -123,7 +123,7 @@ class PackageAdminInspectView(InspectView):
                 document_name = package_utils.get_xml_filename(package_files)
                 rendition_name = package_utils.get_rendition_expected_name(rendition, document_name)
                 data['pdfs'].append({
-                    'base_uri': file_utils.os.path.join(dir_optz, rendition_name),
+                    'base_uri': file_utils.os.path.join(optz_dir, rendition_name),
                     'language': rendition.language,
                 })
         except XMLFormatError:
@@ -133,15 +133,16 @@ class PackageAdminInspectView(InspectView):
         data = {
             'validation_results': {},
             'package_id': self.instance.id,
+            'original_pkg': self.instance.file.name,
             'status': self.instance.status,
             'category': self.instance.category,
             'languages': package_utils.get_languages(self.instance.file.name),
             'pdfs': []
         }
 
-        dir_optz = self.discover_dir_optz()
- 
-        self.set_pdf_paths(data, dir_optz)
+        optz_file_path, optz_dir = self.get_optimized_package_filepath_and_directory()
+        data['optimized_pkg'] = optz_file_path
+        self.set_pdf_paths(data, optz_dir)
 
         for vr in self.instance.validationresult_set.all():
             vr_name = vr.report_name()
@@ -162,7 +163,7 @@ class PackageAdminInspectView(InspectView):
                 if vr.data and isinstance(vr.data, dict):
                     data['validation_results'][vr_name]['xmls'].append({
                         'xml_name': vr.data.get('xml_path'),
-                        'base_uri': file_utils.os.path.join(dir_optz, vr.data.get('xml_path')),
+                        'base_uri': file_utils.os.path.join(optz_dir, vr.data.get('xml_path')),
                         'inspect_uri': ValidationResultAdmin().url_helper.get_action_url('inspect', vr.id)
                     })
 
