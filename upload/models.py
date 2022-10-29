@@ -32,6 +32,11 @@ class Package(CommonControlField):
     stat_incapable_to_fix_n = models.IntegerField(_('Incapable to fix (n)'), null=True, blank=True)
     stat_incapable_to_fix_p = models.FloatField(_('Incapable fo fix (%)'), null=True, blank=True)
 
+    autocomplete_search_field = 'file'
+
+    def autocomplete_label(self):
+        return f'{self.file.name} - {self.category} - {self.article or self.issue} ({self.status})'
+
     panels = [
         FieldPanel('file'),
         FieldPanel('category'),
