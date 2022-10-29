@@ -106,11 +106,13 @@ class ValidationResult(models.Model):
         ),
         MultiFieldPanel(
             [
+                FieldPanel('status'),
                 FieldPanel('data'),
+                FieldPanel('message'),
             ],
             heading=_('Content'),
             classname='collapsible'
-        )
+        ),
     ]
 
     class Meta:
