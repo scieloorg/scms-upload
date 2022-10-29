@@ -100,8 +100,8 @@ class PackageCreateView(CreateView):
 
 
 class PackageAdminInspectView(InspectView):
-    def discover_dir_optz(self):
-        # Obtém caminho do pacote otimzado
+    def get_optimized_package_filepath_and_directory(self):
+        # Obtém caminho do pacote otimizado
         _path = package_utils.generate_filepath_with_new_extension(
             self.instance.file.name, 
             '.optz',
@@ -109,12 +109,14 @@ class PackageAdminInspectView(InspectView):
         )
 
         # Obtém diretório em que o pacote otimizado foi extraído
-        return file_utils.get_file_url(
+        _directory = file_utils.get_file_url(
             dirname='',
             filename=file_utils.get_filename_from_filepath(_path)
         )
 
-    def set_pdf_paths(self, data, dir_optz):
+        return _path, _directory
+
+    def set_pdf_paths(self, data, optz_dir):
         try:
             for rendition in package_utils.get_article_renditions_from_zipped_xml(self.instance.file.name):
                 package_files = file_utils.get_file_list_from_zip(self.instance.file.name)
