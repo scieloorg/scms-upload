@@ -93,7 +93,7 @@ class ValidationResult(models.Model):
     panels = [
         MultiFieldPanel(
             [
-                FieldPanel('package'),
+                AutocompletePanel('package'),
                 FieldPanel('category'),
             ],
             heading=_('Identification'),
