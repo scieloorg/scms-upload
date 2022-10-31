@@ -43,6 +43,9 @@
                 </table>
             </div>
             <div class="nice-padding">
+                <a class="button button-secondary no" style='margin-bottom:10px;' target="_blank" href="/admin/upload/validationresult/create/?package_id={{ package_id }}&status=disapproved">
+                    {% trans 'Add validation error' %}
+                </a>
                 <form method="POST" id="form-send-opinions">
                     {% csrf_token %}
                     <input type="hidden" name="package_id" value="{{ package_id }}"/> 
