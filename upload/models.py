@@ -10,7 +10,7 @@ from core.models import CommonControlField
 from issue.models import Issue
 
 from . import choices
-from .forms import UploadPackageForm
+from .forms import UploadPackageForm, ValidationResultForm
 from .permission_helper import ACCESS_ALL_PACKAGES, ASSIGN_PACKAGE, ANALYSE_VALIDATION_ERROR_RESOLUTION, FINISH_DEPOSIT, SEND_VALIDATION_ERROR_RESOLUTION
 from .utils import file_utils
 
@@ -115,6 +115,8 @@ class ValidationResult(models.Model):
             (SEND_VALIDATION_ERROR_RESOLUTION, _("Can send error resolution")),
             (ANALYSE_VALIDATION_ERROR_RESOLUTION, _("Can analyse error resolution")),
         )
+
+    base_form_class = ValidationResultForm
 
 
 class ErrorResolution(CommonControlField):

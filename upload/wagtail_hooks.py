@@ -15,7 +15,7 @@ from config.menu import get_menu_order
 from issue.models import Issue
 
 from .button_helper import UploadButtonHelper
-from .models import QAPackage, choices, Package, ValidationResult
+from .models import QAPackage, choices, Package, ValidationResult, ErrorResolutionOpinion
 from .permission_helper import UploadPermissionHelper
 from .tasks import run_validations
 from .utils import package_utils
