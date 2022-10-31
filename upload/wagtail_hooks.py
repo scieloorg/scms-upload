@@ -171,6 +171,25 @@ class PackageAdminInspectView(InspectView):
 
 
 class ValidationResultCreateView(CreateView):
+    def get_instance(self):
+        vr_object = super().get_instance()
+
+        status = self.request.GET.get('status')
+        if status and status in (
+            choices.VS_APPROVED, 
+            choices.VS_DISAPPROVED
+        ):
+            vr_object.status = status
+
+        pkg_id = self.request.GET.get('package_id')
+        if pkg_id:
+            try:
+                vr_object.package = Package.objects.get(pk=pkg_id)
+            except Package.DoesNotExist:
+                ...
+
+        return vr_object
+
 class ValidationResultAdminInspectView(InspectView):
     def get_context_data(self):
         try:
