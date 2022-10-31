@@ -190,6 +190,22 @@ class ValidationResultCreateView(CreateView):
 
         return vr_object
 
+    def form_valid(self, form):
+        self.object = form.save_all(self.request.user)
+        
+        op = ErrorResolutionOpinion()
+        op.creator = self.request.user
+        op.opinion = choices.ER_OPINION_FIX_DEMANDED
+        op.validation_result_id = self.object.id
+        op.package_id = self.object.package_id
+        op.guidance = _('This error was reported by an user.')
+        op.save()
+
+        self.object.validation_result_opinion = op
+        self.object.save()
+
+        return HttpResponseRedirect(self.get_success_url())
+
 class ValidationResultAdminInspectView(InspectView):
     def get_context_data(self):
         try:
