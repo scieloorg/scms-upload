@@ -40,18 +40,18 @@ def update_validation_result(validation_result_id, **kwargs):
         ...
 
 
-def upsert_validation_result_error_resolution(validation_result_id, user, action, comment):
+def upsert_validation_result_error_resolution(validation_result_id, user, action, rationale):
     er = upsert_object(ErrorResolution, validation_result_id, user)
     er.action = action
-    er.comment = comment
+    er.rationale = rationale
     er.validation_result = ValidationResult.objects.get(pk=validation_result_id)
     er.save()
 
 
-def upsert_validation_result_error_resolution_opinion(validation_result_id, user, opinion, comment):
+def upsert_validation_result_error_resolution_opinion(validation_result_id, user, opinion, guidance):
     ero = upsert_object(ErrorResolutionOpinion, validation_result_id, user)
     ero.opinion = opinion
-    ero.comment = comment
+    ero.guidance = guidance
     ero.validation_result = ValidationResult.objects.get(pk=validation_result_id)
     ero.save()
 
