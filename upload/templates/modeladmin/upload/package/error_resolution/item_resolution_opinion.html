@@ -7,8 +7,8 @@
         <option value="fixed" {% if opinion == "fixed" %}selected="selected"{% endif %}>{% trans 'This is not an error' %}</option>
         <option value="fix-demanded" {% if opinion == "fix-demanded" %}selected="selected"{% endif %}>{% trans 'This error has to be fixed' %}</option>
     </select>
-    <label for="comment-{{ validation_result_id }}">{% trans 'Comment' %}</label>
-    <textarea id="comment-{{ validation_result_id }}" cols="100" rows="5">{{ comment }}</textarea>
+    <label for="guidance-{{ validation_result_id }}">{% trans 'Guidance' %}</label>
+    <textarea id="guidance-{{ validation_result_id }}" cols="100" rows="5">{{ guidance }}</textarea>
     <button id="btn-send-opinion-{{ validation_result_id }}" style='margin-top:10px;' class="button loading-mask" type="submit">{% trans 'Save' %}</button>
 </form>
 
@@ -23,7 +23,7 @@
             data: {
                 'scope': 'analyse',
                 'validation_result_id': '{{ validation_result_id }}',
-                'comment': $('textarea[id=comment-{{ validation_result_id }}]').val(),
+                'guidance': $('textarea[id=guidance-{{ validation_result_id }}]').val(),
                 'opinion': $('select[id=opinion-{{ validation_result_id }}]').val(),
                 'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
             },
@@ -46,7 +46,7 @@
             data: {
                 'scope': 'analyse',
                 'validation_result_id': '{{ validation_result_id }}',
-                'comment': $('textarea[id=comment-{{ validation_result_id }}]').val(),
+                'guidance': $('textarea[id=guidance-{{ validation_result_id }}]').val(),
                 'opinion': $('select[id=opinion-{{ validation_result_id }}]').val(),
                 'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
             },

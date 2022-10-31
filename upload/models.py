@@ -136,9 +136,9 @@ class ErrorResolution(CommonControlField):
 class ErrorResolutionOpinion(CommonControlField):
     validation_result = models.OneToOneField('ValidationResult', to_field='id', primary_key=True, related_name='analysis', on_delete=models.CASCADE)
     opinion = models.CharField(_('Opinion'), max_length=32, choices=choices.ERROR_RESOLUTION_OPINION, null=True, blank=True)
-    comment = models.TextField(_('Comment'), max_length=512, null=True, blank=True)
+    guidance = models.TextField(_('Guidance'), max_length=512, null=True, blank=True)
 
     panels = [
         FieldPanel('opinion'),
-        FieldPanel('comment'),
+        FieldPanel('guidance'),
     ]

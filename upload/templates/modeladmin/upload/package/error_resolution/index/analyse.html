@@ -35,7 +35,7 @@
                                 <td>{{ vr.resolution.get_action_display }}</td>
                                 <td>{{ vr.resolution.rationale }}</td>
                                 <td>
-                                    {% include 'modeladmin/upload/package/error_resolution/item_resolution_opinion.html' with validation_result_id=vr.id comment=vr.analysis.comment opinion=vr.analysis.opinion %}
+                                    {% include 'modeladmin/upload/package/error_resolution/item_resolution_opinion.html' with validation_result_id=vr.id guidance=vr.analysis.guidance opinion=vr.analysis.opinion %}
                                 </td>
                             </tr>
                         {% endfor %}
