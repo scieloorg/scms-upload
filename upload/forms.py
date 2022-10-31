@@ -23,11 +23,11 @@ class UploadPackageForm(WagtailAdminModelForm):
 
 class ValidationResultErrorResolutionForm(forms.Form):
     validation_result_id = forms.IntegerField()
-    comment = forms.CharField(widget=forms.Textarea, required=False)
+    rationale = forms.CharField(widget=forms.Textarea, required=False)
     action = forms.CharField(widget=forms.Select, required=False)
 
 
 class ValidationResultErrorResolutionOpinionForm(forms.Form):
     validation_result_id = forms.IntegerField()
-    comment = forms.CharField(widget=forms.Textarea, required=False)
+    guidance = forms.CharField(widget=forms.Textarea, required=False)
     opinion = forms.CharField(widget=forms.Select, required=False)
