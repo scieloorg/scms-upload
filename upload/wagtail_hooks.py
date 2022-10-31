@@ -170,6 +170,7 @@ class PackageAdminInspectView(InspectView):
         return super().get_context_data(**data)
 
 
+class ValidationResultCreateView(CreateView):
 class ValidationResultAdminInspectView(InspectView):
     def get_context_data(self):
         try:
@@ -239,6 +240,7 @@ class PackageAdmin(ModelAdmin):
 class ValidationResultAdmin(ModelAdmin):
     model = ValidationResult
     permission_helper_class = UploadPermissionHelper
+    create_view_class = ValidationResultCreateView
     inspect_view_enabled=True
     inspect_view_class=ValidationResultAdminInspectView
     menu_label = _('Validation results')
