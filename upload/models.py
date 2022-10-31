@@ -1,3 +1,4 @@
+from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -10,7 +11,7 @@ from core.models import CommonControlField
 from issue.models import Issue
 
 from . import choices
-from .forms import UploadPackageForm
+from .forms import UploadPackageForm, ValidationResultForm
 from .permission_helper import ACCESS_ALL_PACKAGES, ASSIGN_PACKAGE, ANALYSE_VALIDATION_ERROR_RESOLUTION, FINISH_DEPOSIT, SEND_VALIDATION_ERROR_RESOLUTION
 from .utils import file_utils
 
@@ -26,11 +27,7 @@ class Package(CommonControlField):
     article = models.ForeignKey(Article, blank=True, null=True, on_delete=models.SET_NULL)
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.SET_NULL)
     assignee = models.ForeignKey(User, blank=True, null=True, on_delete=models.SET_NULL)
-
-    stat_disagree_n = models.IntegerField(_('Disagree (n)'), null=True, blank=True)
-    stat_disagree_p = models.FloatField(_('Disagree (%)'), null=True, blank=True)
-    stat_incapable_to_fix_n = models.IntegerField(_('Incapable to fix (n)'), null=True, blank=True)
-    stat_incapable_to_fix_p = models.FloatField(_('Incapable fo fix (%)'), null=True, blank=True)
+    expiration_date = models.DateField(_('Expiration date'), null=False, blank=False)
 
     autocomplete_search_field = 'file'
 
@@ -46,6 +43,10 @@ class Package(CommonControlField):
 
     def __str__(self):
         return self.file.name
+
+    def save(self, *args, **kwargs):
+        self.expiration_date = self.created + timedelta(days=30)
+        super(Package, self).save(*args, **kwargs)
 
     def files_list(self):
         files = {'files': []}
@@ -121,24 +122,26 @@ class ValidationResult(models.Model):
             (ANALYSE_VALIDATION_ERROR_RESOLUTION, _("Can analyse error resolution")),
         )
 
+    base_form_class = ValidationResultForm
+
 
 class ErrorResolution(CommonControlField):
     validation_result = models.OneToOneField('ValidationResult', to_field='id', primary_key=True, related_name='resolution', on_delete=models.CASCADE)
     action = models.CharField(_('Action'), max_length=32, choices=choices.ERROR_RESOLUTION_ACTION, null=True, blank=True)
-    comment = models.TextField(_('Comment'), max_length=512, null=True, blank=True)
+    rationale = models.TextField(_('Rationale'), max_length=512, null=True, blank=True)
     
     panels = [
         FieldPanel('action'),
-        FieldPanel('comment'),
+        FieldPanel('rationale'),
     ]
 
 
 class ErrorResolutionOpinion(CommonControlField):
     validation_result = models.OneToOneField('ValidationResult', to_field='id', primary_key=True, related_name='analysis', on_delete=models.CASCADE)
     opinion = models.CharField(_('Opinion'), max_length=32, choices=choices.ERROR_RESOLUTION_OPINION, null=True, blank=True)
-    comment = models.TextField(_('Comment'), max_length=512, null=True, blank=True)
+    guidance = models.TextField(_('Guidance'), max_length=512, null=True, blank=True)
 
     panels = [
         FieldPanel('opinion'),
-        FieldPanel('comment'),
+        FieldPanel('guidance'),
     ]

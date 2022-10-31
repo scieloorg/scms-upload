@@ -22,9 +22,9 @@
                             <th>{% trans 'Message' %}</th>
                             <th>{% trans 'Data' %}</th>
                             <th>{% trans 'Resolution action' %}</th>
-                            <th>{% trans 'Resolution comment' %}</th>
+                            <th>{% trans 'Resolution rationale' %}</th>
                             <th>{% trans 'Quality analyst opinion' %}</th>
-                            <th>{% trans 'Quality analyst comment' %}</th>
+                            <th>{% trans 'Quality analyst guidance' %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -34,9 +34,9 @@
                                 <td>{{ vr.message|default_if_none:'' }}</td>
                                 <td><pre>{{ vr.data|default_if_none:'' }}</pre></td>
                                 <td>{{ vr.resolution.get_action_display }}</td>
-                                <td>{{ vr.resolution.comment }}</td>
+                                <td>{{ vr.resolution.rationale|default_if_none:'' }}</td>
                                 <td>{{ vr.analysis.get_opinion_display }}</td>
-                                <td>{{ vr.analysis.comment }}</td>
+                                <td>{{ vr.analysis.guidance|default_if_none:'' }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>

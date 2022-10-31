@@ -127,12 +127,10 @@ VALIDATION_STATUS = (
 # Model ErrorResolution, Field action
 ER_ACTION_TO_FIX = 'to-fix'
 ER_ACTION_DISAGREE = 'disagree'
-ER_ACTION_INCAPABLE_TO_FIX = 'incapable-to-fix'
 
 ERROR_RESOLUTION_ACTION = (
     (ER_ACTION_TO_FIX, _('I will fix this error')),
     (ER_ACTION_DISAGREE, _('This is not an error')),
-    (ER_ACTION_INCAPABLE_TO_FIX, _('I do not know how to fix this error'))
 )
 
 

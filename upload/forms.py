@@ -21,13 +21,26 @@ class UploadPackageForm(WagtailAdminModelForm):
         return upload_package
 
 
+class ValidationResultForm(WagtailAdminModelForm):
+
+    def save_all(self, user):
+        vr_obj = super().save(commit=False)
+        
+        if self.instance.pk is None:
+            vr_obj.creator = user        
+        
+        self.save()
+
+        return vr_obj
+
+
 class ValidationResultErrorResolutionForm(forms.Form):
     validation_result_id = forms.IntegerField()
-    comment = forms.CharField(widget=forms.Textarea, required=False)
+    rationale = forms.CharField(widget=forms.Textarea, required=False)
     action = forms.CharField(widget=forms.Select, required=False)
 
 
 class ValidationResultErrorResolutionOpinionForm(forms.Form):
     validation_result_id = forms.IntegerField()
-    comment = forms.CharField(widget=forms.Textarea, required=False)
+    guidance = forms.CharField(widget=forms.Textarea, required=False)
     opinion = forms.CharField(widget=forms.Select, required=False)

@@ -15,7 +15,7 @@ from config.menu import get_menu_order
 from issue.models import Issue
 
 from .button_helper import UploadButtonHelper
-from .models import QAPackage, choices, Package, ValidationResult
+from .models import QAPackage, choices, Package, ValidationResult, ErrorResolutionOpinion
 from .permission_helper import UploadPermissionHelper
 from .tasks import run_validations
 from .utils import package_utils
@@ -170,6 +170,42 @@ class PackageAdminInspectView(InspectView):
         return super().get_context_data(**data)
 
 
+class ValidationResultCreateView(CreateView):
+    def get_instance(self):
+        vr_object = super().get_instance()
+
+        status = self.request.GET.get('status')
+        if status and status in (
+            choices.VS_APPROVED, 
+            choices.VS_DISAPPROVED
+        ):
+            vr_object.status = status
+
+        pkg_id = self.request.GET.get('package_id')
+        if pkg_id:
+            try:
+                vr_object.package = Package.objects.get(pk=pkg_id)
+            except Package.DoesNotExist:
+                ...
+
+        return vr_object
+
+    def form_valid(self, form):
+        self.object = form.save_all(self.request.user)
+        
+        op = ErrorResolutionOpinion()
+        op.creator = self.request.user
+        op.opinion = choices.ER_OPINION_FIX_DEMANDED
+        op.validation_result_id = self.object.id
+        op.package_id = self.object.package_id
+        op.guidance = _('This error was reported by an user.')
+        op.save()
+
+        self.object.validation_result_opinion = op
+        self.object.save()
+
+        return HttpResponseRedirect(self.get_success_url())
+
 class ValidationResultAdminInspectView(InspectView):
     def get_context_data(self):
         try:
@@ -204,6 +240,7 @@ class PackageAdmin(ModelAdmin):
         'created',
         'updated',
         'updated_by',
+        'expiration_date',
     )
     list_filter = (
         'category',
@@ -224,6 +261,7 @@ class PackageAdmin(ModelAdmin):
         'file', 
         'created', 
         'updated',
+        'expiration_date',
         'files_list',
     )
 
@@ -239,6 +277,7 @@ class PackageAdmin(ModelAdmin):
 class ValidationResultAdmin(ModelAdmin):
     model = ValidationResult
     permission_helper_class = UploadPermissionHelper
+    create_view_class = ValidationResultCreateView
     inspect_view_enabled=True
     inspect_view_class=ValidationResultAdminInspectView
     menu_label = _('Validation results')
@@ -296,8 +335,6 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         'created',
         'updated',
         'updated_by',
-        'stat_disagree',
-        'stat_incapable_to_fix',
     )
     list_filter = (
         'assignee',
@@ -308,16 +345,6 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         'creator__username',
         'updated_by__username',
     )
-
-    def stat_incapable_to_fix(self, obj):
-        if obj.stat_incapable_to_fix_n:
-            return f"{obj.stat_incapable_to_fix_n} ({obj.stat_incapable_to_fix_p:.2f}%)"
-        return '-'
-
-    def stat_disagree(self, obj):
-        if obj.stat_disagree_n:
-            return f"{obj.stat_disagree_n} ({obj.stat_disagree_p:.2f}%)"
-        return '-'
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

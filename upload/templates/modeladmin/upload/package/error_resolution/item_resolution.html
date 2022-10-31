@@ -6,10 +6,9 @@
         <option value="" {% if not action %}selected="selected"{% endif %}>{% trans 'Choose an option' %}</option>
         <option value="to-fix" {% if action == "to-fix" %}selected="selected"{% endif %}>{% trans 'I will fix this error' %}</option>
         <option value="disagree" {% if action == "disagree" %}selected="selected"{% endif %}>{% trans 'This is not an error' %}</option>
-        <option value="incapable-to-fix" {% if action == "incapable-to-fix" %}selected="selected"{% endif %}>{% trans 'I do not know how to fix this error' %}</option>
     </select>
-    <label for="comment-{{ validation_result_id }}">{% trans 'Comment' %}</label>
-    <textarea id="comment-{{ validation_result_id }}" cols="100" rows="5">{{ comment }}</textarea>
+    <label for="rationale-{{ validation_result_id }}">{% trans 'Rationale' %}</label>
+    <textarea id="rationale-{{ validation_result_id }}" cols="100" rows="5">{{ rationale }}</textarea>
     <button id="btn-send-resolution-{{ validation_result_id }}" style='margin-top:10px;' class="button loading-mask" type="submit">{% trans 'Save' %}</button>
 </form>
 
@@ -23,7 +22,7 @@
             url: "{% url 'upload:ajx_error_resolution' %}",
             data: {
                 'validation_result_id': '{{ validation_result_id }}',
-                'comment': $('textarea[id=comment-{{ validation_result_id }}]').val(),
+                'rationale': $('textarea[id=rationale-{{ validation_result_id }}]').val(),
                 'action': $('select[id=action-{{ validation_result_id }}]').val(),
                 'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
             },
@@ -45,7 +44,7 @@
             url: "{% url 'upload:ajx_error_resolution' %}",
             data: {
                 'validation_result_id': '{{ validation_result_id }}',
-                'comment': $('textarea[id=comment-{{ validation_result_id }}]').val(),
+                'rationale': $('textarea[id=rationale-{{ validation_result_id }}]').val(),
                 'action': $('select[id=action-{{ validation_result_id }}]').val(),
                 'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
             },
