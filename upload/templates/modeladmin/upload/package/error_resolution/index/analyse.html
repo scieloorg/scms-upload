@@ -30,10 +30,10 @@
                         {% for vr in validation_results %}
                             <tr>
                                 <td>{{ vr.get_category_display }}</td>
-                                <td>{{ vr.message }}</td>
+                                <td>{{ vr.message|default_if_none:'' }}</td>
                                 <td><pre>{{ vr.data }}</pre></td>
                                 <td>{{ vr.resolution.get_action_display }}</td>
-                                <td>{{ vr.resolution.rationale }}</td>
+                                <td>{{ vr.resolution.rationale|default_if_none:'' }}</td>
                                 <td>
                                     {% include 'modeladmin/upload/package/error_resolution/item_resolution_opinion.html' with validation_result_id=vr.id guidance=vr.analysis.guidance opinion=vr.analysis.opinion %}
                                 </td>

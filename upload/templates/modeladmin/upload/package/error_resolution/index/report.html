@@ -34,9 +34,9 @@
                                 <td>{{ vr.message|default_if_none:'' }}</td>
                                 <td><pre>{{ vr.data|default_if_none:'' }}</pre></td>
                                 <td>{{ vr.resolution.get_action_display }}</td>
-                                <td>{{ vr.resolution.rationale }}</td>
+                                <td>{{ vr.resolution.rationale|default_if_none:'' }}</td>
                                 <td>{{ vr.analysis.get_opinion_display }}</td>
-                                <td>{{ vr.analysis.guidance }}</td>
+                                <td>{{ vr.analysis.guidance|default_if_none:'' }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>
