@@ -21,6 +21,19 @@ class UploadPackageForm(WagtailAdminModelForm):
         return upload_package
 
 
+class ValidationResultForm(WagtailAdminModelForm):
+
+    def save_all(self, user):
+        vr_obj = super().save(commit=False)
+        
+        if self.instance.pk is None:
+            vr_obj.creator = user        
+        
+        self.save()
+
+        return vr_obj
+
+
 class ValidationResultErrorResolutionForm(forms.Form):
     validation_result_id = forms.IntegerField()
     rationale = forms.CharField(widget=forms.Textarea, required=False)
