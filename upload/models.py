@@ -125,11 +125,11 @@ class ValidationResult(models.Model):
 class ErrorResolution(CommonControlField):
     validation_result = models.OneToOneField('ValidationResult', to_field='id', primary_key=True, related_name='resolution', on_delete=models.CASCADE)
     action = models.CharField(_('Action'), max_length=32, choices=choices.ERROR_RESOLUTION_ACTION, null=True, blank=True)
-    comment = models.TextField(_('Comment'), max_length=512, null=True, blank=True)
+    rationale = models.TextField(_('Rationale'), max_length=512, null=True, blank=True)
     
     panels = [
         FieldPanel('action'),
-        FieldPanel('comment'),
+        FieldPanel('rationale'),
     ]
 
 

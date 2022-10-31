@@ -22,7 +22,7 @@
                             <th>{% trans 'Message' %}</th>
                             <th>{% trans 'Data' %}</th>
                             <th>{% trans 'Resolution action' %}</th>
-                            <th>{% trans 'Resolution comment' %}</th>
+                            <th>{% trans 'Resolution rationale' %}</th>
                             <th>{% trans 'Opinion' %}</th>
                         </tr>
                     </thead>
@@ -33,7 +33,7 @@
                                 <td>{{ vr.message }}</td>
                                 <td><pre>{{ vr.data }}</pre></td>
                                 <td>{{ vr.resolution.get_action_display }}</td>
-                                <td>{{ vr.resolution.comment }}</td>
+                                <td>{{ vr.resolution.rationale }}</td>
                                 <td>
                                     {% include 'modeladmin/upload/package/error_resolution/item_resolution_opinion.html' with validation_result_id=vr.id comment=vr.analysis.comment opinion=vr.analysis.opinion %}
                                 </td>

@@ -31,7 +31,7 @@
                                 <td>{{ vr.message|default_if_none:'' }}</td>
                                 <td><pre>{{ vr.data|default_if_none:'' }}</pre></td>
                                 <td>
-                                    {% include 'modeladmin/upload/package/error_resolution/item_resolution.html' with validation_result_id=vr.id comment=vr.resolution.comment action=vr.resolution.action %}
+                                    {% include 'modeladmin/upload/package/error_resolution/item_resolution.html' with validation_result_id=vr.id rationale=vr.resolution.rationale action=vr.resolution.action %}
                                 </td>
                             </tr>
                         {% endfor %}
