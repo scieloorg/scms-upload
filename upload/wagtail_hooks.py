@@ -296,8 +296,6 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         'created',
         'updated',
         'updated_by',
-        'stat_disagree',
-        'stat_incapable_to_fix',
     )
     list_filter = (
         'assignee',
@@ -308,16 +306,6 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         'creator__username',
         'updated_by__username',
     )
-
-    def stat_incapable_to_fix(self, obj):
-        if obj.stat_incapable_to_fix_n:
-            return f"{obj.stat_incapable_to_fix_n} ({obj.stat_incapable_to_fix_p:.2f}%)"
-        return '-'
-
-    def stat_disagree(self, obj):
-        if obj.stat_disagree_n:
-            return f"{obj.stat_disagree_n} ({obj.stat_disagree_p:.2f}%)"
-        return '-'
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
