@@ -1,3 +1,4 @@
+from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -26,6 +27,7 @@ class Package(CommonControlField):
     article = models.ForeignKey(Article, blank=True, null=True, on_delete=models.SET_NULL)
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.SET_NULL)
     assignee = models.ForeignKey(User, blank=True, null=True, on_delete=models.SET_NULL)
+    expiration_date = models.DateField(_('Expiration date'), null=False, blank=False)
 
     autocomplete_search_field = 'file'
 
@@ -41,6 +43,10 @@ class Package(CommonControlField):
 
     def __str__(self):
         return self.file.name
+
+    def save(self, *args, **kwargs):
+        self.expiration_date = self.created + timedelta(days=30)
+        super(Package, self).save(*args, **kwargs)
 
     def files_list(self):
         files = {'files': []}

@@ -240,6 +240,7 @@ class PackageAdmin(ModelAdmin):
         'created',
         'updated',
         'updated_by',
+        'expiration_date',
     )
     list_filter = (
         'category',
@@ -260,6 +261,7 @@ class PackageAdmin(ModelAdmin):
         'file', 
         'created', 
         'updated',
+        'expiration_date',
         'files_list',
     )
 
