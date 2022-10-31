@@ -146,28 +146,3 @@ def establish_site_connection(url='scielo.br'):
         return False
 
     return True
-
-
-def compute_package_validation_result_error_resolution_stats(package_id):
-    try:
-        obj = Package.objects.get(pk=package_id)
-    except Package.DoesNotExist:
-        return
-
-    def _get_percentage(numerator, denominator):
-        return float(numerator)/float(denominator) * 100
-
-    actions = [ve.resolution.action for ve in obj.validationresult_set.filter(status=choices.VS_DISAPPROVED)]
-    den = len(actions)
-
-    disagree_num = actions.count(choices.ER_ACTION_DISAGREE)
-    disagree_per = _get_percentage(disagree_num, den)
-    obj.stat_disagree_n = disagree_num
-    obj.stat_disagree_p = disagree_per
-
-    incapable_num = actions.count(choices.ER_ACTION_INCAPABLE_TO_FIX)
-    incapable_per = _get_percentage(incapable_num, den)
-    obj.stat_incapable_to_fix_n = incapable_num
-    obj.stat_incapable_to_fix_p = incapable_per
-
-    obj.save()

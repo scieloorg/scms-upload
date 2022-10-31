@@ -414,8 +414,7 @@ def task_validate_renditions(file_path, xml_path, package_id):
 
 @celery_app.task(bind=True, name='Check validation error resolutions')
 def task_check_resolutions(self, package_id):
-    controller.update_package_check_errors(package_id)
-    return controller.compute_package_validation_result_error_resolution_stats(package_id)
+    return controller.update_package_check_errors(package_id)
 
 
 @celery_app.task(bind=True, name='Check validation error resolutions opinions')
