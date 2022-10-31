@@ -26,8 +26,12 @@ def ajx_error_resolution(request):
         kwargs = {
             'validation_result_id': data['validation_result_id'].value(),
             'user': request.user,
-            'comment': data['comment'].value(),
         }
+
+        if scope == 'analyse':
+            kwargs.update({'guidance': data['guidance'].value()})
+        else:
+            kwargs.update({'rationale': data['rationale'].value()})
 
         if data.is_valid():
             if scope == 'analyse':
