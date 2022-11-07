@@ -9,6 +9,7 @@ from modelcluster.models import ClusterableModel
 
 from core.models import CommonControlField, RichTextWithLang
 
+from . import choices
 from .forms import OfficialJournalForm
 
 
