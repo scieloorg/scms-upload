@@ -27,6 +27,7 @@ class OfficialJournalAdmin(ModelAdmin):
     list_per_page = 10
     list_display = (
         'title',
+        'short_title',
         'foundation_date',
         'ISSN_print',
         'ISSN_electronic',
@@ -37,6 +38,9 @@ class OfficialJournalAdmin(ModelAdmin):
     # )
     search_fields = (
         'title',
+        'title_iso',
+        'short_title',
+        'nlm_title',
         'ISSN_print',
         'ISSN_electronic',
         'ISSNL',

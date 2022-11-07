@@ -24,6 +24,10 @@ class OfficialJournal(CommonControlField):
         return u'%s' % (self.title)
 
     title = models.CharField(_('Official Title'), max_length=256, null=True, blank=True)
+    title_iso = models.CharField(_('Title ISO'), max_length=256, null=True, blank=True)
+    short_title = models.CharField(_('Short Title'), max_length=256, null=True, blank=True)
+    nlm_title = models.CharField(_('NLM Title'), max_length=256, null=True, blank=True)
+
     foundation_date = models.CharField(_('Foundation Date'), max_length=25, null=True, blank=True)
     ISSN_print = models.CharField(_('ISSN Print'), max_length=9, null=True, blank=True)
     ISSN_electronic = models.CharField(_('ISSN Electronic'), max_length=9, null=True, blank=True)
@@ -39,6 +43,9 @@ class OfficialJournal(CommonControlField):
     class Meta:
         indexes = [
             models.Index(fields=['title']),
+            models.Index(fields=['title_iso']),
+            models.Index(fields=['short_title']),
+            models.Index(fields=['nlm_title']),
             models.Index(fields=['foundation_date']),
             models.Index(fields=['ISSN_print']),
             models.Index(fields=['ISSN_electronic']),
