@@ -3,6 +3,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from modelcluster.fields import ParentalKey
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 from wagtail.admin.edit_handlers import InlinePanel, FieldPanel, MultiFieldPanel
 from wagtail.core.models import Orderable, ClusterableModel
 from wagtail.core.fields import RichTextField
@@ -41,6 +42,11 @@ class Article(ClusterableModel, CommonControlField):
     # External models
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.CASCADE)
     related_items = models.ManyToManyField('self', symmetrical=False, through='RelatedItem', related_name='related_to')
+
+    autocomplete_search_field = 'pid_v3'
+
+    def autocomplete_label(self):
+        return self.pid_v3
 
     panel_article_ids = MultiFieldPanel(heading='Article identifiers', classname='collapsible')
     panel_article_ids.children = [
@@ -134,17 +140,11 @@ class RequestArticleChange(CommonControlField):
     pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True)
     demanded_user = models.ForeignKey(User, on_delete=models.CASCADE, blank=False, null=False)
 
-    panel_article = MultiFieldPanel(heading='Select an article from the list below or enter its PID v3 code', classname='collapsible')
-    panel_article.children = [
-        FieldPanel('article'),
-        FieldPanel('pid_v3'),
-    ]
-
     panels = [
+        FieldPanel('pid_v3', classname='collapsible'),
         FieldPanel('deadline', classname='collapsible'),
-        panel_article,
         FieldPanel('change_type', classname='collapsible'),
-        FieldPanel('demanded_user', classname='collapsible'),
+        AutocompletePanel('demanded_user', classname='collapsible'),
         FieldPanel('comment', classname='collapsible'),
     ]
 

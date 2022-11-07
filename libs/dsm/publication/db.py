@@ -11,13 +11,8 @@ from mongoengine import (
 
 from libs.dsm import exceptions
 
-import os
 
-
-OPAC_STRING_CONNECTION = os.environ.get('OPAC_STRING_CONNECTION', '')
-
-
-def mk_connection(host=OPAC_STRING_CONNECTION, alias=None):
+def mk_connection(host, alias=None):
     try:
         return _db_connect_by_uri(host, alias)
     except Exception as e:

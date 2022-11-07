@@ -1,37 +1,36 @@
 {% load i18n modeladmin_tags wagtailadmin_tags %}
-<form method="post" id="form-handle-error-resolution-{{ validation_error_id }}">
+<form method="post" id="form-handle-error-resolution-{{ validation_result_id }}">
     {% csrf_token %}
-    <label for="comment-{{ validation_error_id }}">{% trans 'Comment' %}</label>
-    <textarea id="comment-{{ validation_error_id }}" cols="100" rows="5">{{ comment }}</textarea>
-    <label for="action-{{ validation_error_id }}">{% trans 'Action' %}</label>
-    <select aria-label="Select an action" id="action-{{ validation_error_id }}">
+    <label for="action-{{ validation_result_id }}">{% trans 'Action' %}</label>
+    <select aria-label="Select an action" id="action-{{ validation_result_id }}">
         <option value="" {% if not action %}selected="selected"{% endif %}>{% trans 'Choose an option' %}</option>
         <option value="to-fix" {% if action == "to-fix" %}selected="selected"{% endif %}>{% trans 'I will fix this error' %}</option>
         <option value="disagree" {% if action == "disagree" %}selected="selected"{% endif %}>{% trans 'This is not an error' %}</option>
-        <option value="incapable-to-fix" {% if action == "incapable-to-fix" %}selected="selected"{% endif %}>{% trans 'I do not know how to fix this error' %}</option>
     </select>
-    <button id="btn-send-resolution-{{ validation_error_id }}" style='margin-top:10px;' class="button loading-mask" type="submit">{% trans 'Save' %}</button>
+    <label for="rationale-{{ validation_result_id }}">{% trans 'Rationale' %}</label>
+    <textarea id="rationale-{{ validation_result_id }}" cols="100" rows="5">{{ rationale }}</textarea>
+    <button id="btn-send-resolution-{{ validation_result_id }}" style='margin-top:10px;' class="button loading-mask" type="submit">{% trans 'Save' %}</button>
 </form>
 
 <script type="text/javascript">
     // Botão salvar que grava resolução de erro
-    var form_error_res = $("#form-handle-error-resolution-{{ validation_error_id }}");
+    var form_error_res = $("#form-handle-error-resolution-{{ validation_result_id }}");
     form_error_res.on('submit', function(e){
         e.preventDefault();
         $.ajax({
             type: 'POST',
             url: "{% url 'upload:ajx_error_resolution' %}",
             data: {
-                'validation_error_id': '{{ validation_error_id }}',
-                'comment': $('textarea[id=comment-{{ validation_error_id }}]').val(),
-                'action': $('select[id=action-{{ validation_error_id }}]').val(),
+                'validation_result_id': '{{ validation_result_id }}',
+                'rationale': $('textarea[id=rationale-{{ validation_result_id }}]').val(),
+                'action': $('select[id=action-{{ validation_result_id }}]').val(),
                 'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
             },
             beforeSend: function(){
-                $('#btn-send-resolution-{{ validation_error_id }}').addClass('loading');
+                $('#btn-send-resolution-{{ validation_result_id }}').addClass('loading');
             },
             success: function(){
-                $('#btn-send-resolution-{{ validation_error_id }}').removeClass('loading');
+                $('#btn-send-resolution-{{ validation_result_id }}').removeClass('loading');
             }
         });
     });
@@ -44,9 +43,9 @@
             type: 'POST',
             url: "{% url 'upload:ajx_error_resolution' %}",
             data: {
-                'validation_error_id': '{{ validation_error_id }}',
-                'comment': $('textarea[id=comment-{{ validation_error_id }}]').val(),
-                'action': $('select[id=action-{{ validation_error_id }}]').val(),
+                'validation_result_id': '{{ validation_result_id }}',
+                'rationale': $('textarea[id=rationale-{{ validation_result_id }}]').val(),
+                'action': $('select[id=action-{{ validation_result_id }}]').val(),
                 'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
             },
         });

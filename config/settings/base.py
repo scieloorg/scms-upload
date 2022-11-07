@@ -106,6 +106,7 @@ THIRD_PARTY_APPS = [
     "wagtailmenus",
     "rest_framework",
     "core",
+    "wagtailautocomplete",
 ]
 
 LOCAL_APPS = [
@@ -122,6 +123,7 @@ LOCAL_APPS = [
     "migration",
     "researcher",
     "upload",
+    "controlled_lists"
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps

@@ -22,20 +22,20 @@
                             <th>{% trans 'Message' %}</th>
                             <th>{% trans 'Data' %}</th>
                             <th>{% trans 'Resolution action' %}</th>
-                            <th>{% trans 'Resolution comment' %}</th>
+                            <th>{% trans 'Resolution rationale' %}</th>
                             <th>{% trans 'Opinion' %}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for ve in validation_errors %}
+                        {% for vr in validation_results %}
                             <tr>
-                                <td>{{ ve.get_category_display|abbrev }}</td>
-                                <td>{{ ve.message }}</td>
-                                <td><pre>{{ ve.data }}</pre></td>
-                                <td>{{ ve.resolution.get_action_display }}</td>
-                                <td>{{ ve.resolution.comment }}</td>
+                                <td>{{ vr.get_category_display }}</td>
+                                <td>{{ vr.message|default_if_none:'' }}</td>
+                                <td><pre>{{ vr.data }}</pre></td>
+                                <td>{{ vr.resolution.get_action_display }}</td>
+                                <td>{{ vr.resolution.rationale|default_if_none:'' }}</td>
                                 <td>
-                                    {% include 'modeladmin/upload/package/error_resolution/item_resolution_opinion.html' with validation_error_id=ve.id comment=ve.analysis.comment opinion=ve.analysis.opinion %}
+                                    {% include 'modeladmin/upload/package/error_resolution/item_resolution_opinion.html' with validation_result_id=vr.id guidance=vr.analysis.guidance opinion=vr.analysis.opinion %}
                                 </td>
                             </tr>
                         {% endfor %}
@@ -43,6 +43,9 @@
                 </table>
             </div>
             <div class="nice-padding">
+                <a class="button button-secondary no" style='margin-bottom:10px;' target="_blank" href="/admin/upload/validationresult/create/?package_id={{ package_id }}&status=disapproved">
+                    {% trans 'Add validation error' %}
+                </a>
                 <form method="POST" id="form-send-opinions">
                     {% csrf_token %}
                     <input type="hidden" name="package_id" value="{{ package_id }}"/> 

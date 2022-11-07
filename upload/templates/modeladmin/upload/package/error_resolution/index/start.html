@@ -15,6 +15,9 @@
                         {% trans 'Back to package inspection' %}
                     </a>
                 </p>
+                <div class="help-block help-info">
+                    <p>{% trans 'If you don\'t know how to fix an error, please ask or search for it on our forum: ' %}<a target="_blank" href="https://groups.google.com/g/scielo-xml">{%trans 'Google Groups'%}.</a></p>
+                </div>
                 <table class='listing'>
                     <thead>
                         <tr>
@@ -25,13 +28,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for ve in validation_errors %}
+                        {% for vr in validation_results %}
                             <tr>
-                                <td>{{ ve.get_category_display|abbrev }}</td>
-                                <td>{{ ve.message }}</td>
-                                <td><pre>{{ ve.data }}</pre></td>
+                                <td>{{ vr.get_category_display }}</td>
+                                <td>{{ vr.message|default_if_none:'' }}</td>
+                                <td><pre>{{ vr.data|default_if_none:'' }}</pre></td>
                                 <td>
-                                    {% include 'modeladmin/upload/package/error_resolution/item_resolution.html' with validation_error_id=ve.id comment=ve.resolution.comment action=ve.resolution.action %}
+                                    {% include 'modeladmin/upload/package/error_resolution/item_resolution.html' with validation_result_id=vr.id rationale=vr.resolution.rationale action=vr.resolution.action %}
                                 </td>
                             </tr>
                         {% endfor %}

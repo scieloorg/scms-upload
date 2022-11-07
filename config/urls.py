@@ -1,5 +1,6 @@
 from django.conf.urls.i18n import i18n_patterns
 from django.conf import settings
+from django.conf.urls import url
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path, re_path
@@ -8,6 +9,8 @@ from django.views.generic import TemplateView
 from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.core import urls as wagtail_urls
 from wagtail.documents import urls as wagtaildocs_urls
+
+from wagtailautocomplete.urls.admin import urlpatterns as autocomplete_admin_urls
 
 from core.api import api_router
 from core.search import views as search_views  # noqa isort:skip
@@ -36,6 +39,8 @@ urlpatterns = [
 # These will be available under a language code prefix. For example /en/search/
 urlpatterns += i18n_patterns(
     re_path(r"^search/$", search_views.search, name="search"),
+    # Autocomplete endpoint
+    url(r'^admin/autocomplete/', include(autocomplete_admin_urls)),
     # User management
     path("api/v2/", api_router.urls),
     path("users/", include("core.users.urls", namespace="users")),

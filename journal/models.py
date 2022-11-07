@@ -29,6 +29,11 @@ class OfficialJournal(CommonControlField):
     ISSN_electronic = models.CharField(_('ISSN Electronic'), max_length=9, null=True, blank=True)
     ISSNL = models.CharField(_('ISSNL'), max_length=9, null=True, blank=True)
 
+    autocomplete_search_field = 'title'
+
+    def autocomplete_label(self):
+        return self.title
+
     base_form_class = OfficialJournalForm
 
     class Meta:
@@ -80,3 +85,17 @@ class FieldMission(Orderable, RichTextWithLang):
 
     def __str__(self):
         return u'%s %s' % (self.text, self.language)
+        
+
+class SocialNetwork(models.Model):
+    name = models.CharField(_('Name'), max_length=255, choices=choices.SOCIAL_NETWORK_NAMES, null=False, blank=False)
+    url = models.URLField(_("URL"), max_length=255, null=True, blank=False)
+
+    panels=[
+        FieldPanel('name'),
+        FieldPanel('url')
+    ]
+
+    class Meta:
+        abstract = True
+

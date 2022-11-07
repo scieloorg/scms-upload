@@ -1,10 +1,13 @@
-from zipfile import BadZipFile
-from django.utils.translation import gettext as _
-
+from time import sleep
 from lxml import etree
+from zipfile import BadZipFile
+
+from django.utils.translation import gettext as _
 
 from packtools import SPPackage
 from packtools.domain import HTMLGenerator
+from packtools.sps.libs.async_download import download_files
+from packtools.sps.models.package import PackageName
 from packtools.sps.models.article_authors import Authors
 from packtools.sps.models.article_assets import ArticleAssets
 from packtools.sps.models.article_renditions import ArticleRenditions
@@ -12,11 +15,14 @@ from packtools.sps.models.article_titles import ArticleTitles
 from packtools.sps.models.front_journal_meta import ISSN
 
 from .file_utils import (
+    create_file_for_xml_etree,
+    create_file_for_zip_package,
     generate_filepath_with_new_extension,
     get_filename_from_filepath,
     get_file_absolute_path,
     get_file_list_from_zip,
     get_file_url,
+    get_xml_content_from_uri,
     get_xml_content_from_zip,
     get_xml_filename,
     unzip,
@@ -30,6 +36,80 @@ JS_ARTICLE = '/static/js/articles.js'
 CSS_ARTICLE = '/static/css/article-styles.css'
 
 
+def generate_xml_canonical(xml_uri):
+    # Obtém conteúdo do XML
+    xml_content = get_xml_content_from_uri(xml_uri)
+    xml_etree = get_etree_from_xml_content(xml_content)
+    aa = ArticleAssets(xml_etree)
+
+    assets_dict = {}
+    assets_uris_and_names = []
+
+    # Obtém nome do pacote
+    package_name = PackageName(xml_etree).name
+
+    # Gera dicionário de substituição de nomes de assets e lista de uris e nomes novos
+    for i in aa.article_assets:
+        assets_dict[i.name] = i.name_canonical(package_name)
+        assets_uris_and_names.append({
+            'uri': i.name,
+            'name': i.name_canonical(package_name),
+        })
+
+    # Substitui nomes de assets no XMLTree
+    aa.replace_names(assets_dict)
+
+    return {
+        'xml_etree': aa.xmltree, 
+        'assets_uris_and_names': assets_uris_and_names, 
+        'package_name': package_name
+    }
+
+
+def get_renditions_uris_and_names(doc):
+    renditions_uris_and_names = []
+    for rend in doc.pdfs:
+        renditions_uris_and_names.append(
+            {
+                'uri': rend['url'], 
+                'name': rend['filename'],
+            }
+        )
+    return renditions_uris_and_names
+
+
+def get_package_name(xmltree):
+    return PackageName(xmltree).name
+
+
+def create_package_file_from_site_doc(doc):
+    # Obtém uris e nomes de renditions
+    renditions_uris_and_names = get_renditions_uris_and_names(doc)
+
+    # Cria versão canônica de XML e dados acessórios
+    _data = generate_xml_canonical(doc.xml)
+
+    # Obtém dados de _data relacionados ao xml canônico gerado e outros dados acessórios
+    xml_etree_canonical = _data['xml_etree']
+    assets_uris_and_names = _data['assets_uris_and_names']
+    package_name = _data['package_name']
+
+    # Gera arquivo de dados de xml_etree_canonical e armazena path em lista de arquivos
+    package_files = [
+        create_file_for_xml_etree(
+            xml_etree=xml_etree_canonical,
+            package_name=package_name,
+        )
+    ]   
+
+    # Baixa assets e renditions e armazena paths em lista de arquivos
+    package_files.extend(download_files(assets_uris_and_names))
+    package_files.extend(download_files(renditions_uris_and_names))
+
+    # Cria arquivo zip em disco com o conteúdo dos arquivos coletados e o XML canônico
+    return create_file_for_zip_package(package_files, package_name)
+
+
 def optimise_package(source, target):
     package = SPPackage.from_file(source, mkdtemp())
     package.optimise(
@@ -38,14 +118,14 @@ def optimise_package(source, target):
     )
 
 
-def get_article_assets_from_zipped_xml(path):
-    xmlstr = get_xml_content_from_zip(path)
+def get_article_assets_from_zipped_xml(path, xml_path=None):
+    xmlstr = get_xml_content_from_zip(path, xml_path)
     xmltree = get_etree_from_xml_content(xmlstr)
     return ArticleAssets(xmltree).article_assets
 
 
-def get_article_renditions_from_zipped_xml(path):
-    xmlstr = get_xml_content_from_zip(path)
+def get_article_renditions_from_zipped_xml(path, xml_path=None):
+    xmlstr = get_xml_content_from_zip(path, xml_path)
     xmltree = get_etree_from_xml_content(xmlstr)
     return ArticleRenditions(xmltree).article_renditions
 
@@ -164,14 +244,14 @@ def get_languages(zip_filename, use_optimised_package=True):
         return []
 
 
-def render_html(zip_filename, language, use_optimised_package=True):
+def render_html(zip_filename, xml_path, language, use_optimised_package=True):
     path = generate_filepath_with_new_extension(zip_filename, '.optz', True) if use_optimised_package else zip_filename
 
     dir_optz = get_file_url(
         dirname='',
         filename=get_filename_from_filepath(path)
     )
-    xmlstr = get_xml_content_from_zip(path)
+    xmlstr = get_xml_content_from_zip(path, xml_path)
     xmltree_strio = get_xml_strio_for_preview(xmlstr, dir_optz)
 
     html = HTMLGenerator.parse(
