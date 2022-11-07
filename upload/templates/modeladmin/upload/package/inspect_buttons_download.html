@@ -2,7 +2,7 @@
 
 <div class="nice-padding row">
     <h3>{% trans "Download" %}</h3>
-    <div class="col2">
+    <div class="col3">
         <a href="/media/{{ original_pkg }}" class="button bicolor button--icon">
             <span class="icon-wrapper">
                 <svg class="icon icon-download-alt icon" aria-hidden="true" focusable="false">
@@ -12,7 +12,7 @@
         </a>
     </div>
     {% if category != 'generated-by-the-system' and validation_results.xml_or_dtd.status == 'approved' %}
-        <div class="col2">
+        <div class="col3">
             <a href="/media/{{ optimized_pkg }}" class="button bicolor button--icon">
                 <span class="icon-wrapper">
                     <svg class="icon icon-download-alt icon" aria-hidden="true" focusable="false">
