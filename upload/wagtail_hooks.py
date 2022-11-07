@@ -1,5 +1,4 @@
 from django.contrib import messages
-from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
