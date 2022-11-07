@@ -113,10 +113,10 @@ class ArticleButtonHelper(ButtonHelper):
         if url_name == 'article_article_modeladmin_index':
             classnames.extend(ArticleButtonHelper.index_button_classnames)
 
-        if ph.user_can_request_article_change(usr, obj) and obj.status not in (AS_REQUIRE_CORRECTION, AS_REQUIRE_ERRATUM):
+        if ph.user_can_request_article_change(usr, obj) and obj.status not in (AS_REQUIRE_UPDATE, AS_REQUIRE_ERRATUM):
             btns.append(self.request_change(obj, classnames))
 
-        if ph.user_can_make_article_change(usr, obj) and obj.status in (AS_REQUIRE_ERRATUM, AS_REQUIRE_CORRECTION):
+        if ph.user_can_make_article_change(usr, obj) and obj.status in (AS_REQUIRE_ERRATUM, AS_REQUIRE_UPDATE):
             for rac in obj.requestarticlechange_set.all():
                 if rac.demanded_user == usr:
                     btns.append(self.submit_change(obj, classnames))

@@ -59,7 +59,7 @@ class PackageCreateView(CreateView):
         self.object = form.save_all(self.request.user, article, issue)
 
         if self.object.category in (
-            choices.PC_CORRECTION, 
+            choices.PC_UPDATE, 
             choices.PC_ERRATUM
         ):
             if self.object.article is None:

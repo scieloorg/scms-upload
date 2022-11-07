@@ -17,7 +17,7 @@
     {{ block.super }}
     
     <div class="nice-padding">
-        {% if status == 'required-erratum' or status == 'required-correction' %}
+        {% if status == 'required-erratum' or status == 'required-update' %}
             <h3>{% trans "Article change instructions" %}</h3>
             {% for rac in requested_changes %}
                 <dl class='help-block help-info'>

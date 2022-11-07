@@ -75,7 +75,7 @@ def run_validations(filename, package_id, package_category, article_id=None, iss
 
         # Aciona validação de compatibilidade entre dados do pacote e o Article selecionado
         if article_id is not None and package_category in (
-            choices.PC_CORRECTION, 
+            choices.PC_UPDATE, 
             choices.PC_ERRATUM
         ):
             task_validate_article_change(
@@ -205,8 +205,8 @@ def task_validate_article_change(new_package_file_path, new_package_category, ar
     )
     last_valid_pkg_file_path = file_utils.get_file_absolute_path(last_valid_pkg.file.name)
 
-    if new_package_category == choices.PC_CORRECTION:
-        task_validate_article_correction.apply_async(kwargs={
+    if new_package_category == choices.PC_UPDATE:
+        task_validate_article_update.apply_async(kwargs={
             'new_package_file_path': new_package_file_path,
             'last_valid_package_file_path': last_valid_pkg_file_path,
         })
@@ -240,8 +240,8 @@ def task_update_article_status_by_validations(task_id_article_erratum, task_id_c
     return False
 
 
-@celery_app.task(name='Validate article correction')
-def task_validate_article_correction(new_package_file_path, last_valid_package_file_path):
+@celery_app.task(name='Validate article update')
+def task_validate_article_update(new_package_file_path, last_valid_package_file_path):
     new_pkg_xmltree = sps_package.PackageArticle(new_package_file_path).xmltree_article
     last_valid_pkg_xmltree = sps_package.PackageArticle(last_valid_package_file_path).xmltree_article
 
