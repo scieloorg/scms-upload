@@ -37,7 +37,7 @@ class IssueAdmin(ModelAdmin):
         'publication_year',
     )
     search_fields = (
-        'official_journal',
+        'official_journal__title',
         'publication_year',
         'volume',
         'number',

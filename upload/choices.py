@@ -33,12 +33,12 @@ PACKAGE_STATUS = (
 
 # Model Package, Field category
 PC_ERRATUM = 'erratum'
-PC_CORRECTION = 'correction'
+PC_UPDATE = 'update'
 PC_NEW_DOCUMENT = 'new-document'
 PC_SYSTEM_GENERATED = 'generated-by-the-system'
 
 PACKAGE_CATEGORY = (
-    (PC_CORRECTION, _('Correction')),
+    (PC_UPDATE, _('Update')),
     (PC_ERRATUM, _('Erratum')),
     (PC_NEW_DOCUMENT, _('New document')),
 )

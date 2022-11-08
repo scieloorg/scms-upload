@@ -2,11 +2,11 @@ from django.utils.translation import gettext as _
 
 
 # Model RequestArticleChange, Field change_type
-RCT_CORRECTION = 'correction'
+RCT_UPDATE = 'update'
 RCT_ERRATUM = 'erratum'
 
 REQUEST_CHANGE_TYPE = (
-    (RCT_CORRECTION, _('Correction')),
+    (RCT_UPDATE, _('Update')),
     (RCT_ERRATUM, _('Erratum')),
 )
 
@@ -111,13 +111,13 @@ ARTICLE_TYPE = (
 
 # Model Article, Field status
 AS_CHANGE_SUBMITTED = 'change-submitted'
-AS_REQUIRE_CORRECTION = 'required-correction'
+AS_REQUIRE_UPDATE = 'required-update'
 AS_REQUIRE_ERRATUM = 'required-erratum'
 AS_PUBLISHED = 'published'
 
 ARTICLE_STATUS = (
     (AS_CHANGE_SUBMITTED, _('Change submitted')),
-    (AS_REQUIRE_CORRECTION, _('Required correction')),
+    (AS_REQUIRE_UPDATE, _('Required update')),
     (AS_REQUIRE_ERRATUM, _('Required erratum')),
     (AS_PUBLISHED, _('Published')),
 )

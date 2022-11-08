@@ -76,8 +76,8 @@ class RequestArticleChangeCreateView(CreateView):
 
         if change_request_obj.change_type == choices.RCT_ERRATUM:
             article.status =  choices.AS_REQUIRE_ERRATUM
-        elif change_request_obj.change_type ==  choices.RCT_CORRECTION:
-            article.status = choices.AS_REQUIRE_CORRECTION
+        elif change_request_obj.change_type ==  choices.RCT_UPDATE:
+            article.status = choices.AS_REQUIRE_UPDATE
         
         article.save()
 
@@ -95,7 +95,7 @@ class ArticleAdminInspectView(InspectView):
             'packages': self.instance.package_set.all()
         }
 
-        if self.instance.status in (choices.AS_REQUIRE_CORRECTION, choices.AS_REQUIRE_ERRATUM):
+        if self.instance.status in (choices.AS_REQUIRE_UPDATE, choices.AS_REQUIRE_ERRATUM):
             data['requested_changes'] = []
             for rac in self.instance.requestarticlechange_set.all():
                 data['requested_changes'].append(rac)

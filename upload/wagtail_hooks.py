@@ -1,5 +1,4 @@
 from django.contrib import messages
-from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
@@ -60,7 +59,7 @@ class PackageCreateView(CreateView):
         self.object = form.save_all(self.request.user, article, issue)
 
         if self.object.category in (
-            choices.PC_CORRECTION, 
+            choices.PC_UPDATE, 
             choices.PC_ERRATUM
         ):
             if self.object.article is None:

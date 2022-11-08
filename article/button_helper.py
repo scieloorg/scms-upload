@@ -1,9 +1,9 @@
 from django.utils.translation import gettext as _
 from wagtail.contrib.modeladmin.helpers import ButtonHelper
 
-from upload.choices import PC_CORRECTION, PC_ERRATUM
+from upload.choices import PC_UPDATE, PC_ERRATUM
 
-from .choices import AS_REQUIRE_CORRECTION, AS_REQUIRE_ERRATUM
+from .choices import AS_REQUIRE_UPDATE, AS_REQUIRE_ERRATUM
 
 
 class RequestArticleChangeButtonHelper(ButtonHelper):
@@ -22,8 +22,8 @@ class RequestArticleChangeButtonHelper(ButtonHelper):
     def submit_change(self, obj, classnames):
         text = _("Submit change")
 
-        if obj.article.status == AS_REQUIRE_CORRECTION:
-            package_category = PC_CORRECTION
+        if obj.article.status == AS_REQUIRE_UPDATE:
+            package_category = PC_UPDATE
         elif obj.article.status == AS_REQUIRE_ERRATUM:
             package_category = PC_ERRATUM
 
@@ -56,7 +56,7 @@ class RequestArticleChangeButtonHelper(ButtonHelper):
         if url_name.endswith('_modeladmin_index'):
             classnames.extend(ArticleButtonHelper.index_button_classnames)
 
-        if ph.user_can_make_article_change(usr, obj.article) and obj.article.status in (AS_REQUIRE_ERRATUM, AS_REQUIRE_CORRECTION):
+        if ph.user_can_make_article_change(usr, obj.article) and obj.article.status in (AS_REQUIRE_ERRATUM, AS_REQUIRE_UPDATE):
             if obj.demanded_user == usr:
                 btns.append(self.submit_change(obj, classnames))
                 btns.append(self.see_instructions(obj, classnames))
@@ -79,8 +79,8 @@ class ArticleButtonHelper(ButtonHelper):
     def submit_change(self, obj, classnames):
         text = _("Submit change")
 
-        if obj.status == AS_REQUIRE_CORRECTION:
-            package_category = PC_CORRECTION
+        if obj.status == AS_REQUIRE_UPDATE:
+            package_category = PC_UPDATE
         elif obj.status == AS_REQUIRE_ERRATUM:
             package_category = PC_ERRATUM
 
@@ -113,10 +113,10 @@ class ArticleButtonHelper(ButtonHelper):
         if url_name == 'article_article_modeladmin_index':
             classnames.extend(ArticleButtonHelper.index_button_classnames)
 
-        if ph.user_can_request_article_change(usr, obj) and obj.status not in (AS_REQUIRE_CORRECTION, AS_REQUIRE_ERRATUM):
+        if ph.user_can_request_article_change(usr, obj) and obj.status not in (AS_REQUIRE_UPDATE, AS_REQUIRE_ERRATUM):
             btns.append(self.request_change(obj, classnames))
 
-        if ph.user_can_make_article_change(usr, obj) and obj.status in (AS_REQUIRE_ERRATUM, AS_REQUIRE_CORRECTION):
+        if ph.user_can_make_article_change(usr, obj) and obj.status in (AS_REQUIRE_ERRATUM, AS_REQUIRE_UPDATE):
             for rac in obj.requestarticlechange_set.all():
                 if rac.demanded_user == usr:
                     btns.append(self.submit_change(obj, classnames))

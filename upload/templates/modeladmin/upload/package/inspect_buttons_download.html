@@ -1,25 +1,25 @@
 {% load i18n modeladmin_tags wagtailadmin_tags wagtailcore_tags %}
 
-<div class="nice-padding row">
+<div class="nice-padding">
     <h3>{% trans "Download" %}</h3>
-    <div class="col2">
-        <a href="/media/{{ original_pkg }}" class="button bicolor button--icon">
-            <span class="icon-wrapper">
-                <svg class="icon icon-download-alt icon" aria-hidden="true" focusable="false">
-                    <use href="#icon-download-alt"></use>
-                </svg>
-            </span>{% trans 'Original package' %}
-        </a>
-    </div>
-    {% if category != 'generated-by-the-system' and validation_results.xml_or_dtd.status == 'approved' %}
-        <div class="col2">
-            <a href="/media/{{ optimized_pkg }}" class="button bicolor button--icon">
+    <div class="row">
+        <div class="col12">
+            <a href="/media/{{ original_pkg }}" class="button bicolor button--icon" style="margin-bottom: 10px;">
                 <span class="icon-wrapper">
                     <svg class="icon icon-download-alt icon" aria-hidden="true" focusable="false">
                         <use href="#icon-download-alt"></use>
                     </svg>
-                </span>{% trans 'Optimized package' %}
+                </span>{% trans 'Original package' %}
             </a>
+            {% if category != 'generated-by-the-system' and validation_results.xml_or_dtd.status == 'approved' %}
+                <a href="/media/{{ optimized_pkg }}" class="button bicolor button--icon" style="margin-bottom: 10px;">
+                    <span class="icon-wrapper">
+                        <svg class="icon icon-download-alt icon" aria-hidden="true" focusable="false">
+                            <use href="#icon-download-alt"></use>
+                        </svg>
+                    </span>{% trans 'Optimized package' %}
+                </a>
+            {% endif %}
         </div>
-    {% endif %}
+    </div>
 </div>
