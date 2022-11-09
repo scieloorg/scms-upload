@@ -447,6 +447,14 @@ def task_validate_xml_lang(self, file_path, xml_path, package_id):
         status=choices.VS_CREATED,
         data={'xml_path': xml_path},
     )
+
+    if result is True:
+        controller.update_validation_result(
+            vr.id, 
+            status=choices.VS_APPROVED, 
+            message=_('All languages have been successfully validated.')
+        )
+    else:
 @celery_app.task(bind=True, name='Check validation error resolutions')
 def task_check_resolutions(self, package_id):
     return controller.update_package_check_errors(package_id)
