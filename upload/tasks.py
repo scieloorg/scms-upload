@@ -63,6 +63,16 @@ def run_validations(filename, package_id, package_category, article_id=None, iss
                 countdown=10,
             )
 
+            # Aciona validação de conteúdo
+            task_validate_content.apply_async(
+                kwargs={
+                    'file_path': optimised_filepath,
+                    'xml_path': xml_path,
+                    'package_id': package_id,
+                },
+                countdown=10,
+            )
+
         # Aciona validação de compatibilidade entre dados do pacote e o Issue selecionado
         if issue_id is not None and package_category:
             task_validate_article_and_issue_data.apply_async(
