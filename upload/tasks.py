@@ -433,6 +433,9 @@ def task_validate_content(self, file_path, xml_path, package_id):
         }
     )
 
+
+@celery_app.task(bind=True, name='Validate XML Language')
+def task_validate_xml_lang(self, file_path, xml_path, package_id):
 @celery_app.task(bind=True, name='Check validation error resolutions')
 def task_check_resolutions(self, package_id):
     return controller.update_package_check_errors(package_id)
