@@ -423,6 +423,16 @@ def task_validate_renditions(file_path, xml_path, package_id):
         return True
 
 
+@celery_app.task(bind=True, name='Validate XML content')
+def task_validate_content(self, file_path, xml_path, package_id):
+    task_validate_xml_lang.apply_async(
+        kwargs={
+            'file_path': file_path,
+            'xml_path': xml_path,
+            'package_id': package_id,
+        }
+    )
+
 @celery_app.task(bind=True, name='Check validation error resolutions')
 def task_check_resolutions(self, package_id):
     return controller.update_package_check_errors(package_id)
