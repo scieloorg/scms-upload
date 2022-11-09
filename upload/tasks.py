@@ -440,6 +440,13 @@ def task_validate_xml_lang(self, file_path, xml_path, package_id):
     xml_tree = xml_utils.get_etree_from_xml_content(xml_str)
 
     result, errors = sps_validation_article_and_subarticles.validate_language(xml_tree)
+
+    vr = controller.add_validation_result(
+        error_category=choices.VE_DATA_CONSISTENCY_ERROR,
+        package_id=package_id,
+        status=choices.VS_CREATED,
+        data={'xml_path': xml_path},
+    )
 @celery_app.task(bind=True, name='Check validation error resolutions')
 def task_check_resolutions(self, package_id):
     return controller.update_package_check_errors(package_id)
