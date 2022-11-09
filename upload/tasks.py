@@ -5,6 +5,7 @@ from packtools.sps.utils import file_utils as sps_file_utils
 from packtools.sps.models import package as sps_package
 from packtools.sps import exceptions as sps_exceptions
 from packtools.sps.validation import (
+    article_and_subarticles as sps_validation_article_and_subarticles,
     article as sps_validation_article,
     journal as sps_validation_journal,
 )
