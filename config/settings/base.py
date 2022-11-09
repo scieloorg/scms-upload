@@ -123,7 +123,8 @@ LOCAL_APPS = [
     "migration",
     "researcher",
     "upload",
-    "controlled_lists"
+    "controlled_lists",
+    "checklist",
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
