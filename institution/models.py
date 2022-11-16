@@ -1,6 +1,5 @@
 from django.db import models
 from django.utils.translation import gettext as _
-from wagtail.core.models import Orderable
 from modelcluster.models import ClusterableModel
 from wagtail.admin.edit_handlers import FieldPanel, InlinePanel
 
@@ -89,7 +88,7 @@ class Institution(CommonControlField, ClusterableModel):
     base_form_class = InstitutionForm
 
 
-class InstitutionHistory(Orderable):
+class InstitutionHistory(models.Model):
     institution = models.ForeignKey('Institution', null=True, blank=True, related_name='+', on_delete=models.CASCADE)
     initial_date = models.DateField(_('Initial Date'), null=True, blank=True)
     final_date = models.DateField(_('Final Date'), null=True, blank=True)
