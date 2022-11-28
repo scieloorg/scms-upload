@@ -9,6 +9,7 @@ from modelcluster.models import ClusterableModel
 
 from core.models import CommonControlField, RichTextWithLang
 
+from institution.models import InstitutionHistory
 from . import choices
 from .forms import OfficialJournalForm
 
@@ -106,4 +107,84 @@ class SocialNetwork(models.Model):
 
     class Meta:
         abstract = True
+
+
+class Journal(ClusterableModel, SocialNetwork):
+    short_title = models.CharField(_('Short Title'), max_length=100, null=True, blank=True)
+    official_journal = models.ForeignKey('OfficialJournal', null=True, blank=True, related_name='+', on_delete=models.CASCADE)
+    logo = models.ForeignKey(
+        'wagtailimages.Image',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+'
+    )
+    submission_online_url =  models.URLField(_("Submission online URL"), max_length=255, null=True, blank=True)
+
+    panels_identification = [
+        FieldPanel('official_journal'),
+        FieldPanel('short_title'),
+    ]
+
+    panels_mission = [
+        InlinePanel('mission', label=_('Mission'), classname="collapsed"),
+    ]
+
+    panels_owner = [
+        InlinePanel('owner', label=_('Owner'), classname="collapsed"),
+    ]
+
+    panels_editorial_manager = [
+        InlinePanel('editorialmanager', label=_('Editorial Manager'), classname="collapsed"),
+    ]
+
+    panels_publisher = [
+        InlinePanel('publisher', label=_('Publisher'), classname="collapsed"),
+    ]
+
+    panels_sponsor = [
+        InlinePanel('sponsor', label=_('Sponsor'), classname="collapsed"),
+    ]
+
+    panels_website = [
+        ImageChooserPanel('logo', heading=_('Logo')),
+        FieldPanel('submission_online_url'),
+        InlinePanel('journalsocialnetwork', label=_('Social Network'))
+    ]
+
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(panels_identification, heading=_('Identification')),
+            ObjectList(panels_mission, heading=_('Missions')),
+            ObjectList(panels_owner, heading=_('Owners')),
+            ObjectList(panels_editorial_manager, heading=_('Editorial Manager')),
+            ObjectList(panels_publisher, heading=_('Publisher')),
+            ObjectList(panels_sponsor, heading=_('Sponsor')),
+            ObjectList(panels_website, heading=_('Website')),
+        ]
+    )
+
+
+class Mission(Orderable, RichTextWithLang):
+    page = ParentalKey(Journal, on_delete=models.CASCADE, related_name='mission')
+
+
+class Owner(Orderable, InstitutionHistory):
+    page = ParentalKey(Journal, on_delete=models.CASCADE, related_name='owner')
+
+
+class EditorialManager(Orderable, InstitutionHistory):
+    page = ParentalKey(Journal, on_delete=models.CASCADE, related_name='editorialmanager')
+
+
+class Publisher(Orderable, InstitutionHistory):
+    page = ParentalKey(Journal, on_delete=models.CASCADE, related_name='publisher')
+
+
+class Sponsor(Orderable, InstitutionHistory):
+    page = ParentalKey(Journal, on_delete=models.CASCADE, related_name='sponsor')
+
+
+class JournalSocialNetwork(Orderable, SocialNetwork):
+    page = ParentalKey(Journal, on_delete=models.CASCADE, related_name='journalsocialnetwork')
 
