@@ -27,13 +27,13 @@ LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
-def get_registered_xml(xml, user_id, fput_content):
+def get_registered_xml(xml_adapter, user_id, fput_content):
     """
     Get registered XML
 
     Parameters
     ----------
-    xml : XMLPre
+    xml_adapter : XMLAdapter
 
     Returns
     -------
@@ -46,7 +46,6 @@ def get_registered_xml(xml, user_id, fput_content):
     """
     try:
         # obtém o registro do documento
-        xml_adapter = xml_sps_utils.XMLAdapter(xml)
         logging.info("ADAPT")
         logging.info(xml_adapter)
         registered = _query_document(xml_adapter)
@@ -66,7 +65,7 @@ def get_registered_xml(xml, user_id, fput_content):
         return registered
     except Exception as e:
         raise exceptions.GetRegisteredXMLError(
-            _("Unable to get registered XML {}").format(xml)
+            _("Unable to get registered XML {}").format(xml_adapter)
         )
 
 
@@ -94,7 +93,7 @@ def request_document_ids_for_zip(xml_zip_file_path, user_id, fput_content):
             try:
                 # {"filename": item: "xml": xml}
                 registered = request_document_ids(
-                    item['xml'], user_id, fput_content, item["filename"])
+                    item['xml_with_pre'], user_id, fput_content, item["filename"])
                 if registered:
                     item.update({"registered": registered})
                 yield item
@@ -111,13 +110,13 @@ def request_document_ids_for_zip(xml_zip_file_path, user_id, fput_content):
         )
 
 
-def request_document_ids(xml, user_id, fput_content, object_name):
+def request_document_ids(xml_with_pre, user_id, fput_content, object_name):
     """
     Request PID v3
 
     Parameters
     ----------
-    xml : XMLPre
+    xml : XMLWithPre
     user_id : str
         requester
 
@@ -134,9 +133,11 @@ def request_document_ids(xml, user_id, fput_content, object_name):
     try:
         # obtém o registro do documento
         logging.info("Inicio request_document_ids {}".format(object_name))
-        registered = get_registered_xml(xml, user_id, fput_content)
 
-        xml_adapter = xml_sps_utils.XMLAdapter(xml)
+        # adaptador do xml with pre
+        xml_adapter = xml_sps_utils.XMLAdapter(xml_with_pre)
+
+        registered = get_registered_xml(xml_adapter, user_id, fput_content)
 
         # verfica os PIDs encontrados no XML / atualiza-os se necessário
         pids_updated = _check_xml_pids(xml_adapter, registered)
@@ -146,13 +147,13 @@ def request_document_ids(xml, user_id, fput_content, object_name):
             registered = _register_new_document(xml_adapter, user_id)
 
         if registered:
-            xml_content = xml.tostring()
+            xml_content = xml_with_pre.tostring()
             xml_uri = fput_content(
                 xml_content,
                 mimetype="text/xml",
                 object_name=object_name
             )
-            _update_xml_versions(registered, user_id, xml_uri, xml_content)
+            _add_xml_version(registered, user_id, xml_uri, xml_content)
 
         return registered
 
@@ -164,11 +165,11 @@ def request_document_ids(xml, user_id, fput_content, object_name):
 
     except Exception as e:
         raise exceptions.RequestDocumentIDsError(
-            "Unable to request document IDs for {}".format(xml)
+            "Unable to request document IDs for {}".format(xml_with_pre)
         )
 
 
-def _update_xml_versions(registered, user_id, xml_uri, xml_content):
+def _add_xml_version(registered, user_id, xml_uri, xml_content):
     """
     Adiciona xml_uri no registro de pid_provider
 
@@ -280,6 +281,7 @@ def _query_document_args(xml_adapter, filter_by_issue=False, aop_version=False):
 
     Arguments
     ---------
+    xml_adapter : XMLAdapter
     aop_version: bool
     filter_by_issue: bool
 
@@ -628,10 +630,10 @@ def _sync_new_website_to_pid_provider_system(xmltree, user_id, fput_content):
         for found_doc in new_website_docs:
             try:
                 # registra dados do documento no pid provider system
-                xml = libs_xml_sps_utils.get__xml__from_uri(
+                xml_with_pre = libs_xml_sps_utils.get_xml_with_pre_from_uri(
                     found_doc.xml)
                 registered = request_document_ids(
-                    xml, user_id, fput_content, found_doc._id)
+                    xml_with_pre, user_id, fput_content, found_doc._id)
             except Exception as e:
                 # TODO ???
                 raise exceptions.SyncNewWebsiteToPidProviderSystemError(

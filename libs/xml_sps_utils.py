@@ -29,17 +29,17 @@ LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
-class CreateXMLError(Exception):
+class GetXmlWithPreError(Exception):
     ...
 
 
-class GetXMLFromURIError(Exception):
+class GetXmlWithPreFromURIError(Exception):
     ...
 
 
 def get_xml_items(xml_sps_file_path, filenames=None):
     """
-    Get XML content items from XML file or Zip file
+    Get XML items from XML file or Zip file
 
     Arguments
     ---------
@@ -86,9 +86,9 @@ def get_xml_items_from_zip_file(xml_sps_file_path, filenames=None):
                     try:
                         yield {
                             "filename": item,
-                            "xml": create_xml(zf.read(item).decode("utf-8")),
+                            "xml_with_pre": get_xml_with_pre(zf.read(item).decode("utf-8")),
                         }
-                    except CreateXMLError as e:
+                    except GetXmlWithPreError as e:
                         raise GetXMLItemsFromZipFileError(
                             _("Unable to get xml {} from zip file {}: {} {}").format(
                                 item, xml_sps_file_path, type(e), e)
@@ -119,7 +119,7 @@ def update_zip_file_xml(xml_sps_file_path, xml_file_path, content):
                      (xml_sps_file_path, xml_file_path, content[:100]))
         zf.writestr(xml_file_path, content)
 
-    return xml_sps_file_path
+    return os.path.isfile(xml_sps_file_path)
 
 
 def create_xml_zip_file(xml_sps_file_path, content):
@@ -148,27 +148,27 @@ def create_xml_zip_file(xml_sps_file_path, content):
     return os.path.isfile(xml_sps_file_path)
 
 
-def get__xml__from_uri(uri, timeout=30):
+def get_xml_with_pre_from_uri(uri, timeout=30):
     try:
         response = requests.get(uri, timeout=timeout)
         xml_content = response.content.decode("utf-8")
     except Exception as e:
-        raise GetXMLFromURIError(
+        raise GetXmlWithPreFromURIError(
             _("Unable to get xml from {}").format(uri)
         )
-    return create_xml(xml_content)
+    return get_xml_with_pre(xml_content)
 
 
-def create_xml(xml_content):
+def get_xml_with_pre(xml_content):
     try:
         # return etree.fromstring(xml_content)
         pref, xml = split_processing_instruction_doctype_declaration_and_xml(
             xml_content
         )
-        return XML(pref, etree.fromstring(xml))
+        return XMLWithPre(pref, etree.fromstring(xml))
 
     except Exception as e:
-        raise CreateXMLError(e)
+        raise GetXmlWithPreError(e)
 
 
 def split_processing_instruction_doctype_declaration_and_xml(xml_content):
@@ -196,12 +196,6 @@ class XMLWithPre:
             self.xmlpre +
             etree.tostring(self.xmltree, encoding="utf-8").decode("utf-8")
         )
-
-
-class XML(XMLWithPre):
-
-    def __init__(self, xmlpre, xmltree):
-        super().__init__(xmlpre, xmltree)
 
     def update_ids(self, v3, v2, aop_pid):
         # update IDs

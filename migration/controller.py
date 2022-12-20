@@ -28,7 +28,7 @@ from scielo_classic_website import classic_ws
 
 from django_celery_beat.models import PeriodicTask, CrontabSchedule
 
-from libs.xml_sps_utils import get__xml__from_uri
+from libs.xml_sps_utils import get_xml_with_pre_from_uri
 from libs.dsm.files_storage.minio import MinioStorage
 from libs.dsm.publication.db import mk_connection
 from libs.dsm.publication.journals import JournalToPublish
@@ -1570,7 +1570,7 @@ class DocumentFilesController:
             self._xmls = {}
             for xml_file in self.scielo_document.xml_files.iterator():
                 try:
-                    xml = get__xml__from_uri(xml_file.uri)
+                    xml = get_xml_with_pre_from_uri(xml_file.uri)
                 except Exception as e:
                     raise exceptions.AddLangsToXMLFilesError(
                         _("Unable get xml {} from {}: {} {}").format(
