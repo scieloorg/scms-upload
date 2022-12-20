@@ -27,7 +27,7 @@ LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
-def get_registered_xml(xml_adapter, user_id, fput_content):
+def get_registered_xml(xml_adapter):
     """
     Get registered XML
 
@@ -49,10 +49,6 @@ def get_registered_xml(xml_adapter, user_id, fput_content):
         logging.info("ADAPT")
         logging.info(xml_adapter)
         registered = _query_document(xml_adapter)
-        if not registered:
-            _sync_new_website_to_pid_provider_system(
-                xml_adapter.xmltree, user_id, fput_content)
-            registered = _query_document(xml_adapter)
 
         if registered and xml_adapter.is_aop and not registered.is_aop:
             # levanta exceção se está sendo ingressada uma versão aop de
@@ -137,7 +133,7 @@ def request_document_ids(xml_with_pre, user_id, fput_content, object_name):
         # adaptador do xml with pre
         xml_adapter = xml_sps_utils.XMLAdapter(xml_with_pre)
 
-        registered = get_registered_xml(xml_adapter, user_id, fput_content)
+        registered = get_registered_xml(xml_adapter)
 
         # verfica os PIDs encontrados no XML / atualiza-os se necessário
         pids_updated = _check_xml_pids(xml_adapter, registered)
@@ -609,40 +605,4 @@ def _register_new_document(xml_adapter, user_id):
 
         raise exceptions.SavingError(
             "Register new document error: %s %s %s" % (type(e), e, data)
-        )
-
-
-def _sync_new_website_to_pid_provider_system(xmltree, user_id, fput_content):
-    """
-    Faz sincronização dos dados do site novo e do pid provider
-    Retorna o item registrado em Pid Provider
-    """
-    try:
-        # tentar recuperar documento do site novo
-        data = package_utils.get_article_data_for_comparison(xmltree)
-        new_website_docs = publication_documents.get_similar_documents(
-            article_title=data["title"],
-            journal_electronic_issn=data["journal_electronic_issn"],
-            journal_print_issn=data["journal_print_issn"],
-            authors=data["authors"],
-        )
-
-        for found_doc in new_website_docs:
-            try:
-                # registra dados do documento no pid provider system
-                xml_with_pre = libs_xml_sps_utils.get_xml_with_pre_from_uri(
-                    found_doc.xml)
-                registered = request_document_ids(
-                    xml_with_pre, user_id, fput_content, found_doc._id)
-            except Exception as e:
-                # TODO ???
-                raise exceptions.SyncNewWebsiteToPidProviderSystemError(
-                    _("Unable to register {} in pid provider system").format(
-                        found_doc.xml)
-                )
-    except Exception as e:
-        # TODO ???
-        raise exceptions.SyncNewWebsiteToPidProviderSystemError(
-            _("Unable to sync new website to pid provider system {}").format(
-                xmltree)
         )
