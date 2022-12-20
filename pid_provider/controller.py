@@ -75,7 +75,7 @@ class PidProvider:
                     mimetype="text/xml",
                     object_name=object_name
                 )
-                _add_xml_version(registered, self.user_id, xml_uri, xml_content)
+                registered.add_xml_version(self.user_id, xml_uri, xml_content)
 
             return registered
 
@@ -164,52 +164,6 @@ def _get_registered_xml(xml_adapter):
     except Exception as e:
         raise exceptions.GetRegisteredXMLError(
             _("Unable to get registered XML {}").format(xml_adapter)
-        )
-
-
-def _add_xml_version(registered, user_id, xml_uri, xml_content):
-    """
-    Adiciona xml_uri no registro de pid_provider
-
-    Parameters
-    ----------
-    registered : models.XMLAOPArticle or models.XMLArticle
-    user_id : str
-        requester
-    xml_uri : str
-
-    Returns
-    -------
-        None or models.XMLAOPArticle or models.XMLArticle
-
-    Raises
-    ------
-    exceptions.SaveXMLFileError
-
-    """
-    try:
-        # verifica se o xml já está registrado
-        exist = False
-        xml_content_64_char = xml_sps_utils._str_with_64_char(xml_content)
-        try:
-            current = registered.versions.latest('created')
-        except models.XMLFile.DoesNotExist:
-            pass
-        else:
-            exist = (current.content == xml_content_64_char)
-        if not exist:
-            xml_file = models.XMLFile(
-                uri=xml_uri,
-                created=datetime.utcnow(),
-                content=xml_content_64_char,
-            )
-            xml_file.save()
-
-            return _add_xml_file(registered, xml_file, user_id)
-
-    except Exception as e:
-        raise exceptions.SaveXMLFileError(
-            "Unable to save xml file {} in pid provider".format(xml_uri)
         )
 
 
@@ -539,21 +493,6 @@ def _get_or_create_xml_issue(journal, volume, number, suppl, pub_year):
         issue = models.XMLIssue(**params)
         issue.save()
         return issue
-
-
-def _add_xml_file(registered, xml_file, user_id):
-    try:
-        if registered:
-            registered.versions.add(xml_file)
-            registered.updated_by = User.objects.get(pk=user_id)
-            registered.updated = datetime.utcnow()
-            registered.save()
-            return registered
-    except Exception as e:
-        raise exceptions.SavingError(
-            "Add XML file to registered document error: %s %s %s" %
-            (type(e), e, registered)
-        )
 
 
 def _register_new_document(xml_adapter, user_id):

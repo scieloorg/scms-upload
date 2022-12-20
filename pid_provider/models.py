@@ -7,6 +7,8 @@ from django.utils.translation import gettext as _
 from wagtail.admin.edit_handlers import FieldPanel
 
 from core.models import CommonControlField
+from . import xml_sps_utils
+from . import exceptions
 
 
 LOGGER = logging.getLogger(__name__)
@@ -118,6 +120,57 @@ class BaseArticle(CommonControlField):
             models.Index(fields=['elocation_id']),
         ]
 
+    def add_xml_version(self, user, xml_uri, xml_content):
+        """
+        Adiciona xml_uri no registro de pid_provider
+
+        Parameters
+        ----------
+        user : str
+            requester
+        xml_uri : str
+
+        Raises
+        ------
+        exceptions.SaveXMLFileError
+
+        """
+        try:
+            # verifica se o xml já está registrado
+            exist = False
+            xml_content_64_char = xml_sps_utils._str_with_64_char(xml_content)
+            try:
+                current = self.versions.latest('created')
+            except XMLFile.DoesNotExist:
+                pass
+            else:
+                exist = (current.content == xml_content_64_char)
+            if not exist:
+                self._add_xml_file(xml_uri, xml_content_64_char, user)
+
+        except Exception as e:
+            raise exceptions.SaveXMLFileError(
+                "Unable to save xml file {} in pid provider".format(xml_uri)
+            )
+
+    def _add_xml_file(self, xml_uri, xml_content_64_char, user):
+        try:
+            xml_file = XMLFile(
+                uri=xml_uri,
+                created=datetime.utcnow(),
+                content=xml_content_64_char,
+            )
+            xml_file.save()
+            self.versions.add(xml_file)
+            self.updated_by = user
+            self.updated = datetime.utcnow()
+            self.save()
+        except Exception as e:
+            raise exceptions.SavingError(
+                "Add XML file to registered document error: %s %s %s" %
+                (type(e), e, self)
+            )
+
 
 class XMLAOPArticle(BaseArticle):
     journal = models.ForeignKey('XMLJournal', on_delete=models.SET_NULL, null=True)
@@ -161,3 +214,36 @@ class XMLArticle(BaseArticle):
             models.Index(fields=['fpage_seq']),
             models.Index(fields=['lpage']),
         ]
+
+
+class RequestResult(CommonControlField):
+    xml_source = models.CharField(_("XML source"), max_length=255, null=True, blank=False)
+    v3 = models.CharField(_("v3"), max_length=23, null=True, blank=False)
+    error_msg = models.CharField(_("error_msg"), max_length=255, null=True, blank=False)
+    error_type = models.CharField(_("error_type"), max_length=255, null=True, blank=False)
+
+    def __str__(self):
+        return f'{self.xml_source} {self.v3} {self.created}'
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['v3']),
+            models.Index(fields=['xml_source']),
+            models.Index(fields=['created']),
+            models.Index(fields=['updated_by']),
+            models.Index(fields=['error_type']),
+            models.Index(fields=['error_msg']),
+        ]
+
+    @classmethod
+    def create(cls, xml_source, creator):
+        obj = cls(xml_source=xml_source, creator=creator)
+        obj.save()
+        return obj
+
+    def update(self, updated_by, v3=None, error_msg=None, error_type=None):
+        self.v3 = v3
+        self.error_type = error_type
+        self.error_msg = error_msg
+        self.updated_by = updated_by
+        self.save()
