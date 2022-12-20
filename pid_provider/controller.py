@@ -27,7 +27,109 @@ LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
-def get_registered_xml(xml_adapter):
+class PidProvider:
+
+    def __init__(self, storage, user_id):
+        self.storage = storage
+        self.user_id = user_id
+
+    def request_document_ids(self, xml_with_pre, object_name):
+        """
+        Request PID v3
+
+        Parameters
+        ----------
+        xml : XMLWithPre
+        object_name : str
+
+        Returns
+        -------
+            None or models.XMLAOPArticle or models.XMLArticle
+
+        Raises
+        ------
+        exceptions.RequestDocumentIDsError
+        exceptions.NotAllowedIngressingAOPVersionOfArticlePublishedInAnIssueError
+
+        """
+        try:
+            # obtém o registro do documento
+            logging.info("Inicio request_document_ids {}".format(object_name))
+
+            # adaptador do xml with pre
+            xml_adapter = xml_sps_utils.XMLAdapter(xml_with_pre)
+
+            registered = _get_registered_xml(xml_adapter)
+
+            # verfica os PIDs encontrados no XML / atualiza-os se necessário
+            pids_updated = _check_xml_pids(xml_adapter, registered)
+
+            if not registered:
+                # cria registro
+                registered = _register_new_document(xml_adapter, self.user_id)
+
+            if registered:
+                xml_content = xml_with_pre.tostring()
+                xml_uri = self.storage.fput_content(
+                    xml_content,
+                    mimetype="text/xml",
+                    object_name=object_name
+                )
+                _add_xml_version(registered, self.user_id, xml_uri, xml_content)
+
+            return registered
+
+        except exceptions.FoundAOPPublishedInAnIssueError:
+            raise exceptions.NotAllowedIngressingAOPVersionOfArticlePublishedInAnIssueError(
+                _("Not allowed to ingress document {} as ahead of print, "
+                  "because it is already published in an issue").format(registered)
+            )
+
+        except Exception as e:
+            raise exceptions.RequestDocumentIDsError(
+                "Unable to request document IDs for {}".format(xml_with_pre)
+            )
+
+    def request_document_ids_for_zip(self, xml_zip_file_path):
+        """
+        Request PID v3
+
+        Parameters
+        ----------
+        xml_zip_file_path : str
+            XML URI
+
+        Returns
+        -------
+            models.XMLAOPArticle or models.XMLArticle
+
+        Raises
+        ------
+        exceptions.RequestDocumentIDsForXMLZipFileError
+        """
+        try:
+            for item in libs_xml_sps_utils.get_xml_items(xml_zip_file_path):
+                try:
+                    # {"filename": item: "xml": xml}
+                    registered = self.request_document_ids(
+                        item['xml_with_pre'], item["filename"])
+                    if registered:
+                        item.update({"registered": registered})
+                    yield item
+                except Exception as e:
+                    raise exceptions.RequestDocumentIDsForXMLZipFileError(
+                        _("Unable to request document IDs for {} {}".format(
+                            xml_zip_file_path, item['filename'],
+                            ))
+                    )
+        except Exception as e:
+            raise exceptions.RequestDocumentIDsForXMLZipFileError(
+                _("Unable to request document IDs for {}").format(
+                    xml_zip_file_path)
+            )
+
+
+def _get_registered_xml(xml_adapter):
     """
     Get registered XML
 
@@ -62,106 +164,6 @@ def get_registered_xml(xml_adapter):
     except Exception as e:
         raise exceptions.GetRegisteredXMLError(
             _("Unable to get registered XML {}").format(xml_adapter)
-        )
-
-
-def request_document_ids_for_zip(xml_zip_file_path, user_id, fput_content):
-    """
-    Request PID v3
-
-    Parameters
-    ----------
-    xml_zip_file_path : str
-        XML URI
-    user_id : str
-        requester
-
-    Returns
-    -------
-        models.XMLAOPArticle or models.XMLArticle
-
-    Raises
-    ------
-    exceptions.RequestDocumentIDsForXMLZipFileError
-    """
-    try:
-        for item in libs_xml_sps_utils.get_xml_items(xml_zip_file_path):
-            try:
-                # {"filename": item: "xml": xml}
-                registered = request_document_ids(
-                    item['xml_with_pre'], user_id, fput_content, item["filename"])
-                if registered:
-                    item.update({"registered": registered})
-                yield item
-            except Exception as e:
-                raise exceptions.RequestDocumentIDsForXMLZipFileError(
-                    _("Unable to request document IDs for {} {}".format(
-                        xml_zip_file_path, item['filename'],
-                        ))
-                )
-    except Exception as e:
-        raise exceptions.RequestDocumentIDsForXMLZipFileError(
-            _("Unable to request document IDs for {}").format(
-                xml_zip_file_path)
-        )
-
-
-def request_document_ids(xml_with_pre, user_id, fput_content, object_name):
-    """
-    Request PID v3
-
-    Parameters
-    ----------
-    xml : XMLWithPre
-    user_id : str
-        requester
-
-    Returns
-    -------
-        None or models.XMLAOPArticle or models.XMLArticle
-
-    Raises
-    ------
-    exceptions.RequestDocumentIDsError
-    exceptions.NotAllowedIngressingAOPVersionOfArticlePublishedInAnIssueError
-
-    """
-    try:
-        # obtém o registro do documento
-        logging.info("Inicio request_document_ids {}".format(object_name))
-
-        # adaptador do xml with pre
-        xml_adapter = xml_sps_utils.XMLAdapter(xml_with_pre)
-
-        registered = get_registered_xml(xml_adapter)
-
-        # verfica os PIDs encontrados no XML / atualiza-os se necessário
-        pids_updated = _check_xml_pids(xml_adapter, registered)
-
-        if not registered:
-            # cria registro
-            registered = _register_new_document(xml_adapter, user_id)
-
-        if registered:
-            xml_content = xml_with_pre.tostring()
-            xml_uri = fput_content(
-                xml_content,
-                mimetype="text/xml",
-                object_name=object_name
-            )
-            _add_xml_version(registered, user_id, xml_uri, xml_content)
-
-        return registered
-
-    except exceptions.FoundAOPPublishedInAnIssueError:
-        raise exceptions.NotAllowedIngressingAOPVersionOfArticlePublishedInAnIssueError(
-            _("Not allowed to ingress document {} as ahead of print, "
-              "because it is already published in an issue").format(registered)
-        )
-
-    except Exception as e:
-        raise exceptions.RequestDocumentIDsError(
-            "Unable to request document IDs for {}".format(xml_with_pre)
         )
 
 
