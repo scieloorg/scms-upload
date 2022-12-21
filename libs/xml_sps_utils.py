@@ -168,7 +168,10 @@ def get_xml_with_pre(xml_content):
         return XMLWithPre(pref, etree.fromstring(xml))
 
     except Exception as e:
-        raise GetXmlWithPreError(e)
+        raise GetXmlWithPreError(
+            "Unable to get xml with pre %s ... %s" %
+            (xml_content[:100], xml_content[-200:])
+        )
 
 
 def split_processing_instruction_doctype_declaration_and_xml(xml_content):
@@ -284,11 +287,13 @@ class XMLWithPre:
     def article_in_issue(self):
         if not hasattr(self, '_article_in_issue') or not self._article_in_issue:
             _data = {
-                k: '' for k in (
-                    "volume", "number", "suppl",
-                    "fpage", "fpage_seq", "lpage",
-                    "pub_year",
-                )
+                "volume": None,
+                "number": None,
+                "suppl": None,
+                "fpage": None,
+                "fpage_seq": None,
+                "lpage": None,
+                "pub_year": None,
             }
             article_in_issue = ArticleMetaIssue(self.xmltree)
             _data.update(article_in_issue.data)
