@@ -34,9 +34,7 @@ from libs.dsm.publication.db import mk_connection
 from libs.dsm.publication.journals import JournalToPublish
 from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
 from libs.dsm.publication.documents import DocumentToPublish
-from pid_provider.controller import (
-    request_document_ids,
-)
+from pid_provider.controller import PidProvider
 from core.controller import parse_non_standard_date, parse_months_names
 
 from collection.choices import CURRENT
