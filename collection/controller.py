@@ -39,11 +39,13 @@ def update_files_storage_configuration(
     return files_storage
 
 
-def get_files_storage_configuration(name):
+def get_files_storage_configuration(**kwargs):
     try:
-        return FilesStorageConfiguration.objects.get(name=name)
+        return FilesStorageConfiguration.objects.get(**kwargs)
     except FilesStorageConfiguration.DoesNotExist:
-        return FilesStorageConfiguration(name=name)
+        raise exceptions.GetFilesStorageConfigurationError(
+        	f"There is no files storage which configuration matches with {kwargs}"
+        )
 
 
 def get_files_storage(files_storage_config):
