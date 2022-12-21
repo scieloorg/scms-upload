@@ -28,3 +28,8 @@ class GetSciELOJournalError(Exception):
 
 class StartCollectionConfigurationError(Exception):
     ...
+
+
+class GetFilesStorageConfigurationError(Exception):
+    ...
+
