@@ -10,50 +10,21 @@ LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 class XMLAdapter:
 
-    def __init__(self, xml):
-        self.xml = xml
+    def __init__(self, xml_with_pre):
+        self.xml_with_pre = xml_with_pre
 
     def __getattr__(self, name):
+        # try:
+        #     return getattr(self, name)
+        # except:
         try:
-            return getattr(self.xml, name)
+            return getattr(self.xml_with_pre, name)
         except:
             raise AttributeError(f"XMLAdapter.{name} does not exist")
-
-    # @property
-    # def is_aop(self):
-    #     return self.xml.is_aop
-
-    # @property
-    # def pub_year(self):
-    #     return int(self.xml.article_in_issue['pub_year'])
 
     @property
     def v2_prefix(self):
         return f"S{self.journal_issn_electronic or self.journal_issn_print}{self.issue['pub_year']}"
-
-    # @property
-    # def v3(self):
-    #     return self.xml.v3
-
-    # @property
-    # def v2(self):
-    #     return self.xml.v2
-
-    # @property
-    # def aop_pid(self):
-    #     return self.xml.aop_pid
-
-    # @v3.setter
-    # def v3(self, value):
-    #     self.xml.v3 = value
-
-    # @v2.setter
-    # def v2(self, value):
-    #     self.xml.v2 = value
-
-    # @aop_pid.setter
-    # def aop_pid(self, value):
-    #     self.xml.aop_pid = value
 
     @property
     def journal_issn_print(self):
@@ -84,10 +55,8 @@ class XMLAdapter:
     @property
     def collab(self):
         if not hasattr(self, '_collab') or not self._collab:
-            # list of dict which keys are
-            # href, ext-link-type, related-article-type
-            self._collab = _str_with_64_char(self.xml.collab)
-        return self._links
+            self._collab = _str_with_64_char(self.xml_with_pre.collab)
+        return self._collab
 
     @property
     def surnames(self):
@@ -112,14 +81,14 @@ class XMLAdapter:
     @property
     def partial_body(self):
         if not hasattr(self, '_partial_body') or not self._partial_body:
-            self._partial_body = _str_with_64_char(self.xml.partial_body)
+            self._partial_body = _str_with_64_char(self.xml_with_pre.partial_body)
         return self._partial_body
 
     @property
     def pages(self):
         if not hasattr(self, '_pages') or not self._pages:
             self._pages = {
-                k: self.xml.article_in_issue.get(k)
+                k: self.xml_with_pre.article_in_issue.get(k)
                 for k in (
                     "fpage", "fpage_seq", "lpage", "elocation_id",
                 )
@@ -130,7 +99,7 @@ class XMLAdapter:
     def issue(self):
         if not hasattr(self, '_issue') or not self._issue:
             self._issue = {
-                k: self.xml.article_in_issue.get(k)
+                k: self.xml_with_pre.article_in_issue.get(k)
                 for k in (
                     "volume", "number", "suppl", "pub_year",
                 )
@@ -157,4 +126,6 @@ def _str_with_64_char(text):
     64
     hashlib.sha224(b"Nobody inspects the spammish repetition").hexdigest()
     """
+    if not text:
+        return None
     return hashlib.sha256(_standardize(text).encode("utf-8")).hexdigest()
