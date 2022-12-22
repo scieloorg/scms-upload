@@ -9,9 +9,9 @@ from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
-from upload import exceptions as upload_exceptions
-from upload.models import Package
-from upload.tasks import get_or_create_package
+# from upload import exceptions as upload_exceptions
+# from upload.models import Package
+# from upload.tasks import get_or_create_package
 
 from .button_helper import ArticleButtonHelper, RequestArticleChangeButtonHelper
 from .models import Article, RelatedItem, RequestArticleChange, choices
@@ -43,49 +43,50 @@ class RequestArticleChangeCreateView(CreateView):
 
         return change_request_obj
 
-    def form_valid(self, form):
-        pid_v3 = self.request.POST['pid_v3']
+    # # FIXME
+    # def form_valid(self, form):
+    #     pid_v3 = self.request.POST['pid_v3']
 
-        try:
-            package_id = get_or_create_package(
-                pid_v3=pid_v3,
-                user_id=self.request.user.id
-            )
-        except upload_exceptions.XMLUriIsUnavailableError as e:
-            messages.error(
-                self.request,
-                _('It was not possible to submit the request. XML Uri is unavailable: %s.') % e.uri,
-            )
-            return redirect(self.request.META.get('HTTP_REFERER'))
-        except upload_exceptions.PIDv3DoesNotExistInSiteDatabase:
-            messages.error(
-                self.request,
-                _('It was not possible to submit the request. PIDv3 does not exist in the site database.'),
-            )
-            return redirect(self.request.META.get('HTTP_REFERER'))
-        except upload_exceptions.SiteDatabaseIsUnavailableError:
-            messages.error(
-                self.request,
-                _('It was not possible to submit the request. Site database is unavailable.'),
-            )
-            return redirect(self.request.META.get('HTTP_REFERER'))
+    #     try:
+    #         package_id = get_or_create_package(
+    #             pid_v3=pid_v3,
+    #             user_id=self.request.user.id
+    #         )
+    #     except upload_exceptions.XMLUriIsUnavailableError as e:
+    #         messages.error(
+    #             self.request,
+    #             _('It was not possible to submit the request. XML Uri is unavailable: %s.') % e.uri,
+    #         )
+    #         return redirect(self.request.META.get('HTTP_REFERER'))
+    #     except upload_exceptions.PIDv3DoesNotExistInSiteDatabase:
+    #         messages.error(
+    #             self.request,
+    #             _('It was not possible to submit the request. PIDv3 does not exist in the site database.'),
+    #         )
+    #         return redirect(self.request.META.get('HTTP_REFERER'))
+    #     except upload_exceptions.SiteDatabaseIsUnavailableError:
+    #         messages.error(
+    #             self.request,
+    #             _('It was not possible to submit the request. Site database is unavailable.'),
+    #         )
+    #         return redirect(self.request.META.get('HTTP_REFERER'))
 
-        article = Package.objects.get(pk=package_id).article
+    #     article = Package.objects.get(pk=package_id).article
 
-        change_request_obj = form.save_all(self.request.user, article)
+    #     change_request_obj = form.save_all(self.request.user, article)
 
-        if change_request_obj.change_type == choices.RCT_ERRATUM:
-            article.status =  choices.AS_REQUIRE_ERRATUM
-        elif change_request_obj.change_type ==  choices.RCT_UPDATE:
-            article.status = choices.AS_REQUIRE_UPDATE
+    #     if change_request_obj.change_type == choices.RCT_ERRATUM:
+    #         article.status =  choices.AS_REQUIRE_ERRATUM
+    #     elif change_request_obj.change_type ==  choices.RCT_UPDATE:
+    #         article.status = choices.AS_REQUIRE_UPDATE
         
-        article.save()
+    #     article.save()
 
-        messages.success(
-            self.request, 
-            _('Change request submitted with success.')
-        )
-        return HttpResponseRedirect(self.get_success_url())
+    #     messages.success(
+    #         self.request, 
+    #         _('Change request submitted with success.')
+    #     )
+    #     return HttpResponseRedirect(self.get_success_url())
 
 
 class ArticleAdminInspectView(InspectView):
