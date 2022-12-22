@@ -123,12 +123,14 @@ class PublicationMonthModel(models.Model):
     publication_month_number = models.IntegerField(
         verbose_name=_("Publication month number"),
         null=True,
+        blank=True,
         choices=choices.MONTHS,
     )
     publication_month_name = models.CharField(
         verbose_name=_("Publication month name"),
         max_length=20,
         null=True,
+        blank=True,
     )
 
     class Meta:
@@ -144,21 +146,25 @@ class PublicationMonthsRangeModel(models.Model):
         verbose_name=_("Publication initial month number"),
         choices=choices.MONTHS,
         null=True,
+        blank=True,
     )
     publication_initial_month_name = models.CharField(
         verbose_name=_("Publication initial month name"),
         max_length=20,
         null=True,
+        blank=True,
     )
     publication_final_month_number = models.IntegerField(
         verbose_name=_("Publication final month number"),
         choices=choices.MONTHS,
         null=True,
+        blank=True,
     )
     publication_final_month_name = models.CharField(
         verbose_name=_("Publication final month name"),
         max_length=20,
         null=True,
+        blank=True,
     )
 
     class Meta:
