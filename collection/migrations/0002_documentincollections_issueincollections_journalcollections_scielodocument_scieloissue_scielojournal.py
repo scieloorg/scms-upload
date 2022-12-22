@@ -8,7 +8,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('journal', '0002_auto_20220909_1727'),
+        # ('journal', '0002_auto_20220909_1727'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('issue', '0001_initial'),
         ('collection', '0001_initial'),
