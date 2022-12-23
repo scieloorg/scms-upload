@@ -2,162 +2,41 @@ import logging
 import json
 
 from django.utils.translation import gettext_lazy as _
-
 from .models import (
     Collection,
     SciELOJournal,
     SciELOIssue,
     SciELODocument,
     ClassicWebsiteConfiguration,
-    FilesStorageConfiguration,
     NewWebSiteConfiguration,
 )
-from libs.dsm.files_storage.minio import MinioStorage
-from journal.controller import get_or_create_official_journal
-from journal.exceptions import GetOrCreateOfficialJournalError
-from issue.controller import get_or_create_official_issue
-from article.controller import get_or_create_official_article
-
+from files_storage.models import Configuration as FilesStorageConfiguration
 from . import exceptions
 
 
-def update_files_storage_configuration(
-        files_storage,
-        name, host, access_key, secret_key, secure,
-        bucket_root, bucket_public_subdir,
-        user_id,
-        ):
-    files_storage = files_storage or FilesStorageConfiguration()
-    files_storage.host = host
-    files_storage.secure = secure
-    files_storage.access_key = access_key
-    files_storage.secret_key = secret_key
-    files_storage.bucket_root = bucket_root
-    files_storage.bucket_public_subdir = bucket_public_subdir
-    files_storage.creator_id = user_id
-    files_storage.save()
-    return files_storage
-
-
-def get_files_storage_configuration(**kwargs):
-    try:
-        return FilesStorageConfiguration.objects.get(**kwargs)
-    except FilesStorageConfiguration.DoesNotExist:
-        raise exceptions.GetFilesStorageConfigurationError(
-        	f"There is no files storage which configuration matches with {kwargs}"
-        )
-
-
-def get_files_storage(files_storage_config):
-    try:
-        return MinioStorage(
-            minio_host=files_storage_config.host,
-            minio_access_key=files_storage_config.access_key,
-            minio_secret_key=files_storage_config.secret_key,
-            bucket_root=files_storage_config.bucket_root,
-            bucket_subdir=files_storage_config.bucket_public_subdir,
-            minio_secure=files_storage_config.secure,
-            minio_http_client=None,
-        )
-    except Exception as e:
-        raise exceptions.GetFilesStorageError(
-            _("Unable to get MinioStorage {} {} {}").format(
-                files_storage_config, type(e), e)
-        )
-
-
-def start():
+def load_config(user):
     try:
         with open(".envs/.bigbang") as fp:
             data = json.loads(fp.read())
-        user_id = 1
-        try:
-            collection = Collection.objects.get(
-                acron=data['collection_acron'])
-        except Collection.DoesNotExist:
-            collection = Collection()
-            collection.acron = data['collection_acron']
-            collection.name = data['collection_name']
-            collection.creator_id = user_id
-            collection.save()
-        try:
-            classic_website = ClassicWebsiteConfiguration.objects.get(
-                collection=collection)
-        except ClassicWebsiteConfiguration.DoesNotExist:
-            classic_website = ClassicWebsiteConfiguration()
-            classic_website.collection = collection
-            classic_website.title_path = (
-                data['classic_ws_config']['title_path']
-            )
-            classic_website.issue_path = (
-                data['classic_ws_config']['issue_path']
-            )
-            classic_website.serial_path = (
-                data['classic_ws_config']['SERIAL_PATH']
-            )
-            classic_website.cisis_path = (
-                data['classic_ws_config'].get('CISIS_PATH')
-            )
-            classic_website.bases_work_path = (
-                data['classic_ws_config']['BASES_WORK_PATH']
-            )
-            classic_website.bases_pdf_path = (
-                data['classic_ws_config']['BASES_PDF_PATH']
-            )
-            classic_website.bases_translation_path = (
-                data['classic_ws_config']['BASES_TRANSLATION_PATH']
-            )
-            classic_website.bases_xml_path = (
-                data['classic_ws_config']['BASES_XML_PATH']
-            )
-            classic_website.htdocs_img_revistas_path = (
-                data['classic_ws_config']['HTDOCS_IMG_REVISTAS_PATH']
-            )
-            classic_website.creator_id = user_id
-            classic_website.save()
-        try:
-            files_storage_config = FilesStorageConfiguration.objects.get(
-                host=data['files_storage_config']['host'])
-        except FilesStorageConfiguration.DoesNotExist:
-            files_storage_config = FilesStorageConfiguration()
-            files_storage_config.host = data['files_storage_config']['host']
-            files_storage_config.access_key = (
-                data['files_storage_config']['access_key']
-            )
-            files_storage_config.secret_key = (
-                data['files_storage_config']['secret_key']
-            )
-            files_storage_config.secure = (
-                data['files_storage_config']['secure'] == 'true'
-            )
-            files_storage_config.bucket_public_subdir = (
-                data['files_storage_config']['bucket_public_subdir']
-            )
-            files_storage_config.bucket_migration_subdir = (
-                data['files_storage_config']['bucket_migration_subdir']
-            )
-            files_storage_config.bucket_root = (
-                data['files_storage_config']['bucket_root']
-            )
-            files_storage_config.creator_id = user_id
-            files_storage_config.save()
-        try:
-            new_website_config = NewWebSiteConfiguration.objects.get(
-                url=data['url'])
-        except NewWebSiteConfiguration.DoesNotExist:
-            new_website_config = NewWebSiteConfiguration()
-            new_website_config.db_uri = data['db_uri']
-            new_website_config.url = data.get('url')
-            new_website_config.creator_id = user_id
-            new_website_config.save()
 
-        return (
-            classic_website,
-            files_storage_config,
-            new_website_config,
+        collection = Collection.get_or_create(
+            data['collection_acron'],
+            data['collection_name'],
+            user,
         )
+        classic_website = ClassicWebsiteConfiguration.get_or_create(
+            collection, data['classic_ws_config'], user,
+        )
+        for fs_data in data['files_storages']:
+            fs_data['user'] = user
+            fs_config = FilesStorageConfiguration.get_or_create(
+                **fs_data
+            )
+        new_website_config = NewWebSiteConfiguration.get_or_create(
+            data['url'], data['db_uri'], user)
     except Exception as e:
-        raise exceptions.StartCollectionConfigurationError("Unable to start system %s" % e)
+        raise exceptions.StartCollectionConfigurationError(
+        	"Unable to start system %s" % e)
 
 
 def get_classic_website_configuration(collection_acron):

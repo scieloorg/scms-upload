@@ -38,7 +38,7 @@ from pid_provider.controller import PidProvider
 from core.controller import parse_non_standard_date, parse_months_names
 
 from collection.choices import CURRENT
-from collection import controller as collection_controller
+from collection.controller import load_config
 from collection.exceptions import (
     GetSciELOJournalError,
 )
@@ -81,23 +81,26 @@ def _get_classic_website_rel_path(file_path):
 
 def start(user_id):
     try:
-        logging.info(_("Get or create migration configuration"))
-        classic_website, files_storage_config, new_website_config = collection_controller.start()
-        try:
-            migration_configuration = MigrationConfiguration.objects.get(
-                classic_website_config=classic_website)
-        except MigrationConfiguration.DoesNotExist:
-            migration_configuration = MigrationConfiguration()
-            migration_configuration.classic_website_config = classic_website
-            migration_configuration.new_website_config = new_website_config
-            migration_configuration.files_storage_config = files_storage_config
-            migration_configuration.creator_id = user_id
-            migration_configuration.save()
+        user = User.objects.get(pk=user_id)
 
-        schedule_journals_and_issues_migrations(classic_website.collection.acron, user_id)
+        load_config(user)
+
+        migration_configuration = MigrationConfiguration.get_or_create(
+            ClassicWebsiteConfiguration.objects.all().first(),
+            NewWebSiteConfiguration.objects.all().first(),
+            FilesStorageConfiguration.get_or_create(name='website'),
+            FilesStorageConfiguration.get_or_create(name='migration'),
+            user,
+        )
+
+        schedule_journals_and_issues_migrations(
+            migration_configuration.classic_website_config.collection.acron,
+            user,
+        )
 
     except Exception as e:
-        raise exceptions.MigrationStartError("Unable to start system %s" % e)
+        raise exceptions.MigrationStartError(
+            "Unable to start migration %s" % e)
 
 
 def schedule_journals_and_issues_migrations(collection_acron, user_id):

@@ -14,7 +14,6 @@ from wagtail.contrib.modeladmin.options import (
 from .models import (
     Collection,
     NewWebSiteConfiguration,
-    FilesStorageConfiguration,
     ClassicWebsiteConfiguration,
 )
 
@@ -80,33 +79,6 @@ class NewWebSiteConfigurationModelAdmin(ModelAdmin):
     )
 
 
-class FilesStorageConfigurationModelAdmin(ModelAdmin):
-    model = FilesStorageConfiguration
-    menu_label = _('Files Storage Configuration')
-    menu_icon = 'doc-full'
-    menu_order = 200
-    exclude_from_explorer = False
-    inspect_view_enabled = False
-
-    create_view_class = CoreCreateView
-
-    list_display = (
-        'host',
-        'bucket_root',
-        'created',
-        'updated',
-        'updated_by',
-    )
-    list_filter = (
-        'host',
-        'bucket_root',
-    )
-    search_fields = (
-        'host',
-        'bucket_root',
-    )
-
-
 class ClassicWebsiteConfigurationModelAdmin(ModelAdmin):
     model = ClassicWebsiteConfiguration
     menu_label = _('Classic Website Configuration')
@@ -133,7 +105,6 @@ class CollectionModelAdminGroup(ModelAdminGroup):
     items = (
         CollectionModelAdmin,
         NewWebSiteConfigurationModelAdmin,
-        FilesStorageConfigurationModelAdmin,
         ClassicWebsiteConfigurationModelAdmin,
     )
 

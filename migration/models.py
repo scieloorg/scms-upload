@@ -1,3 +1,5 @@
+import logging
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -8,24 +10,58 @@ from collection.models import (
     SciELOIssue,
     SciELODocument,
     NewWebSiteConfiguration,
-    FilesStorageConfiguration,
     ClassicWebsiteConfiguration,
 )
-
+from files_storage.models import Configuration as FilesStorageConfiguration
 from . import choices
 
 
 class MigrationConfiguration(CommonControlField):
 
     classic_website_config = models.ForeignKey(
-        ClassicWebsiteConfiguration, on_delete=models.CASCADE)
+        ClassicWebsiteConfiguration,
+        verbose_name=_('Classic website configuration'),
+        null=True, blank=True,
+        on_delete=models.SET_NULL)
     new_website_config = models.ForeignKey(
-        NewWebSiteConfiguration, on_delete=models.CASCADE)
-    files_storage_config = models.ForeignKey(
-        FilesStorageConfiguration, on_delete=models.CASCADE)
+        NewWebSiteConfiguration,
+        verbose_name=_('New website configuration'),
+        null=True, blank=True,
+        on_delete=models.SET_NULL)
+    public_files_storage_config = models.ForeignKey(
+        FilesStorageConfiguration,
+        verbose_name=_('Public Files Storage Configuration'),
+        related_name='public_files_storage_config',
+        null=True, blank=True,
+        on_delete=models.SET_NULL)
+    migration_files_storage_config = models.ForeignKey(
+        FilesStorageConfiguration,
+        verbose_name=_('Migration Files Storage Configuration'),
+        related_name='migration_files_storage_config',
+        null=True, blank=True,
+        on_delete=models.SET_NULL)
 
     def __str__(self):
         return f"{self.classic_website_config}"
+
+    @classmethod
+    def get_or_create(cls, classic_website, new_website_config,
+                      public_files_storage_config,
+                      migration_files_storage_config,
+                      creator,
+                      ):
+        logging.info(_("Get or create migration configuration"))
+        try:
+            return cls.objects.get(classic_website_config=classic_website)
+        except cls.DoesNotExist:
+            migration_configuration = cls()
+            migration_configuration.classic_website_config = classic_website
+            migration_configuration.new_website_config = new_website_config
+            migration_configuration.public_files_storage_config = public_files_storage_config
+            migration_configuration.migration_files_storage_config = migration_files_storage_config
+            migration_configuration.creator = creator
+            migration_configuration.save()
+            return migration_configuration
 
     class Meta:
         indexes = [

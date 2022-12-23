@@ -1,8 +1,12 @@
 from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
 
 from config import celery_app
 
 from . import controller
+
+
+User = get_user_model()
 
 
 @celery_app.task(bind=True, name=_('Start'))
@@ -11,9 +15,9 @@ def start(
         user_id=None,
         ):
     try:
-        controller.start(self.request.user.id)
+        controller.start(self.request.user)
     except AttributeError:
-        controller.start(user_id=user_id or 1)
+        controller.start(User.objects.get(pk=user_id or 1))
 
 
 @celery_app.task(bind=True, name=_('Schedule journals and issues migrations'))
