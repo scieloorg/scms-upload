@@ -8,13 +8,9 @@ from shutil import copyfile
 import requests
 
 from django.utils.translation import gettext as _
-from django.contrib.auth import get_user_model
 
 from libs.dsm.publication import documents as publication_documents
-from collection.controller import (
-    get_files_storage,
-    get_files_storage_configuration,
-)
+from files_storage.controller import FilesStorageManager
 
 from upload.utils import package_utils
 from libs import xml_sps_utils as libs_xml_sps_utils
@@ -25,30 +21,24 @@ from . import (
     xml_sps_utils,
 )
 
-User = get_user_model()
-
 LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
 class PidProvider:
 
-    def __init__(self, files_storage_bucket_app, user_id):
-        self.files_storage = (
-            get_files_storage(
-                get_files_storage_configuration(
-                    bucket_app_subdir=files_storage_bucket_app))
-        )
-        self.user = User.objects.get(pk=user_id)
+    def __init__(self, files_storage_name, user):
+        self.files_storage_manager = FilesStorageManager(files_storage_name)
+        self.user = user
 
-    def request_document_ids(self, xml_with_pre, object_name):
+    def request_document_ids(self, xml_with_pre, filename):
         """
         Request PID v3
 
         Parameters
         ----------
         xml : XMLWithPre
-        object_name : str
+        filename : str
 
         Returns
         -------
@@ -62,7 +52,7 @@ class PidProvider:
         """
         try:
             # obtém o registro do documento
-            logging.info("request_document_ids for {}".format(object_name))
+            logging.info("request_document_ids for {}".format(filename))
 
             # adaptador do xml with pre
             xml_adapter = xml_sps_utils.XMLAdapter(xml_with_pre)
@@ -80,14 +70,14 @@ class PidProvider:
                 logging.info("new %s" % registered)
 
             if registered:
-                xml_content = xml_adapter.tostring()
-                xml_uri = self.files_storage.fput_content(
-                    xml_content,
-                    mimetype="text/xml",
-                    object_name=object_name
+                registered.add_version(
+                    self.files_storage_manager.fput_content(
+                        registered.latest,
+                        filename,
+                        xml_adapter.tostring(),
+                        self.user,
+                    )
                 )
-                registered.add_xml_version(self.user, xml_uri, xml_content)
-
             return registered
 
         except exceptions.FoundAOPPublishedInAnIssueError:
@@ -143,11 +133,11 @@ class PidProvider:
                     xml_zip_file_path)
             )
 
-    def request_document_ids_for_xml_uri(self, xml_uri, object_name):
+    def request_document_ids_for_xml_uri(self, xml_uri, filename):
         try:
             result = models.RequestResult.create(xml_uri, self.user)
             xml_with_pre = libs_xml_sps_utils.get_xml_with_pre_from_uri(xml_uri)
-            registered = self.request_document_ids(xml_with_pre, object_name)
+            registered = self.request_document_ids(xml_with_pre, filename)
             result.update(self.user, v3=registered.v3)
         except Exception as e:
             result.update(self.user, error_msg=str(e), error_type=type(e))

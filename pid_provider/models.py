@@ -3,10 +3,11 @@ from datetime import datetime
 
 from django.db import models
 from django.utils.translation import gettext as _
-
 from wagtail.admin.edit_handlers import FieldPanel
 
 from core.models import CommonControlField
+from files_storage.models import MinioFile
+
 from . import xml_sps_utils
 from . import exceptions
 
@@ -74,24 +75,8 @@ class XMLIssue(models.Model):
         ]
 
 
-class XMLFile(models.Model):
-    uri = models.URLField(_("URI"), max_length=265, null=True, blank=False)
-    content = models.CharField('Content', max_length=64, null=True, blank=False)
-    created = models.DateTimeField()
-
-    def __str__(self):
-        return f'{self.uri} {self.content} {self.created}'
-
-    class Meta:
-        indexes = [
-            models.Index(fields=['content']),
-            models.Index(fields=['created']),
-            models.Index(fields=['uri']),
-        ]
-
-
 class BaseArticle(CommonControlField):
-    versions = models.ManyToManyField('XMLFile')
+    versions = models.ManyToManyField(MinioFile)
     v3 = models.CharField(_("v3"), max_length=23, null=True, blank=False)
     main_doi = models.CharField(_("main_doi"), max_length=265, null=True, blank=False)
     elocation_id = models.CharField(_("elocation_id"), max_length=23, null=True, blank=False)
@@ -102,8 +87,13 @@ class BaseArticle(CommonControlField):
     partial_body = models.CharField(_("partial_body"), max_length=64, null=True, blank=False)
 
     @property
-    def lastest(self):
-        return self.versions.latest('created')
+    def latest(self):
+        if self.versions.count():
+            return self.versions.latest('created')
+
+    def add_version(self, version):
+        if version:
+            self.versions.add(version)
 
     def __str__(self):
         return f'{self.v3}'
@@ -119,57 +109,6 @@ class BaseArticle(CommonControlField):
             models.Index(fields=['partial_body']),
             models.Index(fields=['elocation_id']),
         ]
-
-    def add_xml_version(self, user, xml_uri, xml_content):
-        """
-        Adiciona xml_uri no registro de pid_provider
-
-        Parameters
-        ----------
-        user : str
-            requester
-        xml_uri : str
-
-        Raises
-        ------
-        exceptions.SaveXMLFileError
-
-        """
-        try:
-            # verifica se o xml já está registrado
-            exist = False
-            xml_content_64_char = xml_sps_utils._str_with_64_char(xml_content)
-            try:
-                current = self.versions.latest('created')
-            except XMLFile.DoesNotExist:
-                pass
-            else:
-                exist = (current.content == xml_content_64_char)
-            if not exist:
-                self._add_xml_file(xml_uri, xml_content_64_char, user)
-
-        except Exception as e:
-            raise exceptions.SaveXMLFileError(
-                "Unable to save xml file {} in pid provider".format(xml_uri)
-            )
-
-    def _add_xml_file(self, xml_uri, xml_content_64_char, user):
-        try:
-            xml_file = XMLFile(
-                uri=xml_uri,
-                created=datetime.utcnow(),
-                content=xml_content_64_char,
-            )
-            xml_file.save()
-            self.versions.add(xml_file)
-            self.updated_by = user
-            self.updated = datetime.utcnow()
-            self.save()
-        except Exception as e:
-            raise exceptions.SavingError(
-                "Add XML file to registered document error: %s %s %s" %
-                (type(e), e, self)
-            )
 
 
 class XMLAOPArticle(BaseArticle):
@@ -244,6 +183,6 @@ class RequestResult(CommonControlField):
     def update(self, updated_by, v3=None, error_msg=None, error_type=None):
         self.v3 = v3
         self.error_type = error_type
-        self.error_msg = error_msg
+        self.error_msg = error_msg[:255]
         self.updated_by = updated_by
         self.save()

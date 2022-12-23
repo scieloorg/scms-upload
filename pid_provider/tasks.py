@@ -9,15 +9,21 @@ from libs.dsm.publication.db import mk_connection
 from .controller import PidProvider
 
 
+User = get_user_model()
+
+
 @celery_app.task(bind=True, name=_("Request PID for documents registered in the new website"))
 def request_pid_for_new_website_docs(
         self, pids_file_path, db_uri, user_id, files_storage_app_name):
     documents = _get_new_website_xmls(pids_file_path, db_uri)
-    pid_provider = PidProvider(files_storage_app_name, user_id)
+    pid_provider = PidProvider(
+        files_storage_app_name,
+        User.objects.get(pk=user_id),
+    )
     for doc in documents:
         try:
             pid_provider.request_document_ids_for_xml_uri(
-                doc['xml'], doc['v3'])
+                doc['xml'], doc['v3'] + ".xml")
         except Exception as e:
             logging.exception(
                 f"Unable to get document which pid is {doc}"
