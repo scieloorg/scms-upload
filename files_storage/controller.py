@@ -51,3 +51,10 @@ class FilesStorageManager:
         )
         logging.info(uri)
         return MinioFile.create(creator, uri, filename, finger_print)
+
+    def register(self, source_filename, subdirs, preserve_name):
+        return self.files_storage.register(
+            source_filename,
+            subdirs=os.path.join(self.config.bucket_app_subdir, subdirs),
+            preserve_name=preserve_name,
+        )
