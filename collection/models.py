@@ -1,3 +1,5 @@
+import logging
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -156,6 +158,30 @@ class SciELOFile(models.Model):
 
     def __str__(self):
         return f"{self.scielo_issue} {self.name}"
+
+    @classmethod
+    def create_or_update(cls, item):
+        logging.info("Register stored classic file {}".format(item))
+
+        item['file_id'] = item.get('key')
+        params = {
+            k: item[k]
+            for k in item.keys()
+            if hasattr(cls, k)
+        }
+        params['scielo_issue'] = scielo_issue
+
+        try:
+            cls.objects.filter(relative_path=item['relative_path']).delete()
+        except Exception as e:
+            logging.info(e)
+
+        try:
+            return cls.objects.get(**params)
+        except cls.DoesNotExist:
+            file = cls(**params)
+            file.save()
+            return file
 
     class Meta:
 

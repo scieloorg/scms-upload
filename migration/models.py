@@ -45,10 +45,10 @@ class MigrationConfiguration(CommonControlField):
         return f"{self.classic_website_config}"
 
     @classmethod
-    def get_or_create(cls, classic_website, new_website_config,
-                      public_files_storage_config,
-                      migration_files_storage_config,
-                      creator,
+    def get_or_create(cls, classic_website, new_website_config=None,
+                      public_files_storage_config=None,
+                      migration_files_storage_config=None,
+                      creator=None,
                       ):
         logging.info(_("Get or create migration configuration"))
         try:

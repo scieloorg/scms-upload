@@ -29,7 +29,6 @@ from scielo_classic_website import classic_ws
 from django_celery_beat.models import PeriodicTask, CrontabSchedule
 
 from libs.xml_sps_utils import get_xml_with_pre_from_uri
-from libs.dsm.files_storage.minio import MinioStorage
 from libs.dsm.publication.db import mk_connection
 from libs.dsm.publication.journals import JournalToPublish
 from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
@@ -390,7 +389,7 @@ def get_journal_migration_status(scielo_issn):
 
 class MigrationConfigurationController:
 
-    def __init__(self, collection_acron):
+    def __init__(self, collection_acron, user):
         self.config = (
             MigrationConfiguration.objects.get(
                 classic_website_config__collection__acron=collection_acron)
@@ -402,6 +401,7 @@ class MigrationConfigurationController:
             migration=FilesStorageManager(
                 self.config.migration_files_storage_config.name),
         )
+        self.pid_provider = PidProvider('pid-provider', user)
 
     def connect_db(self):
         try:
@@ -489,7 +489,8 @@ def migrate_journals(
         ):
     try:
         action = "migrate"
-        mcc = MigrationConfigurationController(collection_acron)
+        mcc = MigrationConfigurationController(
+            collection_acron, User.objects.get(pk=user_id))
         mcc.connect_db()
         source_file_path = mcc.get_source_file_path("title")
 
@@ -743,7 +744,8 @@ def migrate_issues(
         force_update=False,
         ):
     try:
-        mcc = MigrationConfigurationController(collection_acron)
+        mcc = MigrationConfigurationController(
+            collection_acron, User.objects.get(pk=user_id))
         mcc.connect_db()
         source_file_path = mcc.get_source_file_path("issue")
 
@@ -999,7 +1001,8 @@ def import_issues_files_and_migrate_documents(
         **params,
     )
 
-    mcc = MigrationConfigurationController(collection_acron)
+    mcc = MigrationConfigurationController(
+        collection_acron, User.objects.get(pk=user_id))
     mcc.connect_db()
 
     for issue_migration in items:
@@ -1032,9 +1035,9 @@ def import_issues_files_and_migrate_documents(
                     user_id,
                     collection_acron,
                     source_file_path,
-                    mcc.files_storage,
-                    mcc.bucket_public_subdir,
+                    mcc.fs_managers['website'],
                     issue_migration,
+                    mcc.pid_provider,
                     force_update,
                 )
 
@@ -1069,6 +1072,7 @@ def import_issue_files(
         "xml": XMLFile,
         "html": SciELOHTMLFile,
     }
+    status = MS_IMPORTED
     try:
         scielo_issue = issue_migration.scielo_issue
         issue = classic_ws.Issue(issue_migration.data)
@@ -1076,33 +1080,14 @@ def import_issue_files(
                 scielo_issue.scielo_journal.acron,
                 scielo_issue.issue_folder,
                 ):
-            logging.info("Register stored classic file {}".format(item))
+            if item.get('error'):
+                status = None
 
             ClassFile = ClassFileModels[item.pop('type')]
-            item['file_id'] = item.get('key')
-            params = {
-                k: item[k]
-                for k in item.keys()
-                if hasattr(ClassFile, k)
-            }
-            params['scielo_issue'] = scielo_issue
+            ClassFile.create_or_update(item)
 
-            try:
-                # delete file if exists
-                del_res = ClassFile.objects.filter(relative_path=item['relative_path']).delete()
-            except Exception as e:
-                logging.info(e)
-            try:
-                file = ClassFile.objects.get(**params)
-            except ClassFile.DoesNotExist:
-                try:
-                    file = ClassFile(**params)
-                    file.save()
-                except Exception as e:
-                    logging.exception(
-                        _("Unable to registered imported file {} {}").format(params, e)
-                    )
-        issue_migration.files_status = MS_IMPORTED
+        if status:
+            issue_migration.files_status = status
         issue_migration.save()
     except Exception as e:
         raise exceptions.IssueFilesMigrationSaveError(
@@ -1115,9 +1100,9 @@ def migrate_documents(
         user_id,
         collection_acron,
         source_file_path,
-        files_storage,
-        bucket_public_subdir,
+        files_storage_manager,
         issue_migration,
+        pid_provider,
         force_update=False,
         ):
     """
@@ -1178,8 +1163,8 @@ def migrate_documents(
                 document_files_controller = DocumentFilesController(
                     main_language=document.original_language,
                     scielo_document=scielo_document,
-                    files_storage=files_storage,
-                    bucket_public_subdir=bucket_public_subdir,
+                    files_storage_manager=files_storage_manager,
+                    pid_provider=pid_provider,
                 )
                 document_files_controller.link_scielo_document_to_its_files(
                     user_id
@@ -1399,16 +1384,15 @@ class DocumentFilesController:
     def __init__(self,
                  main_language,
                  scielo_document,
-                 files_storage,
-                 bucket_public_subdir,
+                 files_storage_manager,
+                 pid_provider,
                  ):
-        self._bucket_public_subdir = (
+        self.subdirs = (
             os.path.join(
-                bucket_public_subdir,
                 scielo_document.scielo_issue.scielo_journal.acron,
                 scielo_document.scielo_issue.issue_folder,
             ))
-        self.files_storage = files_storage
+        self.files_storage_manager = files_storage_manager
         self.scielo_document = scielo_document
         self._main_language = main_language
 
@@ -1443,7 +1427,7 @@ class DocumentFilesController:
         self.add_xml_files()
         self.add_html_files()
         self.add_supplementary_material_flag_to_assets()
-        self.add_public_xml_files(user_id)
+        self.change_xmls_to_publish(user_id)
 
     def add_xml_files(self):
         logging.info("Add xml files to {}".format(self.scielo_document))
@@ -1537,13 +1521,13 @@ class DocumentFilesController:
         return self._xmls
 
     @property
-    def issue_assets_uri(self):
-        if not hasattr(self, '_issue_assets_uri') or not self._issue_assets_uri:
-            self._issue_assets_uri = {
+    def issue_assets_uris(self):
+        if not hasattr(self, '_issue_assets_uris') or not self._issue_assets_uris:
+            self._issue_assets_uris = {
                 name: asset.uri
                 for name, asset in self.issue_assets_dict.items()
             }
-        return self._issue_assets_uri
+        return self._issue_assets_uris
 
     @property
     def issue_assets_dict(self):
@@ -1581,11 +1565,6 @@ class DocumentFilesController:
                 items.extend(related.related_articles)
             self._related_items = items
         return self._related_items
-
-    def get_object_name(self, file_path):
-        return self.files_storage.build_object_name(
-            file_path, self._bucket_public_subdir, preserve_name=True
-        )
 
     def add_supplementary_material_flag_to_assets(self):
         logging.info(_("Add supplementary material flag to assets {}").format(
@@ -1628,7 +1607,7 @@ class DocumentFilesController:
             self.add_supplementary_material_flag_to_assets()
         return self._supplementary_materials
 
-    def add_public_xml_files(self, user_id):
+    def change_xmls_to_publish(self, user_id):
         """
         Obtém os XML do site clássico (href com conteúdo "local"),
         - troca o conteúdo de href pelos links respectivos dos ativos digitais
@@ -1647,21 +1626,24 @@ class DocumentFilesController:
                 # obtém os assets do XML
                 self._add_assets_to_public_xml(xml_file)
 
-                xml = self.xmls[xml_file.lang]
-                # cria object_name
-                object_name = self.get_object_name(xml_file.name)
-                # verificar pids em pid_provider
+                xml_with_pre = self.xmls[xml_file.lang]
+                # FIXME - trocar por API
                 registered_in_pid_provider = (
-                    request_document_ids(
-                        xml,
-                        user_id,
-                        self.files_storage.fput_content,
-                        object_name,
+                    pid_provider.request_document_ids(
+                        xml_with_pre,
+                        self.scielo_document.file_id + ".xml",
                     )
                 )
-                # registra XML modificado no Files Storage
                 xml_file.v3 = registered_in_pid_provider.v3
-                xml_file.public_uri = registered_in_pid_provider.lastest.uri
+
+                # PAREI AQUI
+                minio_file = self.files_storage_manager.fput_content(
+                    registered.latest,
+                    self.scielo_document.file_id + ".xml",
+                    xml_with_pre.tostring(),
+                    self.user,
+                )
+                xml_file.public_uri = registered_in_pid_provider.latest.uri
                 xml_file.public_object_name = object_name
                 xml_file.save()
 
@@ -1689,7 +1671,7 @@ class DocumentFilesController:
                     # FIXME tratar asset_file nao encontrado
                     xml_file.assets_files.add(asset)
             xml_file.save()
-            article_assets.replace_names(self.issue_assets_uri)
+            article_assets.replace_names(self.issue_assets_uris)
         except Exception as e:
             raise exceptions.AddPublicXMLError(
                 _("Unable to add assets to public XML to {} {} {})").format(
