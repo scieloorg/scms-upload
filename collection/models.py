@@ -127,7 +127,8 @@ class SciELODocument(CommonControlField):
 
     scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
     pid = models.CharField(_('PID'), max_length=23, null=True, blank=True)
-    file_id = models.CharField(_('File ID'), max_length=50, null=True, blank=True)
+    # filename without extension
+    key = models.CharField(_('File key'), max_length=50, null=True, blank=True)
     official_document = models.ForeignKey(Article, on_delete=models.SET_NULL, null=True, blank=True)
 
     xml_files = models.ManyToManyField('XMLFile', null=True, related_name='xml_files')
@@ -137,20 +138,21 @@ class SciELODocument(CommonControlField):
     class Meta:
         unique_together = [
             ['scielo_issue', 'pid'],
-            ['scielo_issue', 'file_id'],
-            ['pid', 'file_id'],
+            ['scielo_issue', 'key'],
+            ['pid', 'key'],
         ]
         indexes = [
             models.Index(fields=['scielo_issue']),
             models.Index(fields=['pid']),
-            models.Index(fields=['file_id']),
+            models.Index(fields=['key']),
             models.Index(fields=['official_document']),
         ]
 
 
 class SciELOFile(models.Model):
     scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
-    file_id = models.CharField(_('ID'), max_length=255, null=True, blank=True)
+    # filename without extension
+    key = models.CharField(_('File key'), max_length=255, null=True, blank=True)
     relative_path = models.CharField(_('Relative Path'), max_length=255, null=True, blank=True)
     name = models.CharField(_('Filename'), max_length=255, null=False, blank=False)
     uri = models.URLField(_('URI'), max_length=255, null=True)
@@ -163,7 +165,6 @@ class SciELOFile(models.Model):
     def create_or_update(cls, item):
         logging.info("Register stored classic file {}".format(item))
 
-        item['file_id'] = item.get('key')
         params = {
             k: item[k]
             for k in item.keys()
@@ -186,7 +187,7 @@ class SciELOFile(models.Model):
     class Meta:
 
         indexes = [
-            models.Index(fields=['file_id']),
+            models.Index(fields=['key']),
             models.Index(fields=['relative_path']),
             models.Index(fields=['name']),
             models.Index(fields=['object_name']),

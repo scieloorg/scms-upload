@@ -167,38 +167,38 @@ def get_or_create_scielo_issue(scielo_journal, issue_pid, issue_folder, user_id)
 ############################################################################
 
 
-def get_scielo_document(pid, file_id):
+def get_scielo_document(pid, key):
     try:
         scielo_document = SciELODocument.objects.get(
             pid=pid,
-            file_id=file_id,
+            key=key,
         )
     except Exception as e:
         raise exceptions.GetSciELODocumentError(
             _('Unable to get_scielo_document {} {} {} {}').format(
-                pid, file_id, type(e), e
+                pid, key, type(e), e
             )
         )
     return scielo_document
 
 
-def get_or_create_scielo_document(scielo_issue, pid, file_id, user_id):
+def get_or_create_scielo_document(scielo_issue, pid, key, user_id):
     try:
         try:
             logging.info("Get or create SciELODocument {} {} {}".format(
-                scielo_issue, pid, file_id
+                scielo_issue, pid, key
             ))
             scielo_document = SciELODocument.objects.get(
                 scielo_issue=scielo_issue,
                 pid=pid,
-                file_id=file_id,
+                key=key,
             )
             logging.info("Got {}".format(scielo_document))
         except SciELODocument.DoesNotExist:
             scielo_document = SciELODocument()
             scielo_document.scielo_issue = scielo_issue
             scielo_document.pid = pid
-            scielo_document.file_id = file_id
+            scielo_document.key = key
             scielo_document.creator_id = user_id
             scielo_document.save()
             logging.info("Created {}".format(scielo_document))

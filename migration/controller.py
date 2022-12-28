@@ -1434,7 +1434,7 @@ class DocumentFilesController:
         self.scielo_document.xml_files.set(
             XMLFile.objects.filter(
                 scielo_issue=self.scielo_document.scielo_issue,
-                file_id=self.scielo_document.file_id,
+                key=self.scielo_document.key,
             )
         )
         self.scielo_document.save()
@@ -1446,7 +1446,7 @@ class DocumentFilesController:
             # busca o pdf que tem o idioma == 'main'
             main_pdf = FileWithLang.objects.get(
                 scielo_issue=self.scielo_document.scielo_issue,
-                file_id=self.scielo_document.file_id,
+                key=self.scielo_document.key,
                 lang='main'
             )
             # atualiza com o valor de main_language
@@ -1459,7 +1459,7 @@ class DocumentFilesController:
         self.scielo_document.renditions_files.set(
             FileWithLang.objects.filter(
                 scielo_issue=self.scielo_document.scielo_issue,
-                file_id=self.scielo_document.file_id,
+                key=self.scielo_document.key,
             )
         )
         self.scielo_document.save()
@@ -1470,7 +1470,7 @@ class DocumentFilesController:
         self.scielo_document.html_files.set(
             SciELOHTMLFile.objects.filter(
                 scielo_issue=self.scielo_document.scielo_issue,
-                file_id=self.scielo_document.file_id,
+                key=self.scielo_document.key,
             )
         )
         self.scielo_document.save()
@@ -1631,20 +1631,22 @@ class DocumentFilesController:
                 registered_in_pid_provider = (
                     pid_provider.request_document_ids(
                         xml_with_pre,
-                        self.scielo_document.file_id + ".xml",
+                        self.scielo_document.key + ".xml",
                     )
                 )
                 xml_file.v3 = registered_in_pid_provider.v3
 
-                # PAREI AQUI
+                # TODO atribuir minio_file para algum atributo
+                latest = None
                 minio_file = self.files_storage_manager.fput_content(
-                    registered.latest,
-                    self.scielo_document.file_id + ".xml",
+                    latest,
+                    self.scielo_document.key + ".xml",
                     xml_with_pre.tostring(),
                     self.user,
                 )
-                xml_file.public_uri = registered_in_pid_provider.latest.uri
-                xml_file.public_object_name = object_name
+                # TODO atribuir minio_file para algum atributo
+                xml_file.public_uri = minio_file.uri
+                # xml_file.public_object_name = object_name
                 xml_file.save()
 
                 logging.info(
