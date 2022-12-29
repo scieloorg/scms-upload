@@ -57,6 +57,8 @@ from collection.models import (
 )
 from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
 from . import exceptions
+from journal.controller import get_updated_official_journal
+from issue.controller import get_or_create as official_issue_get_or_create
 
 
 User = get_user_model()
@@ -549,22 +551,44 @@ def migrate_journals(
         )
 
 
-def import_data_from_title_database(user, collection_acron, scielo_issn,
+def import_data_from_title_database(user, collection_acron,
+                                    scielo_issn,
                                     journal_data, force_update=False):
     """
     Create/update JournalMigration
     """
-    journal = classic_ws.Journal(journal_data)
-
-    scielo_journal = get_scielo_journal(
-        journal, collection_acron, scielo_issn, user
-    )
-
-    # cria ou obtém journal_migration
-    journal_migration = JournalMigration.get_or_create(
-        scielo_journal, user, force_update)
-
     try:
+        # obtém classic website journal
+        classic_website_journal = classic_ws.Journal(journal_data)
+
+        # cria ou obtém official_journal
+        official_journal = get_updated_official_journal(
+            user,
+            title=classic_website_journal.title,
+            issn_l=None,
+            e_issn=classic_website_journal.electronic_issn,
+            print_issn=classic_website_journal.print_issn,
+            short_title=classic_website_journal.title_iso,
+            foundation_date=classic_website_journal.first_year,
+            foundation_year=classic_website_journal.first_year,
+            foundation_month=None,
+            foundation_day=None,
+        )
+
+        # cria ou obtém scielo_journal
+        scielo_journal = collection_controller.get_updated_scielo_journal(
+            user,
+            collection_acron,
+            scielo_issn,
+            classic_website_journal,
+            official_journal,
+        )
+
+        # cria ou obtém journal_migration
+        journal_migration = JournalMigration.get_or_create(
+            scielo_journal, user, force_update)
+
+        # atualiza journal_migration
         journal_migration.update(journal, journal_data)
         return journal_migration
     except Exception as e:
@@ -573,64 +597,6 @@ def import_data_from_title_database(user, collection_acron, scielo_issn,
                 collection_acron, scielo_issn, e
             )
         )
-
-
-def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
-
-    try:
-        # cria ou obtém official_journal
-        official_journal = collection_controller.get_or_create_official_journal(
-            title=journal.title,
-            issn_l=None,
-            e_issn=journal.electronic_issn,
-            print_issn=journal.print_issn,
-            creator_id=user_id,
-        )
-        official_journal_data = (
-            official_journal.title,
-            official_journal.foundation_date,
-        )
-        journal_data = (
-            journal.title,
-            journal.first_year,
-        )
-        if official_journal_data != journal_data:
-            official_journal.title = journal.title
-            official_journal.foundation_date = journal.first_year
-            official_journal.save()
-    except Exception as e:
-        official_journal = None
-
-    # cria ou obtém scielo_journal
-    scielo_journal = collection_controller.get_or_create_scielo_journal(
-        collection_acron, scielo_issn, user_id
-    )
-    try:
-        scielo_journal_data = (
-            scielo_journal.title,
-            scielo_journal.availability_status,
-            scielo_journal.official_journal,
-            scielo_journal.acron,
-        )
-        journal_data = (
-            journal.title,
-            journal.current_status,
-            official_journal,
-            journal.acronym,
-        )
-        if scielo_journal_data != journal_data:
-            scielo_journal.title = journal.title
-            scielo_journal.availability_status = journal.current_status
-            scielo_journal.official_journal = official_journal
-            scielo_journal.acron = journal.acronym
-            scielo_journal.save()
-    except Exception as e:
-        raise exceptions.JournalMigrationSaveError(
-            _("Unable to save scielo_journal {} {}").format(
-                scielo_journal, e
-            )
-        )
-    return scielo_journal
 
 
 def publish_imported_journal(journal_migration):
@@ -792,18 +758,24 @@ def import_data_from_issue_database(
     """
     Create/update IssueMigration
     """
-    logging.info("Import data from database issue {} {} {}".format(
-        collection_acron, scielo_issn, issue_pid))
-    issue = classic_ws.Issue(issue_data)
-
-    scielo_issue = get_scielo_issue(
-        issue, collection_acron, scielo_issn, issue_pid, user)
-
-    issue_migration = IssueMigration.get_or_create(
-        scielo_issue, creator=user)
-
     try:
-        issue_migration.update(issue, issue_data, force_update)
+        logging.info("Import data from database issue {} {} {}".format(
+            collection_acron, scielo_issn, issue_pid))
+
+        classic_website_issue = classic_ws.Issue(issue_data)
+
+        scielo_issue = get_scielo_issue(
+            classic_website_issue,
+            collection_acron,
+            scielo_issn,
+            issue_pid,
+            user,
+        )
+
+        issue_migration = IssueMigration.get_or_create(
+            scielo_issue, creator=user)
+
+        issue_migration.update(classic_website_issue, issue_data, force_update)
         return issue_migration
     except Exception as e:
         logging.error(_("Error importing issue {} {} {}").format(collection_acron, issue_pid, issue_data))
@@ -815,75 +787,83 @@ def import_data_from_issue_database(
         )
 
 
-def _get_months_from_issue(issue):
+def _get_months_from_issue(classic_website_issue):
     """
     Get months from issue (classic_website.Issue)
     """
     months_names = {}
-    for item in issue.bibliographic_strip_months:
+    for item in classic_website_issue.bibliographic_strip_months:
         if item.get("text"):
             months_names[item['lang']] = item.get("text")
     if months_names:
         return months_names.get("en") or months_names.values()[0]
 
 
-def get_scielo_issue(issue, collection_acron, scielo_issn, issue_pid, user_id):
-    logging.info(_("Get SciELO Issue {} {} {}").format(collection_acron, scielo_issn, issue_pid))
+def get_scielo_issue(
+            classic_website_issue,
+            collection_acron,
+            scielo_issn,
+            issue_pid,
+            user,
+            ):
+    logging.info(_("Get SciELO Issue {} {} {}").format(
+        collection_acron, scielo_issn, issue_pid))
 
     try:
-        # obtém scielo_journal para criar ou obter scielo_issue
-        scielo_journal = collection_controller.get_scielo_journal(
-            collection_acron, scielo_issn)
 
-        # cria ou obtém scielo_issue
-        scielo_issue = collection_controller.get_or_create_scielo_issue(
-            scielo_journal,
-            issue_pid,
-            issue.issue_label,
-            user_id,
+        official_issue = get_or_create_official_issue(
+            classic_website_issue, collection_acron,
+            scielo_issn, issue_pid, user
         )
-        logging.info("Check if it is press release = {}".format(
-            bool(issue.is_press_release)))
-        if not issue.is_press_release:
-            # press release não é um documento oficial, 
-            # sendo assim, não será criado official issue correspondente
-            try:
-                # obtém ou cria official_issue
-                logging.info(_("Create official issue to add to SciELO {}").format(scielo_issue))
-
-                flexible_date = parse_non_standard_date(issue.publication_date)
-                months = parse_months_names(_get_months_from_issue(issue))
-                official_issue = collection_controller.get_or_create_official_issue(
-                    scielo_journal.official_journal,
-                    issue.publication_year,
-                    issue.volume,
-                    issue.number,
-                    issue.supplement,
-                    user_id,
-                    initial_month_number=flexible_date.get("month_number"),
-                    initial_month_name=months.get("initial_month_name"),
-                    final_month_name=months.get("final_month_name"),
-                )
-
-                # atualiza dados de scielo_issue
-                scielo_issue.official_issue = official_issue
-                scielo_issue.save()
-                logging.info(
-                        _("Created official issue to add to SciELO {}"
-                    ).format(scielo_issue))
-            except Exception as e:
-                raise exceptions.SetOfficialIssueToSciELOIssueError(
-                    _("Unable to set official issue to SciELO issue {} {} {}").format(
-                        scielo_issue, type(e), e
-                    )
-                )
-        return scielo_issue
+        return get_updated_scielo_issue(
+            user,
+            collection_acron,
+            scielo_issn,
+            issue_pid,
+            classic_website_issue,
+            official_issue,
+        )
     except Exception as e:
         raise exceptions.GetSciELOIssueError(
             _("Unable to get SciELO issue {} {} {}").format(
                 scielo_issue, type(e), e
             )
         )
+
+
+def get_or_create_official_issue(classic_website_issue, collection_acron,
+                                 scielo_issn, issue_pid, user):
+    if classic_website_issue.is_press_release:
+        # press release não é um documento oficial,
+        # sendo assim, não será criado official issue correspondente
+        return
+
+    try:
+        # obtém ou cria official_issue
+        logging.info(_("Create official issue {}").format(
+            classic_website_issue))
+
+        flexible_date = parse_non_standard_date(
+            classic_website_issue.publication_date)
+        months = parse_months_names(_get_months_from_issue(issue))
+        return official_issue_get_or_create(
+            official_journal,
+            classic_website_issue.publication_year,
+            classic_website_issue.volume,
+            classic_website_issue.number,
+            classic_website_issue.supplement,
+            user,
+            initial_month_number=flexible_date.get("month_number"),
+            initial_month_name=months.get("initial_month_name"),
+            final_month_name=months.get("final_month_name"),
+        )
+    except Exception as e:
+        raise exceptions.GetOrCreateOfficialIssueError(
+            _("Unable to set official issue to SciELO issue {} {} {}").format(
+                scielo_issue, type(e), e
+            )
+        )
+    return scielo_issue
 
 
 def publish_imported_issue(issue_migration):
@@ -1094,13 +1074,13 @@ def migrate_documents(
 
                 scielo_issue = get_scielo_issue(
                     document.issue, collection_acron, scielo_issn,
-                    issue_pid, user_id)
+                    issue_pid, user)
 
                 scielo_document = collection_controller.get_or_create_scielo_document(
                     scielo_issue,
                     pid,
                     document.filename_without_extension,
-                    user_id,
+                    user,
                 )
                 document_migration = DocumentMigration.get_or_create(
                     scielo_document=scielo_document,

@@ -93,8 +93,6 @@ class MigratedData(CommonControlField):
 
     class Meta:
         indexes = [
-            models.Index(fields=['status']),
-            models.Index(fields=['isis_updated_date']),
         ]
 
 
@@ -166,8 +164,6 @@ class JournalMigration(MigratedData):
     class Meta:
         indexes = [
             models.Index(fields=['scielo_journal']),
-            models.Index(fields=['status']),
-            models.Index(fields=['isis_updated_date']),
         ]
 
 
@@ -222,8 +218,6 @@ class IssueMigration(MigratedData):
         indexes = [
             models.Index(fields=['scielo_issue']),
             models.Index(fields=['files_status']),
-            models.Index(fields=['status']),
-            models.Index(fields=['isis_updated_date']),
         ]
 
 
@@ -278,6 +272,4 @@ class DocumentMigration(MigratedData):
         indexes = [
             models.Index(fields=['scielo_document']),
             models.Index(fields=['files_status']),
-            models.Index(fields=['status']),
-            models.Index(fields=['isis_updated_date']),
         ]

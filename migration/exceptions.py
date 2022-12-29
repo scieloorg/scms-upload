@@ -80,3 +80,7 @@ class PublishJournalError(Exception):
 
 class SetOfficialIssueToSciELOIssueError(Exception):
     ...
+
+
+class GetOrCreateOfficialIssueError(Exception):
+	...
