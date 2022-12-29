@@ -10,6 +10,7 @@ from journal.models import OfficialJournal
 from issue.models import Issue
 from article.models import Article
 from .choices import JOURNAL_AVAILABILTY_STATUS, WEBSITE_KIND
+from . import exceptions
 
 
 class Collection(CommonControlField):
@@ -29,16 +30,22 @@ class Collection(CommonControlField):
     base_form_class = CoreAdminModelForm
 
     @classmethod
-    def get_or_create(cls, acron, name, user):
+    def get_or_create(cls, acron, name, creator):
         try:
             return cls.objects.get(acron=acron)
         except cls.DoesNotExist:
             collection = cls()
             collection.acron = acron
             collection.name = name
-            collection.creator = user
+            collection.creator = creator
             collection.save()
             return collection
+        except Exception as e:
+            raise exceptions.GetOrCreateCollectionError(
+                _('Unable to get_or_create_collection {} {} {}').format(
+                    acron, type(e), e
+                )
+            )
 
 
 class SciELOJournal(CommonControlField):
@@ -56,6 +63,78 @@ class SciELOJournal(CommonControlField):
         choices=JOURNAL_AVAILABILTY_STATUS)
     official_journal = models.ForeignKey(
         OfficialJournal, on_delete=models.SET_NULL, null=True)
+
+    @classmethod
+    def get_or_create(cls, collection_acron, scielo_issn, creator):
+        try:
+            logging.info("Create or Get SciELOJournal {} {}".format(
+                collection_acron, scielo_issn))
+            return cls.objects.get(
+                collection__acron=collection_acron,
+                scielo_issn=scielo_issn,
+            )
+        except cls.DoesNotExist:
+            scielo_journal = cls()
+            scielo_journal.collection = Collection.get_or_create(
+                collection_acron, creator
+            )
+            scielo_journal.scielo_issn = scielo_issn
+            scielo_journal.creator = creator
+            scielo_journal.save()
+            logging.info("Created SciELOJournal {}".format(scielo_journal))
+            return scielo_journal
+        except Exception as e:
+            raise exceptions.GetOrCreateScieloJournalError(
+                _('Unable to get_or_create_scielo_journal {} {} {} {}').format(
+                    collection_acron, scielo_issn, type(e), e
+                )
+            )
+
+    @classmethod
+    def get(cls, collection_acron, scielo_issn):
+        try:
+            return cls.objects.get(
+                collection__acron=collection_acron,
+                scielo_issn=scielo_issn,
+            )
+        except Exception as e:
+            raise exceptions.GetSciELOJournalError(
+                _('Unable to get_scielo_journal {} {} {} {}').format(
+                    collection_acron, scielo_issn, type(e), e
+                )
+            )
+
+    def update(
+            self, updated_by,
+            acron=None, title=None, availability_status=None,
+            official_journal=None,
+            ):
+        try:
+            updated = False
+            if acron and self.acron != acron:
+                self.acron = acron
+                updated = True
+            if title and self.title != title:
+                self.title = title
+                updated = True
+            if availability_status and self.availability_status != availability_status:
+                self.availability_status = availability_status
+                updated = True
+            if official_journal and self.official_journal != official_journal:
+                self.official_journal = official_journal
+                updated = True
+            if updated:
+                self.updated_by = updated_by
+                self.updated = datetime.utcnow()
+                self.save()
+        except Exception as e:
+            params = (
+                updated_by, acron, title,
+                availability_status, official_journal)
+            raise exceptions.UpdateSciELOJournalError(
+                _("Unable to update SciELOJournal %s %s %s") %
+                (str(params), type(e), str(e))
+            )
 
     class Meta:
         unique_together = [
@@ -98,6 +177,65 @@ class SciELOIssue(CommonControlField):
     official_issue = models.ForeignKey(
         Issue, on_delete=models.SET_NULL, null=True)
 
+    @classmethod
+    def get(self, issue_pid, issue_folder):
+        try:
+            return SciELOIssue.objects.get(
+                issue_pid=issue_pid,
+                issue_folder=issue_folder,
+            )
+        except Exception as e:
+            raise exceptions.GetOrCreateScieloIssueError(
+                _('Unable to get_scielo_issue {} {} {} {}').format(
+                    issue_pid, issue_folder, type(e), e
+                )
+            )
+
+    @classmethod
+    def get_or_create(cls, scielo_journal, issue_pid, issue_folder, creator):
+        try:
+            logging.info("Get or create SciELOIssue {} {} {}".format(scielo_journal, issue_pid, issue_folder))
+            return cls.objects.get(
+                scielo_journal=scielo_journal,
+                issue_pid=issue_pid,
+                issue_folder=issue_folder,
+            )
+        except SciELOIssue.DoesNotExist:
+            scielo_issue = cls()
+            scielo_issue.scielo_journal = scielo_journal
+            scielo_issue.issue_folder = issue_folder
+            scielo_issue.issue_pid = issue_pid
+            scielo_issue.creator = creator
+            scielo_issue.save()
+            logging.info("Created {}".format(scielo_issue))
+            return scielo_issue
+        except Exception as e:
+            raise exceptions.GetOrCreateScieloIssueError(
+                _('Unable to get_or_create_scielo_issue {} {} {} {}').format(
+                    scielo_journal, issue_pid, type(e), e
+                )
+            )
+
+    def update(
+            self, updated_by,
+            official_issue=None,
+            ):
+        try:
+            updated = False
+            if official_issue and self.official_issue != official_issue:
+                self.official_issue = official_issue
+                updated = True
+            if updated:
+                self.updated_by = updated_by
+                self.updated = datetime.utcnow()
+                self.save()
+        except Exception as e:
+            params = (updated_by, official_issue)
+            raise exceptions.UpdateSciELOJournalError(
+                _("Unable to update SciELOJournal %s %s %s") %
+                (str(params), type(e), str(e))
+            )
+
     class Meta:
         unique_together = [
             ['scielo_journal', 'issue_pid'],
@@ -135,6 +273,46 @@ class SciELODocument(CommonControlField):
     renditions_files = models.ManyToManyField('FileWithLang', null=True, related_name='renditions_files')
     html_files = models.ManyToManyField('SciELOHTMLFile', null=True, related_name='html_files')
 
+    @classmethod
+    def get_scielo_document(cls, pid, key):
+        try:
+            return cls.objects.get(
+                pid=pid,
+                key=key,
+            )
+        except Exception as e:
+            raise exceptions.GetSciELODocumentError(
+                _('Unable to get_scielo_document {} {} {} {}').format(
+                    pid, key, type(e), e
+                )
+            )
+
+    @classmethod
+    def get_or_create(cls, scielo_issue, pid, key, creator):
+        try:
+            logging.info("Get or create SciELODocument {} {} {}".format(
+                scielo_issue, pid, key
+            ))
+            return cls.objects.get(
+                scielo_issue=scielo_issue,
+                pid=pid,
+                key=key,
+            )
+        except cls.DoesNotExist:
+            scielo_document = cls()
+            scielo_document.scielo_issue = scielo_issue
+            scielo_document.pid = pid
+            scielo_document.key = key
+            scielo_document.creator = creator
+            scielo_document.save()
+            logging.info("Created {}".format(scielo_document))
+        except Exception as e:
+            raise exceptions.GetOrCreateScieloDocumentError(
+                _('Unable to get_or_create_scielo_document {} {} {} {}').format(
+                    scielo_issue, pid, type(e), e
+                )
+            )
+
     class Meta:
         unique_together = [
             ['scielo_issue', 'pid'],
@@ -156,7 +334,6 @@ class SciELOFile(models.Model):
     relative_path = models.CharField(_('Relative Path'), max_length=255, null=True, blank=True)
     name = models.CharField(_('Filename'), max_length=255, null=False, blank=False)
     uri = models.URLField(_('URI'), max_length=255, null=True)
-    object_name = models.CharField(_('Object name'), max_length=255, null=True)
 
     def __str__(self):
         return f"{self.scielo_issue} {self.name}"
@@ -170,8 +347,6 @@ class SciELOFile(models.Model):
             for k in item.keys()
             if hasattr(cls, k)
         }
-        params['scielo_issue'] = scielo_issue
-
         try:
             cls.objects.filter(relative_path=item['relative_path']).delete()
         except Exception as e:
@@ -190,7 +365,6 @@ class SciELOFile(models.Model):
             models.Index(fields=['key']),
             models.Index(fields=['relative_path']),
             models.Index(fields=['name']),
-            models.Index(fields=['object_name']),
             models.Index(fields=['scielo_issue']),
         ]
 

@@ -33,3 +33,6 @@ class StartCollectionConfigurationError(Exception):
 class GetFilesStorageConfigurationError(Exception):
     ...
 
+
+class GetUpdatedSciELOIssueError(Exception):
+	...
