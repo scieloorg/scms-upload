@@ -14,6 +14,8 @@ from collection.models import (
 )
 from files_storage.models import Configuration as FilesStorageConfiguration
 from . import choices
+from . import exceptions
+from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
 
 
 class MigrationConfiguration(CommonControlField):
@@ -124,9 +126,48 @@ class JournalMigration(MigratedData):
     def __str__(self):
         return f"{self.scielo_journal} {self.status}"
 
+    @classmethod
+    def get_or_create(cls, scielo_journal, creator):
+        """
+        Returns a JournalMigration (registered or new)
+        """
+        try:
+            return cls.objects.get(
+                scielo_journal=scielo_journal,
+            )
+        except cls.DoesNotExist:
+            item = cls()
+            item.creator = creator
+            item.scielo_journal = scielo_journal
+            item.save()
+            return item
+        except Exception as e:
+            raise exceptions.GetOrCreateJournalMigrationError(
+                _('Unable to get_or_create_journal_migration {} {} {}').format(
+                    scielo_journal, type(e), e
+                )
+            )
+
+    def update(self, journal, journal_data, force_update):
+        # check if it needs to be update
+        if self.isis_updated_date == journal.isis_updated_date:
+            if not force_update:
+                # nao precisa atualizar
+                return
+
+        self.isis_created_date = journal.isis_created_date
+        self.isis_updated_date = journal.isis_updated_date
+        self.status = MS_IMPORTED
+        if journal.current_status != CURRENT:
+            self.status = MS_TO_IGNORE
+        self.data = journal_data
+        self.save()
+
     class Meta:
         indexes = [
             models.Index(fields=['scielo_journal']),
+            models.Index(fields=['status']),
+            models.Index(fields=['isis_updated_date']),
         ]
 
 
@@ -142,9 +183,47 @@ class IssueMigration(MigratedData):
     def __str__(self):
         return f"{self.scielo_issue} | data: {self.status} | files: {self.files_status}"
 
+    @classmethod
+    def get_or_create(cls, scielo_issue, creator):
+        """
+        Returns a IssueMigration (registered or new)
+        """
+        try:
+            return cls.objects.get(
+                scielo_issue=scielo_issue,
+            )
+        except cls.DoesNotExist:
+            item = cls()
+            item.creator = creator
+            item.scielo_issue = scielo_issue
+            item.save()
+            return item
+        except Exception as e:
+            raise exceptions.GetOrCreateIssueMigrationError(
+                _('Unable to get_or_create_issue_migration {} {} {}').format(
+                    scielo_issue, type(e), e
+                )
+            )
+
+    def update(self, issue, issue_data, force_update):
+        if self.isis_updated_date == issue.isis_updated_date:
+            if not force_update:
+                # nao precisa atualizar
+                return
+        self.isis_created_date = issue.isis_created_date
+        self.isis_updated_date = issue.isis_updated_date
+        self.status = MS_IMPORTED
+        if issue.current_status != CURRENT:
+            self.status = MS_TO_IGNORE
+        self.data = issue_data
+        self.save()
+
     class Meta:
         indexes = [
             models.Index(fields=['scielo_issue']),
+            models.Index(fields=['files_status']),
+            models.Index(fields=['status']),
+            models.Index(fields=['isis_updated_date']),
         ]
 
 
@@ -160,7 +239,45 @@ class DocumentMigration(MigratedData):
     def __str__(self):
         return f"{self.scielo_document} | data: {self.status} | files: {self.files_status}"
 
+    @classmethod
+    def get_or_create(cls, scielo_document, creator):
+        """
+        Returns a IssueMigration (registered or new)
+        """
+        try:
+            return cls.objects.get(
+                scielo_document=scielo_document,
+            )
+        except cls.DoesNotExist:
+            item = cls()
+            item.creator = creator
+            item.scielo_document = scielo_document
+            item.save()
+            return item
+        except Exception as e:
+            raise exceptions.GetOrCreateDocumentMigrationError(
+                _('Unable to get_or_create_document_migration {} {} {}').format(
+                    scielo_document, type(e), e
+                )
+            )
+
+    def update(self, document, document_data, force_update):
+        if self.isis_updated_date == document.isis_updated_date:
+            if not force_update:
+                # nao precisa atualizar
+                return
+        self.isis_created_date = document.isis_created_date
+        self.isis_updated_date = document.isis_updated_date
+        self.status = MS_IMPORTED
+        if document.current_status != CURRENT:
+            self.status = MS_TO_IGNORE
+        self.data = document_data
+        self.save()
+
     class Meta:
         indexes = [
             models.Index(fields=['scielo_document']),
+            models.Index(fields=['files_status']),
+            models.Index(fields=['status']),
+            models.Index(fields=['isis_updated_date']),
         ]

@@ -348,29 +348,6 @@ def register_failure(collection_acron, action_name, object_name, pid, e,
     migration_failure.save()
 
 
-def get_or_create_journal_migration(scielo_journal, creator_id):
-    """
-    Returns a JournalMigration (registered or new)
-    """
-    try:
-        try:
-            item = JournalMigration.objects.get(
-                scielo_journal=scielo_journal,
-            )
-        except JournalMigration.DoesNotExist:
-            item = JournalMigration()
-            item.creator_id = creator_id
-            item.scielo_journal = scielo_journal
-            item.save()
-    except Exception as e:
-        raise exceptions.GetOrCreateJournalMigrationError(
-            _('Unable to get_or_create_journal_migration {} {} {}').format(
-                scielo_journal, type(e), e
-            )
-        )
-    return item
-
-
 def get_journal_migration_status(scielo_issn):
     """
     Returns a JournalMigration status
@@ -550,7 +527,7 @@ def migrate_journals(
             try:
                 action = "import"
                 journal_migration = import_data_from_title_database(
-                    user_id, collection_acron,
+                    mcc.user, collection_acron,
                     scielo_issn, journal_data[0], force_update)
                 action = "publish"
                 publish_imported_journal(journal_migration)
@@ -572,7 +549,7 @@ def migrate_journals(
         )
 
 
-def import_data_from_title_database(user_id, collection_acron, scielo_issn,
+def import_data_from_title_database(user, collection_acron, scielo_issn,
                                     journal_data, force_update=False):
     """
     Create/update JournalMigration
@@ -580,26 +557,15 @@ def import_data_from_title_database(user_id, collection_acron, scielo_issn,
     journal = classic_ws.Journal(journal_data)
 
     scielo_journal = get_scielo_journal(
-        journal, collection_acron, scielo_issn, user_id
+        journal, collection_acron, scielo_issn, user
     )
 
     # cria ou obtém journal_migration
-    journal_migration = get_or_create_journal_migration(
-        scielo_journal, creator_id=user_id)
+    journal_migration = JournalMigration.get_or_create(
+        scielo_journal, user, force_update)
 
-    # check if it needs to be update
-    if journal_migration.isis_updated_date == journal.isis_updated_date:
-        if not force_update:
-            # nao precisa atualizar
-            return journal_migration
     try:
-        journal_migration.isis_created_date = journal.isis_created_date
-        journal_migration.isis_updated_date = journal.isis_updated_date
-        journal_migration.status = MS_IMPORTED
-        if journal.current_status != CURRENT:
-            journal_migration.status = MS_TO_IGNORE
-        journal_migration.data = journal_data
-        journal_migration.save()
+        journal_migration.update(journal, journal_data)
         return journal_migration
     except Exception as e:
         raise exceptions.JournalMigrationSaveError(
@@ -767,29 +733,6 @@ def publish_imported_journal(journal_migration):
         )
 
 
-def get_or_create_issue_migration(scielo_issue, creator_id):
-    """
-    Returns a IssueMigration (registered or new)
-    """
-    try:
-        try:
-            item = IssueMigration.objects.get(
-                scielo_issue=scielo_issue,
-            )
-        except IssueMigration.DoesNotExist:
-            item = IssueMigration()
-            item.creator_id = creator_id
-            item.scielo_issue = scielo_issue
-            item.save()
-    except Exception as e:
-        raise exceptions.GetOrCreateIssueMigrationError(
-            _('Unable to get_or_create_issue_migration {} {} {}').format(
-                scielo_issue, type(e), e
-            )
-        )
-    return item
-
-
 def migrate_issues(
         user_id,
         collection_acron,
@@ -801,11 +744,12 @@ def migrate_issues(
         mcc.connect_db()
         source_file_path = mcc.get_source_file_path("issue")
 
+        user = mcc.user
         for issue_pid, issue_data in classic_ws.get_records_by_source_path("issue", source_file_path):
             try:
                 action = "import"
                 issue_migration = import_data_from_issue_database(
-                    user_id=user_id,
+                    user=user,
                     collection_acron=collection_acron,
                     scielo_issn=issue_pid[:9],
                     issue_pid=issue_pid,
@@ -838,7 +782,7 @@ def migrate_issues(
 
 
 def import_data_from_issue_database(
-        user_id,
+        user,
         collection_acron,
         scielo_issn,
         issue_pid,
@@ -853,27 +797,13 @@ def import_data_from_issue_database(
     issue = classic_ws.Issue(issue_data)
 
     scielo_issue = get_scielo_issue(
-        issue, collection_acron, scielo_issn, issue_pid, user_id)
+        issue, collection_acron, scielo_issn, issue_pid, user)
 
-    issue_migration = get_or_create_issue_migration(
-        scielo_issue, creator_id=user_id)
+    issue_migration = IssueMigration.get_or_create(
+        scielo_issue, creator=user)
 
-    # check if it needs to be update
-    if issue_migration.isis_updated_date == issue.isis_updated_date:
-        if not force_update:
-            # nao precisa atualizar
-            logging.info("Skipped: Import data from database issue {} {} {} {} {}".format(
-                collection_acron, scielo_issn, issue_pid, issue_migration.status, force_update))
-            return issue_migration
     try:
-        issue_migration.isis_created_date = issue.isis_created_date
-        issue_migration.isis_updated_date = issue.isis_updated_date
-        issue_migration.status = MS_IMPORTED
-        if issue.is_press_release:
-            issue_migration.status = MS_TO_IGNORE
-        issue_migration.data = issue_data
-
-        issue_migration.save()
+        issue_migration.update(issue, issue_data, force_update)
         return issue_migration
     except Exception as e:
         logging.error(_("Error importing issue {} {} {}").format(collection_acron, issue_pid, issue_data))
@@ -1009,27 +939,6 @@ def publish_imported_issue(issue_migration):
         )
 
 
-def get_or_create_document_migration(scielo_document, creator_id):
-    """
-    Returns a DocumentMigration (registered or new)
-    """
-    try:
-        try:
-            dm = DocumentMigration.objects.get(scielo_document=scielo_document)
-        except DocumentMigration.DoesNotExist:
-            dm = DocumentMigration()
-            dm.creator_id = creator_id
-            dm.scielo_document = scielo_document
-            dm.save()
-    except Exception as e:
-        raise exceptions.GetOrCreateDocumentMigrationError(
-            _('Unable to get_or_create_document_migration {} {} {}').format(
-                scielo_document, type(e), e
-            )
-        )
-    return dm
-
-
 def import_issues_files_and_migrate_documents(
         user_id,
         collection_acron,
@@ -1084,7 +993,7 @@ def import_issues_files_and_migrate_documents(
                 # migra os documentos da base de dados `source_file_path`
                 # que não contém necessariamente os dados de só 1 fascículo
                 migrate_documents(
-                    user_id,
+                    mcc.user,
                     collection_acron,
                     source_file_path,
                     mcc.fs_managers['website'],
@@ -1135,7 +1044,7 @@ def import_issue_files(
 
 
 def migrate_documents(
-        user_id,
+        user,
         collection_acron,
         source_file_path,
         files_storage_manager,
@@ -1193,9 +1102,9 @@ def migrate_documents(
                     document.filename_without_extension,
                     user_id,
                 )
-                document_migration = get_or_create_document_migration(
+                document_migration = DocumentMigration.get_or_create(
                     scielo_document=scielo_document,
-                    creator_id=user_id,
+                    creator=user,
                 )
 
                 document_files_controller = DocumentFilesController(
@@ -1242,20 +1151,8 @@ def import_document(pid, document, document_migration,
     """
     Create/update DocumentMigration
     """
-    # check if it needs to be update
-    if document_migration.isis_updated_date == document.isis_updated_date:
-        if not force_update:
-            # nao precisa atualizar
-            logging.info(
-                "Skipped: Import documents from classic website {}. It is already up to date".format(
-                document_migration))
-            return
     try:
-        document_migration.isis_created_date = document.isis_created_date
-        document_migration.isis_updated_date = document.isis_updated_date
-        document_migration.status = MS_IMPORTED
-        document_migration.data = document_data
-        document_migration.save()
+        document_migration.update(document, document_data, force_update)
     except Exception as e:
         raise exceptions.DocumentMigrationSaveError(
             _("Unable to save document migration {} {}").format(
