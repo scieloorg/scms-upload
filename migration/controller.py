@@ -1065,48 +1065,14 @@ def migrate_documents(
                     continue
 
                 journal_issue_and_document_data['article'] = grp_records
-
-                # instancia Document com registros de title, issue e artigo
-                document = classic_ws.Document(journal_issue_and_document_data)
-                pid = document.pid
-                scielo_issn = document.journal.scielo_issn
-                issue_pid = document.issue.pid
-
-                scielo_issue = get_scielo_issue(
-                    document.issue, collection_acron, scielo_issn,
-                    issue_pid, user)
-
-                scielo_document = collection_controller.get_or_create_scielo_document(
-                    scielo_issue,
-                    pid,
-                    document.filename_without_extension,
+                migrate_document(
+                    files_storage_manager,
+                    pid_provider,
                     user,
-                )
-                document_migration = DocumentMigration.get_or_create(
-                    scielo_document=scielo_document,
-                    creator=user,
-                )
-
-                document_files_controller = DocumentFilesController(
-                    main_language=document.original_language,
-                    scielo_document=scielo_document,
-                    files_storage_manager=files_storage_manager,
-                    pid_provider=pid_provider,
-                )
-                document_files_controller.link_scielo_document_to_its_files(
-                    user_id
-                )
-                document_files_controller.info()
-
-                import_document(
-                    pid, document, document_migration,
+                    collection_acron,
+                    scielo_issn,
+                    issue_pid,
                     journal_issue_and_document_data,
-                    force_update,
-                )
-                publish_document(
-                    pid, document, document_migration,
-                    document_files_controller,
-                    user_id,
                 )
 
             except Exception as e:
@@ -1114,15 +1080,68 @@ def migrate_documents(
                     _('Error migrating document {}').format(pid),
                     collection_acron, "migrate", "document", pid,
                     e,
-                    user_id,
+                    user,
                 )
     except Exception as e:
         _register_failure(
             _('Error migrating documents'),
             collection_acron, "migrate", "document", "GENERAL",
             e,
-            user_id,
+            user,
         )
+
+
+def migrate_document(
+        files_storage_manager,
+        pid_provider,
+        user,
+        collection_acron,
+        scielo_issn,
+        issue_pid,
+        journal_issue_and_document_data,
+        ):
+    # instancia Document com registros de title, issue e artigo
+    document = classic_ws.Document(journal_issue_and_document_data)
+    pid = document.pid
+    scielo_issn = document.journal.scielo_issn
+    issue_pid = document.issue.pid
+
+    scielo_issue = get_scielo_issue(
+        document.issue, collection_acron, scielo_issn,
+        issue_pid, user)
+
+    scielo_document = collection_controller.get_or_create_scielo_document(
+        scielo_issue,
+        pid,
+        document.filename_without_extension,
+        user,
+    )
+    document_migration = DocumentMigration.get_or_create(
+        scielo_document=scielo_document,
+        creator=user,
+    )
+
+    document_files_controller = DocumentFilesController(
+        main_language=document.original_language,
+        scielo_document=scielo_document,
+        files_storage_manager=files_storage_manager,
+        pid_provider=pid_provider,
+    )
+    document_files_controller.link_scielo_document_to_its_files(
+        user
+    )
+    document_files_controller.info()
+
+    import_document(
+        pid, document, document_migration,
+        journal_issue_and_document_data,
+        force_update,
+    )
+    publish_document(
+        pid, document, document_migration,
+        document_files_controller,
+        user,
+    )
 
 
 def import_document(pid, document, document_migration,
