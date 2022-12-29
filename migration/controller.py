@@ -387,6 +387,61 @@ def get_journal_migration_status(scielo_issn):
         )
 
 
+class IssueFilesController:
+
+    ClassFileModels = {
+        "asset": AssetFile,
+        "pdf": FileWithLang,
+        "xml": XMLFile,
+        "html": SciELOHTMLFile,
+    }
+
+    def __init__(self, scielo_issue):
+        self.scielo_issue = scielo_issue
+
+    def add_file(self, item):
+        item['scielo_issue'] = self.scielo_issue
+        ClassFile = self.ClassFileModels[item.pop('type')]
+        ClassFile.create_or_update(item)
+
+    def get_files(self, type_, key, **kwargs):
+        ClassFile = self.ClassFileModels[type_]
+        return ClassFile.objects.get(
+            scielo_issue=self.scielo_issue,
+            key=key,
+            **kwargs,
+        )
+
+    def migrate_files(self, mcc):
+        issue_files = mcc.get_classic_website_issue_files(
+            self.scielo_issue.scielo_journal.acron,
+            self.scielo_issue.issue_folder,
+        )
+        failures = []
+        for item in issue_files:
+            try:
+                files_storage_manager = mcc.get_files_storage(item['path'])
+                response = files_storage_manager.push_file(
+                    item['path'],
+                    subdirs=os.path.join(
+                        self.scielo_issue.scielo_journal.acron,
+                        self.scielo_issue.issue_folder,
+                    ),
+                    preserve_name=True,
+                    creator=mcc.user)
+                item.update(response)
+                logging.info("Stored {} in files storage".format(item))
+            except Exception as e:
+                item['error'] = str(e)
+                item['error_type'] = str(type(e))
+
+            # try ou except podem gerar 'error'
+            if item.get('error'):
+                failures.append(item['path'])
+            self.add_file(item)
+        return {"not migrated": failures}
+
+
 class MigrationConfigurationController:
 
     def __init__(self, collection_acron, user):
@@ -401,6 +456,7 @@ class MigrationConfigurationController:
             migration=FilesStorageManager(
                 self.config.migration_files_storage_config.name),
         )
+        self.user = user
         self.pid_provider = PidProvider('pid-provider', user)
 
     def connect_db(self):
@@ -439,7 +495,7 @@ class MigrationConfigurationController:
         logging.info(artigo_source_files_paths)
         return artigo_source_files_paths
 
-    def migrate_issue_files(self, journal_acron, issue_folder):
+    def get_classic_website_issue_files(self, journal_acron, issue_folder):
         try:
             classic_website_paths = {
                 "BASES_TRANSLATION_PATH": self.classic_website.bases_translation_path,
@@ -465,21 +521,17 @@ class MigrationConfigurationController:
         for info in issue_files:
             try:
                 info['relative_path'] = _get_classic_website_rel_path(info['path'])
-                name, ext = os.path.splitext(info['path'])
-                if ext in (".xml", ".html", ".htm"):
-                    files_storage_manager = self.fs_managers['migration']
-                else:
-                    files_storage_manager = self.fs_managers['website']
-                response = files_storage_manager.register(
-                    info['path'],
-                    subdirs=os.path.join(journal_acron, issue_folder),
-                    preserve_name=True)
-                info.update(response)
-                logging.info("Stored {} in files storage".format(info))
             except Exception as e:
                 info['error'] = str(e)
                 info['error_type'] = str(type(e))
             yield info
+
+    def get_files_storage(self, filename):
+        name, ext = os.path.splitext(filename)
+        if ext in (".xml", ".html", ".htm"):
+            return self.fs_managers['migration']
+        else:
+            return self.fs_managers['website']
 
 
 def migrate_journals(
@@ -1010,7 +1062,7 @@ def import_issues_files_and_migrate_documents(
             import_issue_files(
                 user_id=user_id,
                 issue_migration=issue_migration,
-                migrate_issue_files=mcc.migrate_issue_files,
+                mcc=mcc,
                 force_update=force_update,
             )
         except Exception as e:
@@ -1051,10 +1103,11 @@ def import_issues_files_and_migrate_documents(
             )
 
 
+# FIXME remover user_id
 def import_issue_files(
         user_id,
         issue_migration,
-        migrate_issue_files,
+        mcc,
         force_update,
         ):
     """135
@@ -1066,28 +1119,13 @@ def import_issue_files(
             issue_migration))
         return
 
-    ClassFileModels = {
-        "asset": AssetFile,
-        "pdf": FileWithLang,
-        "xml": XMLFile,
-        "html": SciELOHTMLFile,
-    }
-    status = MS_IMPORTED
     try:
         scielo_issue = issue_migration.scielo_issue
         issue = classic_ws.Issue(issue_migration.data)
-        for item in migrate_issue_files(
-                scielo_issue.scielo_journal.acron,
-                scielo_issue.issue_folder,
-                ):
-            if item.get('error'):
-                status = None
-
-            ClassFile = ClassFileModels[item.pop('type')]
-            ClassFile.create_or_update(item)
-
-        if status:
-            issue_migration.files_status = status
+        issue_files_controller = IssueFilesController(scielo_issue)
+        result = issue_files_controller.migrate_files(mcc)
+        if result.get("failures"):
+            issue_migration.files_status = MS_IMPORTED
         issue_migration.save()
     except Exception as e:
         raise exceptions.IssueFilesMigrationSaveError(
@@ -1395,6 +1433,8 @@ class DocumentFilesController:
         self.files_storage_manager = files_storage_manager
         self.scielo_document = scielo_document
         self._main_language = main_language
+        self.issue_files_controller = IssueFilesController(
+            scielo_document.scielo_issue, self.scielo_document.key)
 
     def info(self):
         logging.info("DocumentFilesController {}".format(self.scielo_document))
@@ -1432,10 +1472,7 @@ class DocumentFilesController:
     def add_xml_files(self):
         logging.info("Add xml files to {}".format(self.scielo_document))
         self.scielo_document.xml_files.set(
-            XMLFile.objects.filter(
-                scielo_issue=self.scielo_document.scielo_issue,
-                key=self.scielo_document.key,
-            )
+            self.issue_files_controller.get_files('xml')
         )
         self.scielo_document.save()
         logging.info("Added to xml files of {}".format(self.scielo_document))
@@ -1444,10 +1481,9 @@ class DocumentFilesController:
         logging.info("Add rendition files to {}".format(self.scielo_document))
         try:
             # busca o pdf que tem o idioma == 'main'
-            main_pdf = FileWithLang.objects.get(
-                scielo_issue=self.scielo_document.scielo_issue,
-                key=self.scielo_document.key,
-                lang='main'
+            main_pdf = self.issue_files_controller.get_files(
+                'pdf',
+                lang='main',
             )
             # atualiza com o valor de main_language
             main_pdf.lang = self._main_language
@@ -1457,10 +1493,7 @@ class DocumentFilesController:
 
         # atualiza rendition files do scielo_document
         self.scielo_document.renditions_files.set(
-            FileWithLang.objects.filter(
-                scielo_issue=self.scielo_document.scielo_issue,
-                key=self.scielo_document.key,
-            )
+            self.issue_files_controller.get_files('pdf')
         )
         self.scielo_document.save()
         logging.info("Added rendition files to {}".format(self.scielo_document))
@@ -1468,10 +1501,7 @@ class DocumentFilesController:
     def add_html_files(self):
         logging.info("Add html files to {}".format(self.scielo_document))
         self.scielo_document.html_files.set(
-            SciELOHTMLFile.objects.filter(
-                scielo_issue=self.scielo_document.scielo_issue,
-                key=self.scielo_document.key,
-            )
+            self.issue_files_controller.get_files('html')
         )
         self.scielo_document.save()
         logging.info("Added html files to {}".format(self.scielo_document))
@@ -1679,3 +1709,5 @@ class DocumentFilesController:
                 _("Unable to add assets to public XML to {} {} {})").format(
                     xml_file, type(e), e
                 ))
+
+# 1718
