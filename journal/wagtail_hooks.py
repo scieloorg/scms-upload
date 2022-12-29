@@ -29,6 +29,9 @@ class OfficialJournalAdmin(ModelAdmin):
         'title',
         'short_title',
         'foundation_date',
+        'foundation_year',
+        'foundation_month',
+        'foundation_day',
         'ISSN_print',
         'ISSN_electronic',
         'ISSNL',
@@ -38,9 +41,7 @@ class OfficialJournalAdmin(ModelAdmin):
     # )
     search_fields = (
         'title',
-        'title_iso',
         'short_title',
-        'nlm_title',
         'ISSN_print',
         'ISSN_electronic',
         'ISSNL',
