@@ -35,4 +35,8 @@ class GetFilesStorageConfigurationError(Exception):
 
 
 class GetUpdatedSciELOIssueError(Exception):
-	...
+    ...
+
+
+class AddAssetFilesError(Exception):
+    ...
