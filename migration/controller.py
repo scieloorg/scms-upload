@@ -33,9 +33,8 @@ from libs.dsm.publication.db import mk_connection
 from libs.dsm.publication.journals import JournalToPublish
 from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
 from libs.dsm.publication.documents import DocumentToPublish
-from pid_provider.controller import PidProvider
+from pid_provider.controller import PidProvider, get_xml_uri
 from core.controller import parse_non_standard_date, parse_months_names
-
 from collection.choices import CURRENT
 from collection.controller import load_config
 from collection.exceptions import (
@@ -60,6 +59,7 @@ from . import exceptions
 from journal.controller import get_updated_official_journal
 from issue.controller import get_or_create as official_issue_get_or_create
 from publication.models import PublicationArticle
+from publication.choices import PUBLICATION_STATUS_PUBLISHED
 
 
 User = get_user_model()
@@ -175,7 +175,6 @@ def schedule_issue_documents_migration(collection_acron,
                                        user_id):
     """
     Agenda tarefas para migrar e publicar um conjunto de documentos por:
-
         - ano
         - periódico
         - periódico e ano
@@ -469,7 +468,7 @@ class MigrationConfigurationController:
         self.user = user
         self.pid_requester = PidRequester('website')
 
-    def pid_provider_request_document_ids(self, xml_with_pre, name, user):
+    def request_v3(self, xml_with_pre, name, user):
         # TODO
         # {"v3": '', "xml_file_versions": ""}
         return self.pid_requester.request_doc_ids(xml_with_pre, name, user)
@@ -1150,6 +1149,44 @@ def migrate_document(
     issue_files_controller = IssueFilesController(
         scielo_document.scielo_issue, scielo_document.key)
 
+    scielo_document_update(
+        document,
+        scielo_issue,
+        scielo_document,
+        issue_files_controller,
+    )
+
+    # solicitar pid v3
+    xml_pre_with_remote_assets = (
+        scielo_document.get_xml_with_pre_with_remote_assets(
+            issue_files_controller.issue_assets_uris))
+    response = mcc.request_v3(**xml_pre_with_remote_assets)
+
+    # cria / atualiza artigo de app publication
+    article = PublicationArticle.get_or_create(response['v3'])
+    article.xml_uri = get_xml_uri(response['v3'])
+    article.status = PUBLICATION_STATUS_PUBLISHED
+    article.save()
+
+    # atualiza status da migração
+    document_migration.update(document, document_data, force_update)
+
+    # publica artigo no site (QA)
+    publish_document(
+        pid,
+        article.v3,
+        article.xml_uri,
+        document, document_migration,
+        scielo_document,
+    )
+
+
+def scielo_document_update(
+        document,
+        scielo_issue,
+        scielo_document,
+        issue_files_controller,
+        ):
     # busca o pdf que tem o idioma == 'main'
     try:
         files = issue_files_controller.get_files('pdf', ang='main')
@@ -1161,37 +1198,22 @@ def migrate_document(
     scielo_document.rendition_files.set(
         issue_files_controller.get_files('pdf')
     )
+    # atualiza html files do scielo_document
     scielo_document.html_files.set(
         issue_files_controller.get_files('html')
     )
+    # atualiza xml files files do scielo_document
     scielo_document.xml_files.set(
         issue_files_controller.get_files('xml')
     )
     if scielo_document.html_files.count() > 0:
         add_xml_generated_from_html(scielo_document, document, mcc, user)
+    # obtém os idiomas do XML e atualiza lang e languages
     scielo_document.set_langs()
+    # obtém os assets do documento
     scielo_document.add_assets(issue_files_controller.issue_assets_dict)
+    # salva os dados
     scielo_document.save()
-
-    # XMLFile
-    xml_pre_with_remote_assets = (
-        scielo_document.get_xml_with_pre_with_remote_assets(
-            issue_files_controller.issue_assets_uris))
-
-    response = mcc.pid_provider_request_document_ids(
-        **xml_pre_with_remote_assets)
-
-    article = PublicationArticle.get_or_create(response['v3'])
-
-    document_migration.update(document, document_data, force_update)
-
-    publish_document(
-        pid,
-        response['v3'],
-        article.xml_uri,
-        document, document_migration,
-        scielo_document,
-    )
 
 
 def add_xml_generated_from_html(scielo_document, document, mcc, user):
@@ -1215,7 +1237,6 @@ def add_xml_generated_from_html(scielo_document, document, mcc, user):
         )
         scielo_document.xml_files.add(xml_file)
         scielo_document.xml_files.save()
-        scielo_document.save()
         break
 
 

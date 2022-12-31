@@ -715,3 +715,17 @@ def _register_new_document(xml_adapter, user):
         raise exceptions.SavingError(
             "Register new document error: %s %s %s" % (type(e), e, data)
         )
+
+
+def get_xml_uri(v3):
+    try:
+        found = models.XMLArticle.objects.filter(v3=v3)[0]
+    except IndexError:
+        try:
+            found = models.XMLAOPArticle.objects.filter(v3=v3)[0]
+        except IndexError:
+            return
+    try:
+        return found.versions.last.uri
+    except AttributeError:
+        return None
