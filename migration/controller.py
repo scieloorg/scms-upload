@@ -59,6 +59,7 @@ from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
 from . import exceptions
 from journal.controller import get_updated_official_journal
 from issue.controller import get_or_create as official_issue_get_or_create
+from publication.models import Article as PublicationArticle
 
 
 User = get_user_model()
@@ -381,44 +382,74 @@ class IssueFilesController:
     def add_file(self, item):
         item['scielo_issue'] = self.scielo_issue
         ClassFile = self.ClassFileModels[item.pop('type')]
-        ClassFile.create_or_update(item)
+        return ClassFile.create_or_update(item)
 
     def get_files(self, type_, key, **kwargs):
         ClassFile = self.ClassFileModels[type_]
-        return ClassFile.objects.get(
+        return ClassFile.objects.filter(
             scielo_issue=self.scielo_issue,
             key=key,
             **kwargs,
         )
 
     def migrate_files(self, mcc):
+        # obtém os arquivos de site clássico
         issue_files = mcc.get_classic_website_issue_files(
             self.scielo_issue.scielo_journal.acron,
             self.scielo_issue.issue_folder,
         )
-        failures = []
+        result = {"failures": [], "success": []}
         for item in issue_files:
-            try:
-                files_storage_manager = mcc.get_files_storage(item['path'])
-                response = files_storage_manager.push_file(
-                    item['path'],
-                    subdirs=os.path.join(
-                        self.scielo_issue.scielo_journal.acron,
-                        self.scielo_issue.issue_folder,
-                    ),
-                    preserve_name=True,
-                    creator=mcc.user)
-                item.update(response)
-                logging.info("Stored {} in files storage".format(item))
-            except Exception as e:
-                item['error'] = str(e)
-                item['error_type'] = str(type(e))
+            self.migrate_file(mcc, item)
+            if item.get("error"):
+                result['failures'].append(item['path'])
+            else:
+                result['success'].append(item['path'])
+        return result
 
-            # try ou except podem gerar 'error'
-            if item.get('error'):
-                failures.append(item['path'])
-            self.add_file(item)
-        return {"not migrated": failures}
+    def migrate_file(self, mcc, item):
+        try:
+            # create AssetFile or XMLFile or SciELOHTMLFile
+            file = self.add_file(item)
+
+            # instancia files storage manager (website ou migration)
+            # de acordo com o arquivo
+            files_storage_manager = mcc.get_files_storage(item['path'])
+
+            # armazena arquivo
+            response = files_storage_manager.push_file(
+                file.versions,
+                item['path'],
+                subdirs=os.path.join(
+                    self.scielo_issue.scielo_journal.acron,
+                    self.scielo_issue.issue_folder,
+                ),
+                preserve_name=True,
+                creator=mcc.user)
+            item.update(response)
+        except Exception as e:
+            item['error'] = str(e)
+            item['error_type'] = str(type(e))
+
+    @property
+    def uris(self):
+        if not hasattr(self, '_uris') or not self._uris:
+            self._uris = {
+                name: asset.uri
+                for name, asset in self.issue_assets_dict.items()
+            }
+        return self._uris
+
+    @property
+    def issue_assets_dict(self):
+        if not hasattr(self, '_issue_assets_as_dict') or not self._issue_assets_as_dict:
+            self._issue_assets_as_dict = {
+                asset.name: asset
+                for asset in AssetFile.objects.filter(
+                    scielo_issue=self.scielo_issue,
+                )
+            }
+        return self._issue_assets_as_dict
 
 
 class MigrationConfigurationController:
@@ -436,12 +467,16 @@ class MigrationConfigurationController:
                 self.config.migration_files_storage_config.name),
         )
         self.user = user
-        self.pid_provider = PidProvider('pid-provider', user)
+        self.pid_requester = PidRequester('website')
+
+    def pid_provider_request_document_ids(self, xml_with_pre, name, user):
+        # TODO
+        # {"v3": '', "xml_file_versions": ""}
+        return self.pid_requester.request_doc_ids(xml_with_pre, name, user)
 
     def connect_db(self):
         try:
             return mk_connection(self.config.new_website_config.db_uri)
-
         except Exception as e:
             raise exceptions.GetMigrationConfigurationError(
                 _("Unable to connect db {} {}").format(type(e), e)
@@ -976,9 +1011,8 @@ def import_issues_files_and_migrate_documents(
                     mcc.user,
                     collection_acron,
                     source_file_path,
-                    mcc.fs_managers['website'],
                     issue_migration,
-                    mcc.pid_provider,
+                    mcc,
                     force_update,
                 )
 
@@ -1013,9 +1047,9 @@ def import_issue_files(
         issue = classic_ws.Issue(issue_migration.data)
         issue_files_controller = IssueFilesController(scielo_issue)
         result = issue_files_controller.migrate_files(mcc)
-        if result.get("failures"):
+        if not result.get("failures"):
             issue_migration.files_status = MS_IMPORTED
-        issue_migration.save()
+            issue_migration.save()
     except Exception as e:
         raise exceptions.IssueFilesMigrationSaveError(
             _("Unable to save issue files migration {} {}").format(
@@ -1027,9 +1061,8 @@ def migrate_documents(
         user,
         collection_acron,
         source_file_path,
-        files_storage_manager,
         issue_migration,
-        pid_provider,
+        mcc,
         force_update=False,
         ):
     """
@@ -1066,8 +1099,7 @@ def migrate_documents(
 
                 journal_issue_and_document_data['article'] = grp_records
                 migrate_document(
-                    files_storage_manager,
-                    pid_provider,
+                    mcc,
                     user,
                     collection_acron,
                     scielo_issn,
@@ -1092,8 +1124,7 @@ def migrate_documents(
 
 
 def migrate_document(
-        files_storage_manager,
-        pid_provider,
+        mcc,
         user,
         collection_acron,
         scielo_issn,
@@ -1116,52 +1147,86 @@ def migrate_document(
         document.filename_without_extension,
         user,
     )
-    document_migration = DocumentMigration.get_or_create(
-        scielo_document=scielo_document,
-        creator=user,
-    )
+    issue_files_controller = IssueFilesController(
+        scielo_document.scielo_issue, scielo_document.key)
 
-    document_files_controller = DocumentFilesController(
-        main_language=document.original_language,
-        scielo_document=scielo_document,
-        files_storage_manager=files_storage_manager,
-        pid_provider=pid_provider,
-    )
-    document_files_controller.link_scielo_document_to_its_files(
-        user
-    )
-    document_files_controller.info()
-
-    import_document(
-        pid, document, document_migration,
-        journal_issue_and_document_data,
-        force_update,
-    )
-    publish_document(
-        pid, document, document_migration,
-        document_files_controller,
-        user,
-    )
-
-
-def import_document(pid, document, document_migration,
-                    document_data,
-                    force_update=False):
-    """
-    Create/update DocumentMigration
-    """
+    # busca o pdf que tem o idioma == 'main'
     try:
-        document_migration.update(document, document_data, force_update)
-    except Exception as e:
-        raise exceptions.DocumentMigrationSaveError(
-            _("Unable to save document migration {} {}").format(
-                pid, e
-            )
+        files = issue_files_controller.get_files('pdf', ang='main')
+        files[0].lang = document.original_language
+        files[0].save()
+    except IndexError:
+        pass
+    # atualiza rendition files do scielo_document
+    scielo_document.rendition_files.set(
+        issue_files_controller.get_files('pdf')
+    )
+    scielo_document.html_files.set(
+        issue_files_controller.get_files('html')
+    )
+    scielo_document.xml_files.set(
+        issue_files_controller.get_files('xml')
+    )
+    if scielo_document.html_files.count() > 0:
+        add_xml_generated_from_html(scielo_document, document, mcc, user)
+    scielo_document.set_langs()
+    scielo_document.add_assets(issue_files_controller.issue_assets_dict)
+    scielo_document.save()
+
+    # XMLFile
+    xml_pre_with_remote_assets = (
+        scielo_document.get_xml_with_pre_with_remote_assets(
+            issue_files_controller.issue_assets_uris))
+
+    response = mcc.pid_provider_request_document_ids(
+        **xml_pre_with_remote_assets)
+
+    article = PublicationArticle.get_or_create(response['v3'])
+
+    document_migration.update(document, document_data, force_update)
+
+    publish_document(
+        pid,
+        response['v3'],
+        article.xml_uri,
+        document, document_migration,
+        scielo_document,
+    )
+
+
+def add_xml_generated_from_html(scielo_document, document, mcc, user):
+    for item in scielo_document.html_files.iterator():
+        xml_from_html = document.filename_without_extension + ".xml"
+        subdirs = "/".join(
+            item.relative_path.split("/")[-3:-1])
+        data = {
+            'scielo_issue': item.scielo_issue,
+            'key': document.filename_without_extension,
+            'relative_path': os.path.join(subdirs, xml_from_html),
+            'name': xml_from_html,
+        }
+        xml_file = XMLFile.create_or_update(data)
+        mcc.fs_managers['migration'].push_xml_content(
+            xml_file.versions,
+            xml_from_html,
+            subdirs,
+            document.xml_from_html,
+            user,
         )
+        scielo_document.xml_files.add(xml_file)
+        scielo_document.xml_files.save()
+        scielo_document.save()
+        break
 
 
-def publish_document(pid, document, document_migration, document_files_controller, user_id):
+def publish_document(pid, v3, xml_uri,
+                     document, document_migration, scielo_document):
     """
+    Atualiza o registro do site novo,
+    preenchendo opac_schema.models.v1.Article com dados provenientes
+    principalmente dos registros das bases ISIS +
+    alguns dados provenientes do XML
+
     Raises
     ------
     PublishDocumentError
@@ -1183,7 +1248,7 @@ def publish_document(pid, document, document_migration, document_files_controlle
     try:
         # IDS
         doc_to_publish.add_identifiers(
-            document_files_controller.v3,
+            v3,
             document.scielo_pid_v2,
             document.publisher_ahead_id,
         )
@@ -1255,16 +1320,14 @@ def publish_document(pid, document, document_migration, document_files_controlle
 
         # ARQUIVOS
         # xml
-        for xml in document_files_controller.xml_files.iterator():
-            doc_to_publish.add_xml(xml.public_uri)
-            break
+        doc_to_publish.add_xml(xml_uri)
 
         # htmls
-        for item in document_files_controller.text_langs:
+        for item in scielo_document.text_langs:
             doc_to_publish.add_html(item['lang'], uri=None)
 
         # pdfs
-        for item in document_files_controller.rendition_files.iterator():
+        for item in scielo_document.rendition_files.iterator():
             doc_to_publish.add_pdf(
                 lang=item.lang,
                 url=item.uri,
@@ -1273,7 +1336,7 @@ def publish_document(pid, document, document_migration, document_files_controlle
             )
 
         # mat supl
-        for item in document_files_controller.supplementary_materials:
+        for item in scielo_document.supplementary_materials:
             doc_to_publish.add_mat_suppl(
                 lang=item['lang'],
                 url=item['uri'],
@@ -1287,7 +1350,7 @@ def publish_document(pid, document, document_migration, document_files_controlle
         #  related-article-type="commentary-article"
         #  xlink:href="10.1590/0101-3173.2022.v45n1.p139">
 
-        for item in document_files_controller.related_items:
+        for item in scielo_document.related_items:
             logging.info(item)
             doc_to_publish.add_related_article(
                 doi=item['href'],
@@ -1311,299 +1374,3 @@ def publish_document(pid, document, document_migration, document_files_controlle
                 pid, e
             )
         )
-
-
-class DocumentFilesController:
-
-    def __init__(self,
-                 main_language,
-                 scielo_document,
-                 files_storage_manager,
-                 pid_provider,
-                 ):
-        self.subdirs = (
-            os.path.join(
-                scielo_document.scielo_issue.scielo_journal.acron,
-                scielo_document.scielo_issue.issue_folder,
-            ))
-        self.files_storage_manager = files_storage_manager
-        self.scielo_document = scielo_document
-        self._main_language = main_language
-        self.issue_files_controller = IssueFilesController(
-            scielo_document.scielo_issue, self.scielo_document.key)
-
-    def info(self):
-        logging.info("DocumentFilesController {}".format(self.scielo_document))
-        for item in self.xml_files.iterator():
-            logging.info("xmlfile: {} {}".format(self.scielo_document, item))
-            logging.info("public: {} {}".format(item.public_uri, item.public_object_name))
-            logging.info("xml file asset: {} {}".format(self.scielo_document, item))
-            for asset in item.assets_files.iterator():
-                logging.info("{} {} {}".format(self.scielo_document, item, asset))
-        for item in self.rendition_files.iterator():
-            logging.info("rendition file: {} {}".format(self.scielo_document, item))
-        for item in self.html_files.iterator():
-            logging.info("html file: {} {}".format(self.scielo_document, item))
-            for asset in item.assets_files.iterator():
-                logging.info("html file asset: {} {} {}".format(self.scielo_document, item, asset))
-
-    @property
-    def main_xml_uri(self):
-        for item in self.scielo_document.xml_files.iterator():
-            if item.lang == self._main_language:
-                return item.uri
-
-    @property
-    def v3(self):
-        for item in self.scielo_document.xml_files.iterator():
-            return item.v3
-
-    def link_scielo_document_to_its_files(self, user_id):
-        self.add_rendition_files()
-        self.add_xml_files()
-        self.add_html_files()
-        self.add_supplementary_material_flag_to_assets()
-        self.change_xmls_to_publish(user_id)
-
-    def add_xml_files(self):
-        logging.info("Add xml files to {}".format(self.scielo_document))
-        self.scielo_document.xml_files.set(
-            self.issue_files_controller.get_files('xml')
-        )
-        self.scielo_document.save()
-        logging.info("Added to xml files of {}".format(self.scielo_document))
-
-    def add_rendition_files(self):
-        logging.info("Add rendition files to {}".format(self.scielo_document))
-        try:
-            # busca o pdf que tem o idioma == 'main'
-            main_pdf = self.issue_files_controller.get_files(
-                'pdf',
-                lang='main',
-            )
-            # atualiza com o valor de main_language
-            main_pdf.lang = self._main_language
-            main_pdf.save()
-        except FileWithLang.DoesNotExist:
-            pass
-
-        # atualiza rendition files do scielo_document
-        self.scielo_document.renditions_files.set(
-            self.issue_files_controller.get_files('pdf')
-        )
-        self.scielo_document.save()
-        logging.info("Added rendition files to {}".format(self.scielo_document))
-
-    def add_html_files(self):
-        logging.info("Add html files to {}".format(self.scielo_document))
-        self.scielo_document.html_files.set(
-            self.issue_files_controller.get_files('html')
-        )
-        self.scielo_document.save()
-        logging.info("Added html files to {}".format(self.scielo_document))
-
-    @property
-    def rendition_files(self):
-        return self.scielo_document.renditions_files
-
-    @property
-    def html_files(self):
-        return self.scielo_document.html_files
-
-    @property
-    def xml_files(self):
-        return self.scielo_document.xml_files
-
-    @property
-    def xmls(self):
-        if not hasattr(self, '_xmls') or not self._xmls:
-            self._xmls = {}
-            for xml_file in self.scielo_document.xml_files.iterator():
-                try:
-                    xml = get_xml_with_pre_from_uri(xml_file.uri)
-                except Exception as e:
-                    raise exceptions.AddLangsToXMLFilesError(
-                        _("Unable get xml {} from {}: {} {}").format(
-                            self.scielo_document, xml_file.uri, type(e), e
-                        )
-                    )
-                try:
-                    article = ArticleRenditions(xml.xmltree)
-                    renditions = article.article_renditions
-                    xml_file.lang = renditions[0].language
-                    xml_file.languages = [
-                        {"lang": rendition.language}
-                        for rendition in renditions
-                    ]
-                    xml_file.save()
-                    logging.info(xml_file)
-                    self._xmls[xml_file.lang] = xml
-                except Exception as e:
-                    raise exceptions.AddLangsToXMLFilesError(
-                        _("Unable to add langs to xml files {} {} {} {}").format(
-                            self.scielo_document, xml_file, type(e), e
-                        )
-                    )
-        return self._xmls
-
-    @property
-    def issue_assets_uris(self):
-        if not hasattr(self, '_issue_assets_uris') or not self._issue_assets_uris:
-            self._issue_assets_uris = {
-                name: asset.uri
-                for name, asset in self.issue_assets_dict.items()
-            }
-        return self._issue_assets_uris
-
-    @property
-    def issue_assets_dict(self):
-        if not hasattr(self, '_issue_assets_as_dict') or not self._issue_assets_as_dict:
-            self._issue_assets_as_dict = {
-                asset.name: asset
-                for asset in AssetFile.objects.filter(
-                    scielo_issue=self.scielo_document.scielo_issue,
-                )
-            }
-        return self._issue_assets_as_dict
-
-    @property
-    def text_langs(self):
-        if not hasattr(self, '_text_langs') or not self._text_langs:
-            if self.xmls:
-                self._text_langs = [
-                    {"lang": lang}
-                    for lang in self.xmls.keys()
-                ]
-            else:
-                self._text_langs = [{"lang": self._main_language}] + [
-                    {"lang": html.lang}
-                    for html in self.html_files
-                    if html.part == "before"
-                ]
-        return self._text_langs
-
-    @property
-    def related_items(self):
-        if not hasattr(self, '_related_items') or not self._related_items:
-            items = []
-            for lang, xml in self.xmls.items():
-                related = RelatedItems(xml.xmltree)
-                items.extend(related.related_articles)
-            self._related_items = items
-        return self._related_items
-
-    def add_supplementary_material_flag_to_assets(self):
-        logging.info(_("Add supplementary material flag to assets {}").format(
-            self.scielo_document
-        ))
-        self._supplementary_materials = []
-        try:
-            for lang, xml in self.xmls.items():
-                suppl_mats = SupplementaryMaterials(xml.xmltree)
-                for sm in suppl_mats.items:
-                    try:
-                        asset_file = self.issue_assets_dict.get(sm.name)
-                        if asset_file:
-                            # TODO tratar asset_file nao encontrado
-                            asset_file.is_supplementary_material = True
-                            asset_file.save()
-                            self._supplementary_materials.append({
-                                "uri": asset_file.uri,
-                                "lang": lang,
-                                "ref_id": None,
-                                "filename": sm.name,
-                            })
-                    except Exception as e:
-                        raise exceptions.AddSupplementaryMaterialFlagToAssetError(
-                            _("Unable to add supplementary material flag to asset {} {} {} {}").format(self.scielo_document, lang, type(e), e)
-                        )
-
-        except Exception as e:
-            raise exceptions.AddSupplementaryMaterialFlagToAssetError(
-                _("Unable to add supplementary material flag to asset {} {} {}").format(
-                    self.scielo_document, type(e), e)
-            )
-        logging.info(_("Added supplementary material flag to assets {}").format(
-            self.scielo_document
-        ))
-
-    @property
-    def supplementary_materials(self):
-        if not hasattr(self, '_supplementary_materials') or not self._supplementary_materials:
-            self.add_supplementary_material_flag_to_assets()
-        return self._supplementary_materials
-
-    def change_xmls_to_publish(self, user_id):
-        """
-        Obtém os XML do site clássico (href com conteúdo "local"),
-        - troca o conteúdo de href pelos links respectivos dos ativos digitais
-        registrados no minio
-        - atualiza os pids v3, v2, aop_pid
-        """
-        if not self.xmls:
-            return
-
-        logging.info(_("Add public xml files to {}").format(
-            self.scielo_document
-        ))
-
-        for xml_file in self.xml_files.iterator():
-            try:
-                # obtém os assets do XML
-                self._add_assets_to_public_xml(xml_file)
-
-                xml_with_pre = self.xmls[xml_file.lang]
-                # FIXME - trocar por API
-                registered_in_pid_provider = (
-                    pid_provider.request_document_ids(
-                        xml_with_pre,
-                        self.scielo_document.key + ".xml",
-                    )
-                )
-                xml_file.v3 = registered_in_pid_provider.v3
-
-                # TODO atribuir minio_file para algum atributo
-                latest = None
-                minio_file = self.files_storage_manager.fput_content(
-                    latest,
-                    self.scielo_document.key + ".xml",
-                    xml_with_pre.tostring(),
-                    self.user,
-                )
-                # TODO atribuir minio_file para algum atributo
-                xml_file.public_uri = minio_file.uri
-                # xml_file.public_object_name = object_name
-                xml_file.save()
-
-                logging.info(
-                    _("Registered {} {}").format(xml_file, xml_file.uri))
-
-            except Exception as e:
-                raise exceptions.AddPublicXMLError(
-                    _("Unable to add public XML to {} {} {})").format(
-                        xml_file, type(e), e
-                    ))
-
-    def _add_assets_to_public_xml(self, xml_file):
-        """
-        Obtém os XML do site clássico (href com conteúdo "local"),
-        - troca o conteúdo de href pelos links respectivos dos ativos digitais
-        registrados no minio
-        """
-        try:
-            # obtém os assets do XML
-            article_assets = ArticleAssets(self.xmls[xml_file.lang].xmltree)
-            for asset_in_xml in article_assets.article_assets:
-                asset = self.issue_assets_dict.get(asset_in_xml.name)
-                if asset:
-                    # FIXME tratar asset_file nao encontrado
-                    xml_file.assets_files.add(asset)
-            xml_file.save()
-            article_assets.replace_names(self.issue_assets_uris)
-        except Exception as e:
-            raise exceptions.AddPublicXMLError(
-                _("Unable to add assets to public XML to {} {} {})").format(
-                    xml_file, type(e), e
-                ))
-
-# 1718
