@@ -11,52 +11,79 @@ from core import choices as core_choices
 from . import exceptions
 
 
+def generate_finger_print(content):
+    if not content:
+        return None
+    content = (content or '').strip().upper()
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+class FileVersions(models.Model):
+    key = models.CharField(_('Key'), max_length=255, null=False, blank=False)
+    versions = models.ManyToManyField('MinioFile')
+
+    def __str__(self):
+        return f"{self.key}"
+
+    @property
+    def latest(self):
+        if self.versions.count():
+            return self.versions.latest('created')
+
+    def add_version(self, version):
+        if version and version.finger_print != self.latest.finger_print:
+            self.versions.add(version)
+
+    @classmethod
+    def create(cls, key):
+        try:
+            obj = cls()
+            obj.creator = creator
+            obj.key = key
+            obj.save()
+            return obj
+        except Exception as e:
+            raise exceptions.SavingError(
+                "Unable to create file versions: %s %s %s" %
+                (type(e), e, key)
+            )
+
+    class Meta:
+
+        indexes = [
+            models.Index(fields=['key']),
+        ]
+
+
 class MinioFile(CommonControlField):
-    source_filename = models.CharField(_('Filename'), max_length=255, null=False, blank=False)
     uri = models.URLField(_('URI'), max_length=255, null=True, blank=True)
     finger_print = models.CharField('Finger print', max_length=64, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.source_filename} {self.created} {self.uri}"
+        return f"{self.uri} {self.created}"
 
     @classmethod
-    def generate_finger_print(cls, content):
-        if not content:
-            return None
-        content = (content or '').strip().upper()
-        return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-    @classmethod
-    def create(cls, creator, uri, source_filename, finger_print=None):
+    def create(cls, creator, uri, finger_print=None):
         try:
             obj = cls()
             obj.creator = creator
             obj.uri = uri
-            obj.source_filename = source_filename
             obj.finger_print = finger_print
             obj.save()
             return obj
         except Exception as e:
             raise exceptions.SavingError(
-                "Unable to save new file version: %s %s %s" %
+                "Unable to create file: %s %s %s" %
                 (type(e), e, obj)
             )
 
     class Meta:
 
         indexes = [
-            models.Index(fields=['source_filename']),
             models.Index(fields=['creator']),
-            models.Index(fields=['updated_by']),
+            models.Index(fields=['created']),
             models.Index(fields=['finger_print']),
         ]
-
-    panels = [
-        FieldPanel('source_filename'),
-        FieldPanel('uri'),
-    ]
-
-    base_form_class = CoreAdminModelForm
 
 
 class Configuration(CommonControlField):

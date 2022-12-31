@@ -7,7 +7,7 @@ from wagtail.contrib.modeladmin.options import (
 )
 from wagtail.contrib.modeladmin.views import CreateView
 
-from .models import Configuration, MinioFile
+from .models import Configuration
 from config.menu import get_menu_order
 
 
@@ -42,37 +42,11 @@ class ConfigurationAdmin(ModelAdmin):
     )
 
 
-class MinioFileAdmin(ModelAdmin):
-    model = MinioFile
-    inspect_view_enabled = True
-    menu_label = _('Files')
-    menu_icon = 'folder'
-    menu_order = get_menu_order('minio_files')
-    add_to_settings_menu = False
-    exclude_from_explorer = False
-
-    list_display = (
-        'source_filename',
-        'uri',
-        'finger_print',
-        'created',
-        'creator',
-    )
-    search_fields = (
-        'source_filename',
-        'uri',
-        'finger_print',
-        'created',
-        'creator',
-    )
-
-
 class ModelsAdminGroup(ModelAdminGroup):
     menu_label = _('Files Storage')
     menu_icon = 'folder'
     menu_order = 1000
     items = (
-        MinioFileAdmin,
         ConfigurationAdmin,
     )
 
