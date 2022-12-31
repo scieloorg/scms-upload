@@ -16,14 +16,13 @@ User = get_user_model()
 def request_pid_for_new_website_docs(
         self, pids_file_path, db_uri, user_id, files_storage_app_name):
     documents = _get_new_website_xmls(pids_file_path, db_uri)
-    pid_provider = PidProvider(
-        files_storage_app_name,
-        User.objects.get(pk=user_id),
-    )
+    pid_provider = PidProvider(files_storage_app_name)
     for doc in documents:
         try:
             pid_provider.request_document_ids_for_xml_uri(
-                doc['xml'], doc['v3'] + ".xml")
+                doc['xml'], doc['v3'] + ".xml",
+                User.objects.get(pk=user_id),
+            )
         except Exception as e:
             logging.exception(
                 f"Unable to get document which pid is {doc}"

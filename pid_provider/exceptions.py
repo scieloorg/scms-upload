@@ -52,3 +52,15 @@ class RequestDocumentIDsForXMLPreError(Exception):
 
 class SaveXMLFileError(Exception):
     ...
+
+
+class IsRegisteredError(Exception):
+    ...
+
+
+class IsRegisteredForXMLUriError(Exception):
+    ...
+
+
+class IsRegisteredXMLZipError(Exception):
+    ...

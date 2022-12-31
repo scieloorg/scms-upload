@@ -6,7 +6,7 @@ from django.utils.translation import gettext as _
 from wagtail.admin.edit_handlers import FieldPanel
 
 from core.models import CommonControlField
-from files_storage.models import MinioFile
+from files_storage.models import FileVersions
 
 from . import xml_sps_utils
 from . import exceptions
@@ -76,7 +76,7 @@ class XMLIssue(models.Model):
 
 
 class BaseArticle(CommonControlField):
-    versions = models.ManyToManyField(MinioFile)
+    versions = models.ManyToManyField(FileVersions)
     v3 = models.CharField(_("v3"), max_length=23, null=True, blank=False)
     main_doi = models.CharField(_("main_doi"), max_length=265, null=True, blank=False)
     elocation_id = models.CharField(_("elocation_id"), max_length=23, null=True, blank=False)
@@ -85,15 +85,6 @@ class BaseArticle(CommonControlField):
     collab = models.CharField(_("collab"), max_length=64, null=True, blank=False)
     links = models.CharField(_("links"), max_length=64, null=True, blank=False)
     partial_body = models.CharField(_("partial_body"), max_length=64, null=True, blank=False)
-
-    @property
-    def latest(self):
-        if self.versions.count():
-            return self.versions.latest('created')
-
-    def add_version(self, version):
-        if version:
-            self.versions.add(version)
 
     def __str__(self):
         return f'{self.v3}'

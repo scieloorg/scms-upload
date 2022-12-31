@@ -4,14 +4,15 @@ import logging
 from datetime import datetime
 from http import HTTPStatus
 from shutil import copyfile
+from tempfile import TemporaryDirectory
+from zipfile import ZipFile
 
 import requests
-
+from requests.auth import HTTPBasicAuth
 from django.utils.translation import gettext as _
 
 from libs.dsm.publication import documents as publication_documents
 from files_storage.controller import FilesStorageManager
-
 from upload.utils import package_utils
 from libs import xml_sps_utils as libs_xml_sps_utils
 from . import (
@@ -25,13 +26,71 @@ LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
+class PidRequester:
+
+    def __init__(self, files_storage_name, timeout=None):
+        self.local_pid_provider = PidProvider(files_storage_name)
+        self.api_uri = None
+        self.timeout = timeout or 15
+
+    def request_doc_ids(self, xml_with_pre, name, user):
+        response = None
+        if self.api_uri:
+            response = self._api_request_doc_ids(xml_with_pre, name, user)
+
+        if response:
+            registered = self.local_pid_provider.request_document_ids_for_xml_uri(
+                response["xml_uri"], name, user)
+        else:
+            registered = self.local_pid_provider.request_document_ids(
+                xml_with_pre, name, user)
+
+        if registered:
+            return {
+                "v3": registered.v3,
+            }
+
+    def _api_request_doc_ids(self, xml_with_pre, name, user):
+        """
+        name : str
+            nome do arquivo xml
+        """
+
+        with TemporaryDirectory() as tmpdirname:
+            zip_xml_file_path = os.path.join(tmpdirname, name + ".zip")
+
+            xml_filename = name
+            name, ext = os.path.splitext(xml_filename)
+
+            with ZipFile(zip_xml_file_path, "w") as zf:
+                zf.writestr(xml_filename, xml_with_pre.tostring())
+
+            with open(zip_xml_file_path, "rb") as fp:
+                # {"v3": v3, "xml_uri": xml_uri}
+                return self._api_request_post(
+                    fp, xml_filename, user, self.timeout)
+
+    def _api_request_post(self, fp, xml_filename, user, timeout):
+        # TODO retry
+        try:
+            auth = HTTPBasicAuth(user.name, user.password)
+            return requests.post(
+                self.api_uri,
+                files={"zip_xml_file_path": fp},
+                auth=auth,
+                timeout=timeout,
+            )
+        except Exception as e:
+            # TODO tratar as exceções
+            logging.exception(e)
+
+
 class PidProvider:
 
-    def __init__(self, files_storage_name, user):
+    def __init__(self, files_storage_name):
         self.files_storage_manager = FilesStorageManager(files_storage_name)
-        self.user = user
 
-    def request_document_ids(self, xml_with_pre, filename):
+    def request_document_ids(self, xml_with_pre, filename, user):
         """
         Request PID v3
 
@@ -66,19 +125,17 @@ class PidProvider:
 
             if not registered:
                 # cria registro
-                registered = _register_new_document(xml_adapter, self.user)
+                registered = _register_new_document(xml_adapter, user)
                 logging.info("new %s" % registered)
 
             if registered:
-                registered.add_version(
-                    self.files_storage_manager.fput_content(
-                        registered.latest,
-                        filename,
-                        xml_adapter.tostring(),
-                        self.user,
-                    )
+                self.files_storage_manager.register_pid_provider_xml(
+                    registered.versions,
+                    filename,
+                    xml_adapter.tostring(),
+                    user,
                 )
-            return registered
+                return registered
 
         except exceptions.FoundAOPPublishedInAnIssueError:
             logging.exception(e)
@@ -93,13 +150,13 @@ class PidProvider:
                 f"Unable to request document IDs for {xml_with_pre} {type(e)} {str(e)}"
             )
 
-    def request_document_ids_for_zip(self, xml_zip_file_path):
+    def request_document_ids_for_xml_zip(self, zip_xml_file_path, user):
         """
         Request PID v3
 
         Parameters
         ----------
-        xml_zip_file_path : str
+        zip_xml_file_path : str
             XML URI
 
         Returns
@@ -111,11 +168,11 @@ class PidProvider:
         exceptions.RequestDocumentIDsForXMLZipFileError
         """
         try:
-            for item in libs_xml_sps_utils.get_xml_items(xml_zip_file_path):
+            for item in libs_xml_sps_utils.get_xml_items(zip_xml_file_path):
                 try:
                     # {"filename": item: "xml": xml}
                     registered = self.request_document_ids(
-                        item['xml_with_pre'], item["filename"])
+                        item['xml_with_pre'], item["filename"], user)
                     if registered:
                         item.update({"registered": registered})
                     yield item
@@ -123,24 +180,102 @@ class PidProvider:
                     logging.exception(e)
                     raise exceptions.RequestDocumentIDsForXMLZipFileError(
                         _("Unable to request document IDs for {} {}".format(
-                            xml_zip_file_path, item['filename'],
+                            zip_xml_file_path, item['filename'],
                             ))
                     )
         except Exception as e:
             logging.exception(e)
             raise exceptions.RequestDocumentIDsForXMLZipFileError(
                 _("Unable to request document IDs for {}").format(
-                    xml_zip_file_path)
+                    zip_xml_file_path)
             )
 
-    def request_document_ids_for_xml_uri(self, xml_uri, filename):
+    def request_document_ids_for_xml_uri(self, xml_uri, filename, user):
         try:
-            result = models.RequestResult.create(xml_uri, self.user)
+            result = models.RequestResult.create(xml_uri, user)
             xml_with_pre = libs_xml_sps_utils.get_xml_with_pre_from_uri(xml_uri)
-            registered = self.request_document_ids(xml_with_pre, filename)
-            result.update(self.user, v3=registered.v3)
+            registered = self.request_document_ids(xml_with_pre, filename, user)
+            result.update(user, v3=registered.v3)
+            return registered
         except Exception as e:
-            result.update(self.user, error_msg=str(e), error_type=type(e))
+            result.update(user, error_msg=str(e), error_type=type(e))
+
+    def is_registered(self, xml_with_pre):
+        """
+        Check if article is registered
+
+        Parameters
+        ----------
+        xml : XMLWithPre
+
+        Returns
+        -------
+            None or models.XMLAOPArticle or models.XMLArticle
+
+        Raises
+        ------
+        exceptions.RequestDocumentIDsError
+        exceptions.FoundAOPPublishedInAnIssueError
+
+        """
+        try:
+            # adaptador do xml with pre
+            xml_adapter = xml_sps_utils.XMLAdapter(xml_with_pre)
+            return _query_document(xml_adapter)
+
+        except Exception as e:
+            logging.exception(e)
+            raise exceptions.IsRegisteredError(
+                _("Unable to request document IDs for {}").format(
+                    zip_xml_file_path)
+            )
+
+    def is_registered_xml_zip(self, zip_xml_file_path):
+        """
+        Check if article is registered
+
+        Parameters
+        ----------
+        zip_xml_file_path : str
+            XML URI
+
+        Returns
+        -------
+            models.XMLAOPArticle or models.XMLArticle
+
+        Raises
+        ------
+        exceptions.IsRegisteredXMLZipError
+        """
+        try:
+            for item in libs_xml_sps_utils.get_xml_items(zip_xml_file_path):
+                try:
+                    # {"filename": item: "xml": xml}
+                    registered = self.is_registered(item['xml_with_pre'])
+                    if registered:
+                        item.update({"registered": registered})
+                    yield item
+                except Exception as e:
+                    logging.exception(e)
+                    raise exceptions.IsRegisteredXMLZipError(
+                        _("Unable to request document IDs for {} {}".format(
+                            zip_xml_file_path, item['filename'],
+                            ))
+                    )
+        except Exception as e:
+            logging.exception(e)
+            raise exceptions.IsRegisteredXMLZipError(
+                _("Unable to request document IDs for {}").format(
+                    zip_xml_file_path)
+            )
+
+    def is_registered_xml_uri(self, xml_uri):
+        try:
+            xml_with_pre = libs_xml_sps_utils.get_xml_with_pre_from_uri(xml_uri)
+            return self.is_registered(xml_with_pre)
+        except Exception as e:
+            logging.exception(e)
+            raise exceptions.IsRegisteredForXMLUriError(e)
 
 
 def _get_registered_xml(xml_adapter):
