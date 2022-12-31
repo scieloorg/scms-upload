@@ -127,6 +127,7 @@ LOCAL_APPS = [
     # "upload",
     "controlled_lists",
     "pid_provider",
+    "publication",
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps

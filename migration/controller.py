@@ -59,7 +59,7 @@ from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
 from . import exceptions
 from journal.controller import get_updated_official_journal
 from issue.controller import get_or_create as official_issue_get_or_create
-from publication.models import Article as PublicationArticle
+from publication.models import PublicationArticle
 
 
 User = get_user_model()
