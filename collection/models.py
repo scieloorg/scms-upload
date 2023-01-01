@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from copy import deepcopy
 
 from django.db import models
@@ -19,7 +20,7 @@ from article.models import Article
 from .choices import JOURNAL_AVAILABILTY_STATUS, WEBSITE_KIND
 from . import exceptions
 from libs.xml_sps_utils import get_xml_with_pre_from_uri
-from files_storage.models import FileVersions
+from files_storage.models import MinioFile
 
 
 class Collection(CommonControlField):
@@ -39,7 +40,7 @@ class Collection(CommonControlField):
     base_form_class = CoreAdminModelForm
 
     @classmethod
-    def get_or_create(cls, acron, name, creator):
+    def get_or_create(cls, acron, creator, name=None):
         try:
             return cls.objects.get(acron=acron)
         except cls.DoesNotExist:
@@ -278,9 +279,14 @@ class SciELODocument(CommonControlField):
     key = models.CharField(_('File key'), max_length=50, null=True, blank=True)
     official_document = models.ForeignKey(Article, on_delete=models.SET_NULL, null=True, blank=True)
 
-    xml_files = models.ManyToManyField('XMLFile', null=True, related_name='xml_files')
-    rendition_files = models.ManyToManyField('FileWithLang', null=True, related_name='rendition_files')
-    html_files = models.ManyToManyField('SciELOHTMLFile', null=True, related_name='html_files')
+    xml_files = models.ManyToManyField('XMLFile', related_name='xml_files')
+    rendition_files = models.ManyToManyField('FileWithLang', related_name='rendition_files')
+    html_files = models.ManyToManyField('SciELOHTMLFile', related_name='html_files')
+
+    def get_xml_with_pre_with_remote_assets(self, issue_assets_uris):
+        for xml_file in self.xml_files.iterator():
+            return xml_file.get_xml_with_pre_with_remote_assets(
+                issue_assets_uris)
 
     @classmethod
     def get(cls, pid, key):
@@ -315,6 +321,7 @@ class SciELODocument(CommonControlField):
             scielo_document.creator = creator
             scielo_document.save()
             logging.info("Created {}".format(scielo_document))
+            return scielo_document
         except Exception as e:
             raise exceptions.GetOrCreateScieloDocumentError(
                 _('Unable to get_or_create_scielo_document {} {} {} {}').format(
@@ -402,8 +409,24 @@ class SciELOFile(models.Model):
     # filename without extension
     key = models.CharField(_('File key'), max_length=255, null=True, blank=True)
     relative_path = models.CharField(_('Relative Path'), max_length=255, null=True, blank=True)
-    name = models.CharField(_('Filename'), max_length=255, null=False, blank=False)
-    versions = models.ForeignKey(FileVersions, on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.CharField(_('Filename'), max_length=255, null=True, blank=True)
+    versions = models.ManyToManyField(MinioFile)
+
+    @property
+    def uri(self):
+        if self.latest_version:
+            return self.latest_version.uri
+
+    @property
+    def latest_version(self):
+        if self.versions.count():
+            return self.versions.latest('created')
+
+    def add_version(self, version):
+        if version:
+            if self.latest_version and version.finger_print == self.latest_version.finger_print:
+                return
+            self.versions.add(version)
 
     def __str__(self):
         return f"{self.scielo_issue} {self.name}"
@@ -448,7 +471,6 @@ class FileWithLang(SciELOFile):
         return f"{self.scielo_issue} {self.name} {self.lang}"
 
     class Meta:
-
         indexes = [
             models.Index(fields=['lang']),
         ]
@@ -461,7 +483,6 @@ class AssetFile(SciELOFile):
         return f"{self.scielo_issue} {self.name} {self.is_supplementary_material}"
 
     class Meta:
-
         indexes = [
             models.Index(fields=['is_supplementary_material']),
         ]

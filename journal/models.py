@@ -1,20 +1,18 @@
+import logging
 from datetime import datetime
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-
 from wagtail.core.models import Orderable
 from wagtail.admin.edit_handlers import (
     FieldPanel, InlinePanel,
     TabbedInterface, ObjectList,
 )
 from wagtail.images.edit_handlers import ImageChooserPanel
-
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 
 from core.models import CommonControlField, RichTextWithLang
-
 from institution.models import InstitutionHistory
 from . import choices
 from .forms import OfficialJournalForm

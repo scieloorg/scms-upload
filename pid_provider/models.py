@@ -6,7 +6,7 @@ from django.utils.translation import gettext as _
 from wagtail.admin.edit_handlers import FieldPanel
 
 from core.models import CommonControlField
-from files_storage.models import FileVersions
+from files_storage.models import MinioFile
 
 from . import xml_sps_utils
 from . import exceptions
@@ -76,7 +76,6 @@ class XMLIssue(models.Model):
 
 
 class BaseArticle(CommonControlField):
-    versions = models.ManyToManyField(FileVersions)
     v3 = models.CharField(_("v3"), max_length=23, null=True, blank=False)
     main_doi = models.CharField(_("main_doi"), max_length=265, null=True, blank=False)
     elocation_id = models.CharField(_("elocation_id"), max_length=23, null=True, blank=False)
@@ -85,6 +84,18 @@ class BaseArticle(CommonControlField):
     collab = models.CharField(_("collab"), max_length=64, null=True, blank=False)
     links = models.CharField(_("links"), max_length=64, null=True, blank=False)
     partial_body = models.CharField(_("partial_body"), max_length=64, null=True, blank=False)
+    versions = models.ManyToManyField(MinioFile)
+
+    @property
+    def latest_version(self):
+        if self.versions.count():
+            return self.versions.latest('created')
+
+    def add_version(self, version):
+        if version:
+            if self.latest_version and version.finger_print == self.latest_version.finger_print:
+                return
+            self.versions.add(version)
 
     def __str__(self):
         return f'{self.v3}'
@@ -144,36 +155,3 @@ class XMLArticle(BaseArticle):
             models.Index(fields=['fpage_seq']),
             models.Index(fields=['lpage']),
         ]
-
-
-class RequestResult(CommonControlField):
-    xml_source = models.CharField(_("XML source"), max_length=255, null=True, blank=False)
-    v3 = models.CharField(_("v3"), max_length=23, null=True, blank=False)
-    error_msg = models.CharField(_("error_msg"), max_length=255, null=True, blank=False)
-    error_type = models.CharField(_("error_type"), max_length=255, null=True, blank=False)
-
-    def __str__(self):
-        return f'{self.xml_source} {self.v3} {self.created}'
-
-    class Meta:
-        indexes = [
-            models.Index(fields=['v3']),
-            models.Index(fields=['xml_source']),
-            models.Index(fields=['created']),
-            models.Index(fields=['updated_by']),
-            models.Index(fields=['error_type']),
-            models.Index(fields=['error_msg']),
-        ]
-
-    @classmethod
-    def create(cls, xml_source, creator):
-        obj = cls(xml_source=xml_source, creator=creator)
-        obj.save()
-        return obj
-
-    def update(self, updated_by, v3=None, error_msg=None, error_type=None):
-        self.v3 = v3
-        self.error_type = error_type
-        self.error_msg = error_msg[:255]
-        self.updated_by = updated_by
-        self.save()

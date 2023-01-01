@@ -16,6 +16,7 @@ from files_storage.models import Configuration as FilesStorageConfiguration
 from . import choices
 from . import exceptions
 from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
+from collection.choices import CURRENT
 
 
 class MigrationConfiguration(CommonControlField):
@@ -209,8 +210,6 @@ class IssueMigration(MigratedData):
         self.isis_created_date = issue.isis_created_date
         self.isis_updated_date = issue.isis_updated_date
         self.status = MS_IMPORTED
-        if issue.current_status != CURRENT:
-            self.status = MS_TO_IGNORE
         self.data = issue_data
         self.save()
 
@@ -263,8 +262,6 @@ class DocumentMigration(MigratedData):
         self.isis_created_date = document.isis_created_date
         self.isis_updated_date = document.isis_updated_date
         self.status = MS_IMPORTED
-        if document.current_status != CURRENT:
-            self.status = MS_TO_IGNORE
         self.data = document_data
         self.save()
 

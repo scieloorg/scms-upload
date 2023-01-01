@@ -28,9 +28,9 @@ LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 class PidRequester:
 
-    def __init__(self, files_storage_name, timeout=None):
+    def __init__(self, files_storage_name, api_uri=None, timeout=None):
         self.local_pid_provider = PidProvider(files_storage_name)
-        self.api_uri = None
+        self.api_uri = api_uri
         self.timeout = timeout or 15
 
     def request_doc_ids(self, xml_with_pre, name, user):
@@ -84,6 +84,10 @@ class PidRequester:
             # TODO tratar as exceções
             logging.exception(e)
 
+    def request_doc_ids_for_xml_uri(self, xml_uri, name, user):
+        xml_with_pre = libs_xml_sps_utils.get_xml_with_pre_from_uri(xml_uri)
+        return self.request_doc_ids(xml_with_pre, name, user)
+
 
 class PidProvider:
 
@@ -106,7 +110,7 @@ class PidProvider:
         Raises
         ------
         exceptions.RequestDocumentIDsError
-        exceptions.NotAllowedIngressingAOPVersionOfArticlePublishedInAnIssueError
+        exceptions.NotAllowedRequestDocumentIDsForAOPVersionOfArticlePublishedInAnIssueError
 
         """
         try:
@@ -130,7 +134,7 @@ class PidProvider:
 
             if registered:
                 self.files_storage_manager.register_pid_provider_xml(
-                    registered.versions,
+                    registered,
                     filename,
                     xml_adapter.tostring(),
                     user,
@@ -139,7 +143,7 @@ class PidProvider:
 
         except exceptions.FoundAOPPublishedInAnIssueError:
             logging.exception(e)
-            raise exceptions.NotAllowedIngressingAOPVersionOfArticlePublishedInAnIssueError(
+            raise exceptions.NotAllowedRequestDocumentIDsForAOPVersionOfArticlePublishedInAnIssueError(
                 _("Not allowed to ingress document {} as ahead of print, "
                   "because it is already published in an issue").format(registered)
             )
@@ -147,7 +151,8 @@ class PidProvider:
         except Exception as e:
             logging.exception(e)
             raise exceptions.RequestDocumentIDsError(
-                f"Unable to request document IDs for {xml_with_pre} {type(e)} {str(e)}"
+                _("Unable to request document IDs for {} {} {}").format(
+                    xml_with_pre, type(e), str(e))
             )
 
     def request_document_ids_for_xml_zip(self, zip_xml_file_path, user):
@@ -179,9 +184,9 @@ class PidProvider:
                 except Exception as e:
                     logging.exception(e)
                     raise exceptions.RequestDocumentIDsForXMLZipFileError(
-                        _("Unable to request document IDs for {} {}".format(
+                        _("Unable to request document IDs for {} {}").format(
                             zip_xml_file_path, item['filename'],
-                            ))
+                            )
                     )
         except Exception as e:
             logging.exception(e)
@@ -192,13 +197,16 @@ class PidProvider:
 
     def request_document_ids_for_xml_uri(self, xml_uri, filename, user):
         try:
-            result = models.RequestResult.create(xml_uri, user)
             xml_with_pre = libs_xml_sps_utils.get_xml_with_pre_from_uri(xml_uri)
             registered = self.request_document_ids(xml_with_pre, filename, user)
-            result.update(user, v3=registered.v3)
             return registered
         except Exception as e:
-            result.update(user, error_msg=str(e), error_type=type(e))
+            logging.exception(e)
+            raise exceptions.RequestDocumentIDsForXMLUriError(
+                _("Unable to request document ids for xml uri {} {} {}").format(
+                    xml_uri, type(e), e
+                )
+            )
 
     def is_registered(self, xml_with_pre):
         """
@@ -258,9 +266,9 @@ class PidProvider:
                 except Exception as e:
                     logging.exception(e)
                     raise exceptions.IsRegisteredXMLZipError(
-                        _("Unable to request document IDs for {} {}".format(
+                        _("Unable to request document IDs for {} {}").format(
                             zip_xml_file_path, item['filename'],
-                            ))
+                            )
                     )
         except Exception as e:
             logging.exception(e)
@@ -313,7 +321,8 @@ def _get_registered_xml(xml_adapter):
     except Exception as e:
         logging.exception(e)
         raise exceptions.GetRegisteredXMLError(
-            _(f"Unable to get registered XML {xml_adapter} {type(e)} {str(e)}")
+            _("Unable to get registered XML {} {} {}").format(
+                xml_adapter, type(e), str(e))
         )
 
 
@@ -726,6 +735,6 @@ def get_xml_uri(v3):
         except IndexError:
             return
     try:
-        return found.versions.last.uri
+        return found.latest_version.uri
     except AttributeError:
         return None

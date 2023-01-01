@@ -8,4 +8,3 @@ def run():
     MinioFile.objects.all().delete()
     models.XMLAOPArticle.objects.all().delete()
     models.XMLArticle.objects.all().delete()
-    models.RequestResult.objects.all().delete()

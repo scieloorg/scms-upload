@@ -14,7 +14,7 @@ class GetXMLFromURIError(Exception):
     ...
 
 
-class NotAllowedIngressingAOPVersionOfArticlePublishedInAnIssueError(Exception):
+class NotAllowedRequestDocumentIDsForAOPVersionOfArticlePublishedInAnIssueError(Exception):
     ...
 
 

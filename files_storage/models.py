@@ -18,43 +18,6 @@ def generate_finger_print(content):
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
-class FileVersions(models.Model):
-    key = models.CharField(_('Key'), max_length=255, null=False, blank=False)
-    versions = models.ManyToManyField('MinioFile')
-
-    def __str__(self):
-        return f"{self.key}"
-
-    @property
-    def latest(self):
-        if self.versions.count():
-            return self.versions.latest('created')
-
-    def add_version(self, version):
-        if version and version.finger_print != self.latest.finger_print:
-            self.versions.add(version)
-
-    @classmethod
-    def create(cls, key):
-        try:
-            obj = cls()
-            obj.creator = creator
-            obj.key = key
-            obj.save()
-            return obj
-        except Exception as e:
-            raise exceptions.SavingError(
-                "Unable to create file versions: %s %s %s" %
-                (type(e), e, key)
-            )
-
-    class Meta:
-
-        indexes = [
-            models.Index(fields=['key']),
-        ]
-
-
 class MinioFile(CommonControlField):
     uri = models.URLField(_('URI'), max_length=255, null=True, blank=True)
     finger_print = models.CharField('Finger print', max_length=64, null=True, blank=True)

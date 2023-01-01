@@ -5,7 +5,6 @@ from django.utils.translation import gettext_lazy as _
 
 from .models import (
     Configuration,
-    FileVersions,
     MinioFile,
     generate_finger_print,
 )
@@ -39,13 +38,13 @@ class FilesStorageManager:
 
     def register_pid_provider_xml(self, versions, filename, content, creator):
         finger_print = generate_finger_print(content)
-        if versions.latest and finger_print == versions.latest.finger_print:
+        if versions and versions.latest_version and finger_print == versions.latest_version.finger_print:
             return
         name, extension = os.path.splitext(filename)
         if extension == '.xml':
             mimetype = "text/xml"
 
-        object_name = f"{name}/{finger_print}/{name}.{extension}"
+        object_name = f"{name}/{finger_print}/{name}{extension}"
         uri = self.files_storage.fput_content(
             content,
             mimetype=mimetype,
@@ -61,7 +60,7 @@ class FilesStorageManager:
         with open(source_filename, "r") as fp:
             finger_print = generate_finger_print(fp.read())
 
-        if versions.latest and finger_print == versions.latest.finger_print:
+        if versions and versions.latest_version and finger_print == versions.latest_version.finger_print:
             return
 
         response = self.files_storage.register(
@@ -77,14 +76,14 @@ class FilesStorageManager:
 
     def push_xml_content(self, versions, filename, subdirs, content, creator):
         finger_print = generate_finger_print(content)
-        if versions.latest and finger_print == versions.latest.finger_print:
+        if versions and versions.latest_version and finger_print == versions.latest_version.finger_print:
             return
 
         name, extension = os.path.splitext(filename)
         if extension == '.xml':
             mimetype = "text/xml"
 
-        object_name = f"{subdirs}/{name}/{finger_print}/{name}.{extension}"
+        object_name = f"{subdirs}/{name}/{finger_print}/{name}{extension}"
         uri = self.files_storage.fput_content(
             content,
             mimetype=mimetype,

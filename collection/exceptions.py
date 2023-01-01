@@ -40,3 +40,15 @@ class GetUpdatedSciELOIssueError(Exception):
 
 class AddAssetFilesError(Exception):
     ...
+
+
+class UpdateSciELOJournalError(Exception):
+    ...
+
+
+class UpdateSciELOIssueError(Exception):
+    ...
+
+
+class UpdateSciELODocumentError(Exception):
+    ...

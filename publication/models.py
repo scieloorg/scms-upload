@@ -20,16 +20,34 @@ class PublicationArticle(CommonControlField):
         blank=True, null=True, choices=choices.PUBLICATION_STATUS)
 
     @classmethod
-    def get_or_create(cls, v3, creator):
+    def get_or_create(cls, v3, creator=None, xml_uri=None, status=None):
         try:
             return cls.objects.get(v3=v3)
         except cls.DoesNotExist:
             item = cls()
             item.v3 = v3
+            item.xml_uri = item.xml_uri or xml_uri
+            item.status = item.status or status
             item.creator = creator
             item.created = datetime.utcnow()
             item.save()
             return item
+
+    @classmethod
+    def create_or_update(cls, v3, creator, xml_uri=None, status=None):
+        try:
+            item = cls.objects.get(v3=v3)
+            item.updated_by = creator
+            item.updated = datetime.utcnow()
+        except cls.DoesNotExist:
+            item = cls()
+            item.v3 = v3
+            item.creator = creator
+            item.created = datetime.utcnow()
+        item.xml_uri = item.xml_uri or xml_uri
+        item.status = item.status or status
+        item.save()
+        return item
 
     @property
     def xml_with_pre(self):

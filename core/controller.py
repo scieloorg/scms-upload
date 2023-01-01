@@ -1,7 +1,8 @@
 from dateutil.parser import parse
+from datetime import datetime
 
 
-def parse_yyyymmdd(date):
+def parse_yyyymmdd(YYYYMMDD):
     """
     Get year, month and day from date format which MM and DD can be 00
     """
@@ -70,3 +71,11 @@ def parse_non_standard_date(date):
     else:
         flexible_date["year"] = get_year_from_textual_date(date)
     return flexible_date
+
+
+def insert_hyphen_in_YYYYMMMDD(YYYYMMMDD):
+    year, month, day = parse_yyyymmdd(YYYYMMMDD)
+    year = year and str(year).zfill(4)
+    month = month and str(month).zfill(2)
+    day = day and str(day).zfill(2)
+    return "-".join([item for item in (year, month, day) if item])

@@ -27,7 +27,8 @@ def task_schedule_journals_and_issues_migrations(
         collection_acron,
         force_update=False,
         ):
-    controller.schedule_journals_and_issues_migrations(collection_acron, user_id)
+    user = User.objects.get(pk=user_id or 1)
+    controller.schedule_journals_and_issues_migrations(collection_acron, user)
 
 
 @celery_app.task(bind=True, name=_('Migrate journals'))
@@ -37,8 +38,9 @@ def task_migrate_journals(
         collection_acron,
         force_update=False,
         ):
+    user = User.objects.get(pk=user_id or 1)
     controller.migrate_journals(
-        user_id,
+        user,
         collection_acron,
         force_update,
     )
@@ -51,8 +53,9 @@ def task_migrate_issues(
         collection_acron,
         force_update=False,
         ):
+    user = User.objects.get(pk=user_id or 1)
     controller.migrate_issues(
-        user_id,
+        user,
         collection_acron,
         force_update,
     )
@@ -67,8 +70,9 @@ def task_import_issues_files_and_migrate_documents(
         publication_year=None,
         force_update=False,
         ):
+    user = User.objects.get(pk=user_id or 1)
     controller.import_issues_files_and_migrate_documents(
-        user_id,
+        user,
         collection_acron,
         scielo_issn,
         publication_year,
