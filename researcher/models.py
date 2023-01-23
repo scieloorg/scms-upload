@@ -54,16 +54,3 @@ class FieldAffiliation(Orderable, InstitutionHistory):
     page = ParentalKey(Researcher, on_delete=models.CASCADE, related_name='affiliation')
 
 
-class ResearcherAffiliation(CommonControlField):
-    """
-    Class that represents the Researcher + Affiliations
-    """
-    def __unicode__(self):
-        return u'%s %s' % (self.year, self.affiliation)
-
-    def __str__(self):
-        return u'%s %s' % (self.year, self.affiliation)
-
-    link_begin_year = models.CharField(_('Begin Year'), max_length=4, blank=True, null=True)
-    link_end_year = models.CharField(_('End Year'), max_length=4, blank=True, null=True)
-    institution = models.ManyToManyField(Institution)
