@@ -168,6 +168,11 @@ class Journal(ClusterableModel, SocialNetwork):
         ]
     )
 
+    autocomplete_search_field = 'official_journal__title'
+
+    def autocomplete_label(self):
+        return str(self.official_journal__title)
+
 
 class Mission(Orderable, RichTextWithLang):
     page = ParentalKey(Journal, on_delete=models.CASCADE, related_name='mission')

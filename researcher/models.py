@@ -5,9 +5,11 @@ from wagtail.core.models import Orderable
 from wagtail.admin.edit_handlers import FieldPanel, InlinePanel
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.models import CommonControlField
 from institution.models import Institution, InstitutionHistory
+from journal.models import Journal
 
 from .forms import ResearcherForm
 from . import choices
@@ -43,6 +45,11 @@ class Researcher(ClusterableModel, CommonControlField):
         InlinePanel('affiliation', label=_('Affiliation'))
     ]
 
+    autocomplete_search_field = 'last_name'
+
+    def autocomplete_label(self):
+        return str(self)
+
     base_form_class = ResearcherForm
 
 
@@ -50,7 +57,26 @@ class FieldEmail(Orderable):
     page = ParentalKey(Researcher, on_delete=models.CASCADE, related_name='page_email')
     email = models.EmailField(_('Email'), max_length=128, blank=True, null=True)
 
+
 class FieldAffiliation(Orderable, InstitutionHistory):
     page = ParentalKey(Researcher, on_delete=models.CASCADE, related_name='affiliation')
 
 
+class EditorialBoardMember(models.Model):
+    journal = models.ForeignKey(Journal, null=True, blank=True, related_name='+', on_delete=models.CASCADE)
+    member = models.ForeignKey(Researcher, null=True, blank=True, related_name='+', on_delete=models.CASCADE)
+    role = models.CharField(_('Role'), max_length=255, choices=choices.ROLE, null=False, blank=False)
+    initial_year =  models.IntegerField(blank=True, null=True)
+    initial_month = models.IntegerField(blank=True, null=True, choices=choices.MONTHS)
+    final_year = models.IntegerField(blank=True, null=True)
+    final_month = models.IntegerField(blank=True, null=True, choices=choices.MONTHS)
+
+    panels = [
+        AutocompletePanel('journal'),
+        AutocompletePanel('member'),
+        FieldPanel('role'),
+        FieldPanel('initial_year'),
+        FieldPanel('initial_month'),
+        FieldPanel('final_year'),
+        FieldPanel('final_month')
+    ]
