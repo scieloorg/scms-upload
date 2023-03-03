@@ -9,7 +9,7 @@ from .forms import DOIWithLangForm
 
 
 class DOIWithLang(CommonControlField):
-    doi = models.CharField(_("DOI"), max_length=255, blank=False, null=False)
+    doi = models.TextField(_("DOI"), blank=False, null=False)
     lang = models.CharField(_("Language"), max_length=64, blank=False, null=False)
 
     panels = [
