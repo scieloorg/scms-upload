@@ -6,7 +6,6 @@ Project that contains a generic template for content management SciELO context.
 
 License: GPLv3
 
-
 ## Startup the development environment and operations
 
 You can use docker commands for the following if you wish, just check our makefile
