@@ -1,63 +1,43 @@
 import json
-import os
 import logging
-import traceback
+import os
 import sys
-from datetime import datetime
-from random import randint
+import traceback
 from copy import deepcopy
+from datetime import datetime
 from io import StringIO
+from random import randint
 
-from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-
+from django.utils.translation import gettext_lazy as _
 from lxml import etree
-
-from packtools.sps.models.article_assets import (
-    ArticleAssets,
-    SupplementaryMaterials,
-)
-from packtools.sps.models.related_articles import (
-    RelatedItems,
-)
-from packtools.sps.models.article_renditions import (
-    ArticleRenditions,
-)
-
+from packtools.sps.models.article_assets import ArticleAssets, SupplementaryMaterials
+from packtools.sps.models.article_renditions import ArticleRenditions
+from packtools.sps.models.related_articles import RelatedItems
 from scielo_classic_website import classic_ws
 
-from django_celery_beat.models import PeriodicTask, CrontabSchedule
-
+from collection import controller as collection_controller
+from collection.choices import CURRENT
+from collection.exceptions import GetSciELOJournalError
+from collection.models import AssetFile, FileWithLang, SciELOHTMLFile, XMLFile
+from core.controller import parse_months_names, parse_non_standard_date
+from django_celery_beat.models import CrontabSchedule, PeriodicTask
 from libs.dsm.files_storage.minio import MinioStorage
 from libs.dsm.publication.db import mk_connection
-from libs.dsm.publication.journals import JournalToPublish
-from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
 from libs.dsm.publication.documents import DocumentToPublish
+from libs.dsm.publication.issues import IssueToPublish, get_bundle_id
+from libs.dsm.publication.journals import JournalToPublish
 
-from core.controller import parse_non_standard_date, parse_months_names
-
-from collection.choices import CURRENT
-from collection import controller as collection_controller
-from collection.exceptions import (
-    GetSciELOJournalError,
-)
-from .models import (
-    JournalMigration,
-    IssueMigration,
-    DocumentMigration,
-    MigrationFailure,
-    MigrationConfiguration,
-)
-from collection.models import (
-    XMLFile,
-    AssetFile,
-    FileWithLang,
-    SciELOHTMLFile,
-)
-from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
 from . import exceptions
-
+from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
+from .models import (
+    DocumentMigration,
+    IssueMigration,
+    JournalMigration,
+    MigrationConfiguration,
+    MigrationFailure,
+)
 
 User = get_user_model()
 

@@ -1,5 +1,5 @@
-from django.http import JsonResponse
 from django.contrib import messages
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 
@@ -9,12 +9,12 @@ from upload.forms import (
 )
 
 from .controller import (
-    upsert_validation_result_error_resolution,
     update_package_check_finish,
+    upsert_validation_result_error_resolution,
     upsert_validation_result_error_resolution_opinion,
 )
 from .models import Package, choices
-from .tasks import check_resolutions, check_opinions
+from .tasks import check_opinions, check_resolutions
 from .utils.package_utils import coerce_package_and_errors, render_html
 
 

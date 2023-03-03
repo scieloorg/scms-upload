@@ -1,23 +1,23 @@
-import logging
 import json
+import logging
 
 from django.utils.translation import gettext_lazy as _
 
-from .models import (
-    Collection,
-    SciELOJournal,
-    SciELOIssue,
-    SciELODocument,
-    ClassicWebsiteConfiguration,
-    FilesStorageConfiguration,
-    NewWebSiteConfiguration,
-)
+from article.controller import get_or_create_official_article
+from issue.controller import get_or_create_official_issue
 from journal.controller import get_or_create_official_journal
 from journal.exceptions import GetOrCreateOfficialJournalError
-from issue.controller import get_or_create_official_issue
-from article.controller import get_or_create_official_article
 
 from . import exceptions
+from .models import (
+    ClassicWebsiteConfiguration,
+    Collection,
+    FilesStorageConfiguration,
+    NewWebSiteConfiguration,
+    SciELODocument,
+    SciELOIssue,
+    SciELOJournal,
+)
 
 
 def start():

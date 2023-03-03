@@ -1,11 +1,10 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from wagtail.admin.edit_handlers import FieldPanel
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.models import CommonControlField, IssuePublicationDate
 from journal.models import OfficialJournal
-
-from wagtailautocomplete.edit_handlers import AutocompletePanel
-from wagtail.admin.edit_handlers import FieldPanel
 
 from .forms import IssueForm
 

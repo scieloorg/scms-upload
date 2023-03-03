@@ -1,6 +1,5 @@
 from django.utils.translation import gettext as _
 
-
 FUNDER = "FUNDER"
 SCHOLARLY = "SCHOLARLY"
 PRIVATE = "PRIVATE"

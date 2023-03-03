@@ -1,9 +1,5 @@
-from opac_schema.v1.models import (
-    Journal,
-    Timeline,
-    Mission,
-    JounalMetrics,
-)
+from opac_schema.v1.models import JounalMetrics, Journal, Mission, Timeline
+
 from libs.dsm import exceptions
 from libs.dsm.publication.db import save_data
 

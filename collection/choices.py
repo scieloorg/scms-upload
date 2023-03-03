@@ -1,6 +1,5 @@
 from django.utils.translation import gettext_lazy as _
 
-
 # JOURNAL_PUBLICATION_STATUS
 # Embora alguns periódicos estão encerrados (CEASED) ou suspensos (SUSPENDED),
 # eles ainda ficam disponíveis no site (`JOURNAL_AT_WEBSITE_STATUS = CURRENT`)

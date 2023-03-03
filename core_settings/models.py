@@ -1,8 +1,6 @@
 from django.db import models
-
-from wagtail.images.edit_handlers import ImageChooserPanel
-
 from wagtail.contrib.settings.models import BaseSetting, register_setting
+from wagtail.images.edit_handlers import ImageChooserPanel
 
 
 @register_setting

@@ -1,16 +1,15 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-
-from wagtail.core.models import Orderable
-from wagtail.admin.edit_handlers import FieldPanel, InlinePanel
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
+from wagtail.admin.edit_handlers import FieldPanel, InlinePanel
+from wagtail.core.models import Orderable
 
 from core.models import CommonControlField
 from institution.models import Institution, InstitutionHistory
 
-from .forms import ResearcherForm
 from . import choices
+from .forms import ResearcherForm
 
 
 class Researcher(ClusterableModel, CommonControlField):

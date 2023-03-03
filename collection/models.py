@@ -1,12 +1,12 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from core.models import CommonControlField
-from core.forms import CoreAdminModelForm
-
-from journal.models import OfficialJournal
-from issue.models import Issue
 from article.models import Article
+from core.forms import CoreAdminModelForm
+from core.models import CommonControlField
+from issue.models import Issue
+from journal.models import OfficialJournal
+
 from .choices import JOURNAL_AVAILABILTY_STATUS, WEBSITE_KIND
 
 

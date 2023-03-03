@@ -1,4 +1,3 @@
-from scielo_scholarly_data import standardizer
 from opac_schema.v1.models import (
     Abstract,
     AOPUrlSegments,
@@ -13,6 +12,7 @@ from opac_schema.v1.models import (
     TranslatedSection,
     TranslatedTitle,
 )
+from scielo_scholarly_data import standardizer
 
 from libs.dsm import exceptions
 from libs.dsm.publication.db import save_data

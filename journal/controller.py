@@ -6,7 +6,6 @@ from journal.models import OfficialJournal
 
 from . import exceptions
 
-
 arg_names = (
     "title",
     "ISSN_electronic",

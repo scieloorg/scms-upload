@@ -1,9 +1,9 @@
 from django.utils.translation import gettext as _
 from wagtail.contrib.modeladmin.helpers import ButtonHelper
 
-from upload.choices import PC_UPDATE, PC_ERRATUM
+from upload.choices import PC_ERRATUM, PC_UPDATE
 
-from .choices import AS_REQUIRE_UPDATE, AS_REQUIRE_ERRATUM
+from .choices import AS_REQUIRE_ERRATUM, AS_REQUIRE_UPDATE
 
 
 class RequestArticleChangeButtonHelper(ButtonHelper):

@@ -1,11 +1,10 @@
-from lxml import etree
+import os
+import re
 from io import StringIO
 
+from lxml import etree
+
 from .file_utils import numbered_lines
-
-import re
-import os
-
 
 PATTERN_START_END_LINE_NUMBERS = r".* line (?P<start>\d*) and .*, line (?P<end>\d*),"
 PATTERN_START_LINE_NUMBER = r".* line (?P<start>\d*),"

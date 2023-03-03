@@ -1,10 +1,10 @@
 from datetime import date, timedelta
+
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-
-from wagtailautocomplete.edit_handlers import AutocompletePanel
 from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article.models import Article
 from core.models import CommonControlField
@@ -14,13 +14,12 @@ from . import choices
 from .forms import UploadPackageForm, ValidationResultForm
 from .permission_helper import (
     ACCESS_ALL_PACKAGES,
-    ASSIGN_PACKAGE,
     ANALYSE_VALIDATION_ERROR_RESOLUTION,
+    ASSIGN_PACKAGE,
     FINISH_DEPOSIT,
     SEND_VALIDATION_ERROR_RESOLUTION,
 )
 from .utils import file_utils
-
 
 User = get_user_model()
 

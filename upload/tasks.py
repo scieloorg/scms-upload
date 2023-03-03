@@ -1,25 +1,21 @@
 from celery.result import AsyncResult
 from django.utils.translation import gettext as _
-
-from packtools.sps.utils import file_utils as sps_file_utils
-from packtools.sps.models import package as sps_package
 from packtools.sps import exceptions as sps_exceptions
-from packtools.sps.validation import (
-    article as sps_validation_article,
-    journal as sps_validation_journal,
-)
+from packtools.sps.models import package as sps_package
+from packtools.sps.utils import file_utils as sps_file_utils
+from packtools.sps.validation import article as sps_validation_article
+from packtools.sps.validation import journal as sps_validation_journal
 
-from article.controller import create_article_from_etree, update_article
 from article.choices import AS_CHANGE_SUBMITTED
+from article.controller import create_article_from_etree, update_article
 from article.models import Article
 from config import celery_app
 from issue.models import Issue
 from journal.controller import get_journal_dict_for_validation
-from libs.dsm.publication.documents import get_similar_documents
-from libs.dsm.publication.documents import get_document
+from libs.dsm.publication.documents import get_document, get_similar_documents
 
-from .utils import file_utils, package_utils, xml_utils
 from . import choices, controller, exceptions, models
+from .utils import file_utils, package_utils, xml_utils
 
 
 def run_validations(

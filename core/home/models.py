@@ -1,9 +1,6 @@
 from django.db import models
 from django.http import JsonResponse
 from django.template.response import TemplateResponse
-
-from wagtail.core.models import Page
-
 from modelcluster.fields import ParentalKey
 from wagtail.admin.edit_handlers import (
     FieldPanel,
@@ -11,10 +8,10 @@ from wagtail.admin.edit_handlers import (
     InlinePanel,
     MultiFieldPanel,
 )
-from wagtail.core.fields import RichTextField
-from wagtail.contrib.forms.models import AbstractFormField
 from wagtail.contrib.forms.edit_handlers import FormSubmissionsPanel
-
+from wagtail.contrib.forms.models import AbstractFormField
+from wagtail.core.fields import RichTextField
+from wagtail.core.models import Page
 from wagtailcaptcha.models import WagtailCaptchaEmailForm
 
 

@@ -1,21 +1,21 @@
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
-
-from config.menu import get_menu_order
-from wagtail.core import hooks
-from wagtail.contrib.modeladmin.views import CreateView
 from wagtail.contrib.modeladmin.options import (
     ModelAdmin,
     ModelAdminGroup,
     modeladmin_register,
 )
+from wagtail.contrib.modeladmin.views import CreateView
+from wagtail.core import hooks
+
+from config.menu import get_menu_order
 
 from .models import (
-    Collection,
-    NewWebSiteConfiguration,
-    FilesStorageConfiguration,
     ClassicWebsiteConfiguration,
+    Collection,
+    FilesStorageConfiguration,
+    NewWebSiteConfiguration,
 )
 
 

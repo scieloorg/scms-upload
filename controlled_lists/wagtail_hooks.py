@@ -1,16 +1,15 @@
 from django.urls import path
 from django.utils.translation import gettext as _
-
-from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import (
     ModelAdmin,
-    modeladmin_register,
     ModelAdminGroup,
+    modeladmin_register,
 )
+from wagtail.core import hooks
 
-from .models import IndexedAt, IndexedAtFile
 from .button_helper import IndexedAtHelper
-from .views import validate, import_file
+from .models import IndexedAt, IndexedAtFile
+from .views import import_file, validate
 
 
 class IndexedAtAdmin(ModelAdmin):

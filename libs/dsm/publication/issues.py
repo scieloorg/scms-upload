@@ -1,8 +1,7 @@
-from opac_schema.v1.models import (
-    Issue,
-    Journal,
-)
+from opac_schema.v1.models import Issue, Journal
+
 from libs.dsm import exceptions
+
 from . import db
 
 

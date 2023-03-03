@@ -3,23 +3,24 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
-
-from config.menu import get_menu_order
-from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import (
     ModelAdmin,
     ModelAdminGroup,
     modeladmin_register,
 )
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
+from wagtail.core import hooks
+
+from config.menu import get_menu_order
+
+from .button_helper import ArticleButtonHelper, RequestArticleChangeButtonHelper
+from .models import Article, RelatedItem, RequestArticleChange, choices
+from .permission_helper import ArticlePermissionHelper
 
 # from upload import exceptions as upload_exceptions
 # from upload.models import Package
 # from upload.tasks import get_or_create_package
 
-from .button_helper import ArticleButtonHelper, RequestArticleChangeButtonHelper
-from .models import Article, RelatedItem, RequestArticleChange, choices
-from .permission_helper import ArticlePermissionHelper
 
 
 class ArticleCreateView(CreateView):

@@ -1,7 +1,8 @@
 from django.db import models
 from django.utils.translation import gettext as _
+
 from core.models import CommonControlField
-from location.forms import LocationForm, CityForm, CountryForm, StateForm
+from location.forms import CityForm, CountryForm, LocationForm, StateForm
 
 
 class City(CommonControlField):
