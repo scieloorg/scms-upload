@@ -105,9 +105,7 @@ class ValidationResult(models.Model):
         blank=False,
     )
     data = models.JSONField(_("Error data"), default=dict, null=True, blank=True)
-    message = models.CharField(
-        _("Error message"), max_length=512, null=True, blank=True
-    )
+    message = models.TextField(_("Error message"), null=True, blank=True)
     status = models.CharField(
         _("Status"),
         max_length=16,
@@ -177,7 +175,7 @@ class ErrorResolution(CommonControlField):
         null=True,
         blank=True,
     )
-    rationale = models.TextField(_("Rationale"), max_length=512, null=True, blank=True)
+    rationale = models.TextField(_("Rationale"), null=True, blank=True)
 
     panels = [
         FieldPanel("action"),
