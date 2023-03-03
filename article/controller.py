@@ -1,11 +1,10 @@
 from datetime import datetime
 
+from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_ids import ArticleIds
 
-from django.utils.translation import gettext_lazy as _
-
-from .models import Article, choices
 from . import exceptions
+from .models import Article, choices
 
 
 def create_article_from_etree(xml_tree, user_id, status=choices.AS_PUBLISHED):

@@ -1,6 +1,5 @@
 from django.utils.translation import gettext as _
 
-
 # Model RequestArticleChange, Field change_type
 RCT_UPDATE = "update"
 RCT_ERRATUM = "erratum"

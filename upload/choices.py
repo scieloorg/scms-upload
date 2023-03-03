@@ -1,6 +1,5 @@
 from django.utils.translation import gettext as _
 
-
 # Model Package, Field status
 PS_SUBMITTED = "submitted"
 PS_ENQUEUED_FOR_VALIDATION = "enqueued-for-validation"

@@ -6,7 +6,6 @@ from issue.models import Issue
 
 from . import exceptions
 
-
 arg_names = (
     "official_journal",
     "volume",

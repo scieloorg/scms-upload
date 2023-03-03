@@ -1,13 +1,7 @@
 from datetime import datetime
 
-from tenacity import (
-    retry,
-    wait_exponential,
-    stop_after_attempt,
-)
-from mongoengine import (
-    connect,
-)
+from mongoengine import connect
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from libs.dsm import exceptions
 

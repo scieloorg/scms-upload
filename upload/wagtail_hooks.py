@@ -1,35 +1,34 @@
+import json
+
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
-from upload.utils import file_utils
-from upload.utils.xml_utils import XMLFormatError
-
-from wagtail.core import hooks
 from wagtail.contrib.modeladmin.options import (
     ModelAdmin,
     ModelAdminGroup,
     modeladmin_register,
 )
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
+from wagtail.core import hooks
 
 from article.models import Article
 from config.menu import get_menu_order
 from issue.models import Issue
+from upload.utils import file_utils
+from upload.utils.xml_utils import XMLFormatError
 
 from .button_helper import UploadButtonHelper
 from .models import (
-    QAPackage,
-    choices,
-    Package,
-    ValidationResult,
     ErrorResolutionOpinion,
+    Package,
+    QAPackage,
+    ValidationResult,
+    choices,
 )
 from .permission_helper import UploadPermissionHelper
 from .tasks import run_validations
 from .utils import package_utils
-
-import json
 
 
 class PackageCreateView(CreateView):

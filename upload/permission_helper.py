@@ -1,6 +1,5 @@
 from wagtail.contrib.modeladmin.helpers import PermissionHelper
 
-
 ACCESS_ALL_PACKAGES = "access_all_packages"
 ASSIGN_PACKAGE = "assign_package"
 FINISH_DEPOSIT = "finish_deposit"

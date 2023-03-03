@@ -1,23 +1,20 @@
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-
 from modelcluster.fields import ParentalKey
-from wagtailautocomplete.edit_handlers import AutocompletePanel
-from wagtail.admin.edit_handlers import InlinePanel, FieldPanel, MultiFieldPanel
-from wagtail.core.models import Orderable, ClusterableModel
+from wagtail.admin.edit_handlers import FieldPanel, InlinePanel, MultiFieldPanel
 from wagtail.core.fields import RichTextField
+from wagtail.core.models import ClusterableModel, Orderable
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.models import CommonControlField
 from doi.models import DOIWithLang
 from issue.models import Issue
 from researcher.models import Researcher
 
+from . import choices
 from .forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
-
-from . import choices
-
 
 User = get_user_model()
 

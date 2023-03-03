@@ -1,27 +1,27 @@
+from tempfile import mkdtemp
 from time import sleep
-from lxml import etree
 from zipfile import BadZipFile
 
 from django.utils.translation import gettext as _
-
+from lxml import etree
 from packtools import SPPackage
 from packtools.domain import HTMLGenerator
 from packtools.sps.libs.async_download import download_files
-from packtools.sps.models.package import PackageName
-from packtools.sps.models.article_authors import Authors
 from packtools.sps.models.article_assets import ArticleAssets
+from packtools.sps.models.article_authors import Authors
 from packtools.sps.models.article_renditions import ArticleRenditions
 from packtools.sps.models.article_titles import ArticleTitles
 from packtools.sps.models.front_journal_meta import ISSN
+from packtools.sps.models.package import PackageName
 
 from .file_utils import (
     create_file_for_xml_etree,
     create_file_for_zip_package,
     generate_filepath_with_new_extension,
-    get_filename_from_filepath,
     get_file_absolute_path,
     get_file_list_from_zip,
     get_file_url,
+    get_filename_from_filepath,
     get_xml_content_from_uri,
     get_xml_content_from_zip,
     get_xml_filename,
@@ -32,9 +32,6 @@ from .xml_utils import (
     get_etree_from_xml_content,
     get_xml_strio_for_preview,
 )
-
-from tempfile import mkdtemp
-
 
 JS_ARTICLE = "/static/js/articles.js"
 CSS_ARTICLE = "/static/css/article-styles.css"

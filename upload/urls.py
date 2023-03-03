@@ -1,14 +1,13 @@
 from django.urls import path
 
 from .views import (
+    ajx_error_resolution,
     assign,
     error_resolution,
-    ajx_error_resolution,
     finish_deposit,
     preview_document,
     validation_report,
 )
-
 
 app_name = "upload"
 

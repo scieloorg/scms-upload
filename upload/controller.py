@@ -3,7 +3,7 @@ from datetime import datetime
 from django.shortcuts import get_object_or_404
 
 from collection.models import NewWebSiteConfiguration
-from libs.dsm.publication.db import mk_connection, exceptions
+from libs.dsm.publication.db import exceptions, mk_connection
 
 from .models import (
     ErrorResolution,
