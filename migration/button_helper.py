@@ -4,7 +4,10 @@ from wagtail.contrib.modeladmin.helpers import ButtonHelper
 
 
 class MigrationFailureButtonHelper(ButtonHelper):
-    btn_default_classnames = ["button-small", "icon", ]
+    btn_default_classnames = [
+        "button-small",
+        "icon",
+    ]
 
     def view_migration_failure(self, obj):
         text = _("View migration failure")

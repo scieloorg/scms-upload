@@ -20,7 +20,6 @@ from .models import (
 
 
 class CoreCreateView(CreateView):
-
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())
@@ -28,8 +27,8 @@ class CoreCreateView(CreateView):
 
 class CollectionModelAdmin(ModelAdmin):
     model = Collection
-    menu_label = _('Collections')
-    menu_icon = 'doc-full'
+    menu_label = _("Collections")
+    menu_icon = "doc-full"
     menu_order = 100
     add_to_settings_menu = False
     exclude_from_explorer = False
@@ -38,28 +37,26 @@ class CollectionModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        'acron',
-        'created',
-        'updated',
-        'updated_by',
+        "acron",
+        "created",
+        "updated",
+        "updated_by",
     )
-    list_filter = (
-        'acron',
-    )
+    list_filter = ("acron",)
     search_fields = (
-        'name',
-        'acron',
+        "name",
+        "acron",
     )
     inspect_view_fields = (
-        'name',
-        'acron',
+        "name",
+        "acron",
     )
 
 
 class NewWebSiteConfigurationModelAdmin(ModelAdmin):
     model = NewWebSiteConfiguration
-    menu_label = _('New WebSites Configurations')
-    menu_icon = 'doc-full'
+    menu_label = _("New WebSites Configurations")
+    menu_icon = "doc-full"
     menu_order = 200
     exclude_from_explorer = False
     inspect_view_enabled = False
@@ -67,23 +64,19 @@ class NewWebSiteConfigurationModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        'url',
-        'created',
-        'updated',
-        'updated_by',
+        "url",
+        "created",
+        "updated",
+        "updated_by",
     )
-    list_filter = (
-        'url',
-    )
-    search_fields = (
-        'url',
-    )
+    list_filter = ("url",)
+    search_fields = ("url",)
 
 
 class FilesStorageConfigurationModelAdmin(ModelAdmin):
     model = FilesStorageConfiguration
-    menu_label = _('Files Storage Configuration')
-    menu_icon = 'doc-full'
+    menu_label = _("Files Storage Configuration")
+    menu_icon = "doc-full"
     menu_order = 200
     exclude_from_explorer = False
     inspect_view_enabled = False
@@ -91,45 +84,43 @@ class FilesStorageConfigurationModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        'host',
-        'bucket_root',
-        'created',
-        'updated',
-        'updated_by',
+        "host",
+        "bucket_root",
+        "created",
+        "updated",
+        "updated_by",
     )
     list_filter = (
-        'host',
-        'bucket_root',
+        "host",
+        "bucket_root",
     )
     search_fields = (
-        'host',
-        'bucket_root',
+        "host",
+        "bucket_root",
     )
 
 
 class ClassicWebsiteConfigurationModelAdmin(ModelAdmin):
     model = ClassicWebsiteConfiguration
-    menu_label = _('Classic Website Configuration')
-    menu_icon = 'doc-full'
+    menu_label = _("Classic Website Configuration")
+    menu_icon = "doc-full"
     menu_order = 200
     exclude_from_explorer = False
     inspect_view_enabled = False
 
     create_view_class = CoreCreateView
 
-    list_display = (
-        'collection',
-    )
+    list_display = ("collection",)
     search_fields = (
-        'collection__acron',
-        'collection__name',
+        "collection__acron",
+        "collection__name",
     )
 
 
 class CollectionModelAdminGroup(ModelAdminGroup):
-    menu_label = _('Collections')
-    menu_icon = 'folder-open-inverse'
-    menu_order = get_menu_order('collection')
+    menu_label = _("Collections")
+    menu_icon = "folder-open-inverse"
+    menu_order = get_menu_order("collection")
     items = (
         CollectionModelAdmin,
         NewWebSiteConfigurationModelAdmin,
@@ -141,9 +132,8 @@ class CollectionModelAdminGroup(ModelAdminGroup):
 modeladmin_register(CollectionModelAdminGroup)
 
 
-@hooks.register('register_admin_urls')
+@hooks.register("register_admin_urls")
 def register_disclosure_url():
     return [
-        path('collection/',
-        include('collection.urls', namespace='collection')),
+        path("collection/", include("collection.urls", namespace="collection")),
     ]

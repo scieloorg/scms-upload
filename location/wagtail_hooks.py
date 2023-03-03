@@ -10,7 +10,6 @@ from .models import Location
 
 
 class LocationCreateView(CreateView):
-
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())
@@ -19,15 +18,32 @@ class LocationCreateView(CreateView):
 class LocationAdmin(ModelAdmin):
     model = Location
     create_view_class = LocationCreateView
-    menu_label = _('Location')
-    menu_icon = 'folder'
-    menu_order = get_menu_order('location')
+    menu_label = _("Location")
+    menu_icon = "folder"
+    menu_order = get_menu_order("location")
     add_to_settings_menu = False  # or True to add your model to the Settings sub-menu
-    exclude_from_explorer = False  # or True to exclude pages of this type from Wagtail's explorer view
-    list_display = ('country', 'state', 'city', 'creator',
-                    'updated', 'created', )
-    search_fields = ('country', 'state', 'city', )
-    list_export = ('country', 'state', 'city', )
-    export_filename = 'locations'
+    exclude_from_explorer = (
+        False  # or True to exclude pages of this type from Wagtail's explorer view
+    )
+    list_display = (
+        "country",
+        "state",
+        "city",
+        "creator",
+        "updated",
+        "created",
+    )
+    search_fields = (
+        "country",
+        "state",
+        "city",
+    )
+    list_export = (
+        "country",
+        "state",
+        "city",
+    )
+    export_filename = "locations"
+
 
 modeladmin_register(LocationAdmin)

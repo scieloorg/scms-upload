@@ -16,9 +16,7 @@ def mk_connection(host, alias=None):
     try:
         return _db_connect_by_uri(host, alias)
     except Exception as e:
-        raise exceptions.DBConnectError(
-            str({"exception": type(e), "msg": str(e)})
-        )
+        raise exceptions.DBConnectError(str({"exception": type(e), "msg": str(e)}))
 
 
 @retry(wait=wait_exponential(), stop=stop_after_attempt(10))
@@ -28,14 +26,14 @@ def _db_connect_by_uri(uri, alias=None):
     """
     params = {"host": uri, "maxPoolSize": None}
     if alias:
-        params['alias'] = alias
+        params["alias"] = alias
     conn = connect(**params)
     print("%s connected" % params)
     return conn
 
 
 def save_data(model):
-    if not hasattr(model, 'created'):
+    if not hasattr(model, "created"):
         model.created = None
 
     model.updated = datetime.utcnow()

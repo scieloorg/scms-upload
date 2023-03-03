@@ -27,13 +27,17 @@ from .file_utils import (
     get_xml_filename,
     unzip,
 )
-from .xml_utils import XMLFormatError, get_etree_from_xml_content, get_xml_strio_for_preview
+from .xml_utils import (
+    XMLFormatError,
+    get_etree_from_xml_content,
+    get_xml_strio_for_preview,
+)
 
 from tempfile import mkdtemp
 
 
-JS_ARTICLE = '/static/js/articles.js'
-CSS_ARTICLE = '/static/css/article-styles.css'
+JS_ARTICLE = "/static/js/articles.js"
+CSS_ARTICLE = "/static/css/article-styles.css"
 
 
 def generate_xml_canonical(xml_uri):
@@ -51,18 +55,20 @@ def generate_xml_canonical(xml_uri):
     # Gera dicionário de substituição de nomes de assets e lista de uris e nomes novos
     for i in aa.article_assets:
         assets_dict[i.name] = i.name_canonical(package_name)
-        assets_uris_and_names.append({
-            'uri': i.name,
-            'name': i.name_canonical(package_name),
-        })
+        assets_uris_and_names.append(
+            {
+                "uri": i.name,
+                "name": i.name_canonical(package_name),
+            }
+        )
 
     # Substitui nomes de assets no XMLTree
     aa.replace_names(assets_dict)
 
     return {
-        'xml_etree': aa.xmltree, 
-        'assets_uris_and_names': assets_uris_and_names, 
-        'package_name': package_name
+        "xml_etree": aa.xmltree,
+        "assets_uris_and_names": assets_uris_and_names,
+        "package_name": package_name,
     }
 
 
@@ -71,8 +77,8 @@ def get_renditions_uris_and_names(doc):
     for rend in doc.pdfs:
         renditions_uris_and_names.append(
             {
-                'uri': rend['url'], 
-                'name': rend['filename'],
+                "uri": rend["url"],
+                "name": rend["filename"],
             }
         )
     return renditions_uris_and_names
@@ -90,9 +96,9 @@ def create_package_file_from_site_doc(doc):
     _data = generate_xml_canonical(doc.xml)
 
     # Obtém dados de _data relacionados ao xml canônico gerado e outros dados acessórios
-    xml_etree_canonical = _data['xml_etree']
-    assets_uris_and_names = _data['assets_uris_and_names']
-    package_name = _data['package_name']
+    xml_etree_canonical = _data["xml_etree"]
+    assets_uris_and_names = _data["assets_uris_and_names"]
+    package_name = _data["package_name"]
 
     # Gera arquivo de dados de xml_etree_canonical e armazena path em lista de arquivos
     package_files = [
@@ -100,7 +106,7 @@ def create_package_file_from_site_doc(doc):
             xml_etree=xml_etree_canonical,
             package_name=package_name,
         )
-    ]   
+    ]
 
     # Baixa assets e renditions e armazena paths em lista de arquivos
     package_files.extend(download_files(assets_uris_and_names))
@@ -112,10 +118,7 @@ def create_package_file_from_site_doc(doc):
 
 def optimise_package(source, target):
     package = SPPackage.from_file(source, mkdtemp())
-    package.optimise(
-        new_package_file_path=target,
-        preserve_files=True
-    )
+    package.optimise(new_package_file_path=target, preserve_files=True)
 
 
 def get_article_assets_from_zipped_xml(path, xml_path=None):
@@ -140,8 +143,8 @@ def evaluate_assets(assets, files_list):
 
 def get_rendition_expected_name(rendition, document_name):
     if not rendition.is_main_language:
-        return f'{document_name}-{rendition.language}.pdf'
-    return f'{document_name}.pdf'
+        return f"{document_name}-{rendition.language}.pdf"
+    return f"{document_name}.pdf"
 
 
 def evaluate_renditions(renditions, files_list):
@@ -151,35 +154,45 @@ def evaluate_renditions(renditions, files_list):
     document_name = get_xml_filename(files_list)
 
     for rendition in renditions:
-        rendition_expected_name = get_rendition_expected_name(rendition, document_name)   
-        yield (rendition, rendition_expected_name, rendition_expected_name in files_list)
+        rendition_expected_name = get_rendition_expected_name(rendition, document_name)
+        yield (
+            rendition,
+            rendition_expected_name,
+            rendition_expected_name in files_list,
+        )
 
 
 def _fill_data_with_valitadion_errors(assets, renditions, validation_errors):
     for ve in validation_errors:
-        if ve.category == 'rendition-error':
-            renditions.append({
-                'expected_filename': ve.data['missing_file'],
-                'is_main_language': ve.data['is_main_language'],
-                'language': ve.data['language'],
-                'is_present': False,
-            })
+        if ve.category == "rendition-error":
+            renditions.append(
+                {
+                    "expected_filename": ve.data["missing_file"],
+                    "is_main_language": ve.data["is_main_language"],
+                    "language": ve.data["language"],
+                    "is_present": False,
+                }
+            )
 
-        if ve.category == 'asset-error':
-            ve_id = ve.data['id']
+        if ve.category == "asset-error":
+            ve_id = ve.data["id"]
             if ve_id not in assets:
                 assets[ve_id] = []
 
-            assets[ve_id].append({
-                'name': ve.data['missing_file'], 
-                'type': ve.data['type'],
-                'is_present': False,
-                'src': ve.data['missing_file'],
-            })
+            assets[ve_id].append(
+                {
+                    "name": ve.data["missing_file"],
+                    "type": ve.data["type"],
+                    "is_present": False,
+                    "src": ve.data["missing_file"],
+                }
+            )
 
 
 def _fill_data_with_present_files(assets, renditions, path, validation_errors):
-    missing_files = [ve.data['missing_file'] for ve in validation_errors if ve.data['missing_file']]
+    missing_files = [
+        ve.data["missing_file"] for ve in validation_errors if ve.data["missing_file"]
+    ]
 
     dir_extracted_files = get_filename_from_filepath(path)
 
@@ -190,12 +203,14 @@ def _fill_data_with_present_files(assets, renditions, path, validation_errors):
             if a.id not in assets:
                 assets[a.id] = []
 
-            assets[a.id].append({
-                'name': a.name, 
-                'type': a.type,
-                'is_present': a_is_present,
-                'src': get_file_url(dir_extracted_files, a.name),
-            })
+            assets[a.id].append(
+                {
+                    "name": a.name,
+                    "type": a.type,
+                    "is_present": a_is_present,
+                    "src": get_file_url(dir_extracted_files, a.name),
+                }
+            )
 
     package_files = get_file_list_from_zip(path)
     document_name = get_xml_filename(package_files)
@@ -205,13 +220,15 @@ def _fill_data_with_present_files(assets, renditions, path, validation_errors):
         r_is_present = r_expected_filename not in missing_files
 
         if r_is_present:
-            renditions.append({
-                'expected_filename': r_expected_filename,
-                'language': r.language,
-                'is_main_language': r.is_main_language,
-                'is_present': True,
-                'src': get_file_url(dir_extracted_files, r_expected_filename),
-            })
+            renditions.append(
+                {
+                    "expected_filename": r_expected_filename,
+                    "language": r.language,
+                    "is_main_language": r.is_main_language,
+                    "is_present": True,
+                    "src": get_file_url(dir_extracted_files, r_expected_filename),
+                }
+            )
 
 
 def coerce_package_and_errors(package, validation_errors):
@@ -219,8 +236,8 @@ def coerce_package_and_errors(package, validation_errors):
     renditions = []
 
     source = get_file_absolute_path(package.file.name)
-    target = generate_filepath_with_new_extension(source, '.optz', True)
-    
+    target = generate_filepath_with_new_extension(source, ".optz", True)
+
     unzip(target)
 
     _fill_data_with_valitadion_errors(assets, renditions, validation_errors)
@@ -236,31 +253,37 @@ def get_main_language(path):
 
 
 def get_languages(zip_filename, use_optimised_package=True):
-    path = generate_filepath_with_new_extension(zip_filename, '.optz', True) if use_optimised_package else zip_filename
+    path = (
+        generate_filepath_with_new_extension(zip_filename, ".optz", True)
+        if use_optimised_package
+        else zip_filename
+    )
 
     try:
-        return [rendition.language for rendition in get_article_renditions_from_zipped_xml(path)]
+        return [
+            rendition.language
+            for rendition in get_article_renditions_from_zipped_xml(path)
+        ]
     except (FileNotFoundError, BadZipFile, XMLFormatError):
         return []
 
 
 def render_html(zip_filename, xml_path, language, use_optimised_package=True):
-    path = generate_filepath_with_new_extension(zip_filename, '.optz', True) if use_optimised_package else zip_filename
-
-    dir_optz = get_file_url(
-        dirname='',
-        filename=get_filename_from_filepath(path)
+    path = (
+        generate_filepath_with_new_extension(zip_filename, ".optz", True)
+        if use_optimised_package
+        else zip_filename
     )
+
+    dir_optz = get_file_url(dirname="", filename=get_filename_from_filepath(path))
     xmlstr = get_xml_content_from_zip(path, xml_path)
     xmltree_strio = get_xml_strio_for_preview(xmlstr, dir_optz)
 
     html = HTMLGenerator.parse(
-        xmltree_strio,
-        valid_only=False,
-        js=JS_ARTICLE,
-        css=CSS_ARTICLE).generate(language)
+        xmltree_strio, valid_only=False, js=JS_ARTICLE, css=CSS_ARTICLE
+    ).generate(language)
 
-    return etree.tostring(html, encoding='unicode', method='html')
+    return etree.tostring(html, encoding="unicode", method="html")
 
 
 def get_article_data_for_comparison(xmltree):
@@ -286,20 +309,18 @@ def get_article_data_for_comparison(xmltree):
     # ISSN (front_journal_meta)
     obj_journal_issn = ISSN(xmltree)
 
-    article_data['journal_print_issn'] = obj_journal_issn.ppub
-    article_data['journal_electronic_issn'] = obj_journal_issn.epub
+    article_data["journal_print_issn"] = obj_journal_issn.ppub
+    article_data["journal_electronic_issn"] = obj_journal_issn.epub
 
     # ArticleTitles
     obj_titles = ArticleTitles(xmltree)
-    article_data['title'] = obj_titles.article_title['text']
+    article_data["title"] = obj_titles.article_title["text"]
 
     # ArticleAuthors
     obj_authors = Authors(xmltree)
 
-    article_data['authors'] = []
+    article_data["authors"] = []
     for c in obj_authors.contribs:
-        article_data['authors'].append(
-            f'{c.get("surname")}, {c.get("given_names")}'
-        )
+        article_data["authors"].append(f'{c.get("surname")}, {c.get("given_names")}')
 
     return article_data

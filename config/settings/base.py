@@ -124,7 +124,7 @@ LOCAL_APPS = [
     "researcher",
     # evitar problema de migração por enquanto
     # "upload",
-    "controlled_lists"
+    "controlled_lists",
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
@@ -328,7 +328,7 @@ CELERY_TASK_SOFT_TIME_LIMIT = 60000
 # http://docs.celeryproject.org/en/latest/userguide/configuration.html#beat-scheduler
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
-CELERY_CACHE_BACKEND = 'django-cache'
+CELERY_CACHE_BACKEND = "django-cache"
 CELERY_RESULT_EXTENDED = True
 
 # django-allauth
@@ -359,22 +359,22 @@ WAGTAIL_SITE_NAME = "core"
 BASE_URL = "https://core"
 
 LANGUAGES = [
-    ('en', "English"),
-    ('es', "Spanish"),
-    ('pt-BR', "Portuguese"),
-    ('it', "Italian"),
+    ("en", "English"),
+    ("es", "Spanish"),
+    ("pt-BR", "Portuguese"),
+    ("it", "Italian"),
 ]
 
 WAGTAIL_I18N_ENABLED = True
 
-WAGTAIL_CONTENT_LANGUAGES =  [
-    ('en', "English"),
-    ('es', "Spanish"),
-    ('pt-BR', "Portuguese"),
-    ('it', "Italian")
+WAGTAIL_CONTENT_LANGUAGES = [
+    ("en", "English"),
+    ("es", "Spanish"),
+    ("pt-BR", "Portuguese"),
+    ("it", "Italian"),
 ]
 
 NOCAPTCHA = True
 
-RECAPTCHA_PUBLIC_KEY = env.str("RECAPTCHA_PUBLIC_KEY", default='')
-RECAPTCHA_PRIVATE_KEY = env.str("RECAPTCHA_PRIVATE_KEY", default='')
+RECAPTCHA_PUBLIC_KEY = env.str("RECAPTCHA_PUBLIC_KEY", default="")
+RECAPTCHA_PRIVATE_KEY = env.str("RECAPTCHA_PRIVATE_KEY", default="")

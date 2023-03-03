@@ -37,9 +37,7 @@ def update_article(article_id, **kwargs):
         raise
     except Exception as e:
         raise exceptions.UpdateDocumentError(
-            _('Unable to update article {} {} {}').format(
-                str(kwargs), type(e), e
-            )
+            _("Unable to update article {} {} {}").format(str(kwargs), type(e), e)
         )
     return article
 
@@ -49,7 +47,7 @@ def get_or_create_official_article(official_issue, **kwargs):
         official_article, status = Article.objects.get_or_create(**kwargs)
     except Exception as e:
         raise exceptions.GetOrCreateDocumentError(
-            _('Unable to get or create official article {} {} {}').format(
+            _("Unable to get or create official article {} {} {}").format(
                 str(kwargs), type(e), e
             )
         )

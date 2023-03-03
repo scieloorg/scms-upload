@@ -5,32 +5,89 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('wagtaildocs', '0012_uploadeddocument'),
+        ("wagtaildocs", "0012_uploadeddocument"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='IndexedAt',
+            name="IndexedAt",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255, null=True, verbose_name='Nome')),
-                ('acronym', models.CharField(max_length=255, null=True, verbose_name='Acronym')),
-                ('url', models.URLField(max_length=255, null=True, verbose_name='URL')),
-                ('description', models.CharField(max_length=255, null=True, verbose_name='Description')),
-                ('type', models.CharField(choices=[('DATABASE', 'DATABASE'), ('DIRECTORY', 'DIRECTORY'), ('OTHER', 'OTHER')], max_length=20, null=True, verbose_name='Tipo')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(max_length=255, null=True, verbose_name="Nome"),
+                ),
+                (
+                    "acronym",
+                    models.CharField(max_length=255, null=True, verbose_name="Acronym"),
+                ),
+                ("url", models.URLField(max_length=255, null=True, verbose_name="URL")),
+                (
+                    "description",
+                    models.CharField(
+                        max_length=255, null=True, verbose_name="Description"
+                    ),
+                ),
+                (
+                    "type",
+                    models.CharField(
+                        choices=[
+                            ("DATABASE", "DATABASE"),
+                            ("DIRECTORY", "DIRECTORY"),
+                            ("OTHER", "OTHER"),
+                        ],
+                        max_length=20,
+                        null=True,
+                        verbose_name="Tipo",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='IndexedAtFile',
+            name="IndexedAtFile",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('is_valid', models.BooleanField(blank=True, default=False, null=True, verbose_name='Is valid?')),
-                ('line_count', models.IntegerField(blank=True, default=0, null=True, verbose_name='Number of lines')),
-                ('attachment', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='wagtaildocs.document')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "is_valid",
+                    models.BooleanField(
+                        blank=True, default=False, null=True, verbose_name="Is valid?"
+                    ),
+                ),
+                (
+                    "line_count",
+                    models.IntegerField(
+                        blank=True, default=0, null=True, verbose_name="Number of lines"
+                    ),
+                ),
+                (
+                    "attachment",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to="wagtaildocs.document",
+                    ),
+                ),
             ],
         ),
     ]

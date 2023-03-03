@@ -2,8 +2,7 @@ from wagtail.admin.forms import WagtailAdminModelForm
 
 
 class ArticleForm(WagtailAdminModelForm):
-
-    def save_all(self, user):        
+    def save_all(self, user):
         article = super().save(commit=False)
         article.creator = user
 
@@ -22,8 +21,7 @@ class ArticleForm(WagtailAdminModelForm):
 
 
 class RelatedItemForm(WagtailAdminModelForm):
-
-    def save_all(self, user):        
+    def save_all(self, user):
         related_item = super().save(commit=False)
         related_item.creator = user
 
@@ -33,7 +31,6 @@ class RelatedItemForm(WagtailAdminModelForm):
 
 
 class RequestArticleChangeForm(WagtailAdminModelForm):
-
     def save_all(self, user, article):
         request_article_change = super().save(commit=False)
         request_article_change.creator = user

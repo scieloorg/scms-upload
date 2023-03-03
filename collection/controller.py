@@ -26,82 +26,66 @@ def start():
             data = json.loads(fp.read())
         user_id = 1
         try:
-            collection = Collection.objects.get(
-                acron=data['collection_acron'])
+            collection = Collection.objects.get(acron=data["collection_acron"])
         except Collection.DoesNotExist:
             collection = Collection()
-            collection.acron = data['collection_acron']
-            collection.name = data['collection_name']
+            collection.acron = data["collection_acron"]
+            collection.name = data["collection_name"]
             collection.creator_id = user_id
             collection.save()
         try:
             classic_website = ClassicWebsiteConfiguration.objects.get(
-                collection=collection)
+                collection=collection
+            )
         except ClassicWebsiteConfiguration.DoesNotExist:
             classic_website = ClassicWebsiteConfiguration()
             classic_website.collection = collection
-            classic_website.title_path = (
-                data['classic_ws_config']['title_path']
-            )
-            classic_website.issue_path = (
-                data['classic_ws_config']['issue_path']
-            )
-            classic_website.serial_path = (
-                data['classic_ws_config']['SERIAL_PATH']
-            )
-            classic_website.cisis_path = (
-                data['classic_ws_config'].get('CISIS_PATH')
-            )
-            classic_website.bases_work_path = (
-                data['classic_ws_config']['BASES_WORK_PATH']
-            )
-            classic_website.bases_pdf_path = (
-                data['classic_ws_config']['BASES_PDF_PATH']
-            )
-            classic_website.bases_translation_path = (
-                data['classic_ws_config']['BASES_TRANSLATION_PATH']
-            )
-            classic_website.bases_xml_path = (
-                data['classic_ws_config']['BASES_XML_PATH']
-            )
-            classic_website.htdocs_img_revistas_path = (
-                data['classic_ws_config']['HTDOCS_IMG_REVISTAS_PATH']
-            )
+            classic_website.title_path = data["classic_ws_config"]["title_path"]
+            classic_website.issue_path = data["classic_ws_config"]["issue_path"]
+            classic_website.serial_path = data["classic_ws_config"]["SERIAL_PATH"]
+            classic_website.cisis_path = data["classic_ws_config"].get("CISIS_PATH")
+            classic_website.bases_work_path = data["classic_ws_config"][
+                "BASES_WORK_PATH"
+            ]
+            classic_website.bases_pdf_path = data["classic_ws_config"]["BASES_PDF_PATH"]
+            classic_website.bases_translation_path = data["classic_ws_config"][
+                "BASES_TRANSLATION_PATH"
+            ]
+            classic_website.bases_xml_path = data["classic_ws_config"]["BASES_XML_PATH"]
+            classic_website.htdocs_img_revistas_path = data["classic_ws_config"][
+                "HTDOCS_IMG_REVISTAS_PATH"
+            ]
             classic_website.creator_id = user_id
             classic_website.save()
         try:
             files_storage_config = FilesStorageConfiguration.objects.get(
-                host=data['files_storage_config']['host'])
+                host=data["files_storage_config"]["host"]
+            )
         except FilesStorageConfiguration.DoesNotExist:
             files_storage_config = FilesStorageConfiguration()
-            files_storage_config.host = data['files_storage_config']['host']
-            files_storage_config.access_key = (
-                data['files_storage_config']['access_key']
-            )
-            files_storage_config.secret_key = (
-                data['files_storage_config']['secret_key']
-            )
+            files_storage_config.host = data["files_storage_config"]["host"]
+            files_storage_config.access_key = data["files_storage_config"]["access_key"]
+            files_storage_config.secret_key = data["files_storage_config"]["secret_key"]
             files_storage_config.secure = (
-                data['files_storage_config']['secure'] == 'true'
+                data["files_storage_config"]["secure"] == "true"
             )
-            files_storage_config.bucket_public_subdir = (
-                data['files_storage_config']['bucket_public_subdir']
-            )
-            files_storage_config.bucket_migration_subdir = (
-                data['files_storage_config']['bucket_migration_subdir']
-            )
-            files_storage_config.bucket_root = (
-                data['files_storage_config']['bucket_root']
-            )
+            files_storage_config.bucket_public_subdir = data["files_storage_config"][
+                "bucket_public_subdir"
+            ]
+            files_storage_config.bucket_migration_subdir = data["files_storage_config"][
+                "bucket_migration_subdir"
+            ]
+            files_storage_config.bucket_root = data["files_storage_config"][
+                "bucket_root"
+            ]
             files_storage_config.creator_id = user_id
             files_storage_config.save()
         try:
-            new_website_config = NewWebSiteConfiguration.objects.get(
-                url=data['url'])
+            new_website_config = NewWebSiteConfiguration.objects.get(url=data["url"])
         except NewWebSiteConfiguration.DoesNotExist:
             new_website_config = NewWebSiteConfiguration()
-            new_website_config.db_uri = data['db_uri']
-            new_website_config.url = data.get('url')
+            new_website_config.db_uri = data["db_uri"]
+            new_website_config.url = data.get("url")
             new_website_config.creator_id = user_id
             new_website_config.save()
 
@@ -111,16 +95,19 @@ def start():
             new_website_config,
         )
     except Exception as e:
-        raise exceptions.StartCollectionConfigurationError("Unable to start system %s" % e)
+        raise exceptions.StartCollectionConfigurationError(
+            "Unable to start system %s" % e
+        )
 
 
 def get_classic_website_configuration(collection_acron):
     try:
         configuration = ClassicWebsiteConfiguration.objects.get(
-            collection__acron=collection_acron)
+            collection__acron=collection_acron
+        )
     except Exception as e:
         raise exceptions.GetClassicWebsiteConfigurationError(
-            _('Unable to get_classic_website_configuration {} {} {}').format(
+            _("Unable to get_classic_website_configuration {} {} {}").format(
                 collection_acron, type(e), e
             )
         )
@@ -142,7 +129,7 @@ def get_or_create_collection(collection_acron, user_id):
             collection.save()
     except Exception as e:
         raise exceptions.GetOrCreateCollectionError(
-            _('Unable to get_or_create_collection {} {} {}').format(
+            _("Unable to get_or_create_collection {} {} {}").format(
                 collection_acron, type(e), e
             )
         )
@@ -160,7 +147,7 @@ def get_scielo_journal(collection_acron, scielo_issn):
         )
     except Exception as e:
         raise exceptions.GetSciELOJournalError(
-            _('Unable to get_scielo_journal {} {} {} {}').format(
+            _("Unable to get_scielo_journal {} {} {} {}").format(
                 collection_acron, scielo_issn, type(e), e
             )
         )
@@ -170,8 +157,11 @@ def get_scielo_journal(collection_acron, scielo_issn):
 def get_or_create_scielo_journal(collection_acron, scielo_issn, user_id):
     try:
         try:
-            logging.info("Create or Get SciELOJournal {} {}".format(
-                collection_acron, scielo_issn))
+            logging.info(
+                "Create or Get SciELOJournal {} {}".format(
+                    collection_acron, scielo_issn
+                )
+            )
             scielo_journal = SciELOJournal.objects.get(
                 collection__acron=collection_acron,
                 scielo_issn=scielo_issn,
@@ -188,7 +178,7 @@ def get_or_create_scielo_journal(collection_acron, scielo_issn, user_id):
             logging.info("Created SciELOJournal {}".format(scielo_journal))
     except Exception as e:
         raise exceptions.GetOrCreateScieloJournalError(
-            _('Unable to get_or_create_scielo_journal {} {} {} {}').format(
+            _("Unable to get_or_create_scielo_journal {} {} {} {}").format(
                 collection_acron, scielo_issn, type(e), e
             )
         )
@@ -196,6 +186,7 @@ def get_or_create_scielo_journal(collection_acron, scielo_issn, user_id):
 
 
 ###########################################################################
+
 
 def get_scielo_issue(issue_pid, issue_folder):
     try:
@@ -205,7 +196,7 @@ def get_scielo_issue(issue_pid, issue_folder):
         )
     except Exception as e:
         raise exceptions.GetOrCreateScieloIssueError(
-            _('Unable to get_scielo_issue {} {} {} {}').format(
+            _("Unable to get_scielo_issue {} {} {} {}").format(
                 issue_pid, issue_folder, type(e), e
             )
         )
@@ -215,7 +206,11 @@ def get_scielo_issue(issue_pid, issue_folder):
 def get_or_create_scielo_issue(scielo_journal, issue_pid, issue_folder, user_id):
     try:
         try:
-            logging.info("Get or create SciELOIssue {} {} {}".format(scielo_journal, issue_pid, issue_folder))
+            logging.info(
+                "Get or create SciELOIssue {} {} {}".format(
+                    scielo_journal, issue_pid, issue_folder
+                )
+            )
             scielo_issue = SciELOIssue.objects.get(
                 scielo_journal=scielo_journal,
                 issue_pid=issue_pid,
@@ -232,7 +227,7 @@ def get_or_create_scielo_issue(scielo_journal, issue_pid, issue_folder, user_id)
             logging.info("Created {}".format(scielo_issue))
     except Exception as e:
         raise exceptions.GetOrCreateScieloIssueError(
-            _('Unable to get_or_create_scielo_issue {} {} {} {}').format(
+            _("Unable to get_or_create_scielo_issue {} {} {} {}").format(
                 scielo_journal, issue_pid, type(e), e
             )
         )
@@ -250,7 +245,7 @@ def get_scielo_document(pid, file_id):
         )
     except Exception as e:
         raise exceptions.GetSciELODocumentError(
-            _('Unable to get_scielo_document {} {} {} {}').format(
+            _("Unable to get_scielo_document {} {} {} {}").format(
                 pid, file_id, type(e), e
             )
         )
@@ -260,9 +255,11 @@ def get_scielo_document(pid, file_id):
 def get_or_create_scielo_document(scielo_issue, pid, file_id, user_id):
     try:
         try:
-            logging.info("Get or create SciELODocument {} {} {}".format(
-                scielo_issue, pid, file_id
-            ))
+            logging.info(
+                "Get or create SciELODocument {} {} {}".format(
+                    scielo_issue, pid, file_id
+                )
+            )
             scielo_document = SciELODocument.objects.get(
                 scielo_issue=scielo_issue,
                 pid=pid,
@@ -279,7 +276,7 @@ def get_or_create_scielo_document(scielo_issue, pid, file_id, user_id):
             logging.info("Created {}".format(scielo_document))
     except Exception as e:
         raise exceptions.GetOrCreateScieloDocumentError(
-            _('Unable to get_or_create_scielo_document {} {} {} {}').format(
+            _("Unable to get_or_create_scielo_document {} {} {} {}").format(
                 scielo_issue, pid, type(e), e
             )
         )

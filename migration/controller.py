@@ -72,19 +72,24 @@ def tostring(xmltree):
 
 
 def _get_classic_website_rel_path(file_path):
-    if 'htdocs' in file_path:
-        return file_path[file_path.find("htdocs"):]
-    if 'base' in file_path:
-        return file_path[file_path.find("base"):]
+    if "htdocs" in file_path:
+        return file_path[file_path.find("htdocs") :]
+    if "base" in file_path:
+        return file_path[file_path.find("base") :]
 
 
 def start(user_id):
     try:
         logging.info(_("Get or create migration configuration"))
-        classic_website, files_storage_config, new_website_config = collection_controller.start()
+        (
+            classic_website,
+            files_storage_config,
+            new_website_config,
+        ) = collection_controller.start()
         try:
             migration_configuration = MigrationConfiguration.objects.get(
-                classic_website_config=classic_website)
+                classic_website_config=classic_website
+            )
         except MigrationConfiguration.DoesNotExist:
             migration_configuration = MigrationConfiguration()
             migration_configuration.classic_website_config = classic_website
@@ -93,7 +98,9 @@ def start(user_id):
             migration_configuration.creator_id = user_id
             migration_configuration.save()
 
-        schedule_journals_and_issues_migrations(classic_website.collection.acron, user_id)
+        schedule_journals_and_issues_migrations(
+            classic_website.collection.acron, user_id
+        )
 
     except Exception as e:
         raise exceptions.MigrationStartError("Unable to start system %s" % e)
@@ -105,13 +112,13 @@ def schedule_journals_and_issues_migrations(collection_acron, user_id):
     """
     logging.info(_("Schedule journals and issues migrations tasks"))
     items = (
-        ("title", _("Migrate journals"), 'migration', 0, 2, 0),
-        ("issue", _("Migrate issues"), 'migration', 0, 7, 2),
+        ("title", _("Migrate journals"), "migration", 0, 2, 0),
+        ("issue", _("Migrate issues"), "migration", 0, 7, 2),
     )
 
     for db_name, task, action, hours_after_now, minutes_after_now, priority in items:
         for mode in ("full", "incremental"):
-            name = f'{collection_acron} | {db_name} | {action} | {mode}'
+            name = f"{collection_acron} | {db_name} | {action} | {mode}"
             kwargs = dict(
                 collection_acron=collection_acron,
                 user_id=user_id,
@@ -121,7 +128,8 @@ def schedule_journals_and_issues_migrations(collection_acron, user_id):
                 periodic_task = PeriodicTask.objects.get(name=name)
             except PeriodicTask.DoesNotExist:
                 hours, minutes = sum_hours_and_minutes(
-                    hours_after_now, minutes_after_now)
+                    hours_after_now, minutes_after_now
+                )
 
                 periodic_task = PeriodicTask()
                 periodic_task.name = name
@@ -151,22 +159,20 @@ def schedule_issues_documents_migration(collection_acron, user_id):
     Agenda tarefas para migrar e publicar todos os documentos
     """
     for issue_migration in IssueMigration.objects.filter(
-            scielo_issue__scielo_journal__collection__acron=collection_acron):
-
+        scielo_issue__scielo_journal__collection__acron=collection_acron
+    ):
         journal_acron = issue_migration.scielo_issue.scielo_journal.acron
         scielo_issn = issue_migration.scielo_issue.scielo_journal.scielo_issn
         publication_year = issue_migration.scielo_issue.official_issue.publication_year
 
         schedule_issue_documents_migration(
-            issue_migration, journal_acron,
-            scielo_issn, publication_year, user_id)
+            issue_migration, journal_acron, scielo_issn, publication_year, user_id
+        )
 
 
-def schedule_issue_documents_migration(collection_acron,
-                                       journal_acron,
-                                       scielo_issn,
-                                       publication_year,
-                                       user_id):
+def schedule_issue_documents_migration(
+    collection_acron, journal_acron, scielo_issn, publication_year, user_id
+):
     """
     Agenda tarefas para migrar e publicar um conjunto de documentos por:
 
@@ -174,14 +180,16 @@ def schedule_issue_documents_migration(collection_acron,
         - periódico
         - periódico e ano
     """
-    logging.info(_("Schedule issue documents migration {} {} {} {}").format(
-        collection_acron,
-        journal_acron,
-        scielo_issn,
-        publication_year,
-    ))
-    action = 'migrate'
-    task = _('Migrate documents')
+    logging.info(
+        _("Schedule issue documents migration {} {} {} {}").format(
+            collection_acron,
+            journal_acron,
+            scielo_issn,
+            publication_year,
+        )
+    )
+    action = "migrate"
+    task = _("Migrate documents")
 
     params_list = (
         {"scielo_issn": scielo_issn, "publication_year": publication_year},
@@ -200,11 +208,10 @@ def schedule_issue_documents_migration(collection_acron,
         if len(params) == 2:
             modes = ("full", "incremental")
         else:
-            modes = ("incremental", )
+            modes = ("incremental",)
 
         for mode in modes:
-
-            name = f'{collection_acron} | {group_id} | {action} | {mode}'
+            name = f"{collection_acron} | {group_id} | {action} | {mode}"
 
             kwargs = dict(
                 collection_acron=collection_acron,
@@ -249,8 +256,8 @@ def schedule_issue_documents_migration(collection_acron,
                     periodic_task.priority = 3
                     if publication_year:
                         # estabelecer prioridade maior para os mais recentes
-                        periodic_task.priority = (
-                            datetime.now().year - int(publication_year)
+                        periodic_task.priority = datetime.now().year - int(
+                            publication_year
                         )
 
                     # deixa habilitado para rodar frequentemente
@@ -259,8 +266,7 @@ def schedule_issue_documents_migration(collection_acron,
                     # programado para rodar automaticamente 1 vez se o ano de
                     # publicação não é o atual
                     periodic_task.one_off = (
-                        publication_year and
-                        publication_year != datetime.now().year
+                        publication_year and publication_year != datetime.now().year
                     )
 
                     # distribui as tarefas para executarem dentro de 1h
@@ -291,13 +297,13 @@ def sum_hours_and_minutes(hours_after_now, minutes_after_now, now=None):
 def get_or_create_crontab_schedule(day_of_week=None, hour=None, minute=None):
     try:
         crontab_schedule, status = CrontabSchedule.objects.get_or_create(
-            day_of_week=day_of_week or '*',
-            hour=hour or '*',
-            minute=minute or '*',
+            day_of_week=day_of_week or "*",
+            hour=hour or "*",
+            minute=minute or "*",
         )
     except Exception as e:
         raise exceptions.GetOrCreateCrontabScheduleError(
-            _('Unable to get_or_create_crontab_schedule {} {} {} {} {}').format(
+            _("Unable to get_or_create_crontab_schedule {} {} {} {} {}").format(
                 day_of_week, hour, minute, type(e), e
             )
         )
@@ -312,24 +318,43 @@ def insert_hyphen_in_YYYYMMMDD(YYYYMMMDD):
     return f"{YYYYMMMDD[:4]}-{YYYYMMMDD[4:6]}-{YYYYMMMDD[6:]}"
 
 
-def _register_failure(msg,
-                      collection_acron, action_name, object_name, pid,
-                      e,
-                      user_id,
-                      # exc_type, exc_value, exc_traceback,
-                      ):
+def _register_failure(
+    msg,
+    collection_acron,
+    action_name,
+    object_name,
+    pid,
+    e,
+    user_id,
+    # exc_type, exc_value, exc_traceback,
+):
     exc_type, exc_value, exc_traceback = sys.exc_info()
     logging.error(msg)
     logging.exception(e)
     register_failure(
-        collection_acron, action_name, object_name, pid,
-        e, exc_type, exc_value, exc_traceback,
+        collection_acron,
+        action_name,
+        object_name,
+        pid,
+        e,
+        exc_type,
+        exc_value,
+        exc_traceback,
         user_id,
     )
 
 
-def register_failure(collection_acron, action_name, object_name, pid, e,
-                     exc_type, exc_value, exc_traceback, user_id):
+def register_failure(
+    collection_acron,
+    action_name,
+    object_name,
+    pid,
+    e,
+    exc_type,
+    exc_value,
+    exc_traceback,
+    user_id,
+):
     migration_failure = MigrationFailure()
     migration_failure.collection_acron = collection_acron
     migration_failure.action_name = action_name
@@ -337,8 +362,7 @@ def register_failure(collection_acron, action_name, object_name, pid, e,
     migration_failure.pid = pid[:23]
     migration_failure.exception_msg = str(e)[:555]
     migration_failure.traceback = [
-        str(item)
-        for item in traceback.extract_tb(exc_traceback)
+        str(item) for item in traceback.extract_tb(exc_traceback)
     ]
     migration_failure.exception_type = str(type(e))
     migration_failure.creator = User.objects.get(pk=user_id)
@@ -361,7 +385,7 @@ def get_or_create_journal_migration(scielo_journal, creator_id):
             item.save()
     except Exception as e:
         raise exceptions.GetOrCreateJournalMigrationError(
-            _('Unable to get_or_create_journal_migration {} {} {}').format(
+            _("Unable to get_or_create_journal_migration {} {} {}").format(
                 scielo_journal, type(e), e
             )
         )
@@ -378,22 +402,20 @@ def get_journal_migration_status(scielo_issn):
         ).status
     except Exception as e:
         raise exceptions.GetJournalMigratioStatusError(
-            _('Unable to get_journal_migration_status {} {} {}').format(
+            _("Unable to get_journal_migration_status {} {} {}").format(
                 scielo_issn, type(e), e
             )
         )
 
 
 class MigrationConfigurationController:
-
     def __init__(self, collection_acron):
         self._collection_acron = collection_acron
 
     @property
     def config(self):
-        return (
-            MigrationConfiguration.objects.get(
-                classic_website_config__collection__acron=self._collection_acron)
+        return MigrationConfiguration.objects.get(
+            classic_website_config__collection__acron=self._collection_acron
         )
 
     def connect_db(self):
@@ -413,16 +435,16 @@ class MigrationConfigurationController:
         except Exception as e:
             raise exceptions.GetMigrationConfigurationError(
                 _("Unable to get classic website configuration {} {}").format(
-                    type(e), e)
+                    type(e), e
+                )
             )
 
     def get_source_file_path(self, db_name):
         try:
-            return getattr(self.classic_website, f'{db_name}_path')
+            return getattr(self.classic_website, f"{db_name}_path")
         except AttributeError:
             raise exceptions.GetMigrationConfigurationError(
-                _("Unable to get path of {} {} {}").format(
-                    db_name, type(e), e)
+                _("Unable to get path of {} {} {}").format(db_name, type(e), e)
             )
 
     def get_artigo_source_files_paths(self, journal_acron, issue_folder):
@@ -430,14 +452,19 @@ class MigrationConfigurationController:
         Apesar de fornecer `issue_folder` o retorno pode ser a base de dados
         inteira do `journal_acron`
         """
-        logging.info("Harvest classic website records {} {}".format(journal_acron, issue_folder))
+        logging.info(
+            "Harvest classic website records {} {}".format(journal_acron, issue_folder)
+        )
         try:
             artigo_source_files_paths = classic_ws.get_artigo_db_path(
-                journal_acron, issue_folder, self.classic_website)
+                journal_acron, issue_folder, self.classic_website
+            )
         except Exception as e:
             raise exceptions.IssueFilesStoreError(
                 _("Unable to get artigo db paths from classic website {} {} {}").format(
-                    journal_acron, issue_folder, e,
+                    journal_acron,
+                    issue_folder,
+                    e,
                 )
             )
         logging.info(artigo_source_files_paths)
@@ -454,8 +481,7 @@ class MigrationConfigurationController:
             }
         except Exception as e:
             raise exceptions.GetMigrationConfigurationError(
-                _("Unable to get classic website paths {} {}").format(
-                    type(e), e)
+                _("Unable to get classic website paths {} {}").format(type(e), e)
             )
 
     @property
@@ -464,8 +490,7 @@ class MigrationConfigurationController:
             return self.config.files_storage_config.bucket_public_subdir
         except Exception as e:
             raise exceptions.GetMigrationConfigurationError(
-                _("Unable to get bucket_public_subdir {} {}").format(
-                    type(e), e)
+                _("Unable to get bucket_public_subdir {} {}").format(type(e), e)
             )
 
     @property
@@ -474,8 +499,7 @@ class MigrationConfigurationController:
             return self.config.files_storage_config.bucket_migration_subdir
         except Exception as e:
             raise exceptions.GetMigrationConfigurationError(
-                _("Unable to get bucket_migration_subdir {} {}").format(
-                    type(e), e)
+                _("Unable to get bucket_migration_subdir {} {}").format(type(e), e)
             )
 
     @property
@@ -490,43 +514,51 @@ class MigrationConfigurationController:
                 minio_secret_key=files_storage_config.secret_key,
                 bucket_root=files_storage_config.bucket_root,
                 bucket_subdir=(
-                    files_storage_config.bucket_app_subdir or
-                    files_storage_config.bucket_public_subdir),
+                    files_storage_config.bucket_app_subdir
+                    or files_storage_config.bucket_public_subdir
+                ),
                 minio_secure=files_storage_config.secure,
                 minio_http_client=None,
             )
         except Exception as e:
             raise exceptions.GetFilesStorageError(
                 _("Unable to get MinioStorage {} {} {}").format(
-                    files_storage_config, type(e), e)
+                    files_storage_config, type(e), e
+                )
             )
 
     def store_issue_files(self, journal_acron, issue_folder):
         try:
             issue_files = classic_ws.get_issue_files(
-                journal_acron, issue_folder, self.classic_website_paths)
+                journal_acron, issue_folder, self.classic_website_paths
+            )
         except Exception as e:
             raise exceptions.IssueFilesStoreError(
                 _("Unable to get issue files from classic website {} {} {}").format(
-                    journal_acron, issue_folder, e,
+                    journal_acron,
+                    issue_folder,
+                    e,
                 )
             )
 
         for info in issue_files:
             try:
                 mimetype = None
-                name, ext = os.path.splitext(info['path'])
+                name, ext = os.path.splitext(info["path"])
                 if ext in (".xml", ".html", ".htm"):
                     subdir = self.bucket_migration_subdir
                     mimetype = "text/xml" if ext == ".xml" else "html"
                 else:
                     subdir = self.bucket_public_subdir
                 subdirs = os.path.join(
-                    subdir, journal_acron, issue_folder,
+                    subdir,
+                    journal_acron,
+                    issue_folder,
                 )
                 response = self.files_storage.register(
-                    info['path'], subdirs=subdirs, preserve_name=True)
-                info['relative_path'] = _get_classic_website_rel_path(info['path'])
+                    info["path"], subdirs=subdirs, preserve_name=True
+                )
+                info["relative_path"] = _get_classic_website_rel_path(info["path"])
                 info.update(response)
                 logging.info("Stored {} in files storage".format(info))
                 yield info
@@ -534,62 +566,76 @@ class MigrationConfigurationController:
             except Exception as e:
                 raise exceptions.IssueFilesStoreError(
                     _("Unable to store issue files {} {} {}").format(
-                        journal_acron, issue_folder, e,
+                        journal_acron,
+                        issue_folder,
+                        e,
                     )
                 )
 
 
 def migrate_journals(
-        user_id,
-        collection_acron,
-        force_update=False,
-        ):
+    user_id,
+    collection_acron,
+    force_update=False,
+):
     try:
         action = "migrate"
         mcc = MigrationConfigurationController(collection_acron)
         mcc.connect_db()
         source_file_path = mcc.get_source_file_path("title")
 
-        for scielo_issn, journal_data in classic_ws.get_records_by_source_path("title", source_file_path):
+        for scielo_issn, journal_data in classic_ws.get_records_by_source_path(
+            "title", source_file_path
+        ):
             try:
                 action = "import"
                 journal_migration = import_data_from_title_database(
-                    user_id, collection_acron,
-                    scielo_issn, journal_data[0], force_update)
+                    user_id,
+                    collection_acron,
+                    scielo_issn,
+                    journal_data[0],
+                    force_update,
+                )
                 action = "publish"
                 publish_imported_journal(journal_migration)
             except Exception as e:
                 _register_failure(
                     _("Error migrating journal {} {}").format(
-                        collection_acron, scielo_issn),
-                    collection_acron, action, "journal", scielo_issn,
+                        collection_acron, scielo_issn
+                    ),
+                    collection_acron,
+                    action,
+                    "journal",
+                    scielo_issn,
                     e,
                     user_id,
                 )
     except Exception as e:
         _register_failure(
-            _("Error migrating journal {} {}").format(
-                collection_acron, _("GENERAL")),
-            collection_acron, action, "journal", _("GENERAL"),
+            _("Error migrating journal {} {}").format(collection_acron, _("GENERAL")),
+            collection_acron,
+            action,
+            "journal",
+            _("GENERAL"),
             e,
             user_id,
         )
 
 
-def import_data_from_title_database(user_id, collection_acron, scielo_issn,
-                                    journal_data, force_update=False):
+def import_data_from_title_database(
+    user_id, collection_acron, scielo_issn, journal_data, force_update=False
+):
     """
     Create/update JournalMigration
     """
     journal = classic_ws.Journal(journal_data)
 
-    scielo_journal = get_scielo_journal(
-        journal, collection_acron, scielo_issn, user_id
-    )
+    scielo_journal = get_scielo_journal(journal, collection_acron, scielo_issn, user_id)
 
     # cria ou obtém journal_migration
     journal_migration = get_or_create_journal_migration(
-        scielo_journal, creator_id=user_id)
+        scielo_journal, creator_id=user_id
+    )
 
     # check if it needs to be update
     if journal_migration.isis_updated_date == journal.isis_updated_date:
@@ -614,7 +660,6 @@ def import_data_from_title_database(user_id, collection_acron, scielo_issn,
 
 
 def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
-
     try:
         # cria ou obtém official_journal
         official_journal = collection_controller.get_or_create_official_journal(
@@ -664,9 +709,7 @@ def get_scielo_journal(journal, collection_acron, scielo_issn, user_id):
             scielo_journal.save()
     except Exception as e:
         raise exceptions.JournalMigrationSaveError(
-            _("Unable to save scielo_journal {} {}").format(
-                scielo_journal, e
-            )
+            _("Unable to save scielo_journal {} {}").format(scielo_journal, e)
         )
     return scielo_journal
 
@@ -692,8 +735,7 @@ def publish_imported_journal(journal_migration):
         )
 
         for mission in journal.mission:
-            journal_to_publish.add_item_to_mission(
-                mission["language"], mission["text"])
+            journal_to_publish.add_item_to_mission(mission["language"], mission["text"])
 
         for item in journal.status_history:
             journal_to_publish.add_item_to_timeline(
@@ -737,7 +779,8 @@ def publish_imported_journal(journal_migration):
 
         # TODO confirmar se subject_categories é subject_descriptors
         journal_to_publish.add_thematic_scopes(
-            journal.subject_descriptors, journal.subject_areas,
+            journal.subject_descriptors,
+            journal.subject_areas,
         )
 
         # journal não tem este dado
@@ -757,8 +800,7 @@ def publish_imported_journal(journal_migration):
         journal_to_publish.publish_journal()
     except Exception as e:
         raise exceptions.PublishJournalError(
-            _("Unable to publish {} {} {}").format(
-                journal_migration, type(e), e)
+            _("Unable to publish {} {} {}").format(journal_migration, type(e), e)
         )
 
     try:
@@ -766,8 +808,7 @@ def publish_imported_journal(journal_migration):
         journal_migration.save()
     except Exception as e:
         raise exceptions.PublishJournalError(
-            _("Unable to publish {} {} {}").format(
-                journal_migration, type(e), e)
+            _("Unable to publish {} {} {}").format(journal_migration, type(e), e)
         )
 
 
@@ -787,7 +828,7 @@ def get_or_create_issue_migration(scielo_issue, creator_id):
             item.save()
     except Exception as e:
         raise exceptions.GetOrCreateIssueMigrationError(
-            _('Unable to get_or_create_issue_migration {} {} {}').format(
+            _("Unable to get_or_create_issue_migration {} {} {}").format(
                 scielo_issue, type(e), e
             )
         )
@@ -795,16 +836,18 @@ def get_or_create_issue_migration(scielo_issue, creator_id):
 
 
 def migrate_issues(
-        user_id,
-        collection_acron,
-        force_update=False,
-        ):
+    user_id,
+    collection_acron,
+    force_update=False,
+):
     try:
         mcc = MigrationConfigurationController(collection_acron)
         mcc.connect_db()
         source_file_path = mcc.get_source_file_path("issue")
 
-        for issue_pid, issue_data in classic_ws.get_records_by_source_path("issue", source_file_path):
+        for issue_pid, issue_data in classic_ws.get_records_by_source_path(
+            "issue", source_file_path
+        ):
             try:
                 action = "import"
                 issue_migration = import_data_from_issue_database(
@@ -826,47 +869,65 @@ def migrate_issues(
                     publish_imported_issue(issue_migration)
             except Exception as e:
                 _register_failure(
-                    _("Error migrating issue {} {}").format(collection_acron, issue_pid),
-                    collection_acron, action, "issue", issue_pid,
+                    _("Error migrating issue {} {}").format(
+                        collection_acron, issue_pid
+                    ),
+                    collection_acron,
+                    action,
+                    "issue",
+                    issue_pid,
                     e,
                     user_id,
                 )
     except Exception as e:
         _register_failure(
             _("Error migrating issue {}").format(collection_acron),
-            collection_acron, "migrate", "issue", "GENERAL",
+            collection_acron,
+            "migrate",
+            "issue",
+            "GENERAL",
             e,
             user_id,
         )
 
 
 def import_data_from_issue_database(
-        user_id,
-        collection_acron,
-        scielo_issn,
-        issue_pid,
-        issue_data,
-        force_update=False,
-        ):
+    user_id,
+    collection_acron,
+    scielo_issn,
+    issue_pid,
+    issue_data,
+    force_update=False,
+):
     """
     Create/update IssueMigration
     """
-    logging.info("Import data from database issue {} {} {}".format(
-        collection_acron, scielo_issn, issue_pid))
+    logging.info(
+        "Import data from database issue {} {} {}".format(
+            collection_acron, scielo_issn, issue_pid
+        )
+    )
     issue = classic_ws.Issue(issue_data)
 
     scielo_issue = get_scielo_issue(
-        issue, collection_acron, scielo_issn, issue_pid, user_id)
+        issue, collection_acron, scielo_issn, issue_pid, user_id
+    )
 
-    issue_migration = get_or_create_issue_migration(
-        scielo_issue, creator_id=user_id)
+    issue_migration = get_or_create_issue_migration(scielo_issue, creator_id=user_id)
 
     # check if it needs to be update
     if issue_migration.isis_updated_date == issue.isis_updated_date:
         if not force_update:
             # nao precisa atualizar
-            logging.info("Skipped: Import data from database issue {} {} {} {} {}".format(
-                collection_acron, scielo_issn, issue_pid, issue_migration.status, force_update))
+            logging.info(
+                "Skipped: Import data from database issue {} {} {} {} {}".format(
+                    collection_acron,
+                    scielo_issn,
+                    issue_pid,
+                    issue_migration.status,
+                    force_update,
+                )
+            )
             return issue_migration
     try:
         issue_migration.isis_created_date = issue.isis_created_date
@@ -879,7 +940,11 @@ def import_data_from_issue_database(
         issue_migration.save()
         return issue_migration
     except Exception as e:
-        logging.error(_("Error importing issue {} {} {}").format(collection_acron, issue_pid, issue_data))
+        logging.error(
+            _("Error importing issue {} {} {}").format(
+                collection_acron, issue_pid, issue_data
+            )
+        )
         logging.exception(e)
         raise exceptions.IssueMigrationSaveError(
             _("Unable to save {} migration {} {} {}").format(
@@ -895,18 +960,21 @@ def _get_months_from_issue(issue):
     months_names = {}
     for item in issue.bibliographic_strip_months:
         if item.get("text"):
-            months_names[item['lang']] = item.get("text")
+            months_names[item["lang"]] = item.get("text")
     if months_names:
         return months_names.get("en") or months_names.values()[0]
 
 
 def get_scielo_issue(issue, collection_acron, scielo_issn, issue_pid, user_id):
-    logging.info(_("Get SciELO Issue {} {} {}").format(collection_acron, scielo_issn, issue_pid))
+    logging.info(
+        _("Get SciELO Issue {} {} {}").format(collection_acron, scielo_issn, issue_pid)
+    )
 
     try:
         # obtém scielo_journal para criar ou obter scielo_issue
         scielo_journal = collection_controller.get_scielo_journal(
-            collection_acron, scielo_issn)
+            collection_acron, scielo_issn
+        )
 
         # cria ou obtém scielo_issue
         scielo_issue = collection_controller.get_or_create_scielo_issue(
@@ -915,14 +983,17 @@ def get_scielo_issue(issue, collection_acron, scielo_issn, issue_pid, user_id):
             issue.issue_label,
             user_id,
         )
-        logging.info("Check if it is press release = {}".format(
-            bool(issue.is_press_release)))
+        logging.info(
+            "Check if it is press release = {}".format(bool(issue.is_press_release))
+        )
         if not issue.is_press_release:
-            # press release não é um documento oficial, 
+            # press release não é um documento oficial,
             # sendo assim, não será criado official issue correspondente
             try:
                 # obtém ou cria official_issue
-                logging.info(_("Create official issue to add to SciELO {}").format(scielo_issue))
+                logging.info(
+                    _("Create official issue to add to SciELO {}").format(scielo_issue)
+                )
 
                 flexible_date = parse_non_standard_date(issue.publication_date)
                 months = parse_months_names(_get_months_from_issue(issue))
@@ -942,8 +1013,8 @@ def get_scielo_issue(issue, collection_acron, scielo_issn, issue_pid, user_id):
                 scielo_issue.official_issue = official_issue
                 scielo_issue.save()
                 logging.info(
-                        _("Created official issue to add to SciELO {}"
-                    ).format(scielo_issue))
+                    _("Created official issue to add to SciELO {}").format(scielo_issue)
+                )
             except Exception as e:
                 raise exceptions.SetOfficialIssueToSciELOIssueError(
                     _("Unable to set official issue to SciELO issue {} {} {}").format(
@@ -953,9 +1024,7 @@ def get_scielo_issue(issue, collection_acron, scielo_issn, issue_pid, user_id):
         return scielo_issue
     except Exception as e:
         raise exceptions.GetSciELOIssueError(
-            _("Unable to get SciELO issue {} {} {}").format(
-                scielo_issue, type(e), e
-            )
+            _("Unable to get SciELO issue {} {} {}").format(scielo_issue, type(e), e)
         )
 
 
@@ -981,16 +1050,14 @@ def publish_imported_issue(issue_migration):
         issue_to_publish = IssueToPublish(published_id)
 
         issue_to_publish.add_identification(
-            issue.volume,
-            issue.number,
-            issue.supplement)
+            issue.volume, issue.number, issue.supplement
+        )
         issue_to_publish.add_journal(issue.journal)
         issue_to_publish.add_order(int(issue.order[4:]))
         issue_to_publish.add_pid(issue.pid)
         issue_to_publish.add_publication_date(
-            issue.publication_year,
-            issue.start_month,
-            issue.end_month)
+            issue.publication_year, issue.start_month, issue.end_month
+        )
         # FIXME indica se há artigos / documentos
         # para uso de indicação fascículo aop "desativado"
         issue_to_publish.has_docs = []
@@ -999,7 +1066,8 @@ def publish_imported_issue(issue_migration):
     except Exception as e:
         raise exceptions.PublishIssueError(
             _("Unable to publish {} {}").format(
-                issue_migration.scielo_issue.issue_pid, e)
+                issue_migration.scielo_issue.issue_pid, e
+            )
         )
 
     try:
@@ -1008,7 +1076,8 @@ def publish_imported_issue(issue_migration):
     except Exception as e:
         raise exceptions.PublishIssueError(
             _("Unable to upate issue_migration status {} {}").format(
-                issue_migration.scielo_issue.issue_pid, e)
+                issue_migration.scielo_issue.issue_pid, e
+            )
         )
 
 
@@ -1026,7 +1095,7 @@ def get_or_create_document_migration(scielo_document, creator_id):
             dm.save()
     except Exception as e:
         raise exceptions.GetOrCreateDocumentMigrationError(
-            _('Unable to get_or_create_document_migration {} {} {}').format(
+            _("Unable to get_or_create_document_migration {} {} {}").format(
                 scielo_document, type(e), e
             )
         )
@@ -1034,20 +1103,17 @@ def get_or_create_document_migration(scielo_document, creator_id):
 
 
 def import_issues_files_and_migrate_documents(
-        user_id,
-        collection_acron,
-        scielo_issn=None,
-        publication_year=None,
-        force_update=False,
-        ):
-
-    params = {
-        'scielo_issue__scielo_journal__collection__acron': collection_acron
-    }
+    user_id,
+    collection_acron,
+    scielo_issn=None,
+    publication_year=None,
+    force_update=False,
+):
+    params = {"scielo_issue__scielo_journal__collection__acron": collection_acron}
     if scielo_issn:
-        params['scielo_issue__scielo_journal__scielo_issn'] = scielo_issn
+        params["scielo_issue__scielo_journal__scielo_issn"] = scielo_issn
     if publication_year:
-        params['scielo_issue__official_issue__publication_year'] = publication_year
+        params["scielo_issue__official_issue__publication_year"] = publication_year
 
     logging.info(params)
 
@@ -1070,7 +1136,9 @@ def import_issues_files_and_migrate_documents(
         except Exception as e:
             _register_failure(
                 _("Error import isse files of {}").format(issue_migration),
-                collection_acron, "import", "issue files",
+                collection_acron,
+                "import",
+                "issue files",
                 issue_migration.scielo_issue.issue_pid,
                 e,
                 user_id,
@@ -1079,10 +1147,9 @@ def import_issues_files_and_migrate_documents(
     for issue_migration in items:
         try:
             for source_file_path in mcc.get_artigo_source_files_paths(
-                    issue_migration.scielo_issue.scielo_journal.acron,
-                    issue_migration.scielo_issue.issue_folder,
-                    ):
-
+                issue_migration.scielo_issue.scielo_journal.acron,
+                issue_migration.scielo_issue.issue_folder,
+            ):
                 # migra os documentos da base de dados `source_file_path`
                 # que não contém necessariamente os dados de só 1 fascículo
                 migrate_documents(
@@ -1098,7 +1165,9 @@ def import_issues_files_and_migrate_documents(
         except Exception as e:
             _register_failure(
                 _("Error importing documents of {}").format(issue_migration),
-                collection_acron, "import", "document",
+                collection_acron,
+                "import",
+                "document",
                 issue_migration.scielo_issue.issue_pid,
                 e,
                 user_id,
@@ -1106,18 +1175,19 @@ def import_issues_files_and_migrate_documents(
 
 
 def import_issue_files(
-        user_id,
-        issue_migration,
-        store_issue_files,
-        force_update,
-        ):
+    user_id,
+    issue_migration,
+    store_issue_files,
+    force_update,
+):
     """135
     Migra os arquivos do fascículo (pdf, img, xml ou html)
     """
     logging.info("Import issue files {}".format(issue_migration.scielo_issue))
     if issue_migration.files_status == MS_IMPORTED and not force_update:
-        logging.info("Skipped: Import files from classic website {}".format(
-            issue_migration))
+        logging.info(
+            "Skipped: Import files from classic website {}".format(issue_migration)
+        )
         return
 
     ClassFileModels = {
@@ -1130,23 +1200,21 @@ def import_issue_files(
         scielo_issue = issue_migration.scielo_issue
         issue = classic_ws.Issue(issue_migration.data)
         for item in store_issue_files(
-                scielo_issue.scielo_journal.acron,
-                scielo_issue.issue_folder,
-                ):
+            scielo_issue.scielo_journal.acron,
+            scielo_issue.issue_folder,
+        ):
             logging.info("Register stored classic file {}".format(item))
 
-            ClassFile = ClassFileModels[item.pop('type')]
-            item['file_id'] = item.get('key')
-            params = {
-                k: item[k]
-                for k in item.keys()
-                if hasattr(ClassFile, k)
-            }
-            params['scielo_issue'] = scielo_issue
+            ClassFile = ClassFileModels[item.pop("type")]
+            item["file_id"] = item.get("key")
+            params = {k: item[k] for k in item.keys() if hasattr(ClassFile, k)}
+            params["scielo_issue"] = scielo_issue
 
             try:
                 # delete file if exists
-                del_res = ClassFile.objects.filter(relative_path=item['relative_path']).delete()
+                del_res = ClassFile.objects.filter(
+                    relative_path=item["relative_path"]
+                ).delete()
             except Exception as e:
                 logging.info(e)
             try:
@@ -1163,20 +1231,19 @@ def import_issue_files(
         issue_migration.save()
     except Exception as e:
         raise exceptions.IssueFilesMigrationSaveError(
-            _("Unable to save issue files migration {} {}").format(
-                scielo_issue, e)
+            _("Unable to save issue files migration {} {}").format(scielo_issue, e)
         )
 
 
 def migrate_documents(
-        user_id,
-        collection_acron,
-        source_file_path,
-        files_storage,
-        bucket_public_subdir,
-        issue_migration,
-        force_update=False,
-        ):
+    user_id,
+    collection_acron,
+    source_file_path,
+    files_storage,
+    bucket_public_subdir,
+    issue_migration,
+    force_update=False,
+):
     """
     Importa os registros presentes na base de dados `source_file_path`
     Importa os arquivos dos documentos (xml, pdf, html, imagens)
@@ -1191,25 +1258,30 @@ def migrate_documents(
             scielo_journal=issue_migration.scielo_issue.scielo_journal
         )
         journal_issue_and_document_data = {
-            'title': journal_migration.data,
-            'issue': issue_migration.data,
+            "title": journal_migration.data,
+            "issue": issue_migration.data,
         }
 
         # obtém registros da base "artigo" que não necessariamente é só
         # do fascículo de issue_migration
         # possivelmente source_file pode conter registros de outros fascículos
         # se source_file for acrônimo
-        logging.info("Importing documents records from source_file_path={}".format(source_file_path))
+        logging.info(
+            "Importing documents records from source_file_path={}".format(
+                source_file_path
+            )
+        )
         for grp_id, grp_records in classic_ws.get_records_by_source_path(
-                "artigo", source_file_path):
+            "artigo", source_file_path
+        ):
             try:
                 logging.info(_("Get {} from {}").format(grp_id, source_file_path))
                 if len(grp_records) == 1:
                     # é possível que em source_file_path exista registro tipo i
-                    journal_issue_and_document_data['issue'] = grp_records[0]
+                    journal_issue_and_document_data["issue"] = grp_records[0]
                     continue
 
-                journal_issue_and_document_data['article'] = grp_records
+                journal_issue_and_document_data["article"] = grp_records
 
                 # instancia Document com registros de title, issue e artigo
                 document = classic_ws.Document(journal_issue_and_document_data)
@@ -1218,8 +1290,8 @@ def migrate_documents(
                 issue_pid = document.issue.pid
 
                 scielo_issue = get_scielo_issue(
-                    document.issue, collection_acron, scielo_issn,
-                    issue_pid, user_id)
+                    document.issue, collection_acron, scielo_issn, issue_pid, user_id
+                )
 
                 scielo_document = collection_controller.get_or_create_scielo_document(
                     scielo_issue,
@@ -1242,35 +1314,45 @@ def migrate_documents(
                 document_files_controller.info()
 
                 import_document(
-                    pid, document, document_migration,
+                    pid,
+                    document,
+                    document_migration,
                     journal_issue_and_document_data,
                     force_update,
                 )
 
                 publish_document(
-                    pid, document, document_migration,
+                    pid,
+                    document,
+                    document_migration,
                     document_files_controller,
                 )
 
             except Exception as e:
                 _register_failure(
-                    _('Error migrating document {}').format(pid),
-                    collection_acron, "migrate", "document", pid,
+                    _("Error migrating document {}").format(pid),
+                    collection_acron,
+                    "migrate",
+                    "document",
+                    pid,
                     e,
                     user_id,
                 )
     except Exception as e:
         _register_failure(
-            _('Error migrating documents'),
-            collection_acron, "migrate", "document", "GENERAL",
+            _("Error migrating documents"),
+            collection_acron,
+            "migrate",
+            "document",
+            "GENERAL",
             e,
             user_id,
         )
 
 
-def import_document(pid, document, document_migration,
-                    document_data,
-                    force_update=False):
+def import_document(
+    pid, document, document_migration, document_data, force_update=False
+):
     """
     Create/update DocumentMigration
     """
@@ -1280,7 +1362,9 @@ def import_document(pid, document, document_migration,
             # nao precisa atualizar
             logging.info(
                 "Skipped: Import documents from classic website {}. It is already up to date".format(
-                document_migration))
+                    document_migration
+                )
+            )
             return
     try:
         document_migration.isis_created_date = document.isis_created_date
@@ -1290,9 +1374,7 @@ def import_document(pid, document, document_migration,
         document_migration.save()
     except Exception as e:
         raise exceptions.DocumentMigrationSaveError(
-            _("Unable to save document migration {} {}").format(
-                pid, e
-            )
+            _("Unable to save document migration {} {}").format(pid, e)
         )
 
 
@@ -1307,13 +1389,17 @@ def publish_document(pid, document, document_migration, document_files_controlle
     if doc_to_publish.doc.created:
         logging.info(
             "Skipped: Publish document {}. It is already published {}".format(
-                document_migration, doc_to_publish.doc.created))
+                document_migration, doc_to_publish.doc.created
+            )
+        )
         return
 
     if document_migration.status != MS_IMPORTED:
         logging.info(
             "Skipped: Publish document {}. Migration status = {} ".format(
-                document_migration, document_migration.status))
+                document_migration, document_migration.status
+            )
+        )
         return
 
     try:
@@ -1336,7 +1422,8 @@ def publish_document(pid, document, document_migration, document_files_controlle
         )
         for item in document.authors:
             doc_to_publish.add_author(
-                item['surname'], item['given_names'],
+                item["surname"],
+                item["given_names"],
                 item.get("suffix"),
                 item.get("affiliation"),
                 item.get("orcid"),
@@ -1376,7 +1463,7 @@ def publish_document(pid, document, document_migration, document_files_controlle
             doc_to_publish.add_doi_with_lang(item["language"], item["doi"])
 
         for item in document.abstracts:
-            doc_to_publish.add_abstract(item['language'], item['text'])
+            doc_to_publish.add_abstract(item["language"], item["text"])
 
         # nao há translated sections
         # TODO necessario resolver
@@ -1385,7 +1472,8 @@ def publish_document(pid, document, document_migration, document_files_controlle
 
         for item in document.translated_titles:
             doc_to_publish.add_translated_title(
-                item['language'], item['text'],
+                item["language"],
+                item["text"],
             )
         for lang, keywords in document.keywords_groups.items():
             doc_to_publish.add_keywords(lang, keywords)
@@ -1398,7 +1486,7 @@ def publish_document(pid, document, document_migration, document_files_controlle
 
         # htmls
         for item in document_files_controller.text_langs:
-            doc_to_publish.add_html(item['lang'], uri=None)
+            doc_to_publish.add_html(item["lang"], uri=None)
 
         # pdfs
         for item in document_files_controller.rendition_files:
@@ -1406,16 +1494,17 @@ def publish_document(pid, document, document_migration, document_files_controlle
                 lang=item.lang,
                 url=item.uri,
                 filename=item.name,
-                type='pdf',
+                type="pdf",
             )
 
         # mat supl
         for item in document_files_controller.supplementary_materials:
             doc_to_publish.add_mat_suppl(
-                lang=item['lang'],
-                url=item['uri'],
-                ref_id=item['ref_id'],
-                filename=item['name'])
+                lang=item["lang"],
+                url=item["uri"],
+                ref_id=item["ref_id"],
+                filename=item["name"],
+            )
 
         # RELATED
         # doc_to_publish.add_related_article(doi, ref_id, related_type)
@@ -1427,8 +1516,8 @@ def publish_document(pid, document, document_migration, document_files_controlle
         for item in document_files_controller.related_items:
             logging.info(item)
             doc_to_publish.add_related_article(
-                doi=item['href'],
-                ref_id=item['id'],
+                doi=item["href"],
+                ref_id=item["id"],
                 related_type=item["related-article-type"],
             )
 
@@ -1444,26 +1533,23 @@ def publish_document(pid, document, document_migration, document_files_controlle
         document_migration.save()
     except Exception as e:
         raise exceptions.PublishDocumentError(
-            _("Unable to upate document_migration status {} {}").format(
-                pid, e
-            )
+            _("Unable to upate document_migration status {} {}").format(pid, e)
         )
 
 
 class DocumentFilesController:
-
-    def __init__(self,
-                 main_language,
-                 scielo_document,
-                 files_storage,
-                 bucket_public_subdir,
-                 ):
-        self._bucket_public_subdir = (
-            os.path.join(
-                bucket_public_subdir,
-                scielo_document.scielo_issue.scielo_journal.acron,
-                scielo_document.scielo_issue.issue_folder,
-            ))
+    def __init__(
+        self,
+        main_language,
+        scielo_document,
+        files_storage,
+        bucket_public_subdir,
+    ):
+        self._bucket_public_subdir = os.path.join(
+            bucket_public_subdir,
+            scielo_document.scielo_issue.scielo_journal.acron,
+            scielo_document.scielo_issue.issue_folder,
+        )
         self.files_storage = files_storage
         self.scielo_document = scielo_document
         self._main_language = main_language
@@ -1472,7 +1558,9 @@ class DocumentFilesController:
         logging.info("DocumentFilesController {}".format(self.scielo_document))
         for item in self.xml_files:
             logging.info("xmlfile: {} {}".format(self.scielo_document, item))
-            logging.info("public: {} {}".format(item.public_uri, item.public_object_name))
+            logging.info(
+                "public: {} {}".format(item.public_uri, item.public_object_name)
+            )
             logging.info("xml file asset: {} {}".format(self.scielo_document, item))
             for asset in item.assets_files.all():
                 logging.info("{} {} {}".format(self.scielo_document, item, asset))
@@ -1481,7 +1569,11 @@ class DocumentFilesController:
         for item in self.html_files:
             logging.info("html file: {} {}".format(self.scielo_document, item))
             for asset in item.assets_files.all():
-                logging.info("html file asset: {} {} {}".format(self.scielo_document, item, asset))
+                logging.info(
+                    "html file asset: {} {} {}".format(
+                        self.scielo_document, item, asset
+                    )
+                )
 
     def add_scielo_document_to_files(self):
         self.add_rendition_files()
@@ -1518,8 +1610,7 @@ class DocumentFilesController:
                 article_renditions = article.article_renditions
                 item.lang = article_renditions[0].language
                 item.languages = [
-                    {"lang": rendition.language}
-                    for rendition in article_renditions
+                    {"lang": rendition.language} for rendition in article_renditions
                 ]
                 item.save()
                 logging.info(item)
@@ -1539,7 +1630,7 @@ class DocumentFilesController:
             main_pdf = FileWithLang.objects.get(
                 scielo_issue=self.scielo_document.scielo_issue,
                 file_id=self.scielo_document.file_id,
-                lang='main'
+                lang="main",
             )
             main_pdf.lang = self._main_language
             main_pdf.save()
@@ -1565,40 +1656,39 @@ class DocumentFilesController:
 
     @property
     def rendition_files(self):
-        if not hasattr(self, '_rendition_files') or not self._rendition_files:
+        if not hasattr(self, "_rendition_files") or not self._rendition_files:
             self.add_rendition_files()
         return self._rendition_files
 
     @property
     def html_files(self):
-        if not hasattr(self, '_html_files') or not self._html_files:
+        if not hasattr(self, "_html_files") or not self._html_files:
             self.add_html_files()
         return self._html_files
 
     @property
     def xml_files(self):
-        if not hasattr(self, '_xml_files') or not self._xml_files:
+        if not hasattr(self, "_xml_files") or not self._xml_files:
             self.add_xml_files()
         return self._xml_files
 
     @property
     def xmltree(self):
-        if not hasattr(self, '_xmltree') or not self._xmltree:
+        if not hasattr(self, "_xmltree") or not self._xmltree:
             self.add_langs_to_xml_files()
         return self._xmltree
 
     @property
     def issue_assets_uri(self):
-        if not hasattr(self, '_issue_assets_uri') or not self._issue_assets_uri:
+        if not hasattr(self, "_issue_assets_uri") or not self._issue_assets_uri:
             self._issue_assets_uri = {
-                name: asset.uri
-                for name, asset in self.issue_assets_dict.items()
+                name: asset.uri for name, asset in self.issue_assets_dict.items()
             }
         return self._issue_assets_uri
 
     @property
     def issue_assets_dict(self):
-        if not hasattr(self, '_issue_assets_as_dict') or not self._issue_assets_as_dict:
+        if not hasattr(self, "_issue_assets_as_dict") or not self._issue_assets_as_dict:
             self._issue_assets_as_dict = {
                 asset.name: asset
                 for asset in AssetFile.objects.filter(
@@ -1609,7 +1699,7 @@ class DocumentFilesController:
 
     @property
     def text_langs(self):
-        if not hasattr(self, '_text_langs') or not self._text_langs:
+        if not hasattr(self, "_text_langs") or not self._text_langs:
             if self.xmltree:
                 self._text_langs = []
                 for lang, xmltree in self.xmltree.items():
@@ -1625,7 +1715,7 @@ class DocumentFilesController:
 
     @property
     def related_items(self):
-        if not hasattr(self, '_related_items') or not self._related_items:
+        if not hasattr(self, "_related_items") or not self._related_items:
             items = []
             for lang, xmltree in self.xmltree.items():
                 related = RelatedItems(xmltree)
@@ -1639,9 +1729,11 @@ class DocumentFilesController:
         )
 
     def add_supplementary_material_flag_to_assets(self):
-        logging.info(_("Add supplementary material flag to assets {}").format(
-            self.scielo_document
-        ))
+        logging.info(
+            _("Add supplementary material flag to assets {}").format(
+                self.scielo_document
+            )
+        )
         self._supplementary_materials = []
         for lang, xmltree in self.xmltree.items():
             try:
@@ -1650,31 +1742,42 @@ class DocumentFilesController:
                     try:
                         asset_file = self.issue_assets_dict.get(sm.name)
                         if asset_file:
-                            # FIXME tratar asset_file nao encontrado 
+                            # FIXME tratar asset_file nao encontrado
                             asset_file.is_supplementary_material = True
                             asset_file.save()
-                            self._supplementary_materials.append({
-                                "uri": asset_file.uri,
-                                "lang": lang,
-                                "ref_id": None,
-                                "filename": sm.name,
-                            })
+                            self._supplementary_materials.append(
+                                {
+                                    "uri": asset_file.uri,
+                                    "lang": lang,
+                                    "ref_id": None,
+                                    "filename": sm.name,
+                                }
+                            )
                     except Exception as e:
                         raise exceptions.AddSupplementaryMaterialFlagToAssetError(
-                            _("Unable to add supplentary material flag to asset {} {} {} {}").format(self.scielo_document, lang, type(e), e)
+                            _(
+                                "Unable to add supplentary material flag to asset {} {} {} {}"
+                            ).format(self.scielo_document, lang, type(e), e)
                         )
 
             except Exception as e:
                 raise exceptions.AddSupplementaryMaterialFlagToAssetError(
-                    _("Unable to add supplentary material flag to asset {} {} {} {}").format(self.scielo_document, lang, type(e), e)
+                    _(
+                        "Unable to add supplentary material flag to asset {} {} {} {}"
+                    ).format(self.scielo_document, lang, type(e), e)
                 )
-        logging.info(_("Added supplementary material flag to assets {}").format(
-            self.scielo_document
-        ))
+        logging.info(
+            _("Added supplementary material flag to assets {}").format(
+                self.scielo_document
+            )
+        )
 
     @property
     def supplementary_materials(self):
-        if not hasattr(self, '_supplementary_materials') or not self._supplementary_materials:
+        if (
+            not hasattr(self, "_supplementary_materials")
+            or not self._supplementary_materials
+        ):
             self.add_supplementary_material_flag_to_assets()
         return self._supplementary_materials
 
@@ -1682,9 +1785,7 @@ class DocumentFilesController:
         if not self.xmltree:
             return
 
-        logging.info(_("Add public xml files to {}").format(
-            self.scielo_document
-        ))
+        logging.info(_("Add public xml files to {}").format(self.scielo_document))
         from_to = self.issue_assets_uri
 
         for xml_file in self.xml_files:
@@ -1711,7 +1812,7 @@ class DocumentFilesController:
                 uri = self.files_storage.fput_content(
                     tostring(article_assets.xmltree),
                     mimetype="text/xml",
-                    object_name=object_name
+                    object_name=object_name,
                 )
                 xml_file.public_uri = uri
                 xml_file.public_object_name = object_name
@@ -1721,4 +1822,5 @@ class DocumentFilesController:
                 raise exceptions.AddPublicXMLError(
                     _("Unable to add public XML to {} {} {})").format(
                         xml_file, type(e), e
-                    ))
+                    )
+                )

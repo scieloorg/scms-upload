@@ -3,10 +3,9 @@ from wagtail.admin.forms import WagtailAdminModelForm
 
 
 class UploadPackageForm(WagtailAdminModelForm):
-
     def save_all(self, user, article, issue):
         upload_package = super().save(commit=False)
-        
+
         if self.instance.pk is None:
             upload_package.creator = user
 
@@ -15,20 +14,19 @@ class UploadPackageForm(WagtailAdminModelForm):
 
         if issue is not None:
             upload_package.issue = issue
-        
+
         self.save()
 
         return upload_package
 
 
 class ValidationResultForm(WagtailAdminModelForm):
-
     def save_all(self, user):
         vr_obj = super().save(commit=False)
-        
+
         if self.instance.pk is None:
-            vr_obj.creator = user        
-        
+            vr_obj.creator = user
+
         self.save()
 
         return vr_obj

@@ -46,11 +46,15 @@ def sha1(path):
 
 class MinioStorage:
     def __init__(
-        self, minio_host, minio_access_key, minio_secret_key,
-        bucket_root, bucket_subdir,
-        minio_secure=True, minio_http_client=None,
+        self,
+        minio_host,
+        minio_access_key,
+        minio_secret_key,
+        bucket_root,
+        bucket_subdir,
+        minio_secure=True,
+        minio_http_client=None,
     ):
-
         self.bucket_root = bucket_root
         self.POLICY_READ_ONLY = {
             "Version": "2012-10-17",
@@ -89,7 +93,7 @@ class MinioStorage:
                 access_key=self.minio_access_key,
                 secret_key=self.minio_secret_key,
                 secure=self.minio_secure,
-                http_client=self.http_client
+                http_client=self.http_client,
             )
             logger.debug(
                 "new Minio client created: <%s at %s>",
@@ -106,9 +110,7 @@ class MinioStorage:
 
     def _create_bucket(self):
         # Make a bucket with the make_bucket API call.
-        self._client.make_bucket(
-            self.bucket_root, location=self.bucket_subdir
-        )
+        self._client.make_bucket(self.bucket_root, location=self.bucket_subdir)
         self._set_public_bucket()
 
     def _set_public_bucket(self):
@@ -135,7 +137,9 @@ class MinioStorage:
         url = self._client.presigned_get_object(self.bucket_root, media_path)
         return url.split("?")[0]
 
-    def register(self, file_path, subdirs="", original_uri=None, preserve_name=False) -> str:
+    def register(
+        self, file_path, subdirs="", original_uri=None, preserve_name=False
+    ) -> str:
         object_name = self.build_object_name(file_path, subdirs, preserve_name)
         metadata = {"origin_name": os.path.basename(file_path)}
         if original_uri is not None:
@@ -146,9 +150,7 @@ class MinioStorage:
         )
         uri = self.fput(file_path, object_name)
 
-        metadata.update(
-            {"object_name": object_name, "uri": uri}
-        )
+        metadata.update({"object_name": object_name, "uri": uri})
         return metadata
 
     def fput(self, file_path, object_name, mimetype=None) -> str:
@@ -193,7 +195,8 @@ class MinioStorage:
 
         try:
             self._client.fget_object(
-                self.bucket_root, object_name, downloaded_file_path)
+                self.bucket_root, object_name, downloaded_file_path
+            )
         except Exception as err:
             raise FileStorageResponseError(err)
 
@@ -227,5 +230,6 @@ class MinioStorage:
                         files[filename] = file_path
         except BadZipFile as e:
             raise GetZipFileItemsError(
-                "Unable to get items from %s %s" % (object_name, e))
+                "Unable to get items from %s %s" % (object_name, e)
+            )
         return files
