@@ -17,6 +17,23 @@ class Researcher(ClusterableModel, CommonControlField):
     """
     Class that represent the Researcher
     """
+    given_names = models.CharField(
+        _("Given names"), max_length=128, blank=False, null=False
+    )
+    last_name = models.CharField(
+        _("Last name"), max_length=128, blank=False, null=False
+    )
+    suffix = models.CharField(_("Suffix"), max_length=128, blank=True, null=True)
+    orcid = models.TextField(_("ORCID"), blank=True, null=True)
+    lattes = models.TextField(_("Lattes"), blank=True, null=True)
+    gender = models.CharField(_("Gender"), max_length=1, choices=choices.GENDER)
+    gender_identification_status = models.CharField(
+        _("Gender identification status"),
+        max_length=255,
+        choices=choices.GENDER_IDENTIFICATION_STATUS,
+        null=False,
+        blank=False,
+    )
 
     def __unicode__(self):
         return "%s%s, %s (%s)" % (
@@ -33,26 +50,6 @@ class Researcher(ClusterableModel, CommonControlField):
             self.given_names,
             self.orcid,
         )
-
-    given_names = models.CharField(
-        _("Given names"), max_length=128, blank=False, null=False
-    )
-    last_name = models.CharField(
-        _("Last name"), max_length=128, blank=False, null=False
-    )
-    suffix = models.CharField(_("Suffix"), max_length=128, blank=True, null=True)
-    orcid = models.CharField(_("ORCID"), max_length=128, blank=True, null=True)
-    lattes = models.CharField(_("Lattes"), max_length=128, blank=True, null=True)
-    gender = models.CharField(
-        _("Gender"), max_length=255, choices=choices.GENDER, null=False, blank=False
-    )
-    gender_identification_status = models.CharField(
-        _("Gender identification status"),
-        max_length=255,
-        choices=choices.GENDER_IDENTIFICATION_STATUS,
-        null=False,
-        blank=False,
-    )
 
     panels = [
         FieldPanel("given_names"),
