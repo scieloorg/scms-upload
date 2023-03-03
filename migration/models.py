@@ -66,14 +66,18 @@ class MigratedData(CommonControlField):
 
 
 class MigrationFailure(CommonControlField):
-    action_name = models.CharField(_("Action"), max_length=255, null=False, blank=False)
-    object_name = models.CharField(_("Object"), max_length=255, null=False, blank=False)
+    action_name = models.TextField(_("Action"), null=False, blank=False)
+    object_name = models.TextField(_("Object"), null=False, blank=False)
     pid = models.CharField(_("Item PID"), max_length=23, null=False, blank=False)
-    exception_type = models.CharField(
-        _("Exception Type"), max_length=255, null=False, blank=False
+    exception_type = models.TextField(
+        _("Exception Type"),
+        null=False,
+        blank=False
     )
-    exception_msg = models.CharField(
-        _("Exception Msg"), max_length=555, null=False, blank=False
+    exception_msg = models.TextField(
+        _("Exception Msg"),
+        null=False,
+        blank=False
     )
     traceback = models.JSONField(null=True, blank=True)
 
