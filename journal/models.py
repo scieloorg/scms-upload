@@ -29,19 +29,28 @@ class OfficialJournal(CommonControlField):
     def __str__(self):
         return "%s" % (self.title)
 
-    title = models.CharField(_("Official Title"), max_length=256, null=True, blank=True)
-    title_iso = models.CharField(_("Title ISO"), max_length=256, null=True, blank=True)
-    short_title = models.CharField(
-        _("Short Title"), max_length=256, null=True, blank=True
-    )
-    nlm_title = models.CharField(_("NLM Title"), max_length=256, null=True, blank=True)
+    title = models.TextField(_("Official Title"), null=True, blank=True)
+    title_iso = models.TextField(_("Title ISO"), null=True, blank=True)
+    short_title = models.TextField(_("Short Title"), null=True, blank=True)
+    nlm_title = models.TextField(_("NLM Title"), null=True, blank=True)
 
     foundation_date = models.CharField(
-        _("Foundation Date"), max_length=25, null=True, blank=True
+        _("Foundation Date"),
+        max_length=25,
+        null=True,
+        blank=True
     )
-    ISSN_print = models.CharField(_("ISSN Print"), max_length=9, null=True, blank=True)
+    ISSN_print = models.CharField(
+        _("ISSN Print"),
+        max_length=9,
+        null=True,
+        blank=True
+    )
     ISSN_electronic = models.CharField(
-        _("ISSN Electronic"), max_length=9, null=True, blank=True
+        _("ISSN Electronic"),
+        max_length=9,
+        null=True,
+        blank=True
     )
     ISSNL = models.CharField(_("ISSNL"), max_length=9, null=True, blank=True)
 
@@ -66,12 +75,6 @@ class OfficialJournal(CommonControlField):
 
 
 class NonOfficialJournalTitle(ClusterableModel, CommonControlField):
-    def __unicode__(self):
-        return "%s" % (self.official_journal.title)
-
-    def __str__(self):
-        return "%s" % (self.official_journal.title)
-
     official_journal = models.ForeignKey(
         "OfficialJournal",
         null=True,
@@ -79,6 +82,12 @@ class NonOfficialJournalTitle(ClusterableModel, CommonControlField):
         related_name="OfficialJournal",
         on_delete=models.CASCADE,
     )
+
+    def __unicode__(self):
+        return "%s" % (self.official_journal.title)
+
+    def __str__(self):
+        return "%s" % (self.official_journal.title)
 
     panels = [
         FieldPanel("official_journal"),
@@ -90,8 +99,10 @@ class NonOfficialJournalTitle(ClusterableModel, CommonControlField):
 
 class NonOfficialTitle(Orderable):
     page = ParentalKey(NonOfficialJournalTitle, related_name="page_non_official_title")
-    non_official_journal_title = models.CharField(
-        _("Non Official Journal Title"), max_length=255, null=False, blank=False
+    non_official_journal_title = models.TextField(
+        _("Non Official Journal Title"),
+        null=False,
+        blank=False
     )
 
 

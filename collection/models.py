@@ -21,10 +21,8 @@ class Collection(CommonControlField):
     def __str__(self):
         return "%s %s" % (self.name, self.acron)
 
-    acron = models.CharField(
-        _("Collection Acronym"), max_length=255, null=True, blank=True
-    )
-    name = models.CharField(_("Collection Name"), max_length=255, null=True, blank=True)
+    acron = models.TextField(_("Collection Acronym"), null=True, blank=True)
+    name = models.TextField(_("Collection Name"), null=True, blank=True)
 
     base_form_class = CoreAdminModelForm
 
@@ -41,7 +39,7 @@ class SciELOJournal(CommonControlField):
         _("SciELO ISSN"), max_length=9, null=False, blank=False
     )
     acron = models.CharField(_("Acronym"), max_length=25, null=True, blank=True)
-    title = models.CharField(_("Title"), max_length=255, null=True, blank=True)
+    title = models.TextField(_("Title"), null=True, blank=True)
     availability_status = models.CharField(
         _("Availability Status"),
         max_length=10,
@@ -154,13 +152,13 @@ class SciELODocument(CommonControlField):
 
 class SciELOFile(models.Model):
     scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
-    file_id = models.CharField(_("ID"), max_length=255, null=True, blank=True)
-    relative_path = models.CharField(
-        _("Relative Path"), max_length=255, null=True, blank=True
+    file_id = models.TextField(_("ID"), null=True, blank=True)
+    relative_path = models.TextField(
+        _("Relative Path"), null=True, blank=True
     )
-    name = models.CharField(_("Filename"), max_length=255, null=False, blank=False)
+    name = models.TextField(_("Filename"), null=False, blank=False)
     uri = models.URLField(_("URI"), max_length=255, null=True)
-    object_name = models.CharField(_("Object name"), max_length=255, null=True)
+    object_name = models.TextField(_("Object name"), null=True, blank=True)
 
     def __str__(self):
         return f"{self.scielo_issue} {self.name}"
@@ -204,8 +202,10 @@ class XMLFile(FileWithLang):
     languages = models.JSONField(null=True)
 
     public_uri = models.URLField(_("Public URI"), max_length=255, null=True)
-    public_object_name = models.CharField(
-        _("Public object name"), max_length=255, null=True
+    public_object_name = models.TextField(
+        _("Public object name"),
+        null=True,
+        blank=True
     )
 
     def __str__(self):

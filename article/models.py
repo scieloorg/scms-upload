@@ -113,8 +113,8 @@ class ArticleDOIWithLang(Orderable, DOIWithLang):
 
 
 class Title(CommonControlField):
-    title = models.CharField(_("Title"), max_length=255, blank=False, null=False)
-    lang = models.CharField(_("Language"), max_length=64, blank=False, null=False)
+    title = models.TextField(_("Title"))
+    lang = models.CharField(_("Language"), max_length=64)
 
     panels = [
         FieldPanel("title"),

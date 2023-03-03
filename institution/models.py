@@ -11,7 +11,7 @@ from .forms import InstitutionForm
 
 
 class Institution(CommonControlField, ClusterableModel):
-    name = models.CharField(_("Name"), max_length=255, null=True, blank=True)
+    name = models.TextField(_("Name"), null=True, blank=True)
     institution_type = models.CharField(
         _("Institution Type"),
         choices=choices.inst_type,
@@ -24,21 +24,13 @@ class Institution(CommonControlField, ClusterableModel):
         Location, null=True, blank=True, on_delete=models.SET_NULL
     )
 
-    acronym = models.CharField(
-        _("Institution Acronym"), blank=True, null=True, max_length=255
-    )
+    acronym = models.TextField(_("Institution Acronym"), blank=True, null=True)
 
-    level_1 = models.CharField(
-        _("Organization Level 1"), blank=True, null=True, max_length=255
-    )
+    level_1 = models.TextField(_("Organization Level 1"), blank=True, null=True)
 
-    level_2 = models.CharField(
-        _("Organization Level 2"), blank=True, null=True, max_length=255
-    )
+    level_2 = models.TextField(_("Organization Level 2"), blank=True, null=True)
 
-    level_3 = models.CharField(
-        _("Organization Level 3"), blank=True, null=True, max_length=255
-    )
+    level_3 = models.TextField(_("Organization Level 3"), blank=True, null=True)
 
     url = models.URLField("url", blank=True, null=True)
 
