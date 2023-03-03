@@ -34,11 +34,9 @@ class Issue(CommonControlField, IssuePublicationDate):
         )
 
     official_journal = models.ForeignKey(OfficialJournal, on_delete=models.CASCADE)
-    volume = models.CharField(_("Volume"), max_length=255, null=True, blank=True)
-    number = models.CharField(_("Number"), max_length=255, null=True, blank=True)
-    supplement = models.CharField(
-        _("Supplement"), max_length=255, null=True, blank=True
-    )
+    volume = models.TextField(_("Volume"), null=True, blank=True)
+    number = models.TextField(_("Number"), null=True, blank=True)
+    supplement = models.TextField(_("Supplement"), null=True, blank=True)
 
     autocomplete_search_field = "official_journal__title"
 
