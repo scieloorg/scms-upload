@@ -2,7 +2,6 @@ from wagtail.admin.forms import WagtailAdminModelForm
 
 
 class InstitutionForm(WagtailAdminModelForm):
-
     def save_all(self, user):
         inst = super().save(commit=False)
 

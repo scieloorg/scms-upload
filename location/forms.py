@@ -2,7 +2,6 @@ from wagtail.admin.forms import WagtailAdminModelForm
 
 
 class CityForm(WagtailAdminModelForm):
-
     def save_all(self, user):
         city = super().save(commit=False)
 
@@ -17,7 +16,6 @@ class CityForm(WagtailAdminModelForm):
 
 
 class StateForm(WagtailAdminModelForm):
-
     def save_all(self, user):
         state = super().save(commit=False)
 
@@ -32,7 +30,6 @@ class StateForm(WagtailAdminModelForm):
 
 
 class CountryForm(WagtailAdminModelForm):
-
     def save_all(self, user):
         country = super().save(commit=False)
 
@@ -47,7 +44,6 @@ class CountryForm(WagtailAdminModelForm):
 
 
 class LocationForm(WagtailAdminModelForm):
-
     def save_all(self, user):
         location = super().save(commit=False)
 

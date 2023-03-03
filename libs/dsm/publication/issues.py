@@ -26,7 +26,6 @@ def get_issue(**kwargs):
 
 
 def _set_issue_type(issue):
-
     if issue.suppl_text:
         issue.type = "supplement"
         return
@@ -46,7 +45,7 @@ def _set_issue_type(issue):
 
 def get_bundle_id(issn_id, year, volume=None, number=None, supplement=None):
     """
-        Gera Id utilizado na ferramenta de migração para cadastro do documentsbundle.
+    Gera Id utilizado na ferramenta de migração para cadastro do documentsbundle.
     """
 
     if all(list(map(lambda x: x is None, [volume, number, supplement]))):
@@ -114,9 +113,7 @@ class IssueToPublish:
         prefixes = ("v", "n", "s")
         values = (volume, number, supplement)
         self.issue.label = "".join(
-            f"{prefix}{value}"
-            for prefix, value in zip(prefixes, values)
-            if value
+            f"{prefix}{value}" for prefix, value in zip(prefixes, values) if value
         )
         # set issue type
         _set_issue_type(self.issue)

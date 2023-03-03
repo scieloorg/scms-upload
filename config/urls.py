@@ -40,7 +40,7 @@ urlpatterns = [
 urlpatterns += i18n_patterns(
     re_path(r"^search/$", search_views.search, name="search"),
     # Autocomplete endpoint
-    url(r'^admin/autocomplete/', include(autocomplete_admin_urls)),
+    url(r"^admin/autocomplete/", include(autocomplete_admin_urls)),
     # User management
     path("api/v2/", api_router.urls),
     path("users/", include("core.users.urls", namespace="users")),

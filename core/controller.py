@@ -30,7 +30,9 @@ def parse_months_names(months_names):
     if months_names:
         months = months_names.split("/")
         flexible_date["initial_month_name"] = months[0]
-        flexible_date["final_month_name"] = months[-1] if months[-1] != months[0] else None
+        flexible_date["final_month_name"] = (
+            months[-1] if months[-1] != months[0] else None
+        )
 
     return flexible_date
 
