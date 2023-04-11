@@ -37,7 +37,7 @@ wagtailmenus==3.0.2
 
 # Wagtail Localize
 # ------------------------------------------------------------------------------
-wagtail-localize==1.2.1
+wagtail-localize==1.5.0
 
 # Wagtail-Autocomplete
 # https://github.com/wagtail/wagtail-autocomplete
