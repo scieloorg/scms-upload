@@ -1,5 +1,5 @@
-pytz==2021.3  # https://github.com/stub42/pytz
-python-slugify==6.0.1  # https://github.com/un33k/python-slugify
+pytz==2023.3  # https://github.com/stub42/pytz
+python-slugify==8.0.1  # https://github.com/un33k/python-slugify
 Pillow==9.2.0  # https://github.com/python-pillow/Pillow
 rcssmin==1.1.0  # https://github.com/ndparker/rcssmin
 argon2-cffi==21.3.0  # https://github.com/hynek/argon2_cffi
@@ -13,17 +13,17 @@ flower==1.0.0  # https://github.com/mher/flower
 # Django
 # ------------------------------------------------------------------------------
 django==3.2.18  # pyup: < 4.0  # https://www.djangoproject.com/
-django-environ==0.8.1  # https://github.com/joke2k/django-environ
-django-model-utils==4.2.0  # https://github.com/jazzband/django-model-utils
-django-allauth==0.48.0  # https://github.com/pennersr/django-allauth
-django-crispy-forms==1.14.0  # https://github.com/django-crispy-forms/django-crispy-forms
+django-environ==0.10.0  # https://github.com/joke2k/django-environ
+django-model-utils==4.3.1  # https://github.com/jazzband/django-model-utils
+django-allauth==0.54.0 # https://github.com/pennersr/django-allauth
+django-crispy-forms==2.0  # https://github.com/django-crispy-forms/django-crispy-forms
 crispy-bootstrap5==0.6  # https://github.com/django-crispy-forms/crispy-bootstrap5
 django-compressor==3.1  # https://github.com/django-compressor/django-compressor
 django-redis==5.2.0  # https://github.com/jazzband/django-redis
 
 # Wagtail
 # ------------------------------------------------------------------------------
-wagtail==2.16.2  # https://github.com/wagtail/wagtail
+wagtail==4.2.2  # https://github.com/wagtail/wagtail
 
 
 # Wagtail Recaptcha

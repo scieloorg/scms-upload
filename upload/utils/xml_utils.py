@@ -1,14 +1,13 @@
-from lxml import etree
+import os
+import re
 from io import StringIO
+
+from lxml import etree
 
 from .file_utils import numbered_lines
 
-import re
-import os
-
-
-PATTERN_START_END_LINE_NUMBERS = r'.* line (?P<start>\d*) and .*, line (?P<end>\d*),'
-PATTERN_START_LINE_NUMBER = r'.* line (?P<start>\d*),'
+PATTERN_START_END_LINE_NUMBERS = r".* line (?P<start>\d*) and .*, line (?P<end>\d*),"
+PATTERN_START_LINE_NUMBER = r".* line (?P<start>\d*),"
 
 
 class XMLFormatError(Exception):
@@ -28,8 +27,8 @@ def _extract_start_row_number(message):
         PATTERN_START_LINE_NUMBER,
     ]:
         match = re.search(ptn, message)
-        if match and 'start' in match.groupdict():
-            return int(match.groupdict()['start'])
+        if match and "start" in match.groupdict():
+            return int(match.groupdict()["start"])
 
 
 def get_etree_from_xml_content(xml_str):
@@ -52,24 +51,23 @@ def get_etree_from_xml_content(xml_str):
 
 def get_xml_strio_for_preview(xmlstr, dirname):
     ASSET_TAGS = (
-        'graphic',
-        'media',
-        'inline-graphic',
-        'supplementary-material',
-        'inline-supplementary-material',
+        "graphic",
+        "media",
+        "inline-graphic",
+        "supplementary-material",
+        "inline-supplementary-material",
     )
-    XPATH_FOR_IDENTIFYING_ASSETS = '|'.join([
-        './/' + at + '[@xlink:href]' for at in ASSET_TAGS
-    ])
+    XPATH_FOR_IDENTIFYING_ASSETS = "|".join(
+        [".//" + at + "[@xlink:href]" for at in ASSET_TAGS]
+    )
     xmltree = get_etree_from_xml_content(xmlstr)
 
     for node in xmltree.xpath(
         XPATH_FOR_IDENTIFYING_ASSETS,
-        namespaces={"xlink": "http://www.w3.org/1999/xlink"}
+        namespaces={"xlink": "http://www.w3.org/1999/xlink"},
     ):
         new_link = os.path.join(
-            dirname,
-            node.attrib['{http://www.w3.org/1999/xlink}href']
+            dirname, node.attrib["{http://www.w3.org/1999/xlink}href"]
         )
         node.set("{http://www.w3.org/1999/xlink}href", new_link)
 

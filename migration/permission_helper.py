@@ -1,7 +1,6 @@
 from wagtail.contrib.modeladmin.helpers import PermissionHelper
 
-
-ACCESS_MIGRATION_FAILURES = 'access_migration_failures'
+ACCESS_MIGRATION_FAILURES = "access_migration_failures"
 
 
 class MigrationFailurePermissionHelper(PermissionHelper):

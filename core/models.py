@@ -1,12 +1,13 @@
 import os
 from datetime import datetime
 
-from django.db import models
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.utils.translation import gettext as _
-from wagtail.core.fields import RichTextField
 from wagtail.admin.edit_handlers import FieldPanel
+from wagtail.core.fields import RichTextField
 from wagtail.snippets.models import register_snippet
+
 from . import choices
 
 User = get_user_model()
@@ -24,14 +25,10 @@ class CommonControlField(models.Model):
     """
 
     # Creation date
-    created = models.DateTimeField(
-        verbose_name=_("Creation date"), auto_now_add=True
-    )
+    created = models.DateTimeField(verbose_name=_("Creation date"), auto_now_add=True)
 
     # Update date
-    updated = models.DateTimeField(
-        verbose_name=_("Last update date"), auto_now=True
-    )
+    updated = models.DateTimeField(verbose_name=_("Last update date"), auto_now=True)
 
     # Creator user
     creator = models.ForeignKey(
@@ -59,28 +56,29 @@ class CommonControlField(models.Model):
 
 class RichTextWithLang(models.Model):
     text = RichTextField(null=False, blank=False)
-    language = models.CharField(_('Language'), max_length=2, choices=choices.LANGUAGE, null=False, blank=False)
+    language = models.CharField(
+        _("Language"), max_length=2, choices=choices.LANGUAGE, null=False, blank=False
+    )
 
-    panels=[
-        FieldPanel('text'),
-        FieldPanel('language')
-    ]
+    panels = [FieldPanel("text"), FieldPanel("language")]
 
     class Meta:
         abstract = True
 
 
 class TextWithLangAndValidity(models.Model):
-    text = models.CharField(_('Text'), max_length=255, null=False, blank=False)
-    language = models.CharField(_('Language'), max_length=2, choices=choices.LANGUAGE, null=False, blank=False)
+    text = models.TextField(_("Text"), null=False, blank=False)
+    language = models.CharField(
+        _("Language"), max_length=2, choices=choices.LANGUAGE, null=False, blank=False
+    )
     initial_date = models.DateField(null=True, blank=True)
     final_date = models.DateField(null=True, blank=True)
 
-    panels=[
-        FieldPanel('text'),
-        FieldPanel('language'),
-        FieldPanel('initial_date'),
-        FieldPanel('final_date')
+    panels = [
+        FieldPanel("text"),
+        FieldPanel("language"),
+        FieldPanel("initial_date"),
+        FieldPanel("final_date"),
     ]
 
     class Meta:
@@ -91,11 +89,11 @@ class RichTextWithLangAndValidity(RichTextWithLang):
     initial_date = models.DateField(null=True, blank=True)
     final_date = models.DateField(null=True, blank=True)
 
-    panels=[
-        FieldPanel('text'),
-        FieldPanel('language'),
-        FieldPanel('initial_date'),
-        FieldPanel('final_date')
+    panels = [
+        FieldPanel("text"),
+        FieldPanel("language"),
+        FieldPanel("initial_date"),
+        FieldPanel("final_date"),
     ]
 
     class Meta:
@@ -103,13 +101,12 @@ class RichTextWithLangAndValidity(RichTextWithLang):
 
 
 class TextWithLang(models.Model):
-    text = models.CharField(_('Text'), max_length=255, null=False, blank=False)
-    language = models.CharField(_('Language'), max_length=2, choices=choices.LANGUAGE, null=False, blank=False)
+    text = models.TextField(_("Text"), null=False, blank=False)
+    language = models.CharField(
+        _("Language"), max_length=2, choices=choices.LANGUAGE, null=False, blank=False
+    )
 
-    panels=[
-        FieldPanel('text'),
-        FieldPanel('language')
-    ]
+    panels = [FieldPanel("text"), FieldPanel("language")]
 
     class Meta:
         abstract = True
@@ -120,6 +117,7 @@ class PublicationMonthModel(models.Model):
     Class PublicationMonthModel
 
     """
+
     publication_month_number = models.IntegerField(
         verbose_name=_("Publication month number"),
         null=True,
@@ -142,6 +140,7 @@ class PublicationMonthsRangeModel(models.Model):
     Class PublicationMonthsRangeModel
 
     """
+
     publication_initial_month_number = models.IntegerField(
         verbose_name=_("Publication initial month number"),
         choices=choices.MONTHS,
@@ -175,6 +174,7 @@ class IssuePublicationDate(PublicationMonthsRangeModel):
     """
     Class IssuePublicationDate
     """
+
     publication_date_text = models.CharField(
         verbose_name=_("Publication date text"),
         max_length=255,
@@ -195,11 +195,7 @@ class IssuePublicationDate(PublicationMonthsRangeModel):
             "publication_final_month_name": self.publication_final_month_name,
             "publication_final_month_number": self.publication_final_month_number,
         }
-        return {
-            k: v
-            for k, v in date.items()
-            if v
-        }
+        return {k: v for k, v in date.items() if v}
 
     class Meta:
         abstract = True
@@ -209,6 +205,7 @@ class DocumentPublicationDate(IssuePublicationDate):
     """
     Class IssuePublicationDate
     """
+
     publication_day = models.IntegerField(
         verbose_name=_("Publication year"),
         null=True,
@@ -225,25 +222,24 @@ class DocumentPublicationDate(IssuePublicationDate):
             "publication_final_month_number": self.publication_final_month_number,
             "publication_day": self.publication_day,
         }
-        return {
-            k: v
-            for k, v in date.items()
-            if v
-        }
+        return {k: v for k, v in date.items() if v}
 
     class Meta:
         abstract = True
 
 
 class FlexibleDateFieldAdapter:
-
-    def __init__(self,
-                 text=None,
-                 year=None,
-                 first_month_number=None, first_month_name=None,
-                 last_month_number=None, last_month_name=None,
-                 day=None,
-                 data=None):
+    def __init__(
+        self,
+        text=None,
+        year=None,
+        first_month_number=None,
+        first_month_name=None,
+        last_month_number=None,
+        last_month_name=None,
+        day=None,
+        data=None,
+    ):
         self._data = data or {}
         self._text = data.get("text") or text
         self._year = data.get("year") or year

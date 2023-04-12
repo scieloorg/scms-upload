@@ -1,6 +1,5 @@
 from django.urls import reverse
 from django.utils.translation import gettext as _
-
 from wagtail.contrib.modeladmin.helpers import ButtonHelper
 
 from . import choices
@@ -8,7 +7,10 @@ from . import choices
 
 class UploadButtonHelper(ButtonHelper):
     index_button_classnames = ["button", "button-small", "button-secondary"]
-    btn_default_classnames = ["button-small", "icon",]
+    btn_default_classnames = [
+        "button-small",
+        "icon",
+    ]
 
     def assign(self, obj, classnames, label=None):
         text = label or _("Assign")
@@ -54,12 +56,16 @@ class UploadButtonHelper(ButtonHelper):
         url_name = self.request.resolver_match.url_name
 
         classnames = []
-        if url_name.endswith('_modeladmin_inspect'):
+        if url_name.endswith("_modeladmin_inspect"):
             classnames.extend(ButtonHelper.inspect_button_classnames)
-        if url_name.endswith('_modeladmin_index'):
+        if url_name.endswith("_modeladmin_index"):
             classnames.extend(UploadButtonHelper.index_button_classnames)
 
-        if obj.status == choices.PS_READY_TO_BE_FINISHED and ph.user_can_finish_deposit(usr, obj) and url_name == 'upload_package_modeladmin_inspect':
+        if (
+            obj.status == choices.PS_READY_TO_BE_FINISHED
+            and ph.user_can_finish_deposit(usr, obj)
+            and url_name == "upload_package_modeladmin_inspect"
+        ):
             btns.append(self.finish_deposit_button(obj, classnames))
 
         if obj.status == choices.PS_PUBLISHED:
@@ -69,6 +75,6 @@ class UploadButtonHelper(ButtonHelper):
             if obj.status == choices.PS_QA and ph.user_can_assign_package(usr, obj):
                 btns.append(self.assign(obj, classnames))
         elif obj.assignee != usr:
-            btns.append(self.assign(obj, classnames, _('Reassign')))
-            
+            btns.append(self.assign(obj, classnames, _("Reassign")))
+
         return btns

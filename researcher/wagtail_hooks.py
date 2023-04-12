@@ -5,8 +5,8 @@ from wagtail.contrib.modeladmin.views import CreateView
 
 from .models import Researcher
 
-class ResearcherCreateView(CreateView):
 
+class ResearcherCreateView(CreateView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())
@@ -15,8 +15,8 @@ class ResearcherCreateView(CreateView):
 class ResearcherAdmin(ModelAdmin):
     model = Researcher
     create_view_class = ResearcherCreateView
-    menu_label = _('Researcher')
-    menu_icon = 'folder'
+    menu_label = _("Researcher")
+    menu_icon = "folder"
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False

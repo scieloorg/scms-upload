@@ -3,12 +3,20 @@ from datetime import datetime
 from django.shortcuts import get_object_or_404
 
 from collection.models import NewWebSiteConfiguration
-from libs.dsm.publication.db import mk_connection, exceptions
+from libs.dsm.publication.db import exceptions, mk_connection
 
-from .models import ErrorResolution, ErrorResolutionOpinion, Package, ValidationResult, choices
+from .models import (
+    ErrorResolution,
+    ErrorResolutionOpinion,
+    Package,
+    ValidationResult,
+    choices,
+)
 
 
-def add_validation_result(error_category, package_id, status=None, message=None, data=None):
+def add_validation_result(
+    error_category, package_id, status=None, message=None, data=None
+):
     val_res = ValidationResult()
     val_res.category = error_category
 
@@ -40,7 +48,9 @@ def update_validation_result(validation_result_id, **kwargs):
         ...
 
 
-def upsert_validation_result_error_resolution(validation_result_id, user, action, rationale):
+def upsert_validation_result_error_resolution(
+    validation_result_id, user, action, rationale
+):
     er = upsert_object(ErrorResolution, validation_result_id, user)
     er.action = action
     er.rationale = rationale
@@ -48,7 +58,9 @@ def upsert_validation_result_error_resolution(validation_result_id, user, action
     er.save()
 
 
-def upsert_validation_result_error_resolution_opinion(validation_result_id, user, opinion, guidance):
+def upsert_validation_result_error_resolution_opinion(
+    validation_result_id, user, opinion, guidance
+):
     ero = upsert_object(ErrorResolutionOpinion, validation_result_id, user)
     ero.opinion = opinion
     ero.guidance = guidance
@@ -84,8 +96,8 @@ def update_package_check_errors(package_id):
     package = get_object_or_404(Package, pk=package_id)
 
     for vr in package.validationresult_set.filter(status=choices.VS_DISAPPROVED):
-        if vr.resolution.action in (choices.ER_ACTION_TO_FIX, ''):
-            package.status = choices.PS_PENDING_CORRECTION    
+        if vr.resolution.action in (choices.ER_ACTION_TO_FIX, ""):
+            package.status = choices.PS_PENDING_CORRECTION
             package.save()
 
             return package.status
@@ -101,7 +113,7 @@ def update_package_check_opinions(package_id):
 
     for vr in package.validationresult_set.filter(status=choices.VS_DISAPPROVED):
         opinion = vr.analysis.opinion
-        if opinion in (choices.ER_OPINION_FIX_DEMANDED, ''):
+        if opinion in (choices.ER_OPINION_FIX_DEMANDED, ""):
             package.status = choices.PS_PENDING_CORRECTION
             package.save()
 
@@ -113,7 +125,13 @@ def update_package_check_opinions(package_id):
     return package.status
 
 
-def create_package(article_id, user_id, file_name, category=choices.PC_SYSTEM_GENERATED, status=choices.PS_PUBLISHED):
+def create_package(
+    article_id,
+    user_id,
+    file_name,
+    category=choices.PC_SYSTEM_GENERATED,
+    status=choices.PS_PUBLISHED,
+):
     package = Package()
     package.article_id = article_id
     package.creator_id = user_id
@@ -129,12 +147,16 @@ def create_package(article_id, user_id, file_name, category=choices.PC_SYSTEM_GE
 
 def get_last_package(article_id, **kwargs):
     try:
-        return Package.objects.filter(article=article_id, **kwargs).order_by('-created').first()
+        return (
+            Package.objects.filter(article=article_id, **kwargs)
+            .order_by("-created")
+            .first()
+        )
     except Package.DoesNotExist:
-        return 
+        return
 
 
-def establish_site_connection(url='scielo.br'):
+def establish_site_connection(url="scielo.br"):
     try:
         host = NewWebSiteConfiguration.objects.get(url__icontains=url).db_uri
     except NewWebSiteConfiguration.DoesNotExist:

@@ -1,4 +1,3 @@
-from scielo_scholarly_data import standardizer
 from opac_schema.v1.models import (
     Abstract,
     AOPUrlSegments,
@@ -13,6 +12,7 @@ from opac_schema.v1.models import (
     TranslatedSection,
     TranslatedTitle,
 )
+from scielo_scholarly_data import standardizer
 
 from libs.dsm import exceptions
 from libs.dsm.publication.db import save_data
@@ -26,13 +26,12 @@ def get_document(**kwargs):
     return doc
 
 
-def get_similar_documents(article_title, journal_print_issn, journal_electronic_issn, authors):
+def get_similar_documents(
+    article_title, journal_print_issn, journal_electronic_issn, authors
+):
     docs = Article.objects(
         title=article_title,
-        journal__in=[
-            journal_print_issn, 
-            journal_electronic_issn
-        ],
+        journal__in=[journal_print_issn, journal_electronic_issn],
     ).only("authors", "aid")
 
     if len(docs) == 0:
@@ -42,11 +41,11 @@ def get_similar_documents(article_title, journal_print_issn, journal_electronic_
     for doc in docs:
         for doc_author in doc.authors:
             filtered_docs_authors_surnames.append(
-                standardizer.document_author_for_deduplication(doc_author).split(',')[0]
+                standardizer.document_author_for_deduplication(doc_author).split(",")[0]
             )
 
     for a in authors:
-        a_surname_std = standardizer.document_author_for_deduplication(a).split(',')[0]
+        a_surname_std = standardizer.document_author_for_deduplication(a).split(",")[0]
         if a_surname_std not in filtered_docs_authors_surnames:
             return []
     return docs
@@ -115,7 +114,9 @@ class DocumentToPublish:
     def add_publication_date(self, year, month, day):
         self.doc.publication_date = "-".join([year, month, day])
 
-    def add_in_issue(self, order, fpage=None, fpage_seq=None, lpage=None, elocation=None):
+    def add_in_issue(
+        self, order, fpage=None, fpage_seq=None, lpage=None, elocation=None
+    ):
         # Dados de localização no issue
         self.doc.order = order
         self.doc.elocation = elocation
@@ -140,7 +141,9 @@ class DocumentToPublish:
         if self.doc.authors is None:
             self.doc.authors = []
         _author = format_author_name(
-            surname, given_names, suffix,
+            surname,
+            given_names,
+            suffix,
         )
         self.doc.authors.append(_author)
 
@@ -207,7 +210,7 @@ class DocumentToPublish:
         if self.doc.htmls is None:
             self.doc.htmls = []
         self.doc.htmls.append({"lang": language, "uri": uri})
-        self.doc.languages = [html['lang'] for html in self.doc.htmls]
+        self.doc.languages = [html["lang"] for html in self.doc.htmls]
 
     def add_pdf(self, lang, url, filename, type):
         # pdfs = ListField(field=DictField()))
@@ -274,4 +277,4 @@ def format_author_name(surname, given_names, suffix):
     # like airflow
     if suffix:
         suffix = " " + suffix
-    return "%s%s, %s" % (surname, suffix or '', given_names)
+    return "%s%s, %s" % (surname, suffix or "", given_names)

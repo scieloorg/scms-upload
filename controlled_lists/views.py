@@ -27,12 +27,17 @@ def validate(request):
     if file_id:
         file_upload = get_object_or_404(IndexedAtFile, pk=file_id)
 
-    if request.method == 'GET':
+    if request.method == "GET":
         try:
             upload_path = file_upload.attachment.file.path
             cols = chkcsv.read_format_specs(
-                os.path.dirname(os.path.abspath(__file__)) + "/chkcsvfmt.fmt", True, False)
-            errorlist = chkcsv.check_csv_file(upload_path, cols, True, True, True, False)
+                os.path.dirname(os.path.abspath(__file__)) + "/chkcsvfmt.fmt",
+                True,
+                False,
+            )
+            errorlist = chkcsv.check_csv_file(
+                upload_path, cols, True, True, True, False
+            )
             if errorlist:
                 raise Exception(_("Validation error"))
             else:
@@ -45,7 +50,7 @@ def validate(request):
         else:
             messages.success(request, _("File successfully validated!"))
 
-    return redirect(request.META.get('HTTP_REFERER'))
+    return redirect(request.META.get("HTTP_REFERER"))
 
 
 def import_file(request):
@@ -62,20 +67,20 @@ def import_file(request):
     file_path = file_upload.attachment.file.path
 
     try:
-        with open(file_path, 'r') as csvfile:
+        with open(file_path, "r") as csvfile:
             data = csv.DictReader(csvfile, delimiter=";")
 
             for line, row in enumerate(data):
                 ed = IndexedAt()
-                ed.name = row['Name']
-                ed.acronym = row['Acronym']
-                ed.url = row['URL']
-                ed.description = row['Description']
-                ed.type = row['Type']
+                ed.name = row["Name"]
+                ed.acronym = row["Acronym"]
+                ed.url = row["URL"]
+                ed.description = row["Description"]
+                ed.type = row["Type"]
                 ed.save()
     except Exception as ex:
         messages.error(request, _("Import error: %s, Line: %s") % (ex, str(line + 2)))
     else:
-       messages.success(request, _("File imported successfully!"))
+        messages.success(request, _("File imported successfully!"))
 
-    return redirect(request.META.get('HTTP_REFERER'))
+    return redirect(request.META.get("HTTP_REFERER"))

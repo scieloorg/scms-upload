@@ -1,9 +1,5 @@
-from opac_schema.v1.models import (
-    Journal,
-    Timeline,
-    Mission,
-    JounalMetrics,
-)
+from opac_schema.v1.models import JounalMetrics, Journal, Mission, Timeline
+
 from libs.dsm import exceptions
 from libs.dsm.publication.db import save_data
 
@@ -104,15 +100,15 @@ class JournalToPublish:
                 self.journal.timeline = []
 
             self.journal.timeline.append(
-                Timeline(**{
-                    'status': status or '',
-                    'since': since or '',
-                    'reason': reason or '',
-                })
+                Timeline(
+                    **{
+                        "status": status or "",
+                        "since": since or "",
+                        "reason": reason or "",
+                    }
+                )
             )
-            self.journal.current_status = (
-                self.journal.timeline[-1].status
-            )
+            self.journal.current_status = self.journal.timeline[-1].status
 
     def add_item_to_mission(self, language, description):
         """
@@ -129,10 +125,12 @@ class JournalToPublish:
                 self.journal.mission = []
 
             self.journal.mission.append(
-                Mission(**{
-                    'language': language or '',
-                    'description': description or '',
-                })
+                Mission(
+                    **{
+                        "language": language or "",
+                        "description": description or "",
+                    }
+                )
             )
 
     def add_item_to_metrics(self, total_h5_index, total_h5_median, h5_metric_year):
@@ -148,12 +146,12 @@ class JournalToPublish:
 
         """
         if all([total_h5_index, total_h5_median, h5_metric_year]):
-            self.journal.metrics = (
-                JounalMetrics(**{
-                    'total_h5_index': total_h5_index or None,
-                    'total_h5_median': total_h5_median or None,
-                    'h5_metric_year': h5_metric_year or None,
-                })
+            self.journal.metrics = JounalMetrics(
+                **{
+                    "total_h5_index": total_h5_index or None,
+                    "total_h5_median": total_h5_median or None,
+                    "h5_metric_year": h5_metric_year or None,
+                }
             )
 
     def publish_journal(self):

@@ -1,11 +1,10 @@
 from datetime import datetime
 
+from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_ids import ArticleIds
 
-from django.utils.translation import gettext_lazy as _
-
-from .models import Article, choices
 from . import exceptions
+from .models import Article, choices
 
 
 def create_article_from_etree(xml_tree, user_id, status=choices.AS_PUBLISHED):
@@ -37,9 +36,7 @@ def update_article(article_id, **kwargs):
         raise
     except Exception as e:
         raise exceptions.UpdateDocumentError(
-            _('Unable to update article {} {} {}').format(
-                str(kwargs), type(e), e
-            )
+            _("Unable to update article {} {} {}").format(str(kwargs), type(e), e)
         )
     return article
 
@@ -49,7 +46,7 @@ def get_or_create_official_article(official_issue, **kwargs):
         official_article, status = Article.objects.get_or_create(**kwargs)
     except Exception as e:
         raise exceptions.GetOrCreateDocumentError(
-            _('Unable to get or create official article {} {} {}').format(
+            _("Unable to get or create official article {} {} {}").format(
                 str(kwargs), type(e), e
             )
         )

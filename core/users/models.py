@@ -25,16 +25,16 @@ class User(AbstractUser):
         """
         return reverse("users:detail", kwargs={"username": self.username})
 
-    autocomplete_search_field = 'username'
+    autocomplete_search_field = "username"
 
     def autocomplete_label(self):
         label = self.username
         user_groups = sorted([g.name for g in self.groups.all()])
 
-        full_name = f'{self.first_name} {self.last_name}'
-        if full_name != ' ':
-            label +=  f" ({full_name})"
-        
+        full_name = f"{self.first_name} {self.last_name}"
+        if full_name != " ":
+            label += f" ({full_name})"
+
         if len(user_groups) > 0:
             label += f" - {', '.join(user_groups)}"
 
