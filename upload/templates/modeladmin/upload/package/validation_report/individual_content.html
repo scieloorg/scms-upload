@@ -15,7 +15,6 @@
                         {% trans 'Back to package inspection' %}
                     </a>
                 </p>
-
                 <table class='listing'>
                     <thead>
                         <tr>
@@ -31,6 +30,15 @@
                                 <td class='title'><h2>{{ v.category }}</h2></td>
                                 <td>{{ v.status }}</td>
                                 <td>{{ v.message|default_if_none:'' }}</td>
+                                <!-- {% if v.data %}
+                                    <td>
+                                        {% for key, value in v.data.items %}
+                                            <p>{{key}}</p>
+                                            <p>{{value}}</p>
+                                        {% endfor%}
+
+                                    </td>
+                                {% endif%}                                 -->
                                 <td><pre>{{ v.data|default_if_none:'' }}</pre></td>
                             </tr>
                         {% endfor %}

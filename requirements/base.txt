@@ -37,7 +37,7 @@ wagtailmenus==3.0.2
 
 # Wagtail Localize
 # ------------------------------------------------------------------------------
-wagtail-localize==1.2.1
+wagtail-localize==1.5.0
 
 # Wagtail-Autocomplete
 # https://github.com/wagtail/wagtail-autocomplete
@@ -54,8 +54,8 @@ minio==7.1.0
 
 # Upload
 # ------------------------------------------------------------------------------
-lxml==4.9.1 # https://github.com/lxml/lxml
--e git+https://github.com/scieloorg/packtools@2.15#egg=packtools
+lxml==4.9.2 # https://github.com/lxml/lxml
+-e git+https://github.com/scieloorg/packtools#egg=packtools
 -e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
 
 # DSM Publication

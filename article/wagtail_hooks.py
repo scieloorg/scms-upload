@@ -9,7 +9,7 @@ from wagtail.contrib.modeladmin.options import (
     modeladmin_register,
 )
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
-from wagtail.core import hooks
+from wagtail import hooks
 
 from config.menu import get_menu_order
 
