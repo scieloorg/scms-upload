@@ -10,8 +10,8 @@ from wagtail.admin.edit_handlers import (
 )
 from wagtail.contrib.forms.edit_handlers import FormSubmissionsPanel
 from wagtail.contrib.forms.models import AbstractFormField
-from wagtail.core.fields import RichTextField
-from wagtail.core.models import Page
+from wagtail.fields import RichTextField
+from wagtail.models import Page
 from wagtailcaptcha.models import WagtailCaptchaEmailForm
 
 

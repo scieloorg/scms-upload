@@ -1,3 +1,5 @@
+import json
+
 from celery.result import AsyncResult
 from django.utils.translation import gettext as _
 from packtools.sps import exceptions as sps_exceptions
@@ -5,6 +7,7 @@ from packtools.sps.models import package as sps_package
 from packtools.sps.utils import file_utils as sps_file_utils
 from packtools.sps.validation import article as sps_validation_article
 from packtools.sps.validation import journal as sps_validation_journal
+from packtools.validation_report import ValidationReportXML
 
 from article.choices import AS_CHANGE_SUBMITTED
 from article.controller import create_article_from_etree, update_article
@@ -59,6 +62,17 @@ def run_validations(
                 },
                 countdown=10,
             )
+
+            # Aciona validacao do conteudo do XML
+            task_validate_content_xml.apply_async(
+                kwargs={
+                    'file_path': file_path,
+                    'xml_path': xml_path,
+                    'package_id': package_id,
+                },
+                countdown=10,
+            )
+
 
         # Aciona validação de compatibilidade entre dados do pacote e o Issue selecionado
         if issue_id is not None and package_category:
@@ -439,6 +453,56 @@ def task_validate_renditions(file_path, xml_path, package_id):
             data={"xml_path": xml_path},
         )
         return True
+from datetime import date
+
+
+@celery_app.task(name='Validate XML')
+def task_validate_content_xml(file_path, xml_path, package_id):
+    xml_str = file_utils.get_xml_content_from_zip(file_path)
+    
+    validations = ValidationReportXML(file_path=xml_str, data_file_path='validation_criteria_example.json').validation_report()
+
+    # data = {}
+    for result in validations:
+        for key, value in result.items():
+            for result_ind in value:
+                string_validations = json.dumps(result_ind, default=str)
+                json_validations = json.loads(string_validations)
+
+                vr = controller.add_validation_result(
+                    error_category=choices.VE_DATA_CONSISTENCY_ERROR,
+                    package_id=package_id,
+                    status=choices.VS_CREATED,
+                    data=json_validations
+                )
+
+                # # TODO
+                # Realizar logica para verificar se a validacao passou ou nao
+                ########
+                try:
+                    message = json_validations['message']
+                except Exception as e:
+                    print(f"Error: {e}")
+                    message = ''
+
+                try:
+                    valor = json_validations['result']
+                except Exception as e:
+                    print(f"Error: {e}")
+                    valor = False
+
+                if valor == 'success':
+                    controller.update_validation_result(
+                        vr.id,
+                        status=choices.VS_APPROVED,
+                        message=_(message),
+                    )
+                else:
+                    controller.update_validation_result(
+                        vr.id, 
+                        status=choices.VS_DISAPPROVED,
+                        message=_(message),
+                    )   
 
 
 @celery_app.task(bind=True, name="Check validation error resolutions")

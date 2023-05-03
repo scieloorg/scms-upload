@@ -123,7 +123,7 @@ LOCAL_APPS = [
     "migration",
     "researcher",
     # evitar problema de migração por enquanto
-    # "upload",
+    "upload",
     "controlled_lists",
 ]
 
