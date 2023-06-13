@@ -11,7 +11,7 @@ from packtools.sps.models.article_assets import ArticleAssets
 from packtools.sps.models.article_authors import Authors
 from packtools.sps.models.article_renditions import ArticleRenditions
 from packtools.sps.models.article_titles import ArticleTitles
-from packtools.sps.models.front_journal_meta import ISSN
+from packtools.sps.models.journal_meta import ISSN
 from packtools.sps.models.package import PackageName
 
 from .file_utils import (
@@ -303,7 +303,7 @@ def get_article_data_for_comparison(xmltree):
     """
     article_data = {}
 
-    # ISSN (front_journal_meta)
+    # ISSN (journal_meta)
     obj_journal_issn = ISSN(xmltree)
 
     article_data["journal_print_issn"] = obj_journal_issn.ppub

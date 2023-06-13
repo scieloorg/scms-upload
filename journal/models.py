@@ -8,7 +8,7 @@ from wagtail.admin.edit_handlers import (
     ObjectList,
     TabbedInterface,
 )
-from wagtail.core.models import Orderable
+from wagtail.models import Orderable
 from wagtail.images.edit_handlers import ImageChooserPanel
 
 from core.models import CommonControlField, RichTextWithLang
