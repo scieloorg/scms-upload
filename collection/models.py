@@ -153,9 +153,7 @@ class SciELODocument(CommonControlField):
 class SciELOFile(models.Model):
     scielo_issue = models.ForeignKey(SciELOIssue, on_delete=models.CASCADE)
     file_id = models.TextField(_("ID"), null=True, blank=True)
-    relative_path = models.TextField(
-        _("Relative Path"), null=True, blank=True
-    )
+    relative_path = models.TextField(_("Relative Path"), null=True, blank=True)
     name = models.TextField(_("Filename"), null=False, blank=False)
     uri = models.URLField(_("URI"), max_length=255, null=True)
     object_name = models.TextField(_("Object name"), null=True, blank=True)
@@ -203,9 +201,7 @@ class XMLFile(FileWithLang):
 
     public_uri = models.URLField(_("Public URI"), max_length=255, null=True)
     public_object_name = models.TextField(
-        _("Public object name"),
-        null=True,
-        blank=True
+        _("Public object name"), null=True, blank=True
     )
 
     def __str__(self):

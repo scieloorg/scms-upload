@@ -1,11 +1,11 @@
 from django.urls import path
 from django.utils.translation import gettext as _
+from wagtail import hooks
 from wagtail.contrib.modeladmin.options import (
     ModelAdmin,
     ModelAdminGroup,
     modeladmin_register,
 )
-from wagtail import hooks
 
 from .button_helper import IndexedAtHelper
 from .models import IndexedAt, IndexedAtFile

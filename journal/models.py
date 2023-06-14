@@ -8,8 +8,8 @@ from wagtail.admin.edit_handlers import (
     ObjectList,
     TabbedInterface,
 )
-from wagtail.models import Orderable
 from wagtail.images.edit_handlers import ImageChooserPanel
+from wagtail.models import Orderable
 
 from core.models import CommonControlField, RichTextWithLang
 from institution.models import InstitutionHistory
@@ -35,22 +35,11 @@ class OfficialJournal(CommonControlField):
     nlm_title = models.TextField(_("NLM Title"), null=True, blank=True)
 
     foundation_date = models.CharField(
-        _("Foundation Date"),
-        max_length=25,
-        null=True,
-        blank=True
+        _("Foundation Date"), max_length=25, null=True, blank=True
     )
-    ISSN_print = models.CharField(
-        _("ISSN Print"),
-        max_length=9,
-        null=True,
-        blank=True
-    )
+    ISSN_print = models.CharField(_("ISSN Print"), max_length=9, null=True, blank=True)
     ISSN_electronic = models.CharField(
-        _("ISSN Electronic"),
-        max_length=9,
-        null=True,
-        blank=True
+        _("ISSN Electronic"), max_length=9, null=True, blank=True
     )
     ISSNL = models.CharField(_("ISSNL"), max_length=9, null=True, blank=True)
 
@@ -100,9 +89,7 @@ class NonOfficialJournalTitle(ClusterableModel, CommonControlField):
 class NonOfficialTitle(Orderable):
     page = ParentalKey(NonOfficialJournalTitle, related_name="page_non_official_title")
     non_official_journal_title = models.TextField(
-        _("Non Official Journal Title"),
-        null=False,
-        blank=False
+        _("Non Official Journal Title"), null=False, blank=False
     )
 
 

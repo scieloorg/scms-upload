@@ -4,13 +4,13 @@ from django.contrib import messages
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext as _
+from wagtail import hooks
 from wagtail.contrib.modeladmin.options import (
     ModelAdmin,
     ModelAdminGroup,
     modeladmin_register,
 )
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
-from wagtail import hooks
 
 from article.models import Article
 from config.menu import get_menu_order
