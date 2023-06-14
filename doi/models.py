@@ -20,3 +20,16 @@ class DOIWithLang(CommonControlField):
         return f"{self.lang.upper()}: {self.doi}"
 
     base_form_class = DOIWithLangForm
+
+
+class XMLCrossRef(CommonControlField):
+    file = models.FileField(null=True, blank=True)
+    uri = models.URLField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("file",)
+        verbose_name = "XMLCrossRef"
+        verbose_name_plural = "XMLCrossRef"
+
+    def __str__(self):
+        return f"{self.uri}"
