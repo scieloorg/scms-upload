@@ -66,13 +66,12 @@ def run_validations(
             # Aciona validacao do conteudo do XML
             task_validate_content_xml.apply_async(
                 kwargs={
-                    'file_path': file_path,
-                    'xml_path': xml_path,
-                    'package_id': package_id,
+                    "file_path": file_path,
+                    "xml_path": xml_path,
+                    "package_id": package_id,
                 },
                 countdown=10,
             )
-
 
         # Aciona validação de compatibilidade entre dados do pacote e o Issue selecionado
         if issue_id is not None and package_category:
@@ -453,14 +452,18 @@ def task_validate_renditions(file_path, xml_path, package_id):
             data={"xml_path": xml_path},
         )
         return True
+
+
 from datetime import date
 
 
-@celery_app.task(name='Validate XML')
+@celery_app.task(name="Validate XML")
 def task_validate_content_xml(file_path, xml_path, package_id):
     xml_str = file_utils.get_xml_content_from_zip(file_path)
-    
-    validations = ValidationReportXML(file_path=xml_str, data_file_path='validation_criteria_example.json').validation_report()
+
+    validations = ValidationReportXML(
+        file_path=xml_str, data_file_path="validation_criteria_example.json"
+    ).validation_report()
 
     # data = {}
     for result in validations:
@@ -473,25 +476,25 @@ def task_validate_content_xml(file_path, xml_path, package_id):
                     error_category=choices.VE_DATA_CONSISTENCY_ERROR,
                     package_id=package_id,
                     status=choices.VS_CREATED,
-                    data=json_validations
+                    data=json_validations,
                 )
 
                 # # TODO
                 # Realizar logica para verificar se a validacao passou ou nao
                 ########
                 try:
-                    message = json_validations['message']
+                    message = json_validations["message"]
                 except Exception as e:
                     print(f"Error: {e}")
-                    message = ''
+                    message = ""
 
                 try:
-                    valor = json_validations['result']
+                    valor = json_validations["result"]
                 except Exception as e:
                     print(f"Error: {e}")
                     valor = False
 
-                if valor == 'success':
+                if valor == "success":
                     controller.update_validation_result(
                         vr.id,
                         status=choices.VS_APPROVED,
@@ -499,10 +502,10 @@ def task_validate_content_xml(file_path, xml_path, package_id):
                     )
                 else:
                     controller.update_validation_result(
-                        vr.id, 
+                        vr.id,
                         status=choices.VS_DISAPPROVED,
                         message=_(message),
-                    )   
+                    )
 
 
 @celery_app.task(bind=True, name="Check validation error resolutions")

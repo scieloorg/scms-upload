@@ -16,6 +16,7 @@ class Researcher(ClusterableModel, CommonControlField):
     """
     Class that represent the Researcher
     """
+
     given_names = models.CharField(
         _("Given names"), max_length=128, blank=False, null=False
     )
