@@ -468,7 +468,10 @@ class PidRequesterXMLAdapterQueryParamsTest(BasePidRequesterXMLAdapterQueryParam
     def test_query_params_z_article_titles_texts_is_set(self):
         self.xml_adapter.xml_with_pre._article_titles_texts = ["TITLES"]
         result = self.xml_adapter.query_params()
-        self.assertEqual("c1f32c10725c3a77d2a876a39637ae1639693227731720a86c1cc105ad54b5cf", result["z_article_titles_texts"])
+        self.assertEqual(
+            "c1f32c10725c3a77d2a876a39637ae1639693227731720a86c1cc105ad54b5cf",
+            result["z_article_titles_texts"],
+        )
 
     def test_query_params_z_article_titles_texts_is_none(self):
         result = self.xml_adapter.query_params()
