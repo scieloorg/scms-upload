@@ -125,6 +125,7 @@ LOCAL_APPS = [
     # evitar problema de migração por enquanto
     "upload",
     "controlled_lists",
+    "pid_requester",
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
