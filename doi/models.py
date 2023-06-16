@@ -25,6 +25,7 @@ class DOIWithLang(CommonControlField):
 class XMLCrossRef(CommonControlField):
     file = models.FileField(null=True, blank=True)
     uri = models.URLField(null=True, blank=True)
+    pid = models.CharField(max_length=23, null=True, blank=True)
 
     class Meta:
         ordering = ("file",)
