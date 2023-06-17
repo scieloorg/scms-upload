@@ -366,7 +366,6 @@ class PidRequesterXMLGetRegisteredTest(TestCase):
             "created": "2023-02-20T00:00:00",
             "updated": "2023-02-20T00:00:00",
             "record_status": "updated",
-            "xml_with_pre": None,
             "synchronized": False,
         }
         self.assertDictEqual(expected, result)
