@@ -14,6 +14,7 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from pid_requester import exceptions, xml_sps_adapter
 from pid_requester import v3_gen
+from xmlsps.xml_sps_lib import get_xml_with_pre
 
 
 LOGGER = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ class SyncFailure(CommonControlField):
 
     @classmethod
     def create(cls, error_msg, error_type, traceback, creator):
+        logging.info("SyncFailure.create")
         obj = cls()
         obj.error_msg = error_msg
         obj.error_type = error_type
@@ -295,11 +297,14 @@ class XMLVersion(CommonControlField):
         obj.finger_print = finger_print
         obj.pid_requester_xml = pid_requester_xml
         obj.pkg_name = pkg_name
-        obj.file.save(pkg_name + ".xml", ContentFile(xml_content))
+        obj.save_file(pkg_name + ".xml", xml_content)
         obj.creator = creator
         obj.created = utcnow()
         obj.save()
         return obj
+
+    def save_file(self, name, content):
+        self.file.save(name, ContentFile(content))
 
     @property
     def xml_with_pre(self):
@@ -308,7 +313,7 @@ class XMLVersion(CommonControlField):
         except Exception as e:
             raise exceptions.PidRequesterXMLWithPreError(
                 _("Unable to get xml with pre (PidRequesterXML) {}: {} {}").format(
-                    self.name, type(e), e
+                    self.pkg_name, type(e), e
                 )
             )
 
@@ -431,7 +436,6 @@ class PidRequesterXML(CommonControlField):
             "v3": self.v3,
             "v2": self.v2,
             "aop_pid": self.aop_pid,
-            "xml_with_pre": self.xml_with_pre,
             "pkg_name": self.pkg_name,
             "created": self.created and self.created.isoformat(),
             "updated": self.updated and self.updated.isoformat(),
@@ -471,6 +475,7 @@ class PidRequesterXML(CommonControlField):
             not self.current_version
             or self.current_version.finger_print != finger_print
         ):
+            logging.info("PidRequesterXML.set_current_version")
             self.current_version = XMLVersion.create(
                 creator=creator,
                 pid_requester_xml=self,
@@ -620,6 +625,7 @@ class PidRequesterXML(CommonControlField):
         então, recusar o registro,
         pois está tentando registrar uma versão desatualizada
         """
+        logging.info("PidRequesterXML.evaluate_registration")
         if xml_adapter.is_aop and registered and not registered.is_aop:
             raise exceptions.ForbiddenPidRequesterXMLRegistrationError(
                 _(
@@ -632,6 +638,7 @@ class PidRequesterXML(CommonControlField):
     def set_synchronized(
         self, user, xml_uri=None, error_type=None, error_msg=None, traceback=None
     ):
+        logging.info("PidRequesterXML.set_synchronized")
         self.synchronized = bool(xml_uri)
         if error_type or error_msg or traceback:
             self.sync_failure = SyncFailure.create(
@@ -664,8 +671,8 @@ class PidRequesterXML(CommonControlField):
         -------
         exceptions.QueryDocumentMultipleObjectsReturnedError
         """
+        logging.info("PidRequesterXML.check_registration_demand")
         xml_adapter = xml_sps_adapter.PidRequesterXMLAdapter(xml_with_pre)
-        print(type(xml_adapter))
 
         try:
             registered = cls._query_document(xml_adapter)
@@ -762,6 +769,7 @@ class PidRequesterXML(CommonControlField):
                 )
 
     def _add_data(self, xml_adapter, user, pkg_name):
+        logging.info(f"PidRequesterXML._add_data {pkg_name}")
         self.pkg_name = pkg_name
         self.article_pub_year = xml_adapter.article_pub_year
         self.v3 = xml_adapter.v3
