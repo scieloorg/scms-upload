@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -12,7 +14,6 @@ from core.models import CommonControlField
 from doi.models import DOIWithLang
 from issue.models import Issue
 from researcher.models import Researcher
-
 from . import choices
 from .forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
@@ -56,6 +57,20 @@ class Article(ClusterableModel, CommonControlField):
     related_items = models.ManyToManyField(
         "self", symmetrical=False, through="RelatedItem", related_name="related_to"
     )
+
+    @classmethod
+    def get_or_create(cls, pid_v3, pid_v2=None, aop_pid=None, creator=None):
+        try:
+            return Article.objects.get(pid_v3=pid_v3)
+        except cls.DoesNotExist:
+            article = Article()
+            article.aop_pid = aop_pid
+            article.pid_v3 = pid_v2
+            article.pid_v2 = pid_v3
+            article.created = datetime.utcnow()
+            article.creator = creator
+            article.save()
+            return article
 
     autocomplete_search_field = "pid_v3"
 
