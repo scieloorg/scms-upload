@@ -14,6 +14,7 @@ from core.models import CommonControlField
 from doi.models import DOIWithLang
 from issue.models import Issue
 from researcher.models import Researcher
+from xmlsps.models import XMLSPS
 from . import choices
 from .forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
@@ -57,6 +58,7 @@ class Article(ClusterableModel, CommonControlField):
     related_items = models.ManyToManyField(
         "self", symmetrical=False, through="RelatedItem", related_name="related_to"
     )
+    xml_sps = models.ForeignKey(XMLSPS, blank=True, null=True, on_delete=models.SET_NULL)
 
     @classmethod
     def get_or_create(cls, pid_v3, pid_v2=None, aop_pid=None, creator=None):
@@ -71,6 +73,10 @@ class Article(ClusterableModel, CommonControlField):
             article.creator = creator
             article.save()
             return article
+
+    def add_xml_sps(self, filename, content):
+        self.xml_sps.save_file(filename, content)
+        self.save()
 
     autocomplete_search_field = "pid_v3"
 
