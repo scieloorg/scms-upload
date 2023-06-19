@@ -71,12 +71,36 @@ class Article(ClusterableModel, CommonControlField):
             article.pid_v2 = pid_v3
             article.created = datetime.utcnow()
             article.creator = creator
+            article.status = choices.AS_READ_TO_PUBLISH
             article.save()
             return article
 
     def add_xml_sps(self, filename, content):
         self.xml_sps.save_file(filename, content)
         self.save()
+
+    def add_type(self, article_type):
+        self.article_type = article_type
+
+    def add_related_item(self, target_doi, target_article_type):
+        self.save()
+        # TODO
+        # item = RelatedItem()
+        # item.item_type = target_article_type
+        # item.source_article = self
+        # item.target_article = target_location
+        # item.save()
+        # self.related_items.add(item)
+
+    def add_pages(self, fpage=None, fpage_seq=None, lpage=None, elocation_id=None):
+        self.fpage = fpage
+        self.fpage_seq = fpage_seq
+        self.lpage = lpage
+        self.elocation_id = elocation_id
+
+    def add_issue(self, volume=None, number=None, suppl=None):
+    	# TODO
+        self.issue = None
 
     autocomplete_search_field = "pid_v3"
 
