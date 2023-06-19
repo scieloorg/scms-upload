@@ -6,6 +6,7 @@ from packtools.sps.models.article_ids import ArticleIds
 from . import exceptions
 from .models import Article, choices
 from pid_requester.controller import PidRequester
+from xmlsps.xml_sps_lib import XMLWithPre
 
 
 def request_pid(xml_with_pre, filename, user):
@@ -23,8 +24,24 @@ def request_pid(xml_with_pre, filename, user):
         aop_pid=response.get("aop_pid"),
         creator=user,
     )
+    article.add_pages(
+        xml_with_pre.fpage,
+        xml_with_pre.fpage_seq,
+        xml_with_pre.lpage,
+        xml_with_pre.elocation_id,
+    )
+    article.add_type(xml_with_pre.xmltree.find(".").get("article-type"))
+    article.add_issue(
+        volume=xml_with_pre.volume,
+        number=xml_with_pre.number,
+        suppl=xml_with_pre.suppl,
+    )
+
     article.add_xml_sps(filename, xml_with_pre.tostring())
-    return article
+
+    for related in xml_with_pre.related_items:
+        article.add_related_item(related["href"], related["related-article-type"])
+    return {"article": article}
 
 
 def create_article_from_etree(xml_tree, user_id, status=choices.AS_PUBLISHED):
