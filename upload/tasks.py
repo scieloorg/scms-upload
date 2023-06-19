@@ -554,3 +554,8 @@ def task_get_or_create_package(pid_v3, user_id):
             user_id=user_id,
             file_name=package_file_name,
         ).id
+
+
+@celery_app.task(bind=True, name="request_pid_for_accepted_packages")
+def task_request_pid_for_accepted_packages(self, user_id):
+    controller.request_pid_for_accepted_packages(user_id)

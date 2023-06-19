@@ -12,7 +12,6 @@ from requests.auth import HTTPBasicAuth
 from pid_requester import exceptions
 from pid_requester.models import PidProviderConfig, PidRequesterXML
 from xmlsps import xml_sps_lib
-from xmlsps.models import XMLSPS
 
 
 User = get_user_model()
@@ -114,6 +113,7 @@ class PidRequester:
                 traceback=response.get("traceback"),
             )
         logging.info(f"request_pid_for_xml_with_pre result: {registered}")
+        registered["xml_with_pre"] = xml_with_pre
         return registered
 
     @classmethod

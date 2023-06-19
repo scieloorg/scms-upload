@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -12,7 +14,7 @@ from core.models import CommonControlField
 from doi.models import DOIWithLang
 from issue.models import Issue
 from researcher.models import Researcher
-
+from xmlsps.models import XMLSPS
 from . import choices
 from .forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
@@ -56,6 +58,49 @@ class Article(ClusterableModel, CommonControlField):
     related_items = models.ManyToManyField(
         "self", symmetrical=False, through="RelatedItem", related_name="related_to"
     )
+    xml_sps = models.ForeignKey(XMLSPS, blank=True, null=True, on_delete=models.SET_NULL)
+
+    @classmethod
+    def get_or_create(cls, pid_v3, pid_v2=None, aop_pid=None, creator=None):
+        try:
+            return Article.objects.get(pid_v3=pid_v3)
+        except cls.DoesNotExist:
+            article = Article()
+            article.aop_pid = aop_pid
+            article.pid_v3 = pid_v2
+            article.pid_v2 = pid_v3
+            article.created = datetime.utcnow()
+            article.creator = creator
+            article.status = choices.AS_READ_TO_PUBLISH
+            article.save()
+            return article
+
+    def add_xml_sps(self, filename, content):
+        self.xml_sps.save_file(filename, content)
+        self.save()
+
+    def add_type(self, article_type):
+        self.article_type = article_type
+
+    def add_related_item(self, target_doi, target_article_type):
+        self.save()
+        # TODO
+        # item = RelatedItem()
+        # item.item_type = target_article_type
+        # item.source_article = self
+        # item.target_article = target_location
+        # item.save()
+        # self.related_items.add(item)
+
+    def add_pages(self, fpage=None, fpage_seq=None, lpage=None, elocation_id=None):
+        self.fpage = fpage
+        self.fpage_seq = fpage_seq
+        self.lpage = lpage
+        self.elocation_id = elocation_id
+
+    def add_issue(self, volume=None, number=None, suppl=None):
+    	# TODO
+        self.issue = None
 
     autocomplete_search_field = "pid_v3"
 

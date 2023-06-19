@@ -4,7 +4,8 @@ from django.shortcuts import get_object_or_404
 
 from collection.models import NewWebSiteConfiguration
 from libs.dsm.publication.db import exceptions, mk_connection
-
+from xmlsps.xml_sps_lib import get_xml_items_from_zip_file
+from article.controller import request_pid as article_controller_request_pid
 from .models import (
     ErrorResolution,
     ErrorResolutionOpinion,
@@ -168,3 +169,25 @@ def establish_site_connection(url="scielo.br"):
         return False
 
     return True
+
+
+def request_pid_for_accepted_packages(user_id):
+    user = User.objects.get(pk=user_id)
+    for pkg in Package.objects.filter(
+        status=choices.PS_ACCEPTED,
+        article__isnull=True
+    ).iterator():
+        for xml_item in get_xml_items_from_zip_file(pkg.file.path):
+            response = article_controller_request_pid(
+                xml_item["xml_with_pre"],
+                xml_item["filename"],
+                user=user,
+            )
+            try:
+                pkg.article = response["article"]
+                pkg.save()
+            except KeyError:
+                # TODO registrar em algum modelo os erros para que o usuário
+                # fique ciente de que houve erro
+                logging.exception(
+                    f"Unable to create / update article {response['error_msg']}")
