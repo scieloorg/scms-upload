@@ -3,14 +3,14 @@ from unittest.mock import ANY, MagicMock, Mock, patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from xmlsps.xml_sps_lib import get_xml_items
 from pid_requester.controller import PidRequester
 from pid_requester.models import (
     PidProviderConfig,
+    PidRequesterXML,
     SyncFailure,
     XMLVersion,
-    PidRequesterXML,
 )
+from xmlsps.xml_sps_lib import get_xml_items
 
 User = get_user_model()
 

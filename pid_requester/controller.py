@@ -13,7 +13,6 @@ from pid_requester import exceptions
 from pid_requester.models import PidProviderConfig, PidRequesterXML
 from xmlsps import xml_sps_lib
 
-
 User = get_user_model()
 
 LOGGER = logging.getLogger(__name__)

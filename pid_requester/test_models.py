@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from unittest import mock
-from unittest.mock import Mock, call, patch, MagicMock, ANY
+from unittest.mock import ANY, MagicMock, Mock, call, patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
