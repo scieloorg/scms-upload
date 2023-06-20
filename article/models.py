@@ -15,6 +15,7 @@ from doi.models import DOIWithLang
 from issue.models import Issue
 from researcher.models import Researcher
 from xmlsps.models import XMLSPS
+
 from . import choices
 from .forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
@@ -58,7 +59,9 @@ class Article(ClusterableModel, CommonControlField):
     related_items = models.ManyToManyField(
         "self", symmetrical=False, through="RelatedItem", related_name="related_to"
     )
-    xml_sps = models.ForeignKey(XMLSPS, blank=True, null=True, on_delete=models.SET_NULL)
+    xml_sps = models.ForeignKey(
+        XMLSPS, blank=True, null=True, on_delete=models.SET_NULL
+    )
 
     @classmethod
     def get_or_create(cls, pid_v3, pid_v2=None, aop_pid=None, creator=None):
@@ -99,7 +102,7 @@ class Article(ClusterableModel, CommonControlField):
         self.elocation_id = elocation_id
 
     def add_issue(self, volume=None, number=None, suppl=None):
-    	# TODO
+        # TODO
         self.issue = None
 
     autocomplete_search_field = "pid_v3"

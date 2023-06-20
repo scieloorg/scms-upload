@@ -3,10 +3,11 @@ from datetime import datetime
 from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_ids import ArticleIds
 
-from . import exceptions
-from .models import Article, choices
 from pid_requester.controller import PidRequester
 from xmlsps.xml_sps_lib import XMLWithPre
+
+from . import exceptions
+from .models import Article, choices
 
 
 def request_pid(xml_with_pre, filename, user):

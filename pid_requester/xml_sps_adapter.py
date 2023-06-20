@@ -4,8 +4,8 @@ import logging
 from django.utils.translation import gettext as _
 from lxml import etree
 
-from pid_requester.utils.finger_print import generate_finger_print
 from pid_requester import exceptions
+from pid_requester.utils.finger_print import generate_finger_print
 
 LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"

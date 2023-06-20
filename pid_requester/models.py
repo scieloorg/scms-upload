@@ -12,10 +12,8 @@ from wagtail.admin.panels import FieldPanel
 
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
-from pid_requester import exceptions, xml_sps_adapter
-from pid_requester import v3_gen
+from pid_requester import exceptions, v3_gen, xml_sps_adapter
 from xmlsps.xml_sps_lib import get_xml_with_pre
-
 
 LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
