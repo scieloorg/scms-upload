@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
 import modelcluster.fields
-import wagtail.core.fields
+import wagtail.fields
 
 
 class Migration(migrations.Migration):
@@ -46,7 +46,7 @@ class Migration(migrations.Migration):
                 ('updated', models.DateTimeField(auto_now=True, verbose_name='Last update date')),
                 ('deadline', models.DateField(verbose_name='Deadline')),
                 ('change_type', models.CharField(choices=[('update', 'Atualizar'), ('erratum', 'Erratum')], max_length=32, verbose_name='Change type')),
-                ('comment', wagtail.core.fields.RichTextField(blank=True, max_length=512, null=True, verbose_name='Comment')),
+                ('comment', wagtail.fields.RichTextField(blank=True, max_length=512, null=True, verbose_name='Comment')),
                 ('pid_v3', models.CharField(blank=True, max_length=23, null=True, verbose_name='PID v3')),
                 ('article', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='article.article')),
                 ('creator', models.ForeignKey(editable=False, on_delete=django.db.models.deletion.CASCADE, related_name='requestarticlechange_creator', to=settings.AUTH_USER_MODEL, verbose_name='Creator')),
