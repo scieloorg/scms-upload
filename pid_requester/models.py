@@ -41,7 +41,7 @@ class SyncFailure(CommonControlField):
 
     @classmethod
     def create(cls, error_msg, error_type, traceback, creator):
-        logging.info("SyncFailure.create")
+        logging.info(f"SyncFailure.create {error_msg}")
         obj = cls()
         obj.error_msg = error_msg
         obj.error_type = error_type
@@ -291,13 +291,17 @@ class XMLVersion(CommonControlField):
         finger_print=None,
         xml_content=None,
     ):
+        logging.info(f"XMLVersion.create({pkg_name})")
         obj = cls()
         obj.finger_print = finger_print
-        obj.pid_requester_xml = pid_requester_xml
         obj.pkg_name = pkg_name
         obj.save_file(pkg_name + ".xml", xml_content)
         obj.creator = creator
         obj.created = utcnow()
+        obj.save()
+
+        # salvar pid_requester_xml e salvar self para evitar exceção
+        obj.pid_requester_xml = pid_requester_xml
         obj.save()
         return obj
 
@@ -473,7 +477,6 @@ class PidRequesterXML(CommonControlField):
             not self.current_version
             or self.current_version.finger_print != finger_print
         ):
-            logging.info("PidRequesterXML.set_current_version")
             self.current_version = XMLVersion.create(
                 creator=creator,
                 pid_requester_xml=self,
