@@ -1,28 +1,4 @@
-class AddLangsToXMLFilesError(Exception):
-    ...
-
-
-class AddPublicXMLError(Exception):
-    ...
-
-
-class AddSupplementaryMaterialFlagToAssetError(Exception):
-    ...
-
-
-class DocumentMigrationSaveError(Exception):
-    ...
-
-
-class GetFilesStorageError(Exception):
-    ...
-
-
-class GetJournalMigratioStatusError(Exception):
-    ...
-
-
-class GetMigrationConfigurationError(Exception):
+class ScheduleMigrationsError(Exception):
     ...
 
 
@@ -30,53 +6,25 @@ class GetOrCreateCrontabScheduleError(Exception):
     ...
 
 
-class GetOrCreateDocumentMigrationError(Exception):
+class CreateOrUpdateMigratedFileError(Exception):
     ...
 
 
-class GetOrCreateIssueMigrationError(Exception):
+class CreateOrUpdateMigratedJournalError(Exception):
     ...
 
 
-class GetOrCreateJournalMigrationError(Exception):
+class CreateOrUpdateMigratedIssueError(Exception):
     ...
 
 
-class GetSciELOIssueError(Exception):
+class CreateOrUpdateMigratedDocumentError(Exception):
     ...
 
 
-class IssueFilesMigrationSaveError(Exception):
+class CreateOrUpdateBodyAndBackFileError(Exception):
     ...
 
 
-class IssueFilesStoreError(Exception):
-    ...
-
-
-class IssueMigrationSaveError(Exception):
-    ...
-
-
-class JournalMigrationSaveError(Exception):
-    ...
-
-
-class MigrationStartError(Exception):
-    ...
-
-
-class PublishDocumentError(Exception):
-    ...
-
-
-class PublishIssueError(Exception):
-    ...
-
-
-class PublishJournalError(Exception):
-    ...
-
-
-class SetOfficialIssueToSciELOIssueError(Exception):
+class CreateOrUpdateGeneratedXMLFileError(Exception):
     ...
