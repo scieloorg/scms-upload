@@ -68,29 +68,42 @@ class Institution(CommonControlField, ClusterableModel):
             self.location,
         )
 
+    @property
+    def data(self):
+        d = {"institution__name": self.name, "institution__acronym": self.acronym}
+        d.update(self.location.data)
+        return d
+
+    @classmethod
+    def get(cls, inst_name=None, inst_acronym=None, location=None):
+        parms = {}
+        if inst_name:
+            parms["name__iexact"] = inst_name
+        if inst_acronym:
+            parms["acronym"] = inst_acronym
+        try:
+            return cls.objects.get(**parms)
+        except cls.MultipleObjectsReturned:
+            selected = None
+            for item in cls.objects.filter(**parms).iterator():
+                if not selected:
+                    selected = item
+                    continue
+                if count(item.data.values(), None) < count(selected.data.values(), None):
+                    selected = item
+            return selected
+
     @classmethod
     def get_or_create(
-        cls, inst_name, inst_acronym, level_1, level_2, level_3, location
+        cls, inst_name=None, inst_acronym=None,
+        level_1=None, level_2=None, level_3=None, location=None,
+        user=None,
     ):
         # Institution
         # check if exists the institution
-        parms = {}
-        if inst_name:
-            parms["name"] = inst_name
-        if inst_acronym:
-            parms["acronym"] = inst_acronym
-        if location:
-            parms["location"] = location
-        if level_1:
-            parms["level_1"] = level_1
-        if level_2:
-            parms["level_2"] = level_2
-        if level_3:
-            parms["level_3"] = level_3
-
         try:
-            return cls.objects.get(**parms)
-        except:
+            return cls.get(inst_name=inst_name, inst_acronym=inst_acronym, location=location)
+        except cls.DoesNotExist:
             institution = cls()
             institution.name = inst_name
             institution.acronym = inst_acronym
@@ -98,8 +111,9 @@ class Institution(CommonControlField, ClusterableModel):
             institution.level_2 = level_2
             institution.level_3 = level_3
             institution.location = location
+            institution.creator = user
             institution.save()
-        return institution
+            return institution
 
     base_form_class = InstitutionForm
 
