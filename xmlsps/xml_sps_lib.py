@@ -308,7 +308,6 @@ class XMLWithPre:
             node.set("specific-use", "scielo-v2")
             parent = self.article_id_parent
             parent.insert(1, node)
-            print(etree.tostring(parent))
         node.text = value
 
     @v3.setter
