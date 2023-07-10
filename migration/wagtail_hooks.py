@@ -25,30 +25,28 @@ class MigrationFailureAdmin(ModelAdmin):
 
     list_display = (
         "action_name",
-        "object_name",
-        "pid",
-        "exception_type",
+        "migrated_item_name",
+        "migrated_item_id",
+        "message",
         "updated",
     )
     list_filter = (
         "action_name",
-        "object_name",
+        "migrated_item_name",
         "exception_type",
     )
     search_fields = (
         "action_name",
-        "object_name",
-        "pid",
-        "exception_type",
+        "migrated_item_id",
+        "message",
         "exception_msg",
     )
     inspect_view_fields = (
         "action_name",
-        "object_name",
-        "pid",
+        "migrated_item_name",
+        "migrated_item_id",
         "exception_type",
         "exception_msg",
-        "traceback",
         "updated",
     )
 
@@ -59,9 +57,9 @@ class CoreCreateView(CreateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
-class MigrationConfigurationModelAdmin(ModelAdmin):
-    model = models.MigrationConfiguration
-    menu_label = _("Migration Configuration")
+class ClassicWebsiteConfigurationModelAdmin(ModelAdmin):
+    model = models.ClassicWebsiteConfiguration
+    menu_label = _("Classic Website Configuration")
     menu_icon = "doc-full"
     menu_order = 100
     add_to_settings_menu = False
@@ -71,17 +69,17 @@ class MigrationConfigurationModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        "classic_website_config",
+        "collection",
         "created",
         "updated",
         "updated_by",
     )
-    list_filter = ("classic_website_config__collection__acron",)
-    search_fields = ("classic_website_config__collection__acron",)
+    list_filter = ("collection__acron",)
+    search_fields = ("collection__acron",)
 
 
-class JournalMigrationModelAdmin(ModelAdmin):
-    model = models.JournalMigration
+class MigratedJournalModelAdmin(ModelAdmin):
+    model = models.MigratedJournal
     menu_label = _("Journal Migration")
     menu_icon = "doc-full"
     menu_order = 300
@@ -107,8 +105,8 @@ class JournalMigrationModelAdmin(ModelAdmin):
     )
 
 
-class IssueMigrationModelAdmin(ModelAdmin):
-    model = models.IssueMigration
+class MigratedIssueModelAdmin(ModelAdmin):
+    model = models.MigratedIssue
     menu_label = _("Issue Migration")
     menu_icon = "doc-full"
     menu_order = 300
@@ -126,9 +124,9 @@ class IssueMigrationModelAdmin(ModelAdmin):
     )
     list_filter = ("status",)
     search_fields = (
-        "scielo_issue__scielo_journal__title",
-        "scielo_issue__scielo_journal__acron",
-        "scielo_issue__publication_date__year",
+        "migrated_journal__scielo_journal__title",
+        "migrated_journal__scielo_journal__acron",
+        "scielo_issue__official_issue__publication_date__year",
         "scielo_issue__issue_folder",
     )
     inspect_view_fields = (
@@ -139,8 +137,8 @@ class IssueMigrationModelAdmin(ModelAdmin):
     )
 
 
-class DocumentMigrationModelAdmin(ModelAdmin):
-    model = models.DocumentMigration
+class MigratedDocumentModelAdmin(ModelAdmin):
+    model = models.MigratedDocument
     menu_label = _("Document Migration")
     menu_icon = "doc-full"
     menu_order = 300
@@ -152,22 +150,30 @@ class DocumentMigrationModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        "scielo_document",
+        "article",
+        "pkg_name",
+        "sps_pkg_name",
+        "pid",
         "status",
         "isis_updated_date",
     )
     list_filter = ("status",)
     search_fields = (
-        "scielo_document__scielo_issue__scielo_journal__title",
-        "scielo_document__scielo_issue__scielo_journal__acron",
-        "scielo_document__scielo_issue__publication_date__year",
-        "scielo_document__scielo_issue__issue_folder",
-        "scielo_document__pid",
+        "article__journal__title",
+        "migrated_issue__migrated_journal__scielo_journal__acron",
+        "migrated_issue__scielo_issue__official_issue__publication_year",
+        "migrated_issue__scielo_issue__issue_folder",
+        "article__pid",
     )
     inspect_view_fields = (
-        "scielo_document",
+        "migrated_issue",
+        "pkg_name",
+        "sps_pkg_name",
+        "pid",
         "status",
         "isis_updated_date",
+        "data",
+        "article",
     )
 
 
@@ -175,11 +181,11 @@ class MigrationModelAdmin(ModelAdminGroup):
     menu_icon = "folder"
     menu_label = "Migration"
     items = (
-        MigrationConfigurationModelAdmin,
+        ClassicWebsiteConfigurationModelAdmin,
         MigrationFailureAdmin,
-        JournalMigrationModelAdmin,
-        IssueMigrationModelAdmin,
-        DocumentMigrationModelAdmin,
+        MigratedJournalModelAdmin,
+        MigratedIssueModelAdmin,
+        MigratedDocumentModelAdmin,
     )
     menu_order = get_menu_order("migration")
 

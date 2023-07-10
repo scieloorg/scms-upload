@@ -1,3 +1,6 @@
+import logging
+from datetime import datetime
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -13,7 +16,7 @@ from wagtail.models import Orderable
 
 from core.models import CommonControlField, RichTextWithLang
 from institution.models import InstitutionHistory
-
+from collection.models import Collection
 from . import choices
 from .forms import OfficialJournalForm
 
@@ -23,44 +26,98 @@ class OfficialJournal(CommonControlField):
     Class that represent the Official Journal
     """
 
-    def __unicode__(self):
-        return "%s" % (self.title)
-
-    def __str__(self):
-        return "%s" % (self.title)
-
     title = models.TextField(_("Official Title"), null=True, blank=True)
-    title_iso = models.TextField(_("Title ISO"), null=True, blank=True)
-    short_title = models.TextField(_("Short Title"), null=True, blank=True)
-    nlm_title = models.TextField(_("NLM Title"), null=True, blank=True)
-
-    foundation_date = models.CharField(
-        _("Foundation Date"), max_length=25, null=True, blank=True
+    title_iso = models.TextField(_("ISO Title"), null=True, blank=True)
+    foundation_year = models.CharField(
+        _("Foundation Year"), max_length=4, null=True, blank=True
     )
-    ISSN_print = models.CharField(_("ISSN Print"), max_length=9, null=True, blank=True)
-    ISSN_electronic = models.CharField(
-        _("ISSN Electronic"), max_length=9, null=True, blank=True
+    issn_print = models.CharField(_("ISSN Print"), max_length=9, null=True, blank=True)
+    issn_electronic = models.CharField(
+        _("ISSN Eletronic"), max_length=9, null=True, blank=True
     )
-    ISSNL = models.CharField(_("ISSNL"), max_length=9, null=True, blank=True)
-
-    autocomplete_search_field = "title"
-
-    def autocomplete_label(self):
-        return self.title
-
-    base_form_class = OfficialJournalForm
+    issnl = models.CharField(_("ISSNL"), max_length=9, null=True, blank=True)
 
     class Meta:
+        verbose_name = _("Official Journal")
+        verbose_name_plural = _("Official Journals")
         indexes = [
-            models.Index(fields=["title"]),
-            models.Index(fields=["title_iso"]),
-            models.Index(fields=["short_title"]),
-            models.Index(fields=["nlm_title"]),
-            models.Index(fields=["foundation_date"]),
-            models.Index(fields=["ISSN_print"]),
-            models.Index(fields=["ISSN_electronic"]),
-            models.Index(fields=["ISSNL"]),
+            models.Index(
+                fields=[
+                    "issn_print",
+                ]
+            ),
+            models.Index(
+                fields=[
+                    "issn_electronic",
+                ]
+            ),
+            models.Index(
+                fields=[
+                    "issnl",
+                ]
+            ),
         ]
+
+    def __unicode__(self):
+        return "%s - %s" % (self.issnl, self.title) or ""
+
+    def __str__(self):
+        return "%s - %s" % (self.issnl, self.title) or ""
+
+    @property
+    def data(self):
+        d = {
+            "official_journal__title": self.title,
+            "official_journal__foundation_year": self.foundation_year,
+            "official_journal__issn_print": self.issn_print,
+            "official_journal__issn_electronic": self.issn_electronic,
+            "official_journal__issnl": self.issnl,
+        }
+        return d
+
+    @classmethod
+    def get(cls, issn_print=None, issn_electronic=None, issnl=None):
+        logging.info(f"OfficialJournal.get({issn_print}, {issn_electronic}, {issnl})")
+        if issn_electronic:
+            return cls.objects.get(issn_electronic=issn_electronic)
+        if issn_print:
+            return cls.objects.get(issn_print=issn_print)
+        if issnl:
+            return cls.objects.get(issnl=issnl)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        issn_print=None,
+        issn_electronic=None,
+        issnl=None,
+        title=None,
+        title_iso=None,
+        foundation_year=None,
+        user=None,
+    ):
+        logging.info(
+            f"OfficialJournal.create_or_update({issn_print}, {issn_electronic}, {issnl})"
+        )
+        try:
+            obj = cls.get(issn_print, issn_electronic, issnl)
+            obj.updated_by = user
+            obj.updated = datetime.utcnow()
+        except cls.DoesNotExist:
+            obj = cls()
+            obj.creator = user
+
+        obj.issnl = issnl or obj.issnl
+        obj.title_iso = title_iso or obj.title_iso
+        obj.title = title or obj.title
+        obj.issn_print = issn_print or obj.issn_print
+        obj.issn_electronic = issn_electronic or obj.issn_electronic
+        obj.foundation_year = foundation_year or obj.foundation_year
+        obj.save()
+        logging.info(f"return {obj}")
+        return obj
+
+    base_form_class = OfficialJournalForm
 
 
 class NonOfficialJournalTitle(ClusterableModel, CommonControlField):
@@ -135,6 +192,10 @@ class SocialNetwork(models.Model):
 
 
 class Journal(ClusterableModel, SocialNetwork):
+    """
+    Journal para site novo
+    """
+
     short_title = models.CharField(
         _("Short Title"), max_length=100, null=True, blank=True
     )
@@ -155,6 +216,12 @@ class Journal(ClusterableModel, SocialNetwork):
     submission_online_url = models.URLField(
         _("Submission online URL"), max_length=255, null=True, blank=True
     )
+
+    def __unicode__(self):
+        return str(self.official_journal)
+
+    def __str__(self):
+        return str(self.official_journal)
 
     panels_identification = [
         FieldPanel("official_journal"),
@@ -201,6 +268,35 @@ class Journal(ClusterableModel, SocialNetwork):
         ]
     )
 
+    @classmethod
+    def get(cls, official_journal):
+        logging.info(f"Journal.get({official_journal}")
+        if official_journal:
+            return cls.objects.get(official_journal=official_journal)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        creator=None,
+        official_journal=None,
+    ):
+        logging.info(f"Journal.create_or_update({official_journal}")
+        try:
+            obj = cls.get(official_journal=official_journal)
+            logging.info("update {}".format(obj))
+            obj.updated_by = creator
+            obj.updated = datetime.utcnow()
+        except cls.DoesNotExist:
+            obj = cls()
+            obj.official_journal = official_journal
+            obj.creator = creator
+            logging.info("create {}".format(obj))
+
+        obj.official_journal = official_journal or obj.official_journal
+        obj.save()
+        logging.info(f"return {obj}")
+        return obj
+
 
 class Mission(Orderable, RichTextWithLang):
     page = ParentalKey(Journal, on_delete=models.CASCADE, related_name="mission")
@@ -228,3 +324,113 @@ class JournalSocialNetwork(Orderable, SocialNetwork):
     page = ParentalKey(
         Journal, on_delete=models.CASCADE, related_name="journalsocialnetwork"
     )
+
+
+class SciELOJournal(CommonControlField):
+    """
+    Class that represents journals data in a SciELO Collection context
+    Its attributes are related to the journal in collection
+    For official data, use Journal model
+
+    SciELO tem particularidades, como scielo_issn é um ISSN adotado como ID
+    na coleção e este dado dentre as coleções podem divergir
+    """
+
+    collection = models.ForeignKey(
+        Collection, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    scielo_issn = models.CharField(
+        _("SciELO ISSN"), max_length=9, null=False, blank=False
+    )
+    acron = models.CharField(_("Acronym"), max_length=25, null=True, blank=True)
+    title = models.TextField(_("Title"), null=True, blank=True)
+    availability_status = models.CharField(
+        _("Availability Status"),
+        max_length=10,
+        null=True,
+        blank=True,
+        choices=choices.JOURNAL_AVAILABILTY_STATUS,
+    )
+    official_journal = models.ForeignKey(
+        OfficialJournal, on_delete=models.SET_NULL, null=True
+    )
+
+    class Meta:
+        unique_together = [
+            ["collection", "scielo_issn"],
+            ["collection", "acron"],
+        ]
+        indexes = [
+            models.Index(fields=["acron"]),
+            models.Index(fields=["collection"]),
+            models.Index(fields=["scielo_issn"]),
+            models.Index(fields=["availability_status"]),
+            models.Index(fields=["official_journal"]),
+        ]
+
+    def __unicode__(self):
+        return "%s %s" % (self.collection, self.scielo_issn)
+
+    def __str__(self):
+        return "%s %s" % (self.collection, self.scielo_issn)
+
+    @classmethod
+    def get(cls, collection, official_journal=None, scielo_issn=None, acron=None):
+        logging.info(
+            f"SciELOJournal.get({collection}, {official_journal}, {scielo_issn}, {acron})"
+        )
+        if not collection:
+            raise ValueError("SciELOJournal.get requires collection")
+        if official_journal:
+            return cls.objects.get(
+                collection=collection, official_journal=official_journal
+            )
+        if acron:
+            return cls.objects.get(collection=collection, acron=acron)
+        if scielo_issn:
+            return cls.objects.get(collection=collection, scielo_issn=scielo_issn)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        collection,
+        scielo_issn=None,
+        creator=None,
+        official_journal=None,
+        acron=None,
+        title=None,
+        availability_status=None,
+    ):
+        if not collection:
+            raise ValueError("SciELOJournal.create_or_update requires collection")
+        if not scielo_issn and not official_journal:
+            raise ValueError(
+                "SciELOJournal.create_or_update requires scielo_issn or official_journal"
+            )
+        logging.info(
+            f"SciELOJournal.create_or_update {collection} {official_journal} {scielo_issn}"
+        )
+        try:
+            obj = cls.get(
+                collection=collection,
+                acron=acron,
+                scielo_issn=scielo_issn,
+                official_journal=official_journal,
+            )
+            logging.info("update {}".format(obj))
+            obj.updated_by = creator
+            obj.updated = datetime.utcnow()
+        except cls.DoesNotExist:
+            obj = cls()
+            obj.creator = creator
+            logging.info("create {}".format(obj))
+
+        obj.collection = collection or obj.collection
+        obj.official_journal = official_journal or obj.official_journal
+        obj.scielo_issn = scielo_issn or obj.scielo_issn
+        obj.acron = acron or obj.acron
+        obj.title = title or obj.title
+        obj.availability_status = availability_status or obj.availability_status
+        obj.save()
+        logging.info(f"return {obj}")
+        return obj

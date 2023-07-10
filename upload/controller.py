@@ -2,7 +2,9 @@ from datetime import datetime
 
 from django.shortcuts import get_object_or_404
 
-from article.controller import request_pid as article_controller_request_pid
+from article.controller import (
+    request_pid_v3_and_create_article as article_controller_request_pid_v3_and_create_article,
+)
 from collection.models import NewWebSiteConfiguration
 from libs.dsm.publication.db import exceptions, mk_connection
 from xmlsps.xml_sps_lib import get_xml_items_from_zip_file
@@ -178,7 +180,7 @@ def request_pid_for_accepted_packages(user_id):
         status=choices.PS_ACCEPTED, article__isnull=True
     ).iterator():
         for xml_item in get_xml_items_from_zip_file(pkg.file.path):
-            response = article_controller_request_pid(
+            response = article_controller_request_pid_v3_and_create_article(
                 xml_item["xml_with_pre"],
                 xml_item["filename"],
                 user=user,
