@@ -26,16 +26,26 @@ class City(CommonControlField):
         return "%s" % self.name
 
     @classmethod
-    def get_or_create(cls, user, name):
+    def get(cls, name):
         if name:
-            try:
-                return cls.objects.get(name=name)
-            except:
-                city = City()
-                city.name = name
-                city.creator = user
-                city.save()
-                return city
+            return cls.objects.get(name=name)
+
+    @classmethod
+    def get_or_create(cls, user, name):
+        try:
+            return cls.get(name=name)
+        except cls.DoesNotExist:
+            city = City()
+            city.name = name
+            city.creator = user
+            city.save()
+            return city
+
+    @property
+    def data(self):
+        return dict(
+            city__name=self.name,
+        )
 
     base_form_class = CityForm
 
@@ -65,27 +75,32 @@ class State(CommonControlField):
         return "%s %s" % (self.name, self.acronym)
 
     @classmethod
-    def get_or_create(cls, user, name=None, acronym=None):
-        if name:
-            try:
-                return cls.objects.get(name__icontains=name)
-            except:
-                pass
-
+    def get(cls, name=None, acronym=None):
         if acronym:
-            try:
-                return cls.objects.get(acronym__icontains=acronym)
-            except:
-                pass
+            return cls.objects.get(acronym=acronym)
+        if name:
+            return cls.objects.get(name__iexact=name)
 
-        if name or acronym:
+    @classmethod
+    def get_or_create(cls, user, name=None, acronym=None):
+        try:
+            return cls.get(name, acronym)
+        except cls.DoesNotExist:
+            if not name and not acronym:
+                raise ValueError("State.get_or_create requires name or acronym")
             state = State()
             state.name = name
-            state.acronym = acronym or ""
-            state.creator = user or ""
+            state.acronym = acronym
+            state.creator = user
             state.save()
-
             return state
+
+    @property
+    def data(self):
+        return dict(
+            state__name=self.name,
+            state__acronym=self.acronym,
+        )
 
     base_form_class = StateForm
 
@@ -115,26 +130,32 @@ class Country(CommonControlField):
         return "%s %s" % (self.name, self.acronym)
 
     @classmethod
-    def get_or_create(cls, user, name=None, acronym=None):
-        if name:
-            try:
-                return cls.objects.get(name__icontains=name)
-            except:
-                pass
-
+    def get(cls, name=None, acronym=None):
         if acronym:
-            try:
-                return cls.objects.get(acronym__icontains=acronym)
-            except:
-                pass
+            return cls.objects.get(acronym=acronym)
+        if name:
+            return cls.objects.get(name__iexact=name)
 
-        if name or acronym:
+    @classmethod
+    def get_or_create(cls, user, name=None, acronym=None):
+        try:
+            return cls.get(name, acronym)
+        except cls.DoesNotExist:
+            if not name and not acronym:
+                raise ValueError("Country.get_or_create requires name or acronym")
             country = Country()
-            country.name = name or ""
-            country.acronym = acronym or ""
+            country.name = name
+            country.acronym = acronym
             country.creator = user
             country.save()
             return country
+
+    @property
+    def data(self):
+        return dict(
+            country__name=self.name,
+            country__acronym=self.acronym,
+        )
 
     base_form_class = CountryForm
 
@@ -173,20 +194,32 @@ class Location(CommonControlField):
         return "%s | %s | %s" % (self.country, self.state, self.city)
 
     @classmethod
-    def get_or_create(cls, user, location_country, location_state, location_city):
-        # check if exists the location
+    def get(cls, country, state, city):
+        return cls.objects.get(
+            country=country, state=state, city=city
+        )
+
+    @classmethod
+    def get_or_create(cls, user, country, state, city):
         try:
-            return cls.objects.get(
-                country=location_country, state=location_state, city=location_city
+            return cls.get(
+                country=country, state=state, city=city
             )
-        except:
+        except cls.DoesNotExist:
             location = Location()
-            location.country = location_country or ""
-            location.state = location_state or ""
-            location.city = location_city or ""
+            location.country = country
+            location.state = state
+            location.city = city
             location.creator = user
             location.save()
+            return location
 
-        return location
+    @property
+    def data(self):
+        d = {}
+        d.update(self.city.data)
+        d.update(self.state.data)
+        d.update(self.country.data)
+        return d
 
     base_form_class = LocationForm
