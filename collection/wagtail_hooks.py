@@ -10,9 +10,8 @@ from wagtail.contrib.modeladmin.options import (
 from wagtail.contrib.modeladmin.views import CreateView
 
 from config.menu import get_menu_order
-
+from migration.models import ClassicWebsiteConfiguration
 from .models import (
-    ClassicWebsiteConfiguration,
     Collection,
     FilesStorageConfiguration,
     NewWebSiteConfiguration,
