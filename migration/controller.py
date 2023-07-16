@@ -18,6 +18,7 @@ from article.controller import (
 from article.models import ArticlePackages
 from collection.models import Collection
 from core.controller import parse_yyyymmdd
+from core.utils.scheduler import schedule_task
 from django_celery_beat.models import CrontabSchedule, PeriodicTask
 from issue.models import Issue, SciELOIssue
 from journal.models import Journal, OfficialJournal, SciELOJournal
@@ -47,271 +48,74 @@ def _get_classic_website_rel_path(file_path):
 
 
 def schedule_migrations(user, collection_acron=None):
-    try:
-        task_parms = (
-            ("title", "migrate_journal_records", 0, 2, 0),
-            ("issue", "migrate_issue_records", 0, 7, 2),
-        )
-        if collection_acron:
-            collections = Collection.objects.filter(acron=collection_acron).iterator()
-        else:
-            collections = Collection.objects.iterator()
-        for collection in collections:
-            collection_acron = collection.acron
-            for (
-                db_name,
-                task,
-                hours_after_now,
-                minutes_after_now,
-                priority,
-            ) in task_parms:
-                for mode in ("full", "incremental"):
-                    # agenda tarefas para migrar title.mst e issue.mst
-                    _schedule_db_migration(
-                        collection_acron,
-                        user,
-                        db_name,
-                        task,
-                        "migrate",
-                        hours_after_now,
-                        minutes_after_now,
-                        priority,
-                        mode,
-                    )
-
-    except Exception as e:
-        logging.exception(e)
-        raise exceptions.ScheduleMigrationsError("Unable to start migration %s" % e)
+    if collection_acron:
+        collections = Collection.objects.filter(acron=collection_acron).iterator()
+    else:
+        collections = Collection.objects.iterator()
+    for collection in collections:
+        collection_acron = collection.acron
+        _schedule_title_migration(user, collection_acron)
+        _schedule_issue_migration(user, collection_acron)
+        _schedule_article_migration(user, collection_acron)
 
 
-def _schedule_db_migration(
-    collection_acron,
-    user,
-    db_name,
-    task,
-    action,
-    hours_after_now,
-    minutes_after_now,
-    priority,
-    mode,
-):
-    """
-    Agenda tarefas para migrar dados de title e issue
-    """
-    name = f"{collection_acron} | {db_name} | {action} | {mode}"
-    kwargs = dict(
-        collection_acron=collection_acron,
-        username=user.username,
-        force_update=(mode == "full"),
-    )
-    try:
-        periodic_task = PeriodicTask.objects.get(name=name)
-    except PeriodicTask.DoesNotExist:
-        hours, minutes = sum_hours_and_minutes(hours_after_now, minutes_after_now)
-
-        periodic_task = PeriodicTask()
-        periodic_task.name = name
-        periodic_task.task = task
-        periodic_task.kwargs = json.dumps(kwargs)
-        if mode == "full":
-            periodic_task.priority = priority
-            periodic_task.enabled = False
-            periodic_task.one_off = True
-            periodic_task.crontab = get_or_create_crontab_schedule(
-                hour=hours,
-                minute=minutes,
-            )
-        else:
-            periodic_task.priority = priority
-            periodic_task.enabled = True
-            periodic_task.one_off = False
-            periodic_task.crontab = get_or_create_crontab_schedule(
-                minute=minutes,
-            )
-        periodic_task.save()
-    logging.info(_("Scheduled task: {}").format(name))
-
-
-def schedule_documents_migration(collection_acron, user):
-    """
-    Agenda tarefas para migrar e publicar todos os documentos
-    """
-    for migrate_journal in MigratedJournal.journals(
-        collection_acron=collection_acron,
-        status=MS_IMPORTED,
-    ):
-        for migrated_issue in MigratedIssue.objects.filter(
-            migrated_journal=migrate_journal,
-        ):
-            _schedule_issue_documents_migrations(user, migrated_issue)
-
-
-def _schedule_issue_documents_migrations(user, migrated_issue):
-    """
-    Agenda tarefas para migrar e publicar todos os documentos
-    """
-    collection_acron = migrated_issue.migrated_journal.collection.acron
-    journal_acron = migrated_issue.migrated_journal.acron
-    scielo_issn = migrated_issue.migrated_journal.scielo_issn
-    publication_year = migrated_issue.publication_year
-
-    """
-    Agenda tarefas para migrar e publicar um conjunto de documentos por:
-        - ano
-        - periódico
-        - periódico e ano
-    """
-    logging.info(
-        _("Schedule issue documents migration {} {} {} {}").format(
-            collection_acron,
-            journal_acron,
-            scielo_issn,
-            publication_year,
-        )
+def _schedule_title_migration(user, collection_acron):
+    schedule_task(
+        task="migrate_journal_records",
+        name="migrate_journal_records",
+        kwargs=dict(
+            collection_acron=collection_acron,
+            username=user.username,
+            force_update=False,
+        ),
+        description=_("Migra os registros da base de dados TITLE"),
+        priority=1,
+        enabled=False,
+        run_once=True,
+        day_of_week="*",
+        hour="8",
+        minute="5",
     )
 
-    params_list = (
-        {"scielo_issn": scielo_issn, "publication_year": publication_year},
-        {"scielo_issn": scielo_issn},
-        {"publication_year": publication_year},
+
+def _schedule_issue_migration(user, collection_acron):
+    schedule_task(
+        task="migrate_issue_records",
+        name="migrate_issue_records",
+        kwargs=dict(
+            collection_acron=collection_acron,
+            username=user.username,
+            force_update=False,
+        ),
+        description=_("Migra os registros da base de dados ISSUE"),
+        priority=1,
+        enabled=True,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute="5,15,25,35,45,55",
     )
-    documents_group_ids = (
-        f"{journal_acron} {publication_year}",
-        f"{journal_acron}",
-        f"{publication_year}",
+
+
+def _schedule_article_migration(user, collection_acron):
+    schedule_task(
+        task="migrate_set_of_issue_files_and_document_records",
+        name="migrate_set_of_issue_files_and_document_records",
+        kwargs=dict(
+            username=user.username,
+            collection_acron=collection_acron,
+            scielo_issn=None,
+            publication_year=None,
+            force_update=False,
+        ),
+        description=_("Migra os registros e arquivos de artigos"),
+        priority=1,
+        enabled=True,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute="10,30,50",
     )
-
-    count = 0
-    for group_id, params in zip(documents_group_ids, params_list):
-        count += 1
-        if len(params) == 2:
-            modes = ("full", "incremental")
-        else:
-            modes = ("incremental",)
-
-        for mode in modes:
-            # agenda tarefa com variações de parâmetros para migrar os documentos
-            _schedule_issue_documents_migration(
-                collection_acron,
-                journal_acron,
-                scielo_issn,
-                publication_year,
-                user,
-                group_id,
-                mode,
-                params,
-                count,
-            )
-
-
-def _schedule_issue_documents_migration(
-    collection_acron,
-    journal_acron,
-    scielo_issn,
-    publication_year,
-    user,
-    group_id,
-    mode,
-    params,
-    count,
-):
-    name = f"{collection_acron} | {group_id} | migrate | {mode}"
-    task = "migrate_issue_files_and_document_records"
-
-    kwargs = dict(
-        collection_acron=collection_acron,
-        username=user.username,
-        force_update=(mode == "full"),
-    )
-    kwargs.update(params)
-
-    try:
-        periodic_task = PeriodicTask.objects.get(name=name, task=task)
-    except PeriodicTask.DoesNotExist:
-        now = datetime.utcnow()
-        periodic_task = PeriodicTask()
-        periodic_task.name = name
-        periodic_task.task = task
-        periodic_task.kwargs = json.dumps(kwargs)
-        if mode == "full":
-            # full: force_update = True
-            # modo full está programado para ser executado manualmente
-            # ou seja, a task fica disponível para que o usuário
-            # apenas clique em RUN e rodará na sequência,
-            # não dependente dos atributos: enabled, one_off, crontab
-
-            # prioridade alta
-            periodic_task.priority = 1
-            # desabilitado para rodar automaticamente
-            periodic_task.enabled = False
-            # este parâmetro não é relevante devido à execução manual
-            periodic_task.one_off = True
-            # este parâmetro não é relevante devido à execução manual
-            hours, minutes = sum_hours_and_minutes(0, 1)
-            periodic_task.crontab = get_or_create_crontab_schedule(
-                hour=hours,
-                minute=minutes,
-            )
-        else:
-            # modo incremental está programado para ser executado
-            # automaticamente
-            # incremental: force_update = False
-
-            # prioridade 3, exceto se houver ano de publicação
-            periodic_task.priority = 3
-            if publication_year:
-                # estabelecer prioridade maior para os mais recentes
-                periodic_task.priority = datetime.now().year - int(publication_year)
-
-            # deixa habilitado para rodar frequentemente
-            periodic_task.enabled = True
-
-            # programado para rodar automaticamente 1 vez se o ano de
-            # publicação não é o atual
-            periodic_task.one_off = (
-                publication_year and publication_year != datetime.now().year
-            )
-
-            # distribui as tarefas para executarem dentro de 1h
-            # e elas executarão a cada 1h
-            hours, minutes = sum_hours_and_minutes(0, count % 100)
-            periodic_task.crontab = get_or_create_crontab_schedule(
-                # hour=hours,
-                minute=minutes,
-            )
-        periodic_task.save()
-    logging.info(_("Scheduled {} tasks to migrate documents").format(count))
-
-
-def sum_hours_and_minutes(hours_after_now, minutes_after_now, now=None):
-    """
-    Retorna a soma dos minutos / horas a partir da hora atual
-    """
-    now = now or datetime.utcnow()
-    hours = now.hour + hours_after_now
-    minutes = now.minute + minutes_after_now
-    if minutes > 59:
-        hours += 1
-    hours = hours % 24
-    minutes = minutes % 60
-    return hours, minutes
-
-
-def get_or_create_crontab_schedule(day_of_week=None, hour=None, minute=None):
-    try:
-        crontab_schedule, status = CrontabSchedule.objects.get_or_create(
-            day_of_week=day_of_week or "*",
-            hour=hour or "*",
-            minute=minute or "*",
-        )
-    except Exception as e:
-        logging.exception(e)
-        raise exceptions.GetOrCreateCrontabScheduleError(
-            _("Unable to get_or_create_crontab_schedule {} {} {} {} {}").format(
-                day_of_week, hour, minute, type(e), e
-            )
-        )
-    return crontab_schedule
 
 
 def get_classic_website(collection_acron):
@@ -500,52 +304,6 @@ def import_data_from_issue_database(
             action_name="migrate",
             e=e,
             creator=user,
-        )
-
-
-def migrate_issue_files_and_document_records(
-    user,
-    collection_acron,
-    scielo_issn=None,
-    publication_year=None,
-    force_update=False,
-):
-    params = {"migrated_journal__scielo_journal__collection__acron": collection_acron}
-    if scielo_issn:
-        params["migrated_journal__scielo_journal__scielo_issn"] = scielo_issn
-    if publication_year:
-        params["scielo_issue__official_issue__publication_year"] = publication_year
-
-    classic_website = get_classic_website(collection_acron)
-
-    # Melhor importar todos os arquivos e depois tratar da carga
-    # dos metadados, e geração de XML, pois
-    # há casos que os HTML mencionam arquivos de pastas diferentes
-    # da sua pasta do fascículo
-    items = MigratedIssue.objects.filter(
-        Q(status=MS_PUBLISHED) | Q(status=MS_IMPORTED),
-        **params,
-    )
-    for migrated_issue in items.iterator():
-        logging.info(migrated_issue)
-
-        issue_folder = migrated_issue.issue_folder
-        issue_pid = migrated_issue.issue_pid
-
-        import_issue_files(
-            migrated_issue=migrated_issue,
-            classic_website=classic_website,
-            force_update=force_update,
-            user=user,
-        )
-        # migra os documentos da base de dados `source_file_path`
-        # que não contém necessariamente os dados de só 1 fascículo
-        migrate_document_records(
-            user,
-            collection_acron,
-            migrated_issue,
-            classic_website,
-            force_update,
         )
 
 
