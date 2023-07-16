@@ -36,14 +36,10 @@ def schedule_task(
         periodic_task.task = task
     periodic_task.description = description
 
-    if hour is None:
-        hour = "*"
-    if minute is None:
-        minute = "*"
     crontab_schedule, status = CrontabSchedule.objects.get_or_create(
         day_of_week=day_of_week or "*",
-        hour=hour,
-        minute=minute,
+        hour=hour or "*",
+        minute=minute or "*",
     )
     # kwargs["full"] = bool(full)
     periodic_task.kwargs = json.dumps(kwargs)
