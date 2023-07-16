@@ -549,6 +549,44 @@ def migrate_issue_files_and_document_records(
         )
 
 
+def migrate_one_issue_files_and_document_records(
+    user,
+    migrated_issue_id,
+    collection_acron,
+    scielo_issn=None,
+    publication_year=None,
+    force_update=False,
+):
+
+    migrated_issue = MigratedIssue.objects.get(id=migrated_issue_id)
+    logging.info(migrated_issue)
+
+    classic_website = get_classic_website(collection_acron)
+
+    # Melhor importar todos os arquivos e depois tratar da carga
+    # dos metadados, e geração de XML, pois
+    # há casos que os HTML mencionam arquivos de pastas diferentes
+    # da sua pasta do fascículo
+    issue_folder = migrated_issue.issue_folder
+    issue_pid = migrated_issue.issue_pid
+
+    import_issue_files(
+        migrated_issue=migrated_issue,
+        classic_website=classic_website,
+        force_update=force_update,
+        user=user,
+    )
+    # migra os documentos da base de dados `source_file_path`
+    # que não contém necessariamente os dados de só 1 fascículo
+    migrate_document_records(
+        user,
+        collection_acron,
+        migrated_issue,
+        classic_website,
+        force_update,
+    )
+
+
 def import_issue_files(
     migrated_issue,
     classic_website,
