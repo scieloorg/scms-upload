@@ -40,13 +40,6 @@ from .models import (
 User = get_user_model()
 
 
-def _get_classic_website_rel_path(file_path):
-    if "htdocs" in file_path:
-        return file_path[file_path.find("htdocs") :]
-    if "base" in file_path:
-        return file_path[file_path.find("base") :]
-
-
 def schedule_migrations(user, collection_acron=None):
     if collection_acron:
         collections = Collection.objects.filter(acron=collection_acron).iterator()
@@ -306,6 +299,242 @@ def import_data_from_issue_database(
         )
 
 
+class IssueMigration:
+
+    def __init__(self, user, collection_acron, migrated_issue, force_update):
+        self.classic_website = get_classic_website(collection_acron)
+        self.collection_acron = collection_acron
+        self.force_update = force_update
+        self.issue_folder = migrated_issue.issue_folder
+        self.issue_pid = migrated_issue.issue_pid
+        self.migrated_issue = migrated_issue
+        self.migrated_journal = migrated_issue.migrated_journal
+        self.journal_acron = self.migrated_journal.acron
+        self.user = user
+
+    def _get_classic_website_rel_path(self, file_path):
+        if "htdocs" in file_path:
+            return file_path[file_path.find("htdocs") :]
+        if "base" in file_path:
+            return file_path[file_path.find("base") :]
+
+    def check_category(self, file):
+        if file["type"] == "pdf":
+            logging.info(file)
+            check = file["name"]
+            try:
+                check = check.replace(file["lang"] + "_", "")
+            except (KeyError, TypeError):
+                pass
+            try:
+                check = check.replace(file["key"], "")
+            except (KeyError, TypeError):
+                pass
+            logging.info(check)
+            if check == "":
+                return "rendition"
+            return "supplmat"
+        return file["type"]
+
+    def import_issue_files(self):
+        """135
+        Migra os arquivos do fascículo (pdf, img, xml ou html)
+        """
+        logging.info(f"Import issue files {self.migrated_issue}")
+
+        classic_issue_files = classic_website.get_issue_files(
+            self.journal_acron, self.issue_folder,
+        )
+        for file in classic_issue_files:
+            """
+            {"type": "pdf", "key": name, "path": path, "name": basename, "lang": lang}
+            {"type": "xml", "key": name, "path": path, "name": basename, }
+            {"type": "html", "key": name, "path": path, "name": basename, "lang": lang, "part": label}
+            {"type": "asset", "path": item, "name": os.path.basename(item)}
+            """
+            try:
+                logging.info(file)
+                migrated_file = MigratedFile.create_or_update(
+                    migrated_issue=self.migrated_issue,
+                    original_path=self._get_classic_website_rel_path(file["path"]),
+                    source_path=file["path"],
+                    category=self.check_category(file),
+                    lang=file.get("lang"),
+                    part=file.get("part"),
+                    pkg_name=file.get("key"),
+                    creator=self.user,
+                )
+            except Exception as e:
+                message = _("Unable to migrate issue files {} {}").format(
+                    self.collection_acron, file
+                )
+                self.register_failure(
+                    e,
+                    migrated_item_name="issue files",
+                    migrated_item_id=file,
+                    message=message,
+                    action_name="migrate",
+                )
+
+    def migrate_document_records(self):
+        """
+        Importa os registros presentes na base de dados `source_file_path`
+        Importa os arquivos dos documentos (xml, pdf, html, imagens)
+        Publica os artigos no site
+        """
+        journal_issue_and_doc_data = {
+            "title": self.migrated_journal.data,
+            "issue": self.migrated_issue.data,
+        }
+
+        logging.info(
+            "Importing documents records {} {}".format(
+                self.journal_acron,
+                self.issue_folder,
+            )
+        )
+        # obtém registros da base "artigo" que não necessariamente é só
+        # do fascículo de migrated_issue
+        # possivelmente source_file pode conter registros de outros fascículos
+        # se a fonte for `bases-work/acron/acron`
+        for doc_id, doc_records in classic_website.get_documents_pids_and_records(
+            self.journal_acron,
+            self.issue_folder,
+            self.issue_pid,
+        ):
+            try:
+                logging.info(_("Get {}").format(doc_id))
+                if len(doc_records) == 1:
+                    # é possível que em source_file_path exista registro tipo i
+                    journal_issue_and_doc_data["issue"] = doc_records[0]
+                    continue
+
+                journal_issue_and_doc_data["article"] = doc_records
+                classic_ws_doc = classic_ws.Document(journal_issue_and_doc_data)
+
+                migrated_document = self.migrate_document(
+                    classic_ws_doc=classic_ws_doc,
+                    journal_issue_and_doc_data=journal_issue_and_doc_data,
+                )
+                self._generate_xml_from_html(classic_ws_doc, migrated_document)
+
+            except Exception as e:
+                message = _("Unable to migrate documents {} {} {} {}").format(
+                    self.collection_acron, self.journal_acron, self.issue_folder, doc_id
+                )
+                self.register_failure(
+                    e,
+                    migrated_item_name="document",
+                    migrated_item_id=doc_id,
+                    message=message,
+                    action_name="migrate",
+                )
+
+    def register_failure(
+        self, e, migrated_item_name, migrated_item_id, message, action_name
+    ):
+        logging.info(message)
+        logging.exception(e)
+        MigrationFailure.create(
+            collection_acron=self.collection_acron,
+            migrated_item_name=migrated_item_name,
+            migrated_item_id=migrated_item_id,
+            message=message,
+            action_name=action_name,
+            e=e,
+            creator=self.user,
+        )
+
+    def migrate_document(self, classic_ws_doc, journal_issue_and_doc_data):
+        try:
+            # instancia Document com registros de title, issue e artigo
+            pid = classic_ws_doc.scielo_pid_v2 or (
+                "S" + issue_pid + classic_ws_doc.order.zfill(5)
+            )
+            pkg_name = classic_ws_doc.filename_without_extension
+
+            if classic_ws_doc.scielo_pid_v2 != pid:
+                classic_ws_doc.scielo_pid_v2 = pid
+
+            return MigratedDocument.create_or_update(
+                migrated_issue=self.migrated_issue,
+                pid=pid,
+                pkg_name=pkg_name,
+                aop_pid=classic_ws_doc.aop_pid,
+                pid_v3=classic_ws_doc.scielo_pid_v3,
+                creator=self.user,
+                isis_created_date=classic_ws_doc.isis_created_date,
+                isis_updated_date=classic_ws_doc.isis_updated_date,
+                data=journal_issue_and_doc_data,
+                status=MS_IMPORTED,
+                force_update=self.force_update,
+            )
+        except Exception as e:
+            migrated_item_id = f"{self.collection_acron} {pid}"
+            message = _("Unable to migrate document {}").format(migrated_item_id)
+            self.register_failure(
+                e,
+                migrated_item_name="document",
+                migrated_item_id=migrated_item_id,
+                message=message,
+                action_name="migrate",
+            )
+
+    def _generate_xml_from_html(self, classic_ws_doc, migrated_document):
+        html_texts = migrated_document.html_texts
+        if not html_texts:
+            return
+
+        pkg_name = migrated_document.pkg_name
+
+        try:
+            # obtém um XML com body e back a partir dos arquivos HTML / traduções
+            classic_ws_doc.generate_body_and_back_from_html(html_texts)
+        except Exception as e:
+            migrated_item_id = f"{self.collection_acron} {migrated_document.pid}"
+            message = _("Unable to generate body and back from HTML {}").format(
+                migrated_item_id
+            )
+            self.register_failure(
+                e,
+                migrated_item_name="document",
+                migrated_item_id=migrated_item_id,
+                message=message,
+                action_name="xml-body-and-back",
+            )
+            return
+
+        for i, xml_body_and_back in enumerate(classic_ws_doc.xml_body_and_back):
+            try:
+                # para cada versão de body/back, guarda a versão de body/back
+                migrated_file = BodyAndBackFile.create_or_update(
+                    migrated_issue=self.migrated_issue,
+                    pkg_name=pkg_name,
+                    creator=self.user,
+                    file_content=xml_body_and_back,
+                    version=i,
+                )
+                # para cada versão de body/back, guarda uma versão de XML
+                xml_content = classic_ws_doc.generate_full_xml(xml_body_and_back)
+                migrated_file = GeneratedXMLFile.create_or_update(
+                    migrated_issue=self.migrated_issue,
+                    pkg_name=pkg_name,
+                    creator=self.user,
+                    file_content=xml_content,
+                    version=i,
+                )
+            except Exception as e:
+                migrated_item_id = f"{self.collection_acron} {migrated_document.pid}"
+                message = _("Unable to generate XML from HTML {}").format(migrated_item_id)
+                self.register_failure(
+                    e,
+                    migrated_item_name="document",
+                    migrated_item_id=migrated_item_id,
+                    message=message,
+                    action_name="xml-to-html",
+                )
+
+
 def migrate_one_issue_files_and_document_records(
     user,
     migrated_issue,
@@ -313,293 +542,18 @@ def migrate_one_issue_files_and_document_records(
     force_update=False,
 ):
 
-    logging.info(migrated_issue)
-
-    classic_website = get_classic_website(collection_acron)
+    logging.info(self.migrated_issue)
+    migration = IssueMigration(user, collection_acron, migrated_issue, force_update)
 
     # Melhor importar todos os arquivos e depois tratar da carga
     # dos metadados, e geração de XML, pois
     # há casos que os HTML mencionam arquivos de pastas diferentes
     # da sua pasta do fascículo
-    issue_folder = migrated_issue.issue_folder
-    issue_pid = migrated_issue.issue_pid
+    migration.import_issue_files()
 
-    import_issue_files(
-        migrated_issue=migrated_issue,
-        classic_website=classic_website,
-        force_update=force_update,
-        user=user,
-    )
     # migra os documentos da base de dados `source_file_path`
     # que não contém necessariamente os dados de só 1 fascículo
-    migrate_document_records(
-        user,
-        collection_acron,
-        migrated_issue,
-        classic_website,
-        force_update,
-    )
-
-
-def import_issue_files(
-    migrated_issue,
-    classic_website,
-    force_update,
-    user,
-):
-    """135
-    Migra os arquivos do fascículo (pdf, img, xml ou html)
-    """
-    collection_acron = migrated_issue.migrated_journal.collection.acron
-    journal_acron = migrated_issue.migrated_journal.acron
-    issue_folder = migrated_issue.issue_folder
-
-    logging.info(f"Import issue files {migrated_issue}")
-
-    classic_issue_files = classic_website.get_issue_files(
-        journal_acron,
-        issue_folder,
-    )
-    for file in classic_issue_files:
-        """
-        {"type": "pdf", "key": name, "path": path, "name": basename, "lang": lang}
-        {"type": "xml", "key": name, "path": path, "name": basename, }
-        {"type": "html", "key": name, "path": path, "name": basename, "lang": lang, "part": label}
-        {"type": "asset", "path": item, "name": os.path.basename(item)}
-        """
-        try:
-            logging.info(file)
-            original_path = _get_classic_website_rel_path(file["path"])
-            category = check_category(file)
-
-            pkg_name = file.get("key")
-            migrated_file = MigratedFile.create_or_update(
-                migrated_issue=migrated_issue,
-                original_path=original_path,
-                source_path=file["path"],
-                category=category,
-                lang=file.get("lang"),
-                part=file.get("part"),
-                pkg_name=pkg_name,
-                creator=user,
-            )
-        except Exception as e:
-            logging.exception(e)
-            message = _("Unable to migrate issue files {} {} {}").format(
-                collection_acron, journal_acron, issue_folder
-            )
-            MigrationFailure.create(
-                collection_acron=collection_acron,
-                migrated_item_name="issue files",
-                migrated_item_id=f"{journal_acron} {issue_folder} {file}",
-                message=message,
-                action_name="migrate",
-                e=e,
-                creator=user,
-            )
-
-
-def check_category(file):
-    if file["type"] == "pdf":
-        logging.info(file)
-        check = file["name"]
-        try:
-            check = check.replace(file["lang"] + "_", "")
-        except (KeyError, TypeError):
-            pass
-        try:
-            check = check.replace(file["key"], "")
-        except (KeyError, TypeError):
-            pass
-        logging.info(check)
-        if check == "":
-            return "rendition"
-        return "supplmat"
-    return file["type"]
-
-
-def migrate_document_records(
-    user,
-    collection_acron,
-    migrated_issue,
-    classic_website,
-    force_update=False,
-):
-    """
-    Importa os registros presentes na base de dados `source_file_path`
-    Importa os arquivos dos documentos (xml, pdf, html, imagens)
-    Publica os artigos no site
-    """
-
-    migrated_journal = migrated_issue.migrated_journal
-    journal_acron = migrated_journal.acron
-    issue_folder = migrated_issue.issue_folder
-    issue_pid = migrated_issue.issue_pid
-
-    journal_issue_and_doc_data = {
-        "title": migrated_journal.data,
-        "issue": migrated_issue.data,
-    }
-
-    # obtém registros da base "artigo" que não necessariamente é só
-    # do fascículo de migrated_issue
-    # possivelmente source_file pode conter registros de outros fascículos
-    # se source_file for acrônimo
-    logging.info(
-        "Importing documents records {} {}".format(
-            journal_acron,
-            issue_folder,
-        )
-    )
-    for doc_id, doc_records in classic_website.get_documents_pids_and_records(
-        journal_acron,
-        issue_folder,
-        issue_pid,
-    ):
-        try:
-            logging.info(_("Get {}").format(doc_id))
-            if len(doc_records) == 1:
-                # é possível que em source_file_path exista registro tipo i
-                journal_issue_and_doc_data["issue"] = doc_records[0]
-                continue
-
-            journal_issue_and_doc_data["article"] = doc_records
-            classic_ws_doc = classic_ws.Document(journal_issue_and_doc_data)
-
-            migrated_document = migrate_document(
-                collection_acron,
-                migrated_issue,
-                issue_pid,
-                user,
-                classic_ws_doc=classic_ws_doc,
-                journal_issue_and_doc_data=journal_issue_and_doc_data,
-                force_update=force_update,
-            )
-            _generate_xml_from_html(classic_ws_doc, migrated_document, user)
-
-        except Exception as e:
-            logging.exception(e)
-            message = _("Unable to migrate issue documents {} {} {} {}").format(
-                collection_acron, journal_acron, issue_folder, doc_id
-            )
-            MigrationFailure.create(
-                collection_acron=collection_acron,
-                migrated_item_name="document",
-                migrated_item_id=f"{journal_acron} {issue_folder} {doc_id}",
-                message=message,
-                action_name="migrate",
-                e=e,
-                creator=user,
-            )
-
-
-def migrate_document(
-    collection_acron,
-    migrated_issue,
-    issue_pid,
-    user,
-    classic_ws_doc,
-    journal_issue_and_doc_data,
-    force_update,
-):
-    try:
-        # instancia Document com registros de title, issue e artigo
-        pid = classic_ws_doc.scielo_pid_v2 or (
-            "S" + issue_pid + classic_ws_doc.order.zfill(5)
-        )
-        pkg_name = classic_ws_doc.filename_without_extension
-
-        if classic_ws_doc.scielo_pid_v2 != pid:
-            classic_ws_doc.scielo_pid_v2 = pid
-
-        return MigratedDocument.create_or_update(
-            migrated_issue=migrated_issue,
-            pid=pid,
-            pkg_name=pkg_name,
-            aop_pid=classic_ws_doc.aop_pid,
-            pid_v3=classic_ws_doc.scielo_pid_v3,
-            creator=user,
-            isis_created_date=classic_ws_doc.isis_created_date,
-            isis_updated_date=classic_ws_doc.isis_updated_date,
-            data=journal_issue_and_doc_data,
-            status=MS_IMPORTED,
-            force_update=force_update,
-        )
-    except Exception as e:
-        logging.exception(e)
-        message = _("Unable to migrate document {} {}").format(collection_acron, pid)
-        MigrationFailure.create(
-            collection_acron=collection_acron,
-            migrated_item_name="document",
-            migrated_item_id=pid,
-            message=message,
-            action_name="migrate",
-            e=e,
-            creator=user,
-        )
-
-
-def _generate_xml_from_html(classic_ws_doc, migrated_document, user):
-    html_texts = migrated_document.html_texts
-    if not html_texts:
-        return
-
-    migrated_issue = migrated_document.migrated_issue
-    collection_acron = migrated_issue.migrated_journal.collection.acron
-    pkg_name = migrated_document.pkg_name
-
-    try:
-        # obtém um XML com body e back a partir dos arquivos HTML / traduções
-        classic_ws_doc.generate_body_and_back_from_html(html_texts)
-    except Exception as e:
-        logging.exception(e)
-        message = _("Unable to generate body and back from HTML {} {}").format(
-            collection_acron, migrated_document.pid
-        )
-        MigrationFailure.create(
-            collection_acron=collection_acron,
-            migrated_item_name="document",
-            migrated_item_id=migrated_document.pid,
-            message=message,
-            action_name="xml-body-and-back",
-            e=e,
-            creator=user,
-        )
-        return
-
-    for i, xml_body_and_back in enumerate(classic_ws_doc.xml_body_and_back):
-        try:
-            # para cada versão de body/back, guarda a versão de body/back
-            migrated_file = BodyAndBackFile.create_or_update(
-                migrated_issue=migrated_issue,
-                pkg_name=pkg_name,
-                creator=user,
-                file_content=xml_body_and_back,
-                version=i,
-            )
-            # para cada versão de body/back, guarda uma versão de XML
-            xml_content = classic_ws_doc.generate_full_xml(xml_body_and_back)
-            migrated_file = GeneratedXMLFile.create_or_update(
-                migrated_issue=migrated_issue,
-                pkg_name=pkg_name,
-                creator=user,
-                file_content=xml_content,
-                version=i,
-            )
-        except Exception as e:
-            logging.exception(e)
-            message = _("Unable to generate XML from HTML {} {}").format(
-                collection_acron, migrated_document.pid
-            )
-            MigrationFailure.create(
-                collection_acron=collection_acron,
-                migrated_item_name="document",
-                migrated_item_id=migrated_document.pid,
-                message=message,
-                action_name="xml-to-html",
-                e=e,
-                creator=user,
-            )
+    migration.migrate_document_records()
 
 
 def create_articles(
@@ -942,3 +896,4 @@ class DocumentMigration:
                 uri = response["uri"]
             except KeyError:
                 self.register_failure(**response)
+#945
