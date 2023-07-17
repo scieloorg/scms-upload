@@ -466,7 +466,8 @@ class IssueMigration:
                     classic_ws_doc=classic_ws_doc,
                     journal_issue_and_doc_data=journal_issue_and_doc_data,
                 )
-                self._generate_xml_from_html(classic_ws_doc, migrated_document)
+                document_migration = DocumentMigration(migrated_document, user)
+                document_migration.generate_xml_from_html(classic_ws_doc)
 
             except Exception as e:
                 message = _("Unable to migrate documents {} {} {} {}").format(
@@ -530,60 +531,6 @@ class IssueMigration:
                 action_name="migrate",
             )
 
-    def _generate_xml_from_html(self, classic_ws_doc, migrated_document):
-        html_texts = migrated_document.html_texts
-        if not html_texts:
-            return
-
-        pkg_name = migrated_document.pkg_name
-
-        try:
-            # obtém um XML com body e back a partir dos arquivos HTML / traduções
-            classic_ws_doc.generate_body_and_back_from_html(html_texts)
-        except Exception as e:
-            migrated_item_id = f"{self.collection_acron} {migrated_document.pid}"
-            message = _("Unable to generate body and back from HTML {}").format(
-                migrated_item_id
-            )
-            self.register_failure(
-                e,
-                migrated_item_name="document",
-                migrated_item_id=migrated_item_id,
-                message=message,
-                action_name="xml-body-and-back",
-            )
-            return
-
-        for i, xml_body_and_back in enumerate(classic_ws_doc.xml_body_and_back):
-            try:
-                # para cada versão de body/back, guarda a versão de body/back
-                migrated_file = BodyAndBackFile.create_or_update(
-                    migrated_issue=self.migrated_issue,
-                    pkg_name=pkg_name,
-                    creator=self.user,
-                    file_content=xml_body_and_back,
-                    version=i,
-                )
-                # para cada versão de body/back, guarda uma versão de XML
-                xml_content = classic_ws_doc.generate_full_xml(xml_body_and_back)
-                migrated_file = GeneratedXMLFile.create_or_update(
-                    migrated_issue=self.migrated_issue,
-                    pkg_name=pkg_name,
-                    creator=self.user,
-                    file_content=xml_content,
-                    version=i,
-                )
-            except Exception as e:
-                migrated_item_id = f"{self.collection_acron} {migrated_document.pid}"
-                message = _("Unable to generate XML from HTML {}").format(migrated_item_id)
-                self.register_failure(
-                    e,
-                    migrated_item_name="document",
-                    migrated_item_id=migrated_item_id,
-                    message=message,
-                    action_name="xml-to-html",
-                )
-
 
 def migrate_one_issue_files(
     user,
@@ -635,6 +582,7 @@ def create_articles(
     ).iterator():
         logging.info(migrate_document)
         dm = DocumentMigration(migrated_document, user)
+        dm.generate_xml_from_html()
         dm.request_pid_v3()
         dm.build_sps_package()
         dm.publish_package(minio_push_file_content)
@@ -654,17 +602,13 @@ class DocumentMigration:
         self.migrated_document = migrated_document
         self.migrated_issue = migrated_document.migrated_issue
         self.collection_acron = (
-            migrated_document.migrated_issue.migrated_journal.collection.acron
+            self.migrated_issue.migrated_journal.collection.acron
         )
         self.user = user
-
-        migrated_xml = migrated_document.migrated_xml
-        self.xml_name = migrated_xml["name"]
-
-        xml = _get_xml(migrated_xml["path"])
-        self.xml_with_pre = xml["xml_with_pre"]
+        self.pid = migrated_document.pid
+        self._xml_name = None
+        self._xml_with_pre = None
         self.article_pkgs = None
-        self._set_sps_pkg_name()
 
     def register_failure(
         self, e, migrated_item_name, migrated_item_id, message, action_name
@@ -680,6 +624,26 @@ class DocumentMigration:
             e=e,
             creator=self.user,
         )
+
+    @property
+    def xml_name(self):
+        if not self._xml_name:
+            migrated_xml = self.migrated_document.migrated_xml
+            self._xml_name = migrated_xml["name"]
+
+            xml = _get_xml(migrated_xml["path"])
+            self._xml_with_pre = xml["xml_with_pre"]
+        return self._xml_name
+
+    @property
+    def xml_with_pre(self):
+        if not self._xml_with_pre:
+            migrated_xml = self.migrated_document.migrated_xml
+            self._xml_name = migrated_xml["name"]
+
+            xml = _get_xml(migrated_xml["path"])
+            self._xml_with_pre = xml["xml_with_pre"]
+        return self._xml_with_pre
 
     def request_pid_v3(self):
         try:
@@ -956,4 +920,59 @@ class DocumentMigration:
                 uri = response["uri"]
             except KeyError:
                 self.register_failure(**response)
+
+    def generate_xml_from_html(self, classic_ws_doc):
+        html_texts = self.migrated_document.html_texts
+        if not html_texts:
+            return
+
+        pkg_name = self.migrated_document.pkg_name
+
+        try:
+            # obtém um XML com body e back a partir dos arquivos HTML / traduções
+            classic_ws_doc.generate_body_and_back_from_html(html_texts)
+        except Exception as e:
+            migrated_item_id = f"{self.collection_acron} {self.pid}"
+            message = _("Unable to generate body and back from HTML {}").format(
+                migrated_item_id
+            )
+            self.register_failure(
+                e,
+                migrated_item_name="document",
+                migrated_item_id=migrated_item_id,
+                message=message,
+                action_name="xml-body-and-back",
+            )
+            return
+
+        for i, xml_body_and_back in enumerate(classic_ws_doc.xml_body_and_back):
+            try:
+                # para cada versão de body/back, guarda a versão de body/back
+                migrated_file = BodyAndBackFile.create_or_update(
+                    migrated_issue=self.migrated_issue,
+                    pkg_name=pkg_name,
+                    creator=self.user,
+                    file_content=xml_body_and_back,
+                    version=i,
+                )
+                # para cada versão de body/back, guarda uma versão de XML
+                xml_content = classic_ws_doc.generate_full_xml(xml_body_and_back)
+                migrated_file = GeneratedXMLFile.create_or_update(
+                    migrated_issue=self.migrated_issue,
+                    pkg_name=pkg_name,
+                    creator=self.user,
+                    file_content=xml_content,
+                    version=i,
+                )
+            except Exception as e:
+                migrated_item_id = f"{self.collection_acron} {self.pid}"
+                message = _("Unable to generate XML from HTML {}").format(migrated_item_id)
+                self.register_failure(
+                    e,
+                    migrated_item_name="document",
+                    migrated_item_id=migrated_item_id,
+                    message=message,
+                    action_name="xml-to-html",
+                )
+
 #945
