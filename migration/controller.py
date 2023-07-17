@@ -582,7 +582,6 @@ def create_articles(
     ).iterator():
         logging.info(migrate_document)
         dm = DocumentMigration(migrated_document, user)
-        dm.request_pid_v3()
         dm.build_sps_package()
         dm.publish_package(minio_push_file_content)
 
@@ -644,58 +643,6 @@ class DocumentMigration:
             xml = _get_xml(migrated_xml["path"])
             self._xml_with_pre = xml["xml_with_pre"]
         return self._xml_with_pre
-
-    def request_pid_v3(self):
-        try:
-            logging.info(f"Solicita PID v3 para {self.migrated_document}")
-            self.xml_with_pre.v2 = self.migrated_document.pid
-
-            # solicita pid v3 e obtém o article criado
-            response = article_controller_request_pid_v3_and_create_article(
-                self.xml_with_pre, self.xml_name, self.user, "migration"
-            )
-            try:
-                # cria / obtém article
-                logging.info(f"Cria / obtém article para {self.migrated_document}")
-                self.migrated_document.sps_pkg_name = self.sps_pkg_name
-                self.migrated_document.article = response["article"]
-                self.migrated_document.article.status = AS_READ_TO_PUBLISH
-                self.migrated_document.article.issue = (
-                    self.migrated_issue.scielo_issue.official_issue
-                )
-                self.migrated_document.article.journal = Journal.get(
-                    official_journal=self.migrated_issue.migrated_journal.scielo_journal.official_journal
-                )
-                self.migrated_document.article.save()
-                self.migrated_document.save()
-
-                logging.info(f"Criado / obtido article para {self.migrated_document}")
-                self.article_pkgs = ArticlePackages.get_or_create(
-                    article=self.migrated_document.article,
-                    sps_pkg_name=self.sps_pkg_name,
-                    creator=self.user,
-                )
-            except KeyError as e:
-                logging.info("Falhou cria / obtém article")
-                self.register_failure(
-                    e,
-                    migrated_item_name="document",
-                    migrated_item_id=self.migrated_document.pid,
-                    message=str(response),
-                    action_name="request-pid-v3",
-                )
-                return
-        except Exception as e:
-            message = _(
-                "Unable to get or create article and xml with pid v3 {} {}"
-            ).format(self.collection_acron, self.migrated_document.pid)
-            self.register_failure(
-                e,
-                migrated_item_name="document",
-                migrated_item_id=self.migrated_document.pid,
-                message=message,
-                action_name="request-pid-v3",
-            )
 
     def build_sps_pkg_name(self):
         issue = self.migrated_issue.scielo_issue.official_issue
