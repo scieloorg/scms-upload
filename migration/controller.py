@@ -608,6 +608,7 @@ class DocumentMigration:
         self.pid = migrated_document.pid
         self._xml_name = None
         self._xml_with_pre = None
+        self._sps_pkg_name = None
         self.article_pkgs = None
 
     def register_failure(
@@ -697,7 +698,7 @@ class DocumentMigration:
                 action_name="request-pid-v3",
             )
 
-    def _set_sps_pkg_name(self):
+    def build_sps_pkg_name(self):
         issue = self.migrated_issue.scielo_issue.official_issue
         journal = issue.official_journal
 
@@ -716,9 +717,19 @@ class DocumentMigration:
             suppl,
             self._get_pkg_name_suffix() or self.migrated_document.pkg_name,
         ]
-        self.migrated_document.sps_pkg_name = "-".join([part for part in parts if part])
+        return "-".join([part for part in parts if part])
+
+    @property
+    def sps_pkg_name(self):
+        if not self._sps_pkg_name:
+            self.sps_pkg_name = self.build_sps_package()
+        return self._sps_pkg_name
+
+    @sps_pkg_name.setter
+    def sps_pkg_name(self, value):
+        self._sps_pkg_name = value
+        self.migrated_document.sps_pkg_name = value
         self.migrated_document.save()
-        self.sps_pkg_name = self.migrated_document.sps_pkg_name
 
     def _get_pkg_name_suffix(self):
         xml_with_pre = self.xml_with_pre
