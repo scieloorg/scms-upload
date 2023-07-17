@@ -45,14 +45,8 @@ def schedule_task(
     periodic_task.kwargs = json.dumps(kwargs)
     periodic_task.priority = priority or 3
     periodic_task.crontab = crontab_schedule
-
-    full = kwargs.get("full")
-    if full:
-        periodic_task.enabled = enabled
-        periodic_task.one_off = run_once
-    else:
-        periodic_task.enabled = True
-        periodic_task.one_off = False
+    periodic_task.enabled = enabled
+    periodic_task.one_off = run_once
 
     periodic_task.save()
     logging.info(_("Scheduled task: {}").format(name))
