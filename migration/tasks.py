@@ -156,23 +156,6 @@ def task_migrate_one_issue_document_records(
     )
 
 
-@celery_app.task(bind=True, name="create_articles")
-def task_create_articles(
-    self,
-    username,
-    collection_acron=None,
-    from_date=None,
-    force_update=False,
-):
-    user = _get_user(self.request, username)
-    controller.create_articles(
-        user,
-        collection_acron,
-        from_date,
-        force_update,
-    )
-
-
 @celery_app.task(bind=True, name=_("run_migrations"))
 def task_run_migrations(
     self,
