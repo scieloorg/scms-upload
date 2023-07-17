@@ -43,36 +43,17 @@ def task_migrate_journal_records(
     )
 
 
-@celery_app.task(bind=True, name="migrate_issue_records")
-def task_migrate_issue_records(
+@celery_app.task(bind=True, name="migrate_issue_records_and_files")
+def task_migrate_issue_records_and_files(
     self,
     username,
     collection_acron,
     force_update=False,
 ):
     user = _get_user(self.request, username)
-    controller.migrate_issue_records(
+    controller.migrate_issue_records_and_files(
         user,
         collection_acron,
-        force_update,
-    )
-
-
-@celery_app.task(bind=True, name="migrate_issue_files_and_document_records")
-def task_migrate_issue_files_and_document_records(
-    self,
-    username,
-    collection_acron,
-    scielo_issn=None,
-    publication_year=None,
-    force_update=False,
-):
-    user = _get_user(self.request, username)
-    controller.migrate_issue_files_and_document_records(
-        user,
-        collection_acron,
-        scielo_issn,
-        publication_year,
         force_update,
     )
 
@@ -190,3 +171,31 @@ def task_create_articles(
         from_date,
         force_update,
     )
+
+
+@celery_app.task(bind=True, name=_("run_migrations"))
+def task_run_migrations(
+    self,
+    username=None,
+    collection_acron=None,
+    force_update=False,
+):
+    user = _get_user(self.request, username)
+    # migra os registros da base TITLE
+    task_migrate_journal_records.apply_async(
+        kwargs={
+            "username": username,
+            "collection_acron": collection_acron,
+            "force_update": force_update,
+        }
+    )
+    # migra os registros da base ISSUE
+    # migra os arquivos contidos nas pastas dos fascículos
+    task_migrate_issue_records_and_files.apply_async(
+        kwargs={
+            "username": username,
+            "collection_acron": collection_acron,
+            "force_update": force_update,
+        }
+    )
+

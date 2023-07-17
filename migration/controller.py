@@ -82,14 +82,14 @@ def _schedule_issue_migration(user, collection_acron):
     Deixa a tarefa abilitada
     """
     schedule_task(
-        task="migrate_issue_records",
-        name="migrate_issue_records",
+        task="migrate_issue_records_and_files",
+        name="migrate_issue_records_and_files",
         kwargs=dict(
             collection_acron=collection_acron,
             username=user.username,
             force_update=False,
         ),
-        description=_("Migra os registros da base de dados ISSUE"),
+        description=_("Migra os registros da base de dados ISSUE e os arquivos de artigos"),
         priority=1,
         enabled=True,
         run_once=False,
@@ -256,11 +256,14 @@ def import_data_from_title_database(
         )
 
 
-def migrate_issue_records(
+def migrate_issue_records_and_files(
     user,
     collection_acron,
     force_update=False,
 ):
+    """
+    Migra os registros dos fascículos e arquivos dos artigos dos fascículos
+    """
     collection = Collection.get_or_create(acron=collection_acron)
     classic_website = get_classic_website(collection_acron)
     for issue_pid, issue_data in classic_website.get_issues_pids_and_records():
@@ -272,6 +275,13 @@ def migrate_issue_records(
             issue_data=issue_data[0],
             force_update=force_update,
         )
+        if migrated_issue:
+            migrate_one_issue_files(
+                user,
+                migrated_issue,
+                collection_acron,
+                force_update=force_update,
+            )
 
 
 def import_data_from_issue_database(
@@ -582,7 +592,7 @@ def migrate_one_issue_files(
     force_update=False,
 ):
 
-    logging.info(self.migrated_issue)
+    logging.info(migrated_issue)
     migration = IssueMigration(user, collection_acron, migrated_issue, force_update)
 
     # Melhor importar todos os arquivos e depois tratar da carga
@@ -599,7 +609,7 @@ def migrate_one_issue_document_records(
     force_update=False,
 ):
 
-    logging.info(self.migrated_issue)
+    logging.info(migrated_issue)
     migration = IssueMigration(user, collection_acron, migrated_issue, force_update)
     # migra os documentos da base de dados `source_file_path`
     # que não contém necessariamente os dados de só 1 fascículo
