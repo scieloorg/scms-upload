@@ -103,8 +103,6 @@ def task_migrate_set_of_issue_files_and_document_records(
                 "username": username,
                 "migrated_issue_id": migrated_issue.id,
                 "collection_acron": collection_acron,
-                "scielo_issn": scielo_issn,
-                "publication_year": publication_year,
                 "force_update": force_update,
             }
         )
@@ -116,17 +114,14 @@ def task_migrate_one_issue_files_and_document_records(
     username,
     migrated_issue_id,
     collection_acron,
-    scielo_issn=None,
-    publication_year=None,
     force_update=False,
 ):
     user = _get_user(self.request, username)
+    migrated_issue = MigratedIssue.objects.get(id=migrated_issue_id)
     controller.migrate_one_issue_files_and_document_records(
         user,
-        migrated_issue_id,
+        migrated_issue,
         collection_acron,
-        scielo_issn,
-        publication_year,
         force_update,
     )
 

@@ -239,7 +239,6 @@ def migrate_issue_records(
             issue_data=issue_data[0],
             force_update=force_update,
         )
-    schedule_documents_migration(collection_acron, user)
 
 
 def import_data_from_issue_database(
@@ -309,14 +308,11 @@ def import_data_from_issue_database(
 
 def migrate_one_issue_files_and_document_records(
     user,
-    migrated_issue_id,
+    migrated_issue,
     collection_acron,
-    scielo_issn=None,
-    publication_year=None,
     force_update=False,
 ):
 
-    migrated_issue = MigratedIssue.objects.get(id=migrated_issue_id)
     logging.info(migrated_issue)
 
     classic_website = get_classic_website(collection_acron)
