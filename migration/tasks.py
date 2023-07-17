@@ -198,4 +198,11 @@ def task_run_migrations(
             "force_update": force_update,
         }
     )
-
+    # migra os registros das bases de artigos
+    task_migrate_set_of_issue_document_records.apply_async(
+        kwargs={
+            "username": username,
+            "collection_acron": collection_acron,
+            "force_update": force_update,
+        }
+    )
