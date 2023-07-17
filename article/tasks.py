@@ -24,7 +24,6 @@ def _get_user(request, username):
 def task_request_pid_v3_and_create_articles(
     self,
     username,
-    source,
 ):
 
     items = ArticlePackages.objects.filter(
@@ -37,7 +36,6 @@ def task_request_pid_v3_and_create_articles(
             kwargs={
                 "username": username,
                 "article_pkgs_id": article_pkgs.id,
-                "source": source,
             }
         )
 
@@ -47,7 +45,6 @@ def task_request_pid_v3_and_create_article(
     self,
     username,
     article_pkgs_id,
-    source,
 ):
     user = _get_user(self.request, username)
     article_pkgs = ArticlePackages.objects.get(id=article_pkgs_id)
@@ -55,12 +52,19 @@ def task_request_pid_v3_and_create_article(
     xml_name = article_pkgs.sps_pkg_name + ".xml"
 
     try:
+        for item in article_pkgs.components.filter(former_locations__isnull=False):
+            if item.collection_acron:
+                collection = Collection.get_or_create(acron=item.collection_acron)
+                break
+    except AttributeError:
+        collection = None
+    try:
         logging.info(f"Solicita/Confirma PID v3 para {xml_name}")
 
         # solicita pid v3 e obtém o article criado
         xml_with_pre = article_pkgs.get_xml_with_pre()
         response = request_pid_v3_and_create_article(
-            xml_with_pre, xml_name, user, source,
+            xml_with_pre, xml_name, user, collection,
         )
         if response["xml_changed"]:
             article_pkgs.update_xml(xml_with_pre)
