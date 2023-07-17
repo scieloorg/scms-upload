@@ -582,7 +582,6 @@ def create_articles(
     ).iterator():
         logging.info(migrate_document)
         dm = DocumentMigration(migrated_document, user)
-        dm.generate_xml_from_html()
         dm.request_pid_v3()
         dm.build_sps_package()
         dm.publish_package(minio_push_file_content)
@@ -722,7 +721,7 @@ class DocumentMigration:
     @property
     def sps_pkg_name(self):
         if not self._sps_pkg_name:
-            self.sps_pkg_name = self.build_sps_package()
+            self.sps_pkg_name = self.build_sps_pkg_name()
         return self._sps_pkg_name
 
     @sps_pkg_name.setter
