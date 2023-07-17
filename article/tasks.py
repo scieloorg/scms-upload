@@ -9,6 +9,7 @@ from article.models import ArticlePackages, Article
 from article.controller import request_pid_v3_and_create_article
 from config import celery_app
 
+
 User = get_user_model()
 
 
@@ -23,10 +24,7 @@ def _get_user(request, username):
 def task_request_pid_v3_and_create_articles(
     self,
     username,
-    collection_acron,
-    scielo_issn=None,
-    publication_year=None,
-    force_update=False,
+    source,
 ):
 
     items = ArticlePackages.objects.filter(
@@ -39,6 +37,7 @@ def task_request_pid_v3_and_create_articles(
             kwargs={
                 "username": username,
                 "article_pkgs_id": article_pkgs.id,
+                "source": source,
             }
         )
 
@@ -73,3 +72,51 @@ def task_request_pid_v3_and_create_article(
     except Exception as e:
         # TODO registra falha e deixa acessível na área restrita
         logging.exception(e)
+
+
+@celery_app.task(bind=True, name="push_articles_files_to_remote_storage")
+def task_push_articles_files_to_remote_storage(
+    self,
+    username,
+):
+
+    items = ArticlePackages.objects.filter(
+        Q(components__isnull=True) | Q(components__uri__isnull=True),
+        article__isnull=False,
+        optimised_zip_file__isnull=False,
+        not_optimised_zip_file__isnull=False,
+    )
+    for article_pkgs in items.iterator():
+        task_push_one_article_files_to_remote_storage.apply_async(
+            kwargs={
+                "username": username,
+                "article_pkgs_id": article_pkgs.id,
+            }
+        )
+
+
+def minio_push_file_content(content, mimetype, object_name):
+    # TODO MinioStorage.fput_content
+    return {"uri": "https://localhost/article/x"}
+
+
+@celery_app.task(bind=True, name="push_one_article_files_to_remote_storage")
+def task_push_one_article_files_to_remote_storage(
+    self,
+    username,
+    article_pkgs_id,
+):
+    user = _get_user(self.request, username)
+    article_pkgs = ArticlePackages.objects.get(id=article_pkgs_id)
+
+    responses = article_pkgs.publish_package(
+        minio_push_file_content,
+        user,
+    )
+    for response in responses:
+        try:
+            uri = response["uri"]
+        except KeyError as e:
+            # TODO registra falha e deixa acessível na área restrita
+            logging.error(f"Falha ao registrar arquivo em storage remoto {response}")
+            logging.exception(e)

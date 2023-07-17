@@ -583,16 +583,11 @@ def create_articles(
         logging.info(migrate_document)
         dm = DocumentMigration(migrated_document, user)
         dm.build_sps_package()
-        dm.publish_package(minio_push_file_content)
 
 
 def _get_xml(path):
     for item in get_xml_items(path):
         return item
-
-
-def minio_push_file_content(**kwargs):
-    return {"uri": "https://localhost"}
 
 
 class DocumentMigration:
@@ -866,17 +861,6 @@ class DocumentMigration:
                 message=message,
                 action_name="build-sps-package",
             )
-
-    def publish_package(self, minio_push_file_content):
-        responses = self.article_pkgs.publish_package(
-            minio_push_file_content,
-            self.user,
-        )
-        for response in responses:
-            try:
-                uri = response["uri"]
-            except KeyError:
-                self.register_failure(**response)
 
     def generate_xml_from_html(self, classic_ws_doc):
         html_texts = self.migrated_document.html_texts
