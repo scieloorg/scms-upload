@@ -49,10 +49,15 @@ def schedule_migrations(user, collection_acron=None):
         collection_acron = collection.acron
         _schedule_title_migration(user, collection_acron)
         _schedule_issue_migration(user, collection_acron)
+        _schedule_issue_files_migration(user, collection_acron)
         _schedule_article_migration(user, collection_acron)
 
 
 def _schedule_title_migration(user, collection_acron):
+    """
+    Cria o agendamento da tarefa de migrar os registros da base de dados TITLE
+    Deixa a tarefa desabilitada
+    """
     schedule_task(
         task="migrate_journal_records",
         name="migrate_journal_records",
@@ -72,6 +77,10 @@ def _schedule_title_migration(user, collection_acron):
 
 
 def _schedule_issue_migration(user, collection_acron):
+    """
+    Cria o agendamento da tarefa de migrar os registros da base de dados ISSUE
+    Deixa a tarefa abilitada
+    """
     schedule_task(
         task="migrate_issue_records",
         name="migrate_issue_records",
@@ -90,10 +99,15 @@ def _schedule_issue_migration(user, collection_acron):
     )
 
 
-def _schedule_article_migration(user, collection_acron):
+def _schedule_issue_files_migration(user, collection_acron):
+    """
+    Cria o agendamento da tarefa de migrar os arquivos dos artigos
+    Deixa a tarefa desabilitada
+    Quando usuário quiser executar, deve preencher os valores e executar
+    """
     schedule_task(
-        task="migrate_set_of_issue_files_and_document_records",
-        name="migrate_set_of_issue_files_and_document_records",
+        task="migrate_set_of_issue_files",
+        name="migrate_set_of_issue_files",
         kwargs=dict(
             username=user.username,
             collection_acron=collection_acron,
@@ -101,13 +115,39 @@ def _schedule_article_migration(user, collection_acron):
             publication_year=None,
             force_update=False,
         ),
-        description=_("Migra os registros e arquivos de artigos"),
+        description=_("Migra os arquivos de artigos"),
         priority=1,
-        enabled=True,
-        run_once=False,
+        enabled=False,
+        run_once=True,
         day_of_week="*",
         hour="*",
         minute="10,30,50",
+    )
+
+
+def _schedule_article_migration(user, collection_acron):
+    """
+    Cria o agendamento da tarefa de migrar os registros dos artigos
+    Deixa a tarefa desabilitada
+    Quando usuário quiser executar, deve preencher os valores e executar
+    """
+    schedule_task(
+        task="migrate_set_of_issue_document_records",
+        name="migrate_set_of_issue_document_records",
+        kwargs=dict(
+            username=user.username,
+            collection_acron=collection_acron,
+            scielo_issn=None,
+            publication_year=None,
+            force_update=False,
+        ),
+        description=_("Migra os registros de artigos"),
+        priority=2,
+        enabled=False,
+        run_once=True,
+        day_of_week="*",
+        hour="*",
+        minute="15,35,55",
     )
 
 
@@ -535,7 +575,7 @@ class IssueMigration:
                 )
 
 
-def migrate_one_issue_files_and_document_records(
+def migrate_one_issue_files(
     user,
     migrated_issue,
     collection_acron,
@@ -551,6 +591,16 @@ def migrate_one_issue_files_and_document_records(
     # da sua pasta do fascículo
     migration.import_issue_files()
 
+
+def migrate_one_issue_document_records(
+    user,
+    migrated_issue,
+    collection_acron,
+    force_update=False,
+):
+
+    logging.info(self.migrated_issue)
+    migration = IssueMigration(user, collection_acron, migrated_issue, force_update)
     # migra os documentos da base de dados `source_file_path`
     # que não contém necessariamente os dados de só 1 fascículo
     migration.migrate_document_records()
