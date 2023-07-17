@@ -12,17 +12,13 @@ from packtools.sps.models.article_assets import ArticleAssets
 from scielo_classic_website import classic_ws
 
 from article.choices import AS_READ_TO_PUBLISH
-from article.controller import (
-    request_pid_v3_and_create_article as article_controller_request_pid_v3_and_create_article,
-)
 from article.models import ArticlePackages
 from collection.models import Collection
 from core.controller import parse_yyyymmdd
 from core.utils.scheduler import schedule_task
-from django_celery_beat.models import CrontabSchedule, PeriodicTask
 from issue.models import Issue, SciELOIssue
 from journal.models import Journal, OfficialJournal, SciELOJournal
-from xmlsps.xml_sps_lib import get_xml_items
+from xmlsps.xml_sps_lib import XMLWithPre
 
 from . import exceptions
 from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
@@ -466,8 +462,9 @@ class IssueMigration:
                     classic_ws_doc=classic_ws_doc,
                     journal_issue_and_doc_data=journal_issue_and_doc_data,
                 )
-                document_migration = DocumentMigration(migrated_document, user)
+                document_migration = DocumentMigration(migrated_document, self.user)
                 document_migration.generate_xml_from_html(classic_ws_doc)
+                document_migration.build_sps_package()
 
             except Exception as e:
                 message = _("Unable to migrate documents {} {} {} {}").format(
@@ -563,30 +560,8 @@ def migrate_one_issue_document_records(
     migration.migrate_document_records()
 
 
-def create_articles(
-    user,
-    collection_acron=None,
-    from_date=None,
-    force_update=None,
-):
-    from_date = from_date or "0"
-    params = {}
-    if collection_acron:
-        params["migrated_issue__migrated_journal__collection__acron"] = collection_acron
-    params = {}
-    if from_date:
-        params["created__gte"] = from_date
-
-    for migrated_document in MigratedDocument.objects.filter(
-        **params,
-    ).iterator():
-        logging.info(migrate_document)
-        dm = DocumentMigration(migrated_document, user)
-        dm.build_sps_package()
-
-
 def _get_xml(path):
-    for item in get_xml_items(path):
+    for item in XMLWithPre.create(path=path):
         return item
 
 
@@ -690,16 +665,26 @@ class DocumentMigration:
                 return xml_with_pre.fpage + (xml_with_pre.fpage_seq or "")
 
     def build_sps_package(self):
+        """
+        A partir do XML original ou gerado a partir do HTML, e
+        dos ativos digitais, todos registrados em MigratedFile,
+        cria o zip com nome no padrão SPS (ISSN-ACRON-VOL-NUM-SUPPL-ARTICLE) e
+        o armazena em ArticlePackages.not_optimised_zip_file.
+        Neste momento o XML não contém pid v3.
+        """
         logging.info(f"Build SPS Package {self.migrated_document}")
         try:
             # gera nome de pacote padrão SPS ISSN-ACRON-VOL-NUM-SUPPL-ARTICLE
             with TemporaryDirectory() as tmpdirname:
                 logging.info("TemporaryDirectory %s" % tmpdirname)
-                temp_zip_file_path = os.path.join(
-                    tmpdirname, f"{self.migrated_document.pkg_name}.zip"
+                tmp_sps_pkg_zip_path = os.path.join(
+                    tmpdirname, f"{self.sps_pkg_name}.zip"
                 )
 
-                with ZipFile(temp_zip_file_path, "w") as zf:
+                self.article_pkgs = ArticlePackages.get_or_create(
+                    sps_pkg_name=self.sps_pkg_name,
+                )
+                with ZipFile(tmp_sps_pkg_zip_path, "w") as zf:
                     # adiciona XML em zip
                     self._build_sps_package_add_xml(zf)
 
@@ -707,13 +692,13 @@ class DocumentMigration:
                     self._build_sps_package_add_renditions(zf)
 
                     # A partir do XML, obtém os nomes dos arquivos dos ativos digitais
-                    sps_article_assets = ArticleAssets(self.xml_with_pre.xmltree)
-                    self._build_sps_package_replace_asset_href(sps_article_assets)
+                    assets = ArticleAssets(self.xml_with_pre.xmltree)
+                    self._build_sps_package_replace_asset_href(assets)
                     self._build_sps_package_add_assets(
-                        zf, sps_article_assets.article_assets
+                        zf, assets.article_assets
                     )
 
-                with open(temp_zip_file_path, "rb") as fp:
+                with open(tmp_sps_pkg_zip_path, "rb") as fp:
                     # guarda o pacote compactado
                     self.article_pkgs.add_sps_package_file(
                         filename=self.sps_pkg_name + ".zip",
@@ -722,12 +707,12 @@ class DocumentMigration:
                     )
         except Exception as e:
             message = _("Unable to build sps package {} {}").format(
-                self.collection_acron, self.migrated_document.pid
+                self.collection_acron, self.pid
             )
             self.register_failure(
                 e,
                 migrated_item_name="zip",
-                migrated_item_id=self.migrated_document.pid,
+                migrated_item_id=self.pid,
                 message=message,
                 action_name="build-sps-package",
             )
@@ -915,5 +900,3 @@ class DocumentMigration:
                     message=message,
                     action_name="xml-to-html",
                 )
-
-#945
