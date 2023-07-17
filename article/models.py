@@ -465,7 +465,7 @@ class ArticlePackages(CommonControlField):
             return cls.objects.get(sps_pkg_name=sps_pkg_name)
 
     @classmethod
-    def get_or_create(cls, article, sps_pkg_name=None, creator=None):
+    def get_or_create(cls, article=None, sps_pkg_name=None, creator=None):
         try:
             logging.info(f"Get or create ArticlePackages {article}")
             obj = cls.get(article=article, sps_pkg_name=sps_pkg_name)
