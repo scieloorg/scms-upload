@@ -182,6 +182,8 @@ def task_run_migrations(
         }
     )
     # migra os registros das bases de artigos
+    # se aplicável, gera XML a partir do HTML
+    # gera SPS package
     task_migrate_set_of_issue_document_records.apply_async(
         kwargs={
             "username": username,

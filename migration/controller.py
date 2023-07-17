@@ -48,6 +48,8 @@ def schedule_migrations(user, collection_acron=None):
         _schedule_issue_files_migration(user, collection_acron)
         _schedule_article_migration(user, collection_acron)
 
+        _schedule_run_migrations(user, collection_acron)
+
 
 def _schedule_title_migration(user, collection_acron):
     """
@@ -144,6 +146,29 @@ def _schedule_article_migration(user, collection_acron):
         day_of_week="*",
         hour="*",
         minute="15,35,55",
+    )
+
+
+def _schedule_run_migrations(user, collection_acron):
+    """
+    Cria o agendamento da tarefa de migrar os registros da base de dados TITLE
+    Deixa a tarefa desabilitada
+    """
+    schedule_task(
+        task="run_migrations",
+        name="run_migrations",
+        kwargs=dict(
+            collection_acron=collection_acron,
+            username=user.username,
+            force_update=False,
+        ),
+        description=_("Executa todas as tarefas de migração"),
+        priority=1,
+        enabled=True,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute="7",
     )
 
 
