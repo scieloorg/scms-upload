@@ -402,7 +402,7 @@ class IssueMigration:
             except (KeyError, TypeError):
                 pass
             logging.info(check)
-            if check == "":
+            if check == ".pdf":
                 return "rendition"
             return "supplmat"
         return file["type"]
@@ -413,7 +413,7 @@ class IssueMigration:
         """
         logging.info(f"Import issue files {self.migrated_issue}")
 
-        classic_issue_files = classic_website.get_issue_files(
+        classic_issue_files = self.classic_website.get_issue_files(
             self.journal_acron, self.issue_folder,
         )
         for file in classic_issue_files:
@@ -468,7 +468,7 @@ class IssueMigration:
         # do fascículo de migrated_issue
         # possivelmente source_file pode conter registros de outros fascículos
         # se a fonte for `bases-work/acron/acron`
-        for doc_id, doc_records in classic_website.get_documents_pids_and_records(
+        for doc_id, doc_records in self.classic_website.get_documents_pids_and_records(
             self.journal_acron,
             self.issue_folder,
             self.issue_pid,
@@ -522,7 +522,7 @@ class IssueMigration:
         try:
             # instancia Document com registros de title, issue e artigo
             pid = classic_ws_doc.scielo_pid_v2 or (
-                "S" + issue_pid + classic_ws_doc.order.zfill(5)
+                "S" + self.issue_pid + classic_ws_doc.order.zfill(5)
             )
             pkg_name = classic_ws_doc.filename_without_extension
 
@@ -624,9 +624,7 @@ class DocumentMigration:
         if not self._xml_name:
             migrated_xml = self.migrated_document.migrated_xml
             self._xml_name = migrated_xml["name"]
-
-            xml = _get_xml(migrated_xml["path"])
-            self._xml_with_pre = xml["xml_with_pre"]
+            self._xml_with_pre = _get_xml(migrated_xml["path"])
         return self._xml_name
 
     @property
@@ -634,9 +632,7 @@ class DocumentMigration:
         if not self._xml_with_pre:
             migrated_xml = self.migrated_document.migrated_xml
             self._xml_name = migrated_xml["name"]
-
-            xml = _get_xml(migrated_xml["path"])
-            self._xml_with_pre = xml["xml_with_pre"]
+            self._xml_with_pre = _get_xml(migrated_xml["path"])
         return self._xml_with_pre
 
     def build_sps_pkg_name(self):
@@ -777,13 +773,14 @@ class DocumentMigration:
                 else:
                     sps_filename = f"{self.sps_pkg_name}.pdf"
                 zf.write(rendition_file.file.path, arcname=sps_filename)
+
                 self.article_pkgs.add_component(
                     sps_filename=sps_filename,
                     user=self.user,
                     category="rendition",
                     lang=rendition_file.lang,
                     collection_acron=self.collection_acron,
-                    former_href=rendition_file.former_href,
+                    former_href=rendition_file.original_href,
                 )
             except Exception as e:
                 message = _(

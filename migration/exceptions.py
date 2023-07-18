@@ -28,3 +28,7 @@ class CreateOrUpdateBodyAndBackFileError(Exception):
 
 class CreateOrUpdateGeneratedXMLFileError(Exception):
     ...
+
+
+class MigratedXMLFileNotFoundError(Exception):
+	...
