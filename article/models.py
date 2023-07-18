@@ -25,7 +25,7 @@ from issue.models import Issue
 from journal.models import Journal, OfficialJournal
 from researcher.models import Researcher
 from collection.models import Language, Collection
-from xmlsps.xml_sps_lib import get_xml_with_pre
+from xmlsps.xml_sps_lib import get_xml_with_pre, XMLWithPre
 from . import choices
 from .forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
@@ -465,7 +465,7 @@ class ArticlePackages(CommonControlField):
             return cls.objects.get(sps_pkg_name=sps_pkg_name)
 
     @classmethod
-    def get_or_create(cls, article, sps_pkg_name=None, creator=None):
+    def get_or_create(cls, article=None, sps_pkg_name=None, creator=None):
         try:
             logging.info(f"Get or create ArticlePackages {article}")
             obj = cls.get(article=article, sps_pkg_name=sps_pkg_name)
@@ -541,6 +541,14 @@ class ArticlePackages(CommonControlField):
                     self.article
                 )
             )
+
+    def get_xml_with_pre(self):
+        for xml_with_pre in XMLWithPre.create(self.optimised_zip_file.path):
+            return xml_with_pre
+
+    def update_xml(self, xml_with_pre):
+        with ZipFile(self.optimised_zip_file.path) as zf:
+            zf.writestr(self.sps_pkg_name + ".xml", xml_with_pre.tostring())
 
     def publish_package(self, minio_push_file_content, user):
         logging.info(f"ArticlePackages.publish_package {self.article}")

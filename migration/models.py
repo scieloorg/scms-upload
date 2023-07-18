@@ -270,15 +270,6 @@ class MigratedFile(CommonControlField):
         sps_pkg_name=None,
     ):
 
-        logging.info(
-            "Get MigratedFile {} {} {} {} {}".format(
-                migrated_issue,
-                original_path,
-                original_name,
-                pkg_name,
-                sps_pkg_name,
-            )
-        )
         if original_href:
             # /pdf/acron/volume/file.pdf
             return cls.objects.get(
@@ -695,11 +686,19 @@ class MigratedDocument(MigratedData):
             category="xml",
         ).iterator():
             return {"path": item.file.path, "name": item.original_name}
+
         item = GeneratedXMLFile.latest(
             migrated_issue=self.migrated_issue,
             pkg_name=self.pkg_name,
         )
-        return {"path": item.file.path, "name": item.original_name}
+        if item:
+            return {"path": item.file.path, "name": item.original_name}
+
+        raise exceptions.MigratedXMLFileNotFoundError(
+            _("Migrated XML file not found: {} {}").format(
+                self.migrated_issue, self.pkg_name,
+            )
+        )
 
 
 def body_and_back_directory_path(instance, filename):
@@ -820,10 +819,13 @@ class GeneratedXMLFile(CommonControlField):
 
     @classmethod
     def latest(cls, migrated_issue, pkg_name):
-        return cls.objects.filter(
-            migrated_issue=migrated_issue,
-            pkg_name=pkg_name,
-        ).latest("version")
+        try:
+            return cls.objects.filter(
+                migrated_issue=migrated_issue,
+                pkg_name=pkg_name,
+            ).latest("version")
+        except (cls.DoesNotExist, AttributeError):
+            return None
 
     @classmethod
     def get(cls, migrated_issue, pkg_name, version):
