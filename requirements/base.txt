@@ -64,7 +64,7 @@ lxml==4.9.2 # https://github.com/lxml/lxml
 mongoengine==0.24.2
 pymongo==3.12.0
 tenacity==8.0.1
-aiohttp==3.8.4
+aiohttp==3.8.5
 python-magic==0.4.27
 
 # DSM Migration
