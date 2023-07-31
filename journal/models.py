@@ -11,7 +11,6 @@ from wagtail.admin.panels import (
     ObjectList,
     TabbedInterface,
 )
-from wagtail.images.edit_handlers import ImageChooserPanel
 from wagtail.models import Orderable
 
 from collection.models import Collection
@@ -252,7 +251,7 @@ class Journal(ClusterableModel, SocialNetwork):
     ]
 
     panels_website = [
-        ImageChooserPanel("logo", heading=_("Logo")),
+        FieldPanel("logo", heading=_("Logo")),
         FieldPanel("submission_online_url"),
         InlinePanel("journalsocialnetwork", label=_("Social Network")),
     ]

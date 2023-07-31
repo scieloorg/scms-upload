@@ -1,6 +1,6 @@
 from django.db import models
 from wagtail.contrib.settings.models import BaseSetting, register_setting
-from wagtail.images.panels import FieldPanel
+from wagtail.admin.panels import FieldPanel
 
 
 @register_setting
@@ -29,6 +29,6 @@ class CustomSettings(BaseSetting):
     )
 
     panels = [
-        ImageChooserPanel("favicon"),
-        ImageChooserPanel("admin_logo"),
+        FieldPanel("favicon"),
+        FieldPanel("admin_logo"),
     ]
