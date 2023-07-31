@@ -21,10 +21,15 @@ crispy-bootstrap5==0.7  # https://github.com/django-crispy-forms/crispy-bootstra
 django-compressor==3.1  # https://github.com/django-compressor/django-compressor
 django-redis==5.2.0  # https://github.com/jazzband/django-redis
 
+# Django celery
+# ------------------------------------------------------------------------------
+django-celery-beat==2.5.0  # https://github.com/celery/django-celery-beat
+django_celery_results==2.5.1
+
+
 # Wagtail
 # ------------------------------------------------------------------------------
 wagtail==4.2.3  # https://github.com/wagtail/wagtail
-
 
 # Wagtail Recaptcha
 # ------------------------------------------------------------------------------
@@ -43,12 +48,6 @@ wagtail-localize==1.5.0
 # https://github.com/wagtail/wagtail-autocomplete
 # ------------------------------------------------------------------------------
 wagtail-autocomplete==0.10.0
-
-# Django celery
-# ------------------------------------------------------------------------------
-django-celery-beat==2.5.0  # https://github.com/celery/django-celery-beat
-django_celery_results==2.5.1
-
 
 # DSM Minio
 # ------------------------------------------------------------------------------
