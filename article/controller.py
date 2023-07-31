@@ -4,10 +4,11 @@ from datetime import datetime
 from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_ids import ArticleIds
 
+from collection.models import Collection
 from pid_requester.controller import PidRequester
+
 from . import exceptions
 from .models import Article, choices
-from collection.models import Collection
 
 
 def request_pid_v3_and_create_article(xml_with_pre, filename, user, collection=None):

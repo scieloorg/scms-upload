@@ -1,13 +1,12 @@
-from django.db.models import Q
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from config import celery_app
+from migration.models import MigratedIssue
 
 from . import controller
 from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
-from migration.models import MigratedIssue
-
 
 User = get_user_model()
 

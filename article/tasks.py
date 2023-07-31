@@ -1,14 +1,14 @@
 import logging
 
-from django.db.models import Q
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from . import controller
-from article.models import ArticlePackages, Article
 from article.controller import request_pid_v3_and_create_article
+from article.models import Article, ArticlePackages
 from config import celery_app
 
+from . import controller
 
 User = get_user_model()
 

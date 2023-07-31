@@ -3,9 +3,7 @@ import json
 from django.contrib.auth import get_user_model
 
 from collection.models import Collection
-from migration.models import (
-    ClassicWebsiteConfiguration,
-)
+from migration.models import ClassicWebsiteConfiguration
 
 User = get_user_model()
 
