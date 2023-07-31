@@ -64,7 +64,7 @@ minio==7.1.15
 
 # Upload
 # ------------------------------------------------------------------------------
-lxml==4.9.2 # https://github.com/lxml/lxml
+lxml==4.9.3 # https://github.com/lxml/lxml
 -e git+https://github.com/scieloorg/packtools#egg=packtools
 -e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
 
@@ -73,7 +73,6 @@ lxml==4.9.2 # https://github.com/lxml/lxml
 -e git+https://github.com/scieloorg/opac_schema.git@v2.66#egg=opac_schema
 mongoengine==0.24.2
 pymongo==3.12.0
-tenacity==8.0.1
 aiohttp==3.8.5
 python-magic==0.4.27
 
@@ -82,3 +81,8 @@ python-magic==0.4.27
 -e git+https://github.com/scieloorg/scielo_migration.git@0.1.6#egg=scielo_classic_website
 python-dateutil==2.8.2
 tornado>=6.3.2 # not directly required, pinned by Snyk to avoid a vulnerability
+
+# Tenacity
+# ------------------------------------------------------------------------------
+tenacity==8.2.2  # https://pypi.org/project/tenacity/
+
