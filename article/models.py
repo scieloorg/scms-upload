@@ -1,31 +1,32 @@
-import mimetypes
 import logging
+import mimetypes
 import os
 from datetime import datetime
-from zipfile import ZipFile
 from tempfile import TemporaryDirectory
+from zipfile import ZipFile
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-from django.core.files.base import ContentFile
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
+from packtools.sps.models.article_assets import ArticleAssets
+from packtools.utils import SPPackage
 from wagtail.admin.edit_handlers import FieldPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
-from packtools.utils import SPPackage
-from packtools.sps.models.article_assets import ArticleAssets
 
+from collection.models import Collection, Language
 from core.models import CommonControlField
 from doi.models import DOIWithLang
 from issue.models import Issue
 from journal.models import Journal, OfficialJournal
 from researcher.models import Researcher
-from collection.models import Language, Collection
-from xmlsps.xml_sps_lib import get_xml_with_pre, XMLWithPre
+from xmlsps.xml_sps_lib import XMLWithPre, get_xml_with_pre
+
 from . import choices
 from .forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
@@ -86,7 +87,6 @@ class CollectionArticleId(ClusterableModel, CommonControlField):
 
 
 class Article(ClusterableModel, CommonControlField):
-
     # PID v3
     pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True)
 

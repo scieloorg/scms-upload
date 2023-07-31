@@ -14,9 +14,10 @@ from wagtail.admin.edit_handlers import (
 from wagtail.images.edit_handlers import ImageChooserPanel
 from wagtail.models import Orderable
 
+from collection.models import Collection
 from core.models import CommonControlField, RichTextWithLang
 from institution.models import InstitutionHistory
-from collection.models import Collection
+
 from . import choices
 from .forms import OfficialJournalForm
 

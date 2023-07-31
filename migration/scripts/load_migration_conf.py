@@ -3,9 +3,7 @@ import json
 from django.contrib.auth import get_user_model
 
 from collection.models import Collection
-from migration.models import (
-    ClassicWebsiteConfiguration,
-)
+from migration.models import ClassicWebsiteConfiguration
 
 User = get_user_model()
 
@@ -15,9 +13,7 @@ def load_classic_website_configuration(username):
     with open(".envs/.bigbang") as fp:
         data = json.loads(fp.read())
 
-    collection = Collection.get_or_create(
-        acron=data["collection_acron"],
-        user=user)
+    collection = Collection.get_or_create(acron=data["collection_acron"], user=user)
 
     config = data["classic_ws_config"]
     classic_website = ClassicWebsiteConfiguration.get_or_create(

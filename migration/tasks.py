@@ -1,13 +1,12 @@
-from django.db.models import Q
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from config import celery_app
+from migration.models import MigratedIssue
 
 from . import controller
 from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
-from migration.models import MigratedIssue
-
 
 User = get_user_model()
 
@@ -77,7 +76,8 @@ def task_migrate_set_of_issue_files(
         params["scielo_issue__official_issue__publication_year"] = publication_year
 
     items = MigratedIssue.objects.filter(
-        Q(status=MS_PUBLISHED) | Q(status=MS_IMPORTED), **params,
+        Q(status=MS_PUBLISHED) | Q(status=MS_IMPORTED),
+        **params,
     )
     for migrated_issue in items.iterator():
         task_migrate_one_issue_files.apply_async(
@@ -126,7 +126,8 @@ def task_migrate_set_of_issue_document_records(
         params["scielo_issue__official_issue__publication_year"] = publication_year
 
     items = MigratedIssue.objects.filter(
-        Q(status=MS_PUBLISHED) | Q(status=MS_IMPORTED), **params,
+        Q(status=MS_PUBLISHED) | Q(status=MS_IMPORTED),
+        **params,
     )
     for migrated_issue in items.iterator():
         task_migrate_one_issue_document_records.apply_async(

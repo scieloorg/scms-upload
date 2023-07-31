@@ -11,11 +11,8 @@ from wagtail.contrib.modeladmin.views import CreateView
 
 from config.menu import get_menu_order
 from migration.models import ClassicWebsiteConfiguration
-from .models import (
-    Collection,
-    FilesStorageConfiguration,
-    NewWebSiteConfiguration,
-)
+
+from .models import Collection, FilesStorageConfiguration, NewWebSiteConfiguration
 
 
 class CoreCreateView(CreateView):

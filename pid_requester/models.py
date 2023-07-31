@@ -118,7 +118,6 @@ class PidRequesterBadRequest(CommonControlField):
     xml = models.FileField(upload_to="bad_request")
 
     class Meta:
-
         indexes = [
             models.Index(fields=["basename"]),
             models.Index(fields=["finger_print"]),

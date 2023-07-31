@@ -109,7 +109,6 @@ class ClassicWebsiteConfiguration(CommonControlField):
         htdocs_img_revistas_path=None,
         creator=None,
     ):
-
         try:
             return cls.objects.get(collection=collection)
         except cls.DoesNotExist:
@@ -269,7 +268,6 @@ class MigratedFile(CommonControlField):
         pkg_name=None,
         sps_pkg_name=None,
     ):
-
         if original_href:
             # /pdf/acron/volume/file.pdf
             return cls.objects.get(
@@ -417,7 +415,6 @@ class MigratedJournal(MigratedData):
         status=None,
         force_update=None,
     ):
-
         logging.info(f"MigratedJournal.create_or_update {scielo_journal}")
         try:
             obj = cls.get(scielo_journal=scielo_journal)
@@ -510,7 +507,6 @@ class MigratedIssue(MigratedData):
         data=None,
         force_update=None,
     ):
-
         logging.info("Create or Update MigratedIssue {}".format(scielo_issue))
         try:
             obj = cls.objects.get(scielo_issue=scielo_issue)
@@ -611,7 +607,6 @@ class MigratedDocument(MigratedData):
         sps_pkg_name=None,
         force_update=None,
     ):
-
         logging.info(
             "Create or Update MigratedDocument {} {} {}".format(
                 migrated_issue,
@@ -696,7 +691,8 @@ class MigratedDocument(MigratedData):
 
         raise exceptions.MigratedXMLFileNotFoundError(
             _("Migrated XML file not found: {} {}").format(
-                self.migrated_issue, self.pkg_name,
+                self.migrated_issue,
+                self.pkg_name,
             )
         )
 

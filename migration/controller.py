@@ -9,7 +9,6 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_assets import ArticleAssets
-from scielo_classic_website import classic_ws
 
 from article.choices import AS_READ_TO_PUBLISH
 from article.models import ArticlePackages
@@ -18,6 +17,7 @@ from core.controller import parse_yyyymmdd
 from core.utils.scheduler import schedule_task
 from issue.models import Issue, SciELOIssue
 from journal.models import Journal, OfficialJournal, SciELOJournal
+from scielo_classic_website import classic_ws
 from xmlsps.xml_sps_lib import XMLWithPre
 
 from . import exceptions
@@ -87,7 +87,9 @@ def _schedule_issue_migration(user, collection_acron):
             username=user.username,
             force_update=False,
         ),
-        description=_("Migra os registros da base de dados ISSUE e os arquivos de artigos"),
+        description=_(
+            "Migra os registros da base de dados ISSUE e os arquivos de artigos"
+        ),
         priority=1,
         enabled=True,
         run_once=False,
@@ -196,7 +198,6 @@ def migrate_journal_records(
     collection = Collection.get_or_create(collection_acron)
     classic_website = get_classic_website(collection.acron)
     for scielo_issn, journal_data in classic_website.get_journals_pids_and_records():
-
         migrated_journal = import_data_from_title_database(
             user,
             collection,
@@ -371,7 +372,6 @@ def import_data_from_issue_database(
 
 
 class IssueMigration:
-
     def __init__(self, user, collection_acron, migrated_issue, force_update):
         self.classic_website = get_classic_website(collection_acron)
         self.collection_acron = collection_acron
@@ -414,7 +414,8 @@ class IssueMigration:
         logging.info(f"Import issue files {self.migrated_issue}")
 
         classic_issue_files = self.classic_website.get_issue_files(
-            self.journal_acron, self.issue_folder,
+            self.journal_acron,
+            self.issue_folder,
         )
         for file in classic_issue_files:
             """
@@ -560,7 +561,6 @@ def migrate_one_issue_files(
     collection_acron,
     force_update=False,
 ):
-
     logging.info(migrated_issue)
     migration = IssueMigration(user, collection_acron, migrated_issue, force_update)
 
@@ -577,7 +577,6 @@ def migrate_one_issue_document_records(
     collection_acron,
     force_update=False,
 ):
-
     logging.info(migrated_issue)
     migration = IssueMigration(user, collection_acron, migrated_issue, force_update)
     # migra os documentos da base de dados `source_file_path`
@@ -594,9 +593,7 @@ class DocumentMigration:
     def __init__(self, migrated_document, user):
         self.migrated_document = migrated_document
         self.migrated_issue = migrated_document.migrated_issue
-        self.collection_acron = (
-            self.migrated_issue.migrated_journal.collection.acron
-        )
+        self.collection_acron = self.migrated_issue.migrated_journal.collection.acron
         self.user = user
         self.pid = migrated_document.pid
         self._xml_name = None
@@ -715,9 +712,7 @@ class DocumentMigration:
                     # A partir do XML, obtém os nomes dos arquivos dos ativos digitais
                     assets = ArticleAssets(self.xml_with_pre.xmltree)
                     self._build_sps_package_replace_asset_href(assets)
-                    self._build_sps_package_add_assets(
-                        zf, assets.article_assets
-                    )
+                    self._build_sps_package_add_assets(zf, assets.article_assets)
 
                 with open(tmp_sps_pkg_zip_path, "rb") as fp:
                     # guarda o pacote compactado
@@ -914,7 +909,9 @@ class DocumentMigration:
                 )
             except Exception as e:
                 migrated_item_id = f"{self.collection_acron} {self.pid}"
-                message = _("Unable to generate XML from HTML {}").format(migrated_item_id)
+                message = _("Unable to generate XML from HTML {}").format(
+                    migrated_item_id
+                )
                 self.register_failure(
                     e,
                     migrated_item_name="document",

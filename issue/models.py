@@ -7,6 +7,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.models import CommonControlField, IssuePublicationDate
 from journal.models import OfficialJournal, SciELOJournal
+
 from .forms import IssueForm
 
 

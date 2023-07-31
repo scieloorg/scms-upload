@@ -3,15 +3,10 @@ import logging
 
 from django.utils.translation import gettext_lazy as _
 
+from migration.models import ClassicWebsiteConfiguration
+
 from . import exceptions
-from migration.models import (
-    ClassicWebsiteConfiguration,
-)
-from .models import (
-    Collection,
-    FilesStorageConfiguration,
-    NewWebSiteConfiguration,
-)
+from .models import Collection, FilesStorageConfiguration, NewWebSiteConfiguration
 
 
 def start():
