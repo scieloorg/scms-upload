@@ -86,7 +86,6 @@ class CollectionArticleId(ClusterableModel, CommonControlField):
 
 
 class Article(ClusterableModel, CommonControlField):
-
     # PID v3
     pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True)
 

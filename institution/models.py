@@ -89,20 +89,29 @@ class Institution(CommonControlField, ClusterableModel):
                 if not selected:
                     selected = item
                     continue
-                if count(item.data.values(), None) < count(selected.data.values(), None):
+                if count(item.data.values(), None) < count(
+                    selected.data.values(), None
+                ):
                     selected = item
             return selected
 
     @classmethod
     def get_or_create(
-        cls, inst_name=None, inst_acronym=None,
-        level_1=None, level_2=None, level_3=None, location=None,
+        cls,
+        inst_name=None,
+        inst_acronym=None,
+        level_1=None,
+        level_2=None,
+        level_3=None,
+        location=None,
         user=None,
     ):
         # Institution
         # check if exists the institution
         try:
-            return cls.get(inst_name=inst_name, inst_acronym=inst_acronym, location=location)
+            return cls.get(
+                inst_name=inst_name, inst_acronym=inst_acronym, location=location
+            )
         except cls.DoesNotExist:
             institution = cls()
             institution.name = inst_name

@@ -195,16 +195,12 @@ class Location(CommonControlField):
 
     @classmethod
     def get(cls, country, state, city):
-        return cls.objects.get(
-            country=country, state=state, city=city
-        )
+        return cls.objects.get(country=country, state=state, city=city)
 
     @classmethod
     def get_or_create(cls, user, country, state, city):
         try:
-            return cls.get(
-                country=country, state=state, city=city
-            )
+            return cls.get(country=country, state=state, city=city)
         except cls.DoesNotExist:
             location = Location()
             location.country = country

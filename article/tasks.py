@@ -25,7 +25,6 @@ def task_request_pid_v3_and_create_articles(
     self,
     username,
 ):
-
     items = ArticlePackages.objects.filter(
         article__isnull=True,
         optimised_zip_file__isnull=False,
@@ -64,7 +63,10 @@ def task_request_pid_v3_and_create_article(
         # solicita pid v3 e obtém o article criado
         xml_with_pre = article_pkgs.get_xml_with_pre()
         response = request_pid_v3_and_create_article(
-            xml_with_pre, xml_name, user, collection,
+            xml_with_pre,
+            xml_name,
+            user,
+            collection,
         )
         if response["xml_changed"]:
             article_pkgs.update_xml(xml_with_pre)
@@ -83,7 +85,6 @@ def task_push_articles_files_to_remote_storage(
     self,
     username,
 ):
-
     items = ArticlePackages.objects.filter(
         Q(components__isnull=True) | Q(components__uri__isnull=True),
         article__isnull=False,
