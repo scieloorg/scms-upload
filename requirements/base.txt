@@ -12,14 +12,18 @@ flower==2.0.0  # https://github.com/mher/flower
 
 # Django
 # ------------------------------------------------------------------------------
-django==4.1.10  # pyup: < 4.0  # https://www.djangoproject.com/
+django==4.1.10
 django-environ==0.10.0  # https://github.com/joke2k/django-environ
 django-model-utils==4.3.1  # https://github.com/jazzband/django-model-utils
-django-allauth==0.54.0 # https://github.com/pennersr/django-allauth
+django-allauth==0.54.0  # https://github.com/pennersr/django-allauth
 django-crispy-forms==2.0  # https://github.com/django-crispy-forms/django-crispy-forms
 crispy-bootstrap5==0.7  # https://github.com/django-crispy-forms/crispy-bootstrap5
-django-compressor==3.1  # https://github.com/django-compressor/django-compressor
+django-compressor==4.3.1  # https://github.com/django-compressor/django-compressor
 django-redis==5.2.0  # https://github.com/jazzband/django-redis
+
+# Django REST
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.2.2  # https://django-rest-framework-simplejwt.readthedocs.io/en/latest/
 
 # Django celery
 # ------------------------------------------------------------------------------
@@ -33,7 +37,12 @@ wagtail==4.2.3  # https://github.com/wagtail/wagtail
 
 # Wagtail Recaptcha
 # ------------------------------------------------------------------------------
-django-recaptcha==2.0.6
+django-recaptcha==3.0.0
+wagtail-django-recaptcha==1.0
+
+# Wagtail Recaptcha
+# ------------------------------------------------------------------------------
+django-recaptcha==3.0.0
 wagtail-django-recaptcha==1.0
 
 # Wagtail Menu
@@ -42,7 +51,7 @@ wagtailmenus==3.1.8
 
 # Wagtail Localize
 # ------------------------------------------------------------------------------
-wagtail-localize==1.5.0
+wagtail-localize==1.5
 
 # Wagtail-Autocomplete
 # https://github.com/wagtail/wagtail-autocomplete
