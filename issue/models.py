@@ -2,7 +2,7 @@ from datetime import datetime
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.edit_handlers import FieldPanel
+from wagtail.admin.panels import FieldPanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.models import CommonControlField, IssuePublicationDate

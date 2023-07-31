@@ -2,7 +2,7 @@ from django.db import models
 from django.http import JsonResponse
 from django.template.response import TemplateResponse
 from modelcluster.fields import ParentalKey
-from wagtail.admin.edit_handlers import (
+from wagtail.admin.panels import (
     FieldPanel,
     FieldRowPanel,
     InlinePanel,

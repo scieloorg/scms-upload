@@ -14,7 +14,7 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.models.article_assets import ArticleAssets
 from packtools.utils import SPPackage
-from wagtail.admin.edit_handlers import FieldPanel, InlinePanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel

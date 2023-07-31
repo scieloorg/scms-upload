@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.edit_handlers import FieldPanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article.models import Article
