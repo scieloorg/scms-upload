@@ -1,13 +1,13 @@
 pytz==2023.3  # https://github.com/stub42/pytz
 python-slugify==8.0.1  # https://github.com/un33k/python-slugify
 Pillow==9.5.0  # https://github.com/python-pillow/Pillow
-rcssmin==1.1.0  # https://github.com/ndparker/rcssmin
+rcssmin==1.1.1  # https://github.com/ndparker/rcssmin
 argon2-cffi==21.3.0  # https://github.com/hynek/argon2_cffi
-whitenoise==6.0.0  # https://github.com/evansd/whitenoise
-redis==4.5.5  # https://github.com/redis/redis-py
-hiredis==2.0.0  # https://github.com/redis/hiredis-py
+whitenoise==6.4.0  # https://github.com/evansd/whitenoise
+redis==4.6.0  # https://github.com/redis/redis-py
+hiredis==2.2.2  # https://github.com/redis/hiredis-py
+# celery==5.2.7  # pyup: < 6.0  # https://github.com/celery/celery
 celery==5.3.1  # pyup: < 6.0  # https://github.com/celery/celery
-django-celery-beat==2.5.0  # https://github.com/celery/django-celery-beat
 flower==2.0.0  # https://github.com/mher/flower
 
 # Django
@@ -44,9 +44,11 @@ wagtail-localize==1.5.0
 # ------------------------------------------------------------------------------
 wagtail-autocomplete==0.10.0
 
-# Django celery results
+# Django celery
 # ------------------------------------------------------------------------------
+django-celery-beat==2.5.0  # https://github.com/celery/django-celery-beat
 django_celery_results==2.5.1
+
 
 # DSM Minio
 # ------------------------------------------------------------------------------
