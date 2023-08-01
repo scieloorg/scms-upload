@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.conf.urls import url
 from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -32,7 +31,7 @@ urlpatterns = [
     # path("", include(wagtail_urls)),
     # Alternatively, if you want Wagtail pages to be served from a subpath
     # of your site, rather than the site root:
-    #    url(r"^pages/", include(wagtail_urls)),
+    #    re_path(r"^pages/", include(wagtail_urls)),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # Translatable URLs
@@ -40,7 +39,7 @@ urlpatterns = [
 urlpatterns += i18n_patterns(
     re_path(r"^search/$", search_views.search, name="search"),
     # Autocomplete endpoint
-    url(r"^admin/autocomplete/", include(autocomplete_admin_urls)),
+    re_path(r"^admin/autocomplete/", include(autocomplete_admin_urls)),
     # User management
     path("api/v2/", api_router.urls),
     path("users/", include("core.users.urls", namespace="users")),

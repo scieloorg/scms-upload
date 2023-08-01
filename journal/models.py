@@ -5,13 +5,12 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
-from wagtail.admin.edit_handlers import (
+from wagtail.admin.panels import (
     FieldPanel,
     InlinePanel,
     ObjectList,
     TabbedInterface,
 )
-from wagtail.images.edit_handlers import ImageChooserPanel
 from wagtail.models import Orderable
 
 from collection.models import Collection
@@ -252,7 +251,7 @@ class Journal(ClusterableModel, SocialNetwork):
     ]
 
     panels_website = [
-        ImageChooserPanel("logo", heading=_("Logo")),
+        FieldPanel("logo", heading=_("Logo")),
         FieldPanel("submission_online_url"),
         InlinePanel("journalsocialnetwork", label=_("Social Network")),
     ]

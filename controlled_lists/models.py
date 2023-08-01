@@ -1,7 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext as _
-from wagtail.admin.edit_handlers import FieldPanel
-from wagtail.documents.edit_handlers import DocumentChooserPanel
+from wagtail.admin.panels import FieldPanel
 
 from . import choices
 
@@ -40,4 +39,4 @@ class IndexedAtFile(models.Model):
     def filename(self):
         return os.path.basename(self.attachment.name)
 
-    panels = [DocumentChooserPanel("attachment")]
+    panels = [FieldPanel("attachment")]
