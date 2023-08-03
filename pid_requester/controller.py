@@ -7,11 +7,11 @@ from tempfile import TemporaryDirectory
 import requests
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
+from packtools.sps.pid_requester.xml_sps_lib import XMLWithPre
 from requests.auth import HTTPBasicAuth
 
 from pid_requester import exceptions
 from pid_requester.models import PidProviderConfig, PidRequesterXML
-from xmlsps import xml_sps_lib
 
 User = get_user_model()
 
@@ -38,7 +38,7 @@ class PidRequester:
             dict
         """
         try:
-            xml_with_pre = xml_sps_lib.get_xml_with_pre_from_uri(xml_uri)
+            xml_with_pre = list(XMLWithPre.create(uri=xml_uri))[0]
         except Exception as e:
             return {
                 "error_msg": f"Unable to request pid for {xml_uri} {e}",
@@ -57,15 +57,23 @@ class PidRequester:
             list of dict
         """
         try:
-            for item in xml_sps_lib.get_xml_items(zip_xml_file_path):
-                xml_with_pre = item.pop("xml_with_pre")
-                registered = self.request_pid_for_xml_with_pre(
-                    xml_with_pre,
-                    item["filename"],
-                    user,
-                )
-                item.update(registered or {})
-                yield item
+            xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
+                logging.info("request_pid_for_xml_zip:")
+                try:
+                    registered = self.request_pid_for_xml_with_pre(
+                        xml_with_pre,
+                        xml_with_pre.filename,
+                        user,
+                    )
+                    registered["filename"] = xml_with_pre.filename
+                    logging.info(registered)
+                    yield registered
+                except Exception as e:
+                    logging.exception(e)
+                    yield {
+                        "error_msg": f"Unable to request pid for {zip_xml_file_path} {e}",
+                        "error_type": str(type(e)),
+                    }
         except Exception as e:
             yield {
                 "error_msg": f"Unable to request pid for {zip_xml_file_path} {e}",
@@ -149,7 +157,7 @@ class PidRequester:
                 "updated": self.updated.isoformat(),
             }
         """
-        xml_with_pre = xml_sps_lib.get_xml_with_pre_from_uri(xml_uri)
+        xml_with_pre = XMLWithPre.create(uri=xml_uri)
         return cls.is_registered_xml_with_pre(xml_with_pre)
 
     @classmethod
@@ -169,11 +177,10 @@ class PidRequester:
                 "updated": self.updated.isoformat(),
                 }
         """
-        for item in xml_sps_lib.get_xml_items(zip_xml_file_path):
-            # {"filename": item: "xml": xml}
-            registered = cls.is_registered_xml_with_pre(item["xml_with_pre"])
-            item.update(registered or {})
-            yield item
+        for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
+            registered = cls.is_registered_xml_with_pre(xml_with_pre)
+            registered["filename"] = xml_with_pre.filename
+            yield registered
 
     @classmethod
     def get_xml_uri(cls, v3):
