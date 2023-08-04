@@ -10,7 +10,7 @@ from pid_requester.models import (
     SyncFailure,
     XMLVersion,
 )
-from xmlsps.xml_sps_lib import get_xml_items
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 User = get_user_model()
 
@@ -27,7 +27,6 @@ User = get_user_model()
 
 
 class PidRequesterTest(TestCase):
-    @patch("pid_requester.controller.xml_sps_lib.get_xml_with_pre_from_uri")
     @patch("pid_requester.controller.requests.post")
     @patch("pid_requester.models.XMLVersion.save")
     @patch("pid_requester.models.PidRequesterXML.save")
@@ -40,33 +39,40 @@ class PidRequesterTest(TestCase):
         return_value="S2236-89062022061645340",
     )
     @patch("pid_requester.controller.PidProviderConfig.get_or_create")
+    @patch("pid_requester.models.XMLSPS.save")
+    @patch("pid_requester.models.XMLIssue.save")
+    @patch("pid_requester.models.XMLJournal.save")
     def test_request_pid_for_xml_zip(
         self,
+        mock_xml_journal_save,
+        mock_xml_issue_save,
+        mock_xml_sps_save,
         mock_pid_provider_config,
         mock_get_unique_v2,
         mock_get_unique_v3,
         mock_pid_requester_xml_save,
         mock_xml_version_create,
         mock_post,
-        mock_get_xml_with_pre_from_uri,
     ):
+        with open("./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml") as fp:
+            xml = fp.read()
         pid_provider_response = {
             "v3": "SJLD63mRxz9nTXtyMj7SLwk",
             "v2": "S2236-89062022061645340",
             "aop_pid": "AOPPID",
-            "xml_uri": "xml_uri",
+            "xml": xml,
             "created": "2020-01-02T00:00:00",
             "updated": "2020-01-02T00:00:00",
             "record_status": "created",
             "xml_changed": True,
         }
         # dubla a configuração de pid provider
-        mock_pid_provider_config.return_value = MagicMock(PidProviderConfig)
-        # dubla a função que retorna a árvore de XML a partir de um URI
-        xml_items = get_xml_items(
-            "./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
-        )
-        mock_get_xml_with_pre_from_uri.return_value = xml_items[0]["xml_with_pre"]
+        mock_config = MagicMock(PidProviderConfig)
+        mock_config._pid_provider_api_post_xml = "https://post_xml_uri"
+        mock_config._api_username = "username"
+        mock_config._api_password = "password"
+        mock_config._pid_provider_api_get_token = "https://get_token"
+        mock_pid_provider_config.return_value = mock_config
 
         # dubla resposta da requisição do token
         mock_get_token_response = Mock()
@@ -91,7 +97,7 @@ class PidRequesterTest(TestCase):
             user=User.objects.first(),
         )
         result = list(result)
-
+        print(result)
         self.assertEqual("SJLD63mRxz9nTXtyMj7SLwk", result[0]["v3"])
         self.assertEqual("S2236-89062022061645340", result[0]["v2"])
         self.assertIsNone(result[0]["aop_pid"])
@@ -113,8 +119,14 @@ class PidRequesterTest(TestCase):
         return_value="S2236-89062022061645340",
     )
     @patch("pid_requester.controller.PidProviderConfig.get_or_create")
+    @patch("pid_requester.models.XMLSPS.save")
+    @patch("pid_requester.models.XMLIssue.save")
+    @patch("pid_requester.models.XMLJournal.save")
     def test_request_pid_for_xml_zip_was_unable_to_get_pid_from_core(
         self,
+        mock_xml_journal_save,
+        mock_xml_issue_save,
+        mock_xml_sps_save,
         mock_pid_provider_config,
         mock_get_unique_v2,
         mock_get_unique_v3,
@@ -155,8 +167,8 @@ class PidRequesterTest(TestCase):
         self.assertIsNotNone(result[0]["error_type"])
 
     @patch("pid_requester.models.PidRequesterXML._query_document")
-    @patch("pid_requester.models.PidRequesterXML.is_equal_to", return_value=True)
-    def test_request_pid_for_xml_with_pre_do_nothing_because_it_is_already_updated(
+    @patch("pid_requester.models.PidRequesterXML.is_equal_to")
+    def test_request_pid_for_xml_with_pre_do_nothing_because_it_is_equal_and_synchronized(
         self,
         mock_is_equal,
         mock_query_document,
@@ -164,8 +176,10 @@ class PidRequesterTest(TestCase):
         # dubla o registro encontrado
         pid_requester_xml = Mock(PidRequesterXML)
         pid_requester_xml.synchronized = True
-        pid_requester_xml.data = {"v3": ""}
+        pid_requester_xml.data = {"v3": "registered_v3"}
         mock_query_document.return_value = pid_requester_xml
+
+        mock_is_equal.return_value = True
 
         pid_requester_ = PidRequester()
         result = pid_requester_.request_pid_for_xml_zip(
@@ -173,6 +187,6 @@ class PidRequesterTest(TestCase):
             user=User.objects.first(),
         )
         result = list(result)
-        self.assertDictEqual(
-            result[0], {"filename": "2236-8906-hoehnea-49-e1082020.xml", "v3": ""}
-        )
+        self.assertEqual("2236-8906-hoehnea-49-e1082020.xml", result[0]["filename"])
+        self.assertEqual("registered_v3", result[0]["v3"])
+        self.assertIsNotNone(result[0]["xml_with_pre"])
