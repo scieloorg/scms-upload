@@ -8,12 +8,13 @@ from shutil import copyfile
 from django.core.files.base import ContentFile
 from django.db import models
 from django.utils.translation import gettext as _
+from packtools.sps.pid_provider import v3_gen, xml_sps_adapter
 from wagtail.admin.panels import FieldPanel
 
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
-from pid_requester import exceptions, v3_gen, xml_sps_adapter
-from xmlsps.xml_sps_lib import get_xml_with_pre
+from pid_requester import exceptions
+from xmlsps.models import XMLSPS, XMLIssue, XMLJournal, XMLVersion, xml_directory_path
 
 LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -106,231 +107,98 @@ class PidProviderConfig(CommonControlField):
     base_form_class = CoreAdminModelForm
 
 
-class PidRequesterBadRequest(CommonControlField):
-    """
-    Tem função de guardar XML que falhou no registro
-    """
-
-    basename = models.TextField(_("Basename"), null=True, blank=True)
-    finger_print = models.CharField(max_length=65, null=True, blank=True)
-    error_type = models.TextField(null=True, blank=True)
-    error_message = models.TextField(null=True, blank=True)
-    xml = models.FileField(upload_to="bad_request")
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["basename"]),
-            models.Index(fields=["finger_print"]),
-            models.Index(fields=["error_type"]),
-            models.Index(fields=["error_message"]),
-        ]
-
-    def __unicode__(self):
-        return f"{self.basename} {self.error_type}"
-
-    def __str__(self):
-        return f"{self.basename} {self.error_type}"
+class PidRequest(CommonControlField):
+    origin = models.CharField(
+        _("Request origin"), max_length=124, null=True, blank=True
+    )
+    result_type = models.TextField(_("Result type"), null=True, blank=True)
+    result_msg = models.TextField(_("Result message"), null=True, blank=True)
+    xml_version = models.ForeignKey(
+        XMLVersion, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    detail = models.JSONField(_("Detail"), null=True, blank=True)
+    origin_date = models.CharField(
+        _("Origin date"), max_length=10, null=True, blank=True
+    )
 
     @property
     def data(self):
-        return {
-            "error_type": self.error_type,
-            "error_message": self.error_message,
-            "id": self.finger_print,
-            "filename": self.basename,
+        _data = {
+            "origin": self.origin,
+            "origin_date": self.origin_date,
+            "result_type": self.result_type,
+            "result_msg": self.result_msg,
+            "detail": self.detail,
         }
+        return _data
+
+    def __unicode__(self):
+        return f"{self.origin}"
+
+    def __str__(self):
+        return f"{self.origin}"
 
     @classmethod
-    def get_or_create(cls, creator, basename, exception, xml_adapter):
-        finger_print = xml_adapter.finger_print
+    def get(
+        cls,
+        origin=None,
+    ):
+        if origin:
+            return cls.objects.get(origin=origin)
+        raise ValueError("PidRequest.get requires parameters")
 
+    @classmethod
+    def create_or_update(
+        cls,
+        user=None,
+        origin=None,
+        result_type=None,
+        result_msg=None,
+        xml_version=None,
+        detail=None,
+        origin_date=None,
+    ):
         try:
-            obj = cls.objects.get(finger_print=finger_print)
+            obj = cls.get(origin=origin)
+            obj.updated_by = user
         except cls.DoesNotExist:
             obj = cls()
-            obj.finger_print = finger_print
+            obj.creator = user
+            obj.origin = origin
 
-        obj.xml = ContentFile(xml_adapter.tostring(), name=finger_print + ".xml")
-        obj.basename = basename
-        obj.error_type = str(type(exception))
-        obj.error_message = str(exception)
-        obj.creator = creator
+        obj.result_type = result_type or obj.result_type
+        obj.result_msg = result_msg or obj.result_msg
+        obj.xml_version = xml_version or obj.xml_version
+        obj.detail = detail or obj.detail
+        obj.origin = origin or obj.origin
+        obj.origin_date = origin_date or obj.origin_date
         obj.save()
         return obj
 
+    @classmethod
+    def register_failure(cls, e, user=None, origin=None, message=None, detail=None):
+        logging.exception(e)
+        msg = str(e)
+        if message:
+            msg = f"{msg} {message}"
+        return PidRequest.create_or_update(
+            user=user,
+            origin=origin,
+            result_type=str(type(e)),
+            result_msg=msg,
+            detail=detail,
+        )
+
     panels = [
-        FieldPanel("basename"),
-        FieldPanel("xml"),
-        FieldPanel("error_type"),
-        FieldPanel("error_message"),
+        FieldPanel("origin"),
+        FieldPanel("origin_date"),
+        FieldPanel("result_type"),
+        FieldPanel("result_msg"),
+        FieldPanel("xml_version"),
+        FieldPanel("detail"),
     ]
 
     base_form_class = CoreAdminModelForm
-
-
-class XMLJournal(models.Model):
-    """
-    Tem função de guardar os dados de Journal encontrados no XML
-    Tem objetivo de identificar o Documento (Artigo)
-    """
-
-    issn_electronic = models.CharField(
-        _("issn_epub"), max_length=9, null=True, blank=True
-    )
-    issn_print = models.CharField(_("issn_ppub"), max_length=9, null=True, blank=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["issn_electronic"]),
-            models.Index(fields=["issn_print"]),
-        ]
-
-    def __str__(self):
-        return f"{self.issn_electronic} {self.issn_print}"
-
-    @classmethod
-    def get_or_create(cls, issn_electronic, issn_print):
-        try:
-            return cls.objects.get(
-                issn_electronic=issn_electronic,
-                issn_print=issn_print,
-            )
-        except cls.DoesNotExist:
-            journal = cls()
-            journal.issn_electronic = issn_electronic
-            journal.issn_print = issn_print
-            journal.save()
-            return journal
-
-
-class XMLIssue(models.Model):
-    """
-    Tem função de guardar os dados de Issue encontrados no XML
-    Tem objetivo de identificar o Documento (Artigo)
-    """
-
-    journal = models.ForeignKey(
-        XMLJournal, on_delete=models.SET_NULL, null=True, blank=True
-    )
-    pub_year = models.CharField(_("pub_year"), max_length=4, null=True, blank=True)
-    volume = models.CharField(_("volume"), max_length=10, null=True, blank=True)
-    number = models.CharField(_("number"), max_length=10, null=True, blank=True)
-    suppl = models.CharField(_("suppl"), max_length=10, null=True, blank=True)
-
-    class Meta:
-        unique_together = [
-            ["journal", "pub_year", "volume", "number", "suppl"],
-        ]
-        indexes = [
-            models.Index(fields=["journal"]),
-            models.Index(fields=["volume"]),
-            models.Index(fields=["number"]),
-            models.Index(fields=["suppl"]),
-            models.Index(fields=["pub_year"]),
-        ]
-
-    def __str__(self):
-        return (
-            f'{self.journal} {self.volume or ""} {self.number or ""} {self.suppl or ""}'
-        )
-
-    @classmethod
-    def get_or_create(cls, journal, volume, number, suppl, pub_year):
-        try:
-            return cls.objects.get(
-                journal=journal,
-                volume=volume,
-                number=number,
-                suppl=suppl,
-                pub_year=pub_year,
-            )
-        except cls.DoesNotExist:
-            issue = cls()
-            issue.journal = journal
-            issue.volume = volume
-            issue.number = number
-            issue.suppl = suppl
-            issue.pub_year = pub_year
-            issue.save()
-            return issue
-
-
-def xml_directory_path(instance, filename):
-    # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
-    return f"xml_pid_requester/{instance.finger_print[-1]}/{instance.finger_print[-2]}/{instance.finger_print}/{filename}"
-
-
-class XMLVersion(CommonControlField):
-    """
-    Tem função de guardar a versão do XML
-    """
-
-    pid_requester_xml = models.ForeignKey(
-        "PidRequesterXML", on_delete=models.SET_NULL, null=True, blank=True
-    )
-    file = models.FileField(upload_to=xml_directory_path, null=True, blank=True)
-    finger_print = models.CharField(max_length=64, null=True, blank=True)
-    pkg_name = models.TextField(_("Name"), null=True, blank=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["finger_print"]),
-            models.Index(fields=["pid_requester_xml"]),
-        ]
-
-    def __str__(self):
-        return self.finger_print
-
-    @classmethod
-    def create(
-        cls,
-        creator,
-        pid_requester_xml,
-        pkg_name=None,
-        finger_print=None,
-        xml_content=None,
-    ):
-        logging.info(f"XMLVersion.create({pkg_name})")
-        obj = cls()
-        obj.finger_print = finger_print
-        obj.pkg_name = pkg_name
-        obj.save_file(pkg_name + ".xml", xml_content)
-        obj.creator = creator
-        obj.created = utcnow()
-        obj.save()
-
-        # salvar pid_requester_xml e salvar self para evitar exceção
-        obj.pid_requester_xml = pid_requester_xml
-        obj.save()
-        return obj
-
-    def save_file(self, name, content):
-        self.file.save(name, ContentFile(content))
-
-    @property
-    def xml_with_pre(self):
-        try:
-            return get_xml_with_pre(self.xml_content)
-        except Exception as e:
-            raise exceptions.PidRequesterXMLWithPreError(
-                _("Unable to get xml with pre (PidRequesterXML) {}: {} {}").format(
-                    self.pkg_name, type(e), e
-                )
-            )
-
-    @property
-    def xml_content(self):
-        try:
-            if self.file:
-                with self.file.open("r") as fp:
-                    return fp.read()
-            return None
-        except Exception as e:
-            raise exceptions.PidRequesterXMLContentError(
-                _("Unable to get xml content (PidRequesterXML) {}: {} {}").format(
-                    self.name, type(e), e
-                )
-            )
 
 
 class XMLRelatedItem(CommonControlField):
@@ -358,6 +226,45 @@ class XMLRelatedItem(CommonControlField):
             obj.main_doi = main_doi
             obj.creator = creator
             obj.created = utcnow()
+            obj.save()
+            return obj
+
+
+class PidChange(CommonControlField):
+    pid_type = models.CharField(_("PID type"), max_length=23, null=True, blank=True)
+    old = models.CharField(_("PID old"), max_length=23, null=True, blank=True)
+    new = models.CharField(_("PID new"), max_length=23, null=True, blank=True)
+    version = models.ForeignKey(
+        XMLVersion, null=True, blank=True, on_delete=models.SET_NULL
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["old"]),
+            models.Index(fields=["new"]),
+            models.Index(fields=["pid_type"]),
+            models.Index(fields=["version"]),
+        ]
+
+    def __str__(self):
+        return f"{self.pid_type} {self.old} -> {self.new}"
+
+    @classmethod
+    def get_or_create(cls, pid_type, old, new, version, user):
+        try:
+            return cls.objects.get(
+                pid_type=pid_type,
+                old=old,
+                new=new,
+                version=version,
+            )
+        except cls.DoesNotExist:
+            obj = cls()
+            obj.creator = user
+            obj.pid_type = pid_type
+            obj.old = old
+            obj.new = new
+            obj.version = version
             obj.save()
             return obj
 
@@ -407,6 +314,33 @@ class PidRequesterXML(CommonControlField):
     sync_failure = models.ForeignKey(
         SyncFailure, null=True, blank=True, on_delete=models.SET_NULL
     )
+
+    base_form_class = CoreAdminModelForm
+
+    panels = [
+        FieldPanel("journal"),
+        FieldPanel("issue"),
+        FieldPanel("pkg_name"),
+        FieldPanel("v3"),
+        FieldPanel("v2"),
+        FieldPanel("aop_pid"),
+        FieldPanel("main_doi"),
+        FieldPanel("elocation_id"),
+        FieldPanel("fpage"),
+        FieldPanel("fpage_seq"),
+        FieldPanel("lpage"),
+        FieldPanel("article_pub_year"),
+        FieldPanel("main_toc_section"),
+        FieldPanel("z_article_titles_texts"),
+        FieldPanel("z_surnames"),
+        FieldPanel("z_collab"),
+        FieldPanel("z_links"),
+        FieldPanel("z_partial_body"),
+        FieldPanel("current_version"),
+        FieldPanel("related_items"),
+        FieldPanel("synchronized"),
+        FieldPanel("sync_failure"),
+    ]
 
     class Meta:
         indexes = [
@@ -471,25 +405,13 @@ class PidRequesterXML(CommonControlField):
     def is_aop(self):
         return self.issue is None
 
-    def set_current_version(self, creator, pkg_name, finger_print, xml_content):
-        if (
-            not self.current_version
-            or self.current_version.finger_print != finger_print
-        ):
-            self.current_version = XMLVersion.create(
-                creator=creator,
-                pid_requester_xml=self,
-                pkg_name=pkg_name,
-                finger_print=finger_print,
-                xml_content=xml_content,
-            )
-
     @classmethod
     def register(
         cls,
         xml_with_pre,
         filename,
         user,
+        is_published=None,
         synchronized=None,
         error_msg=None,
         error_type=None,
@@ -531,7 +453,7 @@ class PidRequesterXML(CommonControlField):
             pkg_name, ext = os.path.splitext(os.path.basename(filename))
 
             # adaptador do xml with pre
-            xml_adapter = xml_sps_adapter.PidRequesterXMLAdapter(xml_with_pre)
+            xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
 
             # consulta se documento já está registrado
             registered = cls._query_document(xml_adapter)
@@ -540,39 +462,62 @@ class PidRequesterXML(CommonControlField):
             cls.evaluate_registration(xml_adapter, registered)
 
             # verfica os PIDs encontrados no XML / atualiza-os se necessário
-            xml_changed = cls._complete_pids(xml_adapter, registered)
+            changed_pids = cls._complete_pids(xml_adapter, registered)
+            if not xml_adapter.v3:
+                raise exceptions.InvalidPidError(
+                    f"Unable to register {filename}, because v3 is invalid"
+                )
 
-            xml_content = xml_adapter.tostring()
-            finger_print = xml_adapter.finger_print
+            if not xml_adapter.v2:
+                raise exceptions.InvalidPidError(
+                    f"Unable to register {filename}, because v2 is invalid"
+                )
 
+            # cria ou atualiza registro
             registered = cls._save(
                 registered,
                 xml_adapter,
                 user,
-                pkg_name,
-                xml_content,
-                finger_print,
+                changed_pids,
                 synchronized,
                 error_type,
                 error_msg,
                 traceback,
             )
+
+            # cria ou atualiza XMLSPS
+            registered._create_or_update_xmlsps(user, is_published)
+
+            # data to return
             data = registered.data.copy()
-            data["xml_changed"] = xml_changed
+            data["xml_changed"] = bool(changed_pids)
             return data
 
         except (
             exceptions.ForbiddenPidRequesterXMLRegistrationError,
             exceptions.NotEnoughParametersToGetDocumentRecordError,
             exceptions.QueryDocumentMultipleObjectsReturnedError,
+            exceptions.InvalidPidError,
         ) as e:
-            bad_request = PidRequesterBadRequest.get_or_create(
-                user,
-                filename,
+            pid_request = PidRequest.register_failure(
                 e,
-                xml_adapter,
+                user=user,
+                origin=filename,
+                detail={"xml": xml_adapter.tostring()},
             )
-            return bad_request.data
+            return pid_request.data
+
+    def _create_or_update_xmlsps(self, user, is_published):
+        XMLSPS.create_or_update(
+            pid_v3=self.v3,
+            pid_v2=self.v2,
+            aop_pid=self.aop_pid,
+            xml_journal=self.journal,
+            xml_issue=self.issue,
+            xml_version=self.current_version,
+            user=user,
+            is_published=is_published,
+        )
 
     @classmethod
     def _save(
@@ -580,9 +525,7 @@ class PidRequesterXML(CommonControlField):
         registered,
         xml_adapter,
         user,
-        pkg_name,
-        xml_content,
-        finger_print,
+        changed_pids,
         synchronized=None,
         error_type=None,
         error_msg=None,
@@ -595,27 +538,33 @@ class PidRequesterXML(CommonControlField):
             registered = cls()
             registered.creator = user
             registered.created = utcnow()
-            registered.save()
 
-        registered._add_data(xml_adapter, user, pkg_name)
+        registered._add_data(xml_adapter, user)
+        registered._add_journal(xml_adapter)
+        registered._add_issue(xml_adapter, registered.journal)
+        registered._add_current_version(xml_adapter, user)
+        registered._add_synchronization_status(error_msg, error_type, traceback, user)
+        registered.save()
 
-        registered.synchronized = synchronized
+        registered._add_pid_changes(changed_pids, user)
+        registered._add_related_items(xml_adapter, user)
+
+        registered.save()
+        return registered
+
+    def _add_synchronization_status(self, error_msg, error_type, traceback, user):
         if error_msg or error_type or traceback:
-            registered.synchronized = False
-            registered.sync_failure = SyncFailure.create(
+            self.synchronized = False
+            self.sync_failure = SyncFailure.create(
                 error_msg,
                 error_type,
                 traceback,
                 user,
             )
-        registered.set_current_version(
-            creator=user,
-            pkg_name=pkg_name,
-            finger_print=finger_print,
-            xml_content=xml_content,
-        )
-        registered.save()
-        return registered
+        else:
+            self.synchronized = True
+            if self.sync_failure:
+                self.sync_failure.delete()
 
     @classmethod
     def evaluate_registration(cls, xml_adapter, registered):
@@ -639,14 +588,7 @@ class PidRequesterXML(CommonControlField):
         self, user, xml_uri=None, error_type=None, error_msg=None, traceback=None
     ):
         logging.info("PidRequesterXML.set_synchronized")
-        self.synchronized = bool(xml_uri)
-        if error_type or error_msg or traceback:
-            self.sync_failure = SyncFailure.create(
-                error_msg,
-                error_type,
-                traceback,
-                user,
-            )
+        self._add_synchronization_status(error_type, error_msg, traceback)
         self.updated_by = user
         self.updated = utcnow()
         self.save()
@@ -672,7 +614,7 @@ class PidRequesterXML(CommonControlField):
         exceptions.QueryDocumentMultipleObjectsReturnedError
         """
         logging.info("PidRequesterXML.check_registration_demand")
-        xml_adapter = xml_sps_adapter.PidRequesterXMLAdapter(xml_with_pre)
+        xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
 
         try:
             registered = cls._query_document(xml_adapter)
@@ -721,7 +663,7 @@ class PidRequesterXML(CommonControlField):
             or
             {"error_msg": str(e), "error_type": str(type(e))}
         """
-        xml_adapter = xml_sps_adapter.PidRequesterXMLAdapter(xml_with_pre)
+        xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
         try:
             registered = cls._query_document(xml_adapter)
         except (
@@ -740,7 +682,7 @@ class PidRequesterXML(CommonControlField):
 
         Arguments
         ---------
-        xml_adapter : PidRequesterXMLAdapter
+        xml_adapter : PidProviderXMLAdapter
 
         Returns
         -------
@@ -755,22 +697,24 @@ class PidRequesterXML(CommonControlField):
         items = xml_adapter.query_list
         for params in items:
             cls.validate_query_params(params)
+            adapted_params = xml_adapter.adapt_query_params(params)
 
             try:
-                return cls.objects.get(**params)
+                return cls.objects.get(**adapted_params)
             except cls.DoesNotExist:
                 continue
             except cls.MultipleObjectsReturned as e:
                 # seria inesperado já que os dados informados devem encontrar
                 # ocorrência única ou None
-                logging.info(f"params={params} | e={e}")
+                logging.info(f"params={adapted_params} | e={e}")
                 raise exceptions.QueryDocumentMultipleObjectsReturnedError(
-                    _("Found more than one document matching to {}").format(params)
+                    _("Found more than one document matching to {}").format(
+                        adapted_params
+                    )
                 )
 
-    def _add_data(self, xml_adapter, user, pkg_name):
-        logging.info(f"PidRequesterXML._add_data {pkg_name}")
-        self.pkg_name = pkg_name
+    def _add_data(self, xml_adapter, user):
+        self.pkg_name = xml_adapter.sps_pkg_name
         self.article_pub_year = xml_adapter.article_pub_year
         self.v3 = xml_adapter.v3
         self.v2 = xml_adapter.v2
@@ -790,25 +734,47 @@ class PidRequesterXML(CommonControlField):
         self.z_links = xml_adapter.z_links
         self.z_partial_body = xml_adapter.z_partial_body
 
+    def _add_journal(self, xml_adapter):
         self.journal = XMLJournal.get_or_create(
             xml_adapter.journal_issn_electronic,
             xml_adapter.journal_issn_print,
         )
-        self.issue = None
+
+    def _add_issue(self, xml_adapter, journal):
         if xml_adapter.volume or xml_adapter.number or xml_adapter.suppl:
             self.issue = XMLIssue.get_or_create(
-                self.journal,
+                journal,
                 xml_adapter.volume,
                 xml_adapter.number,
                 xml_adapter.suppl,
                 xml_adapter.pub_year,
             )
 
-        for related in xml_adapter.related_items:
-            self._add_related_item(related["href"], user)
+    def _add_current_version(self, xml_adapter, user):
+        self.current_version = XMLVersion.get_or_create(user, xml_adapter.xml_with_pre)
 
-    def _add_related_item(self, main_doi, creator):
-        self.related_items.add(XMLRelatedItem.get_or_create(main_doi, creator))
+    def _add_related_items(self, xml_adapter, creator):
+        if xml_adapter.related_items:
+            self.save()
+        for related in xml_adapter.related_items:
+            self.related_items.add(
+                XMLRelatedItem.get_or_create(related["href"], creator)
+            )
+
+    def _add_pid_changes(self, changed_pids, user):
+        # requires registered.current_version is set
+        if not changed_pids:
+            return
+        if not self.current_version:
+            raise ValueError(
+                "PidRequesterXML._add_pid_changes requires current_version is set"
+            )
+        for change_args in changed_pids:
+            if change_args["old"]:
+                # somente registra as mudanças de um old não vazio
+                change_args["user"] = user
+                change_args["version"] = self.current_version
+                change = PidChange.get_or_create(**change_args)
 
     @classmethod
     def _get_unique_v3(cls):
@@ -872,7 +838,7 @@ class PidRequesterXML(CommonControlField):
 
         Parameters
         ----------
-        xml_adapter: PidRequesterXMLAdapter
+        xml_adapter: PidProviderXMLAdapter
         registered: XMLArticle
 
         Returns
@@ -880,17 +846,36 @@ class PidRequesterXML(CommonControlField):
         bool
 
         """
-        before = (xml_adapter.v2, xml_adapter.v3, xml_adapter.aop_pid)
+        before = dict(
+            pid_v3=xml_adapter.v3,
+            pid_v2=xml_adapter.v2,
+            aop_pid=xml_adapter.aop_pid,
+        )
 
         # adiciona os pids faltantes aos dados de entrada
         cls._add_pid_v3(xml_adapter, registered)
         cls._add_pid_v2(xml_adapter, registered)
         cls._add_aop_pid(xml_adapter, registered)
 
-        after = (xml_adapter.v2, xml_adapter.v3, xml_adapter.aop_pid)
+        after = dict(
+            pid_v3=xml_adapter.v3,
+            pid_v2=xml_adapter.v2,
+            aop_pid=xml_adapter.aop_pid,
+        )
 
         LOGGER.info("%s %s" % (before, after))
-        return before != after
+
+        changes = []
+        for k, v in before.items():
+            if v != after[k]:
+                changes.append(
+                    dict(
+                        pid_type=k,
+                        old=v,
+                        new=after[k],
+                    )
+                )
+        return changes
 
     @classmethod
     def _is_valid_pid(cls, value):
@@ -904,7 +889,7 @@ class PidRequesterXML(CommonControlField):
 
         Arguments
         ---------
-        xml_adapter: PidRequesterXMLAdapter
+        xml_adapter: PidProviderXMLAdapter
         registered: XMLArticle
         """
         if registered:
@@ -925,7 +910,7 @@ class PidRequesterXML(CommonControlField):
 
         Arguments
         ---------
-        xml_adapter: PidRequesterXMLAdapter
+        xml_adapter: PidProviderXMLAdapter
         registered: XMLArticle
         """
         if registered and registered.aop_pid:
@@ -938,7 +923,7 @@ class PidRequesterXML(CommonControlField):
 
         Arguments
         ---------
-        xml_adapter: PidRequesterXMLAdapter
+        xml_adapter: PidProviderXMLAdapter
         registered: XMLArticle
 
         """
