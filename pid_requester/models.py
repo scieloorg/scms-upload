@@ -25,34 +25,6 @@ def utcnow():
     # return datetime.utcnow().isoformat().replace("T", " ") + "Z"
 
 
-class SyncFailure(CommonControlField):
-    error_type = models.CharField(
-        _("Exception Type"), max_length=255, null=True, blank=True
-    )
-    error_msg = models.TextField(_("Exception Msg"), null=True, blank=True)
-    traceback = models.JSONField(null=True, blank=True)
-
-    @property
-    def data(self):
-        return {
-            "error_type": self.error_type,
-            "error_msg": self.error_msg,
-            "traceback": self.traceback,
-        }
-
-    @classmethod
-    def create(cls, error_msg, error_type, traceback, creator):
-        logging.info(f"SyncFailure.create {error_msg}")
-        obj = cls()
-        obj.error_msg = error_msg
-        obj.error_type = error_type
-        obj.traceback = traceback
-        obj.creator = creator
-        obj.created = utcnow()
-        obj.save()
-        return obj
-
-
 class PidProviderConfig(CommonControlField):
     """
     Tem função de guardar XML que falhou no registro
@@ -267,6 +239,34 @@ class PidChange(CommonControlField):
             obj.version = version
             obj.save()
             return obj
+
+
+class SyncFailure(CommonControlField):
+    error_type = models.CharField(
+        _("Exception Type"), max_length=255, null=True, blank=True
+    )
+    error_msg = models.TextField(_("Exception Msg"), null=True, blank=True)
+    traceback = models.JSONField(null=True, blank=True)
+
+    @property
+    def data(self):
+        return {
+            "error_type": self.error_type,
+            "error_msg": self.error_msg,
+            "traceback": self.traceback,
+        }
+
+    @classmethod
+    def create(cls, error_msg, error_type, traceback, creator):
+        logging.info(f"SyncFailure.create {error_msg}")
+        obj = cls()
+        obj.error_msg = error_msg
+        obj.error_type = error_type
+        obj.traceback = traceback
+        obj.creator = creator
+        obj.created = utcnow()
+        obj.save()
+        return obj
 
 
 class PidRequesterXML(CommonControlField):
