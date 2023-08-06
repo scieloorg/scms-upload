@@ -18,7 +18,7 @@ from core.utils.scheduler import schedule_task
 from issue.models import Issue, SciELOIssue
 from journal.models import Journal, OfficialJournal, SciELOJournal
 from scielo_classic_website import classic_ws
-from xmlsps.xml_sps_lib import XMLWithPre
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from . import exceptions
 from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
