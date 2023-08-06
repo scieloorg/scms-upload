@@ -4,7 +4,6 @@ import sys
 import traceback
 from tempfile import TemporaryDirectory
 
-import requests
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
 from packtools.sps.pid_provider.xml_sps_lib import (
@@ -16,6 +15,7 @@ from requests.auth import HTTPBasicAuth
 
 from pid_requester import exceptions
 from pid_requester.models import PidProviderConfig, PidRequesterXML
+from pid_requester.utils.requester import post_data
 
 User = get_user_model()
 
@@ -297,6 +297,7 @@ class PidProviderAPI:
                 timeout=self.timeout,
             )
             response = self._prepare_and_post_xml(xml_with_pre, name, token)
+
             self._process_post_xml_response(response, xml_with_pre)
             try:
                 return response[0]
@@ -316,22 +317,21 @@ class PidProviderAPI:
                 ],
             }
 
-    def _handle_response(self, response):
-        return response.json()
-
     def _get_token(self, username, password, timeout):
         """
         curl -X POST 127.0.0.1:8000/api-token-auth/ \
             --data 'username=x&password=x'
         """
         try:
-            response = requests.post(
+            logging.info(self.pid_provider_api_get_token)
+            resp = post_data(
                 self.pid_provider_api_get_token,
                 data={"username": username, "password": password},
                 auth=HTTPBasicAuth(username, password),
                 timeout=timeout,
+                json=True,
             )
-            resp = self._handle_response(response)
+            logging.info(resp)
             return resp.get("access")
         except Exception as e:
             # TODO tratar as exceções
@@ -381,15 +381,15 @@ class PidProviderAPI:
             "Content-Disposition": "attachment; filename=%s" % basename,
         }
         try:
-            response = requests.post(
+            logging.info(self.pid_provider_api_post_xml)
+            return post_data(
                 self.pid_provider_api_post_xml,
                 files=files,
                 headers=header,
                 timeout=timeout,
                 verify=False,
+                json=True,
             )
-            return self._handle_response(response)
-
         except Exception as e:
             logging.exception(e)
             raise exceptions.APIPidProviderPostError(
@@ -401,6 +401,7 @@ class PidProviderAPI:
             )
 
     def _process_post_xml_response(self, response, xml_with_pre):
+        logging.info(f"_process_post_xml_response: {response}")
         if not response:
             return
         for item in response:
