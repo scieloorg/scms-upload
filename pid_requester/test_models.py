@@ -8,15 +8,15 @@ from django.test import TestCase
 from lxml import etree
 
 from pid_requester import exceptions, models
-from pid_requester.xml_sps_adapter import PidRequesterXMLAdapter
-from xmlsps.xml_sps_lib import XMLWithPre, get_xml_items
+from packtools.sps.pid_provider.xml_sps_adapter import PidProviderXMLAdapter
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 User = get_user_model()
 
 
 def _get_xml_adapter_from_file(path):
-    for item in get_xml_items(path):
-        obj = PidRequesterXMLAdapter(item["xml_with_pre"])
+    for item in XMLWithPre.create(path=path):
+        obj = PidProviderXMLAdapter(item)
         return obj
 
 
@@ -28,7 +28,7 @@ def _get_xml_with_pre(xml=None):
 def _get_xml_adapter(xml=None):
     xml = xml or "<article/>"
     xml_with_pre = XMLWithPre("", etree.fromstring(xml))
-    obj = PidRequesterXMLAdapter(xml_with_pre)
+    obj = PidProviderXMLAdapter(xml_with_pre)
     return obj
 
 
@@ -221,7 +221,7 @@ class PidRequesterXMLValidateQueryParamsTest(TestCase):
 
 
 @patch(
-    "pid_requester.xml_sps_adapter.PidRequesterXMLAdapter.query_list",
+    "packtools.sps.pid_provider.xml_sps_adapter.PidProviderXMLAdapter.query_list",
     new_callable=mock.PropertyMock,
 )
 @patch(
@@ -412,8 +412,6 @@ class PidRequesterXMLEvaluateRegistrationTest(TestCase):
         registered = Mock(spec=models.PidRequesterXML)
         registered.is_aop = True
 
-        self.xml_adapter.is_aop = True
-
         result = models.PidRequesterXML.evaluate_registration(
             self.xml_adapter, registered
         )
@@ -423,7 +421,9 @@ class PidRequesterXMLEvaluateRegistrationTest(TestCase):
         registered = Mock(spec=models.PidRequesterXML)
         registered.is_aop = True
 
-        self.xml_adapter.is_aop = False
+        self.xml_adapter = _get_xml_adapter_from_file(
+        	"./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+        )
 
         result = models.PidRequesterXML.evaluate_registration(
             self.xml_adapter, registered
@@ -433,8 +433,6 @@ class PidRequesterXMLEvaluateRegistrationTest(TestCase):
     def test_evaluate_registration_raises_error(self):
         registered = Mock(spec=models.PidRequesterXML)
         registered.is_aop = False
-
-        self.xml_adapter.is_aop = True
 
         with self.assertRaises(exceptions.ForbiddenPidRequesterXMLRegistrationError):
             result = models.PidRequesterXML.evaluate_registration(
@@ -676,391 +674,35 @@ class PidRequesterXMLIsEqualToTest(TestCase):
     def test_is_equal_to_returns_true(self, mock_last_version):
         version = Mock(spec=models.XMLVersion)
         version.finger_print = (
-            "3300d3ff5406efdf74bbba5d46a8b156f99c455df7d70dedd3370433a0105ca9"
+            "fc676757308ad196fd4cebdbc6d7c1f135a68f6ed0c5d3af5f04075664ef6bb3"
         )
 
         mock_last_version.return_value = version
 
-        xml_adapter = _get_xml_adapter()
+        xml_adapter = _get_xml_adapter_from_file(
+        	"./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+        )
+        print(xml_adapter.finger_print)
 
         registered = models.PidRequesterXML()
         result = registered.is_equal_to(xml_adapter)
         self.assertTrue(result)
 
 
-@patch("pid_requester.models.PidRequesterXML.save")
-@patch("pid_requester.models.PidRequesterXML.set_current_version")
-class PidRequesterXMLPushXMLContentTest(TestCase):
-    def test_push_xml_content_results_ok(
-        self,
-        mock_set_current_version,
-        mock_save,
-    ):
-        xml_adapter = _get_xml_adapter()
-        user = User.objects.first()
-        finger_print = (
-            "3300d3ff5406efdf74bbba5d46a8b156f99c455df7d70dedd3370433a0105ca9"
-        )
-
-        registered = models.PidRequesterXML()
-        models.PidRequesterXML._save(
-            registered,
-            xml_adapter=xml_adapter,
-            user=user,
-            pkg_name="filename",
-            xml_content=None,
-            finger_print=finger_print,
-            synchronized=None,
-            error_type=None,
-            error_msg=None,
-            traceback=None,
-        )
-
-        mock_set_current_version.assert_called_with(
-            creator=user,
-            pkg_name="filename",
-            finger_print=finger_print,
-            xml_content=None,
-        )
-
-
-@patch(
-    "pid_requester.xml_sps_adapter.PidRequesterXMLAdapter.z_article_titles_texts",
-    new_callable=mock.PropertyMock(return_value="data-z_article_titles_texts"),
-)
-@patch(
-    "pid_requester.xml_sps_adapter.PidRequesterXMLAdapter.z_surnames",
-    new_callable=mock.PropertyMock(return_value="data-z_surnames"),
-)
-@patch(
-    "pid_requester.xml_sps_adapter.PidRequesterXMLAdapter.z_collab",
-    new_callable=mock.PropertyMock(return_value="data-z_collab"),
-)
-@patch(
-    "pid_requester.xml_sps_adapter.PidRequesterXMLAdapter.z_partial_body",
-    new_callable=mock.PropertyMock(return_value="data-z_partial_body"),
-)
-@patch(
-    "pid_requester.xml_sps_adapter.PidRequesterXMLAdapter.z_links",
-    new_callable=mock.PropertyMock(return_value="data-z_links"),
-)
-@patch(
-    "xmlsps.xml_sps_lib.XMLWithPre.related_items",
-    new_callable=mock.PropertyMock(
-        return_value=[{"href": "data-related-doi-1"}, {"href": "data-related-doi-2"}]
-    ),
-)
-@patch("pid_requester.models.utcnow", return_value=datetime(2020, 2, 2, 0, 0))
-@patch("pid_requester.models.PidRequesterXML.set_current_version")
-@patch("pid_requester.models.PidRequesterXML._add_related_item")
-@patch("pid_requester.models.XMLVersion.save")
-@patch("pid_requester.models.PidRequesterXML.save")
-@patch("pid_requester.models.XMLRelatedItem.save")
-@patch("pid_requester.models.XMLIssue.save")
-@patch("pid_requester.models.XMLJournal.save")
-class PidRequesterXMLAddDataTest(TestCase):
-    def test_add_data_sets_registered_aop_data(
-        self,
-        mock_journal_save,
-        mock_issue_save,
-        mock_related_save,
-        mock_pid_requester_xml_save,
-        mock_version_save,
-        mock_add_related_item,
-        mock_add_xml_version,
-        mock_now,
-        mock_related_items,
-        mock_links,
-        mock_body,
-        mock_collab,
-        mock_surnames,
-        mock_titles,
-    ):
-        user = User()
-        xml_adapter = _create_xml_adapter__aop()
-        registered = models.PidRequesterXML()
-        registered._add_data(xml_adapter, user, "data-pkg_name")
-
-        self.assertEqual("data-issn-e", registered.journal.issn_electronic)
-        self.assertEqual("data-issn-p", registered.journal.issn_print)
-
-        self.assertIsNone(registered.issue)
-
-        self.assertIsNone(registered.fpage)
-        self.assertIsNone(registered.fpage_seq)
-        self.assertIsNone(registered.lpage)
-        self.assertIsNone(registered.elocation_id)
-
-        self.assertEqual("123456789012345678901v3", registered.v3)
-        self.assertEqual("123456789012345678901v2", registered.v2)
-        self.assertEqual("12345678901234567890aop", registered.aop_pid)
-
-        self.assertEqual("data-pub-year", registered.article_pub_year)
-        self.assertEqual("data-main_doi", registered.main_doi)
-        self.assertEqual("data-main_toc_section", registered.main_toc_section)
-        self.assertEqual("data-pkg_name", registered.pkg_name)
-
-        self.assertEqual("data-z_surnames", registered.z_surnames)
-        self.assertEqual("data-z_collab", registered.z_collab)
-        self.assertEqual("data-z_links", registered.z_links)
-        self.assertEqual("data-z_partial_body", registered.z_partial_body)
-
-        expected = [
-            call("data-related-doi-1", user),
-            call("data-related-doi-2", user),
-        ]
-        self.assertEqual(
-            expected,
-            mock_add_related_item.call_args_list,
-        )
-
-    def test_add_data_sets_registered_with_issue(
-        self,
-        mock_journal_save,
-        mock_issue_save,
-        mock_related_save,
-        mock_pid_requester_xml_save,
-        mock_version_save,
-        mock_add_related_item,
-        mock_add_xml_version,
-        mock_now,
-        mock_related_items,
-        mock_links,
-        mock_body,
-        mock_collab,
-        mock_surnames,
-        mock_titles,
-    ):
-        user = User()
-        xml_adapter = _get_xml_adapter_with_issue_data()
-        registered = models.PidRequesterXML()
-        registered._add_data(xml_adapter, user, "data-pkg_name")
-
-        self.assertEqual("data-issn-e", registered.journal.issn_electronic)
-        self.assertEqual("data-issn-p", registered.journal.issn_print)
-
-        self.assertEqual("data-vol", registered.issue.volume)
-        self.assertEqual("data-num", registered.issue.number)
-        self.assertEqual("data-suppl", registered.issue.suppl)
-        self.assertEqual("data-year", registered.issue.pub_year)
-
-        self.assertEqual("data-fpage", registered.fpage)
-        self.assertEqual("data-fpage-seq", registered.fpage_seq)
-        self.assertEqual("data-lpage", registered.lpage)
-        self.assertEqual("data-elocation_id", registered.elocation_id)
-
-        self.assertEqual("123456789012345678901v3", registered.v3)
-        self.assertEqual("123456789012345678901v2", registered.v2)
-        self.assertEqual("12345678901234567890aop", registered.aop_pid)
-
-        self.assertEqual("data-pub-year", registered.article_pub_year)
-        self.assertEqual("data-main_doi", registered.main_doi)
-        self.assertEqual("data-main_toc_section", registered.main_toc_section)
-        self.assertEqual("data-pkg_name", registered.pkg_name)
-
-        self.assertEqual("data-z_surnames", registered.z_surnames)
-        self.assertEqual("data-z_collab", registered.z_collab)
-        self.assertEqual("data-z_links", registered.z_links)
-        self.assertEqual("data-z_partial_body", registered.z_partial_body)
-
-        expected = [
-            call("data-related-doi-1", user),
-            call("data-related-doi-2", user),
-        ]
-        self.assertEqual(
-            expected,
-            mock_add_related_item.call_args_list,
-        )
-
-
 @patch(
     "pid_requester.models.utcnow",
     side_effect=[datetime(2020, 2, 2, 0, 0), datetime(2020, 2, 3, 0, 0)],
 )
-@patch("pid_requester.models.PidRequesterXML.set_current_version")
-@patch("pid_requester.models.PidRequesterXML._add_data")
-@patch("pid_requester.models.PidRequesterXML.save")
-class PidRequesterXMLCreateTest(TestCase):
-    def test_save_registered_remote_file(
-        self,
-        mock_pid_requester_xml_save,
-        mock_add_data,
-        mock_set_current_version,
-        mock_now,
-    ):
-        user = User()
-        xml_adapter = _get_xml_adapter()
-        pkg_name = "filename"
-        registered = None
-
-        finger_print = (
-            "3300d3ff5406efdf74bbba5d46a8b156f99c455df7d70dedd3370433a0105ca9"
-        )
-        registered = models.PidRequesterXML._save(
-            registered,
-            xml_adapter=xml_adapter,
-            user=user,
-            pkg_name=pkg_name,
-            xml_content=None,
-            finger_print=finger_print,
-            synchronized=None,
-            error_type=None,
-            error_msg=None,
-            traceback=None,
-        )
-        self.assertEqual(datetime(2020, 2, 2, 0, 0), registered.created)
-        self.assertIs(user, registered.creator)
-        self.assertIsNone(registered.updated)
-        self.assertIsNone(registered.updated_by)
-        mock_add_data.assert_called_once_with(xml_adapter, user, "filename")
-        mock_set_current_version.assert_called_once_with(
-            creator=user,
-            pkg_name="filename",
-            finger_print=finger_print,
-            xml_content=None,
-        )
-
-    def test_save_registered_local_file(
-        self,
-        mock_pid_requester_xml_save,
-        mock_add_data,
-        mock_set_current_version,
-        mock_now,
-    ):
-        user = User()
-        xml_adapter = _get_xml_adapter()
-        pkg_name = "filename"
-        registered = None
-
-        registered = models.PidRequesterXML._save(
-            registered,
-            xml_adapter=xml_adapter,
-            user=user,
-            pkg_name=pkg_name,
-            xml_content="<root/>",
-            finger_print="fingerprint",
-            synchronized=None,
-            error_type=None,
-            error_msg=None,
-            traceback=None,
-        )
-        self.assertEqual(datetime(2020, 2, 2, 0, 0), registered.created)
-        self.assertIs(user, registered.creator)
-        self.assertIsNone(registered.updated)
-        self.assertIsNone(registered.updated_by)
-        mock_add_data.assert_called_once_with(xml_adapter, user, "filename")
-        mock_set_current_version.assert_called_once_with(
-            creator=user,
-            pkg_name="filename",
-            finger_print="fingerprint",
-            xml_content="<root/>",
-        )
-
-
-@patch("pid_requester.models.utcnow", return_value=datetime(2020, 2, 3, 0, 0))
-@patch("pid_requester.models.PidRequesterXML.set_current_version")
-@patch("pid_requester.models.PidRequesterXML._add_data")
-@patch("pid_requester.models.PidRequesterXML.save")
-class PidRequesterXMLUpdateTest(TestCase):
-    def test_save_registered_remote_file(
-        self,
-        mock_pid_requester_xml_save,
-        mock_add_data,
-        mock_set_current_version,
-        mock_now,
-    ):
-        user = User()
-        xml_adapter = _get_xml_adapter()
-        pkg_name = "filename"
-        registered = models.PidRequesterXML()
-        registered.created = datetime(2020, 2, 2, 0, 0)
-        registered.creator = user
-
-        registered = models.PidRequesterXML._save(
-            registered,
-            xml_adapter=xml_adapter,
-            user=user,
-            pkg_name=pkg_name,
-            xml_content=None,
-            finger_print=None,
-            synchronized=None,
-            error_type=None,
-            error_msg=None,
-            traceback=None,
-        )
-
-        self.assertEqual(datetime(2020, 2, 2, 0, 0), registered.created)
-        self.assertIs(user, registered.creator)
-        self.assertEqual(datetime(2020, 2, 3, 0, 0), registered.updated)
-        self.assertIs(user, registered.updated_by)
-        mock_add_data.assert_called_once_with(xml_adapter, user, "filename")
-        mock_set_current_version.assert_called_once_with(
-            creator=user,
-            pkg_name="filename",
-            finger_print=None,
-            xml_content=None,
-        )
-
-    def test_save_registered_local_file(
-        self,
-        mock_pid_requester_xml_save,
-        mock_add_data,
-        mock_set_current_version,
-        mock_now,
-    ):
-        user = User()
-        xml_adapter = _get_xml_adapter()
-        pkg_name = "filename"
-        registered = models.PidRequesterXML()
-        registered.created = datetime(2020, 2, 2, 0, 0)
-        registered.creator = user
-
-        registered = models.PidRequesterXML._save(
-            registered,
-            xml_adapter=xml_adapter,
-            user=user,
-            pkg_name=pkg_name,
-            xml_content="<root/>",
-            finger_print="fingerprint",
-            synchronized=None,
-            error_type=None,
-            error_msg=None,
-            traceback=None,
-        )
-
-        self.assertEqual(datetime(2020, 2, 2, 0, 0), registered.created)
-        self.assertIs(user, registered.creator)
-        self.assertEqual(datetime(2020, 2, 3, 0, 0), registered.updated)
-        self.assertIs(user, registered.updated_by)
-        mock_add_data.assert_called_once_with(xml_adapter, user, "filename")
-        mock_set_current_version.assert_called_once_with(
-            creator=user,
-            pkg_name="filename",
-            finger_print="fingerprint",
-            xml_content="<root/>",
-        )
-
-
-@patch(
-    "pid_requester.models.utcnow",
-    side_effect=[datetime(2020, 2, 2, 0, 0), datetime(2020, 2, 3, 0, 0)],
-)
-@patch("pid_requester.models.PidRequesterXML.set_current_version")
-@patch("pid_requester.models.PidRequesterXML._add_data")
-@patch("pid_requester.models.PidRequesterBadRequest.save")
+@patch("pid_requester.models.PidRequest.save")
 class PidRequesterXMLRegisterTest(TestCase):
     def test_register_register_bad_request_and_returns_error(
         self,
-        mock_pid_requester_xml_save,
-        mock_add_data,
-        mock_set_current_version,
+        mock_pid_request_save,
         mock_now,
     ):
         expected = {
-            "error_type": "<class 'pid_requester.exceptions.NotEnoughParametersToGetDocumentRecordError'>",
-            "error_message": "No attribute enough for disambiguations {'z_surnames': None, 'z_collab': None, 'main_doi': None, 'z_links': None, 'z_partial_body': None, 'pkg_name': None, 'elocation_id': None, 'journal__issn_print': None, 'journal__issn_electronic': None, 'article_pub_year': None, 'z_article_titles_texts': None}",
-            "id": "3300d3ff5406efdf74bbba5d46a8b156f99c455df7d70dedd3370433a0105ca9",
-            "filename": "filename.xml",
+            "result_type": "<class 'pid_requester.exceptions.NotEnoughParametersToGetDocumentRecordError'>",
+            "result_msg": "No attribute enough for disambiguations {'z_surnames': None, 'z_collab': None, 'main_doi': None, 'z_links': None, 'z_partial_body': None, 'pkg_name': None, 'elocation_id': None, 'journal__issn_print': None, 'journal__issn_electronic': None, 'article_pub_year': None, 'z_article_titles_texts': None}",
         }
 
         user = User()
@@ -1069,29 +711,31 @@ class PidRequesterXMLRegisterTest(TestCase):
             xml_with_pre=xml_with_pre,
             filename="filename.xml",
             user=user,
+            is_published=False,
             synchronized=None,
         )
-        self.assertEqual(len(result), 4)
-        self.assertEqual(expected["error_type"], result["error_type"])
-        self.assertEqual(expected["error_message"], result["error_message"])
-        self.assertEqual(expected["id"], result["id"])
-        self.assertEqual(expected["filename"], result["filename"])
+        self.assertEqual(expected["result_type"], result["result_type"])
+        self.assertIsNotNone(result["result_msg"])
 
     @patch("pid_requester.models.PidRequesterXML._is_registered_pid")
     @patch("pid_requester.models.PidRequesterXML.objects.get")
     @patch("pid_requester.models.PidRequesterXML.save")
     @patch("pid_requester.models.SyncFailure.create")
+    @patch("pid_requester.models.XMLSPS.save")
     @patch("pid_requester.models.XMLVersion.save")
+    @patch("pid_requester.models.XMLIssue.save")
+    @patch("pid_requester.models.XMLJournal.save")
     def test_register_for_xml_zip_was_unable_to_get_pid_from_core(
         self,
+        mock_xml_journal_save,
+        mock_xml_issue_save,
         mock_xml_version_save,
+        mock_xml_sps_save,
         mock_sync_failure_create,
         mock_pid_requester_xml_save,
         mock_pid_requester_xml_objects_get,
         mock_is_registered_pid,
         mock_pid_requester_bad_req_save,
-        mock_pid_requester_add_data,
-        mock_set_current_version,
         mock_now,
     ):
         # instancia os dublês
@@ -1099,16 +743,17 @@ class PidRequesterXMLRegisterTest(TestCase):
         mock_sync_failure_create.return_value = models.SyncFailure()
         mock_is_registered_pid.return_value = None
 
-        items = get_xml_items(
-            "./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+        items = XMLWithPre.create(
+            path="./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
         )
-
+        items = list(items)
         user = User.objects.first()
 
         result = models.PidRequesterXML.register(
-            xml_with_pre=items[0]["xml_with_pre"],
+            xml_with_pre=items[0],
             filename="filename.xml",
             user=user,
+            is_published=False,
             synchronized=None,
             error_type="error_type",
             error_msg="error_msg",

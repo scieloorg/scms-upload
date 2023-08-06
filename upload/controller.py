@@ -7,7 +7,7 @@ from article.controller import (
 )
 from collection.models import NewWebSiteConfiguration
 from libs.dsm.publication.db import exceptions, mk_connection
-from xmlsps.xml_sps_lib import get_xml_items_from_zip_file
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from .models import (
     ErrorResolution,
@@ -179,7 +179,7 @@ def request_pid_for_accepted_packages(user_id):
     for pkg in Package.objects.filter(
         status=choices.PS_ACCEPTED, article__isnull=True
     ).iterator():
-        for xml_item in get_xml_items_from_zip_file(pkg.file.path):
+        for xml_item in XMLWithPre.create(path=pkg.file.path):
             response = article_controller_request_pid_v3_and_create_article(
                 xml_item["xml_with_pre"],
                 xml_item["filename"],

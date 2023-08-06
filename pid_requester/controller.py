@@ -4,14 +4,18 @@ import sys
 import traceback
 from tempfile import TemporaryDirectory
 
-import requests
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
+from packtools.sps.pid_provider.xml_sps_lib import (
+    XMLWithPre,
+    create_xml_zip_file,
+    get_xml_with_pre,
+)
 from requests.auth import HTTPBasicAuth
 
 from pid_requester import exceptions
 from pid_requester.models import PidProviderConfig, PidRequesterXML
-from xmlsps import xml_sps_lib
+from pid_requester.utils.requester import post_data
 
 User = get_user_model()
 
@@ -28,7 +32,7 @@ class PidRequester:
     def __init__(self):
         self.pid_provider_api = PidProviderAPI()
 
-    def request_pid_for_xml_uri(self, xml_uri, name, user):
+    def request_pid_for_xml_uri(self, xml_uri, name, user, is_published=None):
         """
         Recebe um zip de arquivo XML para solicitar o PID da versão 3
         para o Pid Provider
@@ -38,16 +42,19 @@ class PidRequester:
             dict
         """
         try:
-            xml_with_pre = xml_sps_lib.get_xml_with_pre_from_uri(xml_uri)
+            xml_with_pre = list(XMLWithPre.create(uri=xml_uri))[0]
         except Exception as e:
+            logging.exception(e)
             return {
                 "error_msg": f"Unable to request pid for {xml_uri} {e}",
                 "error_type": str(type(e)),
             }
         else:
-            return self.request_pid_for_xml_with_pre(xml_with_pre, name, user)
+            return self.request_pid_for_xml_with_pre(
+                xml_with_pre, name, user, is_published
+            )
 
-    def request_pid_for_xml_zip(self, zip_xml_file_path, user):
+    def request_pid_for_xml_zip(self, zip_xml_file_path, user, is_published=None):
         """
         Recebe um zip de arquivo XML para solicitar o PID da versão 3
         para o Pid Provider
@@ -57,22 +64,32 @@ class PidRequester:
             list of dict
         """
         try:
-            for item in xml_sps_lib.get_xml_items(zip_xml_file_path):
-                xml_with_pre = item.pop("xml_with_pre")
-                registered = self.request_pid_for_xml_with_pre(
-                    xml_with_pre,
-                    item["filename"],
-                    user,
-                )
-                item.update(registered or {})
-                yield item
+            for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
+                logging.info("request_pid_for_xml_zip:")
+                try:
+                    registered = self.request_pid_for_xml_with_pre(
+                        xml_with_pre,
+                        xml_with_pre.filename,
+                        user,
+                        is_published,
+                    )
+                    registered["filename"] = xml_with_pre.filename
+                    logging.info(registered)
+                    yield registered
+                except Exception as e:
+                    logging.exception(e)
+                    yield {
+                        "error_msg": f"Unable to request pid for {zip_xml_file_path} {e}",
+                        "error_type": str(type(e)),
+                    }
         except Exception as e:
+            logging.exception(e)
             yield {
                 "error_msg": f"Unable to request pid for {zip_xml_file_path} {e}",
                 "error_type": str(type(e)),
             }
 
-    def request_pid_for_xml_with_pre(self, xml_with_pre, name, user):
+    def request_pid_for_xml_with_pre(self, xml_with_pre, name, user, is_published=None):
         """
         Recebe um xml_with_pre para solicitar o PID da versão 3
         para o Pid Provider
@@ -106,13 +123,14 @@ class PidRequester:
                 xml_with_pre,
                 name,
                 user,
+                is_published,
                 synchronized=bool(response.get("xml_uri")),
                 error_type=response.get("error_type"),
                 error_msg=response.get("error_msg"),
                 traceback=response.get("traceback"),
             )
-        logging.info(f"request_pid_for_xml_with_pre result: {registered}")
         registered["xml_with_pre"] = xml_with_pre
+        logging.info(f"request_pid_for_xml_with_pre result: {registered}")
         return registered
 
     @classmethod
@@ -149,7 +167,7 @@ class PidRequester:
                 "updated": self.updated.isoformat(),
             }
         """
-        xml_with_pre = xml_sps_lib.get_xml_with_pre_from_uri(xml_uri)
+        xml_with_pre = XMLWithPre.create(uri=xml_uri)
         return cls.is_registered_xml_with_pre(xml_with_pre)
 
     @classmethod
@@ -169,11 +187,10 @@ class PidRequester:
                 "updated": self.updated.isoformat(),
                 }
         """
-        for item in xml_sps_lib.get_xml_items(zip_xml_file_path):
-            # {"filename": item: "xml": xml}
-            registered = cls.is_registered_xml_with_pre(item["xml_with_pre"])
-            item.update(registered or {})
-            yield item
+        for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
+            registered = cls.is_registered_xml_with_pre(xml_with_pre)
+            registered["filename"] = xml_with_pre.filename
+            yield registered
 
     @classmethod
     def get_xml_uri(cls, v3):
@@ -225,7 +242,8 @@ class PidProviderAPI:
         if not hasattr(self, "_config") or not self._config:
             try:
                 self._config = PidProviderConfig.get_or_create()
-            except:
+            except Exception as e:
+                logging.exception(f"PidProviderConfig.get_or_create {e}")
                 self._config = None
         return self._config
 
@@ -279,12 +297,12 @@ class PidProviderAPI:
                 timeout=self.timeout,
             )
             response = self._prepare_and_post_xml(xml_with_pre, name, token)
-            if response:
-                # atualiza xml_with_pre com valor do XML registrado no core
-                xml_with_pre = xml_sps_lib.get_xml_with_pre_from_uri(
-                    response["xml_uri"]
-                )
-            return response
+
+            self._process_post_xml_response(response, xml_with_pre)
+            try:
+                return response[0]
+            except IndexError:
+                return
         except (
             exceptions.GetAPITokenError,
             exceptions.APIPidProviderPostError,
@@ -299,25 +317,25 @@ class PidProviderAPI:
                 ],
             }
 
-    def _handle_response(self, response):
-        return response.json()
-
     def _get_token(self, username, password, timeout):
         """
         curl -X POST 127.0.0.1:8000/api-token-auth/ \
             --data 'username=x&password=x'
         """
         try:
-            response = requests.post(
+            logging.info(self.pid_provider_api_get_token)
+            resp = post_data(
                 self.pid_provider_api_get_token,
                 data={"username": username, "password": password},
                 auth=HTTPBasicAuth(username, password),
                 timeout=timeout,
+                json=True,
             )
-            resp = self._handle_response(response)
+            logging.info(resp)
             return resp.get("access")
         except Exception as e:
             # TODO tratar as exceções
+            logging.exception(e)
             raise exceptions.GetAPITokenError(
                 _("Unable to get api token {} {} {} {}").format(
                     username,
@@ -332,22 +350,13 @@ class PidProviderAPI:
         name : str
             nome do arquivo xml
         """
-        if self.pid_provider_api_post_xml:
-            with TemporaryDirectory() as tmpdirname:
-                name, ext = os.path.splitext(name)
-                zip_xml_file_path = os.path.join(tmpdirname, name + ".zip")
+        with TemporaryDirectory() as tmpdirname:
+            name, ext = os.path.splitext(name)
+            zip_xml_file_path = os.path.join(tmpdirname, name + ".zip")
 
-                xml_sps_lib.create_xml_zip_file(
-                    zip_xml_file_path, xml_with_pre.tostring()
-                )
+            create_xml_zip_file(zip_xml_file_path, xml_with_pre.tostring())
 
-                response = self._post_xml(zip_xml_file_path, token, self.timeout)
-                for item in response:
-                    logging.info(f"Pid provider response: {item}")
-                    try:
-                        return item["registered"]
-                    except KeyError:
-                        return item
+            return self._post_xml(zip_xml_file_path, token, self.timeout)
 
     def _post_xml(self, zip_xml_file_path, token, timeout):
         """
@@ -372,15 +381,15 @@ class PidProviderAPI:
             "Content-Disposition": "attachment; filename=%s" % basename,
         }
         try:
-            response = requests.post(
+            logging.info(self.pid_provider_api_post_xml)
+            return post_data(
                 self.pid_provider_api_post_xml,
                 files=files,
                 headers=header,
                 timeout=timeout,
                 verify=False,
+                json=True,
             )
-            return self._handle_response(response)
-
         except Exception as e:
             logging.exception(e)
             raise exceptions.APIPidProviderPostError(
@@ -390,3 +399,21 @@ class PidProviderAPI:
                     e,
                 )
             )
+
+    def _process_post_xml_response(self, response, xml_with_pre):
+        logging.info(f"_process_post_xml_response: {response}")
+        if not response:
+            return
+        for item in response:
+            if not item.get("xml_changed"):
+                return
+            try:
+                xml_with_pre = get_xml_with_pre(item["xml"])
+            except KeyError:
+                pass
+            try:
+                # atualiza xml_with_pre com valor do XML registrado no core
+                for xml_with_pre in XMLWithPre.create(uri=item["xml_uri"]):
+                    break
+            except KeyError:
+                pass

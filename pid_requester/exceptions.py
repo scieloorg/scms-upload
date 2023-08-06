@@ -36,3 +36,7 @@ class PidRequesterXMLWithPreError(Exception):
 
 class APIPidProviderConfigError(Exception):
     ...
+
+
+class InvalidPidError(Exception):
+    ...

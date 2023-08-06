@@ -13,6 +13,7 @@ from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.models.article_assets import ArticleAssets
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre, get_xml_with_pre
 from packtools.utils import SPPackage
 from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
@@ -25,7 +26,6 @@ from doi.models import DOIWithLang
 from issue.models import Issue
 from journal.models import Journal, OfficialJournal
 from researcher.models import Researcher
-from xmlsps.xml_sps_lib import XMLWithPre, get_xml_with_pre
 
 from . import choices
 from .forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
@@ -543,7 +543,7 @@ class ArticlePackages(CommonControlField):
             )
 
     def get_xml_with_pre(self):
-        for xml_with_pre in XMLWithPre.create(self.optimised_zip_file.path):
+        for xml_with_pre in XMLWithPre.create(path=self.optimised_zip_file.path):
             return xml_with_pre
 
     def update_xml(self, xml_with_pre):
