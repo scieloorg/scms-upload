@@ -21,12 +21,17 @@ class NonRetryableError(Exception):
     """
 
 
+def _add_param(params, name, value):
+    if value:
+        params[name] = value
+
+
 @retry(
     retry=retry_if_exception_type(RetryableError),
     wait=wait_exponential(multiplier=1, min=1, max=5),
     stop=stop_after_attempt(5),
 )
-def post_data(url, files=None, headers=None, json=False, timeout=2, verify=True):
+def post_data(url, auth=None, data=None, files=None, headers=None, json=False, timeout=2, verify=True):
     """
     Post data with HTTP
     Retry: Wait 2^x * 1 second between each retry starting with 4 seconds,
@@ -42,16 +47,17 @@ def post_data(url, files=None, headers=None, json=False, timeout=2, verify=True)
     Except:
         Raise a RetryableError to retry.
     """
-
     try:
         logger.info("Posting data: %s" % url)
-        response = requests.post(
-            url,
-            files=files,
+        params = dict(
             headers=headers,
             timeout=timeout,
             verify=verify,
         )
+        _add_param(params, "auth", auth)
+        _add_param(params, "files", files)
+        _add_param(params, "data", data)
+        response = requests.post(url, **params)
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
         logger.error("Erro posting data: %s, retry..., erro: %s" % (url, exc))
         raise RetryableError(exc) from exc
