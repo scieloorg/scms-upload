@@ -7,7 +7,7 @@ from wagtail.contrib.modeladmin.options import (
 )
 from wagtail.contrib.modeladmin.views import CreateView
 
-from .models import PidRequest, PidRequesterXML, PidChange, PidProviderConfig
+from .models import PidChange, PidProviderConfig, PidRequest, PidRequesterXML
 
 
 class PidRequestCreateView(CreateView):

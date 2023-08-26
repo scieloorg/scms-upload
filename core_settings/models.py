@@ -1,6 +1,6 @@
 from django.db import models
-from wagtail.contrib.settings.models import BaseSetting, register_setting
 from wagtail.admin.panels import FieldPanel
+from wagtail.contrib.settings.models import BaseSetting, register_setting
 
 
 @register_setting

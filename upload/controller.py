@@ -1,13 +1,13 @@
 from datetime import datetime
 
 from django.shortcuts import get_object_or_404
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from article.controller import (
     request_pid_v3_and_create_article as article_controller_request_pid_v3_and_create_article,
 )
 from collection.models import NewWebSiteConfiguration
 from libs.dsm.publication.db import exceptions, mk_connection
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from .models import (
     ErrorResolution,

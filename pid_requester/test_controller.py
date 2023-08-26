@@ -2,6 +2,7 @@ from unittest.mock import ANY, MagicMock, Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from pid_requester.controller import PidRequester
 from pid_requester.models import (
@@ -10,7 +11,6 @@ from pid_requester.models import (
     SyncFailure,
     XMLVersion,
 )
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 User = get_user_model()
 
