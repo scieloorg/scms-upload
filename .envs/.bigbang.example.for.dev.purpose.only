@@ -15,13 +15,13 @@
     "secure": false
     },
 "classic_ws_config": {
-    "BASES_TRANSLATION_PATH": "/app/collection/fixtures/classic_website/bases/translation",
-    "BASES_WORK_PATH": "/app/collection/fixtures/classic_website/bases-work",
-    "BASES_PDF_PATH": "/app/collection/fixtures/classic_website/bases/pdf",
-    "HTDOCS_IMG_REVISTAS_PATH": "/app/collection/fixtures/classic_website/htdocs/img/revistas",
-    "BASES_XML_PATH": "/app/collection/fixtures/classic_website/bases/xml",
-    "title_path": "/app/collection/fixtures/classic_website/bases/title/title.id",
-    "issue_path": "/app/collection/fixtures/classic_website/bases/issue/issue.id",
-    "SERIAL_PATH": "/app/collection/fixtures/classic_website/serial"
+    "BASES_TRANSLATION_PATH": "/app/migration/fixtures/classic_website/bases/translation",
+    "BASES_WORK_PATH": "/app/migration/fixtures/classic_website/bases-work",
+    "BASES_PDF_PATH": "/app/migration/fixtures/classic_website/bases/pdf",
+    "HTDOCS_IMG_REVISTAS_PATH": "/app/migration/fixtures/classic_website/htdocs/img/revistas",
+    "BASES_XML_PATH": "/app/migration/fixtures/classic_website/bases/xml",
+    "title_path": "/app/migration/fixtures/classic_website/bases/title/title.id",
+    "issue_path": "/app/migration/fixtures/classic_website/bases/issue/issue.id",
+    "SERIAL_PATH": "/app/migration/fixtures/classic_website/serial"
     }
 }
