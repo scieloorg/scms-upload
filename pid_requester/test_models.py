@@ -6,10 +6,10 @@ from unittest.mock import ANY, MagicMock, Mock, call, patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from lxml import etree
-
-from pid_requester import exceptions, models
 from packtools.sps.pid_provider.xml_sps_adapter import PidProviderXMLAdapter
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
+
+from pid_requester import exceptions, models
 
 User = get_user_model()
 
@@ -422,7 +422,7 @@ class PidRequesterXMLEvaluateRegistrationTest(TestCase):
         registered.is_aop = True
 
         self.xml_adapter = _get_xml_adapter_from_file(
-        	"./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+            "./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
         )
 
         result = models.PidRequesterXML.evaluate_registration(
@@ -680,7 +680,7 @@ class PidRequesterXMLIsEqualToTest(TestCase):
         mock_last_version.return_value = version
 
         xml_adapter = _get_xml_adapter_from_file(
-        	"./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+            "./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
         )
         print(xml_adapter.finger_print)
 

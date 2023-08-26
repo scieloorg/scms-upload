@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_assets import ArticleAssets
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from article.choices import AS_READ_TO_PUBLISH
 from article.models import ArticlePackages
@@ -18,7 +19,6 @@ from core.utils.scheduler import schedule_task
 from issue.models import Issue, SciELOIssue
 from journal.models import Journal, OfficialJournal, SciELOJournal
 from scielo_classic_website import classic_ws
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from . import exceptions
 from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE

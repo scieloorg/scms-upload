@@ -2,6 +2,7 @@ from unittest.mock import ANY, MagicMock, Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from pid_requester.controller import PidRequester
 from pid_requester.models import (
@@ -10,7 +11,6 @@ from pid_requester.models import (
     SyncFailure,
     XMLVersion,
 )
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 User = get_user_model()
 
@@ -54,7 +54,9 @@ class PidRequesterTest(TestCase):
         mock_xml_version_create,
         mock_post,
     ):
-        with open("./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml") as fp:
+        with open(
+            "./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+        ) as fp:
             xml = fp.read()
         pid_provider_response = {
             "v3": "SJLD63mRxz9nTXtyMj7SLwk",
