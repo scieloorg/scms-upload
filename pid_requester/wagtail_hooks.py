@@ -131,7 +131,12 @@ class PidRequesterAdminGroup(ModelAdminGroup):
     menu_label = _("Pid Requester")
     menu_icon = "folder-open-inverse"  # change as required
     menu_order = 100  # will put in 3rd place (000 being 1st, 100 2nd)
-    items = (PidProviderConfigAdmin, PidRequesterXMLAdmin, PidRequestAdmin, PidChangeAdmin)
+    items = (
+        PidProviderConfigAdmin,
+        PidRequesterXMLAdmin,
+        PidRequestAdmin,
+        PidChangeAdmin,
+    )
 
 
 modeladmin_register(PidRequesterAdminGroup)

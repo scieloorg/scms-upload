@@ -29,6 +29,7 @@ def request_pid_for_file(
 
     pid_requester = PidRequester()
     for resp in pid_requester.request_pid_for_xml_zip(
-            file_path, user, is_published=is_published):
+        file_path, user, is_published=is_published
+    ):
         logging.info(resp)
     # return response

@@ -2,8 +2,12 @@ import logging
 import re
 
 import requests
-from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
-                      wait_exponential)
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 from urllib3.util import Retry
 
 logger = logging.getLogger(__name__)
@@ -31,7 +35,16 @@ def _add_param(params, name, value):
     wait=wait_exponential(multiplier=1, min=1, max=5),
     stop=stop_after_attempt(5),
 )
-def post_data(url, auth=None, data=None, files=None, headers=None, json=False, timeout=2, verify=True):
+def post_data(
+    url,
+    auth=None,
+    data=None,
+    files=None,
+    headers=None,
+    json=False,
+    timeout=2,
+    verify=True,
+):
     """
     Post data with HTTP
     Retry: Wait 2^x * 1 second between each retry starting with 4 seconds,

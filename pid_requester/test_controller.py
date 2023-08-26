@@ -54,7 +54,9 @@ class PidRequesterTest(TestCase):
         mock_xml_version_create,
         mock_post,
     ):
-        with open("./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml") as fp:
+        with open(
+            "./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+        ) as fp:
             xml = fp.read()
         pid_provider_response = {
             "v3": "SJLD63mRxz9nTXtyMj7SLwk",
