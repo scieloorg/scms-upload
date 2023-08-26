@@ -1,0 +1,945 @@
+!ID 000001
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v091!20220317
+!v092!1548
+!v093!20220317
+!v700!1
+!v701!1
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v703!34
+!v705!S
+!v706!o
+!v708!1
+!ID 000002
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^1aff1^k0000-0003-2917-5229^nMayara Costa Carneiro^rND^sRamos
+!v010!^1aff1^k0000-0002-0099-9868^nMaria Augusta Bessa^rND^sRebelo
+!v010!^1aff1^k0000-0002-7125-9082^nJanete Maria^rND^sRebelo Vieira
+!v010!^1aff2^k0000-0001-5336-1959^nLuís Fernando Bandeira^rND^sMiranda
+!v010!^1aff2^k0000-0002-7660-5685^nCinthia Pereira Machado^rND^sTabchoury
+!v010!^1aff2^k0000-0003-1046-5605^nJaime Aparecido^rND^sCury
+!v012!Fluoride toothpaste, sanitary surveillance and the SUS: the case of Manaus-AM, Brazil^len
+!v012!Dentifrício fluoretado, vigilância sanitária e o SUS: o caso de Manaus-AM^lpt
+!v014!^e9
+!v030!Rev. Saúde Pública
+!v031!56
+!v035!0034-8910
+!v038!TAB
+!v038!GRA
+!v040!en
+!v042!1
+!v049!RSP010
+!v058!Capes
+!v058!Capes
+!v060!001
+!v060!88881.200487/2018-1
+!v062!Faculdade de Saúde Pública da Universidade de São Paulo
+!v065!20220000
+!v070!Universidade Federal do Amazonas^1Faculdade de Odontologia^2Programa de Pós-Graduação em Odontologia^cManaus^iaff1^lI^pBrasil^sAM
+!v070!Universidade Estadual de Campinas^1Faculdade de Odontologia de Piracicaba^2Departamento de Biociências^cPiracicaba^iaff2^lII^pBrasil^sSP
+!v071!oa
+!v072!30
+!v083!^aABSTRACT  OBJECTIVE  To determine the anticaries potential of toothpastes distributed by the primary health care public clinics (UBS) of Manaus, AM.  METHODS  Ninety-nine tubes of toothpaste from four commercial brands were collected from October 7, 2019 to October 11, 2019 in 16 UBS. They were assigned a code by brand and source UBS. According to the information on the packaging, the four brands and their batches were formulated with sodium monofluorophosphate (Na2FPO3) and most (91%) had calcium carbonate (CaCO3) as an abrasive. We determined the concentrations of total fluoride (TF = TSF + InsF) and total soluble fluoride (TSF = F ions- or FPO32-), to certify whether they were in compliance with resolution ANVISA RDC No. 530 (maximum of 1,500 ppm TF) and whether they had anticaries potential (minimum of 1,000 ppm TSF). The analyses were performed with a ion- specific electrode.  RESULTS  The concentrations (ppm F) of TF [mean; standard deviation (SD); n] found in toothpaste brands A (1,502.3; SD = 45.6; n = 33), B (1,135.5; SD = 52.7; n = 48) and D (936.8; SD = 20.5; N = 8) were close to those stated on the package, 1,500, 1,100 and 1,000 ppm F, respectively. In toothpaste C, we found a mean of 274.1 ppm (SD = 219.7; n = 10) of TF, which diverges from the declared concentration of 1,500 ppm F. In addition, the five tubes of lot no. 11681118 of toothpaste C did not contain fluoride. Regarding TSF, with the exception of toothpaste D (937.9; SD = 40.29), the others had a lower concentration than their respective TF.  CONCLUSION  We found serious problems of quantity and quality of fluoride in toothpaste distributed by the SUS in Manaus, which shows the need for surveillance of these products and confirms the urgency of revising resolution RDC No. 530.^len
+!v083!^aRESUMO  OBJETIVO  Determinar o potencial anticárie dos dentifrícios distribuídos pelas unidades básicas de saúde (UBS) de Manaus-AM.  MÉTODOS  Noventa e nove bisnagas de dentifrícios de quatro marcas comerciais foram coletadas de 7 de outubro de 2019 a 11 de outubro de 2019 em 16 UBS, que foram codificados por marca e UBS de origem. De acordo com a embalagem, os dentifrícios das quatro marcas e seus lotes foram formulados com monofluorofosfato de sódio (Na2FPO3) e a maioria (91%) tinha carbonato de cálcio (CaCO3) como abrasivo. Foram determinadas as concentrações de fluoreto total (FT = FST + Fins) e de fluoreto solúvel total (FST = íons F- ou FPO32-), para certificar se atendiam à resolução ANVISA RDC Nº 530 (máximo de 1.500 ppm de FT) e se tinham potencial anticárie (mínimo de 1.000 ppm de FST). As análises foram feitas com eletrodo íon específico.  RESULTADOS  As concentrações (ppm F) de FT [média; desvio padrão (DP); n] encontradas nos dentifrícios A (1.502,3; DP = 45,6; n = 33), B (1.135,5; DP = 52,7; n = 48) e D (936,8; DP = 20,5; n = 8) foram próximas ao descrito na embalagem, 1.500, 1.100 e 1.000 ppm F, respectivamente. No dentifrício C, foi encontrada média de 274,1 ppm (DP = 219,7; n = 10) de FT, divergindo da concentração declarada de 1.500 ppm F. Em acréscimo, as cinco bisnagas do lote no 11681118 do dentifrício C não foram fluoretadas. Quanto ao FST, à exceção do dentifrício D (937,9; DP = 40,29), os demais apresentaram concentração inferior ao seu respectivo FT.  CONCLUSÃO  Observou-se problemas graves de quantidade e qualidade do fluoreto nos dentifrícios distribuídos pelo SUS em Manaus, mostrando a necessidade de vigilância desses produtos e ratificando a urgência da revisão da resolução ANVISA RDC Nº 530.^lpt
+!v085!^kToothpastes, supply &amp; distribution^len
+!v085!^kDentifrices, chemistry^len
+!v085!^kFluorides, standards^len
+!v085!^kDental Caries, prevention &amp; control^len
+!v085!^kDental Health Services^len
+!v085!^kCremes Dentais, provisão &amp; distribuição^lpt
+!v085!^kDentifrícios, química^lpt
+!v085!^kFluoretos, normas^lpt
+!v085!^kCárie Dentária, prevenção &amp; controle^lpt
+!v085!^kServiços de Saúde Bucal^lpt
+!v100!Revista de Saúde Pública
+!v102!Funding: Programa Nacional de Cooperação Acadêmica na Amazônia (PROCAD). Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (Capes 001 - Funding code: 88881.200487/2018-1).
+!v112!20210302
+!v114!20210428
+!v120!XML_1.1
+!v121!00207
+!v223!20220321
+!v237!10.11606/s1518-8787.2022056003636
+!v240!Universidade Estadual de Campinas^iaff2^pBR
+!v240!Universidade Federal do Amazonas^cManaus^iaff1^pBR^sAmazonas
+!v265!^kreal^sxml^v20220321
+!v265!^kexpected^sxml^v202200
+!v337!^d10.11606/s1518-8787.2022056003636^len
+!v421!Rev Saude Publica
+!v435!0034-8910^tppub
+!v435!1518-8787^tepub
+!v601!pt
+!v700!2
+!v701!1
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!h
+!v708!1
+!v709!article
+!ID 000003
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^1aff1^k0000-0003-2917-5229^nMayara Costa Carneiro^rND^sRamos
+!v010!^1aff1^k0000-0002-0099-9868^nMaria Augusta Bessa^rND^sRebelo
+!v010!^1aff1^k0000-0002-7125-9082^nJanete Maria^rND^sRebelo Vieira
+!v010!^1aff2^k0000-0001-5336-1959^nLuís Fernando Bandeira^rND^sMiranda
+!v010!^1aff2^k0000-0002-7660-5685^nCinthia Pereira Machado^rND^sTabchoury
+!v010!^1aff2^k0000-0003-1046-5605^nJaime Aparecido^rND^sCury
+!v012!Fluoride toothpaste, sanitary surveillance and the SUS: the case of Manaus-AM, Brazil^len
+!v012!Dentifrício fluoretado, vigilância sanitária e o SUS: o caso de Manaus-AM^lpt
+!v014!^e9
+!v030!Rev. Saúde Pública
+!v031!56
+!v035!0034-8910
+!v038!TAB
+!v038!GRA
+!v040!en
+!v042!1
+!v049!RSP010
+!v058!Capes
+!v058!Capes
+!v060!001
+!v060!88881.200487/2018-1
+!v062!Faculdade de Saúde Pública da Universidade de São Paulo
+!v065!20220000
+!v070!Universidade Federal do Amazonas^1Faculdade de Odontologia^2Programa de Pós-Graduação em Odontologia^cManaus^iaff1^lI^pBrasil^sAM
+!v070!Universidade Estadual de Campinas^1Faculdade de Odontologia de Piracicaba^2Departamento de Biociências^cPiracicaba^iaff2^lII^pBrasil^sSP
+!v071!oa
+!v072!30
+!v083!^a<title>ABSTRACT</title> <sec> <title>OBJECTIVE</title> <p> To determine the anticaries potential of toothpastes distributed by the primary health care public clinics (UBS) of Manaus, AM.</p></sec> <sec> <title>METHODS</title> <p> Ninety-nine tubes of toothpaste from four commercial brands were collected from October 7, 2019 to October 11, 2019 in 16 UBS. They were assigned a code by brand and source UBS. According to the information on the packaging, the four brands and their batches were formulated with sodium monofluorophosphate (Na<sub>2</sub>FPO<sub>3</sub>) and most (91%) had calcium carbonate (CaCO<sub>3</sub>) as an abrasive. We determined the concentrations of total fluoride (TF = TSF + InsF) and total soluble fluoride (TSF = F ions<sup>-</sup> or FPO<sub>3</sub><sup>2-</sup>), to certify whether they were in compliance with resolution ANVISA RDC No. 530 (maximum of 1,500 ppm TF) and whether they had anticaries potential (minimum of 1,000 ppm TSF). The analyses were performed with a ion- specific electrode.</p></sec> <sec> <title>RESULTS</title> <p> The concentrations (ppm F) of TF [mean; standard deviation (SD); n] found in toothpaste brands A (1,502.3; SD = 45.6; n = 33), B (1,135.5; SD = 52.7; n = 48) and D (936.8; SD = 20.5; N = 8) were close to those stated on the package, 1,500, 1,100 and 1,000 ppm F, respectively. In toothpaste C, we found a mean of 274.1 ppm (SD = 219.7; n = 10) of TF, which diverges from the declared concentration of 1,500 ppm F. In addition, the five tubes of lot no. 11681118 of toothpaste C did not contain fluoride. Regarding TSF, with the exception of toothpaste D (937.9; SD = 40.29), the others had a lower concentration than their respective TF.</p></sec> <sec> <title>CONCLUSION</title> <p> We found serious problems of quantity and quality of fluoride in toothpaste distributed by the SUS in Manaus, which shows the need for surveillance of these products and confirms the urgency of revising resolution RDC No. 530.</p></sec>^len
+!v083!^a<title>RESUMO</title> <sec> <title>OBJETIVO</title> <p> Determinar o potencial anticárie dos dentifrícios distribuídos pelas unidades básicas de saúde (UBS) de Manaus-AM.</p></sec> <sec> <title>MÉTODOS</title> <p> Noventa e nove bisnagas de dentifrícios de quatro marcas comerciais foram coletadas de 7 de outubro de 2019 a 11 de outubro de 2019 em 16 UBS, que foram codificados por marca e UBS de origem. De acordo com a embalagem, os dentifrícios das quatro marcas e seus lotes foram formulados com monofluorofosfato de sódio (Na<sub>2</sub>FPO<sub>3</sub>) e a maioria (91%) tinha carbonato de cálcio (CaCO<sub>3</sub>) como abrasivo. Foram determinadas as concentrações de fluoreto total (FT = FST + Fins) e de fluoreto solúvel total (FST = íons F<sup>-</sup> ou FPO<sub>3</sub><sup>2-</sup>), para certificar se atendiam à resolução ANVISA RDC Nº 530 (máximo de 1.500 ppm de FT) e se tinham potencial anticárie (mínimo de 1.000 ppm de FST). As análises foram feitas com eletrodo íon específico.</p></sec> <sec> <title>RESULTADOS</title> <p> As concentrações (ppm F) de FT [média; desvio padrão (DP); n] encontradas nos dentifrícios A (1.502,3; DP = 45,6; n = 33), B (1.135,5; DP = 52,7; n = 48) e D (936,8; DP = 20,5; n = 8) foram próximas ao descrito na embalagem, 1.500, 1.100 e 1.000 ppm F, respectivamente. No dentifrício C, foi encontrada média de 274,1 ppm (DP = 219,7; n = 10) de FT, divergindo da concentração declarada de 1.500 ppm F. Em acréscimo, as cinco bisnagas do lote n<sup>o</sup> 11681118 do dentifrício C não foram fluoretadas. Quanto ao FST, à exceção do dentifrício D (937,9; DP = 40,29), os demais apresentaram concentração inferior ao seu respectivo FT.</p></sec> <sec> <title>CONCLUSÃO</title> <p> Observou-se problemas graves de quantidade e qualidade do fluoreto nos dentifrícios distribuídos pelo SUS em Manaus, mostrando a necessidade de vigilância desses produtos e ratificando a urgência da revisão da resolução ANVISA RDC Nº 530.</p></sec>^lpt
+!v085!^kToothpastes, supply &amp; distribution^len
+!v085!^kDentifrices, chemistry^len
+!v085!^kFluorides, standards^len
+!v085!^kDental Caries, prevention &amp; control^len
+!v085!^kDental Health Services^len
+!v085!^kCremes Dentais, provisão &amp; distribuição^lpt
+!v085!^kDentifrícios, química^lpt
+!v085!^kFluoretos, normas^lpt
+!v085!^kCárie Dentária, prevenção &amp; controle^lpt
+!v085!^kServiços de Saúde Bucal^lpt
+!v100!Revista de Saúde Pública
+!v102!Funding: Programa Nacional de Cooperação Acadêmica na Amazônia (PROCAD). Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (Capes 001 - Funding code: 88881.200487/2018-1).
+!v112!20210302
+!v114!20210428
+!v120!XML_1.1
+!v121!00207
+!v223!20220321
+!v237!10.11606/s1518-8787.2022056003636
+!v240!Universidade Estadual de Campinas^iaff2^pBR
+!v240!Universidade Federal do Amazonas^cManaus^iaff1^pBR^sAmazonas
+!v265!^kreal^sxml^v20220321
+!v265!^kexpected^sxml^v202200
+!v337!^d10.11606/s1518-8787.2022056003636^len
+!v421!Rev Saude Publica
+!v435!0034-8910^tppub
+!v435!1518-8787^tepub
+!v601!pt
+!v700!3
+!v701!1
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!f
+!v708!1
+!v709!article
+!ID 000004
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^1aff1^k0000-0003-2917-5229^nMayara Costa Carneiro^rND^sRamos
+!v010!^1aff1^k0000-0002-0099-9868^nMaria Augusta Bessa^rND^sRebelo
+!v010!^1aff1^k0000-0002-7125-9082^nJanete Maria^rND^sRebelo Vieira
+!v010!^1aff2^k0000-0001-5336-1959^nLuís Fernando Bandeira^rND^sMiranda
+!v010!^1aff2^k0000-0002-7660-5685^nCinthia Pereira Machado^rND^sTabchoury
+!v010!^1aff2^k0000-0003-1046-5605^nJaime Aparecido^rND^sCury
+!v012!Fluoride toothpaste, sanitary surveillance and the SUS: the case of Manaus-AM, Brazil^len
+!v012!Dentifrício fluoretado, vigilância sanitária e o SUS: o caso de Manaus-AM^lpt
+!v014!^e9
+!v030!Rev. Saúde Pública
+!v031!56
+!v035!0034-8910
+!v038!TAB
+!v038!GRA
+!v040!en
+!v042!1
+!v049!RSP010
+!v058!Capes
+!v058!Capes
+!v060!001
+!v060!88881.200487/2018-1
+!v062!Faculdade de Saúde Pública da Universidade de São Paulo
+!v065!20220000
+!v070!Universidade Federal do Amazonas^1Faculdade de Odontologia^2Programa de Pós-Graduação em Odontologia^cManaus^iaff1^lI^pBrasil^sAM
+!v070!Universidade Estadual de Campinas^1Faculdade de Odontologia de Piracicaba^2Departamento de Biociências^cPiracicaba^iaff2^lII^pBrasil^sSP
+!v071!oa
+!v072!30
+!v083!^a<title>ABSTRACT</title> <sec> <title>OBJECTIVE</title> <p> To determine the anticaries potential of toothpastes distributed by the primary health care public clinics (UBS) of Manaus, AM.</p></sec> <sec> <title>METHODS</title> <p> Ninety-nine tubes of toothpaste from four commercial brands were collected from October 7, 2019 to October 11, 2019 in 16 UBS. They were assigned a code by brand and source UBS. According to the information on the packaging, the four brands and their batches were formulated with sodium monofluorophosphate (Na<sub>2</sub>FPO<sub>3</sub>) and most (91%) had calcium carbonate (CaCO<sub>3</sub>) as an abrasive. We determined the concentrations of total fluoride (TF = TSF + InsF) and total soluble fluoride (TSF = F ions<sup>-</sup> or FPO<sub>3</sub><sup>2-</sup>), to certify whether they were in compliance with resolution ANVISA RDC No. 530 (maximum of 1,500 ppm TF) and whether they had anticaries potential (minimum of 1,000 ppm TSF). The analyses were performed with a ion- specific electrode.</p></sec> <sec> <title>RESULTS</title> <p> The concentrations (ppm F) of TF [mean; standard deviation (SD); n] found in toothpaste brands A (1,502.3; SD = 45.6; n = 33), B (1,135.5; SD = 52.7; n = 48) and D (936.8; SD = 20.5; N = 8) were close to those stated on the package, 1,500, 1,100 and 1,000 ppm F, respectively. In toothpaste C, we found a mean of 274.1 ppm (SD = 219.7; n = 10) of TF, which diverges from the declared concentration of 1,500 ppm F. In addition, the five tubes of lot no. 11681118 of toothpaste C did not contain fluoride. Regarding TSF, with the exception of toothpaste D (937.9; SD = 40.29), the others had a lower concentration than their respective TF.</p></sec> <sec> <title>CONCLUSION</title> <p> We found serious problems of quantity and quality of fluoride in toothpaste distributed by the SUS in Manaus, which shows the need for surveillance of these products and confirms the urgency of revising resolution RDC No. 530.</p></sec>^len
+!v083!^a<title>RESUMO</title> <sec> <title>OBJETIVO</title> <p> Determinar o potencial anticárie dos dentifrícios distribuídos pelas unidades básicas de saúde (UBS) de Manaus-AM.</p></sec> <sec> <title>MÉTODOS</title> <p> Noventa e nove bisnagas de dentifrícios de quatro marcas comerciais foram coletadas de 7 de outubro de 2019 a 11 de outubro de 2019 em 16 UBS, que foram codificados por marca e UBS de origem. De acordo com a embalagem, os dentifrícios das quatro marcas e seus lotes foram formulados com monofluorofosfato de sódio (Na<sub>2</sub>FPO<sub>3</sub>) e a maioria (91%) tinha carbonato de cálcio (CaCO<sub>3</sub>) como abrasivo. Foram determinadas as concentrações de fluoreto total (FT = FST + Fins) e de fluoreto solúvel total (FST = íons F<sup>-</sup> ou FPO<sub>3</sub><sup>2-</sup>), para certificar se atendiam à resolução ANVISA RDC Nº 530 (máximo de 1.500 ppm de FT) e se tinham potencial anticárie (mínimo de 1.000 ppm de FST). As análises foram feitas com eletrodo íon específico.</p></sec> <sec> <title>RESULTADOS</title> <p> As concentrações (ppm F) de FT [média; desvio padrão (DP); n] encontradas nos dentifrícios A (1.502,3; DP = 45,6; n = 33), B (1.135,5; DP = 52,7; n = 48) e D (936,8; DP = 20,5; n = 8) foram próximas ao descrito na embalagem, 1.500, 1.100 e 1.000 ppm F, respectivamente. No dentifrício C, foi encontrada média de 274,1 ppm (DP = 219,7; n = 10) de FT, divergindo da concentração declarada de 1.500 ppm F. Em acréscimo, as cinco bisnagas do lote n<sup>o</sup> 11681118 do dentifrício C não foram fluoretadas. Quanto ao FST, à exceção do dentifrício D (937,9; DP = 40,29), os demais apresentaram concentração inferior ao seu respectivo FT.</p></sec> <sec> <title>CONCLUSÃO</title> <p> Observou-se problemas graves de quantidade e qualidade do fluoreto nos dentifrícios distribuídos pelo SUS em Manaus, mostrando a necessidade de vigilância desses produtos e ratificando a urgência da revisão da resolução ANVISA RDC Nº 530.</p></sec>^lpt
+!v085!^kToothpastes, supply &amp; distribution^len
+!v085!^kDentifrices, chemistry^len
+!v085!^kFluorides, standards^len
+!v085!^kDental Caries, prevention &amp; control^len
+!v085!^kDental Health Services^len
+!v085!^kCremes Dentais, provisão &amp; distribuição^lpt
+!v085!^kDentifrícios, química^lpt
+!v085!^kFluoretos, normas^lpt
+!v085!^kCárie Dentária, prevenção &amp; controle^lpt
+!v085!^kServiços de Saúde Bucal^lpt
+!v100!Revista de Saúde Pública
+!v102!Funding: Programa Nacional de Cooperação Acadêmica na Amazônia (PROCAD). Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (Capes 001 - Funding code: 88881.200487/2018-1).
+!v112!20210302
+!v114!20210428
+!v120!XML_1.1
+!v121!00207
+!v223!20220321
+!v237!10.11606/s1518-8787.2022056003636
+!v240!Universidade Estadual de Campinas^iaff2^pBR
+!v240!Universidade Federal do Amazonas^cManaus^iaff1^pBR^sAmazonas
+!v265!^kreal^sxml^v20220321
+!v265!^kexpected^sxml^v202200
+!v337!^d10.11606/s1518-8787.2022056003636^len
+!v421!Rev Saude Publica
+!v435!0034-8910^tppub
+!v435!1518-8787^tepub
+!v601!pt
+!v700!4
+!v701!1
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!l
+!v708!1
+!v709!article
+!ID 000005
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nD^rND^sBratthall
+!v010!^nG^rND^sHänsel-Petersson
+!v010!^nH^rND^sSundberg
+!v012!Reasons for the caries decline: what do the experts believe?
+!v014!416-22
+!v030!Eur J Oral Sci
+!v031!104
+!v032!4
+!v037!https://doi.org/10.1111/j.1600-0722.1996.tb00104.x
+!v061!Pt 2
+!v064!1996
+!v065!19960000
+!v071!journal
+!v118!1
+!v514!^f416^l422
+!v700!5
+!v701!1
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000006
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nJA^rND^sCury
+!v010!^nLMA^rND^sTenuta
+!v010!^nCCC^rND^sRibeiro
+!v010!^nAF^rND^sPaes Leme
+!v012!The importance of fluoride dentifrices to the current dental caries prevalence in Brazil
+!v014!167-74
+!v030!Braz Dent J
+!v031!15
+!v032!3
+!v037!https://doi.org/10.1590/s0103-64402004000300001
+!v061!https://doi.org/10.1590/s0103-64402004000300001
+!v064!2004
+!v065!20040000
+!v071!journal
+!v118!2
+!v514!^f167^l174
+!v700!6
+!v701!2
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000007
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nJA^rND^sCury
+!v010!^nLMA^rND^sTenuta
+!v012!Evidence-based recommendation on toothpaste use
+!v014!1-7
+!v030!Braz Oral Res
+!v031!28
+!v032!Spec
+!v037!https://doi.org/10.1590/S1806-83242014.50000001
+!v061!https://doi.org/10.1590/S1806-83242014.50000001
+!v064!2014
+!v065!20140000
+!v071!journal
+!v118!3
+!v514!^f1^l7
+!v700!7
+!v701!3
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000008
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nLMA^rND^sTenuta
+!v010!^nJA^rND^sCury
+!v012!Laboratory and human studies to estimate anticaries efficacy of fluoride toothpastes
+!v014!108-24
+!v030!Monogr Oral Sci
+!v031!23
+!v037!https://doi.org/10.1159/000350479
+!v061!https://doi.org/10.1159/000350479
+!v064!2013
+!v065!20130000
+!v071!journal
+!v118!4
+!v514!^f108^l124
+!v700!8
+!v701!4
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000009
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nGK^rND^sStookey
+!v012!Are all fluoride dentifrices the same?
+!v014!105-31
+!v016!^nSH^rND^sWei
+!v018!Clinical uses of fluorides
+!v062!Lea &amp; Febiger
+!v064!1985
+!v065!19850000
+!v066!Philadelphia, PA
+!v071!book
+!v118!5
+!v514!^f105^l131
+!v700!9
+!v701!5
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000010
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nCSS^rND^sCoelho
+!v010!^nJA^rND^sCury
+!v010!^nCPM^rND^sTabchoury
+!v012!Chemically soluble fluoride in Na2FPO3/CaCO3-based toothpaste as an indicator of fluoride bioavailability in saliva during and after toothbrushing
+!v014!185-93
+!v030!Caries Res
+!v031!54
+!v032!2
+!v037!https://doi.org/10.1159/000506439
+!v061!https://doi.org/10.1159/000506439
+!v064!2020
+!v065!20200000
+!v071!journal
+!v118!6
+!v514!^f185^l193
+!v700!10
+!v701!6
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000011
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nVC^rND^sMarinho
+!v010!^nJP^rND^sHiggins
+!v010!^nA^rND^sSheiham
+!v010!^nS^rND^sLogan
+!v012!Fluoride toothpastes for preventing dental caries in children and adolescents
+!v020!CD002278^upages
+!v030!Cochrane Database Syst Rev
+!v032!1
+!v037!https://doi.org/10.1002/14651858.CD002278
+!v061!https://doi.org/10.1002/14651858.CD002278
+!v064!2003
+!v065!20030000
+!v071!journal
+!v118!7
+!v700!11
+!v701!7
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000012
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nT^rND^sWalsh
+!v010!^nHV^rND^sWorthington
+!v010!^nAM^rND^sGlenny
+!v010!^nVCC^rND^sMarinho
+!v010!^nA^rND^sJeroncic
+!v012!Fluoride toothpastes of different concentrations for preventing dental caries
+!v020!CD007868^upages
+!v030!Cochrane Database Syst Rev
+!v031!3
+!v032!3
+!v037!https://doi.org/10.1002/14651858.CD007868.pub3
+!v061!https://doi.org/10.1002/14651858.CD007868.pub3
+!v064!2019
+!v065!20190000
+!v071!journal
+!v118!8
+!v700!12
+!v701!8
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000013
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nAPP^rND^sSantos
+!v010!^nP^rND^sNadanovsky
+!v010!^nBH^rND^sOliveira
+!v012!A systematic review and meta-analysis of the effects of fluoride toothpastes on the prevention of dental caries in the primary dentition of preschool children
+!v014!1-12
+!v030!Community Dent Oral Epidemiol
+!v031!41
+!v032!1
+!v037!https://doi.org/10.1111/j.1600-0528.2012.00708.x
+!v061!https://doi.org/10.1111/j.1600-0528.2012.00708.x
+!v064!2013
+!v065!20130000
+!v071!journal
+!v118!9
+!v514!^f1^l12
+!v700!13
+!v701!9
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000014
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nCH^rND^sSplieth
+!v010!^nA^rND^sBanerjee
+!v010!^nP^rND^sBottenberg
+!v010!^nL^rND^sBreschi
+!v010!^nG^rND^sCampus
+!v010!^nKR^rND^sEkstrand
+!v012!How to intervene in the caries process in children: A Joint ORCA and EFCD Expert Delphi Consensus Statement
+!v014!297-305
+!v030!Caries Res
+!v031!54
+!v032!4
+!v037!https://doi.org/10.1159/000507692
+!v061!https://doi.org/10.1159/000507692
+!v064!2020
+!v065!20200000
+!v071!journal
+!v118!10
+!v514!^f297^l305
+!v700!14
+!v701!10
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v810!et al
+!v865!20220000
+!ID 000015
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nJA^rND^sCury
+!v010!^nLFB^rND^sMiranda
+!v010!^nPG^rND^sCaldarelli
+!v010!^nCPM^rND^sTabchoury
+!v012!Dentifrícios fluoretados e o SUS-Brasil: o que precisa ser mudado?
+!v014!9-27
+!v030!Tempus Actas Saude Coletiva
+!v031!14
+!v032!1
+!v037!https://doi.org/10.18569/tempus.v14i1.2631
+!v061!https://doi.org/10.18569/tempus.v14i1.2631
+!v064!2020
+!v065!20200000
+!v071!journal
+!v118!11
+!v514!^f9^l27
+!v700!15
+!v701!11
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000016
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nAP^rND^sRicomini Filho
+!v010!^nLMA^rND^sTenuta
+!v010!^nFSF^rND^sFernandes
+!v010!^nAFB^rND^sCalvo
+!v010!^nSC^rND^sKusano
+!v010!^nJA^rND^sCury
+!v012!Fluoride concentration in the top-selling Brazilian toothpastes purchased at different regions
+!v014!45-8
+!v030!Braz Dent J
+!v031!23
+!v032!1
+!v037!https://doi.org/10.1590/s0103-64402012000100008
+!v061!https://doi.org/10.1590/s0103-64402012000100008
+!v064!2012
+!v065!20120000
+!v071!journal
+!v118!12
+!v514!^f45^l48
+!v700!16
+!v701!12
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000017
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nJA^rND^sCury
+!v010!^nEDV^rND^sDantas
+!v010!^nLMA^rND^sTenuta
+!v010!^nDA^rND^sRomão
+!v010!^nCPM^rND^sTabchoury
+!v010!^nDF^rND^sNóbrega
+!v012!Concentração de fluoreto nos dentifrícios a base de MFP/CaCO3 mais vendidos no Brasil, ao final dos seus prazos de validade
+!v014!248-51
+!v030!Rev Assoc Paul Cir Dent
+!v031!69
+!v032!3
+!v064!2015
+!v065!20150000
+!v071!journal
+!v118!13
+!v514!^f248^l251
+!v700!17
+!v701!13
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v810!et al
+!v865!20220000
+!ID 000018
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nAS^rND^sGoldman
+!v010!^nR^rND^sYee
+!v010!^nCJ^rND^sHolmgren
+!v010!^nH^rND^sBenzian
+!v012!Global affordability of fluoride toothpaste
+!v020!7^upages
+!v030!Global Health
+!v031!4
+!v037!https://doi.org/10.1186/1744-8603-4-7
+!v061!https://doi.org/10.1186/1744-8603-4-7
+!v064!2008
+!v065!20080000
+!v071!journal
+!v118!14
+!v700!18
+!v701!14
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000019
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v017!Ministério da Saúde (BR)
+!v017!Agência Nacional de Vigilância Sanitária
+!v018!RDC Nº 530, de 4 de agosto de 2021. Publicado em: 11/08/2021 | Edição: 151 | Seção: 1 | Página: 119
+!v071!report
+!v118!15
+!v700!19
+!v701!15
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000020
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v017!MERCOSUL
+!v018!MERCOSUL/GMC/RES Nº 48/02. Regulamento técnico MERCOSUL sobre lista de substâncias que os produtos de higiene pessoal, cosméticos e perfumes não devem conter, exceto nas condições e com as restrições estabelecidas
+!v037!http://www.sice.oas.org/trade/mrcsrs/resolutions/res4802p.as
+!v061!http://www.sice.oas.org/trade/mrcsrs/resolutions/res4802p.as
+!v062!Sistema de Informação do Comércio Exterior
+!v064!2002
+!v065!20020000
+!v066!Brasília (DF)
+!v071!report
+!v118!16
+!v700!20
+!v701!16
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000021
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v017!European Union
+!v017!Statutory Instruments
+!v018!Consumer Protection: The Cosmetic Products (Safety) Regulations 2008: Nº 1284
+!v037!http://www.legislation.gov.uk/uksi/2008/1284/pdfs/uksi_20081284_en.pdf
+!v061!http://www.legislation.gov.uk/uksi/2008/1284/pdfs/uksi_20081284_en.pdf
+!v062!Stationery Office
+!v064!2008
+!v065!20080000
+!v066!London (UK
+!v071!webpage
+!v118!17
+!v700!21
+!v701!17
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000022
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nJA^rND^sCury
+!v010!^nPG^rND^sCaldarelli
+!v010!^nLMA^rND^sTenuta
+!v012!Necessity to review the Brazilian regulation about fluoride toothpastes
+!v020!74^upages
+!v030!Rev Saude Publica
+!v031!49
+!v037!https://doi.org/10.1590/S0034-8910.2015049005768
+!v061!https://doi.org/10.1590/S0034-8910.2015049005768
+!v064!2015
+!v065!20150000
+!v071!journal
+!v118!18
+!v700!22
+!v701!18
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000023
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nBA^rND^sChávez
+!v010!^nGB^rND^sVergel
+!v010!^nCP^rND^sCáceres
+!v010!^nMF^rND^sPerazzo
+!v010!^nRG^rND^sVieira-Andrade
+!v010!^nJA^rND^sCury
+!v012!Fluoride content in children&#8217;s dentifrices marketed in Lima, Peru
+!v030!Braz Oral Res
+!v031!33
+!v037!https://doi.org/10.1590/1807-3107bor-2019.vol33.0051
+!v061!https://doi.org/10.1590/1807-3107bor-2019.vol33.0051
+!v064!2019
+!v065!20190000
+!v071!journal
+!v118!19
+!v514!^ee051
+!v700!23
+!v701!19
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000024
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nJA^rND^sCury
+!v010!^nMJL^rND^sOliveira
+!v010!^nCC^rND^sMartins
+!v010!^nLMA^rND^sTenuta
+!v010!^nSM^rND^sPaiva
+!v012!Available fluoride in toothpastes used by Brazilian children
+!v014!396-400
+!v030!Braz Dent J
+!v031!21
+!v032!5
+!v037!https://doi.org/10.1590/s0103-64402010000500003
+!v061!https://doi.org/10.1590/s0103-64402010000500003
+!v064!2010
+!v065!20100000
+!v071!journal
+!v118!20
+!v514!^f396^l400
+!v700!24
+!v701!20
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000025
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nEA^rND^sMartinez-Mier
+!v010!^nLMA^rND^sTenuta
+!v010!^nCM^rND^sCarey
+!v010!^nJA^rND^sCury
+!v010!^nC^rND^sLoveren
+!v010!^nKR^rND^sEkstrand
+!v011!ORCA Fluoride in Toothpaste Analysis Work Group
+!v012!European Organization for Caries Research Workshop: methodology for determination of potentially available fluoride in toothpastes
+!v014!119-36
+!v030!Caries Res
+!v031!53
+!v032!2
+!v037!https://doi.org/10.1159/000490196
+!v061!https://doi.org/10.1159/000490196
+!v064!2019
+!v065!20190000
+!v071!journal
+!v118!21
+!v514!^f119^l136
+!v700!25
+!v701!21
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v810!et al
+!v865!20220000
+!ID 000026
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nNJ^rND^sKassebaum
+!v010!^nAGC^rND^sSmith
+!v010!^nE^rND^sBernabé
+!v010!^nTD^rND^sFleming
+!v010!^nAE^rND^sReynolds
+!v010!^nT^rND^sVos
+!v011!GBD 2015 Oral Health Collaborators
+!v012!Global, Regional, and National Prevalence, Incidence, and Disability-Adjusted Life Years for Oral Conditions for 195 Countries, 1990-2015: a systematic analysis for the global burden of diseases, injuries, and risk factors
+!v014!380-7
+!v030!J Dent Res
+!v031!96
+!v032!4
+!v037!https://doi.org/10.1177/0022034517693566
+!v061!https://doi.org/10.1177/0022034517693566
+!v064!2017
+!v065!20170000
+!v071!journal
+!v118!22
+!v514!^f380^l387
+!v700!26
+!v701!22
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v810!et al
+!v865!20220000
+!ID 000027
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nLM^rND^sMarin
+!v010!^nW^rND^sVieira
+!v010!^nLMA^rND^sTenuta
+!v010!^nCOM^rND^sTabchoury
+!v010!^nJA^rND^sCury
+!v012!Fluoride concentration in local dentifrices from Brazilian regions
+!v014!60-5
+!v030!Rev Assoc Paul Cir Dent
+!v031!71
+!v032!1
+!v064!2017
+!v065!20170000
+!v071!journal
+!v118!23
+!v514!^f60^l65
+!v700!27
+!v701!23
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000028
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nJLF^rND^sAntunes
+!v010!^nPC^rND^sNarvai
+!v012!Políticas de saúde bucal no Brasil e seu impacto sobre as desigualdades em saúde
+!v014!360-5
+!v030!Rev Saude Publica
+!v031!44
+!v032!2
+!v037!https://doi.org/10.1590/S0034-89102010005000002
+!v061!https://doi.org/10.1590/S0034-89102010005000002
+!v064!2010
+!v065!20100000
+!v071!journal
+!v118!24
+!v514!^f360^l365
+!v700!28
+!v701!24
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000029
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nRA^rND^sGiacaman
+!v010!^nCA^rND^sCarrera
+!v010!^nC^rND^sMuñoz-Sandoval
+!v010!^nC^rND^sFernandez
+!v010!^nJA^rND^sCury
+!v012!Fluoride content in toothpastes commercialized for children in Chile and discussion on professional recommendations of use
+!v014!77-83
+!v030!Int J Paediatr Dent
+!v031!23
+!v032!2
+!v037!https://doi.org/10.1111/j.1365-263X.2012.01226.x
+!v061!https://doi.org/10.1111/j.1365-263X.2012.01226.x
+!v064!2013
+!v065!20130000
+!v071!journal
+!v118!25
+!v514!^f77^l83
+!v700!29
+!v701!25
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000030
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nH^rND^sBenzian
+!v010!^nC^rND^sHolmgren
+!v010!^nM^rND^sBuijs
+!v010!^nC^rND^sLoveren
+!v010!^nF^rND^sWeijden
+!v010!^nW^rND^sPalenstein Helderman
+!v012!Total and free available fluoride in toothpastes in Brunei, Cambodia, Laos, the Netherlands and Suriname
+!v014!213-21
+!v030!Int Dent J
+!v031!62
+!v032!4
+!v037!https://doi.org/10.1111/j.1875-595X.2012.00116.x
+!v061!https://doi.org/10.1111/j.1875-595X.2012.00116.x
+!v064!2012
+!v065!20120000
+!v071!journal
+!v118!26
+!v514!^f213^l221
+!v700!30
+!v701!26
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000031
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v010!^nCE^rND^sFernández
+!v010!^nCA^rND^sCarrera
+!v010!^nC^rND^sMuñoz-Sandoval
+!v010!^nJA^rND^sCury
+!v010!^nRA^rND^sGiacaman
+!v012!Stability of chemically available fluoride in Chilean toothpastes
+!v014!496-505
+!v030!Int J Paediatr Dent
+!v031!27
+!v032!6
+!v037!https://doi.org/10.1111/ipd.12288
+!v061!https://doi.org/10.1111/ipd.12288
+!v064!2017
+!v065!20170000
+!v071!journal
+!v118!27
+!v514!^f496^l505
+!v700!31
+!v701!27
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000032
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v017!US Food and Drug Administration
+!v017!CFR &#8211; Code of Federal Regulations
+!v018!Title 21: Food and drugs. Washington (DC): FDA; 2013 [cited 2019 Feb 20]. Chapter I, Food and Drug Administration Department of Health and Human Services, Subchapter D, Drugs from human use (part 355): anticaries drugs products for over the counter human use
+!v037!https://www.govinfo.gov/content/pkg/CFR-2013-title21-vol5/pdf/CFR-2013-title21-vol5-chapI.pdf
+!v061!https://www.govinfo.gov/content/pkg/CFR-2013-title21-vol5/pdf/CFR-2013-title21-vol5-chapI.pdf
+!v071!webpage
+!v118!28
+!v700!32
+!v701!28
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000033
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v017!Bureau des Normes de Madagascar
+!v018!Norme Malagasy. NMG/ISO 11609:2017. Medecine bucco-dentaire &#8211; dentifrices: exigences, methodes d&#8217;essai et marquage
+!v037!http://blog.aoi-fr.org/wp-content/uploads/2018/11/Normes-Dentifrice-Madagascra-aout-2018.pdf
+!v061!http://blog.aoi-fr.org/wp-content/uploads/2018/11/Normes-Dentifrice-Madagascra-aout-2018.pdf
+!v062!BNM
+!v064!2018
+!v065!20180000
+!v066!Madagascar
+!v071!webpage
+!v118!29
+!v700!33
+!v701!29
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
+!ID 000034
+!v002!1518-8787-rsp-56-9.xml
+!v004!v56
+!v017!FDI World Dental Federation
+!v018!Promoting dental health through fluoride toothpaste
+!v037!https://www.fdiworlddental.org/resources/policy-statements/promoting-dental-health-through-fluoride-toothpaste
+!v061!https://www.fdiworlddental.org/resources/policy-statements/promoting-dental-health-through-fluoride-toothpaste
+!v062!FDI
+!v064!2018
+!v065!20180000
+!v066!Geneva (CH)
+!v071!webpage
+!v118!30
+!v700!34
+!v701!30
+!v702!rsp/v56/1518-8787-rsp-56-9.xml
+!v705!S
+!v706!c
+!v708!30
+!v865!20220000
