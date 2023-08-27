@@ -1,12 +1,22 @@
+import logging
+
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from config import celery_app
-from migration.models import MigratedIssue
+from migration.models import MigratedDocument, MigratedIssue
 
 from . import controller
-from .choices import MS_IMPORTED, MS_PUBLISHED, MS_TO_IGNORE
+from .choices import (
+    MS_IMPORTED,
+    MS_MISSING_ASSETS,
+    MS_PUBLISHED,
+    MS_TO_IGNORE,
+    MS_TO_MIGRATE,
+    MS_XML_WIP,
+    MS_XML_WIP_AND_MISSING_ASSETS,
+)
 
 User = get_user_model()
 
@@ -36,6 +46,7 @@ def task_migrate_journal_records(
     force_update=False,
 ):
     user = _get_user(self.request, username)
+    # migra registros da base de dados title
     controller.migrate_journal_records(
         user,
         collection_acron,
@@ -43,64 +54,81 @@ def task_migrate_journal_records(
     )
 
 
-@celery_app.task(bind=True, name="migrate_issue_records_and_files")
-def task_migrate_issue_records_and_files(
+@celery_app.task(bind=True, name="migrate_issue_records")
+def task_migrate_issue_records(
     self,
     username,
     collection_acron,
     force_update=False,
 ):
     user = _get_user(self.request, username)
-    controller.migrate_issue_records_and_files(
+    # migra registros da base de dados issue
+    controller.migrate_issue_records(
         user,
         collection_acron,
         force_update,
     )
 
 
-@celery_app.task(bind=True, name="migrate_set_of_issue_files")
-def task_migrate_set_of_issue_files(
+@celery_app.task(bind=True, name="migrate_document_files_and_records")
+def task_migrate_document_files_and_records(
     self,
     username,
     collection_acron,
-    scielo_issn=None,
+    journal_acron=None,
     publication_year=None,
     force_update=False,
 ):
     user = _get_user(self.request, username)
 
     params = {"migrated_journal__scielo_journal__collection__acron": collection_acron}
-    if scielo_issn:
-        params["migrated_journal__scielo_journal__scielo_issn"] = scielo_issn
+    if journal_acron:
+        params["migrated_journal__scielo_journal__acron"] = journal_acron
     if publication_year:
         params["scielo_issue__official_issue__publication_year"] = publication_year
 
-    items = MigratedIssue.objects.filter(
-        Q(status=MS_PUBLISHED) | Q(status=MS_IMPORTED),
-        **params,
-    )
+    if force_update:
+        items = MigratedIssue.objects.filter(
+            Q(status=MS_TO_MIGRATE) | Q(status=MS_IMPORTED), **params
+        )
+    else:
+        items = MigratedIssue.objects.filter(Q(status=MS_TO_MIGRATE), **params)
+    logging.info(params)
     for migrated_issue in items.iterator():
-        task_migrate_one_issue_files.apply_async(
+        # migra os arquivos do issue (pdf, img, xml, html, ...)
+        # migra os registros de artigo
+        logging.info(f"Schedule task to migrate issue documents {migrated_issue}")
+        task_migrate_one_issue_documents.apply_async(
             kwargs={
                 "username": username,
-                "migrated_issue_id": migrated_issue.id,
                 "collection_acron": collection_acron,
+                "journal_acron": migrated_issue.migrated_journal.scielo_journal.acron,
+                "issue_folder": migrated_issue.scielo_issue.issue_folder,
                 "force_update": force_update,
             }
         )
 
 
-@celery_app.task(bind=True, name="migrate_one_issue_files")
-def task_migrate_one_issue_files(
+@celery_app.task(bind=True, name="migrate_one_issue_documents")
+def task_migrate_one_issue_documents(
     self,
     username,
-    migrated_issue_id,
     collection_acron,
+    journal_acron,
+    issue_folder,
     force_update=False,
 ):
     user = _get_user(self.request, username)
-    migrated_issue = MigratedIssue.objects.get(id=migrated_issue_id)
-    controller.migrate_one_issue_files(
+    logging.info(f"Running migrate issue documents {journal_acron} {issue_folder}")
+    migrated_issue = MigratedIssue.get(
+        collection_acron=collection_acron,
+        journal_acron=journal_acron,
+        issue_folder=issue_folder,
+    )
+    # migra os arquivos do issue (pdf, img, xml, html, ...)
+    # migra os registros de artigo
+    logging.info(f"Running migrate issue: {migrated_issue}")
+    controller.migrate_one_issue_documents(
         user,
         migrated_issue,
         collection_acron,
@@ -108,54 +136,155 @@ def task_migrate_one_issue_files(
     )
 
 
-@celery_app.task(bind=True, name="migrate_set_of_issue_document_records")
-def task_migrate_set_of_issue_document_records(
+@celery_app.task(bind=True, name="generate_sps_packages")
+def task_generate_sps_packages(
     self,
     username,
-    collection_acron,
-    scielo_issn=None,
+    collection_acron=None,
+    journal_acron=None,
     publication_year=None,
+    issue_folder=None,
     force_update=False,
 ):
     user = _get_user(self.request, username)
-
-    params = {"migrated_journal__scielo_journal__collection__acron": collection_acron}
-    if scielo_issn:
-        params["migrated_journal__scielo_journal__scielo_issn"] = scielo_issn
+    params = {}
+    if collection_acron:
+        params[
+            "migrated_issue__migrated_journal__scielo_journal__collection__acron"
+        ] = collection_acron
+    if journal_acron:
+        params[
+            "migrated_issue__migrated_journal__scielo_journal__acron"
+        ] = journal_acron
     if publication_year:
-        params["scielo_issue__official_issue__publication_year"] = publication_year
+        params[
+            "migrated_issue__scielo_issue__official_issue__publication_year"
+        ] = publication_year
+    if issue_folder:
+        params["migrated_issue__scielo_issue__issue_folder"] = issue_folder
 
-    items = MigratedIssue.objects.filter(
-        Q(status=MS_PUBLISHED) | Q(status=MS_IMPORTED),
-        **params,
-    )
-    for migrated_issue in items.iterator():
-        task_migrate_one_issue_document_records.apply_async(
+    if force_update:
+        items = MigratedDocument.objects.filter(
+            Q(status=MS_TO_MIGRATE) | Q(status=MS_IMPORTED), **params
+        )
+    else:
+        items = MigratedDocument.objects.filter(Q(status=MS_TO_MIGRATE), **params)
+
+    logging.info(f"Schedule generation of sps packages params: {params}")
+    for migrated_doc in items.iterator():
+        logging.info(f"Schedule generation of sps packages {migrated_doc}")
+        task_generate_sps_package.apply_async(
             kwargs={
                 "username": username,
-                "migrated_issue_id": migrated_issue.id,
-                "collection_acron": collection_acron,
-                "force_update": force_update,
+                "collection_acron": migrated_doc.migrated_issue.migrated_journal.scielo_journal.collection.acron,
+                "pid": migrated_doc.pid,
             }
         )
 
 
-@celery_app.task(bind=True, name="migrate_one_issue_document_records")
-def task_migrate_one_issue_document_records(
+@celery_app.task(bind=True, name="generate_sps_package")
+def task_generate_sps_package(
     self,
     username,
-    migrated_issue_id,
     collection_acron,
+    pid,
+):
+    user = _get_user(self.request, username)
+    try:
+        migrated_document = MigratedDocument.objects.get(
+            migrated_issue__migrated_journal__scielo_journal__collection__acron=collection_acron,
+            pid=pid,
+        )
+        controller.generate_sps_package(collection_acron, user, migrated_document)
+    except MigratedDocument.MultipleObjectsReturned as e:
+        logging.exception(f"collection_acron: {collection_acron} pid: {pid} {e}")
+        for item in MigratedDocument.objects.filter(
+            migrated_issue__migrated_journal__scielo_journal__collection__acron=collection_acron,
+            pid=pid,
+        ).iterator():
+            item.migrated_issue.status = MS_TO_MIGRATE
+            item.migrated_issue.save()
+            item.delete()
+
+
+@celery_app.task(bind=True, name="html_to_xmls")
+def task_html_to_xmls(
+    self,
+    username,
+    collection_acron=None,
+    journal_acron=None,
+    publication_year=None,
+    issue_folder=None,
     force_update=False,
 ):
     user = _get_user(self.request, username)
-    migrated_issue = MigratedIssue.objects.get(id=migrated_issue_id)
-    controller.migrate_one_issue_document_records(
-        user,
-        migrated_issue,
-        collection_acron,
-        force_update,
+    params = {}
+    params["file_type"] = "html"
+    if collection_acron:
+        params[
+            "migrated_issue__migrated_journal__scielo_journal__collection__acron"
+        ] = collection_acron
+    if journal_acron:
+        params[
+            "migrated_issue__migrated_journal__scielo_journal__acron"
+        ] = journal_acron
+    if publication_year:
+        params[
+            "migrated_issue__scielo_issue__official_issue__publication_year"
+        ] = publication_year
+    if issue_folder:
+        params["migrated_issue__scielo_issue__issue_folder"] = issue_folder
+
+    if force_update:
+        items = MigratedDocument.objects.filter(
+            Q(status=MS_IMPORTED),
+        ).update(status=MS_TO_MIGRATE)
+
+    items = MigratedDocument.objects.filter(
+        Q(status=MS_MISSING_ASSETS)
+        or Q(status=MS_XML_WIP)
+        or Q(status=MS_XML_WIP_AND_MISSING_ASSETS)
+        or Q(status=MS_TO_MIGRATE),
+        **params,
     )
+
+    logging.info(f"Schedule html to xmls params: {params}")
+    for migrated_doc in items.iterator():
+        logging.info(f"Schedule html to xmls {migrated_doc}")
+        task_html_to_xml.apply_async(
+            kwargs={
+                "username": username,
+                "collection_acron": migrated_doc.migrated_issue.migrated_journal.scielo_journal.collection.acron,
+                "pid": migrated_doc.pid,
+            }
+        )
+
+
+@celery_app.task(bind=True, name="html_to_xml")
+def task_html_to_xml(
+    self,
+    username,
+    collection_acron,
+    pid,
+):
+    user = _get_user(self.request, username)
+    try:
+        migrated_document = MigratedDocument.objects.get(
+            migrated_issue__migrated_journal__scielo_journal__collection__acron=collection_acron,
+            pid=pid,
+        )
+        logging.info("controller.html_to_xml...")
+        controller.html_to_xml(collection_acron, user, migrated_document)
+    except MigratedDocument.MultipleObjectsReturned as e:
+        logging.exception(f"collection_acron: {collection_acron} pid: {pid} {e}")
+        for item in MigratedDocument.objects.filter(
+            migrated_issue__migrated_journal__scielo_journal__collection__acron=collection_acron,
+            pid=pid,
+        ).iterator():
+            item.migrated_issue.status = MS_TO_MIGRATE
+            item.migrated_issue.save()
+            item.delete()
+        logging.info("Retry html 2 xml")
 
 
 @celery_app.task(bind=True, name=_("run_migrations"))
@@ -175,21 +304,27 @@ def task_run_migrations(
         }
     )
     # migra os registros da base ISSUE
-    # migra os arquivos contidos nas pastas dos fascículos
-    task_migrate_issue_records_and_files.apply_async(
+    task_migrate_issue_records.apply_async(
         kwargs={
             "username": username,
             "collection_acron": collection_acron,
             "force_update": force_update,
         }
     )
+    # migra os arquivos contidos nas pastas dos fascículos
     # migra os registros das bases de artigos
-    # se aplicável, gera XML a partir do HTML
-    # gera SPS package
-    task_migrate_set_of_issue_document_records.apply_async(
+    task_migrate_document_files_and_records.apply_async(
         kwargs={
             "username": username,
             "collection_acron": collection_acron,
             "force_update": force_update,
+        }
+    )
+    # se aplicável, gera XML a partir do HTML
+    # gera pacote sps
+    task_generate_sps_packages.apply_async(
+        kwargs={
+            "username": username,
+            "collection_acron": collection_acron,
         }
     )
