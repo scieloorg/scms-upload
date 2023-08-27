@@ -1,12 +1,13 @@
 import logging
 
 from django.contrib.auth import get_user_model
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from django.db.models import Q
 
-from article.controller import request_pid_v3_and_create_article
-from article.models import Article, ArticlePackages
 from config import celery_app
+from files_storage.models import MinioConfiguration, RemoteSPSPkg
+from package import choices
+from package.models import SPSPkg
 
 from . import controller
 
@@ -25,16 +26,14 @@ def task_request_pid_v3_and_create_articles(
     self,
     username,
 ):
-    items = ArticlePackages.objects.filter(
-        article__isnull=True,
-        optimised_zip_file__isnull=False,
-        not_optimised_zip_file__isnull=False,
-    )
-    for article_pkgs in items.iterator():
+    last = Article.get_latest_change()
+    items = RemoteSPSPkg.get_items_for_task(
+        from_date=last, task_name="request_pid_v3_and_create_articles")
+    for item in items:
         task_request_pid_v3_and_create_article.apply_async(
             kwargs={
                 "username": username,
-                "article_pkgs_id": article_pkgs.id,
+                "pkg_id": item.id,
             }
         )
 
@@ -43,38 +42,29 @@ def task_request_pid_v3_and_create_articles(
 def task_request_pid_v3_and_create_article(
     self,
     username,
-    article_pkgs_id,
+    pkg_id,
 ):
     user = _get_user(self.request, username)
-    article_pkgs = ArticlePackages.objects.get(id=article_pkgs_id)
+    item = RemoteSPSPkg.objects.get(id=pkg_id)
 
-    xml_name = article_pkgs.sps_pkg_name + ".xml"
+    xml_name = item.sps_pkg_name + ".xml"
 
-    try:
-        for item in article_pkgs.components.filter(former_locations__isnull=False):
-            if item.collection_acron:
-                collection = Collection.get_or_create(acron=item.collection_acron)
-                break
-    except AttributeError:
-        collection = None
     try:
         logging.info(f"Solicita/Confirma PID v3 para {xml_name}")
 
         # solicita pid v3 e obtém o article criado
-        xml_with_pre = article_pkgs.get_xml_with_pre()
+        xml_with_pre = item.xml_with_pre
         response = request_pid_v3_and_create_article(
             xml_with_pre,
             xml_name,
             user,
-            collection,
         )
         if response["xml_changed"]:
-            article_pkgs.update_xml(xml_with_pre)
+            item.update_xml(xml_with_pre)
         # cria / obtém article
         logging.info(f"Cria / obtém article para {xml_name}")
-        article_pkgs.article = response["article"]
-        article_pkgs.save()
-
+        item.task_name = None
+        item.save()
     except Exception as e:
         # TODO registra falha e deixa acessível na área restrita
         logging.exception(e)
@@ -85,39 +75,40 @@ def task_push_articles_files_to_remote_storage(
     self,
     username,
 ):
-    items = ArticlePackages.objects.filter(
-        Q(components__isnull=True) | Q(components__uri__isnull=True),
-        article__isnull=False,
-        optimised_zip_file__isnull=False,
-        not_optimised_zip_file__isnull=False,
-    )
-    for article_pkgs in items.iterator():
+    last = RemoteSPSPkg.get_latest_change()
+    items = SPSPkg.get_items_for_task(
+        from_date=last, task_name="push_articles_files_to_remote_storage")
+    for item in items:
         task_push_one_article_files_to_remote_storage.apply_async(
             kwargs={
                 "username": username,
-                "article_pkgs_id": article_pkgs.id,
+                "pkg_id": item.id,
             }
         )
 
 
 def minio_push_file_content(content, mimetype, object_name):
     # TODO MinioStorage.fput_content
-    return {"uri": "https://localhost/article/x"}
+    try:
+        minio = MinioConfiguration.get_files_storage(name="website")
+        return minio.fput_content(content, mimetype, object_name)
+    except Exception as e:
+        logging.exception(e)
+        return {"uri": "https://localhost/article/x"}
 
 
 @celery_app.task(bind=True, name="push_one_article_files_to_remote_storage")
 def task_push_one_article_files_to_remote_storage(
     self,
     username,
-    article_pkgs_id,
+    pkg_id,
 ):
+    failures = 0
     user = _get_user(self.request, username)
-    article_pkgs = ArticlePackages.objects.get(id=article_pkgs_id)
+    sps_pkg = SPSPkg.objects.get(id=pkg_id)
 
-    responses = article_pkgs.publish_package(
-        minio_push_file_content,
-        user,
-    )
+    remote = RemoteSPSPkg.create_or_update(user, sps_pkg)
+    responses = remote.publish_package(minio_push_file_content, user)
     for response in responses:
         try:
             uri = response["uri"]
@@ -125,3 +116,10 @@ def task_push_one_article_files_to_remote_storage(
             # TODO registra falha e deixa acessível na área restrita
             logging.error(f"Falha ao registrar arquivo em storage remoto {response}")
             logging.exception(e)
+            failures += 1
+
+    if not failures:
+        remote.task_name = "request_pid_v3_and_create_articles"
+        remote.save()
+        sps_pkg.task_name = None
+        sps_pkg.save()
