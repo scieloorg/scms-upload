@@ -26,45 +26,61 @@ User = get_user_model()
 
 
 def schedule_migrations(user, collection_acron=None):
-    if collection_acron:
-        collections = Collection.objects.filter(acron=collection_acron).iterator()
-    else:
-        collections = Collection.objects.iterator()
-    for collection in collections:
-        collection_acron = collection.acron
-        _schedule_one_issue_migration(user, collection_acron)
-        _schedule_title_db_migration(user, collection_acron)
-        _schedule_issue_db_migration(user, collection_acron)
-        _schedule_documents_migration(user, collection_acron)
-        _schedule_generate_sps_packages(user, collection_acron)
-        _schedule_html_to_xmls(user, collection_acron)
-        _schedule_run_migrations(user, collection_acron)
+    _schedule_one_issue_migration(user)
+    _schedule_title_db_migration(user)
+    _schedule_create_or_update_journal(user)
+    _schedule_issue_db_migration(user)
+    _schedule_documents_migration(user)
+    _schedule_generate_sps_packages(user)
+    _schedule_html_to_xmls(user)
+    _schedule_run_migrations(user)
 
 
-def _schedule_title_db_migration(user, collection_acron):
+def _schedule_title_db_migration(user):
     """
     Agenda a tarefa de migrar os registros da base de dados TITLE
     Deixa a tarefa desabilitada
     """
     schedule_task(
-        task="migrate_journal_records",
-        name="migrate_journal_records",
+        task="migrate_title_db",
+        name="migrate_title_db",
         kwargs=dict(
-            collection_acron=collection_acron,
             username=user.username,
             force_update=False,
         ),
         description=_("Migra os registros da base de dados TITLE"),
         priority=0,
-        enabled=False,
-        run_once=True,
+        enabled=True,
+        run_once=False,
         day_of_week="*",
-        hour="8",
-        minute="5",
+        hour="*",
+        minute="1,11,21,31,41,51",
     )
 
 
-def _schedule_issue_db_migration(user, collection_acron):
+def _schedule_create_or_update_journal(user):
+    """
+    Agenda a tarefa de migrar os registros da base de dados TITLE
+    Deixa a tarefa desabilitada
+    """
+    schedule_task(
+        task="create_or_update_journal",
+        name="create_or_update_journal",
+        kwargs=dict(
+            username=user.username,
+            force_update=False,
+        ),
+        description=_("Create or update journals"),
+        priority=0,
+        enabled=True,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute="2,12,22,32,42,52",
+    )
+
+
+def _schedule_issue_db_migration(user):
     """
     Agenda a tarefa de migrar os registros da base de dados ISSUE
     Deixa a tarefa abilitada
@@ -73,7 +89,6 @@ def _schedule_issue_db_migration(user, collection_acron):
         task="migrate_issue_records",
         name="migrate_issue_records",
         kwargs=dict(
-            collection_acron=collection_acron,
             username=user.username,
             force_update=False,
         ),
@@ -87,7 +102,7 @@ def _schedule_issue_db_migration(user, collection_acron):
     )
 
 
-def _schedule_documents_migration(user, collection_acron):
+def _schedule_documents_migration(user):
     """
     Agenda a tarefa de migrar os arquivos e registros dos artigos
     Deixa a tarefa desabilitada
@@ -98,7 +113,6 @@ def _schedule_documents_migration(user, collection_acron):
         name="migrate_document_files_and_records",
         kwargs=dict(
             username=user.username,
-            collection_acron=collection_acron,
             journal_acron=None,
             publication_year=None,
             force_update=False,
@@ -113,7 +127,7 @@ def _schedule_documents_migration(user, collection_acron):
     )
 
 
-def _schedule_one_issue_migration(user, collection_acron):
+def _schedule_one_issue_migration(user):
     """
     Agenda a tarefa de migrar os arquivos e registros dos artigos
     de um dado fascículo
@@ -125,7 +139,6 @@ def _schedule_one_issue_migration(user, collection_acron):
         name="migrate_one_issue_documents",
         kwargs=dict(
             username=user.username,
-            collection_acron=collection_acron,
             journal_acron=None,
             issue_folder=None,
             force_update=False,
@@ -140,7 +153,7 @@ def _schedule_one_issue_migration(user, collection_acron):
     )
 
 
-def _schedule_html_to_xmls(user, collection_acron):
+def _schedule_html_to_xmls(user):
     """
     Agenda a tarefa de gerar os pacotes SPS dos documentos migrados
     Deixa a tarefa desabilitada
@@ -151,7 +164,6 @@ def _schedule_html_to_xmls(user, collection_acron):
         name="html_to_xmls",
         kwargs=dict(
             username=user.username,
-            collection_acron=collection_acron,
             journal_acron=None,
             issue_folder=None,
             force_update=False,
@@ -166,7 +178,7 @@ def _schedule_html_to_xmls(user, collection_acron):
     )
 
 
-def _schedule_generate_sps_packages(user, collection_acron):
+def _schedule_generate_sps_packages(user):
     """
     Agenda a tarefa de gerar os pacotes SPS dos documentos migrados
     Deixa a tarefa desabilitada
@@ -177,7 +189,6 @@ def _schedule_generate_sps_packages(user, collection_acron):
         name="generate_sps_packages",
         kwargs=dict(
             username=user.username,
-            collection_acron=collection_acron,
             journal_acron=None,
             issue_folder=None,
             force_update=False,
@@ -192,7 +203,7 @@ def _schedule_generate_sps_packages(user, collection_acron):
     )
 
 
-def _schedule_run_migrations(user, collection_acron):
+def _schedule_run_migrations(user):
     """
     Agenda a tarefa de migrar os registros da base de dados TITLE
     Deixa a tarefa desabilitada
@@ -201,7 +212,6 @@ def _schedule_run_migrations(user, collection_acron):
         task="run_migrations",
         name="run_migrations",
         kwargs=dict(
-            collection_acron=collection_acron,
             username=user.username,
             force_update=False,
         ),
@@ -231,35 +241,74 @@ def get_classic_website(collection_acron):
     )
 
 
-def migrate_journal_records(
+def migrate_title_db(
     user,
-    collection_acron,
     force_update=False,
 ):
-    collection = Collection.get_or_create(collection_acron)
-    classic_website = get_classic_website(collection.acron)
-    for scielo_issn, journal_data in classic_website.get_journals_pids_and_records():
-        migrated_journal = import_data_from_title_database(
-            user,
-            collection,
-            scielo_issn,
-            journal_data[0],
-            force_update,
-        )
+    for collection in Collection.objects.iterator():
+        classic_website = get_classic_website(collection.acron)
+
+        for scielo_issn, journal_data in classic_website.get_journals_pids_and_records():
+            migrated_journal = create_or_update_migrated_journal_record(
+                user,
+                collection,
+                scielo_issn,
+                journal_data[0],
+                force_update,
+            )
 
 
-def import_data_from_title_database(
+def create_or_update_migrated_journal_record(
     user,
     collection,
     scielo_issn,
     journal_data,
-    classic_website_journal,
     force_update=False,
 ):
     """
-    Create/update JournalMigration
+    Create/update MigratedJournal
     """
     try:
+        # obtém classic website journal
+        classic_website_journal = classic_ws.Journal(journal_data)
+
+        migrated_journal = MigratedJournal.create_or_update(
+            collection=collection,
+            pid=scielo_issn,
+            creator=user,
+            isis_created_date=classic_website_journal.isis_created_date,
+            isis_updated_date=classic_website_journal.isis_updated_date,
+            data=journal_data,
+            status=MS_TO_MIGRATE,
+            force_update=force_update,
+        )
+        return migrated_journal
+    except Exception as e:
+        logging.exception(e)
+        message = _("Unable to migrate journal {} {}").format(
+            collection.acron, scielo_issn
+        )
+        MigrationFailure.create(
+            collection_acron=collection.acron,
+            migrated_item_name="journal",
+            migrated_item_id=scielo_issn,
+            message=message,
+            action_name="migrate",
+            e=e,
+            creator=user,
+        )
+
+
+def create_or_update_journal(
+    user,
+    migrated_journal,
+):
+    """
+    Create/update OfficialJournal, SciELOJournal e Journal
+    """
+    try:
+        journal_data = migrated_journal.data
+
         # obtém classic website journal
         classic_website_journal = classic_ws.Journal(journal_data)
 
@@ -283,8 +332,8 @@ def import_data_from_title_database(
         #     journal.add_publisher(user, publisher_name)
 
         scielo_journal = SciELOJournal.create_or_update(
-            collection,
-            scielo_issn=scielo_issn,
+            migrated_journal.collection,
+            scielo_issn=migrated_journal.pid,
             creator=user,
             official_journal=official_journal,
             acron=classic_website_journal.acronym,
@@ -293,25 +342,19 @@ def import_data_from_title_database(
         )
         logging.info(f"Got scielo_journal {scielo_journal}")
 
-        migrated_journal = MigratedJournal.create_or_update(
-            scielo_journal=scielo_journal,
-            creator=user,
-            isis_created_date=classic_website_journal.isis_created_date,
-            isis_updated_date=classic_website_journal.isis_updated_date,
-            data=journal_data,
-            status=MS_IMPORTED,
-            force_update=force_update,
-        )
+        migrated_journal.status = MS_IMPORTED
+        migrated_journal.save()
+
         return migrated_journal
     except Exception as e:
         logging.exception(e)
-        message = _("Unable to migrate journal {} {}").format(
-            collection.acron, scielo_issn
+        message = _("Unable to create journals {}").format(
+            migrated_journal
         )
         MigrationFailure.create(
             collection_acron=collection.acron,
             migrated_item_name="journal",
-            migrated_item_id=scielo_issn,
+            migrated_item_id=migrated_journal.pid,
             message=message,
             action_name="migrate",
             e=e,
