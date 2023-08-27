@@ -5,7 +5,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from config import celery_app
-from migration.models import MigratedDocument, MigratedIssue
+from migration.models import MigratedJournal, MigratedDocument, MigratedIssue
 
 from . import controller
 from .choices import (
@@ -38,20 +38,36 @@ def task_schedule_migrations(
     controller.schedule_migrations(user, collection_acron)
 
 
-@celery_app.task(bind=True, name="migrate_journal_records")
-def task_migrate_journal_records(
+@celery_app.task(bind=True, name="migrate_title_db")
+def task_migrate_title_db(
     self,
     username,
-    collection_acron,
     force_update=False,
 ):
+    """
+    Cria registro MigratedJournal com cada registro da base title
+    """
     user = _get_user(self.request, username)
-    # migra registros da base de dados title
-    controller.migrate_journal_records(
+    controller.migrate_title_db(
         user,
-        collection_acron,
         force_update,
     )
+
+
+@celery_app.task(bind=True, name="create_or_update_journal")
+def task_create_or_update_journal(
+    self,
+    username,
+    force_update=False,
+):
+    """
+    Cria ou atualiza os registros de OfficialJournal, SciELOJournal e Journal
+    somente para os registros de MigratedJournal criados ou atualizados
+    recentemente (status=MS_TO_MIGRATE)
+    """
+    user = _get_user(self.request, username)
+    for item in MigratedJournal.objects.filter(status=MS_TO_MIGRATE):
+        controller.create_or_update_journal(user, item)
 
 
 @celery_app.task(bind=True, name="migrate_issue_records")
