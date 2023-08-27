@@ -50,8 +50,47 @@ class CommonControlField(models.Model):
         on_delete=models.CASCADE,
     )
 
+    task_name = models.CharField(
+        null=True,
+        blank=True,
+        max_length=128,
+    )
+
     class Meta:
         abstract = True
+
+    @classmethod
+    def get_latest_change(cls):
+        dates = []
+        try:
+            dates.append(cls.objects.latest("updated"))
+        except:
+            pass
+        try:
+            dates.append(cls.objects.latest("created"))
+        except:
+            pass
+        try:
+            return max(dates)
+        except ValueError:
+            return
+
+    @classmethod
+    def get_items_for_task(cls, from_date=None, task_name=None):
+        if from_date and task_name:
+            return cls.objects.filter(
+                Q(updated__gte=from_date) | Q(created__gte=from_date),
+                task_name=task_name,
+            ).iterator()
+        if task_name:
+            return cls.objects.filter(
+               task_name=task_name,
+            ).iterator()
+        if from_date:
+            return cls.objects.filter(
+                Q(updated__gte=from_date) | Q(created__gte=from_date),
+            ).iterator()
+        return cls.objects.iterator()
 
 
 class RichTextWithLang(models.Model):
