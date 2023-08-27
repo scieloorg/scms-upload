@@ -15,8 +15,6 @@ from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from collection.models import Collection, Language
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
-from issue.models import SciELOIssue
-from journal.models import SciELOJournal
 from package.models import SPSPkg
 from scielo_classic_website import classic_ws
 from scielo_classic_website.htmlbody.html_body import HTMLContent
@@ -149,6 +147,15 @@ class ClassicWebsiteConfiguration(CommonControlField):
 class MigratedData(CommonControlField):
     # datas no registro da base isis para identificar
     # se houve mudança nos dados durante a migração
+
+    collection = models.ForeignKey(
+        Collection, on_delete=models.SET_NULL, null=True, blank=True
+    )
+
+    pid = models.CharField(
+        _("PID"), max_length=1, null=True, blank=True
+    )
+
     isis_updated_date = models.CharField(
         _("ISIS updated date"), max_length=8, null=True, blank=True
     )
@@ -169,9 +176,67 @@ class MigratedData(CommonControlField):
 
     class Meta:
         indexes = [
+            models.Index(fields=["pid"]),
             models.Index(fields=["status"]),
             models.Index(fields=["isis_updated_date"]),
         ]
+
+    def __str__(self):
+    	return f"{self.collection} {self.pid}"
+
+    @classmethod
+    def get(cls, collection, pid):
+        logging.info(
+            f"MigratedData.get collection={collection} pid={pid}"
+        )
+        return cls.objects.get(collection=collection, pid=pid)
+
+    @classmethod
+    def create_or_update(
+        cls, collection, pid,
+        creator=None,
+        isis_created_date=None,
+        isis_updated_date=None,
+        data=None,
+        status=None,
+        force_update=None,
+    ):
+        logging.info(f"MigratedData.create_or_update {collection} {pid}")
+        try:
+            obj = cls.get(collection=collection, pid=pid)
+
+            if (
+                force_update
+                or not obj.isis_updated_date
+                or obj.isis_updated_date < isis_updated_date
+                or data != obj.data
+            ):
+                logging.info(f"Update MigratedData {obj}")
+                obj.updated_by = creator
+            else:
+                logging.info("Skip updating MigratedData")
+                return obj
+        except cls.DoesNotExist:
+            obj = cls()
+            obj.collection = collection
+            obj.pid = pid
+            obj.creator = creator
+            logging.info("Create MigratedData {}".format(obj))
+
+        try:
+            obj.isis_created_date = isis_created_date or obj.isis_created_date
+            obj.isis_updated_date = isis_updated_date or obj.isis_updated_date
+            obj.status = status or obj.status
+            obj.data = data or obj.data
+            obj.save()
+            logging.info("Created / Updated MigratedData {}".format(obj))
+            return obj
+        except Exception as e:
+            raise exceptions.CreateOrUpdateMigratedError(
+                _("Unable to create_or_update_migrated_journal {} {} {} {}").format(
+                    collection, pid, type(e), e
+                )
+            )
 
 
 class MigrationFailure(CommonControlField):
@@ -216,7 +281,7 @@ class MigrationFailure(CommonControlField):
 
 def migrated_files_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
-    issue_pid = instance.migrated_issue.issue_pid
+    issue_pid = instance.pid
     return (
         f"migration/{issue_pid[:9]}/"
         f"{issue_pid[9:13]}/"
@@ -452,210 +517,26 @@ class MigratedJournal(MigratedData):
     """
     Dados migrados do periódico do site clássico
     """
-
-    scielo_journal = models.ForeignKey(
-        SciELOJournal, on_delete=models.SET_NULL, null=True, blank=True
+    pid = models.CharField(
+        _("PID"), max_length=9, null=True, blank=True
     )
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["scielo_journal"]),
-        ]
-
-    def __str__(self):
-        return f"{self.scielo_journal.scielo_issn} ({self.scielo_journal.acron})"
-
-    @classmethod
-    def get(cls, collection=None, scielo_issn=None, scielo_journal=None):
-        logging.info(
-            f"MigratedJournal.create_or_update collection={collection} scielo_issn={scielo_issn} scielo_journal={scielo_journal} "
-        )
-        if collection and scielo_issn:
-            return cls.objects.get(
-                scielo_journal__collection=collection,
-                scielo_journal__scielo_issn=scielo_issn,
-            )
-        if scielo_journal:
-            return cls.objects.get(
-                scielo_journal=scielo_journal,
-            )
-
-    @classmethod
-    def create_or_update(
-        cls,
-        scielo_journal,
-        creator=None,
-        isis_created_date=None,
-        isis_updated_date=None,
-        data=None,
-        status=None,
-        force_update=None,
-    ):
-        logging.info(f"MigratedJournal.create_or_update {scielo_journal}")
-        try:
-            obj = cls.get(scielo_journal=scielo_journal)
-
-            if (
-                force_update
-                or not obj.isis_updated_date
-                or obj.isis_updated_date < isis_updated_date
-                or data != obj.data
-            ):
-                logging.info("Update MigratedJournal {}".format(obj))
-                obj.updated_by = creator
-            else:
-                logging.info("Skip updating journal")
-                return obj
-        except cls.DoesNotExist:
-            obj = cls()
-            obj.scielo_journal = scielo_journal
-            obj.creator = creator
-            logging.info("Create MigratedJournal {}".format(obj))
-
-        try:
-            obj.isis_created_date = isis_created_date or obj.isis_created_date
-            obj.isis_updated_date = isis_updated_date or obj.isis_updated_date
-            obj.status = status or obj.status
-            obj.data = data or obj.data
-            obj.save()
-            logging.info("Created / Updated MigratedJournal {}".format(obj))
-            return obj
-        except Exception as e:
-            raise exceptions.CreateOrUpdateMigratedJournalError(
-                _("Unable to create_or_update_migrated_journal {} {} {}").format(
-                    scielo_journal, type(e), e
-                )
-            )
-
-    @classmethod
-    def journals(cls, collection_acron, status):
-        return cls.objects.filter(
-            scielo_journal__collection__acron=collection_acron,
-            status=status,
-        ).iterator()
-
-    @property
-    def collection(self):
-        return self.scielo_journal.collection
-
-    @property
-    def acron(self):
-        return self.scielo_journal.acron
-
-    @property
-    def scielo_issn(self):
-        return self.scielo_journal.scielo_issn
 
 
 class MigratedIssue(MigratedData):
-    scielo_issue = models.ForeignKey(
-        SciELOIssue, on_delete=models.SET_NULL, null=True, blank=True
+    pid = models.CharField(
+        _("PID"), max_length=17, null=True, blank=True
     )
-    migrated_journal = models.ForeignKey(
-        MigratedJournal, on_delete=models.SET_NULL, null=True, blank=True
-    )
+    migrated_journal = models.ForeignKey(MigratedJournal)
     migrated_files = models.ManyToManyField(MigratedFile)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["scielo_issue"]),
-            models.Index(fields=["migrated_journal"]),
-        ]
-
-    def __unicode__(self):
-        return f"{self.scielo_issue}"
-
-    def __str__(self):
-        return f"{self.scielo_issue}"
-
-    @property
-    def issue_pid(self):
-        return self.scielo_issue.issue_pid
-
-    @property
-    def issue_folder(self):
-        return self.scielo_issue.issue_folder
-
-    @property
-    def publication_year(self):
-        return self.scielo_issue.official_issue.publication_year
-
-    @classmethod
-    def get(
-        cls,
-        collection_acron=None,
-        journal_acron=None,
-        issue_folder=None,
-        scielo_issue=None,
-    ):
-        if scielo_issue:
-            return cls.objects.get(scielo_issue=scielo_issue)
-        if collection_acron and journal_acron and issue_folder:
-            return cls.objects.get(
-                migrated_journal__scielo_journal__collection__acron=collection_acron,
-                migrated_journal__scielo_journal__acron=journal_acron,
-                scielo_issue__issue_folder=issue_folder,
-            )
-        raise ValueError(
-            "MigratedIssue.get requires scielo_issue or collection and journal_acron and issue_folder"
-        )
-
-    @classmethod
-    def create_or_update(
-        cls,
-        scielo_issue,
-        migrated_journal,
-        creator=None,
-        isis_created_date=None,
-        isis_updated_date=None,
-        status=None,
-        data=None,
-        force_update=None,
-    ):
-        logging.info("Create or Update MigratedIssue {}".format(scielo_issue))
-        try:
-            obj = cls.objects.get(scielo_issue=scielo_issue)
-            if (
-                force_update
-                or not obj.isis_updated_date
-                or obj.isis_updated_date < isis_updated_date
-                or obj.data != data
-            ):
-                logging.info(f"Update MigratedIssue {obj}")
-                obj.updated_by = creator
-            else:
-                logging.info(f"Skip updating issue {obj}")
-                return obj
-        except cls.DoesNotExist:
-            obj = cls()
-            obj.scielo_issue = scielo_issue
-            obj.creator = creator
-            logging.info(f"Create MigratedIssue {obj}")
-
-        try:
-            obj.migrated_journal = migrated_journal or obj.migrated_journal
-            obj.isis_created_date = isis_created_date or obj.isis_created_date
-            obj.isis_updated_date = isis_updated_date or obj.isis_updated_date
-            obj.status = status or obj.status
-            obj.data = data or obj.data
-            obj.save()
-            logging.info(f"Created / Updated MigratedIssue {obj}")
-            return obj
-        except Exception as e:
-            raise exceptions.CreateOrUpdateMigratedIssueError(
-                _("Unable to create_or_update_migrated_issue {} {} {}").format(
-                    scielo_issue, type(e), e
-                )
-            )
 
 
 class MigratedDocument(MigratedData):
-    migrated_issue = models.ForeignKey(
-        MigratedIssue, null=True, blank=True, on_delete=models.SET_NULL
+    pid = models.CharField(
+        _("PID"), max_length=23, null=True, blank=True
     )
-    pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
+    migrated_issue = models.ForeignKey(MigratedIssue)
     pkg_name = models.TextField(_("Package name"), null=True, blank=True)
-    sps_pkg_name = models.TextField(_("New Package name"), null=True, blank=True)
+    sps_pkg_name = models.TextField(_("SPS Package name"), null=True, blank=True)
     file_type = models.CharField(_("File type"), max_length=5, null=True, blank=True)
     missing_assets = models.JSONField(null=True, blank=True)
     migrated_files = models.ManyToManyField(MigratedFile)
@@ -663,36 +544,21 @@ class MigratedDocument(MigratedData):
     generated_xml = models.ManyToManyField("GeneratedXMLFile")
 
     def __unicode__(self):
-        return f"{self.migrated_issue} {self.pkg_name}"
+        return f"{self.pid} {self.pkg_name}"
 
     def __str__(self):
-        return f"{self.migrated_issue} {self.pkg_name}"
+        return f"{self.pid} {self.pkg_name}"
 
     class Meta:
         indexes = [
-            models.Index(fields=["migrated_issue"]),
-            models.Index(fields=["pid"]),
+            models.Index(fields=["file_type"]),
             models.Index(fields=["pkg_name"]),
         ]
 
     @classmethod
-    def get(cls, migrated_issue, pid=None, pkg_name=None):
-        if pid:
-            return cls.objects.get(
-                migrated_issue=migrated_issue,
-                pid=pid,
-            )
-        if pkg_name:
-            return cls.objects.get(
-                migrated_issue=migrated_issue,
-                pkg_name=pkg_name,
-            )
-
-    @classmethod
     def create_or_update(
         cls,
-        migrated_issue,
-        pid=None,
+        collection, pid,
         pkg_name=None,
         creator=None,
         isis_created_date=None,
@@ -703,19 +569,8 @@ class MigratedDocument(MigratedData):
         file_type=None,
         force_update=None,
     ):
-        key = dict(
-            migrated_issue=migrated_issue,
-            pid=pid,
-            pkg_name=pkg_name,
-        )
-        logging.info(f"Create or Update MigratedDocument {key}")
-
         try:
-            obj = cls.get(
-                migrated_issue=migrated_issue,
-                pid=pid,
-                pkg_name=pkg_name,
-            )
+            obj = cls.get(collection=collection, pid=pid)
             if (
                 force_update
                 or not obj.isis_updated_date
@@ -729,24 +584,21 @@ class MigratedDocument(MigratedData):
                 return obj
         except cls.MultipleObjectsReturned as e:
             logging.exception(e)
-            cls.objects.filter(
-                migrated_issue=migrated_issue,
-                pid=pid,
-                pkg_name=pkg_name,
-            ).delete()
+            cls.objects.filter(collection=collection, pid=pid).delete()
             obj = cls()
-            obj.migrated_issue = migrated_issue
+            obj.collection = collection
+            obj.pid = pid
             obj.creator = creator
             logging.info("Create MigratedDocument {}".format(obj))
         except cls.DoesNotExist:
             obj = cls()
-            obj.migrated_issue = migrated_issue
+            obj.collection = collection
+            obj.pid = pid
             obj.creator = creator
             logging.info("Create MigratedDocument {}".format(obj))
         try:
             obj.file_type = file_type or obj.file_type
             obj.pkg_name = pkg_name or obj.pkg_name
-            obj.pid = pid or obj.pid
             obj.isis_created_date = isis_created_date
             obj.isis_updated_date = isis_updated_date
             obj.status = status or obj.status
@@ -757,8 +609,8 @@ class MigratedDocument(MigratedData):
             return obj
         except Exception as e:
             raise exceptions.CreateOrUpdateMigratedDocumentError(
-                _("Unable to create_or_update_migrated_document {} {} {} {} {}").format(
-                    migrated_issue, pkg_name, pid, type(e), e
+                _("Unable to create_or_update_migrated_document {} {} {} {}").format(
+                    collection, pid, type(e), e
                 )
             )
 
@@ -859,20 +711,6 @@ class MigratedDocument(MigratedData):
             return choices.MS_MISSING_ASSETS
         return choices.MS_IMPORTED
 
-    # @property
-    # def xml(self):
-    #     if self.migrated_xml:
-    #         return self.migrated_xml.file
-    #     if self.generated_xml:
-    #         return self.generated_xml.file
-
-    @property
-    def collection(self):
-        try:
-            return self.migrated_issue.migrated_journal.scielo_journal.collection
-        except (AttributeError, IndexError):
-            return
-
     def register_failure(
         self, e, migrated_item_name, migrated_item_id, message, action_name, user
     ):
@@ -910,10 +748,10 @@ class MigratedDocument(MigratedData):
 
             for i, xml_body_and_back in enumerate(classic_ws_doc.xml_body_and_back):
                 # guarda cada versão de body/back
-                migrated_item_id = f"{self.migrated_document} {i}"
+                migrated_item_id = f"{self} {i}"
                 self.body_and_back_files.add(
                     BodyAndBackFile.create_or_update(
-                        migrated_document=self.migrated_document,
+                        migrated_document=self,
                         creator=user,
                         file_content=xml_body_and_back,
                         version=i,
@@ -958,12 +796,12 @@ class MigratedDocument(MigratedData):
 
             xml_content = classic_ws_doc.generate_full_xml(xml_body_and_back)
             self.generated_xml = GeneratedXMLFile.create_or_update(
-                migrated_document=self.migrated_document,
+                migrated_document=self,
                 creator=user,
                 file_content=xml_content,
             )
         except Exception as e:
-            migrated_item_id = f"{self.migrated_document}"
+            migrated_item_id = f"{self}"
             message = _("Unable to generate XML from HTML {}").format(migrated_item_id)
             self.register_failure(
                 e,
