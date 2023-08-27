@@ -1,7 +1,7 @@
 from dateutil.parser import parse
 
 
-def parse_yyyymmdd(date):
+def parse_yyyymmdd(YYYYMMDD):
     """
     Get year, month and day from date format which MM and DD can be 00
     """
