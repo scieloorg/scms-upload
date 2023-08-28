@@ -536,50 +536,16 @@ class MigratedIssue(MigratedData):
         choices=choices.MIGRATION_STATUS,
         default=choices.MS_TO_MIGRATE,
     )
+    docs_status = models.CharField(
+        _("Document Status"),
+        max_length=26,
+        choices=choices.MIGRATION_STATUS,
+        default=choices.MS_TO_MIGRATE,
+    )
 
 
-class MigratedRecord(MigratedData):
+class MigratedDocumentRecord(MigratedData):
     pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
-    id_file = models.CharField(_("ID file path"), max_length=256, null=True, blank=True)
-    group_name = models.CharField(
-        _("Group name"), max_length=128, null=True, blank=True
-    )
-    order = models.CharField(_("Order"), max_length=16, null=True, blank=True)
-    issue_folder = models.CharField(
-        _("Issue folder"), max_length=16, null=True, blank=True
-    )
-    scielo_issn = models.CharField(
-        _("SciELO ISSN"), max_length=9, null=True, blank=True
-    )
-
-    def __unicode__(self):
-        return f"{self.id_file} {self.group_name}"
-
-    def __str__(self):
-        return f"{self.id_file} {self.group_name}"
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["issue_folder"]),
-            models.Index(fields=["scielo_issn"]),
-        ]
-
-    @classmethod
-    def get(cls, group_name):
-        if group_name:
-            return MigratedRecord.objects.get(group_name=doc_id)
-
-    @classmethod
-    def create_or_update(cls, user, group_name, data):
-        try:
-            record = cls.get(group_name)
-            record.updated_by = user
-        except cls.DoesNotExist:
-            record = MigratedRecord()
-            record.creator = user
-            record.group_name = group_name
-        record.data = data
-        return record
 
 
 class MigratedParagraphRecord(MigratedData):

@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 import os
 
@@ -20,7 +21,7 @@ from .models import (
     MigratedIssue,
     MigratedJournal,
     MigrationFailure,
-    MigratedRecord,
+    MigratedDocumentRecord,
     MigratedParagraphRecord,
 )
 
@@ -30,6 +31,7 @@ User = get_user_model()
 def schedule_migrations(user, collection_acron=None):
     _schedule_one_issue_migration(user)
     _schedule_p_records_migration(user)
+    _schedule_document_records_migration(user)
     _schedule_title_db_migration(user)
     _schedule_create_or_update_journal(user)
     _schedule_issue_db_migration(user)
@@ -140,6 +142,27 @@ def _schedule_migrate_files(user):
             force_update=False,
         ),
         description=_("Migra os arquivos"),
+        priority=3,
+        enabled=False,
+        run_once=True,
+        day_of_week="*",
+        hour="*",
+        minute="4,14,24,34,44,54",
+    )
+
+
+def _schedule_document_records_migration(user):
+    """
+    Agenda a tarefa de migrar os registros de documentos de issue_folder
+    """
+    schedule_task(
+        task="migrate_document_records",
+        name="migrate_document_records",
+        kwargs=dict(
+            username=user.username,
+            force_update=False,
+        ),
+        description=_("Migra os registros de documentos"),
         priority=3,
         enabled=False,
         run_once=True,
@@ -565,8 +588,6 @@ class IssueMigration:
         self.classic_website = get_classic_website(collection_acron)
         self.collection_acron = collection_acron
         self.force_update = force_update
-        self.issue_folder = migrated_issue.issue_folder
-        self.issue_pid = migrated_issue.issue_pid
         self.migrated_issue = migrated_issue
         self.migrated_journal = migrated_issue.migrated_journal
         self.journal_acron = self.migrated_journal.acron
@@ -649,121 +670,121 @@ class IssueMigration:
                     action_name="migrate",
                 )
 
-    def migrate_document_records(self):
-        """
-        Importa os registros presentes na base de dados `source_file_path`
-        Importa os arquivos dos documentos (xml, pdf, html, imagens)
-        Publica os artigos no site
-        """
-        journal_issue_and_doc_data = {
-            "title": self.migrated_journal.data,
-            "issue": self.migrated_issue.data,
-        }
+    # def migrate_document_records(self):
+    #     """
+    #     Importa os registros presentes na base de dados `source_file_path`
+    #     Importa os arquivos dos documentos (xml, pdf, html, imagens)
+    #     Publica os artigos no site
+    #     """
+    #     journal_issue_and_doc_data = {
+    #         "title": self.migrated_journal.data,
+    #         "issue": self.migrated_issue.data,
+    #     }
 
-        logging.info(f"Importing documents records {self.migrated_issue}")
-        # obtém registros da base "artigo" que não necessariamente é só
-        # do fascículo de migrated_issue
-        # possivelmente source_file pode conter registros de outros fascículos
-        # se a fonte for `bases-work/acron/acron`
-        for doc_id, doc_records in self.classic_website.get_documents_pids_and_records(
-            self.journal_acron,
-            self.issue_folder,
-            self.issue_pid,
-        ):
-            try:
-                logging.info(_("Get self.issue_pid={}").format(self.issue_pid))
-                logging.info(_("Get doc_id={}").format(doc_id))
-                logging.info(_("records={}").format(len(doc_records)))
+    #     logging.info(f"Importing documents records {self.migrated_issue}")
+    #     # obtém registros da base "artigo" que não necessariamente é só
+    #     # do fascículo de migrated_issue
+    #     # possivelmente source_file pode conter registros de outros fascículos
+    #     # se a fonte for `bases-work/acron/acron`
+    #     for doc_id, doc_records in self.classic_website.get_documents_pids_and_records(
+    #         self.journal_acron,
+    #         self.issue_folder,
+    #         self.issue_pid,
+    #     ):
+    #         try:
+    #             logging.info(_("Get self.issue_pid={}").format(self.issue_pid))
+    #             logging.info(_("Get doc_id={}").format(doc_id))
+    #             logging.info(_("records={}").format(len(doc_records)))
 
-                if len(doc_records) == 1:
-                    # é possível que em source_file_path exista registro tipo i
-                    journal_issue_and_doc_data["issue"] = doc_records[0]
-                    continue
+    #             if len(doc_records) == 1:
+    #                 # é possível que em source_file_path exista registro tipo i
+    #                 journal_issue_and_doc_data["issue"] = doc_records[0]
+    #                 continue
 
-                journal_issue_and_doc_data["article"] = doc_records
+    #             journal_issue_and_doc_data["article"] = doc_records
 
-                logging.info(".......")
-                migrated_document = self.migrate_one_document_records(
-                    journal_issue_and_doc_data=journal_issue_and_doc_data,
-                )
-                logging.info(":::::::")
+    #             logging.info(".......")
+    #             migrated_document = self.migrate_one_document_records(
+    #                 journal_issue_and_doc_data=journal_issue_and_doc_data,
+    #             )
+    #             logging.info(":::::::")
 
-            except Exception as e:
-                message = _("Unable to migrate documents {} {} {} {}").format(
-                    self.collection_acron, self.journal_acron, self.issue_folder, doc_id
-                )
-                self.register_failure(
-                    e,
-                    migrated_item_name="document",
-                    migrated_item_id=doc_id,
-                    message=message,
-                    action_name="migrate",
-                )
+    #         except Exception as e:
+    #             message = _("Unable to migrate documents {} {} {} {}").format(
+    #                 self.collection_acron, self.journal_acron, self.issue_folder, doc_id
+    #             )
+    #             self.register_failure(
+    #                 e,
+    #                 migrated_item_name="document",
+    #                 migrated_item_id=doc_id,
+    #                 message=message,
+    #                 action_name="migrate",
+    #             )
 
-    def register_failure(
-        self, e, migrated_item_name, migrated_item_id, message, action_name
-    ):
-        logging.info("!!!!!!!!!")
-        logging.info(message)
-        logging.info(".........")
-        logging.exception(e)
-        logging.info("_________")
-        MigrationFailure.create(
-            collection_acron=self.collection_acron,
-            migrated_item_name=migrated_item_name,
-            migrated_item_id=migrated_item_id,
-            message=message,
-            action_name=action_name,
-            e=e,
-            creator=self.user,
-        )
+    # def register_failure(
+    #     self, e, migrated_item_name, migrated_item_id, message, action_name
+    # ):
+    #     logging.info("!!!!!!!!!")
+    #     logging.info(message)
+    #     logging.info(".........")
+    #     logging.exception(e)
+    #     logging.info("_________")
+    #     MigrationFailure.create(
+    #         collection_acron=self.collection_acron,
+    #         migrated_item_name=migrated_item_name,
+    #         migrated_item_id=migrated_item_id,
+    #         message=message,
+    #         action_name=action_name,
+    #         e=e,
+    #         creator=self.user,
+    #     )
 
-    def migrate_one_document_records(self, journal_issue_and_doc_data):
-        try:
-            logging.info(
-                f"migrate_one_document_records: {journal_issue_and_doc_data.keys()}"
-            )
+    # def migrate_one_document_records(self, journal_issue_and_doc_data):
+    #     try:
+    #         logging.info(
+    #             f"migrate_one_document_records: {journal_issue_and_doc_data.keys()}"
+    #         )
 
-            # instancia Document com registros de title, issue e artigo
-            classic_ws_doc = classic_ws.Document(journal_issue_and_doc_data)
+    #         # instancia Document com registros de title, issue e artigo
+    #         classic_ws_doc = classic_ws.Document(journal_issue_and_doc_data)
 
-            # pkg_name
-            pkg_name = classic_ws_doc.filename_without_extension
-            logging.info(f"pkg_name={pkg_name}")
-            logging.info(f"order={classic_ws_doc.order.zfill(5)}")
-            logging.info(f"pid={classic_ws_doc.scielo_pid_v2}")
+    #         # pkg_name
+    #         pkg_name = classic_ws_doc.filename_without_extension
+    #         logging.info(f"pkg_name={pkg_name}")
+    #         logging.info(f"order={classic_ws_doc.order.zfill(5)}")
+    #         logging.info(f"pid={classic_ws_doc.scielo_pid_v2}")
 
-            pid = classic_ws_doc.scielo_pid_v2 or (
-                "S" + self.issue_pid + classic_ws_doc.order.zfill(5)
-            )
-            logging.info(f"pid={pid}")
+    #         pid = classic_ws_doc.scielo_pid_v2 or (
+    #             "S" + self.issue_pid + classic_ws_doc.order.zfill(5)
+    #         )
+    #         logging.info(f"pid={pid}")
 
-            if classic_ws_doc.scielo_pid_v2 != pid:
-                classic_ws_doc.scielo_pid_v2 = pid
+    #         if classic_ws_doc.scielo_pid_v2 != pid:
+    #             classic_ws_doc.scielo_pid_v2 = pid
 
-            return MigratedDocument.create_or_update(
-                migrated_issue=self.migrated_issue,
-                pid=pid,
-                pkg_name=pkg_name,
-                creator=self.user,
-                isis_created_date=classic_ws_doc.isis_created_date,
-                isis_updated_date=classic_ws_doc.isis_updated_date,
-                data=journal_issue_and_doc_data,
-                status=MS_TO_MIGRATE,
-                file_type=classic_ws_doc.file_type,
-                force_update=self.force_update,
-            )
-        except Exception as e:
-            raise
-            migrated_item_id = f"{self.collection_acron} {pid}"
-            message = _("Unable to migrate document {}").format(migrated_item_id)
-            self.register_failure(
-                e,
-                migrated_item_name="document",
-                migrated_item_id=migrated_item_id,
-                message=message,
-                action_name="migrate",
-            )
+    #         return MigratedDocument.create_or_update(
+    #             migrated_issue=self.migrated_issue,
+    #             pid=pid,
+    #             pkg_name=pkg_name,
+    #             creator=self.user,
+    #             isis_created_date=classic_ws_doc.isis_created_date,
+    #             isis_updated_date=classic_ws_doc.isis_updated_date,
+    #             data=journal_issue_and_doc_data,
+    #             status=MS_TO_MIGRATE,
+    #             file_type=classic_ws_doc.file_type,
+    #             force_update=self.force_update,
+    #         )
+    #     except Exception as e:
+    #         raise
+    #         migrated_item_id = f"{self.collection_acron} {pid}"
+    #         message = _("Unable to migrate document {}").format(migrated_item_id)
+    #         self.register_failure(
+    #             e,
+    #             migrated_item_name="document",
+    #             migrated_item_id=migrated_item_id,
+    #             message=message,
+    #             action_name="migrate",
+    #         )
 
 
 def migrate_one_issue_documents(
@@ -834,8 +855,7 @@ def migrate_files(
 
 
 def migrate_p_records(user, collection, force_update):
-    """
-    """
+    """ """
     classic_website = get_classic_website(collection.acron)
 
     for pid, p_records in classic_website.p_records:
@@ -862,6 +882,122 @@ def migrate_p_records(user, collection, force_update):
                 e=e,
                 creator=user,
             )
+
+
+def
+(
+    migrated_issue,
+    journal_acron,
+    issue_folder=None,
+    issue_pid=None,
+    try_without_issue_folder=False,
+):
+    """
+    Cria registros MigratedDocument com dados obtidos de base de dados ISIS
+    de artigos
+    """
+    collection = migrated_issue.collection
+    logging.info(f"Importing documents records {journal_acron} {issue_folder}")
+
+    classic_website = get_classic_website(collection.acron)
+    journal_issue_and_doc_data = {}
+    pids = set()
+    for doc_id, doc_records in classic_website.get_documents_pids_and_records(
+        journal_acron,
+        issue_folder,
+        try_without_issue_folder,
+    ):
+        try:
+            if len(doc_records) == 1:
+                # é possível que em source_file_path exista registro tipo i
+                journal_issue_and_doc_data["issue"] = doc_records[0]
+                continue
+
+            journal_issue_and_doc_data["article"] = doc_records
+
+            logging.info(".......")
+            migrated_document_record = create_or_update_migrated_document_record(
+                migrated_issue,
+                journal_issue_and_doc_data,
+                issue_pid,
+                user,
+            )
+            logging.info(":::::::")
+            pids.add(migrated_document_record.pid[1:-5])
+        except Exception as e:
+            message = _("Unable to migrate documents {} {} {} {}").format(
+                collection.acron, journal_acron, issue_folder, doc_id
+            )
+            MigrationFailure.create(
+                collection_acron=collection.acron,
+                migrated_item_name="doc_records",
+                migrated_item_id=f"{journal_acron} {issue_folder} {doc_id}",
+                message=message,
+                action_name="migrate",
+                e=e,
+                creator=user,
+            )
+    year = datetime.now().isoformat()[:4]
+    for pid in pids:
+        if pid[10:14] == year:
+            continue
+        MigratedIssue.objects.filter(
+            collection=migrated_issue.collection,
+            pid=pid,
+        ).update(docs_status=MS_IMPORTED)
+
+
+def create_or_update_migrated_document_record(
+    migrated_issue, journal_issue_and_doc_data, issue_pid, user
+):
+    try:
+        collection = migrated_issue.collection
+
+        logging.info(
+            f"migrate_one_document_records: {journal_issue_and_doc_data.keys()}"
+        )
+
+        # instancia Document com registros de title, issue e artigo
+        classic_ws_doc = classic_ws.Document(journal_issue_and_doc_data)
+
+        pid = classic_ws_doc.scielo_pid_v2 or (
+            "S" + issue_pid + classic_ws_doc.order.zfill(5)
+        )
+
+        if len(pid) != 23:
+            ValueError(f"Expected 23-characters pid. Found {pid} ({len(pid)})")
+
+        if classic_ws_doc.scielo_pid_v2 != pid:
+            classic_ws_doc.scielo_pid_v2 = pid
+
+        # pkg_name
+        pkg_name = classic_ws_doc.filename_without_extension
+        logging.info(f"pkg_name={pkg_name}")
+        logging.info(f"order={classic_ws_doc.order[:-5].zfill(5)}")
+        logging.info(f"pid={classic_ws_doc.scielo_pid_v2}")
+
+        return MigratedDocumentRecord.create_or_update(
+            collection,
+            pid,
+            creator=user,
+            data=journal_issue_and_doc_data,
+            status=MS_TO_MIGRATE,
+            force_update=force_update,
+        )
+
+    except Exception as e:
+        message = _("Unable to migrate records {} {} {} {}").format(
+            collection.acron, journal_acron, issue_pid, pid
+        )
+        MigrationFailure.create(
+            collection_acron=collection.acron,
+            migrated_item_name="doc_records",
+            migrated_item_id=f"{journal_acron} {issue_pid} {pid}",
+            message=message,
+            action_name="migrate",
+            e=e,
+            creator=user,
+        )
 
 
 def generate_sps_package(

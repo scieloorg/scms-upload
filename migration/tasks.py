@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from config import celery_app
 from collection.models import Collection
-from migration.models import MigratedJournal, MigratedDocument, MigratedIssue
+from issue.models import MigratedFilegration.models import MigratedJournal, MigratedDocument, MigratedIssue
 
 from . import controller
 from .choices import (
@@ -110,7 +110,7 @@ def task_migrate_files(
     force_update=False,
 ):
     """
-    Cria ou atualiza os registros de SciELOIssue e Issue
+    Cria ou atualiza os registros de MigratedFile
     somente para os registros de MigratedIssue cujo files_status=MS_TO_MIGRATE
     """
     user = _get_user(self.request, username)
@@ -132,6 +132,48 @@ def task_create_or_update_issue(
     user = _get_user(self.request, username)
     for item in MigratedIssue.objects.filter(status=MS_TO_MIGRATE):
         controller.create_or_update_issue(user, item, force_update)
+
+
+@celery_app.task(bind=True, name="migrate_document_records")
+def task_migrate_document_records(
+    self,
+    username,
+    force_update=False,
+):
+    """
+    Cria ou atualiza os registros de MigratedRecord
+    """
+    try_without_issue_folder_ = False
+    user = _get_user(self.request, username)
+    scielo_journal = None
+    for item in MigratedIssue.objects.filter(docs_status=MS_TO_MIGRATE):
+        try:
+            scielo_journal = SciELOJournal.get(
+                collection=item.collection,
+                scielo_issn=item.pid,
+            )
+            scielo_issue = SciELOIssue.get(
+                scielo_journal=scielo_journal,
+                issue_pid=item.pid,
+            )
+            controller.migrate_document_records(
+                migrated_issue=item,
+                journal_acron=scielo_journal.acron,
+                issue_folder=scielo_issue.issue_folder,
+                issue_pid=item.pid,
+                try_without_issue_folder=False,
+            )
+        except FileNotFoundError:
+            try_without_issue_folder_ = True
+    if try_without_issue_folder_ and scielo_journal:
+        try:
+            controller.migrate_document_records(
+                migrated_issue=item,
+                journal_acron=scielo_journal.acron,
+                try_without_issue_folder=False,
+            )
+        except FileNotFoundError:
+            try_without_issue_folder_ = True
 
 
 @celery_app.task(bind=True, name="migrate_document_files_and_records")
