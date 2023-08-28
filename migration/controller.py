@@ -30,6 +30,8 @@ def schedule_migrations(user, collection_acron=None):
     _schedule_title_db_migration(user)
     _schedule_create_or_update_journal(user)
     _schedule_issue_db_migration(user)
+    _schedule_create_or_update_issue(user)
+    _schedule_migrate_files(user)
     _schedule_documents_migration(user)
     _schedule_generate_sps_packages(user)
     _schedule_html_to_xmls(user)
@@ -71,7 +73,7 @@ def _schedule_create_or_update_journal(user):
             force_update=False,
         ),
         description=_("Create or update journals"),
-        priority=0,
+        priority=1,
         enabled=True,
         run_once=False,
         day_of_week="*",
@@ -86,19 +88,62 @@ def _schedule_issue_db_migration(user):
     Deixa a tarefa abilitada
     """
     schedule_task(
-        task="migrate_issue_records",
-        name="migrate_issue_records",
+        task="migrate_issue_db",
+        name="migrate_issue_db",
         kwargs=dict(
             username=user.username,
             force_update=False,
         ),
         description=_("Migra os registros da base de dados ISSUE"),
-        priority=1,
+        priority=2,
         enabled=True,
         run_once=False,
         day_of_week="*",
         hour="*",
-        minute="2,12,22,32,42,52",
+        minute="3,13,23,33,43,53",
+    )
+
+
+def _schedule_migrate_files(user):
+    """
+    Agenda a tarefa de migrar os arquivos de issue_folder
+    """
+    schedule_task(
+        task="migrate_files",
+        name="migrate_files",
+        kwargs=dict(
+            username=user.username,
+            force_update=False,
+        ),
+        description=_("Migra os arquivos"),
+        priority=3,
+        enabled=False,
+        run_once=True,
+        day_of_week="*",
+        hour="*",
+        minute="4,14,24,34,44,54",
+    )
+
+
+def _schedule_create_or_update_issue(user):
+    """
+    Agenda a tarefa de migrar os registros da base de dados ISSUE
+    Deixa a tarefa desabilitada
+    """
+    schedule_task(
+        task="create_or_update_issue",
+        name="create_or_update_issue",
+        kwargs=dict(
+            username=user.username,
+            force_update=False,
+        ),
+        description=_("Create or update issue"),
+        priority=4,
+        enabled=True,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute="4,14,24,34,44,54",
     )
 
 
@@ -248,7 +293,10 @@ def migrate_title_db(
     for collection in Collection.objects.iterator():
         classic_website = get_classic_website(collection.acron)
 
-        for scielo_issn, journal_data in classic_website.get_journals_pids_and_records():
+        for (
+            scielo_issn,
+            journal_data,
+        ) in classic_website.get_journals_pids_and_records():
             migrated_journal = create_or_update_migrated_journal_record(
                 user,
                 collection,
@@ -348,9 +396,7 @@ def create_or_update_journal(
         return migrated_journal
     except Exception as e:
         logging.exception(e)
-        message = _("Unable to create journals {}").format(
-            migrated_journal
-        )
+        message = _("Unable to create journals {}").format(migrated_journal)
         MigrationFailure.create(
             collection_acron=collection.acron,
             migrated_item_name="journal",
@@ -362,28 +408,28 @@ def create_or_update_journal(
         )
 
 
-def migrate_issue_records(
+def migrate_issue_db(
     user,
-    collection_acron,
     force_update=False,
 ):
     """
     Migra os registros da base de dados issue
     """
-    collection = Collection.get_or_create(acron=collection_acron)
-    classic_website = get_classic_website(collection_acron)
-    for issue_pid, issue_data in classic_website.get_issues_pids_and_records():
-        migrated_issue = import_data_from_issue_database(
-            user=user,
-            collection=collection,
-            scielo_issn=issue_pid[:9],
-            issue_pid=issue_pid,
-            issue_data=issue_data[0],
-            force_update=force_update,
-        )
+    for collection in Collection.objects.iterator():
+        classic_website = get_classic_website(collection.acron)
+
+        for issue_pid, issue_data in classic_website.get_issues_pids_and_records():
+            migrated_issue = create_or_update_migrated_issue_record(
+                user=user,
+                collection=collection,
+                scielo_issn=issue_pid[:9],
+                issue_pid=issue_pid,
+                issue_data=issue_data[0],
+                force_update=force_update,
+            )
 
 
-def import_data_from_issue_database(
+def create_or_update_migrated_issue_record(
     user,
     collection,
     scielo_issn,
@@ -392,7 +438,7 @@ def import_data_from_issue_database(
     force_update=False,
 ):
     """
-    Create/update IssueMigration
+    Create/update MigratedIssue
     """
     try:
         logging.info(
@@ -403,32 +449,15 @@ def import_data_from_issue_database(
 
         classic_website_issue = classic_ws.Issue(issue_data)
 
-        migrated_journal = MigratedJournal.get(
-            collection=collection, scielo_issn=scielo_issn
-        )
-        issue = Issue.get_or_create(
-            official_journal=migrated_journal.scielo_journal.official_journal,
-            publication_year=classic_website_issue.publication_year,
-            volume=classic_website_issue.volume,
-            number=classic_website_issue.number,
-            supplement=classic_website_issue.supplement,
-            user=user,
-        )
-        scielo_issue = SciELOIssue.create_or_update(
-            scielo_journal=migrated_journal.scielo_journal,
-            user=user,
-            issue_pid=issue_pid,
-            issue_folder=classic_website_issue.issue_label,
-            official_issue=issue,
-        )
         if classic_website_issue.is_press_release:
             status = MS_TO_IGNORE
         else:
             status = MS_TO_MIGRATE
+
         logging.info(f"status = {status}")
         migrated_issue = MigratedIssue.create_or_update(
-            scielo_issue=scielo_issue,
-            migrated_journal=migrated_journal,
+            collection=collection,
+            pid=issue_pid,
             creator=user,
             isis_created_date=classic_website_issue.isis_created_date,
             isis_updated_date=classic_website_issue.isis_updated_date,
@@ -436,6 +465,8 @@ def import_data_from_issue_database(
             data=issue_data,
             force_update=force_update,
         )
+        migrated_issue.migrated_journal = MigratedJournal.get(collection, scielo_issn)
+        migrated_issue.save()
         return migrated_issue
     except Exception as e:
         logging.exception(e)
@@ -444,6 +475,60 @@ def import_data_from_issue_database(
             collection_acron=collection.acron,
             migrated_item_name="issue",
             migrated_item_id=issue_pid,
+            message=message,
+            action_name="migrate",
+            e=e,
+            creator=user,
+        )
+
+
+def create_or_update_issue(
+    user,
+    migrated_issue,
+    force_update,
+):
+    """
+    Create/update Issue e SciELOIssue
+    """
+    try:
+        logging.info(f"Import data from database issue {migrated_issue}")
+
+        scielo_journal = SciELOJournal.get(
+            collection=migrated_issue.collection,
+            scielo_issn=migrated_issue.migrated_journal.pid,
+        )
+
+        classic_website_issue = classic_ws.Issue(migrated_issue.data)
+
+        issue = Issue.get_or_create(
+            official_journal=scielo_journal.official_journal,
+            publication_year=classic_website_issue.publication_year,
+            volume=classic_website_issue.volume,
+            number=classic_website_issue.number,
+            supplement=classic_website_issue.supplement,
+            user=user,
+        )
+        scielo_issue = SciELOIssue.create_or_update(
+            scielo_journal=scielo_journal,
+            issue_pid=migrated_issue.pid,
+            issue_folder=classic_website_issue.issue_label,
+            official_issue=issue,
+            user=user,
+        )
+
+        migrated_issue.status = MS_IMPORTED
+        migrated_issue.save()
+
+        return migrated_issue
+    except Exception as e:
+        logging.exception(e)
+        message = _("Unable to migrate issue {} {}").format(
+            migrated_issue.collection.acron, migrated_issue.pid
+        )
+        MigrationFailure.create(
+            collection_acron=migrated_issue.collection.acron,
+            migrated_item_name="issue",
+            migrated_item_id=migrated_issue.pid,
             message=message,
             action_name="migrate",
             e=e,
@@ -491,9 +576,19 @@ class IssueMigration:
         """
         logging.info(f"Import issue files {self.migrated_issue}")
 
+        scielo_journal = SciELOJournal.get(
+            collection=migrated_issue.collection,
+            scielo_issn=migrated_issue.migrated_journal.pid,
+        )
+        scielo_issue = SciELOIssue.get(
+            scielo_journal=scielo_journal,
+            issue_pid=migrated_issue.pid,
+        )
+        classic_website_issue = classic_ws.Issue(self.migrated_issue.data)
+
         classic_issue_files = self.classic_website.get_issue_files(
-            self.journal_acron,
-            self.issue_folder,
+            scielo_journal.acron,
+            scielo_issue.issue_folder,
         )
         for file in classic_issue_files:
             """
@@ -520,7 +615,7 @@ class IssueMigration:
                 )
             except Exception as e:
                 message = _("Unable to migrate issue files {} {}").format(
-                    self.collection_acron, file
+                    self.migrated_issue.collection.acron, file
                 )
                 self.register_failure(
                     e,
@@ -670,6 +765,48 @@ def migrate_one_issue_documents(
 
     # migrated_issue.status = MS_IMPORTED
     # migrated_issue.save()
+
+
+def migrate_files(
+    user,
+    migrated_issue,
+    force_update,
+):
+    """
+    Create/update MigratedFile
+    """
+    try:
+        logging.info(f"Import issue files {migrated_issue}")
+
+        migration = IssueMigration(
+            user, migrated_issue.collection.acron, migrated_issue, force_update
+        )
+
+        # Melhor importar todos os arquivos e depois tratar da carga
+        # dos metadados, e geração de XML, pois
+        # há casos que os HTML mencionam arquivos de pastas diferentes
+        # da sua pasta do fascículo
+        migration.import_issue_files()
+        logging.info(f"Imported issue files {migrated_issue}")
+
+        migrated_issue.files_status = MS_IMPORTED
+        migrated_issue.save()
+
+        return migrated_issue
+    except Exception as e:
+        logging.exception(e)
+        message = _("Unable to migrate issue {} {}").format(
+            migrated_issue.collection.acron, migrated_issue.pid
+        )
+        MigrationFailure.create(
+            collection_acron=migrated_issue.collection.acron,
+            migrated_item_name="issue",
+            migrated_item_id=migrated_issue.pid,
+            message=message,
+            action_name="migrate",
+            e=e,
+            creator=user,
+        )
 
 
 def generate_sps_package(
