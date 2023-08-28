@@ -39,8 +39,8 @@ def task_schedule_migrations(
     controller.schedule_migrations(user, collection_acron)
 
 
-@celery_app.task(bind=True, name="migrate_p_records")
-def task_migrate_p_records(
+@celery_app.task(bind=True, name="import_p_records")
+def task_import_p_records(
     self,
     username,
     force_update=False,
@@ -50,7 +50,7 @@ def task_migrate_p_records(
     """
     user = _get_user(self.request, username)
     for collection in Collection.objects.iterator():
-        controller.migrate_p_records(
+        controller.import_p_records(
             user,
             collection,
             force_update,
@@ -103,8 +103,8 @@ def task_migrate_issue_db(
     )
 
 
-@celery_app.task(bind=True, name="migrate_files")
-def task_migrate_files(
+@celery_app.task(bind=True, name="import_files")
+def task_import_files(
     self,
     username,
     force_update=False,
@@ -115,7 +115,7 @@ def task_migrate_files(
     """
     user = _get_user(self.request, username)
     for item in MigratedIssue.objects.filter(files_status=MS_TO_MIGRATE):
-        controller.migrate_files(user, item, force_update)
+        controller.import_files(user, item, force_update)
 
 
 @celery_app.task(bind=True, name="create_or_update_issue")
@@ -134,8 +134,8 @@ def task_create_or_update_issue(
         controller.create_or_update_issue(user, item, force_update)
 
 
-@celery_app.task(bind=True, name="migrate_document_records")
-def task_migrate_document_records(
+@celery_app.task(bind=True, name="import_document_records")
+def task_import_document_records(
     self,
     username,
     force_update=False,
@@ -156,7 +156,7 @@ def task_migrate_document_records(
                 scielo_journal=scielo_journal,
                 issue_pid=item.pid,
             )
-            controller.migrate_document_records(
+            controller.import_document_records(
                 migrated_issue=item,
                 journal_acron=scielo_journal.acron,
                 issue_folder=scielo_issue.issue_folder,
@@ -167,7 +167,7 @@ def task_migrate_document_records(
             try_without_issue_folder_ = True
     if try_without_issue_folder_ and scielo_journal:
         try:
-            controller.migrate_document_records(
+            controller.import_document_records(
                 migrated_issue=item,
                 journal_acron=scielo_journal.acron,
                 try_without_issue_folder=False,

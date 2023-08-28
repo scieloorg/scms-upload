@@ -30,26 +30,26 @@ User = get_user_model()
 
 def schedule_migrations(user, collection_acron=None):
     _schedule_one_issue_migration(user)
-    _schedule_p_records_migration(user)
-    _schedule_document_records_migration(user)
+    _schedule_import_p_records(user)
+    _schedule_import_document_records(user)
     _schedule_title_db_migration(user)
     _schedule_create_or_update_journal(user)
     _schedule_issue_db_migration(user)
     _schedule_create_or_update_issue(user)
-    _schedule_migrate_files(user)
+    _schedule_import_files(user)
     _schedule_documents_migration(user)
     _schedule_generate_sps_packages(user)
     _schedule_html_to_xmls(user)
     _schedule_run_migrations(user)
 
 
-def _schedule_p_records_migration(user):
+def _schedule_import_p_records(user):
     """
     Agenda a tarefa de migrar os registros p
     """
     schedule_task(
-        task="migrate_p_records",
-        name="migrate_p_records",
+        task="import_p_records",
+        name="import_p_records",
         kwargs=dict(
             username=user.username,
             force_update=False,
@@ -130,13 +130,13 @@ def _schedule_issue_db_migration(user):
     )
 
 
-def _schedule_migrate_files(user):
+def _schedule_import_files(user):
     """
     Agenda a tarefa de migrar os arquivos de issue_folder
     """
     schedule_task(
-        task="migrate_files",
-        name="migrate_files",
+        task="import_files",
+        name="import_files",
         kwargs=dict(
             username=user.username,
             force_update=False,
@@ -151,13 +151,13 @@ def _schedule_migrate_files(user):
     )
 
 
-def _schedule_document_records_migration(user):
+def _schedule_import_document_records(user):
     """
     Agenda a tarefa de migrar os registros de documentos de issue_folder
     """
     schedule_task(
-        task="migrate_document_records",
-        name="migrate_document_records",
+        task="import_document_records",
+        name="import_document_records",
         kwargs=dict(
             username=user.username,
             force_update=False,
@@ -670,7 +670,7 @@ class IssueMigration:
                     action_name="migrate",
                 )
 
-    # def migrate_document_records(self):
+    # def import_document_records(self):
     #     """
     #     Importa os registros presentes na base de dados `source_file_path`
     #     Importa os arquivos dos documentos (xml, pdf, html, imagens)
@@ -805,14 +805,14 @@ def migrate_one_issue_documents(
 
     # migra os documentos da base de dados `source_file_path`
     # que não contém necessariamente os dados de só 1 fascículo
-    migration.migrate_document_records()
+    migration.import_document_records()
     logging.info(f"Imported records {migrated_issue}")
 
     # migrated_issue.status = MS_IMPORTED
     # migrated_issue.save()
 
 
-def migrate_files(
+def import_files(
     user,
     migrated_issue,
     force_update,
@@ -854,7 +854,7 @@ def migrate_files(
         )
 
 
-def migrate_p_records(user, collection, force_update):
+def import_p_records(user, collection, force_update):
     """ """
     classic_website = get_classic_website(collection.acron)
 
@@ -870,7 +870,7 @@ def migrate_p_records(user, collection, force_update):
             )
 
         except Exception as e:
-            message = _("Unable to migrate_p_records {} {}").format(
+            message = _("Unable to import_p_records {} {}").format(
                 collection.acron, pid
             )
             MigrationFailure.create(
