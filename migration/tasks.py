@@ -70,20 +70,49 @@ def task_create_or_update_journal(
         controller.create_or_update_journal(user, item)
 
 
-@celery_app.task(bind=True, name="migrate_issue_records")
-def task_migrate_issue_records(
+@celery_app.task(bind=True, name="migrate_issue_db")
+def task_migrate_issue_db(
     self,
     username,
-    collection_acron,
     force_update=False,
 ):
     user = _get_user(self.request, username)
     # migra registros da base de dados issue
-    controller.migrate_issue_records(
+    controller.migrate_issue_db(
         user,
-        collection_acron,
         force_update,
     )
+
+
+@celery_app.task(bind=True, name="migrate_files")
+def task_migrate_files(
+    self,
+    username,
+    force_update=False,
+):
+    """
+    Cria ou atualiza os registros de SciELOIssue e Issue
+    somente para os registros de MigratedIssue cujo files_status=MS_TO_MIGRATE
+    """
+    user = _get_user(self.request, username)
+    for item in MigratedIssue.objects.filter(files_status=MS_TO_MIGRATE):
+        controller.migrate_files(user, item, force_update)
+
+
+@celery_app.task(bind=True, name="create_or_update_issue")
+def task_create_or_update_issue(
+    self,
+    username,
+    force_update=False,
+):
+    """
+    Cria ou atualiza os registros de SciELOIssue e Issue
+    somente para os registros de MigratedIssue criados ou atualizados
+    recentemente (status=MS_TO_MIGRATE)
+    """
+    user = _get_user(self.request, username)
+    for item in MigratedIssue.objects.filter(status=MS_TO_MIGRATE):
+        controller.create_or_update_issue(user, item, force_update)
 
 
 @celery_app.task(bind=True, name="migrate_document_files_and_records")
