@@ -5,6 +5,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from config import celery_app
+from collection.models import Collection
 from migration.models import MigratedJournal, MigratedDocument, MigratedIssue
 
 from . import controller
@@ -36,6 +37,24 @@ def task_schedule_migrations(
 ):
     user = _get_user(self.request, username)
     controller.schedule_migrations(user, collection_acron)
+
+
+@celery_app.task(bind=True, name="migrate_p_records")
+def task_migrate_p_records(
+    self,
+    username,
+    force_update=False,
+):
+    """
+    Cria registros MigratedParagraphRecord
+    """
+    user = _get_user(self.request, username)
+    for collection in Collection.objects.iterator():
+        controller.migrate_p_records(
+            user,
+            collection,
+            force_update,
+        )
 
 
 @celery_app.task(bind=True, name="migrate_title_db")

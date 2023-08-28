@@ -152,9 +152,7 @@ class MigratedData(CommonControlField):
         Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
 
-    pid = models.CharField(
-        _("PID"), max_length=1, null=True, blank=True
-    )
+    pid = models.CharField(_("PID"), max_length=1, null=True, blank=True)
 
     isis_updated_date = models.CharField(
         _("ISIS updated date"), max_length=8, null=True, blank=True
@@ -182,18 +180,18 @@ class MigratedData(CommonControlField):
         ]
 
     def __str__(self):
-    	return f"{self.collection} {self.pid}"
+        return f"{self.collection} {self.pid}"
 
     @classmethod
     def get(cls, collection, pid):
-        logging.info(
-            f"MigratedData.get collection={collection} pid={pid}"
-        )
+        logging.info(f"MigratedData.get collection={collection} pid={pid}")
         return cls.objects.get(collection=collection, pid=pid)
 
     @classmethod
     def create_or_update(
-        cls, collection, pid,
+        cls,
+        collection,
+        pid,
         creator=None,
         isis_created_date=None,
         isis_updated_date=None,
@@ -207,9 +205,9 @@ class MigratedData(CommonControlField):
 
             if (
                 force_update
-                or not obj.isis_updated_date
-                or obj.isis_updated_date < isis_updated_date
                 or data != obj.data
+                or not obj.isis_updated_date
+                or (isis_updated_date and obj.isis_updated_date < isis_updated_date)
             ):
                 logging.info(f"Update MigratedData {obj}")
                 obj.updated_by = creator
@@ -226,6 +224,13 @@ class MigratedData(CommonControlField):
         try:
             obj.isis_created_date = isis_created_date or obj.isis_created_date
             obj.isis_updated_date = isis_updated_date or obj.isis_updated_date
+
+            if obj.isis_created_date:
+                if not obj.isis_updated_date:
+                    obj.isis_updated_date = now()[:12].replace("-", "")
+            else:
+                obj.isis_created_date = now()[:12].replace("-", "")
+
             obj.status = status or obj.status
             obj.data = data or obj.data
             obj.save()
@@ -517,23 +522,72 @@ class MigratedJournal(MigratedData):
     """
     Dados migrados do periódico do site clássico
     """
-    pid = models.CharField(
-        _("PID"), max_length=9, null=True, blank=True
-    )
+
+    pid = models.CharField(_("PID"), max_length=9, null=True, blank=True)
 
 
 class MigratedIssue(MigratedData):
-    pid = models.CharField(
-        _("PID"), max_length=17, null=True, blank=True
-    )
+    pid = models.CharField(_("PID"), max_length=17, null=True, blank=True)
     migrated_journal = models.ForeignKey(MigratedJournal)
     migrated_files = models.ManyToManyField(MigratedFile)
+    files_status = models.CharField(
+        _("Files Status"),
+        max_length=26,
+        choices=choices.MIGRATION_STATUS,
+        default=choices.MS_TO_MIGRATE,
+    )
+
+
+class MigratedRecord(MigratedData):
+    pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
+    id_file = models.CharField(_("ID file path"), max_length=256, null=True, blank=True)
+    group_name = models.CharField(
+        _("Group name"), max_length=128, null=True, blank=True
+    )
+    order = models.CharField(_("Order"), max_length=16, null=True, blank=True)
+    issue_folder = models.CharField(
+        _("Issue folder"), max_length=16, null=True, blank=True
+    )
+    scielo_issn = models.CharField(
+        _("SciELO ISSN"), max_length=9, null=True, blank=True
+    )
+
+    def __unicode__(self):
+        return f"{self.id_file} {self.group_name}"
+
+    def __str__(self):
+        return f"{self.id_file} {self.group_name}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["issue_folder"]),
+            models.Index(fields=["scielo_issn"]),
+        ]
+
+    @classmethod
+    def get(cls, group_name):
+        if group_name:
+            return MigratedRecord.objects.get(group_name=doc_id)
+
+    @classmethod
+    def create_or_update(cls, user, group_name, data):
+        try:
+            record = cls.get(group_name)
+            record.updated_by = user
+        except cls.DoesNotExist:
+            record = MigratedRecord()
+            record.creator = user
+            record.group_name = group_name
+        record.data = data
+        return record
+
+
+class MigratedParagraphRecord(MigratedData):
+    pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
 
 
 class MigratedDocument(MigratedData):
-    pid = models.CharField(
-        _("PID"), max_length=23, null=True, blank=True
-    )
+    pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
     migrated_issue = models.ForeignKey(MigratedIssue)
     pkg_name = models.TextField(_("Package name"), null=True, blank=True)
     sps_pkg_name = models.TextField(_("SPS Package name"), null=True, blank=True)
@@ -558,7 +612,8 @@ class MigratedDocument(MigratedData):
     @classmethod
     def create_or_update(
         cls,
-        collection, pid,
+        collection,
+        pid,
         pkg_name=None,
         creator=None,
         isis_created_date=None,

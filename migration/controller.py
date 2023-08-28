@@ -20,6 +20,8 @@ from .models import (
     MigratedIssue,
     MigratedJournal,
     MigrationFailure,
+    MigratedRecord,
+    MigratedParagraphRecord,
 )
 
 User = get_user_model()
@@ -27,6 +29,7 @@ User = get_user_model()
 
 def schedule_migrations(user, collection_acron=None):
     _schedule_one_issue_migration(user)
+    _schedule_p_records_migration(user)
     _schedule_title_db_migration(user)
     _schedule_create_or_update_journal(user)
     _schedule_issue_db_migration(user)
@@ -36,6 +39,27 @@ def schedule_migrations(user, collection_acron=None):
     _schedule_generate_sps_packages(user)
     _schedule_html_to_xmls(user)
     _schedule_run_migrations(user)
+
+
+def _schedule_p_records_migration(user):
+    """
+    Agenda a tarefa de migrar os registros p
+    """
+    schedule_task(
+        task="migrate_p_records",
+        name="migrate_p_records",
+        kwargs=dict(
+            username=user.username,
+            force_update=False,
+        ),
+        description=_("Migra os registros p"),
+        priority=0,
+        enabled=True,
+        run_once=True,
+        day_of_week="*",
+        hour="2",
+        minute="1",
+    )
 
 
 def _schedule_title_db_migration(user):
@@ -807,6 +831,37 @@ def migrate_files(
             e=e,
             creator=user,
         )
+
+
+def migrate_p_records(user, collection, force_update):
+    """
+    """
+    classic_website = get_classic_website(collection.acron)
+
+    for pid, p_records in classic_website.p_records:
+        try:
+            MigratedParagraphRecord.create_or_update(
+                collection,
+                pid,
+                creator=user,
+                data=p_records,
+                status=MS_TO_MIGRATE,
+                force_update=force_update,
+            )
+
+        except Exception as e:
+            message = _("Unable to migrate_p_records {} {}").format(
+                collection.acron, pid
+            )
+            MigrationFailure.create(
+                collection_acron=collection.acron,
+                migrated_item_name="p_records",
+                migrated_item_id=pid,
+                message=message,
+                action_name="migrate",
+                e=e,
+                creator=user,
+            )
 
 
 def generate_sps_package(
