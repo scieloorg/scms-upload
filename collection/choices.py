@@ -32,3 +32,14 @@ WEBSITE_KIND = [
     (QA, _("QA")),
     (PUBLIC, _("PUBLIC")),
 ]
+
+
+WS_QA = "QA"
+WS_APPROVED = "APPROVED"
+WS_PUBLISHED = "PUBLISHED"
+
+WS_PUBLICATION_STAGE = [
+    (WS_QA, _("QA")),
+    (WS_APPROVED, _("APPROVED")),
+    (WS_PUBLISHED, _("PUBLISHED")),
+]

@@ -22,4 +22,4 @@ class ResearcherAdmin(ModelAdmin):
     exclude_from_explorer = False
 
 
-modeladmin_register(ResearcherAdmin)
+# modeladmin_register(ResearcherAdmin)

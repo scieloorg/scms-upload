@@ -2,12 +2,14 @@ import logging
 from datetime import datetime
 
 from django.db import models
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
 from wagtail.models import Orderable
 
+from collection import choices as collection_choices
 from collection.models import Collection
 from core.models import CommonControlField, RichTextWithLang
 from institution.models import InstitutionHistory
@@ -54,10 +56,10 @@ class OfficialJournal(CommonControlField):
         ]
 
     def __unicode__(self):
-        return "%s - %s" % (self.issnl, self.title) or ""
+        return self.title
 
     def __str__(self):
-        return "%s - %s" % (self.issnl, self.title) or ""
+        return self.title
 
     @property
     def data(self):
@@ -199,7 +201,7 @@ class Journal(ClusterableModel, SocialNetwork):
         null=True,
         blank=True,
         related_name="+",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
     )
     logo = models.ForeignKey(
         "wagtailimages.Image",
@@ -263,6 +265,10 @@ class Journal(ClusterableModel, SocialNetwork):
         ]
     )
 
+    @property
+    def logo_url(self):
+        return self.logo and self.logo.url
+
     @classmethod
     def get(cls, official_journal):
         logging.info(f"Journal.get({official_journal}")
@@ -281,6 +287,8 @@ class Journal(ClusterableModel, SocialNetwork):
             logging.info("update {}".format(obj))
             obj.updated_by = creator
             obj.updated = datetime.utcnow()
+            obj.publication_stage = None
+
         except cls.DoesNotExist:
             obj = cls()
             obj.official_journal = official_journal
@@ -346,8 +354,13 @@ class SciELOJournal(CommonControlField):
         blank=True,
         choices=choices.JOURNAL_AVAILABILTY_STATUS,
     )
-    official_journal = models.ForeignKey(
-        OfficialJournal, on_delete=models.SET_NULL, null=True
+    journal = models.ForeignKey(Journal, on_delete=models.SET_NULL, null=True)
+    publication_stage = models.CharField(
+        _("Publication stage"),
+        max_length=16,
+        null=True,
+        blank=True,
+        choices=collection_choices.WS_PUBLICATION_STAGE,
     )
 
     class Meta:
@@ -357,29 +370,25 @@ class SciELOJournal(CommonControlField):
         ]
         indexes = [
             models.Index(fields=["acron"]),
-            models.Index(fields=["collection"]),
             models.Index(fields=["scielo_issn"]),
             models.Index(fields=["availability_status"]),
-            models.Index(fields=["official_journal"]),
         ]
 
     def __unicode__(self):
-        return "%s %s" % (self.collection, self.scielo_issn)
+        return f"{self.collection} {self.acron}"
 
     def __str__(self):
-        return "%s %s" % (self.collection, self.scielo_issn)
+        return f"{self.collection} {self.acron}"
 
     @classmethod
-    def get(cls, collection, official_journal=None, scielo_issn=None, acron=None):
+    def get(cls, collection, journal=None, scielo_issn=None, acron=None):
         logging.info(
-            f"SciELOJournal.get({collection}, {official_journal}, {scielo_issn}, {acron})"
+            f"SciELOJournal.get({collection}, {journal}, {scielo_issn}, {acron})"
         )
         if not collection:
             raise ValueError("SciELOJournal.get requires collection")
-        if official_journal:
-            return cls.objects.get(
-                collection=collection, official_journal=official_journal
-            )
+        if journal:
+            return cls.objects.get(collection=collection, journal=journal)
         if acron:
             return cls.objects.get(collection=collection, acron=acron)
         if scielo_issn:
@@ -391,37 +400,36 @@ class SciELOJournal(CommonControlField):
         collection,
         scielo_issn=None,
         creator=None,
-        official_journal=None,
+        journal=None,
         acron=None,
         title=None,
         availability_status=None,
     ):
         if not collection:
             raise ValueError("SciELOJournal.create_or_update requires collection")
-        if not scielo_issn and not official_journal:
+        if not scielo_issn and not journal:
             raise ValueError(
-                "SciELOJournal.create_or_update requires scielo_issn or official_journal"
+                "SciELOJournal.create_or_update requires scielo_issn or journal"
             )
         logging.info(
-            f"SciELOJournal.create_or_update {collection} {official_journal} {scielo_issn}"
+            f"SciELOJournal.create_or_update {collection} {journal} {scielo_issn}"
         )
         try:
             obj = cls.get(
                 collection=collection,
                 acron=acron,
                 scielo_issn=scielo_issn,
-                official_journal=official_journal,
+                journal=journal,
             )
             logging.info("update {}".format(obj))
             obj.updated_by = creator
-            obj.updated = datetime.utcnow()
         except cls.DoesNotExist:
             obj = cls()
             obj.creator = creator
             logging.info("create {}".format(obj))
 
         obj.collection = collection or obj.collection
-        obj.official_journal = official_journal or obj.official_journal
+        obj.journal = journal or obj.journal
         obj.scielo_issn = scielo_issn or obj.scielo_issn
         obj.acron = acron or obj.acron
         obj.title = title or obj.title
@@ -429,3 +437,30 @@ class SciELOJournal(CommonControlField):
         obj.save()
         logging.info(f"return {obj}")
         return obj
+
+    @classmethod
+    def items_to_publish(cls, website_kind, collection=None):
+        params = {}
+        if collection:
+            params["collection"] = collection
+        if website_kind == collection_choices.QA:
+            # seleciona journals para publicar em QA
+            return cls.objects.filter(
+                publication_stage__isnull=True,
+                availability_status=choices.CURRENT,
+                **params,
+            ).iterator()
+
+        # seleciona journals para publicar em produção
+        return cls.objects.filter(
+            publication_stage=collection_choices.WS_APPROVED,
+            availability_status=choices.CURRENT,
+            **params,
+        ).iterator()
+
+    def update_publication_stage(self):
+        if self.publication_stage == collection_choices.WS_APPROVED:
+            self.publication_stage = collection_choices.WS_PUBLISHED
+        elif self.publication_stage is None:
+            self.publication_stage = collection_choices.WS_QA
+        self.save()

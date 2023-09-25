@@ -11,11 +11,13 @@ from wagtail.fields import RichTextField
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
+from collection import choices as collection_choices
 from collection.models import Collection
 from core.models import CommonControlField
 from doi.models import DOIWithLang
 from issue.models import Issue
-from journal.models import Journal, OfficialJournal
+from journal.models import Journal, OfficialJournal, SciELOJournal
+from package.models import SPSPkg
 from researcher.models import Researcher
 
 from . import choices
@@ -25,64 +27,84 @@ from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
 User = get_user_model()
 
 
-class CollectionArticleId(ClusterableModel, CommonControlField):
+class SciELOArticle(CommonControlField):
     # Armazena os IDs dos artigos no contexto de cada coleção
     # serve para conseguir recuperar artigos pelo ID do site clássico
     collection = models.ForeignKey(
         Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
-    pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True)
-    pid_v2 = models.CharField(_("PID v2"), max_length=23, blank=True, null=True)
-    aop_pid = models.CharField(_("AOP PID"), max_length=23, blank=True, null=True)
+    article = models.ForeignKey(
+        "Article", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    publication_stage = models.CharField(
+        _("Publication stage"),
+        max_length=16,
+        null=True,
+        blank=True,
+        choices=collection_choices.WS_PUBLICATION_STAGE,
+    )
 
     @classmethod
-    def get(cls, pid_v3=None, pid_v2=None, aop_pid=None, collection=None):
-        if pid_v3:
-            return cls.objects.get(pid_v3=pid_v3)
-
-        if collection:
-            if pid_v2:
-                return cls.objects.get(
-                    Q(aop_pid=pid_v2) | Q(pid_v2=pid_v2), collection=collection
-                )
-            if aop_pid:
-                return cls.objects.get(
-                    Q(aop_pid=aop_pid) | Q(pid_v2=aop_pid), collection=collection
-                )
-
-        if pid_v2:
-            return cls.objects.get(Q(aop_pid=pid_v2) | Q(pid_v2=pid_v2))
-        if aop_pid:
-            return cls.objects.get(Q(aop_pid=aop_pid) | Q(pid_v2=aop_pid))
+    def get(cls, article=None, collection=None):
+        return cls.objects.get(article=article, collection=collection)
 
     @classmethod
     def create_or_update(
-        cls, pid_v3=None, pid_v2=None, aop_pid=None, collection=None, creator=None
+        cls,
+        user=None,
+        article=None,
+        collection=None,
+        publication_stage=None,
     ):
         try:
-            obj = cls.get(
-                pid_v3=pid_v3, pid_v2=pid_v2, aop_pid=aop_pid, collection=collection
-            )
-            obj.updated_by = creator
-            obj.updated = datetime.utcnow()
+            obj = cls.get(article=article, collection=collection)
+            obj.updated_by = user
+            obj.publication_stage = None
         except cls.DoesNotExist:
             obj = cls()
-            obj.creator = creator
-            obj.created = datetime.utcnow()
-        obj.collection = collection or obj.collection
-        obj.aop_pid = aop_pid or obj.aop_pid
-        obj.pid_v3 = pid_v3 or obj.pid_v3
-        obj.pid_v2 = pid_v2 or obj.pid_v2
+            obj.creator = user
+            obj.collection = collection or obj.collection
+            obj.article = article or obj.article
+        obj.publication_stage = publication_stage or obj.publication_stage
         obj.save()
         return obj
 
+    @classmethod
+    def items_to_publish(cls, website_kind):
+        if website_kind == collection_choices.QA:
+            # seleciona journals para publicar em QA
+            return cls.objects.filter(publication_stage__isnull=True).iterator()
+
+        # seleciona itens para publicar em produção
+        return cls.objects.filter(
+            publication_stage=collection_choices.WS_APPROVED
+        ).iterator()
+
+    def update_publication_stage(self):
+        if self.publication_stage == collection_choices.WS_APPROVED:
+            # indica que foi publicado
+            self.publication_stage = collection_choices.WS_PUBLISHED
+        elif self.publication_stage is None:
+            if self.article.sps_pkg.is_migrated:
+                # indica que já está aprovado e deve ser publicado
+                self.publication_stage = collection_choices.WS_APPROVED
+            else:
+                # indica que deve ser avaliado e aprovado para ser publicado
+                self.publication_stage = collection_choices.WS_QA
+
 
 class Article(ClusterableModel, CommonControlField):
+    """
+    No contexto de Upload, Article deve conter o mínimo de campos,
+    suficiente para o processo de ingresso / validações,
+    pois os dados devem ser obtidos do XML
+    """
+
+    sps_pkg = models.ForeignKey(
+        SPSPkg, blank=True, null=True, on_delete=models.SET_NULL
+    )
     # PID v3
     pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True)
-
-    # Identificadores no contexto das coleção / compatibilidade com legado
-    aids = models.ManyToManyField(CollectionArticleId)
 
     # Article type
     article_type = models.CharField(
@@ -118,139 +140,6 @@ class Article(ClusterableModel, CommonControlField):
         "self", symmetrical=False, through="RelatedItem", related_name="related_to"
     )
 
-    @classmethod
-    def get(cls, pid_v3=None, pid_v2=None, aop_pid=None, collection=None):
-        if pid_v3:
-            return cls.objects.get(pid_v3=pid_v3)
-
-        if collection:
-            if pid_v2:
-                return cls.objects.get(
-                    Q(aids__aop_pid=pid_v2) | Q(aids__pid_v2=pid_v2),
-                    collection=collection,
-                )
-            if aop_pid:
-                return cls.objects.get(
-                    Q(aids__aop_pid=aop_pid) | Q(aids__pid_v2=aop_pid),
-                    collection=collection,
-                )
-
-    @classmethod
-    def get_or_create(
-        cls,
-        pid_v3,
-        pid_v2=None,
-        aop_pid=None,
-        creator=None,
-        issn_electronic=None,
-        issn_print=None,
-        issnl=None,
-        volume=None,
-        number=None,
-        suppl=None,
-        publication_year=None,
-        collection=None,
-    ):
-        try:
-            return cls.get(pid_v3, pid_v2, aop_pid, collection)
-        except cls.DoesNotExist:
-            obj = cls()
-            obj.pid_v3 = pid_v3
-            obj.created = datetime.utcnow()
-            obj.creator = creator
-
-            if collection:
-                obj.save()
-                obj.aids.add(
-                    CollectionArticleId.create_or_update(
-                        collection=collection,
-                        pid_v3=pid_v3,
-                        pid_v2=pid_v2,
-                        aop_pid=aop_pid,
-                        creator=creator,
-                    )
-                )
-
-            if issn_electronic or issn_print or issnl:
-                official_journal = OfficialJournal.get_or_create(
-                    issn_print=issn_print,
-                    issn_electronic=issn_electronic,
-                    issnl=issnl,
-                )
-                obj.journal = Journal.get_or_create(official_journal)
-
-                if volume or number or suppl or publication_year:
-                    obj.issue = Issue.get_or_create(
-                        official_journal=obj.journal.official_journal,
-                        volume=volume,
-                        supplement=suppl,
-                        number=number,
-                        publication_year=publication_year,
-                        user=creator,
-                    )
-            obj.save()
-            return obj
-
-    def add_type(self, article_type):
-        self.article_type = article_type
-
-    def add_related_item(self, target_doi, target_article_type):
-        self.save()
-        # TODO
-        # item = RelatedItem()
-        # item.item_type = target_article_type
-        # item.source_article = self
-        # item.target_article = target_location
-        # item.save()
-        # self.related_items.add(item)
-
-    def add_pages(self, fpage=None, fpage_seq=None, lpage=None, elocation_id=None):
-        self.fpage = fpage
-        self.fpage_seq = fpage_seq
-        self.lpage = lpage
-        self.elocation_id = elocation_id
-
-    def add_issue(
-        self,
-        official_journal=None,
-        publication_year=None,
-        volume=None,
-        number=None,
-        suppl=None,
-        user=None,
-    ):
-        self.issue = Issue.get_or_create(
-            official_journal,
-            volume,
-            suppl,
-            number,
-            publication_year,
-            user,
-        )
-
-    def add_journal(
-        self,
-        official_journal=None,
-        publication_year=None,
-        volume=None,
-        number=None,
-        suppl=None,
-        user=None,
-    ):
-        self.issue = Issue.get_or_create(
-            official_journal,
-            volume,
-            suppl,
-            number,
-            publication_year,
-            user,
-        )
-
-    autocomplete_search_field = "pid_v3"
-
-    def autocomplete_label(self):
-        return self.pid_v3
-
     panel_article_ids = MultiFieldPanel(
         heading="Article identifiers", classname="collapsible"
     )
@@ -280,9 +169,6 @@ class Article(ClusterableModel, CommonControlField):
         FieldPanel("issue", classname="collapsible"),
     ]
 
-    def __str__(self):
-        return f"{self.pid_v3}"
-
     class Meta:
         permissions = (
             (MAKE_ARTICLE_CHANGE, _("Can make article change")),
@@ -290,6 +176,87 @@ class Article(ClusterableModel, CommonControlField):
         )
 
     base_form_class = ArticleForm
+
+    autocomplete_search_field = "pid_v3"
+
+    def autocomplete_label(self):
+        return self.pid_v3
+
+    def __str__(self):
+        return f"{self.pid_v3}"
+
+    @classmethod
+    def get(cls, pid_v3):
+        if pid_v3:
+            return cls.objects.get(pid_v3=pid_v3)
+        raise ValueError("Article.get requires pid_v3")
+
+    @classmethod
+    def create_or_update(cls, user, sps_pkg):
+        if not sps_pkg or sps_pkg.pid_v3 is None:
+            raise ValueError("create_article requires sps_pkg with pid_v3")
+
+        try:
+            obj = cls.get(sps_pkg.pid_v3)
+            obj.updated_by = user
+        except cls.DoesNotExist:
+            obj = cls()
+            obj.pid_v3 = sps_pkg.pid_v3
+            obj.creator = user
+
+        obj.sps_pkg = sps_pkg
+        obj.save()
+
+        for journal in SciELOJournal.objects.filter(journal=obj.journal).iterator():
+            SciELOArticle.create_or_update(
+                user=user,
+                collection=journal.collection,
+                article=obj,
+            )
+        return obj
+
+    def complete_data(self, user):
+        self.add_journal()
+        self.add_issue()
+        # ...
+        article.save()
+
+    def add_type(self, article_type):
+        self.article_type = article_type
+
+    def add_related_item(self, target_doi, target_article_type):
+        self.save()
+        # TODO
+        # item = RelatedItem()
+        # item.item_type = target_article_type
+        # item.source_article = self
+        # item.target_article = target_location
+        # item.save()
+        # self.related_items.add(item)
+
+    def add_pages(self, fpage=None, fpage_seq=None, lpage=None, elocation_id=None):
+        self.fpage = fpage
+        self.fpage_seq = fpage_seq
+        self.lpage = lpage
+        self.elocation_id = elocation_id
+
+    def add_issue(self, user):
+        xml_with_pre = self.sps_pkg.xml_with_pre
+        self.issue = Issue.get(
+            journal=self.journal,
+            volume=xml_with_pre.volume,
+            supplement=xml_with_pre.suppl,
+            number=xml_with_pre.number,
+        )
+
+    def add_journal(self, user):
+        xml_with_pre = self.sps_pkg.xml_with_pre
+        self.journal = Journal.get(
+            official_journal=OfficialJournal.get(
+                issn_electronic=xml_with_pre.journal_issn_electronic,
+                issn_print=xml_with_pre.journal_issn_print,
+            ),
+        )
 
 
 class ArticleAuthor(Orderable, Researcher):

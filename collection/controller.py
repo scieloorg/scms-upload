@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from migration.models import ClassicWebsiteConfiguration
 
 from . import exceptions
-from .models import Collection, FilesStorageConfiguration, NewWebSiteConfiguration
+from .models import Collection, FilesStorageConfiguration
 
 
 def start():
@@ -62,20 +62,6 @@ def start():
             ]
             files_storage_config.creator_id = user_id
             files_storage_config.save()
-        try:
-            new_website_config = NewWebSiteConfiguration.objects.get(url=data["url"])
-        except NewWebSiteConfiguration.DoesNotExist:
-            new_website_config = NewWebSiteConfiguration()
-            new_website_config.db_uri = data["db_uri"]
-            new_website_config.url = data.get("url")
-            new_website_config.creator_id = user_id
-            new_website_config.save()
-
-        return (
-            classic_website,
-            files_storage_config,
-            new_website_config,
-        )
     except Exception as e:
         raise exceptions.StartCollectionConfigurationError(
             "Unable to start system %s" % e

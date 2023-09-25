@@ -3,8 +3,8 @@ import hashlib
 import json
 import logging
 import os
-import tempfile
 from mimetypes import types_map
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 from minio import Minio
 from minio.error import S3Error
@@ -331,7 +331,7 @@ class MinioStorage:
 
         Parameters
         ----------
-        content : str
+        content : bytes
             conteúdo do arquivo
         mimetype : str
             indica se o nome do arquivo será mantido ou será criado um novo
@@ -347,8 +347,11 @@ class MinioStorage:
         MinioStorageFPutContentError
         """
         try:
-            file_path = self._create_tmp_file(content)
-            return self.fput(file_path, object_name, mimetype)
+            with TemporaryDirectory() as targetdir:
+                file_path = os.path.join(targetdir, os.path.basename(object_name))
+                with open(file_path, "wb") as fp:
+                    fp.write(content)
+                return self.fput(file_path, object_name, mimetype)
         except Exception as e:
             raise MinioStorageFPutContentError(
                 "Unable to fput content %s %s %s" % (object_name, type(e), e)
@@ -368,9 +371,9 @@ class MinioStorage:
         -------
         str
         """
-        tf = tempfile.NamedTemporaryFile(delete=False)
+        tf = NamedTemporaryFile(delete=False)
         if content:
-            with open(tf.name, "w") as fp:
+            with open(tf.name, "wb") as fp:
                 fp.write(content)
         return tf.name
 

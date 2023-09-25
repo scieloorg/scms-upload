@@ -75,9 +75,7 @@ class Institution(CommonControlField, ClusterableModel):
                 if not selected:
                     selected = item
                     continue
-                if count(item.data.values(), None) < count(
-                    selected.data.values(), None
-                ):
+                if item.data.values().count(None) < selected.data.values().count(None):
                     selected = item
             return selected
 

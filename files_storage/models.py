@@ -13,7 +13,6 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from files_storage import exceptions
 from files_storage.minio import MinioStorage
-from package.models import SPSPkg
 
 
 class MinioConfiguration(CommonControlField):
@@ -107,10 +106,17 @@ class FileLocation(CommonControlField):
     basename = models.TextField(_("Basename"), null=True, blank=True)
     uri = models.URLField(_("URI"), null=True, blank=True)
 
+    autocomplete_search_field = "uri"
+
     class Meta:
         indexes = [
-            models.Index(fields=["basename"]),
+            models.Index(fields=["uri"]),
         ]
+
+    panels = [
+        FieldPanel("basename"),
+        FieldPanel("uri"),
+    ]
 
     def __unicode__(self):
         return f"{self.uri} {self.created}"
@@ -132,111 +138,4 @@ class FileLocation(CommonControlField):
         except Exception as e:
             raise exceptions.MinioFileGetOrCreateError(
                 "Unable to create file: %s %s %s" % (type(e), e, obj)
-            )
-
-
-class RemoteSPSPkg(CommonControlField):
-    sps_pkg = models.ForeignKey(
-        SPSPkg, null=True, blank=True, on_delete=models.SET_NULL
-    )
-    locations = models.ManyToManyField(FileLocation)
-
-    @property
-    def xml_with_pre(self):
-        return self.sps_pkg.xml_with_pre
-
-    def update_xml(self, xml_with_pre):
-        self.update_xml(xml_with_pre)
-
-    @classmethod
-    def create_or_update(cls, user, sps_pkg):
-        try:
-            obj = cls.objects.get(sps_pkg=sps_pkg)
-            obj.updated_by = user
-        except cls.DoesNotExist:
-            obj = cls()
-            obj.sps_pkg = sps_pkg
-            obj.creator = user
-        obj.save()
-        return obj
-
-    def publish_package(self, minio_push_file_content, user):
-        mimetypes.init()
-
-        sps_pkg_name = self.sps_pkg.sps_pkg_name
-        subdir = sps_pkg_name[:9]
-        suffix = sps_pkg_name[10:]
-        subdir = os.path.join(subdir, "/".join(suffix.split("-")))
-        xml_with_pre = None
-
-        local_to_remote = {}
-        with ZipFile(self.sps_pkg.file.path) as optimised_fp:
-            for item in optimised_fp.namelist():
-                with optimised_fp.open(item) as optimised_item_fp:
-                    name, ext = os.path.splitext(item)
-                    if ext == ".xml":
-                        xml_name = item
-                        xml_with_pre = get_xml_with_pre(
-                            optimised_item_fp.read().decode("utf-8")
-                        )
-                        continue
-
-                    response = self._register_remote_file(
-                        minio_push_file_content,
-                        content=optimised_item_fp.read(),
-                        ext=ext,
-                        subdir=subdir,
-                        sps_filename=item,
-                        user=user,
-                    )
-                    try:
-                        local_to_remote[item] = response["uri"]
-                    except KeyError:
-                        pass
-                    yield response
-
-            if xml_with_pre:
-                if local_to_remote:
-                    # Troca href local por href remoto (sps_filename -> uri)
-                    xml_assets = ArticleAssets(xml_with_pre.xmltree)
-                    xml_assets.replace_names(local_to_remote)
-                response = self._register_remote_file(
-                    minio_push_file_content,
-                    content=xml_with_pre.tostring(),
-                    ext=".xml",
-                    subdir=subdir,
-                    sps_filename=xml_name,
-                    user=user,
-                )
-                yield response
-
-    def _register_remote_file(
-        self, minio_push_file_content, content, ext, subdir, sps_filename, user
-    ):
-        try:
-            # fput_content(self, content, mimetype, object_name)
-            logging.info(f"ArticlePackages._register_remote_file {sps_filename}")
-            response = minio_push_file_content(
-                content=content,
-                mimetype=mimetypes.types_map[ext],
-                object_name=f"{subdir}/{sps_filename}",
-            )
-            self.locations.add(
-                FileLocation.get_or_create(
-                    creator=user, uri=response["uri"], basename=sps_filename
-                )
-            )
-            return response
-        except Exception as e:
-            logging.info(response)
-            logging.exception(e)
-            message = _("Unable to register file in minio {} {}").format(
-                sps_filename, response
-            )
-            return dict(
-                e=e,
-                migrated_item_name="remote_file",
-                migrated_item_id=sps_filename,
-                message=message,
-                action_name="minio_push_file_content",
             )

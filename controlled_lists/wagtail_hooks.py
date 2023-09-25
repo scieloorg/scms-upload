@@ -49,7 +49,7 @@ class IndexedAtAdminGroup(ModelAdminGroup):
     )
 
 
-modeladmin_register(IndexedAtAdminGroup)
+# modeladmin_register(IndexedAtAdminGroup)
 
 
 @hooks.register("register_admin_urls")

@@ -20,7 +20,8 @@ class IssueAdmin(ModelAdmin):
     menu_label = _("Issues")
     create_view_class = IssueCreateView
     menu_icon = "folder"
-    menu_order = get_menu_order("issue")
+    # menu_order = get_menu_order("issue")
+    menu_order = 300
     add_to_settings_menu = False
     exclude_from_explorer = False
 
