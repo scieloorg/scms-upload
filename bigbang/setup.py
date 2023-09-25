@@ -2,15 +2,18 @@ import json
 
 from django.contrib.auth import get_user_model
 
-from collection.models import Collection
+from collection.models import Collection, WebSiteConfiguration
 from migration.models import ClassicWebsiteConfiguration
+from files_storage.models import MinioConfiguration
+from pid_requester.models import PidProviderConfig
+
 
 User = get_user_model()
 
 
-def load_classic_website_configuration(username):
-    user = User.objects.get(username=username)
-    with open(".envs/.bigbang") as fp:
+def setup(user, file_path):
+    file_path = file_path or "./bigbang/.envs/.bigbang"
+    with open(file_path) as fp:
         data = json.loads(fp.read())
 
     collection = Collection.get_or_create(acron=data["collection_acron"], user=user)
@@ -29,7 +32,16 @@ def load_classic_website_configuration(username):
         htdocs_img_revistas_path=config["HTDOCS_IMG_REVISTAS_PATH"],
         user=user,
     )
+    MinioConfiguration.get_or_create(user=user, **data["files_storage_config"])
 
-
-def run(username):
-    load_classic_website_configuration(username)
+    for item in data["websites"]:
+        item["enabled"] = item["enabled"] == "true"
+        WebSiteConfiguration.create_or_update(user=user, collection=collection, **item)
+    PidProviderConfig.get_or_create(
+        creator=user,
+        pid_provider_api_post_xml=data["pid_provider"]["pid_provider"],
+        pid_provider_api_get_token=data["pid_provider"]["token"],
+        api_username=data["pid_provider"]["name"],
+        api_password=data["pid_provider"]["pp"],
+        timeout=10,
+    )
