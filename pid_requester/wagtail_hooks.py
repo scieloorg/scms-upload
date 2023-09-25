@@ -8,6 +8,7 @@ from wagtail.contrib.modeladmin.options import (
 from wagtail.contrib.modeladmin.views import CreateView
 
 from .models import PidChange, PidProviderConfig, PidRequest, PidRequesterXML
+from config.menu import get_menu_order
 
 
 class PidRequestCreateView(CreateView):
@@ -130,7 +131,9 @@ class PidProviderConfigAdmin(ModelAdmin):
 class PidRequesterAdminGroup(ModelAdminGroup):
     menu_label = _("Pid Requester")
     menu_icon = "folder-open-inverse"  # change as required
-    menu_order = 100  # will put in 3rd place (000 being 1st, 100 2nd)
+    menu_order = get_menu_order(
+        "pid_provider"
+    )  # will put in 3rd place (000 being 1st, 100 2nd)
     items = (
         PidProviderConfigAdmin,
         PidRequesterXMLAdmin,
