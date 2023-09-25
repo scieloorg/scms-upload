@@ -45,7 +45,7 @@ class PeriodicTaskAdmin(ModelAdmin):
     list_filter = [
         "enabled",
         "one_off",
-        "task",
+        # "task",
     ]
     actions = ("enable_tasks", "disable_tasks", "toggle_tasks", "run_tasks")
     search_fields = ("name",)

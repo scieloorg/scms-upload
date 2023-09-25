@@ -10,14 +10,8 @@ from django.template.defaultfilters import pluralize
 from django.utils.translation import gettext_lazy as _
 from kombu.utils.json import loads
 
-from .models import (
-    ClockedSchedule,
-    CrontabSchedule,
-    IntervalSchedule,
-    PeriodicTask,
-    PeriodicTasks,
-    SolarSchedule,
-)
+from .models import (ClockedSchedule, CrontabSchedule, IntervalSchedule,
+                     PeriodicTask, PeriodicTasks, SolarSchedule)
 from .utils import is_database_scheduler
 
 
@@ -28,13 +22,10 @@ class TaskSelectWidget(Select):
     _choices = None
 
     def tasks_as_choices(self):
-        _ = self._modules  # noqa
-        tasks = list(
-            sorted(
-                name for name in self.celery_app.tasks if not name.startswith("celery.")
-            )
-        )
-        return (("", ""),) + tuple(zip(tasks, tasks))
+        _ = self._modules
+        tasks = list(sorted(name for name in self.celery_app.tasks
+                            if not name.startswith('celery.')))
+        return (('', ''), ) + tuple(zip(tasks, tasks))
 
     @property
     def choices(self):
@@ -66,11 +57,11 @@ class PeriodicTaskForm(forms.ModelForm):
     """Form that lets you create and modify periodic tasks."""
 
     regtask = TaskChoiceField(
-        label=_("Task (registered)"),
+        label=_('Task (registered)'),
         required=False,
     )
     task = forms.CharField(
-        label=_("Task (custom)"),
+        label=_('Task (custom)'),
         required=False,
         max_length=200,
     )
@@ -83,17 +74,17 @@ class PeriodicTaskForm(forms.ModelForm):
 
     def clean(self):
         data = super().clean()
-        regtask = data.get("regtask")
+        regtask = data.get('regtask')
         if regtask:
-            data["task"] = regtask
-        if not data["task"]:
-            exc = forms.ValidationError(_("Need name of task"))
-            self._errors["task"] = self.error_class(exc.messages)
+            data['task'] = regtask
+        if not data['task']:
+            exc = forms.ValidationError(_('Need name of task'))
+            self._errors['task'] = self.error_class(exc.messages)
             raise exc
 
-        if data.get("expire_seconds") is not None and data.get("expires"):
+        if data.get('expire_seconds') is not None and data.get('expires'):
             raise forms.ValidationError(
-                _("Only one can be set, in expires and expire_seconds")
+                _('Only one can be set, in expires and expire_seconds')
             )
         return data
 
@@ -103,15 +94,15 @@ class PeriodicTaskForm(forms.ModelForm):
             loads(value)
         except ValueError as exc:
             raise forms.ValidationError(
-                _("Unable to parse JSON: %s") % exc,
+                _('Unable to parse JSON: %s') % exc,
             )
         return value
 
     def clean_args(self):
-        return self._clean_json("args")
+        return self._clean_json('args')
 
     def clean_kwargs(self):
-        return self._clean_json("kwargs")
+        return self._clean_json('kwargs')
 
 
 class PeriodicTaskAdmin(admin.ModelAdmin):
@@ -120,81 +111,62 @@ class PeriodicTaskAdmin(admin.ModelAdmin):
     form = PeriodicTaskForm
     model = PeriodicTask
     celery_app = current_app
-    date_hierarchy = "start_time"
-    list_display = (
-        "__str__",
-        "enabled",
-        "interval",
-        "start_time",
-        "last_run_at",
-        "one_off",
-    )
-    list_filter = ["enabled", "one_off", "task", "start_time", "last_run_at"]
-    actions = ("enable_tasks", "disable_tasks", "toggle_tasks", "run_tasks")
-    search_fields = ("name",)
+    date_hierarchy = 'start_time'
+    list_display = ('name', 'enabled', 'scheduler', 'interval', 'start_time',
+                    'last_run_at', 'one_off')
+    list_filter = ['enabled', 'one_off', 'task', 'start_time', 'last_run_at']
+    actions = ('enable_tasks', 'disable_tasks', 'toggle_tasks', 'run_tasks')
+    search_fields = ('name',)
     fieldsets = (
-        (
-            None,
-            {
-                "fields": (
-                    "name",
-                    "regtask",
-                    "task",
-                    "enabled",
-                    "description",
-                ),
-                "classes": ("extrapretty", "wide"),
-            },
-        ),
-        (
-            "Schedule",
-            {
-                "fields": (
-                    "interval",
-                    "crontab",
-                    "solar",
-                    "clocked",
-                    "start_time",
-                    "last_run_at",
-                    "one_off",
-                ),
-                "classes": ("extrapretty", "wide"),
-            },
-        ),
-        (
-            "Arguments",
-            {
-                "fields": ("args", "kwargs"),
-                "classes": ("extrapretty", "wide", "collapse", "in"),
-            },
-        ),
-        (
-            "Execution Options",
-            {
-                "fields": (
-                    "expires",
-                    "expire_seconds",
-                    "queue",
-                    "exchange",
-                    "routing_key",
-                    "priority",
-                    "headers",
-                ),
-                "classes": ("extrapretty", "wide", "collapse", "in"),
-            },
-        ),
+        (None, {
+            'fields': ('name', 'regtask', 'task', 'enabled', 'description',),
+            'classes': ('extrapretty', 'wide'),
+        }),
+        (_('Schedule'), {
+            'fields': ('interval', 'crontab', 'crontab_translation', 'solar',
+                       'clocked', 'start_time', 'last_run_at', 'one_off'),
+            'classes': ('extrapretty', 'wide'),
+        }),
+        (_('Arguments'), {
+            'fields': ('args', 'kwargs'),
+            'classes': ('extrapretty', 'wide', 'collapse', 'in'),
+        }),
+        (_('Execution Options'), {
+            'fields': ('expires', 'expire_seconds', 'queue', 'exchange',
+                       'routing_key', 'priority', 'headers'),
+            'classes': ('extrapretty', 'wide', 'collapse', 'in'),
+        }),
     )
-    readonly_fields = ("last_run_at",)
+    readonly_fields = (
+        'last_run_at', 'crontab_translation',
+    )
+
+    def crontab_translation(self, obj):
+        return obj.crontab.human_readable
+
+    change_form_template = 'admin/djcelery/change_periodictask_form.html'
+
+    def changeform_view(self, request, object_id=None, form_url='',
+                        extra_context=None):
+        extra_context = extra_context or {}
+        crontabs = CrontabSchedule.objects.all()
+        crontab_dict = {}
+        for crontab in crontabs:
+            crontab_dict[crontab.id] = crontab.human_readable
+        extra_context['readable_crontabs'] = crontab_dict
+        return super().changeform_view(request, object_id,
+                                       extra_context=extra_context)
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
-        scheduler = getattr(settings, "CELERY_BEAT_SCHEDULER", None)
-        extra_context["wrong_scheduler"] = not is_database_scheduler(scheduler)
-        return super(PeriodicTaskAdmin, self).changelist_view(request, extra_context)
+        scheduler = getattr(settings, 'CELERY_BEAT_SCHEDULER', None)
+        extra_context['wrong_scheduler'] = not is_database_scheduler(scheduler)
+        return super().changelist_view(
+            request, extra_context)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related("interval", "crontab", "solar", "clocked")
+        return qs.select_related('interval', 'crontab', 'solar', 'clocked')
 
     def _message_user_about_update(self, request, rows_updated, verb):
         """Send message about action to user.
@@ -204,10 +176,10 @@ class PeriodicTaskAdmin(admin.ModelAdmin):
         """
         self.message_user(
             request,
-            _("{0} task{1} {2} successfully {3}").format(
+            _('{0} task{1} {2} successfully {3}').format(
                 rows_updated,
                 pluralize(rows_updated),
-                pluralize(rows_updated, _("was,were")),
+                pluralize(rows_updated, _('was,were')),
                 verb,
             ),
         )
@@ -215,43 +187,35 @@ class PeriodicTaskAdmin(admin.ModelAdmin):
     def enable_tasks(self, request, queryset):
         rows_updated = queryset.update(enabled=True)
         PeriodicTasks.update_changed()
-        self._message_user_about_update(request, rows_updated, "enabled")
-
-    enable_tasks.short_description = _("Enable selected tasks")
+        self._message_user_about_update(request, rows_updated, 'enabled')
+    enable_tasks.short_description = _('Enable selected tasks')
 
     def disable_tasks(self, request, queryset):
-        rows_updated = queryset.update(enabled=False)
+        rows_updated = queryset.update(enabled=False, last_run_at=None)
         PeriodicTasks.update_changed()
-        self._message_user_about_update(request, rows_updated, "disabled")
-
-    disable_tasks.short_description = _("Disable selected tasks")
+        self._message_user_about_update(request, rows_updated, 'disabled')
+    disable_tasks.short_description = _('Disable selected tasks')
 
     def _toggle_tasks_activity(self, queryset):
-        return queryset.update(
-            enabled=Case(
-                When(enabled=True, then=Value(False)),
-                default=Value(True),
-            )
-        )
+        return queryset.update(enabled=Case(
+            When(enabled=True, then=Value(False)),
+            default=Value(True),
+        ))
 
     def toggle_tasks(self, request, queryset):
         rows_updated = self._toggle_tasks_activity(queryset)
         PeriodicTasks.update_changed()
-        self._message_user_about_update(request, rows_updated, "toggled")
-
-    toggle_tasks.short_description = _("Toggle activity of selected tasks")
+        self._message_user_about_update(request, rows_updated, 'toggled')
+    toggle_tasks.short_description = _('Toggle activity of selected tasks')
 
     def run_tasks(self, request, queryset):
         self.celery_app.loader.import_default_modules()
-        tasks = [
-            (
-                self.celery_app.tasks.get(task.task),
-                loads(task.args),
-                loads(task.kwargs),
-                task.queue,
-            )
-            for task in queryset
-        ]
+        tasks = [(self.celery_app.tasks.get(task.task),
+                  loads(task.args),
+                  loads(task.kwargs),
+                  task.queue,
+                  task.name)
+                 for task in queryset]
 
         if any(t[0] is None for t in tasks):
             for i, t in enumerate(tasks):
@@ -263,39 +227,50 @@ class PeriodicTaskAdmin(admin.ModelAdmin):
 
             self.message_user(
                 request,
-                _('task "{0}" not found'.format(not_found_task_name)),
+                _(f'task "{not_found_task_name}" not found'),
                 level=messages.ERROR,
             )
             return
 
         task_ids = [
-            task.apply_async(args=args, kwargs=kwargs, queue=queue)
+            task.apply_async(args=args, kwargs=kwargs, queue=queue,
+                             periodic_task_name=periodic_task_name)
             if queue and len(queue)
-            else task.apply_async(args=args, kwargs=kwargs)
-            for task, args, kwargs, queue in tasks
+            else task.apply_async(args=args, kwargs=kwargs,
+                                  periodic_task_name=periodic_task_name)
+            for task, args, kwargs, queue, periodic_task_name in tasks
         ]
         tasks_run = len(task_ids)
         self.message_user(
             request,
-            _("{0} task{1} {2} successfully run").format(
+            _('{0} task{1} {2} successfully run').format(
                 tasks_run,
                 pluralize(tasks_run),
-                pluralize(tasks_run, _("was,were")),
+                pluralize(tasks_run, _('was,were')),
             ),
         )
-
-    run_tasks.short_description = _("Run selected tasks")
+    run_tasks.short_description = _('Run selected tasks')
 
 
 class ClockedScheduleAdmin(admin.ModelAdmin):
     """Admin-interface for clocked schedules."""
 
-    fields = ("clocked_time",)
-    list_display = ("clocked_time",)
+    fields = (
+        'clocked_time',
+    )
+    list_display = (
+        'clocked_time',
+    )
+
+
+class CrontabScheduleAdmin(admin.ModelAdmin):
+    """Admin class for CrontabSchedule."""
+
+    list_display = ('__str__', 'human_readable')
 
 
 admin.site.register(IntervalSchedule)
-admin.site.register(CrontabSchedule)
+admin.site.register(CrontabSchedule, CrontabScheduleAdmin)
 admin.site.register(SolarSchedule)
 admin.site.register(ClockedSchedule, ClockedScheduleAdmin)
 admin.site.register(PeriodicTask, PeriodicTaskAdmin)
