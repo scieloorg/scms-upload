@@ -10,9 +10,10 @@ from wagtail.contrib.modeladmin.options import (
 from wagtail.contrib.modeladmin.views import CreateView
 
 from config.menu import get_menu_order
+from files_storage.models import MinioConfiguration
 from migration.models import ClassicWebsiteConfiguration
 
-from .models import Collection, FilesStorageConfiguration, NewWebSiteConfiguration
+from .models import Collection, WebSiteConfiguration
 
 
 class CoreCreateView(CreateView):
@@ -49,8 +50,8 @@ class CollectionModelAdmin(ModelAdmin):
     )
 
 
-class NewWebSiteConfigurationModelAdmin(ModelAdmin):
-    model = NewWebSiteConfiguration
+class WebSiteConfigurationModelAdmin(ModelAdmin):
+    model = WebSiteConfiguration
     menu_label = _("New WebSites Configurations")
     menu_icon = "doc-full"
     menu_order = 200
@@ -61,16 +62,21 @@ class NewWebSiteConfigurationModelAdmin(ModelAdmin):
 
     list_display = (
         "url",
+        "purpose",
+        "enabled",
         "created",
         "updated",
         "updated_by",
     )
-    list_filter = ("url",)
+    list_filter = (
+        "purpose",
+        "enabled",
+    )
     search_fields = ("url",)
 
 
-class FilesStorageConfigurationModelAdmin(ModelAdmin):
-    model = FilesStorageConfiguration
+class MinioConfigurationModelAdmin(ModelAdmin):
+    model = MinioConfiguration
     menu_label = _("Files Storage Configuration")
     menu_icon = "doc-full"
     menu_order = 200
@@ -116,11 +122,12 @@ class ClassicWebsiteConfigurationModelAdmin(ModelAdmin):
 class CollectionModelAdminGroup(ModelAdminGroup):
     menu_label = _("Collections")
     menu_icon = "folder-open-inverse"
-    menu_order = get_menu_order("collection")
+    # menu_order = get_menu_order("collection")
+    menu_order = 100
     items = (
         CollectionModelAdmin,
-        NewWebSiteConfigurationModelAdmin,
-        FilesStorageConfigurationModelAdmin,
+        WebSiteConfigurationModelAdmin,
+        MinioConfigurationModelAdmin,
         ClassicWebsiteConfigurationModelAdmin,
     )
 

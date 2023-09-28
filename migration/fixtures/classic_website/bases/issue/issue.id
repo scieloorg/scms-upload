@@ -4,13 +4,13 @@
 !v706!i
 !v701!1
 !v091!20110929
-!v130!Revista de Saúde Pública
+!v130!Revista de Saï¿½de Pï¿½blica
 !v421!Rev Saude Publica
-!v151!Rev. saúde pública
+!v151!Rev. saï¿½de pï¿½blica
 !v230!Journal of Public Health
 !v035!0034-8910
-!v480!Faculdade de Saúde Pública da Universidade de São Paulo
-!v030!Rev. Saúde Pública
+!v480!Faculdade de Saï¿½de Pï¿½blica da Universidade de Sï¿½o Paulo
+!v030!Rev. Saï¿½de Pï¿½blica
 !v930!RSP
 !v117!vancouv
 !v085!decs
@@ -23,23 +23,23 @@
 !v065!20111000
 !v122!25
 !v048!^les^hSumario
-!v048!^lpt^hSumário
+!v048!^lpt^hSumï¿½rio
 !v048!^len^hTable of Contents
 !v049!^lpt^cRSP010^tArtigos Originais
 !v049!^len^cRSP010^tOriginal Articles
-!v049!^lpt^cRSP140^tRevisão
+!v049!^lpt^cRSP140^tRevisï¿½o
 !v049!^len^cRSP140^tReview
-!v049!^lpt^cRSP150^tInformes Técnicos Institucionais
+!v049!^lpt^cRSP150^tInformes Tï¿½cnicos Institucionais
 !v049!^len^cRSP150^tTechnical Institutional Reports
-!v049!^lpt^cRSP410^tComunicação Breve
+!v049!^lpt^cRSP410^tComunicaï¿½ï¿½o Breve
 !v049!^len^cRSP410^tBrief Communications
-!v049!^lpt^cRSP670^tComentários
+!v049!^lpt^cRSP670^tComentï¿½rios
 !v049!^len^cRSP670^tComments
 !v049!^lpt^cRSP760^tCarta ao Editor
 !v049!^len^cRSP760^tLetter to the Editor
-!v043!^les^tRev. Saúde Pública^vvol.45^nno.5^cSão Paulo^moct.^a2011
-!v043!^lpt^tRev. Saúde Pública^vvol.45^nno.5^cSão Paulo^mout.^a2011
-!v043!^len^tRev. Saúde Pública^vvol.45^nno.5^cSão Paulo^mOct.^a2011
+!v043!^les^tRev. Saï¿½de Pï¿½blica^vvol.45^nno.5^cSï¿½o Paulo^moct.^a2011
+!v043!^lpt^tRev. Saï¿½de Pï¿½blica^vvol.45^nno.5^cSï¿½o Paulo^mout.^a2011
+!v043!^len^tRev. Saï¿½de Pï¿½blica^vvol.45^nno.5^cSï¿½o Paulo^mOct.^a2011
 !v541!BY-NC
 !ID 0027604
 !v991!1
@@ -47,13 +47,13 @@
 !v706!i
 !v701!1
 !v091!20220824
-!v130!Revista de Saúde Pública
+!v130!Revista de Saï¿½de Pï¿½blica
 !v421!Rev Saude Publica
-!v151!Rev. saúde pública
+!v151!Rev. saï¿½de pï¿½blica
 !v230!Journal of Public Health
 !v035!0034-8910
-!v480!Faculdade de Saúde Pública da Universidade de São Paulo
-!v030!Rev. Saúde Pública
+!v480!Faculdade de Saï¿½de Pï¿½blica da Universidade de Sï¿½o Paulo
+!v030!Rev. Saï¿½de Pï¿½blica
 !v930!RSP
 !v117!vancouv
 !v085!decs
@@ -67,23 +67,339 @@
 !v065!20220000
 !v122!3
 !v048!^les^hSumario
-!v048!^lpt^hSumário
+!v048!^lpt^hSumï¿½rio
 !v048!^len^hTable of Contents
 !v049!^lpt^cRSP010^tArtigos Originais
 !v049!^len^cRSP010^tOriginal Articles
-!v049!^les^cRSP900^tComunicación Breve
-!v049!^lpt^cRSP900^tComunicação Breve
+!v049!^les^cRSP900^tComunicaciï¿½n Breve
+!v049!^lpt^cRSP900^tComunicaï¿½ï¿½o Breve
 !v049!^len^cRSP900^tBrief Communication
-!v049!^les^cRSP910^tRevisión
-!v049!^lpt^cRSP910^tRevisão
+!v049!^les^cRSP910^tRevisiï¿½n
+!v049!^lpt^cRSP910^tRevisï¿½o
 !v049!^len^cRSP910^tReview
 !v049!^les^cRSP920^tCarta al Editor
 !v049!^lpt^cRSP920^tCarta ao Editor
 !v049!^len^cRSP920^tLetters to the Editor
 !v049!^les^cRSP930^tComentarios
-!v049!^lpt^cRSP930^tComentários
+!v049!^lpt^cRSP930^tComentï¿½rios
 !v049!^len^cRSP930^tComments
-!v043!^les^tRev. Saúde Pública^vvol.56^cSão Paulo^a2022
-!v043!^lpt^tRev. Saúde Pública^vvol.56^cSão Paulo^a2022
-!v043!^len^tRev. Saúde Pública^vvol.56^cSão Paulo^a2022
+!v043!^les^tRev. Saï¿½de Pï¿½blica^vvol.56^cSï¿½o Paulo^a2022
+!v043!^lpt^tRev. Saï¿½de Pï¿½blica^vvol.56^cSï¿½o Paulo^a2022
+!v043!^len^tRev. Saï¿½de Pï¿½blica^vvol.56^cSï¿½o Paulo^a2022
 !v541!BY
+!ID 0000001
+!v030!Rev. Saï¿½de Pï¿½blica
+!v031!38
+!v032!1
+!v035!0034-8910
+!v036!20041
+!v042!1
+!v043!^les^tRev. Saï¿½de Pï¿½blica^vv.38^nn.1^cSï¿½o Paulo^mfeb.^a2004
+!v043!^lpt^tRev. Saï¿½de Pï¿½blica^vv.38^nn.1^cSï¿½o Paulo^mfev.^a2004
+!v043!^len^tRev. Saï¿½de Pï¿½blica^vvol.38^nno.1^cSï¿½o Paulo^mFeb.^a2004
+!v048!^les^hSumario
+!v048!^lpt^hSumï¿½rio
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP090^tArtigo Especial
+!v049!^lpt^cRSP220^tComunicaï¿½ï¿½es Breves
+!v049!^lpt^cRSP270^tCartas ao Editor
+!v049!^lpt^cRSP150^tInformes Tï¿½cnicos Institucionais
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP090^tSpecial Article
+!v049!^len^cRSP220^tBrief Communications
+!v049!^len^cRSP270^tLetters to the editor
+!v049!^len^cRSP150^tTechnical Institutional Reports
+!v065!20040200
+!v085!decs
+!v091!20040106
+!v117!vancouv
+!v122!23
+!v130!Revista de Saï¿½de Pï¿½blica
+!v151!Rev. saï¿½de pï¿½blica
+!v200!0
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saï¿½de Pï¿½blica da Universidade de Sï¿½o Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!198
+!ID 0000002
+!v030!Rev. Saï¿½de Pï¿½blica
+!v031!38
+!v032!2
+!v035!0034-8910
+!v036!20042
+!v042!1
+!v043!^les^tRev. Saï¿½de Pï¿½blica^vv.38^nn.2^cSï¿½o Paulo^mabr.^a2004
+!v043!^lpt^tRev. Saï¿½de Pï¿½blica^vv.38^nn.2^cSï¿½o Paulo^mabr.^a2004
+!v043!^len^tRev. Saï¿½de Pï¿½blica^vvol.38^nno.2^cSï¿½o Paulo^mApr.^a2004
+!v048!^les^hSumario
+!v048!^lpt^hSumï¿½rio
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP150^tInformes Tï¿½cnicos Institucionais
+!v049!^lpt^cRSP080^tCartas ao Editor
+!v049!^lpt^cRSP220^tComunicaï¿½ï¿½es Breves
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP150^tTechnical Institutional Reports
+!v049!^len^cRSP080^tLetter to editor
+!v049!^len^cRSP220^tBrief Communications
+!v065!20040400
+!v085!decs
+!v091!20040426
+!v117!vancouv
+!v122!30
+!v130!Revista de Saï¿½de Pï¿½blica
+!v151!Rev. saï¿½de pï¿½blica
+!v200!0
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saï¿½de Pï¿½blica da Universidade de Sï¿½o Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!199
+!ID 0000003
+!v030!Rev. Saï¿½de Pï¿½blica
+!v031!38
+!v032!3
+!v035!0034-8910
+!v036!20043
+!v042!1
+!v043!^les^tRev. Saï¿½de Pï¿½blica^vv.38^nn.3^cSï¿½o Paulo^mjun.^a2004
+!v043!^lpt^tRev. Saï¿½de Pï¿½blica^vv.38^nn.3^cSï¿½o Paulo^mjun.^a2004
+!v043!^len^tRev. Saï¿½de Pï¿½blica^vvol.38^nno.3^cSï¿½o Paulo^mJune^a2004
+!v048!^les^hSumario
+!v048!^lpt^hSumï¿½rio
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP220^tComunicaï¿½ï¿½es Breves
+!v049!^lpt^cRSP150^tInformes Tï¿½cnicos Institucionais
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP220^tBrief Communications
+!v049!^len^cRSP150^tTechnical Institutional Reports
+!v065!20040600
+!v085!decs
+!v091!20040706
+!v117!vancouv
+!v122!22
+!v130!Revista de Saï¿½de Pï¿½blica
+!v151!Rev. saï¿½de pï¿½blica
+!v200!0
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saï¿½de Pï¿½blica da Universidade de Sï¿½o Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!200
+!ID 0000004
+!v030!Rev. Saï¿½de Pï¿½blica
+!v031!38
+!v032!4
+!v035!0034-8910
+!v036!20044
+!v042!1
+!v043!^les^tRev. Saï¿½de Pï¿½blica^vv.38^nn.4^cSï¿½o Paulo^mago.^a2004
+!v043!^lpt^tRev. Saï¿½de Pï¿½blica^vv.38^nn.4^cSï¿½o Paulo^mago.^a2004
+!v043!^len^tRev. Saï¿½de Pï¿½blica^vvol.38^nno.4^cSï¿½o Paulo^mAug.^a2004
+!v048!^les^hSumario
+!v048!^lpt^hSumï¿½rio
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP220^tComunicaï¿½ï¿½es Breves
+!v049!^lpt^cRSP030^tAtualizaï¿½ï¿½o
+!v049!^lpt^cRSP150^tInformes Tï¿½cnicos Institucionais
+!v049!^lpt^cRSP140^tRevisï¿½o
+!v049!^lpt^cRSP260^tCartas ao Editor
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP220^tBrief Communications
+!v049!^len^cRSP030^tCurrent Comments
+!v049!^len^cRSP150^tTechnical Institutional Reports
+!v049!^len^cRSP140^tReview
+!v049!^len^cRSP260^tLetter to the Editor
+!v065!20040800
+!v085!decs
+!v091!20040809
+!v117!vancouv
+!v122!24
+!v130!Revista de Saï¿½de Pï¿½blica
+!v151!Rev. saï¿½de pï¿½blica
+!v200!0
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saï¿½de Pï¿½blica da Universidade de Sï¿½o Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!201
+!ID 0000005
+!v030!Rev. Saï¿½de Pï¿½blica
+!v031!38
+!v032!5
+!v035!0034-8910
+!v036!20045
+!v042!1
+!v043!^les^tRev. Saï¿½de Pï¿½blica^vv.38^nn.5^cSï¿½o Paulo^moct.^a2004
+!v043!^lpt^tRev. Saï¿½de Pï¿½blica^vv.38^nn.5^cSï¿½o Paulo^mout.^a2004
+!v043!^len^tRev. Saï¿½de Pï¿½blica^vvol.38^nno.5^cSï¿½o Paulo^mOct.^a2004
+!v048!^les^hSumario
+!v048!^lpt^hSumï¿½rio
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP090^tArtigo Especial
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP220^tComunicaï¿½ï¿½es Breves
+!v049!^lpt^cRSP150^tInformes Tï¿½cnicos Institucionais
+!v049!^len^cRSP090^tSpecial Article
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP220^tBrief Communications
+!v049!^len^cRSP150^tTechnical Institutional Reports
+!v065!20041000
+!v085!decs
+!v091!20041019
+!v117!vancouv
+!v122!26
+!v130!Revista de Saï¿½de Pï¿½blica
+!v151!Rev. saï¿½de pï¿½blica
+!v200!0
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saï¿½de Pï¿½blica da Universidade de Sï¿½o Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!202
+!ID 0000006
+!v030!Rev. Saï¿½de Pï¿½blica
+!v031!38
+!v032!6
+!v035!0034-8910
+!v036!20046
+!v042!1
+!v043!^les^tRev. Saï¿½de Pï¿½blica^vv.38^nn.6^cSï¿½o Paulo^mdic.^a2004
+!v043!^lpt^tRev. Saï¿½de Pï¿½blica^vv.38^nn.6^cSï¿½o Paulo^mdez.^a2004
+!v043!^len^tRev. Saï¿½de Pï¿½blica^vvol.38^nno.6^cSï¿½o Paulo^mDec.^a2004
+!v048!^les^hSumario
+!v048!^lpt^hSumï¿½rio
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP150^tInformes Tï¿½cnicos Institucionais
+!v049!^lpt^cRSP410^tComunicaï¿½ï¿½o Breve
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP150^tTechnical Institutional Reports
+!v049!^len^cRSP410^tBrief Communications
+!v065!20041200
+!v085!decs
+!v091!20041209
+!v117!vancouv
+!v122!16
+!v130!Revista de Saï¿½de Pï¿½blica
+!v151!Rev. saï¿½de pï¿½blica
+!v200!0
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saï¿½de Pï¿½blica da Universidade de Sï¿½o Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!203
+!ID 0000007
+!v030!Rev. Saï¿½de Pï¿½blica
+!v031!38
+!v035!0034-8910
+!v036!20047
+!v042!1
+!v043!^les^tRev. Saï¿½de Pï¿½blica^vv.38^wsupl.^cSï¿½o Paulo^mdic.^a2004
+!v043!^lpt^tRev. Saï¿½de Pï¿½blica^vv.38^wsupl.^cSï¿½o Paulo^mdez.^a2004
+!v043!^len^tRev. Saï¿½de Pï¿½blica^vvol.38^wsuppl.^cSï¿½o Paulo^mDec.^a2004
+!v048!^les^hSumario
+!v048!^lpt^hSumï¿½rio
+!v048!^len^hTable of Contents
+!v049!^lpt^cRSP010^tArtigos Originais
+!v049!^lpt^cRSP060^tEditorial
+!v049!^lpt^cRSP030^tAtualizaï¿½ï¿½o
+!v049!^len^cRSP010^tOriginal Articles
+!v049!^len^cRSP060^tEditorial
+!v049!^len^cRSP030^tCurrent Comments
+!v065!20041200
+!v085!decs
+!v091!20041209
+!v117!vancouv
+!v122!13
+!v130!Revista de Saï¿½de Pï¿½blica
+!v131!0
+!v151!Rev. saï¿½de pï¿½blica
+!v200!0
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v480!Faculdade de Saï¿½de Pï¿½blica da Universidade de Sï¿½o Paulo
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v991!1
+!v006!204
+!ID 0000001
+!v030!Rev. Saï¿½de Pï¿½blica
+!v031!56
+!v035!0034-8910
+!v036!20221
+!v042!1
+!v043!^a2022^cSï¿½o Paulo^les^tRev. Saï¿½de Pï¿½blica^vvol.56
+!v043!^a2022^cSï¿½o Paulo^lpt^tRev. Saï¿½de Pï¿½blica^vvol.56
+!v043!^a2022^cSï¿½o Paulo^len^tRev. Saï¿½de Pï¿½blica^vvol.56
+!v048!^hSumario^les
+!v048!^hSumï¿½rio^lpt
+!v048!^hTable of Contents^len
+!v049!^cRSP010^lpt^tArtigos Originais
+!v049!^cRSP010^len^tOriginal Articles
+!v049!^cRSP860^lpt^tErrata
+!v049!^cRSP860^len^tErratum
+!v049!^cRSP900^les^tComunicaciï¿½n Breve
+!v049!^cRSP900^lpt^tComunicaï¿½ï¿½o Breve
+!v049!^cRSP900^len^tBrief Communication
+!v049!^cRSP910^les^tRevisiï¿½n
+!v049!^cRSP910^lpt^tRevisï¿½o
+!v049!^cRSP910^len^tReview
+!v049!^cRSP920^les^tCarta al Editor
+!v049!^cRSP920^lpt^tCarta ao Editor
+!v049!^cRSP920^len^tLetters to the Editor
+!v049!^cRSP930^les^tComentarios
+!v049!^cRSP930^lpt^tComentï¿½rios
+!v049!^cRSP930^len^tComments
+!v065!20220000
+!v085!decs
+!v091!20221108
+!v117!vancouv
+!v122!3
+!v130!Revista de Saï¿½de Pï¿½blica
+!v151!Rev. saï¿½de pï¿½blica
+!v200!0
+!v230!Journal of Public Health
+!v421!Rev Saude Publica
+!v435!0034-8910^tPRINT
+!v435!1518-8787^tONLIN
+!v480!Faculdade de Saï¿½de Pï¿½blica da Universidade de Sï¿½o Paulo
+!v541!BY
+!v700!0
+!v701!1
+!v706!i
+!v930!RSP
+!v935!1518-8787
+!v991!1
+!v9999!../bases-work/rsp/rsp
+!v006!302

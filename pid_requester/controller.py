@@ -337,9 +337,8 @@ class PidProviderAPI:
             # TODO tratar as exceções
             logging.exception(e)
             raise exceptions.GetAPITokenError(
-                _("Unable to get api token {} {} {} {}").format(
+                _("Unable to get api token {} {} {}").format(
                     username,
-                    password,
                     type(e),
                     e,
                 )

@@ -14,7 +14,7 @@ from wagtail.contrib.modeladmin.views import CreateView, InspectView
 from config.menu import get_menu_order
 
 from .button_helper import ArticleButtonHelper, RequestArticleChangeButtonHelper
-from .models import Article, RelatedItem, RequestArticleChange, choices
+from .models import Article, RelatedItem, RequestArticleChange, choices, SciELOArticle
 from .permission_helper import ArticlePermissionHelper
 
 # from upload import exceptions as upload_exceptions
@@ -111,6 +111,38 @@ class ArticleAdminInspectView(InspectView):
         return super().get_context_data(**data)
 
 
+class SciELOArticleModelAdmin(ModelAdmin):
+    model = SciELOArticle
+    menu_label = _("SciELO Articles")
+    inspect_view_enabled = True
+    menu_icon = "doc-full"
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+
+    list_display = (
+        "collection",
+        "article",
+        "publication_stage",
+        "created",
+        "updated",
+    )
+    list_filter = (
+        "publication_stage",
+        "collection",
+    )
+    search_fields = (
+        "article__pid_v3",
+    )
+    inspect_view_fields = (
+        "collection",
+        "article",
+        "publication_stage",
+        "created",
+        "updated",
+    )
+
+
 class ArticleModelAdmin(ModelAdmin):
     model = Article
     menu_label = _("Articles")
@@ -124,30 +156,25 @@ class ArticleModelAdmin(ModelAdmin):
     add_to_settings_menu = False
     exclude_from_explorer = False
 
-    def doi_list(self, obj):
-        return ", ".join([str(dl) for dl in obj.doi_with_lang.all()])
-
     list_display = (
         "pid_v3",
-        "pid_v2",
-        "doi_list",
-        "aop_pid",
-        "article_type",
+        # "pid_v2",
+        # "doi_list",
+        # "aop_pid",
+        # "article_type",
         "status",
         "issue",
+        "journal",
         "created",
         "updated",
-        "updated_by",
+        # "updated_by",
     )
     list_filter = (
         "status",
-        "article_type",
     )
     search_fields = (
-        "pid_v2",
         "pid_v3",
-        "doi_with_lang__doi",
-        "aop_pid",
+        "issue__publication_year",
     )
     inspect_view_fields = (
         "created",
@@ -155,14 +182,14 @@ class ArticleModelAdmin(ModelAdmin):
         "creator",
         "updated_by",
         "pid_v3",
-        "pid_v2",
-        "aop_pid",
+        # "pid_v2",
+        # "aop_pid",
         "doi_with_lang",
         "article_type",
         "status",
         "issue",
-        "author",
-        "title_with_lang",
+        # "author",
+        # "title_with_lang",
         "elocation_id",
         "fpage",
         "lpage",
@@ -242,8 +269,14 @@ class RequestArticleChangeModelAdmin(ModelAdmin):
 class ArticleModelAdminGroup(ModelAdminGroup):
     menu_label = _("Articles")
     menu_icon = "folder-open-inverse"
-    menu_order = get_menu_order("article")
-    items = (ArticleModelAdmin, RelatedItemModelAdmin, RequestArticleChangeModelAdmin)
+    # menu_order = get_menu_order("article")
+    menu_order = 400
+    items = (
+        SciELOArticleModelAdmin,
+        ArticleModelAdmin,
+        RelatedItemModelAdmin,
+        # RequestArticleChangeModelAdmin,
+    )
 
 
 modeladmin_register(ArticleModelAdminGroup)

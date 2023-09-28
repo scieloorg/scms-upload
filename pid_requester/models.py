@@ -543,9 +543,9 @@ class PidRequesterXML(CommonControlField):
         registered._add_journal(xml_adapter)
         registered._add_issue(xml_adapter, registered.journal)
         registered._add_current_version(xml_adapter, user)
-        registered._add_synchronization_status(error_msg, error_type, traceback, user)
         registered.save()
 
+        registered._add_synchronization_status(error_msg, error_type, traceback, user)
         registered._add_pid_changes(changed_pids, user)
         registered._add_related_items(xml_adapter, user)
 

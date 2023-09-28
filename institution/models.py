@@ -49,24 +49,10 @@ class Institution(CommonControlField, ClusterableModel):
     ]
 
     def __unicode__(self):
-        return "%s | %s | %s | %s | %s" % (
-            self.name,
-            self.acronym,
-            self.level_1,
-            self.level_2,
-            self.level_3,
-            self.location,
-        )
+        return f"{self.name} {self.acronym} {self.location}"
 
     def __str__(self):
-        return "%s | %s | %s | %s | %s" % (
-            self.name,
-            self.acronym,
-            self.level_1,
-            self.level_2,
-            self.level_3,
-            self.location,
-        )
+        return f"{self.name} {self.acronym} {self.location}"
 
     @property
     def data(self):
@@ -89,9 +75,7 @@ class Institution(CommonControlField, ClusterableModel):
                 if not selected:
                     selected = item
                     continue
-                if count(item.data.values(), None) < count(
-                    selected.data.values(), None
-                ):
+                if item.data.values().count(None) < selected.data.values().count(None):
                     selected = item
             return selected
 

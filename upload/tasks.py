@@ -1,6 +1,7 @@
 import json
 
 from celery.result import AsyncResult
+from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
 from packtools.sps import exceptions as sps_exceptions
 from packtools.sps.models import package as sps_package
@@ -19,6 +20,8 @@ from libs.dsm.publication.documents import get_document, get_similar_documents
 
 from . import choices, controller, exceptions, models
 from .utils import file_utils, package_utils, xml_utils
+
+User = get_user_model()
 
 
 def run_validations(
@@ -454,9 +457,6 @@ def task_validate_renditions(file_path, xml_path, package_id):
         return True
 
 
-from datetime import date
-
-
 @celery_app.task(name="Validate XML")
 def task_validate_content_xml(file_path, xml_path, package_id):
     xml_str = file_utils.get_xml_content_from_zip(file_path)
@@ -556,6 +556,14 @@ def task_get_or_create_package(pid_v3, user_id):
         ).id
 
 
+def _get_user(request, user_id):
+    try:
+        return User.objects.get(pk=request.user.id)
+    except AttributeError:
+        return User.objects.get(pk=user_id)
+
+
 @celery_app.task(bind=True, name="request_pid_for_accepted_packages")
 def task_request_pid_for_accepted_packages(self, user_id):
-    controller.request_pid_for_accepted_packages(user_id)
+    user = _get_user(self.request, user_id)
+    controller.request_pid_for_accepted_packages(user)

@@ -1,3 +1,7 @@
+class CreateOrUpdateMigratedError(Exception):
+    ...
+
+
 class ScheduleMigrationsError(Exception):
     ...
 

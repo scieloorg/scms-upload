@@ -3,10 +3,13 @@ from datetime import datetime
 
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db.models import Q
 from django.utils.translation import gettext as _
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
 from wagtail.snippets.models import register_snippet
+
+from core.forms import CoreAdminModelForm
 
 from . import choices
 
@@ -50,8 +53,26 @@ class CommonControlField(models.Model):
         on_delete=models.CASCADE,
     )
 
+    @classmethod
+    def get_latest_change(cls):
+        dates = []
+        try:
+            dates.append(cls.objects.latest("updated").updated)
+        except:
+            pass
+        try:
+            dates.append(cls.objects.latest("created").created)
+        except:
+            pass
+        try:
+            return max(dates)
+        except ValueError:
+            return
+
     class Meta:
         abstract = True
+
+    base_form_class = CoreAdminModelForm
 
 
 class RichTextWithLang(models.Model):

@@ -1,127 +1,65 @@
 import logging
+from datetime import datetime
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from article.controller import request_pid_v3_and_create_article
-from article.models import Article, ArticlePackages
+from article.controller import create_article
+from article.models import Article
 from config import celery_app
-
-from . import controller
+from package.models import SPSPkg
 
 User = get_user_model()
 
 
-def _get_user(request, username):
-    try:
-        return User.objects.get(pk=request.user.id)
-    except AttributeError:
+def _get_user(user_id, username):
+    if user_id:
+        return User.objects.get(pk=user_id)
+    if username:
         return User.objects.get(username=username)
 
 
-@celery_app.task(bind=True, name="request_pid_v3_and_create_articles")
-def task_request_pid_v3_and_create_articles(
+@celery_app.task(bind=True)
+def task_create_or_update_articles(
     self,
-    username,
+    user_id=None,
+    username=None,
+    from_date=None,
+    force_update=None,
 ):
-    items = ArticlePackages.objects.filter(
-        article__isnull=True,
-        optimised_zip_file__isnull=False,
-        not_optimised_zip_file__isnull=False,
-    )
-    for article_pkgs in items.iterator():
-        task_request_pid_v3_and_create_article.apply_async(
-            kwargs={
-                "username": username,
-                "article_pkgs_id": article_pkgs.id,
-            }
-        )
-
-
-@celery_app.task(bind=True, name="request_pid_v3_and_create_article")
-def task_request_pid_v3_and_create_article(
-    self,
-    username,
-    article_pkgs_id,
-):
-    user = _get_user(self.request, username)
-    article_pkgs = ArticlePackages.objects.get(id=article_pkgs_id)
-
-    xml_name = article_pkgs.sps_pkg_name + ".xml"
+    user = _get_user(user_id, username)
 
     try:
-        for item in article_pkgs.components.filter(former_locations__isnull=False):
-            if item.collection_acron:
-                collection = Collection.get_or_create(acron=item.collection_acron)
-                break
-    except AttributeError:
-        collection = None
-    try:
-        logging.info(f"Solicita/Confirma PID v3 para {xml_name}")
-
-        # solicita pid v3 e obtém o article criado
-        xml_with_pre = article_pkgs.get_xml_with_pre()
-        response = request_pid_v3_and_create_article(
-            xml_with_pre,
-            xml_name,
-            user,
-            collection,
-        )
-        if response["xml_changed"]:
-            article_pkgs.update_xml(xml_with_pre)
-        # cria / obtém article
-        logging.info(f"Cria / obtém article para {xml_name}")
-        article_pkgs.article = response["article"]
-        article_pkgs.save()
-
+        if force_update:
+            from_date = "2000-01-01"
+        if from_date:
+            from_date = datetime.strptime(from_date, "%Y-%M-%d")
+        last = from_date or Article.get_latest_change()
+        items = SPSPkg.objects.filter(
+            Q(updated__gte=last) | Q(created__gte=last),
+            # is_approved=True
+        ).iterator()
     except Exception as e:
-        # TODO registra falha e deixa acessível na área restrita
         logging.exception(e)
+        items = SPSPkg.objects.iterator()
 
-
-@celery_app.task(bind=True, name="push_articles_files_to_remote_storage")
-def task_push_articles_files_to_remote_storage(
-    self,
-    username,
-):
-    items = ArticlePackages.objects.filter(
-        Q(components__isnull=True) | Q(components__uri__isnull=True),
-        article__isnull=False,
-        optimised_zip_file__isnull=False,
-        not_optimised_zip_file__isnull=False,
-    )
-    for article_pkgs in items.iterator():
-        task_push_one_article_files_to_remote_storage.apply_async(
+    for item in items:
+        task_create_or_update_article.apply_async(
             kwargs={
-                "username": username,
-                "article_pkgs_id": article_pkgs.id,
+                "username": user.username,
+                "pkg_id": item.id,
             }
         )
 
 
-def minio_push_file_content(content, mimetype, object_name):
-    # TODO MinioStorage.fput_content
-    return {"uri": "https://localhost/article/x"}
-
-
-@celery_app.task(bind=True, name="push_one_article_files_to_remote_storage")
-def task_push_one_article_files_to_remote_storage(
+@celery_app.task(bind=True)
+def task_create_or_update_article(
     self,
-    username,
-    article_pkgs_id,
+    user_id=None,
+    username=None,
+    pkg_id=None,
 ):
-    user = _get_user(self.request, username)
-    article_pkgs = ArticlePackages.objects.get(id=article_pkgs_id)
-
-    responses = article_pkgs.publish_package(
-        minio_push_file_content,
-        user,
-    )
-    for response in responses:
-        try:
-            uri = response["uri"]
-        except KeyError as e:
-            # TODO registra falha e deixa acessível na área restrita
-            logging.error(f"Falha ao registrar arquivo em storage remoto {response}")
-            logging.exception(e)
+    user = _get_user(user_id, username)
+    item = SPSPkg.objects.get(id=pkg_id)
+    create_article(item, user)

@@ -80,7 +80,7 @@ class ClassicWebsiteConfigurationModelAdmin(ModelAdmin):
 
 class MigratedJournalModelAdmin(ModelAdmin):
     model = models.MigratedJournal
-    menu_label = _("Journal Migration")
+    menu_label = _("Journals")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
@@ -107,7 +107,7 @@ class MigratedJournalModelAdmin(ModelAdmin):
 
 class MigratedIssueModelAdmin(ModelAdmin):
     model = models.MigratedIssue
-    menu_label = _("Issue Migration")
+    menu_label = _("Issues")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
@@ -139,7 +139,7 @@ class MigratedIssueModelAdmin(ModelAdmin):
 
 class MigratedDocumentModelAdmin(ModelAdmin):
     model = models.MigratedDocument
-    menu_label = _("Document Migration")
+    menu_label = _("Articles")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
@@ -150,42 +150,192 @@ class MigratedDocumentModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        "article",
+        "migrated_issue",
         "pkg_name",
-        "sps_pkg_name",
+        "sps_pkg",
         "pid",
         "status",
+        "xml_status",
         "isis_updated_date",
     )
-    list_filter = ("status",)
+    list_filter = (
+        "status",
+        "xml_status",
+        "migrated_issue__scielo_issue__official_issue__publication_year",
+    )
     search_fields = (
-        "article__journal__title",
         "migrated_issue__migrated_journal__scielo_journal__acron",
         "migrated_issue__scielo_issue__official_issue__publication_year",
         "migrated_issue__scielo_issue__issue_folder",
-        "article__pid",
     )
     inspect_view_fields = (
+        "collection",
+        "pid",
         "migrated_issue",
         "pkg_name",
         "sps_pkg_name",
-        "pid",
         "status",
+        "xml_status",
         "isis_updated_date",
         "data",
-        "article",
+        "file",
+    )
+
+
+class MigratedFileModelAdmin(ModelAdmin):
+    model = models.MigratedFile
+    menu_label = _("Migrated files")
+    menu_icon = "doc-full"
+    menu_order = 300
+    add_to_settings_menu = False
+    exclude_from_explorer = True
+    inspect_view_enabled = True
+
+    list_per_page = 10
+    create_view_class = CoreCreateView
+
+    list_display = (
+        "migrated_issue",
+        "created",
+        "updated",
+    )
+    search_fields = ("migrated_issue__scielo_issue__official_issue__publication_year",)
+    inspect_view_fields = (
+        "migrated_issue",
+        "file",
+    )
+
+
+class BodyAndBackFileModelAdmin(ModelAdmin):
+    model = models.BodyAndBackFile
+    menu_label = _("XML with body and back")
+    menu_icon = "doc-full"
+    menu_order = 300
+    add_to_settings_menu = False
+    exclude_from_explorer = True
+    inspect_view_enabled = True
+
+    list_per_page = 10
+    create_view_class = CoreCreateView
+
+    list_display = (
+        "migrated_issue",
+        "pkg_name",
+        "version",
+        "created",
+        "updated",
+    )
+    list_filter = ("version",)
+    search_fields = (
+        "collection__acron",
+        "collection__name",
+        "migrated_issue",
+        "pkg_name",
+    )
+    inspect_view_fields = (
+        "collection",
+        "migrated_issue",
+        "pkg_name",
+        "version",
+        "file",
+    )
+
+
+class MigratedDocumentHTMLModelAdmin(ModelAdmin):
+    model = models.MigratedDocumentHTML
+    menu_label = _("Migrated document (html)")
+    menu_icon = "doc-full"
+    menu_order = 300
+    add_to_settings_menu = False
+    exclude_from_explorer = True
+    inspect_view_enabled = True
+
+    list_per_page = 10
+    create_view_class = CoreCreateView
+
+    list_display = (
+        "migrated_issue",
+        "pkg_name",
+        "sps_pkg",
+        "pid",
+        "status",
+        "xml_status",
+        "isis_updated_date",
+    )
+    list_filter = (
+        "status",
+        "xml_status",
+        "migrated_issue__scielo_issue__official_issue__publication_year",
+    )
+    search_fields = (
+        "migrated_issue__migrated_journal__scielo_journal__acron",
+        "migrated_issue__scielo_issue__official_issue__publication_year",
+        "migrated_issue__scielo_issue__issue_folder",
+    )
+    inspect_view_fields = (
+        "collection",
+        "pid",
+        "migrated_issue",
+        "pkg_name",
+        "sps_pkg_name",
+        "status",
+        "xml_status",
+        "isis_updated_date",
+        "data",
+        "file",
+    )
+
+
+class Html2xmlReportModelAdmin(ModelAdmin):
+    model = models.Html2xmlReport
+    menu_label = _("HTML 2 XML report")
+    menu_icon = "doc-full"
+    menu_order = 300
+    add_to_settings_menu = False
+    exclude_from_explorer = True
+    inspect_view_enabled = True
+
+    list_per_page = 10
+    create_view_class = CoreCreateView
+
+    list_display = (
+        "xml",
+        "attention_demands",
+        "img_src_total",
+        "table_total",
+        "fig_total",
+        "table_wrap_total",
+        "text_lang_total",
+        "updated",
+    )
+    list_filter = (
+        "empty_body",
+        "article_type",
+        "attention_demands",
+    )
+    search_fields = (
+        "xml__collection__acron",
+        "xml__pid",
+        "xml__migrated_issue",
+        "xml__pkg_name",
     )
 
 
 class MigrationModelAdmin(ModelAdminGroup):
     menu_icon = "folder"
     menu_label = "Migration"
+    menu_order = get_menu_order("migration")
+
     items = (
         ClassicWebsiteConfigurationModelAdmin,
         MigrationFailureAdmin,
         MigratedJournalModelAdmin,
         MigratedIssueModelAdmin,
+        MigratedFileModelAdmin,
         MigratedDocumentModelAdmin,
+        MigratedDocumentHTMLModelAdmin,
+        Html2xmlReportModelAdmin,
+        BodyAndBackFileModelAdmin,
     )
     menu_order = get_menu_order("migration")
 

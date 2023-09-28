@@ -114,18 +114,21 @@ LOCAL_APPS = [
     "core_settings",
     # Your stuff: custom apps go here
     "article",
+    "bigbang",
     "collection",
+    "controlled_lists",
     "doi",
+    "files_storage",
     "institution",
     "issue",
     "journal",
     "location",
     "migration",
-    "researcher",
-    # evitar problema de migração por enquanto
-    "upload",
-    "controlled_lists",
+    "package",
     "pid_requester",
+    "publication",
+    "researcher",
+    "upload",
     "xmlsps",
 ]
 
