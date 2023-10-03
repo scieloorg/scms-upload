@@ -85,4 +85,4 @@ tornado>=6.3.2 # not directly required, pinned by Snyk to avoid a vulnerability
 # Tenacity
 # ------------------------------------------------------------------------------
 tenacity==8.2.2  # https://pypi.org/project/tenacity/
-urllib3==2.0.4
+urllib3==2.0.6
