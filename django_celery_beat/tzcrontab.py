@@ -4,15 +4,21 @@ from datetime import datetime, timezone
 
 from celery import schedules
 
-schedstate = namedtuple('schedstate', ('is_due', 'next'))
+schedstate = namedtuple("schedstate", ("is_due", "next"))
 
 
 class TzAwareCrontab(schedules.crontab):
     """Timezone Aware Crontab."""
 
     def __init__(
-            self, minute='*', hour='*', day_of_week='*',
-            day_of_month='*', month_of_year='*', tz=timezone.utc, app=None
+        self,
+        minute="*",
+        hour="*",
+        day_of_week="*",
+        day_of_month="*",
+        month_of_year="*",
+        tz=timezone.utc,
+        app=None,
     ):
         """Overwrite Crontab constructor to include a timezone argument."""
         self.tz = tz
@@ -20,9 +26,13 @@ class TzAwareCrontab(schedules.crontab):
         nowfun = self.nowfunc
 
         super().__init__(
-            minute=minute, hour=hour, day_of_week=day_of_week,
+            minute=minute,
+            hour=hour,
+            day_of_week=day_of_week,
             day_of_month=day_of_month,
-            month_of_year=month_of_year, nowfun=nowfun, app=app
+            month_of_year=month_of_year,
+            nowfun=nowfun,
+            app=app,
         )
 
     def nowfunc(self):
@@ -51,22 +61,32 @@ class TzAwareCrontab(schedules.crontab):
         return """<crontab: {0._orig_minute} {0._orig_hour}
          {0._orig_day_of_week} {0._orig_day_of_month}
           {0._orig_month_of_year} (m/h/d/dM/MY), {0.tz}>
-        """.format(self)
+        """.format(
+            self
+        )
 
     def __reduce__(self):
-        return (self.__class__, (self._orig_minute,
-                                 self._orig_hour,
-                                 self._orig_day_of_week,
-                                 self._orig_day_of_month,
-                                 self._orig_month_of_year,
-                                 self.tz), None)
+        return (
+            self.__class__,
+            (
+                self._orig_minute,
+                self._orig_hour,
+                self._orig_day_of_week,
+                self._orig_day_of_month,
+                self._orig_month_of_year,
+                self.tz,
+            ),
+            None,
+        )
 
     def __eq__(self, other):
         if isinstance(other, schedules.crontab):
-            return (other.month_of_year == self.month_of_year
-                    and other.day_of_month == self.day_of_month
-                    and other.day_of_week == self.day_of_week
-                    and other.hour == self.hour
-                    and other.minute == self.minute
-                    and other.tz == self.tz)
+            return (
+                other.month_of_year == self.month_of_year
+                and other.day_of_month == self.day_of_month
+                and other.day_of_week == self.day_of_week
+                and other.hour == self.hour
+                and other.minute == self.minute
+                and other.tz == self.tz
+            )
         return NotImplemented
