@@ -1,8 +1,7 @@
 """Timezone aware Cron schedule Implementation."""
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timezone
 
-import pytz
 from celery import schedules
 
 schedstate = namedtuple("schedstate", ("is_due", "next"))
@@ -18,7 +17,7 @@ class TzAwareCrontab(schedules.crontab):
         day_of_week="*",
         day_of_month="*",
         month_of_year="*",
-        tz=pytz.utc,
+        tz=timezone.utc,
         app=None,
     ):
         """Overwrite Crontab constructor to include a timezone argument."""
@@ -37,13 +36,13 @@ class TzAwareCrontab(schedules.crontab):
         )
 
     def nowfunc(self):
-        return self.tz.normalize(pytz.utc.localize(datetime.utcnow()))
+        return datetime.now(self.tz)
 
     def is_due(self, last_run_at):
         """Calculate when the next run will take place.
 
-        Return tuple of (is_due, next_time_to_check).
-        The last_run_at argument needs to be timezone aware.
+        Return tuple of ``(is_due, next_time_to_check)``.
+        The ``last_run_at`` argument needs to be timezone aware.
 
         """
         # convert last_run_at to the schedule timezone

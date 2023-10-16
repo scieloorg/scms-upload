@@ -28,7 +28,7 @@ class TaskSelectWidget(Select):
     _choices = None
 
     def tasks_as_choices(self):
-        _ = self._modules  # noqa
+        _ = self._modules
         tasks = list(
             sorted(
                 name for name in self.celery_app.tasks if not name.startswith("celery.")
@@ -122,8 +122,9 @@ class PeriodicTaskAdmin(admin.ModelAdmin):
     celery_app = current_app
     date_hierarchy = "start_time"
     list_display = (
-        "__str__",
+        "name",
         "enabled",
+        "scheduler",
         "interval",
         "start_time",
         "last_run_at",
@@ -147,11 +148,12 @@ class PeriodicTaskAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Schedule",
+            _("Schedule"),
             {
                 "fields": (
                     "interval",
                     "crontab",
+                    "crontab_translation",
                     "solar",
                     "clocked",
                     "start_time",
@@ -162,14 +164,14 @@ class PeriodicTaskAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Arguments",
+            _("Arguments"),
             {
                 "fields": ("args", "kwargs"),
                 "classes": ("extrapretty", "wide", "collapse", "in"),
             },
         ),
         (
-            "Execution Options",
+            _("Execution Options"),
             {
                 "fields": (
                     "expires",
@@ -184,13 +186,30 @@ class PeriodicTaskAdmin(admin.ModelAdmin):
             },
         ),
     )
-    readonly_fields = ("last_run_at",)
+    readonly_fields = (
+        "last_run_at",
+        "crontab_translation",
+    )
+
+    def crontab_translation(self, obj):
+        return obj.crontab.human_readable
+
+    change_form_template = "admin/djcelery/change_periodictask_form.html"
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        extra_context = extra_context or {}
+        crontabs = CrontabSchedule.objects.all()
+        crontab_dict = {}
+        for crontab in crontabs:
+            crontab_dict[crontab.id] = crontab.human_readable
+        extra_context["readable_crontabs"] = crontab_dict
+        return super().changeform_view(request, object_id, extra_context=extra_context)
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
         scheduler = getattr(settings, "CELERY_BEAT_SCHEDULER", None)
         extra_context["wrong_scheduler"] = not is_database_scheduler(scheduler)
-        return super(PeriodicTaskAdmin, self).changelist_view(request, extra_context)
+        return super().changelist_view(request, extra_context)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -220,7 +239,7 @@ class PeriodicTaskAdmin(admin.ModelAdmin):
     enable_tasks.short_description = _("Enable selected tasks")
 
     def disable_tasks(self, request, queryset):
-        rows_updated = queryset.update(enabled=False)
+        rows_updated = queryset.update(enabled=False, last_run_at=None)
         PeriodicTasks.update_changed()
         self._message_user_about_update(request, rows_updated, "disabled")
 
@@ -249,6 +268,7 @@ class PeriodicTaskAdmin(admin.ModelAdmin):
                 loads(task.args),
                 loads(task.kwargs),
                 task.queue,
+                task.name,
             )
             for task in queryset
         ]
@@ -263,16 +283,23 @@ class PeriodicTaskAdmin(admin.ModelAdmin):
 
             self.message_user(
                 request,
-                _('task "{0}" not found'.format(not_found_task_name)),
+                _(f'task "{not_found_task_name}" not found'),
                 level=messages.ERROR,
             )
             return
 
         task_ids = [
-            task.apply_async(args=args, kwargs=kwargs, queue=queue)
+            task.apply_async(
+                args=args,
+                kwargs=kwargs,
+                queue=queue,
+                periodic_task_name=periodic_task_name,
+            )
             if queue and len(queue)
-            else task.apply_async(args=args, kwargs=kwargs)
-            for task, args, kwargs, queue in tasks
+            else task.apply_async(
+                args=args, kwargs=kwargs, periodic_task_name=periodic_task_name
+            )
+            for task, args, kwargs, queue, periodic_task_name in tasks
         ]
         tasks_run = len(task_ids)
         self.message_user(
@@ -294,8 +321,14 @@ class ClockedScheduleAdmin(admin.ModelAdmin):
     list_display = ("clocked_time",)
 
 
+class CrontabScheduleAdmin(admin.ModelAdmin):
+    """Admin class for CrontabSchedule."""
+
+    list_display = ("__str__", "human_readable")
+
+
 admin.site.register(IntervalSchedule)
-admin.site.register(CrontabSchedule)
+admin.site.register(CrontabSchedule, CrontabScheduleAdmin)
 admin.site.register(SolarSchedule)
 admin.site.register(ClockedSchedule, ClockedScheduleAdmin)
 admin.site.register(PeriodicTask, PeriodicTaskAdmin)
