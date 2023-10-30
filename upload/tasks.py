@@ -7,7 +7,7 @@ from packtools.sps.models import package as sps_package
 from packtools.sps.utils import file_utils as sps_file_utils
 from packtools.sps.validation import article as sps_validation_article
 from packtools.sps.validation import journal as sps_validation_journal
-from packtools.validation_report import ValidationReportXML
+from packtools.validator import ValidationReportXML
 
 from article.choices import AS_CHANGE_SUBMITTED
 from article.controller import create_article_from_etree, update_article
