@@ -1,29 +1,29 @@
 pytz==2023.3  # https://github.com/stub42/pytz
 python-slugify==8.0.1  # https://github.com/un33k/python-slugify
-Pillow==9.5.0  # https://github.com/python-pillow/Pillow
+Pillow==10.1.0  # https://github.com/python-pillow/Pillow
 rcssmin==1.1.1  # https://github.com/ndparker/rcssmin
-argon2-cffi==21.3.0  # https://github.com/hynek/argon2_cffi
-whitenoise==6.4.0  # https://github.com/evansd/whitenoise
-redis==4.6.0  # https://github.com/redis/redis-py
-hiredis==2.2.2  # https://github.com/redis/hiredis-py
+argon2-cffi==23.1.0  # https://github.com/hynek/argon2_cffi
+whitenoise==6.6.0  # https://github.com/evansd/whitenoise
+redis==5.0.1  # https://github.com/redis/redis-py
+hiredis==2.2.3  # https://github.com/redis/hiredis-py
 # celery==5.2.7  # pyup: < 6.0  # https://github.com/celery/celery
-celery==5.3.1  # pyup: < 6.0  # https://github.com/celery/celery
-flower==2.0.0  # https://github.com/mher/flower
+celery==5.3.4  # pyup: < 6.0  # https://github.com/celery/celery
+flower==2.0.1 # https://github.com/mher/flower
 
 # Django
 # ------------------------------------------------------------------------------
 django==4.2.6
-django-environ==0.10.0  # https://github.com/joke2k/django-environ
+django-environ==0.11.2  # https://github.com/joke2k/django-environ
 django-model-utils==4.3.1  # https://github.com/jazzband/django-model-utils
-django-allauth==0.54.0  # https://github.com/pennersr/django-allauth
-django-crispy-forms==2.0  # https://github.com/django-crispy-forms/django-crispy-forms
+django-allauth==0.58.1  # https://github.com/pennersr/django-allauth
+django-crispy-forms==2.1  # https://github.com/django-crispy-forms/django-crispy-forms
 crispy-bootstrap5==0.7  # https://github.com/django-crispy-forms/crispy-bootstrap5
-django-compressor==4.3.1  # https://github.com/django-compressor/django-compressor
-django-redis==5.2.0  # https://github.com/jazzband/django-redis
+django-compressor==4.4  # https://github.com/django-compressor/django-compressor
+django-redis==5.4.0  # https://github.com/jazzband/django-redis
 
 # Django REST
 djangorestframework==3.14.0
-djangorestframework-simplejwt==5.2.2  # https://django-rest-framework-simplejwt.readthedocs.io/en/latest/
+djangorestframework-simplejwt==5.3.0  # https://django-rest-framework-simplejwt.readthedocs.io/en/latest/
 
 # Django celery
 # ------------------------------------------------------------------------------
@@ -47,7 +47,7 @@ wagtail-django-recaptcha==1.0
 
 # Wagtail Menu
 # ------------------------------------------------------------------------------
-wagtailmenus==3.1.8
+wagtailmenus==3.1.9
 
 # Wagtail Localize
 # ------------------------------------------------------------------------------
@@ -60,7 +60,7 @@ wagtail-autocomplete==0.10.0
 
 # DSM Minio
 # ------------------------------------------------------------------------------
-minio==7.1.15
+minio==7.1.17
 
 # Upload
 # ------------------------------------------------------------------------------
@@ -71,9 +71,9 @@ lxml==4.9.3 # https://github.com/lxml/lxml
 # DSM Publication
 # ------------------------------------------------------------------------------
 -e git+https://github.com/scieloorg/opac_schema.git@v2.66#egg=opac_schema
-mongoengine==0.24.2
-pymongo==3.12.0
-aiohttp==3.8.5
+mongoengine==0.27.0
+pymongo==4.5.0
+aiohttp==3.8.6
 python-magic==0.4.27
 
 # DSM Migration
@@ -84,5 +84,5 @@ tornado>=6.3.2 # not directly required, pinned by Snyk to avoid a vulnerability
 
 # Tenacity
 # ------------------------------------------------------------------------------
-tenacity==8.2.2  # https://pypi.org/project/tenacity/
-urllib3==2.0.4
+tenacity==8.2.3  # https://pypi.org/project/tenacity/
+urllib3==2.0.7
