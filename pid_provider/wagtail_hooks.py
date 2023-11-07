@@ -7,12 +7,12 @@ from wagtail.contrib.modeladmin.options import (
 )
 from wagtail.contrib.modeladmin.views import CreateView
 
-from .models import PidChange, PidProviderConfig, PidRequest, PidRequesterXML
+from .models import PidChange, PidProviderConfig, PidRequest, PidProviderXML
 
 
 class PidRequestCreateView(CreateView):
     def form_valid(self, form):
-        self.object = form.save_all(self.request.user)
+        self.object = form.save_all(self.provide.user)
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -40,18 +40,18 @@ class PidRequestAdmin(ModelAdmin):
     )
 
 
-class PidRequesterXMLAdminCreateView(CreateView):
+class PidProviderXMLAdminCreateView(CreateView):
     def form_valid(self, form):
-        self.object = form.save_all(self.request.user)
+        self.object = form.save_all(self.provide.user)
         return HttpResponseRedirect(self.get_success_url())
 
 
-class PidRequesterXMLAdmin(ModelAdmin):
+class PidProviderXMLAdmin(ModelAdmin):
     list_per_page = 10
-    model = PidRequesterXML
+    model = PidProviderXML
     inspect_view_enabled = True
     menu_label = _("Pid Requester XMLs")
-    create_view_class = PidRequesterXMLAdminCreateView
+    create_view_class = PidProviderXMLAdminCreateView
     menu_icon = "folder"
     menu_order = 300
     add_to_settings_menu = False
@@ -77,7 +77,7 @@ class PidRequesterXMLAdmin(ModelAdmin):
 
 class PidChangeAdminCreateView(CreateView):
     def form_valid(self, form):
-        self.object = form.save_all(self.request.user)
+        self.object = form.save_all(self.provide.user)
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -106,7 +106,7 @@ class PidChangeAdmin(ModelAdmin):
 
 class PidProviderConfigCreateView(CreateView):
     def form_valid(self, form):
-        self.object = form.save_all(self.request.user)
+        self.object = form.save_all(self.provide.user)
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -127,16 +127,16 @@ class PidProviderConfigAdmin(ModelAdmin):
     )
 
 
-class PidRequesterAdminGroup(ModelAdminGroup):
+class PidProviderAdminGroup(ModelAdminGroup):
     menu_label = _("Pid Requester")
     menu_icon = "folder-open-inverse"  # change as required
     menu_order = 100  # will put in 3rd place (000 being 1st, 100 2nd)
     items = (
         PidProviderConfigAdmin,
-        PidRequesterXMLAdmin,
+        PidProviderXMLAdmin,
         PidRequestAdmin,
         PidChangeAdmin,
     )
 
 
-modeladmin_register(PidRequesterAdminGroup)
+modeladmin_register(PidProviderAdminGroup)

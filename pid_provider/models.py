@@ -13,7 +13,7 @@ from wagtail.admin.panels import FieldPanel
 
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
-from pid_requester import exceptions
+from pid_provider import exceptions
 from xmlsps.models import XMLSPS, XMLIssue, XMLJournal, XMLVersion, xml_directory_path
 
 LOGGER = logging.getLogger(__name__)
@@ -269,7 +269,7 @@ class SyncFailure(CommonControlField):
         return obj
 
 
-class PidRequesterXML(CommonControlField):
+class PidProviderXML(CommonControlField):
     """
     Tem responsabilidade de garantir a atribuição do PID da versão 3,
     armazenando dados chaves que garantem a identificação do XML
@@ -363,7 +363,7 @@ class PidRequesterXML(CommonControlField):
         ]
 
     def __str__(self):
-        return self.pkg_name or self.v3 or "PidRequesterXML sem ID"
+        return self.pkg_name or self.v3 or "PidProviderXML sem ID"
 
     @property
     def data(self):
@@ -384,7 +384,7 @@ class PidRequesterXML(CommonControlField):
     @classmethod
     def unsynchronized(cls):
         """
-        Identifica no pid requester os registros que não
+        Identifica no pid provideer os registros que não
         estão sincronizados com o pid provider (central) e
         faz a sincronização, registrando o XML local no pid provider
         """
@@ -449,7 +449,7 @@ class PidRequesterXML(CommonControlField):
 
         """
         try:
-            logging.info(f"PidRequesterXML.register ....  {filename}")
+            logging.info(f"PidProviderXML.register ....  {filename}")
             pkg_name, ext = os.path.splitext(os.path.basename(filename))
 
             # adaptador do xml with pre
@@ -494,18 +494,18 @@ class PidRequesterXML(CommonControlField):
             return data
 
         except (
-            exceptions.ForbiddenPidRequesterXMLRegistrationError,
+            exceptions.ForbiddenPidProviderXMLRegistrationError,
             exceptions.NotEnoughParametersToGetDocumentRecordError,
             exceptions.QueryDocumentMultipleObjectsReturnedError,
             exceptions.InvalidPidError,
         ) as e:
-            pid_request = PidRequest.register_failure(
+            pid_provide = PidRequest.register_failure(
                 e,
                 user=user,
                 origin=filename,
                 detail={"xml": xml_adapter.tostring()},
             )
-            return pid_request.data
+            return pid_provide.data
 
     def _create_or_update_xmlsps(self, user, is_published):
         XMLSPS.create_or_update(
@@ -574,9 +574,9 @@ class PidRequesterXML(CommonControlField):
         então, recusar o registro,
         pois está tentando registrar uma versão desatualizada
         """
-        logging.info("PidRequesterXML.evaluate_registration")
+        logging.info("PidProviderXML.evaluate_registration")
         if xml_adapter.is_aop and registered and not registered.is_aop:
-            raise exceptions.ForbiddenPidRequesterXMLRegistrationError(
+            raise exceptions.ForbiddenPidProviderXMLRegistrationError(
                 _(
                     "The XML content is an ahead of print version "
                     "but the document {} is already published in an issue"
@@ -587,7 +587,7 @@ class PidRequesterXML(CommonControlField):
     def set_synchronized(
         self, user, xml_uri=None, error_type=None, error_msg=None, traceback=None
     ):
-        logging.info("PidRequesterXML.set_synchronized")
+        logging.info("PidProviderXML.set_synchronized")
         self._add_synchronization_status(error_type, error_msg, traceback)
         self.updated_by = user
         self.updated = utcnow()
@@ -613,7 +613,7 @@ class PidRequesterXML(CommonControlField):
         -------
         exceptions.QueryDocumentMultipleObjectsReturnedError
         """
-        logging.info("PidRequesterXML.check_registration_demand")
+        logging.info("PidProviderXML.check_registration_demand")
         xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
 
         try:
@@ -686,7 +686,7 @@ class PidRequesterXML(CommonControlField):
 
         Returns
         -------
-        None or PidRequesterXML
+        None or PidProviderXML
 
         Raises
         ------
@@ -767,7 +767,7 @@ class PidRequesterXML(CommonControlField):
             return
         if not self.current_version:
             raise ValueError(
-                "PidRequesterXML._add_pid_changes requires current_version is set"
+                "PidProviderXML._add_pid_changes requires current_version is set"
             )
         for change_args in changed_pids:
             if change_args["old"]:

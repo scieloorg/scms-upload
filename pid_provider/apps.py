@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class PidRequesterConfig(AppConfig):
+class PidProviderConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "pid_requester"
+    name = "pid_provider"

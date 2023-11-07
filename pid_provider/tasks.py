@@ -3,14 +3,14 @@ import logging
 from django.contrib.auth import get_user_model
 
 from config import celery_app
-from pid_requester.controller import PidRequester
+from pid_provider.controller import PidProvider
 
 User = get_user_model()
 
 
-def _get_user(request, username=None, user_id=None):
+def _get_user(provide, username=None, user_id=None):
     try:
-        return User.objects.get(pk=request.user.id)
+        return User.objects.get(pk=provide.user.id)
     except AttributeError:
         if user_id:
             return User.objects.get(pk=user_id)
@@ -18,17 +18,17 @@ def _get_user(request, username=None, user_id=None):
             return User.objects.get(username=username)
 
 
-@celery_app.task(bind=True, name="request_pid_for_file")
-def request_pid_for_file(
+@celery_app.task(bind=True, name="provide_pid_for_file")
+def provide_pid_for_file(
     self,
     username=None,
     file_path=None,
     is_published=None,
 ):
-    user = _get_user(self.request, username=username)
+    user = _get_user(self.provide, username=username)
 
-    pid_requester = PidRequester()
-    for resp in pid_requester.request_pid_for_xml_zip(
+    pid_provider = PidProvider()
+    for resp in pid_provider.provide_pid_for_xml_zip(
         file_path, user, is_published=is_published
     ):
         logging.info(resp)

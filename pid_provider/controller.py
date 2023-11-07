@@ -11,11 +11,11 @@ from packtools.sps.pid_provider.xml_sps_lib import (
     create_xml_zip_file,
     get_xml_with_pre,
 )
-from requests.auth import HTTPBasicAuth
+from provides.auth import HTTPBasicAuth
 
-from pid_requester import exceptions
-from pid_requester.models import PidProviderConfig, PidRequesterXML
-from pid_requester.utils.requester import post_data
+from pid_provider import exceptions
+from pid_provider.models import PidProviderConfig, PidProviderXML
+from pid_provider.utils.provideer import post_data
 
 User = get_user_model()
 
@@ -23,7 +23,7 @@ LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
-class PidRequester:
+class PidProvider:
     """
     Solicitar o PID da versão 3 para o Pid Provider e
     armazena o XML
@@ -32,7 +32,7 @@ class PidRequester:
     def __init__(self):
         self.pid_provider_api = PidProviderAPI()
 
-    def request_pid_for_xml_uri(self, xml_uri, name, user, is_published=None):
+    def provide_pid_for_xml_uri(self, xml_uri, name, user, is_published=None):
         """
         Recebe um zip de arquivo XML para solicitar o PID da versão 3
         para o Pid Provider
@@ -46,15 +46,15 @@ class PidRequester:
         except Exception as e:
             logging.exception(e)
             return {
-                "error_msg": f"Unable to request pid for {xml_uri} {e}",
+                "error_msg": f"Unable to provide pid for {xml_uri} {e}",
                 "error_type": str(type(e)),
             }
         else:
-            return self.request_pid_for_xml_with_pre(
+            return self.provide_pid_for_xml_with_pre(
                 xml_with_pre, name, user, is_published
             )
 
-    def request_pid_for_xml_zip(self, zip_xml_file_path, user, is_published=None):
+    def provide_pid_for_xml_zip(self, zip_xml_file_path, user, is_published=None):
         """
         Recebe um zip de arquivo XML para solicitar o PID da versão 3
         para o Pid Provider
@@ -65,9 +65,9 @@ class PidRequester:
         """
         try:
             for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
-                logging.info("request_pid_for_xml_zip:")
+                logging.info("provide_pid_for_xml_zip:")
                 try:
-                    registered = self.request_pid_for_xml_with_pre(
+                    registered = self.provide_pid_for_xml_with_pre(
                         xml_with_pre,
                         xml_with_pre.filename,
                         user,
@@ -79,17 +79,17 @@ class PidRequester:
                 except Exception as e:
                     logging.exception(e)
                     yield {
-                        "error_msg": f"Unable to request pid for {zip_xml_file_path} {e}",
+                        "error_msg": f"Unable to provide pid for {zip_xml_file_path} {e}",
                         "error_type": str(type(e)),
                     }
         except Exception as e:
             logging.exception(e)
             yield {
-                "error_msg": f"Unable to request pid for {zip_xml_file_path} {e}",
+                "error_msg": f"Unable to provide pid for {zip_xml_file_path} {e}",
                 "error_type": str(type(e)),
             }
 
-    def request_pid_for_xml_with_pre(self, xml_with_pre, name, user, is_published=None):
+    def provide_pid_for_xml_with_pre(self, xml_with_pre, name, user, is_published=None):
         """
         Recebe um xml_with_pre para solicitar o PID da versão 3
         para o Pid Provider
@@ -106,7 +106,7 @@ class PidRequester:
         armazena o resultado
         """
         # verifica a necessidade de registro local e/ou remoto
-        demand = PidRequesterXML.check_registration_demand(xml_with_pre)
+        demand = PidProviderXML.check_registration_demand(xml_with_pre)
 
         logging.info(f"demand={demand}")
         if demand.get("error_type"):
@@ -119,7 +119,7 @@ class PidRequester:
             response = self.pid_provider_api.provide_pid(xml_with_pre, name)
 
         if demand["required_local_registration"]:
-            registered = PidRequesterXML.register(
+            registered = PidProviderXML.register(
                 xml_with_pre,
                 name,
                 user,
@@ -130,7 +130,7 @@ class PidRequester:
                 traceback=response.get("traceback"),
             )
         registered["xml_with_pre"] = xml_with_pre
-        logging.info(f"request_pid_for_xml_with_pre result: {registered}")
+        logging.info(f"provide_pid_for_xml_with_pre result: {registered}")
         return registered
 
     @classmethod
@@ -149,7 +149,7 @@ class PidRequester:
                 "updated": self.updated.isoformat(),
             }
         """
-        return PidRequesterXML.get_registered(xml_with_pre)
+        return PidProviderXML.get_registered(xml_with_pre)
 
     @classmethod
     def is_registered_xml_uri(cls, xml_uri):
@@ -197,7 +197,7 @@ class PidRequester:
         """
         Retorna XML URI ou None
         """
-        return PidRequesterXML.get_xml_uri(v3)
+        return PidProviderXML.get_xml_uri(v3)
 
     def synchronize(self, user):
         """
@@ -211,7 +211,7 @@ class PidRequester:
                     "Unable to synchronized data with central pid provider because API URI is missing"
                 )
             )
-        for item in PidRequesterXML.unsynchronized:
+        for item in PidProviderXML.unsynchronized:
             name = item.pkg_name
             xml_with_pre = item.xml_with_pre
             response = self.pid_provider_api.provide_pid(xml_with_pre, name)
