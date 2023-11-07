@@ -2,10 +2,16 @@
 
 -r base.txt
 
+gevent==21.12.0  # http://www.gevent.org/
 gunicorn==21.2.0  # https://github.com/benoitc/gunicorn
-sentry-sdk==1.33.1  # https://github.com/getsentry/sentry-python
+sentry-sdk==1.14.0  # https://github.com/getsentry/sentry-python
 psycopg2==2.9.9  # https://github.com/psycopg/psycopg2
 
 # Django
 # ------------------------------------------------------------------------------
 django-anymail==10.2  # https://github.com/anymail/django-anymail
+
+
+# Elastic-APM  # https://pypi.org/project/elastic-apm/
+# ------------------------------------------------------------------------------
+elastic-apm==6.15.1
