@@ -20,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
-class PidProviderAPI:
+class PidProviderAPIClient:
     """
     Interface com o pid provider
     """

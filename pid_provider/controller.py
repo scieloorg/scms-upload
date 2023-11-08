@@ -6,7 +6,7 @@ from packtools.sps.pid_provider.xml_sps_lib import (
 )
 
 from pid_provider.models import PidProviderXML
-from pid_provider.pid_provider_client import PidProviderAPI
+from pid_provider.client import PidProviderAPIClient
 
 
 LOGGER = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ class PidProvider:
     """
 
     def __init__(self):
-        self.pid_provider_api = PidProviderAPI()
+        self.pid_provider_api = PidProviderAPIClient()
 
     def provide_pid_for_xml_zip(self, zip_xml_file_path, user, is_published=None):
         """
@@ -95,20 +95,8 @@ class PidProvider:
         Caso contrário, solicita PID versão 3 para o Pid Provider e
         armazena o resultado
         """
-        # verifica a necessidade de registro local e/ou remoto
-        demand = PidProviderXML.check_registration_demand(xml_with_pre)
-
-        logging.info(f"demand={demand}")
-        if demand.get("error_type"):
-            return demand
-
-        response = {}
-        registered = demand["registered"]
-
-        if demand["required_remote_registration"]:
-            response = self.pid_provider_api.provide_pid(xml_with_pre, name)
-
-        if demand["required_local_registration"]:
+        response = self.pre_registration(xml_with_pre)
+        if response.get("required_local_registration"):
             registered = PidProviderXML.register(
                 xml_with_pre,
                 name,
@@ -119,6 +107,8 @@ class PidProvider:
                 error_msg=response.get("error_msg"),
                 traceback=response.get("traceback"),
             )
+        else:
+            registered = response.get("registered")
         registered["xml_with_pre"] = xml_with_pre
         logging.info(f"provide_pid_for_xml_with_pre result: {registered}")
         return registered
@@ -188,6 +178,22 @@ class PidProvider:
         Retorna XML URI ou None
         """
         return PidProviderXML.get_xml_uri(v3)
+
+    def pre_registration(self, xml_with_pre):
+        # verifica a necessidade de registro local e/ou remoto
+
+        demand = PidProviderXML.check_registration_demand(xml_with_pre)
+
+        logging.info(f"demand={demand}")
+        if demand.get("error_type"):
+            return demand
+
+        response = {}
+        if demand["required_remote_registration"]:
+            response = self.pid_provider_api.provide_pid(xml_with_pre, name)
+
+        response.update(demand)
+        return response
 
     def synchronize(self, user):
         """
