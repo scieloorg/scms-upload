@@ -25,6 +25,63 @@ def utcnow():
     # return datetime.utcnow().isoformat().replace("T", " ") + "Z"
 
 
+class XMLRelatedItem(CommonControlField):
+    """
+    Tem função de guardar os relacionamentos entre outro Documento (Artigo)
+    Tem objetivo de identificar o Documento (Artigo)
+    """
+
+    main_doi = models.TextField(_("DOI"), null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["main_doi"]),
+        ]
+
+    def __str__(self):
+        return self.main_doi
+
+    @classmethod
+    def get_or_create(cls, main_doi, creator=None):
+        try:
+            return cls.objects.get(main_doi=main_doi)
+        except cls.DoesNotExist:
+            obj = cls()
+            obj.main_doi = main_doi
+            obj.creator = creator
+            obj.created = utcnow()
+            obj.save()
+            return obj
+
+
+class SyncFailure(CommonControlField):
+    error_type = models.CharField(
+        _("Exception Type"), max_length=255, null=True, blank=True
+    )
+    error_msg = models.TextField(_("Exception Msg"), null=True, blank=True)
+    traceback = models.JSONField(null=True, blank=True)
+
+    @property
+    def data(self):
+        return {
+            "error_type": self.error_type,
+            "error_msg": self.error_msg,
+            "traceback": self.traceback,
+        }
+
+    @classmethod
+    def create(cls, error_msg, error_type, traceback, creator):
+        logging.info(f"SyncFailure.create {error_msg}")
+        obj = cls()
+        obj.error_msg = error_msg
+        obj.error_type = error_type
+        obj.traceback = traceback
+        obj.creator = creator
+        obj.created = utcnow()
+        obj.save()
+        return obj
+
+
 class PidProviderConfig(CommonControlField):
     """
     Tem função de guardar XML que falhou no registro
@@ -173,35 +230,6 @@ class PidRequest(CommonControlField):
     base_form_class = CoreAdminModelForm
 
 
-class XMLRelatedItem(CommonControlField):
-    """
-    Tem função de guardar os relacionamentos entre outro Documento (Artigo)
-    Tem objetivo de identificar o Documento (Artigo)
-    """
-
-    main_doi = models.TextField(_("DOI"), null=True, blank=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["main_doi"]),
-        ]
-
-    def __str__(self):
-        return self.main_doi
-
-    @classmethod
-    def get_or_create(cls, main_doi, creator=None):
-        try:
-            return cls.objects.get(main_doi=main_doi)
-        except cls.DoesNotExist:
-            obj = cls()
-            obj.main_doi = main_doi
-            obj.creator = creator
-            obj.created = utcnow()
-            obj.save()
-            return obj
-
-
 class PidChange(CommonControlField):
     pid_type = models.CharField(_("PID type"), max_length=23, null=True, blank=True)
     old = models.CharField(_("PID old"), max_length=23, null=True, blank=True)
@@ -239,34 +267,6 @@ class PidChange(CommonControlField):
             obj.version = version
             obj.save()
             return obj
-
-
-class SyncFailure(CommonControlField):
-    error_type = models.CharField(
-        _("Exception Type"), max_length=255, null=True, blank=True
-    )
-    error_msg = models.TextField(_("Exception Msg"), null=True, blank=True)
-    traceback = models.JSONField(null=True, blank=True)
-
-    @property
-    def data(self):
-        return {
-            "error_type": self.error_type,
-            "error_msg": self.error_msg,
-            "traceback": self.traceback,
-        }
-
-    @classmethod
-    def create(cls, error_msg, error_type, traceback, creator):
-        logging.info(f"SyncFailure.create {error_msg}")
-        obj = cls()
-        obj.error_msg = error_msg
-        obj.error_type = error_type
-        obj.traceback = traceback
-        obj.creator = creator
-        obj.created = utcnow()
-        obj.save()
-        return obj
 
 
 class PidProviderXML(CommonControlField):
@@ -380,15 +380,6 @@ class PidProviderXML(CommonControlField):
         if self.sync_failure:
             _data.update(self.sync_failure.data)
         return _data
-
-    @classmethod
-    def unsynchronized(cls):
-        """
-        Identifica no pid provideer os registros que não
-        estão sincronizados com o pid provider (central) e
-        faz a sincronização, registrando o XML local no pid provider
-        """
-        return cls.objects.filter(synchronized=False).iterator()
 
     @classmethod
     def get_xml_with_pre(cls, v3):
@@ -584,58 +575,10 @@ class PidProviderXML(CommonControlField):
             )
         return True
 
-    def set_synchronized(
-        self, user, xml_uri=None, error_type=None, error_msg=None, traceback=None
-    ):
-        logging.info("PidProviderXML.set_synchronized")
-        self._add_synchronization_status(error_type, error_msg, traceback)
-        self.updated_by = user
-        self.updated = utcnow()
-        self.save()
-
     def is_equal_to(self, xml_adapter):
         return bool(
             self.current_version
             and self.current_version.finger_print == xml_adapter.finger_print
-        )
-
-    @classmethod
-    def check_registration_demand(cls, xml_with_pre):
-        """
-        Verifica se há necessidade de registrar local (upload) e/ou
-        remotamente (core)
-
-        Parameters
-        ----------
-        xml_with_pre : XMLWithPre
-
-        Returns
-        -------
-        exceptions.QueryDocumentMultipleObjectsReturnedError
-        """
-        logging.info("PidProviderXML.check_registration_demand")
-        xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
-
-        try:
-            registered = cls._query_document(xml_adapter)
-        except (
-            exceptions.NotEnoughParametersToGetDocumentRecordError,
-            exceptions.QueryDocumentMultipleObjectsReturnedError,
-        ) as e:
-            logging.exception(e)
-            return {"error_msg": str(e), "error_type": str(type(e))}
-
-        required_remote = (
-            not registered
-            or not registered.is_equal_to(xml_adapter)
-            or not registered.synchronized
-        )
-        required_local = not registered or required_remote
-
-        return dict(
-            registered=registered and registered.data or {},
-            required_local_registration=required_local,
-            required_remote_registration=required_remote,
         )
 
     @classmethod
@@ -994,3 +937,60 @@ class PidProviderXML(CommonControlField):
                 )
             )
         return True
+
+    @classmethod
+    def unsynchronized(cls):
+        """
+        Identifica no pid provideer os registros que não
+        estão sincronizados com o pid provider (central) e
+        faz a sincronização, registrando o XML local no pid provider
+        """
+        return cls.objects.filter(synchronized=False).iterator()
+
+    def set_synchronized(
+        self, user, xml_uri=None, error_type=None, error_msg=None, traceback=None
+    ):
+        logging.info("PidProviderXML.set_synchronized")
+        self._add_synchronization_status(error_type, error_msg, traceback)
+        self.updated_by = user
+        self.updated = utcnow()
+        self.save()
+
+    @classmethod
+    def check_registration_demand(cls, xml_with_pre):
+        """
+        Verifica se há necessidade de registrar local (upload) e/ou
+        remotamente (core)
+
+        Parameters
+        ----------
+        xml_with_pre : XMLWithPre
+
+        Returns
+        -------
+        exceptions.QueryDocumentMultipleObjectsReturnedError
+        """
+        logging.info("PidProviderXML.check_registration_demand")
+        xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
+
+        try:
+            registered = cls._query_document(xml_adapter)
+        except (
+            exceptions.NotEnoughParametersToGetDocumentRecordError,
+            exceptions.QueryDocumentMultipleObjectsReturnedError,
+        ) as e:
+            logging.exception(e)
+            return {"error_msg": str(e), "error_type": str(type(e))}
+
+        required_remote = (
+            not registered
+            or not registered.is_equal_to(xml_adapter)
+            or not registered.synchronized
+        )
+        required_local = not registered or required_remote
+
+        return dict(
+            registered=registered and registered.data or {},
+            required_local_registration=required_local,
+            required_remote_registration=required_remote,
+        )
