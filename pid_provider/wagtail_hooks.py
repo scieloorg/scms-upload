@@ -7,12 +7,12 @@ from wagtail.contrib.modeladmin.options import (
 )
 from wagtail.contrib.modeladmin.views import CreateView
 
-from .models import PidChange, PidProviderConfig, PidRequest, PidProviderXML
+from .models import PidChange, PidProviderConfig, PidProviderXML, PidRequest
 
 
 class PidRequestCreateView(CreateView):
     def form_valid(self, form):
-        self.object = form.save_all(self.provide.user)
+        self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -42,7 +42,7 @@ class PidRequestAdmin(ModelAdmin):
 
 class PidProviderXMLAdminCreateView(CreateView):
     def form_valid(self, form):
-        self.object = form.save_all(self.provide.user)
+        self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -50,7 +50,7 @@ class PidProviderXMLAdmin(ModelAdmin):
     list_per_page = 10
     model = PidProviderXML
     inspect_view_enabled = True
-    menu_label = _("Pid Requester XMLs")
+    menu_label = _("Pid Provider XMLs")
     create_view_class = PidProviderXMLAdminCreateView
     menu_icon = "folder"
     menu_order = 300
@@ -77,7 +77,7 @@ class PidProviderXMLAdmin(ModelAdmin):
 
 class PidChangeAdminCreateView(CreateView):
     def form_valid(self, form):
-        self.object = form.save_all(self.provide.user)
+        self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -106,7 +106,7 @@ class PidChangeAdmin(ModelAdmin):
 
 class PidProviderConfigCreateView(CreateView):
     def form_valid(self, form):
-        self.object = form.save_all(self.provide.user)
+        self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())
 
 
