@@ -117,6 +117,7 @@ LOCAL_APPS = [
     "collection",
     "doi",
     "files_storage",
+    "htmlxml",
     "institution",
     "issue",
     "journal",
