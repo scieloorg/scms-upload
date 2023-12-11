@@ -123,6 +123,7 @@ LOCAL_APPS = [
     "location",
     "migration",
     "package",
+    "proc",
     "researcher",
     "upload",
     "controlled_lists",
