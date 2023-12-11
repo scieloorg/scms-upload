@@ -122,10 +122,10 @@ LOCAL_APPS = [
     "location",
     "migration",
     "researcher",
-    # evitar problema de migração por enquanto
     "upload",
     "controlled_lists",
     "pid_requester",
+    "tracker",
     "xmlsps",
 ]
 
