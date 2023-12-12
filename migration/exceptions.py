@@ -1,3 +1,15 @@
+class CreateOrUpdateBodyAndBackFileError(Exception):
+    ...
+
+
+class ClassicWebsiteJournalDataGetError(Exception):
+    ...
+
+
+class CreateOrUpdateMigratedError(Exception):
+    ...
+
+
 class ScheduleMigrationsError(Exception):
     ...
 
