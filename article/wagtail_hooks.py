@@ -124,30 +124,23 @@ class ArticleModelAdmin(ModelAdmin):
     add_to_settings_menu = False
     exclude_from_explorer = False
 
-    def doi_list(self, obj):
-        return ", ".join([str(dl) for dl in obj.doi_with_lang.all()])
-
     list_display = (
         "pid_v3",
-        "pid_v2",
-        "doi_list",
-        "aop_pid",
-        "article_type",
+        # "pid_v2",
+        # "doi_list",
+        # "aop_pid",
+        # "article_type",
         "status",
         "issue",
+        "journal",
         "created",
         "updated",
-        "updated_by",
+        # "updated_by",
     )
-    list_filter = (
-        "status",
-        "article_type",
-    )
+    list_filter = ("status",)
     search_fields = (
-        "pid_v2",
         "pid_v3",
-        "doi_with_lang__doi",
-        "aop_pid",
+        "issue__publication_year",
     )
     inspect_view_fields = (
         "created",
@@ -155,14 +148,14 @@ class ArticleModelAdmin(ModelAdmin):
         "creator",
         "updated_by",
         "pid_v3",
-        "pid_v2",
-        "aop_pid",
+        # "pid_v2",
+        # "aop_pid",
         "doi_with_lang",
         "article_type",
         "status",
         "issue",
-        "author",
-        "title_with_lang",
+        # "author",
+        # "title_with_lang",
         "elocation_id",
         "fpage",
         "lpage",
@@ -242,11 +235,17 @@ class RequestArticleChangeModelAdmin(ModelAdmin):
 class ArticleModelAdminGroup(ModelAdminGroup):
     menu_label = _("Articles")
     menu_icon = "folder-open-inverse"
-    menu_order = get_menu_order("article")
-    items = (ArticleModelAdmin, RelatedItemModelAdmin, RequestArticleChangeModelAdmin)
+    # menu_order = get_menu_order("article")
+    menu_order = 400
+    items = (
+        ArticleModelAdmin,
+        # RelatedItemModelAdmin,
+        # RequestArticleChangeModelAdmin,
+    )
 
 
-modeladmin_register(ArticleModelAdminGroup)
+# modeladmin_register(ArticleModelAdminGroup)
+modeladmin_register(ArticleModelAdmin)
 
 
 @hooks.register("register_admin_urls")
