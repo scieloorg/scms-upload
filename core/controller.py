@@ -1,22 +1,23 @@
 from dateutil.parser import parse
+from datetime import datetime
 
 
-def parse_yyyymmdd(date):
+def parse_yyyymmdd(YYYYMMDD):
     """
     Get year, month and day from date format which MM and DD can be 00
     """
     year, month, day = None, None, None
     try:
         _year = int(YYYYMMDD[:4])
-        d = datetime(_year, 1, 1)
+        datetime(_year, 1, 1)
         year = _year
 
         _month = int(YYYYMMDD[4:6])
-        d = datetime(year, _month, 1)
+        datetime(year, _month, 1)
         month = _month
 
         _day = int(YYYYMMDD[6:])
-        d = datetime(year, month, _day)
+        datetime(year, month, _day)
         day = _day
 
     except:
