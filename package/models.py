@@ -32,6 +32,10 @@ from tracker.models import UnexpectedEvent
 pid_requester_app = PidRequester()
 
 
+class SPSPkgOptimizeError(Exception):
+    ...
+
+
 class SPSPkgAddPidV3ToZipFileError(Exception):
     ...
 
@@ -273,7 +277,7 @@ class PreviewArticlePage(Orderable):
             return obj
         except Exception as e:
             raise SPSPkgComponentCreateOrUpdateError(
-                f"Unable to create or update componentfile: {uri} {basename} {e} {str(type(e))}"
+                f"Unable to create or update componentfile: {e} {str(type(e))}"
             )
 
     def save_file(self, name, content):
