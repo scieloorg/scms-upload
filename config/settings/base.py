@@ -125,6 +125,7 @@ LOCAL_APPS = [
     "migration",
     "package",
     "proc",
+    "publication",
     "researcher",
     "upload",
     "controlled_lists",
