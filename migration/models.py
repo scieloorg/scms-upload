@@ -875,3 +875,7 @@ class GeneratedXMLFile(CommonControlField):
                     "Unable to create_or_update_generated xml file {} {} {} {} {}"
                 ).format(migrated_issue, pkg_name, version, type(e), e)
             )
+
+
+class MigratedArticle(MigratedData):
+    pass
