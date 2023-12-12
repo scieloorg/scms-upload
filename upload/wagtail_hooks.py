@@ -378,7 +378,7 @@ class UploadModelAdminGroup(ModelAdminGroup):
     menu_order = get_menu_order("upload")
 
 
-modeladmin_register(UploadModelAdminGroup)
+# modeladmin_register(UploadModelAdminGroup)
 
 
 @hooks.register("register_admin_urls")
