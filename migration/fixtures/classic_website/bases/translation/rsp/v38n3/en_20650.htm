@@ -1,0 +1,331 @@
+<html>
+<head>
+<title>03</title>
+</head>
+<body bgcolor="#ffffff">
+<p align="right"><font size="2" face="Verdana, Arial, Helvetica, sans-serif"><b>ORIGINAL 
+  ARTICLES</b></font></p>
+<p>&nbsp;</p>
+<p><b><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="4"><a name="top10"></a>Use 
+  of an artificial neural network for detecting excess deaths due to cholera in 
+  Cear&aacute;, Brazil</font></b></p>
+<p>&nbsp;</p>
+<p>&nbsp; </p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2"><b>Maria 
+  L&uacute;cia F Penna</b></font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Escola Nacional 
+  de Sa&uacute;de P&uacute;blica. Departamento de Endemias Samuel Pessoa. Rio 
+  de Janeiro, RJ, Brasil</font></p>
+<p><font face="Verdana, Arial, Helvetica, sans-serif" size="2"><a href="#back10">Correspondence</a></font></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<hr size="1" noshade>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2"><b>ABSTRACT</b></font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2"><b>OBJECTIVE: 
+  </b>To evaluate recurrent neural networks as a predictive technique for time-series 
+  in the health field.<br>
+  <b>METHODS: </b>The study was carried out during a cholera epidemic which took 
+  place in 1993 and 1994 in the state of Cear&aacute;, northeastern Brazil, and 
+  was based on excess deaths having 'poorly defined intestinal infections' as 
+  the underlying cause (ICD-9). The monthly number of deaths with due to this 
+  cause between 1979 and 1995 in the state of Cear&aacute; was obtained from the 
+  Ministry of Health's Mortality Information System (SIM). A network comprising 
+  two neurons in the input layer, twelve in the hidden layer, one in the output 
+  layer, and one in the memory layer was trained by backpropagation using the 
+  fist 150 observations, with 0.01 learning rate and 0.9 momentum. Training was 
+  ended after 22,000 epochs. We compare the results with those of a negative binomial 
+  regression.<br>
+  <b>RESULTS: </b>ANN forecasting was adequate. Excessive mortality (number of 
+  deaths above the upper limit of the confidence interval) was detected in December 
+  1993 and October/November 1994. However, negative binomial regression detected 
+  excess mortality from March 1992 onwards.<br>
+  <b>CONCLUSIONS: </b>The artificial neural network showed good predictive ability, 
+  especially in the initial period, and was able to detect alterations concomitant 
+  and a subsequent to the cholera epidemic. However, it was less precise that 
+  the binomial regression model, which was more sensitive to abnormal data concomitant 
+  with cholera circulation.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2"><b>Keywords: 
+  </b>Neural networks (computer). Time series. Forecasting. Cholera, epidemiology. 
+  Epidemiologic surveillance.</font></p>
+<hr size="1" noshade>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="3"><b>INTRODUCTION</b></font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">The prediction 
+  of events in epidemiological surveillance is aimed at planning the future needs 
+  of Public health and at detecting of disturbances in behavior within a time 
+  series, which may indicate an excessive number of cases or deaths. Techniques 
+  employed to this end include adjustment to periodic functions, the ARIMA<sup>4</sup> 
+  models, and Poisson's regression.<sup>1,4,19,16</sup></font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">One of the 
+  goals of epidemiological surveillance is the detection of epidemics. This is 
+  accomplished by analyzing either disease notification data, healthcare service 
+  usage or mortality data. From the statistical standpoint, to detect an epidemic 
+  is to detect the presence of abnormal values within a time series. The detection 
+  of abnormalities based on notification levels from the previous five years<sup>18</sup> 
+  is used in certain countries – the US, for example – in routine epidemiological 
+  surveillance. When the goal is to detect excess mortality, longer periods are 
+  generally used.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Excess mortality 
+  was introduced into epidemiological surveillance in the context of evaluating 
+  the impact of influenza epidemics.<sup>5</sup> This was due to difficulties 
+  in classifying influenza-related deaths, which were, in their majority, attributed 
+  to complications of the infection, such as pneumonia. The concept of excess 
+  mortality was also used in evaluating the impact of heat waves, atmospheric 
+  pollution, and of apparently benign epidemics.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Epidemiological 
+  surveillance in Brazil shows greater operational variability than in developed 
+  countries, which results in decreased precision (greater variance) of the data 
+  and consequently less sensitivity of the notification system in detecting new 
+  diseases and the occurrence of epidemics. Thus, the use of excess mortality 
+  techniques may prove useful for increasing the sensitivity of the surveillance 
+  system, since mortality registration has higher coverage and longer available 
+  time series than the notification system.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">However, 
+  the statistical methods traditionally used require profound knowledge of statistics 
+  for the selection and evaluation of models, which prevents them from being used 
+  in a decentralized manner.<sup>3,17</sup> Artificial Neural Networks (ANN), 
+  on the other hand, have the advantage of being applicable to several time series 
+  sequentially, without prior diagnosis of their behavior, providing good results.<sup>12,21</sup></font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">In most 
+  time series of interest to Public Health, variability is largely attributable 
+  to trends and seasonality. Their behavior is non-linear, and their cycles are 
+  irregular. The advantage of using neural networks to approximate non-linear 
+  functions is that this technique has been successful in analyzing series in 
+  which the mathematical knowledge of the stochastic process behind the series 
+  is either unknown, or difficult to be rationalized.<sup>2</sup></font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Neural networks 
+  were developed initially as a strategy for simulating human mental processes 
+  – such as image and sound recognition – and later as an efficient technological 
+  instrument for performing a large number of different tasks.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">A neural 
+  network is composed of neurons, or nodes, ant their connections, which may be 
+  inputs or outputs with respect to each individual neuron. The node or neuron 
+  is the site of mathematical processing. Such processing is divided into two 
+  steps: the weighted addition of inputs (<font face="Symbol">S</font> W<sub>i</sub>X<sub>i</sub>) 
+  and the submission the result to an activating function, which may generate 
+  an input for other neurons. This function is usually a logistic function or 
+  a hyperbolic tangent. Such functions are sigmoidal in shape, with very little 
+  variation for extreme values of <i>x</i>, which simulates the saturation of 
+  a biological neuron when incoming stimuli are too intense.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">ANNs may 
+  be described as a strategy for the mathematical modeling of problems, which 
+  are conceived as systems with inputs and outputs. Unlike in other modeling strategies, 
+  one does not need to know the mathematical relationship between inputs and outputs. 
+  Thus, unlike multiple regression, the ANN model does not require a function 
+  to be proposed in advance,<sup>11</sup> since certain neural networks are capable 
+  of approximating any function whatsoever. The network would therefore be able 
+  to solve any problem whose relationships it can represent.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Our aim 
+  is to evaluate the appropriateness of the use of recurrent neural networks as 
+  a predictive technique for time series in Public Health.</font></p>
+<p>&nbsp;</p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="3"><b>METHODS</b></font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">The study 
+  was carried out during a cholera epidemic which took place in 1993 and 1994 
+  in the state of Cear&aacute;, northeastern Brazil, and was based on excess deaths 
+  with 'poorly defined intestinal infections' as the underlying cause (ICD-9).</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Excess mortality 
+  was attributed to non-diagnosed lethal cases of cholera.<sup>8</sup> Cear&aacute; 
+  was chosen for having presented, for two consecutive years, the highest yearly 
+  incidence rates of cholera ever registered in Brazil – namely 346.19 and 302.74 
+  per 100,000 population, in 1993 and 1994, respectively.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">The monthly 
+  number of deaths in the state of Cear&aacute; between 1979 and 1995 with "poorly-defined 
+  intestinal infections" (ICD-9) as the underlying cause were obtained from the 
+  Ministry of Health's Mortality Information System.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">As a comparison 
+  we chose negative binomial regression, a statistical technique widely employed 
+  for this type of data in cases where Poisson regression proves inadequate.<sup>15</sup></font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">A recurrent 
+  network was built with two neurons in the input layer (corresponding to year 
+  and month), twelve in the hidden layer, one in the output layer, and one in 
+  the memory layer. The recurrent connection connects the output layer to the 
+  memory layer, which, in its turn, is connected to the hidden layer. All activating 
+  functions were based on the logistic function. Training was carried out through 
+  backpropagation, with 0.01 learning rate and 0.9 momentum. The criterion for 
+  training termination was reaching 22,000 epochs. NeuroShell<sup>&acirc;</sup> 
+  software was used.<sup>23</sup></font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Data from 
+  January 1979 to June 1991 – totaling 150 observations – were used for network 
+  training and model adjustment. This choice was aimed at ensuring the absence 
+  of <i>Vibrio cholerae</i> circulation in the adjustment period, given that the 
+  first case notified in the state of Cear&aacute; took place in February 1992, 
+  and non-detected cases may have occurred in the immediately preceding months.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Data for 
+  the 54-month period between August 1991 and December 1995 were predicted based 
+  on the network. Due to the change from ICD-9 to ICD-10 in January 1996, we chose 
+  not to prolong the extrapolation beyond this date in order to ensure the homogeneity 
+  of the series. The confidence interval for the implicit ANN model was estimated 
+  based on the distribution of residues from the training period, assuming a normal 
+  distribution with mean =0. Bootstrapping with 2,000 samples was performed in 
+  order to evaluate the adequacy of the parameters directly estimated from the 
+  150 residues.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Data were 
+  also adjusted to a negative binomial distribution, deaths being a function of 
+  order of occurrence, representing month-year, and of month of occurrence, transformed 
+  into a dummy variable, representing the seasonal component, after verifying 
+  an over-dispersion in a Poisson regression model. STATA<sup>19</sup> software 
+  was used for this analysis.</font></p>
+<p>&nbsp;</p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="3"><b>RESULTS</b></font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2"><a href="#tab1">Table 
+  1</a> shows the results of negative binomial regression. June was removed from 
+  the model for colinearity reasons, i.e., according to the adjusted model, June 
+  is the baseline month for the definition of the remaining parameters, which 
+  express the seasonal component. The months between July and November were not 
+  statistically significant, but were kept in the model to ensure its validity.</font></p>
+<p align="center"><a name="tab1"></a></p>
+<p align="center">&nbsp;</p>
+<p align="center"><img src="/img/revistas/rsp/v38n3/en_20650t1.gif"></p>
+<p align="center">&nbsp;</p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">The parameters 
+  related to the residues of the neural network are presented in <a href="#tab2">Table 
+  2</a>. The confidence intervals around the mean include zero.</font></p>
+<p align="center"><a name="tab2"></a></p>
+<p align="center">&nbsp;</p>
+<p align="center"><img src="/img/revistas/rsp/v38n3/en_20650t2.gif"></p>
+<p align="center">&nbsp;</p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2"><a href="#fig1">Figure 
+  1</a> shows estimates from both models for the adjustment period. Agreement 
+  between the two models is high, with a 0.95 Pearson correlation coefficient. 
+  The mean difference between the two estimates was 0.544740 (95%CI -294971 to 
+  4.039190). <a href="#fig2">Figure 2</a> presents estimates from both models 
+  extrapolated for the July 1991 – December 1995 period. In this case there is 
+  less agreement between both estimates, with a 0.92 Pearson correlation coefficient. 
+  Mean difference is -6.56195 (95%CI -13.9088 to 0.784901). The estimate given 
+  by the ANN is higher than that obtained through regression. Although ANN estimates 
+  for the December – May period – the season with highest mortality – were closer 
+  to the observed values, the values estimated through regression were closer 
+  to the observed values in the remaining months.</font></p>
+<p align="center"><a name="fig1"></a></p>
+<p align="center">&nbsp;</p>
+<p align="center"><img src="/img/revistas/rsp/v38n3/en_20650f1.gif"></p>
+<p align="center">&nbsp;</p>
+<p align="center"><a name="fig2"></a></p>
+<p align="center">&nbsp;</p>
+<p align="center"><img src="/img/revistas/rsp/v38n3/en_20650f2.gif"></p>
+<p align="center">&nbsp;</p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2"><a href="#fig3">Figure 
+  3</a> presents the upper limit of the confidence intervals of both estimates, 
+  observed data, and cholera occurrence, from July 1991 to December 1995. The 
+  regression model detected excess mortality in March-April 1992 – shortly after 
+  the detection of the first cases of cholera in the state in February – and in 
+  October-November 1992. From February 1993 onward, with the exception of August 
+  and September 1994, all points were above the upper limit of the regression 
+  model. Considering excess mortality as the difference between the number of 
+  deaths observed and the upper limit of the confidence interval, the excess mortality 
+  – as defined by regression – was 68 deaths in 1992, 266 in 1993, 285 in 1994, 
+  and 205 in 1995.</font></p>
+<p align="center"><a name="fig3"></a></p>
+<p align="center">&nbsp;</p>
+<p align="center"><img src="/img/revistas/rsp/v38n3/en_20650f3.gif"></p>
+<p align="center">&nbsp;</p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">The neural 
+  network detected an excess mortality of only five deaths in December 1993, the 
+  month preceding the highest peak in the cholera epidemic, and of 17 deaths in 
+  November-December 1994, in the following season.</font></p>
+<p>&nbsp;</p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="3"><b>DISCUSSION</b></font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">The results 
+  obtained indicate that excess mortality did occur in the state of Cear&aacute; 
+  in the period, and that it may be possible to detect this excess mortality based 
+  on monthly mortality data. In the studied period, 217 deaths due to cholera 
+  were registered in the state: 19 in 1992, 89 in 1993, 104 in 1994 and five in 
+  1995. The neural network underestimated excess mortality. There are doubts concerning 
+  the considerable magnitude of the binomial regression estimate for 1995. Such 
+  magnitude may be due to the extended extrapolation period. Prolonging the series 
+  to encompass the period immediately following would perhaps clear this point. 
+  Unfortunately, the change from ICD-9 to ICD-10 would cast doubts on the homogeneity 
+  of the series, introducing a likely bias and hampering result interpretation.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">It should 
+  be noted that, with respect to the season with the greatest number of deaths 
+  ascribed to poorly defined intestinal infections, point estimates provided by 
+  the neural network were closer to the observed values than those provided by 
+  negative binomial regression in the extrapolation period (<a href="#fig2">Figure 
+  2</a>), but not in the model-adjustment period (<a href="#fig1">Figure 1</a>), 
+  suggesting that, for longer intervals, extrapolation through binomial regression 
+  is less reliable than that provided by neural networks. This potential characteristic 
+  of the neural network, however, is not advantageous, since interval estimation 
+  has low levels of precision.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Estimates 
+  from both models showed good agreement, indicating the adequacy of using ANNs 
+  for health-related time series. However, from a more pragmatic standpoint – 
+  the usual approach in econometrics – the choice between different prediction 
+  strategies must tend towards that which correctly predicts the outcome. In epidemiological 
+  surveillance, the subject of the prediction is the detection of abnormal values<sup>20</sup> 
+  rather than the greater proximity between predicted and observed numbers – which 
+  is the case with price prediction, for instance. In the present case, negative 
+  binomial regression was more adequate for the detection of excess deaths during 
+  the circulation of <i>Vibrio cholerae</i> due to its narrower variance.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">The difference 
+  between negative binomial regression and Poisson regression resides in its estimation 
+  of variance, which incorporates an over-dispersion parameter – alpha. This method 
+  was used only because residues registered after adjustment of a Poisson regression 
+  showed greater dispersion than their corresponding distributions. When alpha 
+  equals zero, negative binomial distribution is reduced to Poisson distribution.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Different 
+  strategies have been used for error estimation in neural network predictions.<sup>2</sup> 
+  The one used in the present study is based on the assumption that, theoretically, 
+  an exact model for the time series can be found, but that, due to measurement 
+  errors and to the influence of uncontrollable and unknown factors, there is 
+  a randomly produced residual error, and the neural network is a quasi-optimal 
+  model. This is doubtless an area to be further explored and developed.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">The neural 
+  networks most used are the non-recurrent or feed-forward networks. In this model 
+  each neuron in a given layer interacts with al neurons in adjacent layers, but 
+  not with those in the same layer, processing occurring always in one direction, 
+  from input to output. By contrast, recurrent neural networks, such as the one 
+  employed in the present study, are capable of learning sequences and are thus 
+  the best choice for dealing with time-series data. Whereas networks with standard 
+  connections respond to a given input always through the same output, a recurrent 
+  network can respond to a same input through different outputs at different moments, 
+  depending on the input previously presented.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">When incorporating 
+  a neuron into the memory layer, the network is incorporating an auto-regressive 
+  component,<sup>22</sup> in addition to the trend and seasonality components 
+  represented by the two input neurons, year and month. The auto-regressive component 
+  allows the values predicted at a given moment to influence the subsequent prediction, 
+  ascribing greater influence to recent values. This did not generate divergence 
+  between models, despite the negative binomial regression not considering auto-correlation 
+  in time.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">The main 
+  difficulty faced in using neural networks is that, due to the novelty of the 
+  method, researchers in general have little familiarity with the process, compared 
+  to other statistical methods.<sup>14</sup> The criterion for choosing between 
+  different networks is pragmatic, i.e., the network chosen is that which fulfils 
+  the objectives expected. Result reproducibility is also not guaranteed, since 
+  initial weights are random in each training session – which may lead to different 
+  areas in the error surface –, and since there are different convergence criteria 
+  – which may result in different local minimums. These characteristics contribute 
+  towards a certain degree of uncertainty in using this instrument, which can 
+  be overcome by carrying out several training sessions and observing result distribution.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">Another 
+  problem mentioned in the literature<sup>9</sup> is over-training, by which the 
+  network captures quantitative relationships generated by noise from the data, 
+  with negative effects on generalization (external validity). An alternative 
+  is to compare networks with different training times.<sup>6,7</sup> The network 
+  presented in the present study was the first one adjusted, no important differences 
+  having been detected in subsequent networks. One may say that the criterion 
+  for convergence was learning 'time', since convergence was determined by the 
+  number of times the entire set of data was presented during training. The 'training 
+  set' comprised the data from the period preceding the introduction of cholera 
+  in the country. A separate calibration set was not determined, since the size 
+  of the training set has important implications on generalization. In this case, 
+  the calibration method – cross-validation – would not compensate for the reduction 
+  in the size of the training set.</font></p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="2">In this 
+  example, the neural network was less sensitive than negative binomial regression. 
+  Its main advantage was the lower level of statistical knowledge required for 
+  its application. It was clearly the technique most easily applicable in the 
+  present example, since it did not imply the recognition of models according 
+  to the behavior of the series, nor the evaluation of the adjusted model. The 
+  present results indicate promising aspects in the use of neural networks in 
+  epidemiological surveillance. However, there is still need for deepening theoretical 
+  knowledge of the statistical behavior of network residues, so as to allow for 
+  greater estimate precision.</font></p>
+<p>&nbsp;</p>
+<p><font face="Verdana, Arial, Helvetica-Normal, sans-serif" size="3"><b>REFERENCES</b></font></p>
+</body>
+</html>
+
