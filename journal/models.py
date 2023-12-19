@@ -61,10 +61,10 @@ class OfficialJournal(CommonControlField):
         ]
 
     def __unicode__(self):
-        return self.title
+        return self.title or self.issn_electronic or self.issn_print or ""
 
     def __str__(self):
-        return self.title
+        return self.title or self.issn_electronic or self.issn_print or ""
 
     @property
     def data(self):
@@ -136,10 +136,10 @@ class Journal(CommonControlField, ClusterableModel):
     )
 
     def __unicode__(self):
-        return str(self.official_journal)
+        return self.title or str(self.official_journal)
 
     def __str__(self):
-        return str(self.official_journal)
+        return self.title or str(self.official_journal)
 
     base_form_class = OfficialJournalForm
 
