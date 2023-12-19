@@ -263,6 +263,7 @@ class DocumentRecordsImporter:
             pkg_name=classic_ws_doc.filename_without_extension,
             migration_status=tracker_choices.PROGRESS_STATUS_TODO,
             user=self.user,
+            main_lang=classic_ws_doc.original_language,
             force_update=self.force_update,
         )
         if classic_ws_doc.file_type == "html":
