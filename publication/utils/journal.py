@@ -52,9 +52,11 @@ def build_journal(journal_proc, builder):
         title_iso=official_journal.title_iso,
         short_title=journal.short_title,
     )
-    builder.add_logo_url(
-        journal.logo_url or "https://www.scielo.org/journal_logo_missing.gif"
-    )
+    try:
+        # FIXME
+        builder.add_logo_url(journal.logo_url)
+    except AttributeError:
+        builder.add_logo_url("https://www.scielo.org/journal_logo_missing.gif")
     builder.add_online_submission_url(classic_j.submission_url)
     # TODO
     # builder.add_related_journals(previous_journal, next_journal_title)
