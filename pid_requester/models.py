@@ -561,10 +561,13 @@ class PidRequesterXML(CommonControlField):
                 traceback,
                 user,
             )
+            self.save()
         else:
             self.synchronized = True
+            self.save()
             if self.sync_failure:
                 self.sync_failure.delete()
+
 
     @classmethod
     def evaluate_registration(cls, xml_adapter, registered):
