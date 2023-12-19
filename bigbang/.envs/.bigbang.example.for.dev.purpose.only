@@ -37,8 +37,8 @@
  ],
 
  "files_storage_config": {"name": "website", "host": "192.168.1.97:9000",
-    "access_key": "HSytHT1hg2sihNnS",
-    "secret_key": "ngALz7J0hHevNjux4fPgwqyxNdr1tedj", 
+    "access_key": "",
+    "secret_key": "", 
     "bucket_root": "root",
 
     "bucket_app_subdir": "website", 
