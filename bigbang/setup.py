@@ -10,10 +10,17 @@ from pid_requester.models import PidProviderConfig
 User = get_user_model()
 
 
-def setup(user, file_path):
-    file_path = file_path or "./bigbang/.envs/.bigbang"
-    with open(file_path) as fp:
-        data = json.loads(fp.read())
+def setup(user, file_path=None, config=None):
+
+    if config:
+        data = json.loads(config)
+    else:
+        try:
+            file_path = file_path or "./bigbang/.envs/.bigbang"
+            with open(file_path) as fp:
+                data = json.loads(fp.read())
+        except FileNotFoundError:
+            raise FileNotFoundError(file_path)
 
     collection = Collection.get_or_create(acron=data["collection_acron"], user=user)
 

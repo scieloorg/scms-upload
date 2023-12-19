@@ -18,10 +18,13 @@ def _get_user(user_id, username):
 
 @celery_app.task(bind=True)
 def task_start(
-    self, user_id=None, username=None, file_path=None, activate_subtasks=None
+    self, user_id=None, username=None, file_path=None, activate_subtasks=None,
+    config=None
 ):
     user = _get_user(user_id, username)
-    setup(user, file_path)
+
+    if file_path or config:
+        setup(user, file_path, config)
 
     # activate_subtasks = activate_subtasks or True
     tasks_scheduler.schedule_publication_subtasks(username, activate_subtasks)
