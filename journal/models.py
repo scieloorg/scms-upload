@@ -124,7 +124,9 @@ class Journal(CommonControlField, ClusterableModel):
     """
     Journal para site novo
     """
-
+    short_title = models.CharField(
+        _("Short Title"), max_length=100, null=True, blank=True
+    )
     official_journal = models.ForeignKey(
         "OfficialJournal",
         null=True,
