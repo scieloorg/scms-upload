@@ -37,7 +37,7 @@ class OfficialJournal(CommonControlField):
     autocomplete_search_field = "title"
 
     def autocomplete_label(self):
-        return self.title
+        return str(self.title)
 
     class Meta:
         verbose_name = _("Official Journal")
