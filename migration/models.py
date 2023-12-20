@@ -17,7 +17,6 @@ from collection.models import Collection
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from tracker import choices as tracker_choices
-from tracker.models import UnexpectedEvent, format_traceback
 
 from . import exceptions
 
@@ -187,6 +186,10 @@ class MigratedData(CommonControlField):
     data = models.JSONField(blank=True, null=True)
 
     panels = [
+        FieldPanel("content_type"),
+        FieldPanel("pid"),
+        FieldPanel("collection"),
+        FieldPanel("migration_status"),
         FieldPanel("isis_updated_date"),
         FieldPanel("isis_created_date"),
         FieldPanel("data"),

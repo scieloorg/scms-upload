@@ -458,13 +458,16 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
     n_paragraphs = models.IntegerField(default=0)
     n_references = models.IntegerField(default=0)
     record_types = models.CharField(max_length=16, blank=True, null=True)
-    html_translation_langs = models.CharField(max_length=16, blank=True, null=True)
+    html_translation_langs = models.CharField(max_length=64, blank=True, null=True)
+    pdf_langs = models.CharField(max_length=64, blank=True, null=True)
+
     panel_status = [
         FieldPanel("html2xml_status"),
         FieldPanel("quality"),
         FieldPanel("n_paragraphs"),
         FieldPanel("n_references"),
         FieldPanel("html_translation_langs"),
+        FieldPanel("pdf_langs"),
         FieldPanel("record_types"),
     ]
     panel_bb_files = [
@@ -584,14 +587,8 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
     ):
         try:
             self.html2xml_status = tracker_choices.PROGRESS_STATUS_DOING
-            self.html_translation_langs = "-".join(
-                sorted(
-                    [
-                        item.lang or "__"
-                        for item in self.article_proc.translation_files.iterator()
-                    ]
-                )
-            )
+            self.html_translation_langs = "-".join(sorted(self.article_proc.translations.keys()))
+            self.pdf_langs = "-".join(sorted([item.lang or self.article_proc.main_lang for item in self.article_proc.renditions]))
             self.save()
 
             document = Document(self.article_proc.migrated_data.data)
@@ -644,6 +641,10 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         operation = self.article_proc.start(user, "generate xml body and back")
 
         document.generate_body_and_back_from_html(document._translated_html_by_lang)
+
+        if not document.xml_body_and_back:
+            # cria xml_body_and_back padrão
+            document.xml_body_and_back = ["<article/>"]
 
         # guarda cada versão de body/back
         if document.xml_body_and_back:

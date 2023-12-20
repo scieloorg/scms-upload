@@ -1,2 +1,6 @@
 class GetOrCreateOfficialJournalError(Exception):
     ...
+
+
+class JournalProcUpdateError(Exception):
+    ...

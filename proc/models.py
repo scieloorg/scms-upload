@@ -9,6 +9,8 @@ from django.core.files.base import ContentFile
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
 from scielo_classic_website.htmlbody.html_body import HTMLContent
@@ -19,6 +21,7 @@ from wagtail.admin.panels import (
     ObjectList,
     TabbedInterface,
 )
+from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article.models import Article
@@ -40,7 +43,7 @@ from package.models import BasicXMLFile, SPSPkg
 from proc import exceptions
 from proc.forms import ProcAdminModelForm
 from tracker import choices as tracker_choices
-from tracker.models import UnexpectedEvent, format_traceback
+from tracker.models import Event, UnexpectedEvent, format_traceback
 
 
 class HTMLXMLCreateOrUpdateError(Exception):
@@ -65,26 +68,33 @@ class OperationFinishError(Exception):
 
 class Operation(CommonControlField):
 
-    operation_name = models.CharField(
+    name = models.CharField(
         _("Name"),
         max_length=64,
         null=True,
         blank=True,
     )
     completed = models.BooleanField(null=True, blank=True, default=False)
+    event = models.ForeignKey(Event, on_delete=models.SET_NULL, null=True, blank=True)
+    detail = models.JSONField(null=True, blank=True)
+
+    base_form_class = ProcAdminModelForm
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("created", read_only=True),
+        FieldPanel("updated", read_only=True),
+        FieldPanel("completed"),
+        FieldPanel("detail"),
+    ]
 
     class Meta:
         indexes = [
-            models.Index(fields=["operation_name"]),
+            models.Index(fields=["name"]),
         ]
 
     def __str__(self):
-        return f"{self.operation_name} {self.started} {self.finished} {self.completed}"
-
-    def autocomplete_label(self):
-        return str(self)
-
-    autocomplete_search_field = "operation_name"
+        return f"{self.name} {self.started} {self.finished} {self.completed}"
 
     @property
     def started(self):
@@ -97,35 +107,71 @@ class Operation(CommonControlField):
     @classmethod
     def start(
         cls,
-        user=None,
-        operation_name=None,
+        user,
+        proc,
+        name=None,
     ):
         try:
             obj = cls()
-            obj.operation_name = operation_name
+            obj.proc = proc
+            obj.name = name
             obj.creator = user
             obj.save()
             return obj
         except Exception as exc:
             raise OperationStartError(
-                f"Unable to create Operation ({operation_name}). EXCEPTION: {type(exc)}  {exc}"
+                f"Unable to create Operation ({name}). EXCEPTION: {type(exc)}  {exc}"
             )
 
-    def finish(self, user=None, completed=False):
+    def finish(
+        self,
+        user,
+        completed=False,
+        exception=None,
+        message_type=None,
+        message=None,
+        exc_traceback=None,
+        detail=None,
+    ):
         try:
+            if not message_type:
+                if not completed:
+                    message_type = "ERROR"
+
+            if message_type or exception or exc_traceback:
+                self.event = Event.create(
+                    user=user,
+                    message_type=message_type,
+                    message=message,
+                    e=exception,
+                    exc_traceback=exc_traceback,
+                    detail=detail,
+                )
+                detail = self.event.data
+            self.detail = detail
             self.completed = completed
             self.updated_by = user
             self.save()
             return self
         except Exception as exc:
             raise OperationFinishError(
-                f"Unable to update Operation ({self.operation_name}). EXCEPTION: {type(exc)}  {exc}"
+                f"Unable to finish ({self.name}). EXCEPTION: {type(exc)}  {exc}"
             )
 
 
-class BaseProc(
-    CommonControlField,
-):
+class JournalProcResult(Operation, Orderable):
+    proc = ParentalKey("JournalProc", related_name="journal_proc_result")
+
+
+class IssueProcResult(Operation, Orderable):
+    proc = ParentalKey("IssueProc", related_name="issue_proc_result")
+
+
+class ArticleProcResult(Operation, Orderable):
+    proc = ParentalKey("ArticleProc", related_name="article_proc_result")
+
+
+class BaseProc(CommonControlField):
     """ """
 
     collection = models.ForeignKey(
@@ -157,12 +203,6 @@ class BaseProc(
         default=tracker_choices.PROGRESS_STATUS_TODO,
     )
 
-    operations = models.ManyToManyField("Operation")
-
-    error_detail = models.JSONField(null=True, blank=True)
-    error_found = models.BooleanField(null=True, blank=True)
-    error_date = models.DateTimeField(null=True, blank=True)
-
     class Meta:
         abstract = True
         indexes = [
@@ -176,11 +216,9 @@ class BaseProc(
         FieldPanel("migration_status"),
         FieldPanel("qa_ws_status"),
         FieldPanel("public_ws_status"),
-        FieldPanel("error_detail"),
-        FieldPanel("error_date"),
     ]
-    panel_operations = [
-        AutocompletePanel("operations"),
+    panel_proc_result = [
+        # InlinePanel("proc_result"),
     ]
     # panel_events = [
     #     AutocompletePanel("events"),
@@ -188,8 +226,7 @@ class BaseProc(
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
-            # ObjectList(panel_events, heading=_("Events")),
-            ObjectList(panel_operations, heading=_("Operations")),
+            ObjectList(panel_proc_result, heading=_("Result")),
         ]
     )
 
@@ -218,11 +255,12 @@ class BaseProc(
             obj.save()
         return obj
 
-    def start(self, user, operation_name):
-        self.save()
-        operation = Operation.start(user, operation_name)
-        self.operations.add(operation)
-        return operation
+    def start(self, user, name):
+        # self.save()
+        # operation = Operation.start(user, name)
+        # self.operations.add(operation)
+        # return operation
+        return self.ProcResult.start(user, self, name)
 
     @classmethod
     def register_classic_website_data(
@@ -235,7 +273,8 @@ class BaseProc(
         force_update=False,
     ):
         try:
-
+            obj = None
+            operation = None
             obj = cls.get_or_create(user, collection, pid)
             if (
                 obj.migration_status != tracker_choices.PROGRESS_STATUS_TODO
@@ -253,26 +292,27 @@ class BaseProc(
                 force_update,
             )
             obj.migration_status = obj.migrated_data.migration_status
+            obj.save()
             operation.finish(
                 user,
                 completed=(
                     obj.migration_status == tracker_choices.PROGRESS_STATUS_TODO
                 ),
+                message=None,
             )
-            obj.register_result(None)
             return obj
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            if obj:
-                obj.register_result(exc_traceback, e)
+            if operation:
+                operation.finish(user, exc_traceback=exc_traceback, exception=e)
             else:
                 UnexpectedEvent.create(
                     e=e,
                     exc_traceback=exc_traceback,
-                    error_detail={
-                        "task": "proc.BaseProc.create_or_update_migrated_data",
+                    detail={
+                        "task": "proc.BaseProc.register_classic_website_data",
                         "username": user.username,
-                        "collection": collection,
+                        "collection": collection.acron,
                         "pid": pid,
                     },
                 )
@@ -283,6 +323,17 @@ class BaseProc(
         Muda o migration_status de REPROC para TODO
         E se force_update = True, muda o migration_status de DONE para TODO
         """
+        logging.info(f"items_to_register: {collection}")
+        logging.info(f"items_to_register: {content_type}")
+        logging.info(f"items_to_register: {force_update}")
+
+        params = dict(
+            collection=collection,
+            migrated_data__content_type=content_type,
+        )
+        if content_type == "article":
+            params["xml_status"] = tracker_choices.PROGRESS_STATUS_DONE
+
         q = Q(migration_status=tracker_choices.PROGRESS_STATUS_REPROC)
         if force_update:
             q |= Q(migration_status=tracker_choices.PROGRESS_STATUS_DONE) | Q(
@@ -291,15 +342,18 @@ class BaseProc(
 
         cls.objects.filter(
             q,
-            collection=collection,
-            migrated_data__content_type=content_type,
+            **params,
         ).update(migration_status=tracker_choices.PROGRESS_STATUS_TODO)
 
         # seleciona os registros MigratedData
+        count = cls.objects.filter(
+            migration_status=tracker_choices.PROGRESS_STATUS_TODO,
+            **params,
+        ).count()
+        logging.info(f"count: {count}")
         return cls.objects.filter(
             migration_status=tracker_choices.PROGRESS_STATUS_TODO,
-            collection=collection,
-            migrated_data__content_type=content_type,
+            **params,
         ).iterator()
 
     def create_or_update_item(
@@ -309,10 +363,12 @@ class BaseProc(
         callable_register_data,
     ):
         try:
-            collection = self.collection
-            data = self.migrated_data.data
+            try:
+                item_name = self.migrated_data.content_type
+            except AttributeError:
+                item_name = ""
 
-            operation = self.start(user, "register data")
+            operation = self.start(user, f"create or update {item_name}")
 
             callable_register_data(user, self, force_update)
 
@@ -322,10 +378,9 @@ class BaseProc(
                     self.migration_status == tracker_choices.PROGRESS_STATUS_DONE
                 ),
             )
-            self.register_result(None)
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            self.register_result(exc_traceback, e)
+            operation.finish(user, exc_traceback=exc_traceback, exception=e)
 
     @classmethod
     def items_to_publish_on_qa(cls, user, content_type, force_update=None, params=None):
@@ -349,36 +404,12 @@ class BaseProc(
         # seleciona itens para publicar em produção
         return items.iterator()
 
-    def register_result(self, failures, exception=None):
-        if exception:
-            logging.exception(exception)
-            logging.info(exception)
-            logging.info(type(exception))
-
-            detail = {
-                "type": str(type(exception)),
-                "exception": str(exception),
-                "traceback": format_traceback(failures),
-            }
-        else:
-            detail = failures
-
-        if detail:
-            self.error_detail = detail
-            self.error_found = True
-            self.error_date = datetime.utcnow()
-        else:
-            self.error_detail = None
-            self.error_found = False
-            self.error_date = None
-        self.save()
-
     def publish(self, user, callable_publish, website_kind, api_data):
         operation = self.start(user, f"publication on {website_kind}")
         response = callable_publish(user, self, api_data)
         if response.get("id") or response.get("result") == "OK":
             self.update_publication_stage()
-        operation.finish(user, bool(response.get("id")))
+        operation.finish(user, completed=bool(response.get("id")))
 
     def update_publication_stage(self):
         """
@@ -437,7 +468,7 @@ class BaseProc(
         return items.iterator()
 
 
-class JournalProc(BaseProc):
+class JournalProc(BaseProc, ClusterableModel):
     """ """
 
     acron = models.CharField(_("Acronym"), max_length=25, null=True, blank=True)
@@ -451,14 +482,25 @@ class JournalProc(BaseProc):
     )
     journal = models.ForeignKey(Journal, on_delete=models.SET_NULL, null=True)
 
+    ProcResult = JournalProcResult
+    base_form_class = ProcAdminModelForm
+
+    panel_proc_result = [
+        InlinePanel("journal_proc_result", label=_("Proc result")),
+    ]
+    MigratedDataClass = MigratedJournal
+
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(BaseProc.panel_status, heading=_("Status")),
+            ObjectList(panel_proc_result, heading=_("Result")),
+        ]
+    )
+
     class Meta:
         indexes = [
             models.Index(fields=["acron"]),
         ]
-
-    base_form_class = ProcAdminModelForm
-    edit_handler = BaseProc.edit_handler
-    MigratedDataClass = MigratedJournal
 
     @staticmethod
     def autocomplete_custom_queryset_filter(search_term):
@@ -526,7 +568,7 @@ def is_out_of_date(file_path, file_date):
     return file_date.isoformat() < modified_date(file_path).isoformat()
 
 
-class IssueProc(BaseProc):
+class IssueProc(BaseProc, ClusterableModel):
     """ """
 
     def __unicode__(self):
@@ -560,6 +602,7 @@ class IssueProc(BaseProc):
 
     MigratedDataClass = MigratedIssue
     base_form_class = ProcAdminModelForm
+    ProcResult = IssueProcResult
 
     panel_status = [
         FieldPanel("migration_status"),
@@ -567,20 +610,17 @@ class IssueProc(BaseProc):
         FieldPanel("docs_status"),
         FieldPanel("qa_ws_status"),
         FieldPanel("public_ws_status"),
-        FieldPanel("error_detail"),
-        FieldPanel("error_date"),
-    ]
-    panel_operations = [
-        AutocompletePanel("operations"),
     ]
     panel_files = [
         AutocompletePanel("issue_files"),
     ]
+    panel_proc_result = [
+        InlinePanel("issue_proc_result"),
+    ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
-            ObjectList(panel_files, heading=_("Events")),
-            ObjectList(panel_operations, heading=_("Operations")),
+            ObjectList(panel_proc_result, heading=_("Result")),
         ]
     )
 
@@ -668,10 +708,10 @@ class IssueProc(BaseProc):
                 and not force_update
             ):
                 return
+            operation = self.start(user, "get_files_from_classic_website")
+
             self.files_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
-
-            operation = self.start(user, "get_files_from_classic_website")
 
             result = f_get_files_from_classic_website(user, self, force_update)
             failures = result.get("failures")
@@ -685,16 +725,23 @@ class IssueProc(BaseProc):
                 if failures
                 else tracker_choices.PROGRESS_STATUS_DONE
             )
+            self.save()
             operation.finish(
                 user,
                 completed=(self.files_status == tracker_choices.PROGRESS_STATUS_DONE),
+                message="Files",
+                detail=failures,
             )
-            self.register_result(failures)
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.files_status = tracker_choices.PROGRESS_STATUS_PENDING
-            self.register_result(exc_traceback, e)
+            self.save()
+            operation.finish(
+                user,
+                exc_traceback=exc_traceback,
+                exception=e,
+            )
 
     @classmethod
     def docs_to_migrate(cls, collection, force_update):
@@ -731,11 +778,11 @@ class IssueProc(BaseProc):
                 )
                 return
         try:
+            operation = self.start(user, "get_article_records_from_classic_website")
 
             self.docs_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
-            operation = self.start(user, "get_article_records_from_classic_website")
             result = f_get_article_records_from_classic_website(
                 user, self, ArticleProc, force_update
             )
@@ -747,15 +794,22 @@ class IssueProc(BaseProc):
                 if failures
                 else tracker_choices.PROGRESS_STATUS_DONE
             )
+            self.save()
             operation.finish(
                 user,
                 completed=(self.docs_status == tracker_choices.PROGRESS_STATUS_DONE),
+                message="article records",
+                detail=failures,
             )
-            self.register_result(failures)
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.docs_status = tracker_choices.PROGRESS_STATUS_PENDING
-            self.register_result(exc_traceback, e)
+            self.save()
+            operation.finish(
+                user,
+                exc_traceback=exc_traceback,
+                exception=e,
+            )
 
     def find_asset(self, basename, name=None):
         if not name:
@@ -774,14 +828,19 @@ class ArticleEventReportCreateError(Exception):
     ...
 
 
-class ArticleProc(BaseProc, BasicXMLFile):
+class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
     # Armazena os IDs dos artigos no contexto de cada coleção
     # serve para conseguir recuperar artigos pelo ID do site clássico
     issue_proc = models.ForeignKey(
         IssueProc, on_delete=models.SET_NULL, null=True, blank=True
     )
     pkg_name = models.TextField(_("Package name"), null=True, blank=True)
-
+    main_lang = models.CharField(
+        _("Main lang"),
+        max_length=2,
+        blank=True,
+        null=True,
+    )
     # article = models.ForeignKey(
     #     "Article", on_delete=models.SET_NULL, null=True, blank=True
     # )
@@ -807,31 +866,29 @@ class ArticleProc(BaseProc, BasicXMLFile):
         null=True,
     )
 
+    ProcResult = ArticleProcResult
     panel_files = [
         FieldPanel("file"),
         AutocompletePanel("sps_pkg"),
     ]
     panel_status = [
-        FieldPanel("migration_status"),
         FieldPanel("xml_status"),
         FieldPanel("sps_pkg_status"),
+        FieldPanel("migration_status"),
         FieldPanel("qa_ws_status"),
         FieldPanel("public_ws_status"),
-        FieldPanel("error_detail"),
-        FieldPanel("error_date"),
-    ]
-    panel_operations = [
-        AutocompletePanel("operations"),
     ]
     # panel_events = [
     #     AutocompletePanel("events"),
     # ]
+    panel_proc_result = [
+        InlinePanel("article_proc_result"),
+    ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
             ObjectList(panel_files, heading=_("Files")),
-            # ObjectList(panel_events, heading=_("Events")),
-            ObjectList(panel_operations, heading=_("Operations")),
+            ObjectList(panel_proc_result, heading=_("Result")),
         ]
     )
 
@@ -860,13 +917,14 @@ class ArticleProc(BaseProc, BasicXMLFile):
         pkg_name=None,
         migration_status=None,
         user=None,
+        main_lang=None,
         force_update=None,
     ):
         try:
             self.updated_by = user
             self.issue_proc = issue_proc
             self.pkg_name = pkg_name
-
+            self.main_lang = main_lang
             self.migration_status = migration_status or self.migration_status
             self.save()
 
@@ -888,12 +946,17 @@ class ArticleProc(BaseProc, BasicXMLFile):
             else:
                 self.add_xml(user, source_path=self.migrated_xml.file.path)
 
-            operation.finish(user, bool(self.file.path))
-            self.register_result(None)
+            operation.finish(user, completed=bool(self.file.path))
+
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.xml_status = tracker_choices.PROGRESS_STATUS_PENDING
-            self.register_result(exc_traceback, e)
+            self.save()
+            operation.finish(
+                user,
+                exc_traceback=exc_traceback,
+                exception=e,
+            )
 
     def html_to_xml(self, user, htmlxml, body_and_back_xml):
 
@@ -907,7 +970,6 @@ class ArticleProc(BaseProc, BasicXMLFile):
             user,
             completed=(htmlxml.html2xml_status == tracker_choices.PROGRESS_STATUS_DONE),
         )
-        self.register_result(None)
 
     @classmethod
     def items_to_get_xml(
@@ -1144,10 +1206,8 @@ class ArticleProc(BaseProc, BasicXMLFile):
     ):
         xml = ArticleAndSubArticles(xml_with_pre.xmltree)
         xml_langs = []
-        if xml.main_lang:
-            xml_langs.append(xml.main_lang)
         for item in xml.data:
-            if item.get("lang") and item["article_type"] == "translation":
+            if item.get("lang"):
                 xml_langs.append(item.get("lang"))
 
         pdf_langs = []
@@ -1175,7 +1235,7 @@ class ArticleProc(BaseProc, BasicXMLFile):
         html_langs = list(self.translations.keys())
         try:
             if self.migrated_data.n_paragraphs:
-                html_langs.append(xml.main_lang)
+                html_langs.append(self.main_lang)
         except Exception as e:
             pass
 
@@ -1265,7 +1325,7 @@ class ArticleProc(BaseProc, BasicXMLFile):
                 else "asset"
             )
             components[sps_filename] = {
-                "xml_elem_id": asset.id,
+                "xml_elem_id": xml_graphic.id,
                 "legacy_uri": asset.original_href,
                 "component_type": component_type,
             }
@@ -1296,10 +1356,10 @@ class ArticleProc(BaseProc, BasicXMLFile):
         html_to_xml=False,
     ):
         try:
+            operation = self.start(user, "generate_sps_package")
+
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
-
-            operation = self.start(user, "generate_sps_package")
 
             components = {}
             texts = {}
@@ -1324,28 +1384,35 @@ class ArticleProc(BaseProc, BasicXMLFile):
                     texts=texts,
                 )
 
+            detail = dict(
+                texts=texts,
+                components=components,
+                is_pid_provider_synchronized=self.sps_pkg.is_pid_provider_synchronized,
+            )
             if (
                 self.sps_pkg.is_pid_provider_synchronized
                 and self.sps_pkg.valid_texts
-                and self.sps_pkg_valid_components
+                and self.sps_pkg.valid_components
             ):
                 self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DONE
-                operation.finish(user, True)
-                self.register_result({})
+                self.save()
+                operation.finish(user, completed=True, detail=detail)
             else:
                 self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_PENDING
-                result = texts
-                result.update(components)
-                result[
-                    "is_pid_provider_synchronized"
-                ] = self.sps_pkg.is_pid_provider_synchronized
-                operation.finish(user, False)
-                self.register_result(result)
+                self.save()
+                operation.finish(
+                    user, completed=False, detail=detail
+                )
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_PENDING
-            self.register_result(exc_traceback, e)
+            self.save()
+            operation.finish(
+                user,
+                exc_traceback=exc_traceback,
+                exception=e,
+            )
 
     @property
     def journal_proc(self):

@@ -41,7 +41,6 @@ class JournalProcModelAdmin(ModelAdmin):
         "created",
     )
     list_filter = (
-        "error_found",
         "availability_status",
         "migration_status",
         "qa_ws_status",
@@ -76,7 +75,6 @@ class IssueProcModelAdmin(ModelAdmin):
         "created",
     )
     list_filter = (
-        "error_found",
         "migration_status",
         "docs_status",
         "files_status",
@@ -146,7 +144,6 @@ class ArticleProcModelAdmin(ModelAdmin):
         "created",
     )
     list_filter = (
-        "error_found",
         "migration_status",
         "xml_status",
         "sps_pkg_status",

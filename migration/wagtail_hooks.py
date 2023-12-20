@@ -300,10 +300,9 @@ class HTMLXMLModelAdmin(ModelAdmin):
         "quality",
         "attention_demands",
         "html_translation_langs",
+        "pdf_langs",
         "n_paragraphs",
         "n_references",
-        "record_types",
-        "article_type",
         "created_updated",
     )
     list_filter = (
@@ -315,10 +314,11 @@ class HTMLXMLModelAdmin(ModelAdmin):
         "html2xml_status",
         "quality",
         "html_translation_langs",
+        "pdf_langs",
     )
     search_fields = (
         "article_proc__migrated_data__pid",
-        # "article_proc__migrated_data__pkg_name",
+        "article_proc__pkg_name",
         "html2xml_status",
         "article_type",
     )

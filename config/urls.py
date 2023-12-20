@@ -15,6 +15,9 @@ from core.api import api_router
 from core.search import views as search_views  # noqa isort:skip
 
 urlpatterns = [
+    # Autocomplete endpoint
+    # Manter fora das rotas com traducoes
+    re_path(r"^admin/autocomplete/", include(autocomplete_admin_urls)),
     path("", TemplateView.as_view(template_name="home/home_page.html"), name="home"),
     path(
         "about/", TemplateView.as_view(template_name="pages/about.html"), name="about"
@@ -38,8 +41,6 @@ urlpatterns = [
 # These will be available under a language code prefix. For example /en/search/
 urlpatterns += i18n_patterns(
     re_path(r"^search/$", search_views.search, name="search"),
-    # Autocomplete endpoint
-    re_path(r"^admin/autocomplete/", include(autocomplete_admin_urls)),
     # User management
     path("api/v2/", api_router.urls),
     path("users/", include("core.users.urls", namespace="users")),

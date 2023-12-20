@@ -1,0 +1,65 @@
+{"user_id":1,
+ "collection_acron": "scl",
+ "collection_name": "SciELO Brasil",
+ "db_uri": "mongodb://192.168.1.97:27017/scielo_qa",
+ "db_name": ""
+ "url": "new.scielo.br",
+
+ "websites": [
+    {
+        "url": "http://192.168.1.97:8014",
+        "purpose": "QA",
+        "db_name": "qa",
+        "db_uri": "mongodb://192.168.1.97:27017/scielo_qa",
+        "api_url_article": null,
+        "api_url_issue": null,
+        "api_url_journal": null,
+        "api_get_token_url": null,
+        "api_username": null,
+        "api_password": null,
+        "api_token": null,
+        "enabled": true
+    },
+    {
+        "url": "http://192.168.1.97:8015",
+        "purpose": "PUBLIC",
+        "db_name": "prod",
+        "db_uri": null,
+        "api_url_article": "http://192.168.1.97:8015/api/v1/article",
+        "api_url_issue": "http://192.168.1.97:8015/api/v1/issue",
+        "api_url_journal": "http://192.168.1.97:8015/api/v1/journal",
+        "api_get_token_url": null,
+        "api_username": "x",
+        "api_password": "x",
+        "api_token": "x",
+        "enabled": false
+    }
+ ],
+
+ "files_storage_config": {"name": "website", "host": "192.168.1.97:9000",
+    "access_key": "",
+    "secret_key": "", 
+    "bucket_root": "root",
+
+    "bucket_app_subdir": "website", 
+
+    "secure": false
+    },
+
+"classic_ws_config": {
+    "BASES_TRANSLATION_PATH": "/app/migration/fixtures/classic_website/bases/translation",
+    "BASES_WORK_PATH": "/app/migration/fixtures/classic_website/bases-work",
+    "BASES_PDF_PATH": "/app/migration/fixtures/classic_website/bases/pdf",
+    "HTDOCS_IMG_REVISTAS_PATH": "/app/migration/fixtures/classic_website/htdocs/img/revistas",
+    "BASES_XML_PATH": "/app/migration/fixtures/classic_website/bases/xml",
+    "title_path": "/app/migration/fixtures/classic_website/bases/title/title.id",
+    "issue_path": "/app/migration/fixtures/classic_website/bases/issue/issue.id",
+    "SERIAL_PATH": "/app/migration/fixtures/classic_website/serial"
+    },
+"pid_provider": {
+    "token": "http://192.168.1.97:8000/api/v2/auth/token/",
+    "pid_provider": "http://192.168.1.97:8000/api/v2/pid/pid_provider/"
+    "name": "adm",
+    "pp": "x",
+    }
+}

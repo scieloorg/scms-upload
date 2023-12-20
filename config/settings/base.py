@@ -114,6 +114,7 @@ LOCAL_APPS = [
     "core_settings",
     # Your stuff: custom apps go here
     "article",
+    "bigbang",
     "collection",
     "doi",
     "files_storage",

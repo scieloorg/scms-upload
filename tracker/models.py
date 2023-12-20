@@ -118,7 +118,6 @@ class Event(CommonControlField):
     )
 
     class Meta:
-        abstract = True
         indexes = [
             models.Index(fields=["message_type"]),
         ]
@@ -127,7 +126,6 @@ class Event(CommonControlField):
     def data(self):
         d = {}
         d["created"] = self.created.isoformat()
-        d["user"] = self.user.username
         d.update(
             dict(
                 message=self.message, message_type=self.message_type, detail=self.detail

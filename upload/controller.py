@@ -1,12 +1,12 @@
+import logging
 from datetime import datetime
 
 from django.shortcuts import get_object_or_404
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
-from article.controller import (
-    request_pid_v3_and_create_article as article_controller_request_pid_v3_and_create_article,
-)
-from collection.models import NewWebSiteConfiguration
+from article.controller import create_article
+from collection.models import WebSiteConfiguration
+from package.models import SPSPkg
+from package import choices as package_choices
 from libs.dsm.publication.db import exceptions, mk_connection
 
 from .models import (
@@ -162,8 +162,8 @@ def get_last_package(article_id, **kwargs):
 
 def establish_site_connection(url="scielo.br"):
     try:
-        host = NewWebSiteConfiguration.objects.get(url__icontains=url).db_uri
-    except NewWebSiteConfiguration.DoesNotExist:
+        host = WebSiteConfiguration.objects.get(url__icontains=url).db_uri
+    except WebSiteConfiguration.DoesNotExist:
         return False
 
     try:
@@ -174,23 +174,29 @@ def establish_site_connection(url="scielo.br"):
     return True
 
 
-def request_pid_for_accepted_packages(user_id):
-    user = User.objects.get(pk=user_id)
+def request_pid_for_accepted_packages(user):
+    # FIXME Usar package.SPSPkg no lugar de Package
     for pkg in Package.objects.filter(
         status=choices.PS_ACCEPTED, article__isnull=True
     ).iterator():
-        for xml_item in XMLWithPre.create(path=pkg.file.path):
-            response = article_controller_request_pid_v3_and_create_article(
-                xml_item["xml_with_pre"],
-                xml_item["filename"],
-                user=user,
+        # FIXME indicar se é atualização (True) ou novo (False)
+        is_published = None
+
+        sps_pkg = SPSPkg.create_or_update(
+            user,
+            pkg.file.path,
+            package_choices.PKG_ORIGIN_INGRESS_WITH_VALIDATION,
+            reset_failures=True,
+            is_published=is_published,
+        )
+
+        response = create_article(user, sps_pkg)
+        try:
+            pkg.article = response["article"]
+            pkg.save()
+        except KeyError:
+            # TODO registrar em algum modelo os erros para que o usuário
+            # fique ciente de que houve erro
+            logging.exception(
+                f"Unable to create / update article {response['error_msg']}"
             )
-            try:
-                pkg.article = response["article"]
-                pkg.save()
-            except KeyError:
-                # TODO registrar em algum modelo os erros para que o usuário
-                # fique ciente de que houve erro
-                logging.exception(
-                    f"Unable to create / update article {response['error_msg']}"
-                )

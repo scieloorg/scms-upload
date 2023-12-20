@@ -7,11 +7,16 @@ from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 
 from django.core.files.base import ContentFile
+from django.db.models import Q
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from packtools import HTMLGenerator
 from packtools.sps.models.v2.article_assets import ArticleAssets
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre, get_xml_with_pre, get_xml_with_pre_from_uri
+from packtools.sps.pid_provider.xml_sps_lib import (
+    XMLWithPre,
+    get_xml_with_pre,
+    get_xml_with_pre_from_uri,
+)
 from packtools.utils import SPPackage
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -30,6 +35,10 @@ from tracker.models import UnexpectedEvent
 
 
 pid_requester_app = PidRequester()
+
+
+class SPSPkgOptimizeError(Exception):
+    ...
 
 
 class SPSPkgAddPidV3ToZipFileError(Exception):
@@ -142,7 +151,11 @@ class BasicXMLFile(models.Model):
 
 
 def pkg_directory_path(instance, filename):
-    subdir = "/".join(instance.sps_pkg_name.split("-"))
+    try:
+        sps_pkg_name = instance.sps_pkg_name
+    except AttributeError:
+        sps_pkg_name = instance.sps_pkg.sps_pkg_name
+    subdir = "/".join(sps_pkg_name.split("-"))
     return f"pkg/{subdir}/{filename}"
 
 
@@ -268,12 +281,12 @@ class PreviewArticlePage(Orderable):
             obj.lang = lang
 
         try:
-            obj.save_file(sps_pkg.sps_pkg_name + "-" + lang + ".html", content)
+            obj.save_file(sps_pkg.sps_pkg_name + "-" + lang.code2 + ".html", content)
             obj.save()
             return obj
         except Exception as e:
             raise SPSPkgComponentCreateOrUpdateError(
-                f"Unable to create or update componentfile: {uri} {basename} {e} {str(type(e))}"
+                f"Unable to create or update componentfile: {e} {str(type(e))}"
             )
 
     def save_file(self, name, content):
@@ -284,7 +297,9 @@ class PreviewArticlePage(Orderable):
         try:
             self.file.save(name, ContentFile(content))
         except Exception as e:
-            raise PreviewArticlePageFileSaveError(f"Unable to save {name}. Exception: {e}")
+            raise PreviewArticlePageFileSaveError(
+                f"Unable to save {name}. Exception: {e}"
+            )
 
 
 class SPSPkg(CommonControlField, ClusterableModel):
@@ -333,10 +348,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
             return self.sps_pkg_name
 
     panel_files = [
-        FieldPanel("xml_uri", read_only=True),
-        FieldPanel("file", read_only=True),
-        InlinePanel("article_page"),
-        InlinePanel("component"),
+        FieldPanel("xml_uri"),
+        FieldPanel("file"),
+        InlinePanel("article_page", label=_("Article Page")),
+        InlinePanel("component", label=_("Package component")),
     ]
 
     panel_status = [
@@ -426,20 +441,31 @@ class SPSPkg(CommonControlField, ClusterableModel):
         obj = cls.add_pid_v3_to_zip(user, sps_pkg_zip_path, is_public)
         obj.origin = origin or obj.origin
         obj.is_public = is_public or obj.is_public
-        obj.optimise_pkg(user, sps_pkg_zip_path)
-        obj.push_package(user, components)
-        obj.generate_article_html_page(user)
-        obj.storaged_files_total = obj.components.filter(uri__isnull=False).count()
         obj.expected_component_total = len(components)
         obj.texts = texts
-        obj.valid_components = obj.storaged_files_total == obj.expected_components_total
-
-        obj.valid_texts = (
-            set(texts.get("xml_langs"))
-            == set(texts.get("pdf_langs"))
-            == set(texts.get("html_langs"))
-        )
+        if texts.get("html_langs"):
+            obj.valid_texts = (
+                set(texts.get("xml_langs"))
+                == set(texts.get("pdf_langs"))
+                == set(texts.get("html_langs"))
+            )
+        else:
+            obj.valid_texts = set(texts.get("xml_langs")) == set(texts.get("pdf_langs"))
         obj.save()
+
+        obj.optimise_pkg(user, sps_pkg_zip_path)
+
+        obj.push_package(user, components)
+        obj.storaged_files_total = obj.components.filter(uri__isnull=False).count()
+        stored_components = len(
+            [item for item in components.values() if item.get("uri")]
+        )
+        if obj.xml_uri:
+            stored_components += 1
+        obj.valid_components = stored_components == obj.expected_component_total
+        obj.save()
+
+        obj.generate_article_html_page(user)
         return obj
 
     @classmethod
@@ -497,9 +523,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
     def generate_article_html_page(self, user):
         try:
-            xml_with_pre = get_xml_with_pre_from_uri(self.xml_uri)
             generator = HTMLGenerator.parse(
-                xml=xml_with_pre.xmltree,
+                file=self.xml_uri,
                 valid_only=False,
                 xslt="3.0",
             )
@@ -507,8 +532,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 PreviewArticlePage.create_or_update(
                     user,
                     self,
-                    lang=lang,
-                    content=generator.generate(lang),
+                    lang=Language.get_or_create(creator=user, code2=lang),
+                    content=str(generator.generate(lang)),
                 )
         except Exception as e:
             logging.exception(f"PreviewArticlePage {self.sps_pkg_name} {e}")
@@ -531,19 +556,35 @@ class SPSPkg(CommonControlField, ClusterableModel):
         mimetypes.init()
         self.components.all().delete()
 
+        # components contém os components antes da otimização
+        # que gera novos componentes (miniatura e imagem para web)
+        THUMB = ".thumbnail"
+        optimised_components = {}
+        for k, v in components.items():
+            name, ext = os.path.splitext(k)
+            if THUMB in name:
+                name = name[: name.find(THUMB)]
+            optimised_components[name] = v.copy()
+            try:
+                optimised_components[name].pop("legacy_uri")
+            except KeyError:
+                logging.info(v)
+
         with ZipFile(self.file.path) as optimised_fp:
             for item in optimised_fp.namelist():
-                logging.info(f"{self.file.path} {item}")
-
-                component_data = components.get(item) or {}
+                name, ext = os.path.splitext(item)
 
                 with optimised_fp.open(item, "r") as optimised_item_fp:
                     content = optimised_item_fp.read()
 
-                name, ext = os.path.splitext(item)
                 if ext == ".xml":
                     xml_name = item
-                    xml_with_pre = get_xml_with_pre(content.decode("utf-8"))
+                    try:
+                        xml_with_pre = get_xml_with_pre(content.decode("utf-8"))
+                    except Exception as e:
+                        logging.info(self)
+                        logging.exception(e)
+                    # registrará XML após trocar o xlink:href por URI do MinIO
                     continue
 
                 try:
@@ -556,6 +597,13 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 except Exception as e:
                     uri = None
 
+                component_data = components.get(item) or {}
+                if component_data:
+                    components[item]["uri"] = uri
+                else:
+                    if THUMB in name:
+                        name = name[: name.find(THUMB)]
+                    component_data = optimised_components.get(name) or {}
                 self.components.add(
                     SPSPkgComponent.create_or_update(
                         user=user,

@@ -2,49 +2,18 @@ import logging
 from datetime import datetime
 
 from django.utils.translation import gettext_lazy as _
-from packtools.sps.models.article_ids import ArticleIds
 
-from collection.models import Collection
-from pid_requester.controller import PidRequester
+from packtools.sps.models.article_ids import ArticleIds
 
 from . import exceptions
 from .models import Article, choices
 
 
-def request_pid_v3_and_create_article(xml_with_pre, filename, user, collection=None):
-    """
-    Solicita PID versão 3, registra o artigo e o arquivo XML com o pid v3
-    provido pelo PID Provider
-
-    collection: identificar coleção se requisição vier da migração
-    """
-    logging.info(f"Request PID V3 para {filename}")
-    pid_requester = PidRequester()
-    response = pid_requester.request_pid_for_xml_with_pre(xml_with_pre, filename, user)
-
-    # IGNORA ERRO DE SOLICITACAO PID PROVIDER DO CORE
-    # TODO REMOVER O COMENTÁRIO FUTURAMENTE
-    # if response.get("error_type"):
-    #     return response
-
-    try:
-        issnl = xml_with_pre.journal_issnl
-    except AttributeError:
-        issnl = None
-    article = Article.get_or_create(
-        pid_v3=response["v3"],
-        pid_v2=response["v2"],
-        aop_pid=response.get("aop_pid"),
-        creator=user,
-        issn_electronic=xml_with_pre.journal_issn_electronic,
-        issn_print=xml_with_pre.journal_issn_print,
-        issnl=issnl,
-        volume=xml_with_pre.volume,
-        number=xml_with_pre.number,
-        suppl=xml_with_pre.suppl,
-        publication_year=xml_with_pre.pub_year,
-        collection=collection,
-    )
+def create_article(sps_pkg, user, force_update):
+    article = Article.create_or_update(user, sps_pkg)
+    article.add_journal(user)
+    article.add_issue(user)
+    article.save()
     return {"article": article}
 
 
