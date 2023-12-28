@@ -9,7 +9,7 @@ from lxml import etree
 from packtools.sps.pid_provider.xml_sps_adapter import PidProviderXMLAdapter
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
-from pid_requester import exceptions, models
+from pid_provider import exceptions, models
 
 User = get_user_model()
 
@@ -76,7 +76,7 @@ def _create_xml_adapter__aop():
     return xml_adapter
 
 
-class PidRequesterXMLValidateQueryParamsTest(TestCase):
+class PidProviderXMLValidateQueryParamsTest(TestCase):
     def setUp(self):
         self.article_params = {
             "z_article_titles_texts": "TITLES",
@@ -104,20 +104,20 @@ class PidRequesterXMLValidateQueryParamsTest(TestCase):
 
     def test_validate_query_params_all_present(self):
         params = self.article_params
-        result = models.PidRequesterXML.validate_query_params(params)
+        result = models.PidProviderXML.validate_query_params(params)
         self.assertTrue(result)
 
     def test_validate_query_params_all_present_plus_issue_params(self):
         params = self.article_params
         params.update(self.issue_params)
-        result = models.PidRequesterXML.validate_query_params(params)
+        result = models.PidProviderXML.validate_query_params(params)
         self.assertTrue(result)
 
     def test_validate_query_params_issue_params_only(self):
         params = {}
         params.update(self.issue_params)
         with self.assertRaises(exceptions.NotEnoughParametersToGetDocumentRecordError):
-            result = models.PidRequesterXML.validate_query_params(params)
+            result = models.PidProviderXML.validate_query_params(params)
 
     def test_validate_query_params_journal_issns_absence(self):
         params = self.article_params
@@ -125,7 +125,7 @@ class PidRequesterXMLValidateQueryParamsTest(TestCase):
         del params["journal__issn_print"]
         del params["journal__issn_electronic"]
         with self.assertRaises(exceptions.NotEnoughParametersToGetDocumentRecordError):
-            result = models.PidRequesterXML.validate_query_params(params)
+            result = models.PidProviderXML.validate_query_params(params)
 
     def test_validate_query_params_pub_year_absence(self):
         params = self.article_params
@@ -133,27 +133,27 @@ class PidRequesterXMLValidateQueryParamsTest(TestCase):
         del params["article_pub_year"]
         del params["issue__pub_year"]
         with self.assertRaises(exceptions.NotEnoughParametersToGetDocumentRecordError):
-            result = models.PidRequesterXML.validate_query_params(params)
+            result = models.PidProviderXML.validate_query_params(params)
 
     def test_validate_query_params_main_doi_absence(self):
         params = self.article_params
         params.update(self.issue_params)
         del params["main_doi"]
-        result = models.PidRequesterXML.validate_query_params(params)
+        result = models.PidProviderXML.validate_query_params(params)
         self.assertTrue(result)
 
     def test_validate_query_params_fpage_absence(self):
         params = self.article_params
         params.update(self.issue_params)
         del params["fpage"]
-        result = models.PidRequesterXML.validate_query_params(params)
+        result = models.PidProviderXML.validate_query_params(params)
         self.assertTrue(result)
 
     def test_validate_query_params_elocation_id_absence(self):
         params = self.article_params
         params.update(self.issue_params)
         del params["elocation_id"]
-        result = models.PidRequesterXML.validate_query_params(params)
+        result = models.PidProviderXML.validate_query_params(params)
         self.assertTrue(result)
 
     def test_validate_query_params_main_doi_fpage_elocation_id_absence(self):
@@ -162,7 +162,7 @@ class PidRequesterXMLValidateQueryParamsTest(TestCase):
         del params["main_doi"]
         del params["fpage"]
         del params["elocation_id"]
-        result = models.PidRequesterXML.validate_query_params(params)
+        result = models.PidProviderXML.validate_query_params(params)
         self.assertTrue(result)
 
     def test_validate_query_params_z_surnames_id_absence(self):
@@ -172,7 +172,7 @@ class PidRequesterXMLValidateQueryParamsTest(TestCase):
         del params["fpage"]
         del params["elocation_id"]
         del params["z_surnames"]
-        result = models.PidRequesterXML.validate_query_params(params)
+        result = models.PidProviderXML.validate_query_params(params)
         self.assertTrue(result)
 
     def test_validate_query_params_z_collab_id_absence(self):
@@ -182,7 +182,7 @@ class PidRequesterXMLValidateQueryParamsTest(TestCase):
         del params["fpage"]
         del params["elocation_id"]
         del params["z_collab"]
-        result = models.PidRequesterXML.validate_query_params(params)
+        result = models.PidProviderXML.validate_query_params(params)
         self.assertTrue(result)
 
     def test_validate_query_params_z_collab_id_absence(self):
@@ -192,7 +192,7 @@ class PidRequesterXMLValidateQueryParamsTest(TestCase):
         del params["fpage"]
         del params["elocation_id"]
         del params["z_links"]
-        result = models.PidRequesterXML.validate_query_params(params)
+        result = models.PidProviderXML.validate_query_params(params)
         self.assertTrue(result)
 
     def test_validate_query_params_z_collab_id_absence(self):
@@ -202,7 +202,7 @@ class PidRequesterXMLValidateQueryParamsTest(TestCase):
         del params["fpage"]
         del params["elocation_id"]
         del params["pkg_name"]
-        result = models.PidRequesterXML.validate_query_params(params)
+        result = models.PidProviderXML.validate_query_params(params)
         self.assertTrue(result)
 
     def test_validate_query_params_z_collab_id_absence(self):
@@ -217,7 +217,7 @@ class PidRequesterXMLValidateQueryParamsTest(TestCase):
         del params["z_links"]
 
         with self.assertRaises(exceptions.NotEnoughParametersToGetDocumentRecordError):
-            result = models.PidRequesterXML.validate_query_params(params)
+            result = models.PidProviderXML.validate_query_params(params)
 
 
 @patch(
@@ -225,11 +225,11 @@ class PidRequesterXMLValidateQueryParamsTest(TestCase):
     new_callable=mock.PropertyMock,
 )
 @patch(
-    "pid_requester.models.PidRequesterXML.validate_query_params",
+    "pid_provider.models.PidProviderXML.validate_query_params",
     return_value=True,
 )
-@patch("pid_requester.models.PidRequesterXML.objects.get")
-class PidRequesterXMLQueryDocumentTest(TestCase):
+@patch("pid_provider.models.PidProviderXML.objects.get")
+class PidProviderXMLQueryDocumentTest(TestCase):
     def test_query_document_is_called_with_query_params(
         self,
         mock_get,
@@ -237,16 +237,16 @@ class PidRequesterXMLQueryDocumentTest(TestCase):
         mock_query_list,
     ):
         """
-        PidRequesterXML._query_document is called with parameters returned by
-        PidRequesterXML.query_list
+        PidProviderXML._query_document is called with parameters returned by
+        PidProviderXML.query_list
         """
         params_list = [
             {"key": "value"},
         ]
         mock_query_list.return_value = params_list
-        mock_get.side_effect = models.PidRequesterXML.DoesNotExist
+        mock_get.side_effect = models.PidProviderXML.DoesNotExist
         xml_adapter = _get_xml_adapter()
-        result = models.PidRequesterXML._query_document(xml_adapter)
+        result = models.PidProviderXML._query_document(xml_adapter)
         mock_get.assert_called_once_with(**{"key": "value"})
 
     def test_query_document_returns_none_if_document_does_not_exist(
@@ -259,9 +259,9 @@ class PidRequesterXMLQueryDocumentTest(TestCase):
             {"key": "value"},
         ]
         mock_query_list.return_value = params_list
-        mock_get.side_effect = models.PidRequesterXML.DoesNotExist
+        mock_get.side_effect = models.PidProviderXML.DoesNotExist
         xml_adapter = _get_xml_adapter()
-        result = models.PidRequesterXML._query_document(xml_adapter)
+        result = models.PidProviderXML._query_document(xml_adapter)
         self.assertIsNone(result)
 
     def test_query_document_returns_found_document(
@@ -274,10 +274,10 @@ class PidRequesterXMLQueryDocumentTest(TestCase):
             {"key": "value"},
         ]
         mock_query_list.return_value = params_list
-        mock_get.return_value = models.PidRequesterXML()
+        mock_get.return_value = models.PidProviderXML()
         xml_adapter = _get_xml_adapter()
-        result = models.PidRequesterXML._query_document(xml_adapter)
-        self.assertEqual(models.PidRequesterXML, type(result))
+        result = models.PidProviderXML._query_document(xml_adapter)
+        self.assertEqual(models.PidProviderXML, type(result))
 
     def test_query_document_returns_found_item_at_the_second_round(
         self,
@@ -291,12 +291,12 @@ class PidRequesterXMLQueryDocumentTest(TestCase):
         ]
         mock_query_list.return_value = params_list
         mock_get.side_effect = [
-            models.PidRequesterXML.DoesNotExist,
-            models.PidRequesterXML(),
+            models.PidProviderXML.DoesNotExist,
+            models.PidProviderXML(),
         ]
         xml_adapter = _get_xml_adapter()
-        result = models.PidRequesterXML._query_document(xml_adapter)
-        self.assertEqual(models.PidRequesterXML, type(result))
+        result = models.PidProviderXML._query_document(xml_adapter)
+        self.assertEqual(models.PidProviderXML, type(result))
 
     def test_query_document_raises_query_document_error_because_multiple_objects_returned(
         self,
@@ -308,12 +308,12 @@ class PidRequesterXMLQueryDocumentTest(TestCase):
             {"key": "value"},
         ]
         mock_query_list.return_value = params_list
-        mock_get.side_effect = models.PidRequesterXML.MultipleObjectsReturned
+        mock_get.side_effect = models.PidProviderXML.MultipleObjectsReturned
         with self.assertRaises(
             exceptions.QueryDocumentMultipleObjectsReturnedError
         ) as exc:
             xml_adapter = _get_xml_adapter()
-            result = models.PidRequesterXML._query_document(xml_adapter)
+            result = models.PidProviderXML._query_document(xml_adapter)
 
     def test_query_document_raises_error(
         self,
@@ -322,8 +322,8 @@ class PidRequesterXMLQueryDocumentTest(TestCase):
         mock_query_list,
     ):
         """
-        PidRequesterXML._query_document is called with parameters returned by
-        PidRequesterXML.query_list
+        PidProviderXML._query_document is called with parameters returned by
+        PidProviderXML.query_list
         """
         params_list = [
             {"key": "value"},
@@ -335,11 +335,11 @@ class PidRequesterXMLQueryDocumentTest(TestCase):
 
         with self.assertRaises(exceptions.NotEnoughParametersToGetDocumentRecordError):
             xml_adapter = _get_xml_adapter()
-            result = models.PidRequesterXML._query_document(xml_adapter)
+            result = models.PidProviderXML._query_document(xml_adapter)
 
 
-@patch("pid_requester.models.PidRequesterXML._query_document")
-class PidRequesterXMLGetRegisteredTest(TestCase):
+@patch("pid_provider.models.PidProviderXML._query_document")
+class PidProviderXMLGetRegisteredTest(TestCase):
     def setUp(self):
         self.xml_with_pre = _get_xml_with_pre()
 
@@ -347,7 +347,7 @@ class PidRequesterXMLGetRegisteredTest(TestCase):
         self,
         mock_query_document,
     ):
-        pid_req_xml = models.PidRequesterXML()
+        pid_req_xml = models.PidProviderXML()
         pid_req_xml.pkg_name = "registered_pkg_name"
         pid_req_xml.v2 = "registered_v2"
         pid_req_xml.v3 = "registered_v3"
@@ -357,7 +357,7 @@ class PidRequesterXMLGetRegisteredTest(TestCase):
 
         mock_query_document.return_value = pid_req_xml
 
-        result = models.PidRequesterXML.get_registered(self.xml_with_pre)
+        result = models.PidProviderXML.get_registered(self.xml_with_pre)
         expected = {
             "v3": "registered_v3",
             "v2": "registered_v2",
@@ -376,7 +376,7 @@ class PidRequesterXMLGetRegisteredTest(TestCase):
     ):
         mock_query_document.return_value = None
 
-        result = models.PidRequesterXML.get_registered(self.xml_with_pre)
+        result = models.PidProviderXML.get_registered(self.xml_with_pre)
         self.assertIsNone(result)
 
     def test_get_registered_returns_error_multiple_return(
@@ -387,7 +387,7 @@ class PidRequesterXMLGetRegisteredTest(TestCase):
             exceptions.QueryDocumentMultipleObjectsReturnedError
         )
 
-        result = models.PidRequesterXML.get_registered(self.xml_with_pre)
+        result = models.PidProviderXML.get_registered(self.xml_with_pre)
         self.assertIn("error_type", result.keys())
         self.assertIn("error_msg", result.keys())
 
@@ -399,49 +399,49 @@ class PidRequesterXMLGetRegisteredTest(TestCase):
             exceptions.NotEnoughParametersToGetDocumentRecordError
         )
 
-        result = models.PidRequesterXML.get_registered(self.xml_with_pre)
+        result = models.PidProviderXML.get_registered(self.xml_with_pre)
         self.assertIn("error_type", result.keys())
         self.assertIn("error_msg", result.keys())
 
 
-class PidRequesterXMLEvaluateRegistrationTest(TestCase):
+class PidProviderXMLEvaluateRegistrationTest(TestCase):
     def setUp(self):
         self.xml_adapter = _get_xml_adapter()
 
     def test_evaluate_registration_accepts_xml_is_aop_and_registered_is_aop(self):
-        registered = Mock(spec=models.PidRequesterXML)
+        registered = Mock(spec=models.PidProviderXML)
         registered.is_aop = True
 
-        result = models.PidRequesterXML.evaluate_registration(
+        result = models.PidProviderXML.evaluate_registration(
             self.xml_adapter, registered
         )
         self.assertTrue(result)
 
     def test_evaluate_registration_accepts_xml_is_not_aop_and_registered_is_aop(self):
-        registered = Mock(spec=models.PidRequesterXML)
+        registered = Mock(spec=models.PidProviderXML)
         registered.is_aop = True
 
         self.xml_adapter = _get_xml_adapter_from_file(
-            "./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+            "./pid_provider/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
         )
 
-        result = models.PidRequesterXML.evaluate_registration(
+        result = models.PidProviderXML.evaluate_registration(
             self.xml_adapter, registered
         )
         self.assertTrue(result)
 
     def test_evaluate_registration_raises_error(self):
-        registered = Mock(spec=models.PidRequesterXML)
+        registered = Mock(spec=models.PidProviderXML)
         registered.is_aop = False
 
-        with self.assertRaises(exceptions.ForbiddenPidRequesterXMLRegistrationError):
-            result = models.PidRequesterXML.evaluate_registration(
+        with self.assertRaises(exceptions.ForbiddenPidProviderXMLRegistrationError):
+            result = models.PidProviderXML.evaluate_registration(
                 self.xml_adapter, registered
             )
 
 
-@patch("pid_requester.models.PidRequesterXML._get_unique_v2")
-class PidRequesterXMLAddV2Test(TestCase):
+@patch("pid_provider.models.PidProviderXML._get_unique_v2")
+class PidProviderXMLAddV2Test(TestCase):
     def _get_xml_adapter(self, v2=None, v3=None, aop_pid=None):
         v2 = (
             v2
@@ -476,60 +476,60 @@ class PidRequesterXMLAddV2Test(TestCase):
     #     self,
     #     mock_get_unique_v2,
     # ):
-    #     found = models.PidRequesterXML()
+    #     found = models.PidProviderXML()
     #     found.v2 = "registered_v2"
 
     #     xml_adapter = self._get_xml_adapter(v2='xml_v2')
 
     #     mock_get_unique_v2.return_value = "generated_v2"
 
-    #     models.PidRequesterXML._add_pid_v2(xml_adapter, found)
+    #     models.PidProviderXML._add_pid_v2(xml_adapter, found)
     #     self.assertEqual("registered_v2", xml_adapter.v2)
 
     def test_add_pid_v2_replace_xml_v2_because_its_value_is_invalid_length_is_not_23(
         self,
         mock_get_unique_v2,
     ):
-        found = models.PidRequesterXML()
+        found = models.PidProviderXML()
         found.v2 = None
 
         xml_adapter = self._get_xml_adapter(v2="bad_size_not_23")
 
         mock_get_unique_v2.return_value = "S1806-37132022000201100"
 
-        models.PidRequesterXML._add_pid_v2(xml_adapter, found)
+        models.PidProviderXML._add_pid_v2(xml_adapter, found)
         self.assertEqual("S1806-37132022000201100", xml_adapter.v2)
 
     def test_add_pid_v2_keeps_xml_v2(
         self,
         mock_get_unique_v2,
     ):
-        found = models.PidRequesterXML()
+        found = models.PidProviderXML()
         found.v2 = None
 
         xml_adapter = self._get_xml_adapter(v2="S1806-37132022000199999")
 
         mock_get_unique_v2.return_value = "S1806-37132022000300001"
 
-        models.PidRequesterXML._add_pid_v2(xml_adapter, found)
+        models.PidProviderXML._add_pid_v2(xml_adapter, found)
         self.assertEqual("S1806-37132022000199999", xml_adapter.v2)
 
     def test_add_pid_v2_uses_unique_v2(
         self,
         mock_get_unique_v2,
     ):
-        found = models.PidRequesterXML()
+        found = models.PidProviderXML()
         found.v2 = None
 
         xml_adapter = self._get_xml_adapter()
 
         mock_get_unique_v2.return_value = "S1806-37132022000201100"
 
-        models.PidRequesterXML._add_pid_v2(xml_adapter, found)
+        models.PidProviderXML._add_pid_v2(xml_adapter, found)
         self.assertEqual("S1806-37132022000201100", xml_adapter.v2)
 
 
-class PidRequesterXMLAddAopPidTest(TestCase):
+class PidProviderXMLAddAopPidTest(TestCase):
     def _get_xml_adapter(self, v2=None, v3=None, aop_pid=None):
         v2 = (
             v2
@@ -562,29 +562,29 @@ class PidRequesterXMLAddAopPidTest(TestCase):
     def test_add_aop_pid_uses_registered_aop_pid(
         self,
     ):
-        found = models.PidRequesterXML()
+        found = models.PidProviderXML()
         found.aop_pid = "12345678901234567890aop"
 
         xml_adapter = self._get_xml_adapter(aop_pid="xml_aop_pid")
 
-        models.PidRequesterXML._add_aop_pid(xml_adapter, found)
+        models.PidProviderXML._add_aop_pid(xml_adapter, found)
         self.assertEqual("12345678901234567890aop", xml_adapter.aop_pid)
 
     def test_add_aop_pid_does_not_replace_by_none(
         self,
     ):
-        found = models.PidRequesterXML()
+        found = models.PidProviderXML()
         found.aop_pid = None
 
         xml_adapter = self._get_xml_adapter(aop_pid="xml_aop_pid")
 
-        models.PidRequesterXML._add_aop_pid(xml_adapter, found)
+        models.PidProviderXML._add_aop_pid(xml_adapter, found)
         self.assertEqual("xml_aop_pid", xml_adapter.aop_pid)
 
 
-@patch("pid_requester.models.PidRequesterXML._is_registered_pid")
-@patch("pid_requester.models.PidRequesterXML._get_unique_v3")
-class PidRequesterXMLAddPidV3Test(TestCase):
+@patch("pid_provider.models.PidProviderXML._is_registered_pid")
+@patch("pid_provider.models.PidProviderXML._get_unique_v3")
+class PidProviderXMLAddPidV3Test(TestCase):
     def _get_xml_adapter(self, v2=None, v3=None, aop_pid=None):
         v2 = (
             v2
@@ -619,12 +619,12 @@ class PidRequesterXMLAddPidV3Test(TestCase):
         mock__get_unique_v3,
         mock__is_registered_pid,
     ):
-        found = models.PidRequesterXML()
+        found = models.PidProviderXML()
         found.v3 = "123456789012345678901v3"
 
         xml_adapter = self._get_xml_adapter(v3="xml_v3")
 
-        models.PidRequesterXML._add_pid_v3(xml_adapter, found)
+        models.PidProviderXML._add_pid_v3(xml_adapter, found)
         self.assertEqual("123456789012345678901v3", xml_adapter.v3)
 
     def test_add_pid_v3_replaced_by_generated(
@@ -639,7 +639,7 @@ class PidRequesterXMLAddPidV3Test(TestCase):
 
         xml_adapter = self._get_xml_adapter(v3="xml_v3")
 
-        models.PidRequesterXML._add_pid_v3(xml_adapter, found)
+        models.PidProviderXML._add_pid_v3(xml_adapter, found)
         self.assertEqual("gen456789012345678901v3", xml_adapter.v3)
 
     def test_add_pid_v3_keeps_xml_v3(
@@ -654,17 +654,17 @@ class PidRequesterXMLAddPidV3Test(TestCase):
 
         xml_adapter = self._get_xml_adapter(v3="xml456789012345678901v3")
 
-        models.PidRequesterXML._add_pid_v3(xml_adapter, found)
+        models.PidProviderXML._add_pid_v3(xml_adapter, found)
         self.assertEqual("xml456789012345678901v3", xml_adapter.v3)
 
 
 @patch(
-    "pid_requester.models.PidRequesterXML.current_version",
+    "pid_provider.models.PidProviderXML.current_version",
     new_callable=mock.PropertyMock,
 )
-class PidRequesterXMLIsEqualToTest(TestCase):
+class PidProviderXMLIsEqualToTest(TestCase):
     def test_is_equal_to_returns_false(self, mock_last_version):
-        registered = models.PidRequesterXML()
+        registered = models.PidProviderXML()
 
         xml_adapter = _get_xml_adapter()
 
@@ -680,34 +680,34 @@ class PidRequesterXMLIsEqualToTest(TestCase):
         mock_last_version.return_value = version
 
         xml_adapter = _get_xml_adapter_from_file(
-            "./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+            "./pid_provider/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
         )
         print(xml_adapter.finger_print)
 
-        registered = models.PidRequesterXML()
+        registered = models.PidProviderXML()
         result = registered.is_equal_to(xml_adapter)
         self.assertTrue(result)
 
 
 @patch(
-    "pid_requester.models.utcnow",
+    "pid_provider.models.utcnow",
     side_effect=[datetime(2020, 2, 2, 0, 0), datetime(2020, 2, 3, 0, 0)],
 )
-@patch("pid_requester.models.PidRequest.save")
-class PidRequesterXMLRegisterTest(TestCase):
-    def test_register_register_bad_request_and_returns_error(
+@patch("pid_provider.models.PidRequest.save")
+class PidProviderXMLRegisterTest(TestCase):
+    def test_register_register_bad_provide_and_returns_error(
         self,
-        mock_pid_request_save,
+        mock_pid_provide_save,
         mock_now,
     ):
         expected = {
-            "result_type": "<class 'pid_requester.exceptions.NotEnoughParametersToGetDocumentRecordError'>",
+            "result_type": "<class 'pid_provider.exceptions.NotEnoughParametersToGetDocumentRecordError'>",
             "result_msg": "No attribute enough for disambiguations {'z_surnames': None, 'z_collab': None, 'main_doi': None, 'z_links': None, 'z_partial_body': None, 'pkg_name': None, 'elocation_id': None, 'journal__issn_print': None, 'journal__issn_electronic': None, 'article_pub_year': None, 'z_article_titles_texts': None}",
         }
 
         user = User()
         xml_with_pre = _get_xml_with_pre()
-        result = models.PidRequesterXML.register(
+        result = models.PidProviderXML.register(
             xml_with_pre=xml_with_pre,
             filename="filename.xml",
             user=user,
@@ -717,14 +717,14 @@ class PidRequesterXMLRegisterTest(TestCase):
         self.assertEqual(expected["result_type"], result["result_type"])
         self.assertIsNotNone(result["result_msg"])
 
-    @patch("pid_requester.models.PidRequesterXML._is_registered_pid")
-    @patch("pid_requester.models.PidRequesterXML.objects.get")
-    @patch("pid_requester.models.PidRequesterXML.save")
-    @patch("pid_requester.models.SyncFailure.create")
-    @patch("pid_requester.models.XMLSPS.save")
-    @patch("pid_requester.models.XMLVersion.save")
-    @patch("pid_requester.models.XMLIssue.save")
-    @patch("pid_requester.models.XMLJournal.save")
+    @patch("pid_provider.models.PidProviderXML._is_registered_pid")
+    @patch("pid_provider.models.PidProviderXML.objects.get")
+    @patch("pid_provider.models.PidProviderXML.save")
+    @patch("pid_provider.models.SyncFailure.create")
+    @patch("pid_provider.models.XMLSPS.save")
+    @patch("pid_provider.models.XMLVersion.save")
+    @patch("pid_provider.models.XMLIssue.save")
+    @patch("pid_provider.models.XMLJournal.save")
     def test_register_for_xml_zip_was_unable_to_get_pid_from_core(
         self,
         mock_xml_journal_save,
@@ -732,24 +732,24 @@ class PidRequesterXMLRegisterTest(TestCase):
         mock_xml_version_save,
         mock_xml_sps_save,
         mock_sync_failure_create,
-        mock_pid_requester_xml_save,
-        mock_pid_requester_xml_objects_get,
+        mock_pid_provider_xml_save,
+        mock_pid_provider_xml_objects_get,
         mock_is_registered_pid,
-        mock_pid_requester_bad_req_save,
+        mock_pid_provider_bad_req_save,
         mock_now,
     ):
         # instancia os dublês
-        mock_pid_requester_xml_objects_get.return_value = None
+        mock_pid_provider_xml_objects_get.return_value = None
         mock_sync_failure_create.return_value = models.SyncFailure()
         mock_is_registered_pid.return_value = None
 
         items = XMLWithPre.create(
-            path="./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+            path="./pid_provider/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
         )
         items = list(items)
         user = User.objects.first()
 
-        result = models.PidRequesterXML.register(
+        result = models.PidProviderXML.register(
             xml_with_pre=items[0],
             filename="filename.xml",
             user=user,
@@ -769,19 +769,19 @@ class PidRequesterXMLRegisterTest(TestCase):
         )
 
 
-@patch("pid_requester.models.PidRequesterXML.is_equal_to")
-@patch("pid_requester.models.PidRequesterXML._query_document")
-class PidRequesterGetRegistrationDemandTest(TestCase):
+@patch("pid_provider.models.PidProviderXML.is_equal_to")
+@patch("pid_provider.models.PidProviderXML._query_document")
+class PidProviderGetRegistrationDemandTest(TestCase):
     def test_check_registration_demand_requires_none(
         self,
         mock_query_document,
         mock_is_equal_to,
     ):
         mock_is_equal_to.return_value = True
-        registered = MagicMock(models.PidRequesterXML)
+        registered = MagicMock(models.PidProviderXML)
         registered.synchronized = True
         mock_query_document.return_value = registered
-        demand = models.PidRequesterXML.check_registration_demand(ANY)
+        demand = models.PidProviderXML.check_registration_demand(ANY)
 
         self.assertIsNotNone(demand["registered"])
         self.assertFalse(demand["required_remote_registration"])
@@ -794,7 +794,7 @@ class PidRequesterGetRegistrationDemandTest(TestCase):
     ):
         mock_is_equal_to.return_value = False
         mock_query_document.return_value = None
-        demand = models.PidRequesterXML.check_registration_demand(ANY)
+        demand = models.PidProviderXML.check_registration_demand(ANY)
 
         self.assertDictEqual({}, demand["registered"])
         self.assertTrue(demand["required_remote_registration"])
@@ -810,7 +810,7 @@ class PidRequesterGetRegistrationDemandTest(TestCase):
                 "NotEnoughParametersToGetDocumentRecordError"
             )
         )
-        demand = models.PidRequesterXML.check_registration_demand(ANY)
+        demand = models.PidProviderXML.check_registration_demand(ANY)
 
         self.assertIsNotNone(demand["error_type"])
         self.assertIsNotNone(demand["error_msg"])
@@ -821,10 +821,10 @@ class PidRequesterGetRegistrationDemandTest(TestCase):
         mock_is_equal_to,
     ):
         mock_is_equal_to.return_value = True
-        registered = MagicMock(models.PidRequesterXML)
+        registered = MagicMock(models.PidProviderXML)
         registered.synchronized = False
         mock_query_document.return_value = registered
-        demand = models.PidRequesterXML.check_registration_demand(ANY)
+        demand = models.PidProviderXML.check_registration_demand(ANY)
 
         self.assertIsNotNone(demand["registered"])
         self.assertTrue(demand["required_remote_registration"])
@@ -836,10 +836,10 @@ class PidRequesterGetRegistrationDemandTest(TestCase):
         mock_is_equal_to,
     ):
         mock_is_equal_to.return_value = False
-        registered = MagicMock(models.PidRequesterXML)
+        registered = MagicMock(models.PidProviderXML)
         registered.synchronized = False
         mock_query_document.return_value = registered
-        demand = models.PidRequesterXML.check_registration_demand(ANY)
+        demand = models.PidProviderXML.check_registration_demand(ANY)
 
         self.assertIsNotNone(demand["registered"])
         self.assertTrue(demand["required_remote_registration"])

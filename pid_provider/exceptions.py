@@ -2,11 +2,11 @@ class APIPidProviderPostError(Exception):
     ...
 
 
-class PidRequesterXMLContentError(Exception):
+class PidProviderXMLContentError(Exception):
     ...
 
 
-class ForbiddenPidRequesterXMLRegistrationError(Exception):
+class ForbiddenPidProviderXMLRegistrationError(Exception):
     ...
 
 
@@ -22,15 +22,15 @@ class QueryDocumentMultipleObjectsReturnedError(Exception):
     ...
 
 
-class PidRequesterXMLCreateError(Exception):
+class PidProviderXMLCreateError(Exception):
     ...
 
 
-class PidRequesterXMLUpdateError(Exception):
+class PidProviderXMLUpdateError(Exception):
     ...
 
 
-class PidRequesterXMLWithPreError(Exception):
+class PidProviderXMLWithPreError(Exception):
     ...
 
 
