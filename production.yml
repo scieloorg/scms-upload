@@ -13,14 +13,13 @@ services:
     env_file:
       - ./.envs/.production/.django
       - ./.envs/.production/.postgres
-      - ./.envs/.production/.opac
     command: /start
 
   pgbouncer:
     image: edoburu/pgbouncer:1.14.0
     restart: always
     environment:
-      - DATABASE_URL=postgres://GVRFlLmcCNfGLhsFvSnCioYOPJPYpyfj:DAkWfpsnPHcAxMeQk2QmPOIZuz4BXG5qGFWi2hCCQE6kvndJHTuzz8SjnxOJY5qj@postgres/core
+      - DATABASE_URL=postgres://GVRFlLmcCNfGLhsFvSnCioYOPJPYpyfj:BQ4hSUL4rdj5WZLdR8ilDLRQMvCtzo0caMaXDO0olGsmycQjlcZlTVK9DepZR8kk@postgres/uploaddb
       - MAX_CLIENT_CONN=100
     ports:
       - 6434:5432
@@ -40,16 +39,19 @@ services:
     env_file:
       - ./.envs/.production/.postgres
 
-  mongo:
-    image: mongo
-    container_name: upload_production_mongo
-    restart: always
-    user: mongodb
-    hostname: mongo
+  traefik:
+    build:
+      context: .
+      dockerfile: ./compose/production/traefik/Dockerfile
+    image: upload_production_traefik
+    depends_on:
+      - django
     volumes:
-      - ../scms_data/mongo:/data/db
+      - ../scms_data/traefik:/etc/traefik/acme:z
     ports:
-        - "27017:27017"
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+      - "0.0.0.0:5555:5555"
 
   redis:
     image: redis:6
