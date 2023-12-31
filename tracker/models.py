@@ -161,8 +161,15 @@ class Event(CommonControlField):
                 )
                 obj.save()
         except Exception as exc:
+            data = dict(
+                message_type=message_type,
+                message=message,
+                e=e,
+                exc_traceback=exc_traceback,
+                detail=detail,
+            )
             raise EventCreateError(
-                f"Unable to create Event ({message} {e}). EXCEPTION: {exc}"
+                f"Unable to create Event ({message} {e}) Input {data}. EXCEPTION: {exc}"
             )
         return obj
 
