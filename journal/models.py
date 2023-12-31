@@ -136,10 +136,10 @@ class Journal(CommonControlField, ClusterableModel):
     )
 
     def __unicode__(self):
-        return self.title or str(self.official_journal)
+        return self.short_title or str(self.official_journal)
 
     def __str__(self):
-        return self.title or str(self.official_journal)
+        return self.short_title or str(self.official_journal)
 
     base_form_class = OfficialJournalForm
 

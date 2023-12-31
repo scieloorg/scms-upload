@@ -10,7 +10,6 @@ from wagtail.contrib.modeladmin.options import (
 from wagtail.contrib.modeladmin.views import CreateView
 
 from config.menu import get_menu_order
-from htmlxml.models import HTMLXML
 from migration.models import (
     ClassicWebsiteConfiguration,
     MigratedArticle,
@@ -282,48 +281,6 @@ class MigratedFileModelAdmin(ModelAdmin):
 #     )
 
 
-class HTMLXMLModelAdmin(ModelAdmin):
-    model = HTMLXML
-    menu_label = _("XML from HTML")
-    menu_icon = "doc-full"
-    menu_order = 300
-    add_to_settings_menu = False
-    exclude_from_explorer = True
-    inspect_view_enabled = True
-
-    list_per_page = 10
-    create_view_class = CoreCreateView
-
-    list_display = (
-        "article_proc",
-        "html2xml_status",
-        "quality",
-        "attention_demands",
-        "html_translation_langs",
-        "pdf_langs",
-        "n_paragraphs",
-        "n_references",
-        "created_updated",
-    )
-    list_filter = (
-        "html_img_total",
-        "html_table_total",
-        "empty_body",
-        "attention_demands",
-        "article_type",
-        "html2xml_status",
-        "quality",
-        "html_translation_langs",
-        "pdf_langs",
-    )
-    search_fields = (
-        "article_proc__migrated_data__pid",
-        "article_proc__pkg_name",
-        "html2xml_status",
-        "article_type",
-    )
-
-
 class MigrationModelAdmin(ModelAdminGroup):
     menu_icon = "folder"
     menu_label = _("Migration")
@@ -337,7 +294,6 @@ class MigrationModelAdmin(ModelAdminGroup):
         MigratedIssueModelAdmin,
         MigratedArticleModelAdmin,
         MigratedFileModelAdmin,
-        HTMLXMLModelAdmin,
     )
     menu_order = get_menu_order("migration")
 

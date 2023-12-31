@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from collection.models import Collection, WebSiteConfiguration
 from files_storage.models import MinioConfiguration
 from migration.models import ClassicWebsiteConfiguration
-from pid_requester.models import PidProviderConfig
+from pid_provider.models import PidProviderConfig
 
 User = get_user_model()
 

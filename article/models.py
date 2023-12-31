@@ -106,6 +106,10 @@ class Article(ClusterableModel, CommonControlField):
     ]
 
     class Meta:
+        indexes = [
+            models.Index(fields=["pid_v3"]),
+        ]
+
         permissions = (
             (MAKE_ARTICLE_CHANGE, _("Can make article change")),
             (REQUEST_ARTICLE_CHANGE, _("Can request article change")),

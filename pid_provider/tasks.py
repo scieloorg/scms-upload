@@ -3,7 +3,7 @@ import logging
 from django.contrib.auth import get_user_model
 
 from config import celery_app
-from pid_requester.controller import PidRequester
+from pid_provider.controller import PidProvider
 
 User = get_user_model()
 
@@ -18,8 +18,8 @@ def _get_user(request, username=None, user_id=None):
             return User.objects.get(username=username)
 
 
-@celery_app.task(bind=True, name="request_pid_for_file")
-def request_pid_for_file(
+@celery_app.task(bind=True, name="provide_pid_for_file")
+def provide_pid_for_file(
     self,
     username=None,
     file_path=None,
@@ -27,9 +27,21 @@ def request_pid_for_file(
 ):
     user = _get_user(self.request, username=username)
 
-    pid_requester = PidRequester()
-    for resp in pid_requester.request_pid_for_xml_zip(
+    pid_provider = PidProvider()
+    for resp in pid_provider.provide_pid_for_xml_zip(
         file_path, user, is_published=is_published
     ):
         logging.info(resp)
     # return response
+
+
+@celery_app.task(bind=True, name="task_synchronize_to_pid_provider")
+def task_synchronize_to_pid_provider(
+    self,
+    username=None,
+    user_id=None,
+):
+    user = _get_user(self.request, username=username, user_id=user_id)
+
+    pid_provider = PidProvider()
+    pid_provider.synchronize(user)

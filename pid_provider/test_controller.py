@@ -4,10 +4,10 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
-from pid_requester.controller import PidRequester
-from pid_requester.models import (
+from pid_provider.controller import PidProvider
+from pid_provider.models import (
     PidProviderConfig,
-    PidRequesterXML,
+    PidProviderXML,
     SyncFailure,
     XMLVersion,
 )
@@ -26,23 +26,23 @@ User = get_user_model()
 #     return config
 
 
-class PidRequesterTest(TestCase):
-    @patch("pid_requester.controller.requests.post")
-    @patch("pid_requester.models.XMLVersion.save")
-    @patch("pid_requester.models.PidRequesterXML.save")
+class PidProviderTest(TestCase):
+    @patch("pid_provider.controller.provides.post")
+    @patch("pid_provider.models.XMLVersion.save")
+    @patch("pid_provider.models.PidProviderXML.save")
     @patch(
-        "pid_requester.models.PidRequesterXML._get_unique_v3",
+        "pid_provider.models.PidProviderXML._get_unique_v3",
         return_value="SJLD63mRxz9nTXtyMj7SLwk",
     )
     @patch(
-        "pid_requester.models.PidRequesterXML._get_unique_v2",
+        "pid_provider.models.PidProviderXML._get_unique_v2",
         return_value="S2236-89062022061645340",
     )
-    @patch("pid_requester.controller.PidProviderConfig.get_or_create")
-    @patch("pid_requester.models.XMLSPS.save")
-    @patch("pid_requester.models.XMLIssue.save")
-    @patch("pid_requester.models.XMLJournal.save")
-    def test_request_pid_for_xml_zip(
+    @patch("pid_provider.controller.PidProviderConfig.get_or_create")
+    @patch("pid_provider.models.XMLSPS.save")
+    @patch("pid_provider.models.XMLIssue.save")
+    @patch("pid_provider.models.XMLJournal.save")
+    def test_provide_pid_for_xml_zip(
         self,
         mock_xml_journal_save,
         mock_xml_issue_save,
@@ -50,12 +50,12 @@ class PidRequesterTest(TestCase):
         mock_pid_provider_config,
         mock_get_unique_v2,
         mock_get_unique_v3,
-        mock_pid_requester_xml_save,
+        mock_pid_provider_xml_save,
         mock_xml_version_create,
         mock_post,
     ):
         with open(
-            "./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+            "./pid_provider/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
         ) as fp:
             xml = fp.read()
         pid_provider_response = {
@@ -93,9 +93,9 @@ class PidRequesterTest(TestCase):
             mock_post_xml_response,
         ]
 
-        pid_requester = PidRequester()
-        result = pid_requester.request_pid_for_xml_zip(
-            zip_xml_file_path="./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml.zip",
+        pid_provider = PidProvider()
+        result = pid_provider.provide_pid_for_xml_zip(
+            zip_xml_file_path="./pid_provider/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml.zip",
             user=User.objects.first(),
         )
         result = list(result)
@@ -109,22 +109,22 @@ class PidRequesterTest(TestCase):
         self.assertEqual("created", result[0]["record_status"])
         self.assertEqual(True, result[0]["xml_changed"])
 
-    @patch("pid_requester.models.XMLVersion.save")
-    @patch("pid_requester.models.SyncFailure.save")
-    @patch("pid_requester.models.PidRequesterXML.save")
+    @patch("pid_provider.models.XMLVersion.save")
+    @patch("pid_provider.models.SyncFailure.save")
+    @patch("pid_provider.models.PidProviderXML.save")
     @patch(
-        "pid_requester.models.PidRequesterXML._get_unique_v3",
+        "pid_provider.models.PidProviderXML._get_unique_v3",
         return_value="SJLD63mRxz9nTXtyMj7SLwk",
     )
     @patch(
-        "pid_requester.models.PidRequesterXML._get_unique_v2",
+        "pid_provider.models.PidProviderXML._get_unique_v2",
         return_value="S2236-89062022061645340",
     )
-    @patch("pid_requester.controller.PidProviderConfig.get_or_create")
-    @patch("pid_requester.models.XMLSPS.save")
-    @patch("pid_requester.models.XMLIssue.save")
-    @patch("pid_requester.models.XMLJournal.save")
-    def test_request_pid_for_xml_zip_was_unable_to_get_pid_from_core(
+    @patch("pid_provider.controller.PidProviderConfig.get_or_create")
+    @patch("pid_provider.models.XMLSPS.save")
+    @patch("pid_provider.models.XMLIssue.save")
+    @patch("pid_provider.models.XMLJournal.save")
+    def test_provide_pid_for_xml_zip_was_unable_to_get_pid_from_core(
         self,
         mock_xml_journal_save,
         mock_xml_issue_save,
@@ -132,19 +132,19 @@ class PidRequesterTest(TestCase):
         mock_pid_provider_config,
         mock_get_unique_v2,
         mock_get_unique_v3,
-        mock_pid_requester_xml_save,
+        mock_pid_provider_xml_save,
         mock_sync_failure_create,
         mock_xml_version_create,
     ):
         # dubla a configuração de pid provider
         mock_pid_provider_config.return_value = None
-        mock_pid_requester_xml_save.return_value = None
+        mock_pid_provider_xml_save.return_value = None
         mock_sync_failure_create.return_value = SyncFailure()
         mock_xml_version_create.return_value = XMLVersion()
 
-        pid_requester_ = PidRequester()
-        result = pid_requester_.request_pid_for_xml_zip(
-            zip_xml_file_path="./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml.zip",
+        pid_provider_ = PidProvider()
+        result = pid_provider_.provide_pid_for_xml_zip(
+            zip_xml_file_path="./pid_provider/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml.zip",
             user=User.objects.first(),
         )
         result = list(result)
@@ -157,35 +157,35 @@ class PidRequesterTest(TestCase):
         self.assertEqual(True, result[0]["xml_changed"])
         self.assertEqual(False, result[0]["synchronized"])
 
-    def test_request_pid_for_xml_with_pre_returns_error_type_because_of_bad_xml(
+    def test_provide_pid_for_xml_with_pre_returns_error_type_because_of_bad_xml(
         self,
     ):
-        pid_requester_ = PidRequester()
-        result = pid_requester_.request_pid_for_xml_zip(
-            zip_xml_file_path="./pid_requester/fixtures/incomplete/incomplete.xml.zip",
+        pid_provider_ = PidProvider()
+        result = pid_provider_.provide_pid_for_xml_zip(
+            zip_xml_file_path="./pid_provider/fixtures/incomplete/incomplete.xml.zip",
             user=User.objects.first(),
         )
         result = list(result)
         self.assertIsNotNone(result[0]["error_type"])
 
-    @patch("pid_requester.models.PidRequesterXML._query_document")
-    @patch("pid_requester.models.PidRequesterXML.is_equal_to")
-    def test_request_pid_for_xml_with_pre_do_nothing_because_it_is_equal_and_synchronized(
+    @patch("pid_provider.models.PidProviderXML._query_document")
+    @patch("pid_provider.models.PidProviderXML.is_equal_to")
+    def test_provide_pid_for_xml_with_pre_do_nothing_because_it_is_equal_and_synchronized(
         self,
         mock_is_equal,
         mock_query_document,
     ):
         # dubla o registro encontrado
-        pid_requester_xml = Mock(PidRequesterXML)
-        pid_requester_xml.synchronized = True
-        pid_requester_xml.data = {"v3": "registered_v3"}
-        mock_query_document.return_value = pid_requester_xml
+        pid_provider_xml = Mock(PidProviderXML)
+        pid_provider_xml.synchronized = True
+        pid_provider_xml.data = {"v3": "registered_v3"}
+        mock_query_document.return_value = pid_provider_xml
 
         mock_is_equal.return_value = True
 
-        pid_requester_ = PidRequester()
-        result = pid_requester_.request_pid_for_xml_zip(
-            zip_xml_file_path="./pid_requester/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml.zip",
+        pid_provider_ = PidProvider()
+        result = pid_provider_.provide_pid_for_xml_zip(
+            zip_xml_file_path="./pid_provider/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml.zip",
             user=User.objects.first(),
         )
         result = list(result)

@@ -29,3 +29,4 @@ def task_start(
     # activate_subtasks = activate_subtasks or True
     tasks_scheduler.schedule_publication_subtasks(username, activate_subtasks)
     tasks_scheduler.schedule_migration_subtasks(username, activate_subtasks)
+    tasks_scheduler.schedule_task_synchronize_to_pid_provider(username, activate_subtasks)

@@ -154,8 +154,16 @@ class Operation(CommonControlField):
             self.save()
             return self
         except Exception as exc:
+            data = dict(
+                completed=completed,
+                exception=exception,
+                message_type=message_type,
+                message=message,
+                exc_traceback=exc_traceback,
+                detail=detail,
+            )
             raise OperationFinishError(
-                f"Unable to finish ({self.name}). EXCEPTION: {type(exc)}  {exc}"
+                f"Unable to finish ({self.name}). Input: {data}. EXCEPTION: {type(exc)} {exc}"
             )
 
 
@@ -384,6 +392,9 @@ class BaseProc(CommonControlField):
 
     @classmethod
     def items_to_publish_on_qa(cls, user, content_type, force_update=None, params=None):
+        """
+        BaseProc
+        """
         params = params or {}
         params["migrated_data__content_type"] = content_type
         params["migration_status"] = tracker_choices.PROGRESS_STATUS_DONE
@@ -985,6 +996,9 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
         E se force_update = True, muda o status de DONE para TODO
         """
         params = {}
+        params["issue_proc__files_status"] = tracker_choices.PROGRESS_STATUS_DONE
+        params["issue_proc__docs_status"] = tracker_choices.PROGRESS_STATUS_DONE
+
         if collection_acron:
             params["collection__acron"] = collection_acron
         if journal_acron:
@@ -1003,7 +1017,6 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
 
         cls.objects.filter(
             q,
-            issue_proc__files_status=tracker_choices.PROGRESS_STATUS_DONE,
             **params,
         ).update(
             xml_status=tracker_choices.PROGRESS_STATUS_TODO,
@@ -1011,7 +1024,6 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
 
         return cls.objects.filter(
             xml_status=tracker_choices.PROGRESS_STATUS_TODO,
-            issue_proc__files_status=tracker_choices.PROGRESS_STATUS_DONE,
             **params,
         ).iterator()
 
@@ -1058,6 +1070,9 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
 
     @classmethod
     def items_to_publish_on_qa(cls, user, content_type, force_update=None, params=None):
+        """
+        ArtcleProc
+        """
         params = params or {}
         params["migrated_data__content_type"] = content_type
         params["migration_status"] = tracker_choices.PROGRESS_STATUS_DONE
@@ -1382,6 +1397,7 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
                     is_public=True,
                     components=components,
                     texts=texts,
+                    article_proc=self,
                 )
 
             detail = dict(
