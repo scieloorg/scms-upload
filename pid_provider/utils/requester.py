@@ -1,7 +1,7 @@
 import logging
 import re
 
-import provides
+import requests
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -56,7 +56,7 @@ def post_data(
         json: True|False
         verify: Verify the SSL.
     Returns:
-        Return a provides.response object.
+        Return a requests.response object.
     Except:
         Raise a RetryableError to retry.
     """
@@ -70,19 +70,19 @@ def post_data(
         _add_param(params, "auth", auth)
         _add_param(params, "files", files)
         _add_param(params, "data", data)
-        response = provides.post(url, **params)
-    except (provides.exceptions.ConnectionError, provides.exceptions.Timeout) as exc:
+        response = requests.post(url, **params)
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
         logger.error("Erro posting data: %s, retry..., erro: %s" % (url, exc))
         raise RetryableError(exc) from exc
     except (
-        provides.exceptions.InvalidSchema,
-        provides.exceptions.MissingSchema,
-        provides.exceptions.InvalidURL,
+        requests.exceptions.InvalidSchema,
+        requests.exceptions.MissingSchema,
+        requests.exceptions.InvalidURL,
     ) as exc:
         raise NonRetryableError(exc) from exc
     try:
         response.raise_for_status()
-    except provides.HTTPError as exc:
+    except requests.HTTPError as exc:
         if 400 <= exc.response.status_code < 500:
             raise NonRetryableError(exc) from exc
         elif 500 <= exc.response.status_code < 600:

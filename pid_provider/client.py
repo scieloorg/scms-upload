@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import traceback
 from tempfile import TemporaryDirectory
 
 from django.utils.translation import gettext as _
@@ -9,11 +10,11 @@ from packtools.sps.pid_provider.xml_sps_lib import (
     create_xml_zip_file,
     get_xml_with_pre,
 )
-from provides.auth import HTTPBasicAuth
+from requests.auth import HTTPBasicAuth
 
 from pid_provider import exceptions
 from pid_provider.models import PidProviderConfig
-from pid_provider.utils.provideer import post_data
+from pid_provider.utils.requester import post_data
 
 
 LOGGER = logging.getLogger(__name__)
