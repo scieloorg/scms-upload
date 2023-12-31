@@ -154,8 +154,16 @@ class Operation(CommonControlField):
             self.save()
             return self
         except Exception as exc:
+            data = dict(
+                completed=completed,
+                exception=exception,
+                message_type=message_type,
+                message=message,
+                exc_traceback=exc_traceback,
+                detail=detail,
+            )
             raise OperationFinishError(
-                f"Unable to finish ({self.name}). EXCEPTION: {type(exc)}  {exc}"
+                f"Unable to finish ({self.name}). Input: {data}. EXCEPTION: {type(exc)} {exc}"
             )
 
 
@@ -1382,6 +1390,7 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
                     is_public=True,
                     components=components,
                     texts=texts,
+                    article_proc=self,
                 )
 
             detail = dict(

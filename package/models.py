@@ -29,12 +29,12 @@ from collection.models import Language
 from core.models import CommonControlField
 from files_storage.models import FileLocation, MinioConfiguration
 from package import choices
-from pid_requester.controller import PidRequester
-from pid_requester.models import PidRequesterXML
+from pid_provider.controller import PidProvider
+from pid_provider.models import PidProviderXML
 from tracker.models import UnexpectedEvent
 
 
-pid_requester_app = PidRequester()
+pid_provider_app = PidProvider()
 
 
 class SPSPkgOptimizeError(Exception):
@@ -386,7 +386,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
     def set_is_pid_provider_synchronized(self):
         try:
-            self.is_pid_provider_synchronized = PidRequesterXML.get(
+            self.is_pid_provider_synchronized = PidProviderXML.get(
                 v3=self.pid_v3
             ).synchronized
         except Exception as e:
@@ -437,8 +437,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
         is_public,
         components,
         texts,
+        article_proc,
     ):
-        obj = cls.add_pid_v3_to_zip(user, sps_pkg_zip_path, is_public)
+        obj = cls.add_pid_v3_to_zip(user, sps_pkg_zip_path, is_public, article_proc)
         obj.origin = origin or obj.origin
         obj.is_public = is_public or obj.is_public
         obj.expected_component_total = len(components)
@@ -469,7 +470,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         return obj
 
     @classmethod
-    def add_pid_v3_to_zip(cls, user, zip_xml_file_path, is_public):
+    def add_pid_v3_to_zip(cls, user, zip_xml_file_path, is_public, article_proc):
         """
         Solicita PID versão 3
 
@@ -477,9 +478,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
         try:
             response = None
             logging.info(f"Request PID V3 para {zip_xml_file_path}")
-            for response in pid_requester_app.request_pid_for_xml_zip(
+            for response in pid_provider_app.provide_pid_for_xml_zip(
                 zip_xml_file_path, user, is_published=is_public
             ):
+                operation = article_proc.start(user, "provide_pid_for_xml_zip")
                 pid_v3 = response["v3"]
                 sps_pkg_name = response["xml_with_pre"].sps_pkg_name
                 synchronized = response["synchronized"]
@@ -493,6 +495,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 obj = cls.get_or_create(user, pid_v3, sps_pkg_name)
                 obj.is_pid_provider_synchronized = synchronized
                 obj.save()
+                detail = response.copy()
+                detail["xml_with_pre"] = str(detail.get("xml_with_pre"))
+                operation.finish(user, completed=synchronized, detail=detail)
                 return obj
         except Exception as e:
             raise SPSPkgAddPidV3ToZipFileError(
