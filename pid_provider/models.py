@@ -3,7 +3,7 @@ import logging
 import sys
 from datetime import datetime
 
-from django.db import models
+from django.db import models, IntegrityError
 from django.db.models import Q
 from django.utils.translation import gettext as _
 from packtools.sps.pid_provider import v3_gen, xml_sps_adapter
@@ -139,16 +139,6 @@ class PidRequest(CommonControlField):
             models.Index(
                 fields=[
                     "v3",
-                ]
-            ),
-            models.Index(
-                fields=[
-                    "times",
-                ]
-            ),
-            models.Index(
-                fields=[
-                    "detail",
                 ]
             ),
         ]
@@ -575,7 +565,11 @@ class PidProviderXML(CommonControlField):
 
             # cria ou atualiza registro
             registered = cls._save(
-                registered, xml_adapter, user, changed_pids, origin_date,
+                registered,
+                xml_adapter,
+                user,
+                changed_pids,
+                origin_date,
                 synchronized,
                 error_type,
                 error_msg,
@@ -635,6 +629,7 @@ class PidProviderXML(CommonControlField):
             response = input_data
             response.update(pid_request.data)
             return response
+
     @classmethod
     def _save(
         cls,
@@ -676,20 +671,21 @@ class PidProviderXML(CommonControlField):
         return registered
 
     def _add_synchronization_status(self, error_msg, error_type, traceback, user):
+        self.save()
         if error_msg or error_type or traceback:
-            self.synchronized = False
             self.sync_failure = SyncFailure.create(
                 error_msg,
                 error_type,
                 traceback,
                 user,
             )
+            self.synchronized = False
             self.save()
         else:
             self.synchronized = True
-            self.save()
             if self.sync_failure:
                 self.sync_failure.delete()
+            self.save()
 
     @classmethod
     def skip_registration(cls, xml_adapter, registered, force_update, origin_date):
@@ -1204,6 +1200,15 @@ class CollectionPidRequest(CommonControlField):
     )
     end_date = models.CharField(max_length=10, null=True, blank=True)
 
+    panels = [
+        FieldPanel("end_date"),
+    ]
+
+    base_form_class = CoreAdminModelForm
+
+    class Meta:
+        unique_together = [("collection",)]
+
     def __unicode__(self):
         return f"{self.collection}"
 
@@ -1216,8 +1221,33 @@ class CollectionPidRequest(CommonControlField):
         collection=None,
     ):
         if collection:
-            return cls.objects.get(collection=collection)
+            try:
+                return cls.objects.get(collection=collection)
+            except cls.MultipleObjectsReturned:
+                obj = cls.objects.filter(collection=collection).first()
+                for item in cls.objects.filter(collection=collection).iterator():
+                    if item is obj:
+                        continue
+                    item.delete()
+                return obj
         raise ValueError("PidRequest.get requires parameters")
+
+    @classmethod
+    def create(
+        cls,
+        user=None,
+        collection=None,
+        end_date=None,
+    ):
+        try:
+            obj = cls()
+            obj.creator = user
+            obj.collection = collection
+            obj.end_date = end_date
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(collection)
 
     @classmethod
     def create_or_update(
@@ -1229,17 +1259,8 @@ class CollectionPidRequest(CommonControlField):
         try:
             obj = cls.get(collection=collection)
             obj.updated_by = user
+            obj.end_date = end_date or obj.end_date or "1900-01-01"
+            obj.save()
+            return obj
         except cls.DoesNotExist:
-            obj = cls()
-            obj.creator = user
-            obj.collection = collection
-
-        obj.end_date = end_date or obj.end_date
-        obj.save()
-        return obj
-
-    panels = [
-        FieldPanel("end_date"),
-    ]
-
-    base_form_class = CoreAdminModelForm
+            return cls.create(user, collection, end_date)
