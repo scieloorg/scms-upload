@@ -25,14 +25,35 @@ ISSUE_REGISTRATION_MINUTES = MINUTES[2]
 
 IMPORT_ARTICLE_RECORDS_MINUTES = MINUTES[3]
 IMPORT_ARTICLE_FILES_MINUTES = MINUTES[3]
-HTML_TO_XMLS_MINUTES = MINUTES[7]
-GENERATE_SPS_PACKAGES_MINUTES = MINUTES[9]
+HTML_TO_XMLS_MINUTES = MINUTES[6]
+GENERATE_SPS_PACKAGES_MINUTES = MINUTES[4] + "," + MINUTES[9]
 
 ARTICLE_REGISTRATION_MINUTES = MINUTES[1]
 
 JOURNAL_PUBLICATION_MINUTES = MINUTES[2]
 ISSUE_PUBLICATION_MINUTES = MINUTES[3]
 ARTICLE_PUBLICATION_MINUTES = MINUTES[4]
+
+SINCHRONIZE_TO_PID_PROVIDER_MINUTES = MINUTES[1]
+
+
+TITLE_DB_MIGRATION_PRIORITY = 0
+ISSUE_DB_MIGRATION_PRIORITY = 0
+
+JOURNAL_REGISTRATION_PRIORITY = 1
+ISSUE_REGISTRATION_PRIORITY = 2
+ARTICLE_REGISTRATION_PRIORITY = 3
+
+JOURNAL_PUBLICATION_PRIORITY = 2
+ISSUE_PUBLICATION_PRIORITY = 3
+ARTICLE_PUBLICATION_PRIORITY = 4
+
+IMPORT_ARTICLE_RECORDS_PRIORITY = 6
+IMPORT_ARTICLE_FILES_PRIORITY = 7
+HTML_TO_XMLS_PRIORITY = 9
+GENERATE_SPS_PACKAGES_PRIORITY = 8
+
+SINCHRONIZE_TO_PID_PROVIDER_PRIORITY = 5
 
 
 def schedule_migration_subtasks(username, enabled=None):
@@ -150,7 +171,7 @@ def _schedule_title_db_migration(username, enabled):
             force_update=False,
         ),
         description=_("Migra os registros da base de dados TITLE"),
-        priority=0,
+        priority=TITLE_DB_MIGRATION_PRIORITY,
         enabled=enabled,
         run_once=False,
         day_of_week="*",
@@ -172,7 +193,7 @@ def _schedule_issue_db_migration(username, enabled):
             force_update=False,
         ),
         description=_("Migra os registros da base de dados ISSUE"),
-        priority=0,
+        priority=ISSUE_DB_MIGRATION_PRIORITY,
         enabled=enabled,
         run_once=False,
         day_of_week="*",
@@ -192,7 +213,7 @@ def _schedule_title_registration(username, enabled):
             username=username,
         ),
         description=_("Register journals"),
-        priority=1,
+        priority=JOURNAL_REGISTRATION_PRIORITY,
         enabled=enabled,
         run_once=False,
         day_of_week="*",
@@ -212,7 +233,7 @@ def _schedule_issue_registration(username, enabled):
             username=username,
         ),
         description=_("Register issues"),
-        priority=2,
+        priority=ISSUE_REGISTRATION_PRIORITY,
         enabled=enabled,
         run_once=False,
         day_of_week="*",
@@ -233,7 +254,7 @@ def _schedule_migrate_document_files_and_records(username, enabled):
             force_update=False,
         ),
         description=_("Migra arquivos dos documentos"),
-        priority=3,
+        priority=IMPORT_ARTICLE_FILES_PRIORITY,
         enabled=enabled,
         run_once=False,
         day_of_week="*",
@@ -248,7 +269,7 @@ def _schedule_migrate_document_files_and_records(username, enabled):
             force_update=False,
         ),
         description=_("Migra registros dos documentos"),
-        priority=2,
+        priority=IMPORT_ARTICLE_RECORDS_PRIORITY,
         enabled=enabled,
         run_once=False,
         day_of_week="*",
@@ -271,7 +292,7 @@ def _schedule_get_xmls(username, enabled):
             force_update=False,
         ),
         description=_("Obtém XML"),
-        priority=4,
+        priority=HTML_TO_XMLS_PRIORITY,
         enabled=enabled,
         run_once=False,
         day_of_week="*",
@@ -294,10 +315,31 @@ def _schedule_generate_sps_packages(username, enabled):
             force_update=False,
         ),
         description=_("Gera os pacotes SPS"),
-        priority=5,
+        priority=GENERATE_SPS_PACKAGES_PRIORITY,
         enabled=enabled,
         run_once=False,
         day_of_week="*",
         hour="*",
         minute=GENERATE_SPS_PACKAGES_MINUTES,
+    )
+
+
+def schedule_task_synchronize_to_pid_provider(username, enabled):
+    """
+    Agenda a tarefa de publicar os registros da base de dados TITLE
+    Deixa a tarefa desabilitada
+    """
+    schedule_task(
+        task="pid_provider.tasks.task_synchronize_to_pid_provider",
+        name="task_synchronize_to_pid_provider",
+        kwargs=dict(
+            username=username,
+        ),
+        description=_("Sinchronize to pid provider"),
+        priority=SINCHRONIZE_TO_PID_PROVIDER_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=SINCHRONIZE_TO_PID_PROVIDER_MINUTES,
     )
