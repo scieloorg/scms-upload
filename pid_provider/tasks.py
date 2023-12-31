@@ -8,9 +8,9 @@ from pid_provider.controller import PidProvider
 User = get_user_model()
 
 
-def _get_user(provide, username=None, user_id=None):
+def _get_user(request, username=None, user_id=None):
     try:
-        return User.objects.get(pk=provide.user.id)
+        return User.objects.get(pk=request.user.id)
     except AttributeError:
         if user_id:
             return User.objects.get(pk=user_id)
@@ -25,7 +25,7 @@ def provide_pid_for_file(
     file_path=None,
     is_published=None,
 ):
-    user = _get_user(self.provide, username=username)
+    user = _get_user(self.request, username=username)
 
     pid_provider = PidProvider()
     for resp in pid_provider.provide_pid_for_xml_zip(
@@ -33,3 +33,15 @@ def provide_pid_for_file(
     ):
         logging.info(resp)
     # return response
+
+
+@celery_app.task(bind=True, name="task_synchronize_to_pid_provider")
+def task_synchronize_to_pid_provider(
+    self,
+    username=None,
+    user_id=None,
+):
+    user = _get_user(self.request, username=username, user_id=user_id)
+
+    pid_provider = PidProvider()
+    pid_provider.synchronize(user)
