@@ -7,7 +7,7 @@ from wagtail.contrib.modeladmin.options import (
 )
 from wagtail.contrib.modeladmin.views import CreateView
 
-from .models import CollectionPidRequest, PidChange, PidProviderXML, PidRequest
+from .models import CollectionPidRequest, PidChange, PidProviderConfig, PidProviderXML, PidRequest
 
 
 class PidRequestCreateView(CreateView):
@@ -33,7 +33,8 @@ class PidRequestAdmin(ModelAdmin):
         "result_msg",
         "v3",
         "times",
-        "created_updated",
+        "created",
+        "updated",
     )
     list_filter = ("result_type",)
     search_fields = (
@@ -90,10 +91,12 @@ class PidProviderXMLAdmin(ModelAdmin):
         "v2",
         "aop_pid",
         "main_doi",
+        "synchronized",
         "website_publication_date",
-        "created_updated",
+        "created",
+        "updated",
     )
-    list_filter = ("article_pub_year", "pub_year")
+    list_filter = ("article_pub_year", "pub_year", "synchronized")
     search_fields = (
         "pkg_name",
         "v3",
@@ -127,7 +130,8 @@ class PidChangeAdmin(ModelAdmin):
         "pid_in_xml",
         "pid_assigned",
         "pid_type",
-        "created_updated",
+        "created",
+        "updated",
     )
     list_filter = ("pid_type",)
     search_fields = (
@@ -168,6 +172,7 @@ class PidProviderAdminGroup(ModelAdminGroup):
         PidProviderXMLAdmin,
         PidRequestAdmin,
         PidChangeAdmin,
+        CollectionPidRequestAdmin,
     )
 
 
