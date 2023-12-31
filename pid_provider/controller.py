@@ -119,7 +119,16 @@ class PidProvider:
                 origin=xml_uri,
             )
 
-    def provide_pid_for_xml_with_pre(self, xml_with_pre, name, user, is_published=None):
+    def provide_pid_for_xml_with_pre(
+        self,
+        xml_with_pre,
+        name,
+        user,
+        origin_date=None,
+        force_update=None,
+        is_published=None,
+        origin=None,
+    ):
         """
         Recebe um xml_with_pre para solicitar o PID da versão 3
         para o Pid Provider
@@ -135,13 +144,16 @@ class PidProvider:
         Caso contrário, solicita PID versão 3 para o Pid Provider e
         armazena o resultado
         """
-        response = self.pre_registration(xml_with_pre)
+        response = self.pre_registration(xml_with_pre, name)
         if response.get("required_local_registration"):
             registered = PidProviderXML.register(
                 xml_with_pre,
                 name,
                 user,
-                is_published,
+                origin_date=origin_date,
+                force_update=force_update,
+                is_published=is_published,
+                origin=origin,
                 synchronized=bool(response.get("xml_uri")),
                 error_type=response.get("error_type"),
                 error_msg=response.get("error_msg"),
@@ -243,7 +255,7 @@ class PidProvider:
                 "error_type": str(type(e)),
             }
 
-    def pre_registration(self, xml_with_pre):
+    def pre_registration(self, xml_with_pre, name):
         # verifica a necessidade de registro local e/ou remoto
 
         demand = PidProviderXML.check_registration_demand(xml_with_pre)
@@ -271,8 +283,12 @@ class PidProvider:
                     "Unable to synchronized data with central pid provider because API URI is missing"
                 )
             )
-        for item in PidProviderXML.unsynchronized:
+        for item in PidProviderXML.unsynchronized():
             name = item.pkg_name
             xml_with_pre = item.xml_with_pre
             response = self.pid_provider_api.provide_pid(xml_with_pre, name)
             item.set_synchronized(user, **response)
+            # if response.get("synchronized"):
+            #     article_proc = ArticleProc.objects.get(sps_pkg__pid_v3=item.pid_v3)
+            #     article_proc.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DONE
+            #     article_proc.save()
