@@ -129,7 +129,6 @@ LOCAL_APPS = [
     "publication",
     "researcher",
     "upload",
-    "controlled_lists",
     "pid_provider",
     "tracker",
     "xmlsps",
