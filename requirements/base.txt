@@ -81,3 +81,4 @@ tornado>=6.3.2 # not directly required, pinned by Snyk to avoid a vulnerability
 # ------------------------------------------------------------------------------
 tenacity==8.2.3  # https://pypi.org/project/tenacity/
 urllib3==2.1.0
+certifi>=2023.7.22 # not directly required, pinned by Snyk to avoid a vulnerability
