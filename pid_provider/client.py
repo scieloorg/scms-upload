@@ -41,6 +41,7 @@ class PidProviderAPIClient:
         self._api_username = api_username
         self._api_password = api_password
         self.token = None
+
     @property
     def config(self):
         if not hasattr(self, "_config") or not self._config:
@@ -221,11 +222,11 @@ class PidProviderAPIClient:
             try:
                 for pid_type, pid_value in item["xml_changed"].items():
                     try:
-                        if pid_type == 'pid_v3':
+                        if pid_type == "pid_v3":
                             xml_with_pre.v3 = pid_value
-                        elif pid_type == 'pid_v2':
+                        elif pid_type == "pid_v2":
                             xml_with_pre.v2 = pid_value
-                        elif pid_type == 'aop_pid':
+                        elif pid_type == "aop_pid":
                             xml_with_pre.aop_pid = pid_value
                     except Exception as e:
                         pass
