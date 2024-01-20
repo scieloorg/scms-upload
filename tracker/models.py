@@ -81,22 +81,31 @@ class UnexpectedEvent(models.Model):
     def create(
         cls,
         e=None,
+        exception=None,
         exc_traceback=None,
         detail=None,
     ):
         try:
+            e = e or exception
             if e:
+                logging.info("-"*10)
                 logging.exception(e)
+                logging.info("="*10)
 
             obj = cls()
-            obj.exception_msg = e
-            obj.exception_type = type(e)
-            obj.detail = detail
+            obj.exception_msg = str(e)
+            obj.exception_type = str(type(e))
+            try:
+                json.dumps(detail)
+                obj.detail = detail
+            except:
+                obj.detail = str(detail)
             if exc_traceback:
                 obj.traceback = traceback.format_tb(exc_traceback)
             obj.save()
             return obj
         except Exception as exc:
+            logging.exception(exc)
             raise UnexpectedEventCreateError(
                 f"Unable to create unexpected event ({e} {exc_traceback}). EXCEPTION {exc}"
             )
@@ -149,12 +158,17 @@ class Event(CommonControlField):
             obj = cls()
             obj.creator = user
             obj.message = message
-            obj.message_type = message_type
-            obj.detail = detail
+            obj.message_type = str(message_type)
+
+            if detail:
+                try:
+                    json.dumps(detail)
+                    obj.detail = detail
+                except:
+                    obj.detail = str(detail)
             obj.save()
 
             if e:
-                logging.exception(f"{message}: {e}")
                 obj.unexpected_event = UnexpectedEvent.create(
                     e=e,
                     exc_traceback=exc_traceback,
@@ -168,6 +182,7 @@ class Event(CommonControlField):
                 exc_traceback=exc_traceback,
                 detail=detail,
             )
+            logging.exception(exc)
             raise EventCreateError(
                 f"Unable to create Event ({message} {e}) Input {data}. EXCEPTION: {exc}"
             )
@@ -221,6 +236,7 @@ class EventReport(CommonControlField):
             obj.creator = user
             obj.save()
         except Exception as e:
+            logging.exception(e)
             raise EventReportCreateError(
                 f"Unable to create EventReport. Exception: {e}"
             )
