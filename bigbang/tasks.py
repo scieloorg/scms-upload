@@ -18,7 +18,7 @@ def _get_user(user_id, username):
 
 @celery_app.task(bind=True)
 def task_start(
-    self, user_id=None, username=None, file_path=None, activate_subtasks=None,
+    self, user_id=None, username=None, file_path=None, enable=None,
     config=None
 ):
     user = _get_user(user_id, username)
@@ -26,7 +26,6 @@ def task_start(
     if file_path or config:
         setup(user, file_path, config)
 
-    # activate_subtasks = activate_subtasks or True
-    tasks_scheduler.schedule_publication_subtasks(username, activate_subtasks)
-    tasks_scheduler.schedule_migration_subtasks(username, activate_subtasks)
-    tasks_scheduler.schedule_task_synchronize_to_pid_provider(username, activate_subtasks)
+    tasks_scheduler.schedule_publication_subtasks(username, enable)
+    tasks_scheduler.schedule_migration_subtasks(username, enable)
+    tasks_scheduler.schedule_task_synchronize_to_pid_provider(username, enable)
