@@ -253,6 +253,7 @@ class OtherPid(CommonControlField):
     """
     Registro de PIDs (associados a um PidProviderXML) cujo valor difere do valor atribuído
     """
+
     pid_provider_xml = ParentalKey(
         "PidProviderXML",
         null=True,
@@ -316,7 +317,10 @@ class PidProviderXML(CommonControlField, ClusterableModel):
     Tem responsabilidade de garantir a atribuição do PID da versão 3,
     armazenando dados chaves que garantem a identificação do XML
     """
-    z_journal_title = models.CharField(_("journal title"), max_length=64, null=True, blank=True)
+
+    z_journal_title = models.CharField(
+        _("journal title"), max_length=64, null=True, blank=True
+    )
     issn_electronic = models.CharField(
         _("issn_epub"), max_length=10, null=True, blank=True
     )
@@ -335,7 +339,9 @@ class PidProviderXML(CommonControlField, ClusterableModel):
     v2 = models.CharField(_("v2"), max_length=24, null=True, blank=True)
     aop_pid = models.CharField(_("AOP PID"), max_length=64, null=True, blank=True)
 
-    elocation_id = models.CharField(_("elocation id"), max_length=64, null=True, blank=True)
+    elocation_id = models.CharField(
+        _("elocation id"), max_length=64, null=True, blank=True
+    )
     fpage = models.CharField(_("fpage"), max_length=20, null=True, blank=True)
     fpage_seq = models.CharField(_("fpage_seq"), max_length=8, null=True, blank=True)
     lpage = models.CharField(_("lpage"), max_length=20, null=True, blank=True)
@@ -555,14 +561,18 @@ class PidProviderXML(CommonControlField, ClusterableModel):
                 )
 
             xml_changed = {
-                change["pid_type"]: change["pid_assigned"]
-                for change in changed_pids
+                change["pid_type"]: change["pid_assigned"] for change in changed_pids
             }
 
             # cria ou atualiza registro
             registered = cls._save(
-                registered, xml_adapter, user, changed_pids, origin_date, available_since,
-                registered_in_core
+                registered,
+                xml_adapter,
+                user,
+                changed_pids,
+                origin_date,
+                available_since,
+                registered_in_core,
             )
 
             # data to return
@@ -859,7 +869,9 @@ class PidProviderXML(CommonControlField, ClusterableModel):
                 change_args["pid_provider_xml"] = self
                 change_args.pop("pid_assigned")
                 OtherPid.get_or_create(**change_args)
-                self.other_pid_count = OtherPid.objects.filter(pid_provider_xml=self).count()
+                self.other_pid_count = OtherPid.objects.filter(
+                    pid_provider_xml=self
+                ).count()
                 self.save()
 
     @classmethod

@@ -53,7 +53,9 @@ class PidProvider(BasePidProvider):
             logging.info(f"PidProviderXML.register registered: {registered}")
             logging.info(f"PidProviderXML.register resp: {resp}")
 
-        resp["synchronized"] = resp["registered_in_core"] and resp["registered_in_upload"]
+        resp["synchronized"] = (
+            resp["registered_in_core"] and resp["registered_in_upload"]
+        )
         resp["xml_with_pre"] = xml_with_pre
         resp["filename"] = name
         logging.info(f"PidProvider.provide_pid_for_xml_with_pre: resp={resp}")

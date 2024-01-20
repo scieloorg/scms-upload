@@ -9,7 +9,6 @@ from tracker.models import UnexpectedEvent
 
 
 class BasePidProvider:
-
     def __init__(self):
         pass
 
