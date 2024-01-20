@@ -330,7 +330,7 @@ def schedule_task_synchronize_to_pid_provider(username, enabled):
     Deixa a tarefa desabilitada
     """
     schedule_task(
-        task="proc.tasks.task_synchronize_to_pid_provider",
+        task="pid_provider.tasks.task_synchronize_to_pid_provider",
         name="task_synchronize_to_pid_provider",
         kwargs=dict(
             username=username,
