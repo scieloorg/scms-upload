@@ -10,11 +10,12 @@ from packtools.sps.pid_provider.xml_sps_lib import (
     create_xml_zip_file,
     get_xml_with_pre,
 )
+from requests import HTTPError
 from requests.auth import HTTPBasicAuth
 
+from core.utils.requester import post_data
 from pid_provider import exceptions
 from pid_provider.models import PidProviderConfig
-from pid_provider.utils.requester import post_data
 
 
 LOGGER = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class PidProviderAPIClient:
         self._pid_provider_api_get_token = pid_provider_api_get_token
         self._api_username = api_username
         self._api_password = api_password
-
+        self.token = None
     @property
     def config(self):
         if not hasattr(self, "_config") or not self._config:
@@ -94,12 +95,13 @@ class PidProviderAPIClient:
             nome do arquivo xml
         """
         try:
-            token = self._get_token(
+
+            self.token = self.token or self._get_token(
                 username=self.api_username,
                 password=self.api_password,
                 timeout=self.timeout,
             )
-            response = self._prepare_and_post_xml(xml_with_pre, name, token)
+            response = self._prepare_and_post_xml(xml_with_pre, name, self.token)
 
             self._process_post_xml_response(response, xml_with_pre)
             try:
@@ -126,7 +128,6 @@ class PidProviderAPIClient:
             --data 'username=x&password=x'
         """
         try:
-            logging.info(self.pid_provider_api_get_token)
             resp = post_data(
                 self.pid_provider_api_get_token,
                 data={"username": username, "password": password},
@@ -134,15 +135,14 @@ class PidProviderAPIClient:
                 timeout=timeout,
                 json=True,
             )
-            logging.info(resp)
             return resp.get("access")
         except Exception as e:
             # TODO tratar as exceções
             logging.exception(e)
             raise exceptions.GetAPITokenError(
                 _("Unable to get api token {} {} {} {}").format(
+                    self.pid_provider_api_get_token,
                     username,
-                    password,
                     type(e),
                     e,
                 )
@@ -159,7 +159,15 @@ class PidProviderAPIClient:
 
             create_xml_zip_file(zip_xml_file_path, xml_with_pre.tostring())
 
-            return self._post_xml(zip_xml_file_path, token, self.timeout)
+            try:
+                return self._post_xml(zip_xml_file_path, self.token, self.timeout)
+            except Exception as e:
+                self.token = self._get_token(
+                    username=self.api_username,
+                    password=self.api_password,
+                    timeout=self.timeout,
+                )
+                return self._post_xml(zip_xml_file_path, self.token, self.timeout)
 
     def _post_xml(self, zip_xml_file_path, token, timeout):
         """
@@ -184,7 +192,6 @@ class PidProviderAPIClient:
             "Content-Disposition": "attachment; filename=%s" % basename,
         }
         try:
-            logging.info(self.pid_provider_api_post_xml)
             return post_data(
                 self.pid_provider_api_post_xml,
                 files=files,
@@ -196,7 +203,8 @@ class PidProviderAPIClient:
         except Exception as e:
             logging.exception(e)
             raise exceptions.APIPidProviderPostError(
-                _("Unable to get pid from pid provider {} {} {}").format(
+                _("Unable to get pid from pid provider {} {} {} {}").format(
+                    self.pid_provider_api_post_xml,
                     zip_xml_file_path,
                     type(e),
                     e,
@@ -204,14 +212,24 @@ class PidProviderAPIClient:
             )
 
     def _process_post_xml_response(self, response, xml_with_pre):
-        logging.info(f"_process_post_xml_response: {response}")
         if not response:
             return
+        logging.info(f"_process_post_xml_response: {response}")
         for item in response:
             if not item.get("xml_changed"):
                 return
             try:
-                xml_with_pre = get_xml_with_pre(item["xml"])
+                for pid_type, pid_value in item["xml_changed"].items():
+                    try:
+                        if pid_type == 'pid_v3':
+                            xml_with_pre.v3 = pid_value
+                        elif pid_type == 'pid_v2':
+                            xml_with_pre.v2 = pid_value
+                        elif pid_type == 'aop_pid':
+                            xml_with_pre.aop_pid = pid_value
+                    except Exception as e:
+                        pass
+
             except KeyError:
                 pass
             try:

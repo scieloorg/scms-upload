@@ -62,7 +62,6 @@ def post_data(
         Raise a RetryableError to retry.
     """
     try:
-        logger.info("Posting data: %s" % url)
         params = dict(
             headers=headers,
             timeout=timeout,
@@ -71,9 +70,6 @@ def post_data(
         params = _add_param(params, "auth", auth)
         params = _add_param(params, "files", files)
         params = _add_param(params, "data", data)
-        logging.info(f"data={data}")
-        for k, v in params.items():
-        	logging.info(f"{k}={v}")
         response = requests.post(url, **params)
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
         logger.error("Erro posting data: %s, retry..., erro: %s" % (url, exc))
