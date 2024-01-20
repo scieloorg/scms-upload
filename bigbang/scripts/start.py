@@ -7,6 +7,6 @@ def run(username, file_path, status):
         kwargs=dict(
             username=username,
             file_path=file_path,
-            activate_subtasks=(status == "true"),
+            enable=(status == "true"),
         )
     )
