@@ -481,6 +481,11 @@ class MigratedJournal(MigratedData):
     def get_data_from_classic_website(cls, data):
         return classic_ws.Journal(data)
 
+    @property
+    def journal_acron(self):
+        j = classic_ws.Journal(self.data)
+        return j.acronym
+
 
 class MigratedIssue(MigratedData):
     panels = [
@@ -492,6 +497,11 @@ class MigratedIssue(MigratedData):
     @classmethod
     def get_data_from_classic_website(cls, data):
         return classic_ws.Issue(data)
+
+    @property
+    def issue_folder(self):
+        issue = classic_ws.Issue(self.data)
+        return issue.issue_label
 
 
 class MigratedArticle(MigratedData):
@@ -506,6 +516,15 @@ class MigratedArticle(MigratedData):
         return classic_ws.Document(data)
 
     @property
+    def document(self):
+        if not hasattr(self, '_document') or not self._document:
+            self._document = classic_ws.Document(self.data)
+        return self._document
+
+    @property
     def n_paragraphs(self):
-        classic_ws_doc = classic_ws.Document(self.data)
-        return len(classic_ws_doc.p_records or [])
+        return len(self.document.p_records or [])
+
+    @property
+    def pkg_name(self):
+        return self.document.filename_without_extension
