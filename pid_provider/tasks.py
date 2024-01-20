@@ -33,3 +33,15 @@ def provide_pid_for_file(
     ):
         logging.info(resp)
     # return response
+
+
+@celery_app.task(bind=True, name="task_synchronize_to_pid_provider")
+def task_synchronize_to_pid_provider(
+    self,
+    username=None,
+    user_id=None,
+):
+    user = _get_user(self.request, username=username, user_id=user_id)
+
+    pid_provider = PidProvider()
+    pid_provider.synchronize(user)
