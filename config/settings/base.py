@@ -131,7 +131,6 @@ LOCAL_APPS = [
     "upload",
     "pid_provider",
     "tracker",
-    "xmlsps",
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
