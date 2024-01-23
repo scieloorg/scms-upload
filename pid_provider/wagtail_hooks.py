@@ -182,7 +182,6 @@ class PidProviderAdminGroup(ModelAdminGroup):
         PidRequestAdmin,
         OtherPidAdmin,
         CollectionPidRequestAdmin,
-        PidConflictAdmin,
     )
 
 
