@@ -66,7 +66,9 @@ class PublicationAPI:
             }
             return response
 
-        if response.get("failed") is False:
+        if response.get("id") and response["id"] != "None":
+            response["result"] = "OK"
+        elif response.get("failed") is False:
             response["result"] = "OK"
         return response or {}
 

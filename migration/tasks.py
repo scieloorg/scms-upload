@@ -441,7 +441,7 @@ def task_get_xml(
 
         item = ArticleProc.objects.get(pk=item_id)
         try:
-            htmlxml = HTMLXML.get(article_proc=item)
+            htmlxml = HTMLXML.get(migrated_article=item.migrated_data)
         except HTMLXML.DoesNotExist:
             htmlxml = None
         item.get_xml(user, htmlxml, body_and_back_xml)

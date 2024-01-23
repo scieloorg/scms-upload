@@ -12,6 +12,32 @@ class BasePidProvider:
     def __init__(self):
         pass
 
+    def provide_pid_for_xml_with_pre(
+        self,
+        xml_with_pre,
+        name,
+        user,
+        origin_date=None,
+        force_update=None,
+        is_published=None,
+        origin=None,
+        registered_in_core=None,
+    ):
+        """
+        Fornece / Valida PID para o XML no formato de objeto de XMLWithPre
+        """
+        registered = PidProviderXML.register(
+            xml_with_pre,
+            name,
+            user,
+            origin_date=origin_date,
+            force_update=force_update,
+            is_published=is_published,
+            origin=origin,
+            registered_in_core=registered_in_core,
+        )
+        return registered
+
     def provide_pid_for_xml_zip(
         self,
         zip_xml_file_path,
@@ -20,6 +46,7 @@ class BasePidProvider:
         origin_date=None,
         force_update=None,
         is_published=None,
+        registered_in_core=None,
     ):
         """
         Fornece / Valida PID para o XML em um arquivo compactado
@@ -38,6 +65,7 @@ class BasePidProvider:
                     force_update=force_update,
                     is_published=is_published,
                     origin=zip_xml_file_path,
+                    registered_in_core=registered_in_core,
                 )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -109,6 +137,7 @@ class BasePidProvider:
                 force_update=force_update,
                 is_published=is_published,
                 origin=xml_uri,
+                registered_in_core=registered_in_core,
             )
 
     @classmethod

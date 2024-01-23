@@ -39,8 +39,8 @@ class JournalProcModelAdmin(ModelAdmin):
     exclude_from_explorer = False
 
     list_display = (
-        "acron",
         "journal",
+        "acron",
         "migration_status",
         "qa_ws_status",
         "public_ws_status",
@@ -112,7 +112,7 @@ class HTMLXMLModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        "article_proc",
+        "migrated_article",
         "html2xml_status",
         "quality",
         "attention_demands",
@@ -123,19 +123,18 @@ class HTMLXMLModelAdmin(ModelAdmin):
         "created_updated",
     )
     list_filter = (
-        "html_img_total",
-        "html_table_total",
-        "empty_body",
-        "attention_demands",
-        "article_type",
         "html2xml_status",
         "quality",
-        "html_translation_langs",
         "pdf_langs",
+        "html_translation_langs",
+        "article_type",
+        "empty_body",
+        "html_img_total",
+        "html_table_total",
+        "attention_demands",
     )
     search_fields = (
-        "article_proc__migrated_data__pid",
-        "article_proc__pkg_name",
+        "migrated_article__pid",
         "html2xml_status",
         "article_type",
     )
@@ -151,9 +150,9 @@ class SPSPkgModelAdmin(ModelAdmin):
     exclude_from_explorer = False
 
     list_display = (
-        "pid_v3",
         "sps_pkg_name",
-        "is_pid_provider_synchronized",
+        "pid_v3",
+        "registered_in_core",
         "valid_texts",
         "valid_components",
         "is_public",
@@ -164,7 +163,7 @@ class SPSPkgModelAdmin(ModelAdmin):
 
     list_filter = (
         "origin",
-        "is_pid_provider_synchronized",
+        "registered_in_core",
         "valid_texts",
         "valid_components",
         "is_public",
@@ -187,8 +186,8 @@ class ArticleProcModelAdmin(ModelAdmin):
     exclude_from_explorer = False
 
     list_display = (
-        "issue_proc",
         "pkg_name",
+        "issue_proc",
         "xml_status",
         "sps_pkg_status",
         "qa_ws_status",

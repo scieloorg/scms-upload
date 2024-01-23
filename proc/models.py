@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import json
 from datetime import datetime
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
@@ -11,8 +12,6 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
-from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
-from packtools.sps.models.v2.article_assets import ArticleAssets
 from scielo_classic_website.htmlbody.html_body import HTMLContent
 from wagtail.admin.panels import (
     FieldPanel,
@@ -38,8 +37,9 @@ from migration.models import (
     MigratedIssue,
     MigratedJournal,
 )
+from migration.controller import PkgZipBuilder, get_migrated_xml_with_pre
 from package import choices as package_choices
-from package.models import BasicXMLFile, SPSPkg
+from package.models import SPSPkg
 from proc import exceptions
 from proc.forms import ProcAdminModelForm
 from tracker import choices as tracker_choices
@@ -134,10 +134,13 @@ class Operation(CommonControlField):
         detail=None,
     ):
         try:
+            if exception:
+                logging.exception(exception)
             if not message_type:
                 if not completed:
                     message_type = "ERROR"
 
+            detail = detail or {}
             if message_type or exception or exc_traceback:
                 self.event = Event.create(
                     user=user,
@@ -148,12 +151,17 @@ class Operation(CommonControlField):
                     detail=detail,
                 )
                 detail = self.event.data
-            self.detail = detail
+            try:
+                json.dumps(detail)
+                self.detail = detail
+            except TypeError:
+                self.detail = str(detail)
             self.completed = completed
             self.updated_by = user
             self.save()
             return self
         except Exception as exc:
+            logging.exception(exc)
             data = dict(
                 completed=completed,
                 exception=exception,
@@ -162,8 +170,16 @@ class Operation(CommonControlField):
                 exc_traceback=exc_traceback,
                 detail=detail,
             )
+            error = []
+            for k, v in data.items():
+                try:
+                    json.dumps(v)
+                    error.append(k)
+                except TypeError:
+                    pass
+
             raise OperationFinishError(
-                f"Unable to finish ({self.name}). Input: {data}. EXCEPTION: {type(exc)} {exc}"
+                f"Unable to finish ({self.name}). Input: {error}. EXCEPTION: {type(exc)} {exc}"
             )
 
 
@@ -188,9 +204,6 @@ class BaseProc(CommonControlField):
 
     pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
 
-    migrated_data = models.ForeignKey(
-        MigratedData, on_delete=models.SET_NULL, null=True, blank=True
-    )
     migration_status = models.CharField(
         _("Status"),
         max_length=8,
@@ -217,7 +230,7 @@ class BaseProc(CommonControlField):
             models.Index(fields=["pid"]),
         ]
 
-    MigratedDataClass = MigratedData
+    # MigratedDataClass = MigratedData
     base_form_class = ProcAdminModelForm
 
     panel_status = [
@@ -331,21 +344,18 @@ class BaseProc(CommonControlField):
         Muda o migration_status de REPROC para TODO
         E se force_update = True, muda o migration_status de DONE para TODO
         """
-        logging.info(f"items_to_register: {collection}")
-        logging.info(f"items_to_register: {content_type}")
-        logging.info(f"items_to_register: {force_update}")
-
         params = dict(
             collection=collection,
             migrated_data__content_type=content_type,
         )
         if content_type == "article":
-            params["xml_status"] = tracker_choices.PROGRESS_STATUS_DONE
-
+            params["sps_pkg__pid_v3__isnull"] = False
         q = Q(migration_status=tracker_choices.PROGRESS_STATUS_REPROC)
         if force_update:
-            q |= Q(migration_status=tracker_choices.PROGRESS_STATUS_DONE) | Q(
-                migration_status=tracker_choices.PROGRESS_STATUS_PENDING
+            q |= (
+                Q(migration_status=tracker_choices.PROGRESS_STATUS_DONE)
+                | Q(migration_status=tracker_choices.PROGRESS_STATUS_PENDING)
+                | Q(migration_status=tracker_choices.PROGRESS_STATUS_BLOCKED)
             )
 
         cls.objects.filter(
@@ -358,7 +368,6 @@ class BaseProc(CommonControlField):
             migration_status=tracker_choices.PROGRESS_STATUS_TODO,
             **params,
         ).count()
-        logging.info(f"count: {count}")
         return cls.objects.filter(
             migration_status=tracker_choices.PROGRESS_STATUS_TODO,
             **params,
@@ -398,17 +407,25 @@ class BaseProc(CommonControlField):
         params = params or {}
         params["migrated_data__content_type"] = content_type
         params["migration_status"] = tracker_choices.PROGRESS_STATUS_DONE
+        if content_type == "article":
+            params["sps_pkg__pid_v3__isnull"] = False
 
         q = Q(qa_ws_status=tracker_choices.PROGRESS_STATUS_REPROC)
         if force_update:
-            q = Q(qa_ws_status__isnull=tracker_choices.PROGRESS_STATUS_DONE) | Q(
-                qa_ws_status__isnull=tracker_choices.PROGRESS_STATUS_PENDING
+            q = (
+                Q(qa_ws_status__isnull=tracker_choices.PROGRESS_STATUS_DONE)
+                | Q(qa_ws_status__isnull=tracker_choices.PROGRESS_STATUS_PENDING)
+                | Q(qa_ws_status__isnull=tracker_choices.PROGRESS_STATUS_BLOCKED)
             )
 
         cls.objects.filter(q, **params).update(
             qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO
         )
 
+        count = cls.objects.filter(
+            qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO, **params
+        ).count()
+        logging.info(f"It will publish: {count}")
         items = cls.objects.filter(
             qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO, **params
         )
@@ -418,9 +435,11 @@ class BaseProc(CommonControlField):
     def publish(self, user, callable_publish, website_kind, api_data):
         operation = self.start(user, f"publication on {website_kind}")
         response = callable_publish(user, self, api_data)
-        if response.get("id") or response.get("result") == "OK":
+        logging.info(f"Publish response: {response}")
+        completed = bool(response.get("result") == "OK")
+        if completed:
             self.update_publication_stage()
-        operation.finish(user, completed=bool(response.get("id")))
+        operation.finish(user, completed=completed, detail=response)
 
     def update_publication_stage(self):
         """
@@ -460,12 +479,18 @@ class BaseProc(CommonControlField):
         params = params or {}
         params["migrated_data__content_type"] = content_type
         params["qa_ws_status"] = tracker_choices.PROGRESS_STATUS_DONE
+        if content_type == "article":
+            params["sps_pkg_status"] = False
+            params["sps_pkg__pid_v3__isnull"] = False
+            params["sps_pkg__registered_in_core"] = True
 
         q = Q(public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC)
 
         if force_update:
-            q |= Q(public_ws_status=tracker_choices.PROGRESS_STATUS_DONE) | Q(
-                public_ws_status=tracker_choices.PROGRESS_STATUS_PENDING
+            q |= (
+                Q(public_ws_status=tracker_choices.PROGRESS_STATUS_DONE)
+                | Q(public_ws_status=tracker_choices.PROGRESS_STATUS_PENDING)
+                | Q(public_ws_status=tracker_choices.PROGRESS_STATUS_BLOCKED)
             )
 
         cls.objects.filter(q, **params).update(
@@ -481,6 +506,10 @@ class BaseProc(CommonControlField):
 
 class JournalProc(BaseProc, ClusterableModel):
     """ """
+
+    migrated_data = models.ForeignKey(
+        MigratedJournal, on_delete=models.SET_NULL, null=True, blank=True
+    )
 
     acron = models.CharField(_("Acronym"), max_length=25, null=True, blank=True)
     title = models.TextField(_("Title"), null=True, blank=True)
@@ -581,6 +610,10 @@ def is_out_of_date(file_path, file_date):
 
 class IssueProc(BaseProc, ClusterableModel):
     """ """
+
+    migrated_data = models.ForeignKey(
+        MigratedIssue, on_delete=models.SET_NULL, null=True, blank=True
+    )
 
     def __unicode__(self):
         return f"{self.journal_proc} {self.issue_folder}"
@@ -694,8 +727,10 @@ class IssueProc(BaseProc, ClusterableModel):
         """
         q = Q(files_status=tracker_choices.PROGRESS_STATUS_REPROC)
         if force_update:
-            q |= Q(files_status=tracker_choices.PROGRESS_STATUS_DONE) | Q(
-                files_status=tracker_choices.PROGRESS_STATUS_PENDING
+            q |= (
+                Q(files_status=tracker_choices.PROGRESS_STATUS_DONE)
+                | Q(files_status=tracker_choices.PROGRESS_STATUS_PENDING)
+                | Q(files_status=tracker_choices.PROGRESS_STATUS_BLOCKED)
             )
 
         cls.objects.filter(
@@ -728,8 +763,10 @@ class IssueProc(BaseProc, ClusterableModel):
             failures = result.get("failures")
             migrated = result.get("migrated")
 
+            ok = []
             for item in migrated:
                 self.issue_files.add(item)
+                ok.append({"file": item.original_path})
 
             self.files_status = (
                 tracker_choices.PROGRESS_STATUS_PENDING
@@ -741,17 +778,18 @@ class IssueProc(BaseProc, ClusterableModel):
                 user,
                 completed=(self.files_status == tracker_choices.PROGRESS_STATUS_DONE),
                 message="Files",
-                detail=failures,
+                detail=failures + ok,
             )
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            self.files_status = tracker_choices.PROGRESS_STATUS_PENDING
+            self.files_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
             operation.finish(
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
+                detail=result,
             )
 
     @classmethod
@@ -762,8 +800,10 @@ class IssueProc(BaseProc, ClusterableModel):
         """
         q = Q(docs_status=tracker_choices.PROGRESS_STATUS_REPROC)
         if force_update:
-            q |= Q(docs_status=tracker_choices.PROGRESS_STATUS_DONE) | Q(
-                docs_status=tracker_choices.PROGRESS_STATUS_PENDING
+            q |= (
+                Q(docs_status=tracker_choices.PROGRESS_STATUS_DONE)
+                | Q(docs_status=tracker_choices.PROGRESS_STATUS_PENDING)
+                | Q(docs_status=tracker_choices.PROGRESS_STATUS_BLOCKED)
             )
 
         cls.objects.filter(
@@ -810,16 +850,17 @@ class IssueProc(BaseProc, ClusterableModel):
                 user,
                 completed=(self.docs_status == tracker_choices.PROGRESS_STATUS_DONE),
                 message="article records",
-                detail=failures,
+                detail=result,
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            self.docs_status = tracker_choices.PROGRESS_STATUS_PENDING
+            self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
             operation.finish(
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
+                detail=result,
             )
 
     def find_asset(self, basename, name=None):
@@ -839,9 +880,12 @@ class ArticleEventReportCreateError(Exception):
     ...
 
 
-class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
+class ArticleProc(BaseProc, ClusterableModel):
     # Armazena os IDs dos artigos no contexto de cada coleção
     # serve para conseguir recuperar artigos pelo ID do site clássico
+    migrated_data = models.ForeignKey(
+        MigratedArticle, on_delete=models.SET_NULL, null=True, blank=True
+    )
     issue_proc = models.ForeignKey(
         IssueProc, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -879,7 +923,7 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
 
     ProcResult = ArticleProcResult
     panel_files = [
-        FieldPanel("file"),
+        FieldPanel("pkg_name"),
         AutocompletePanel("sps_pkg"),
     ]
     panel_status = [
@@ -953,34 +997,28 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
             self.save()
 
             if htmlxml:
-                self.html_to_xml(user, htmlxml, body_and_back_xml)
+                xml = htmlxml.html_to_xml(user, self, body_and_back_xml)
             else:
-                self.add_xml(user, source_path=self.migrated_xml.file.path)
-
-            operation.finish(user, completed=bool(self.file.path))
+                xml = get_migrated_xml_with_pre(self.migrated_data)
+            if xml:
+                self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
+            else:
+                self.xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            self.save()
+            operation.finish(
+                user,
+                completed=self.xml_status==tracker_choices.PROGRESS_STATUS_DONE,
+            )
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            self.xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+            self.xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
             operation.finish(
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
             )
-
-    def html_to_xml(self, user, htmlxml, body_and_back_xml):
-
-        operation = self.start(user, "generate xml from html")
-
-        xml_content = htmlxml.html_to_xml(user, body_and_back_xml)
-        self.add_xml(user=user, xml_content=xml_content)
-        htmlxml.generate_report(user, xml_content)
-
-        operation.finish(
-            user,
-            completed=(htmlxml.html2xml_status == tracker_choices.PROGRESS_STATUS_DONE),
-        )
 
     @classmethod
     def items_to_get_xml(
@@ -1011,17 +1049,21 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
         q = Q(xml_status=tracker_choices.PROGRESS_STATUS_REPROC)
 
         if force_update:
-            q |= Q(xml_status=tracker_choices.PROGRESS_STATUS_DONE) | Q(
-                xml_status=tracker_choices.PROGRESS_STATUS_PENDING
+            q |= (
+                Q(xml_status=tracker_choices.PROGRESS_STATUS_DONE)
+                | Q(xml_status=tracker_choices.PROGRESS_STATUS_PENDING)
+                | Q(xml_status=tracker_choices.PROGRESS_STATUS_BLOCKED)
             )
 
-        cls.objects.filter(
-            q,
-            **params,
-        ).update(
+        cls.objects.filter(q, **params).update(
             xml_status=tracker_choices.PROGRESS_STATUS_TODO,
         )
 
+        count = cls.objects.filter(
+            xml_status=tracker_choices.PROGRESS_STATUS_TODO,
+            **params,
+        ).count()
+        logging.info(f"items_to_get_xml: {count} {params}")
         return cls.objects.filter(
             xml_status=tracker_choices.PROGRESS_STATUS_TODO,
             **params,
@@ -1041,6 +1083,7 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
         E se force_update = True, muda o status de DONE para TODO
         """
         params = {}
+        params["xml_status"] = tracker_choices.PROGRESS_STATUS_DONE
         if collection_acron:
             params["collection__acron"] = collection_acron
         if journal_acron:
@@ -1052,83 +1095,24 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
 
         q = Q(sps_pkg_status=tracker_choices.PROGRESS_STATUS_REPROC)
         if force_update:
-            q |= Q(sps_pkg_status=tracker_choices.PROGRESS_STATUS_DONE) | Q(
-                sps_pkg_status=tracker_choices.PROGRESS_STATUS_PENDING
+            q |= (
+                Q(sps_pkg_status=tracker_choices.PROGRESS_STATUS_DONE)
+                | Q(sps_pkg_status=tracker_choices.PROGRESS_STATUS_PENDING)
+                | Q(sps_pkg_status=tracker_choices.PROGRESS_STATUS_BLOCKED)
             )
-        cls.objects.filter(
-            q,
-            xml_status=tracker_choices.PROGRESS_STATUS_DONE,
-            **params,
-        ).update(
+        cls.objects.filter(q, **params,).update(
             sps_pkg_status=tracker_choices.PROGRESS_STATUS_TODO,
         )
         return cls.objects.filter(
             sps_pkg_status=tracker_choices.PROGRESS_STATUS_TODO,
-            xml_status=tracker_choices.PROGRESS_STATUS_DONE,
             **params,
         ).iterator()
-
-    @classmethod
-    def items_to_publish_on_qa(cls, user, content_type, force_update=None, params=None):
-        """
-        ArtcleProc
-        """
-        params = params or {}
-        params["migrated_data__content_type"] = content_type
-        params["migration_status"] = tracker_choices.PROGRESS_STATUS_DONE
-        params["sps_pkg__isnull"] = False
-
-        q = Q(qa_ws_status=tracker_choices.PROGRESS_STATUS_REPROC)
-        if force_update:
-            q |= Q(qa_ws_status=tracker_choices.PROGRESS_STATUS_DONE) | Q(
-                qa_ws_status=tracker_choices.PROGRESS_STATUS_PENDING
-            )
-
-        cls.objects.filter(q, **params,).update(
-            qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO,
-        )
-        items = cls.objects.filter(
-            qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO, **params
-        )
-        return items.iterator()
-
-    @classmethod
-    def items_to_publish_on_public(
-        cls, user, content_type, force_update=None, params=None
-    ):
-        params = params or {}
-        params["migrated_data__content_type"] = content_type
-        params["sps_pkg__isnull"] = False
-        params["qa_ws_status"] = tracker_choices.PROGRESS_STATUS_DONE
-
-        q = Q(public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC)
-        if force_update:
-            q |= Q(public_ws_status=tracker_choices.PROGRESS_STATUS_DONE) | Q(
-                public_ws_status=tracker_choices.PROGRESS_STATUS_PENDING
-            )
-
-        cls.objects.filter(q, **params,).update(
-            public_ws_status=tracker_choices.PROGRESS_STATUS_TODO,
-        )
-        items = cls.objects.filter(
-            public_ws_status=tracker_choices.PROGRESS_STATUS_TODO, **params
-        )
-        return items.iterator()
 
     @property
     def renditions(self):
         return self.issue_proc.issue_files.filter(
             pkg_name=self.pkg_name, component_type="rendition"
         ).iterator()
-
-    def add_xml(self, user, source_path=None, xml_content=None):
-        if source_path:
-            with open(source_path) as fp:
-                xml_content = fp.read()
-        if xml_content:
-            self.save_file(self.pkg_name + ".xml", xml_content)
-            self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
-            self.save()
 
     @property
     def migrated_xml(self):
@@ -1139,24 +1123,6 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
 
     @property
     def translation_files(self):
-        logging.info(
-            dict(
-                component_type="html",
-                pkg_name=self.pkg_name,
-            )
-        )
-        items = self.issue_proc.issue_files.filter(
-            component_type="html",
-            pkg_name=self.pkg_name,
-        )
-        count = items.count()
-        logging.info(count)
-        if count > 0:
-            for item in self.issue_proc.issue_files.filter(
-                component_type="html",
-                pkg_name=self.pkg_name,
-            ):
-                logging.info(f"{self.pkg_name} {item.part} {item.original_path}")
         return self.issue_proc.issue_files.filter(
             component_type="html",
             pkg_name=self.pkg_name,
@@ -1178,191 +1144,7 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
             lang = item.lang
             xhtmls.setdefault(lang, {})
             xhtmls[lang][part[item.part]] = hc.content
-            logging.info(f"{lang} {part[item.part]}")
         return xhtmls
-
-    def build_sps_package(self, user, output_folder, components, texts):
-        """
-        A partir do XML original ou gerado a partir do HTML, e
-        dos ativos digitais, todos registrados em MigratedFile,
-        cria o zip com nome no padrão SPS (ISSN-ACRON-VOL-NUM-SUPPL-ARTICLE) e
-        o armazena em SPSPkg.not_optimised_zip_file.
-        Neste momento o XML não contém pid v3.
-        """
-        # gera nome de pacote padrão SPS ISSN-ACRON-VOL-NUM-SUPPL-ARTICLE
-        xml_with_pre = self.xml_with_pre
-        sps_pkg_name = xml_with_pre.sps_pkg_name
-
-        sps_pkg_zip_path = os.path.join(output_folder, f"{sps_pkg_name}.zip")
-
-        # cria pacote zip
-        with ZipFile(sps_pkg_zip_path, "w") as zf:
-
-            # A partir do XML, obtém os nomes dos arquivos dos ativos digitais
-            self._build_sps_package_add_assets(
-                zf, user, xml_with_pre, sps_pkg_name, components
-            )
-
-            # add renditions (pdf) to zip
-            result = self._build_sps_package_add_renditions(
-                zf, user, xml_with_pre, sps_pkg_name, components
-            )
-            texts.update(result)
-
-            # adiciona XML em zip
-            self._build_sps_package_add_xml(
-                zf, user, xml_with_pre, sps_pkg_name, components
-            )
-
-        return sps_pkg_zip_path
-
-    def _build_sps_package_add_renditions(
-        self, zf, user, xml_with_pre, sps_pkg_name, components
-    ):
-        xml = ArticleAndSubArticles(xml_with_pre.xmltree)
-        xml_langs = []
-        for item in xml.data:
-            if item.get("lang"):
-                xml_langs.append(item.get("lang"))
-
-        pdf_langs = []
-
-        for rendition in self.renditions:
-            try:
-                if rendition.lang:
-                    sps_filename = f"{sps_pkg_name}-{rendition.lang}.pdf"
-                else:
-                    sps_filename = f"{sps_pkg_name}.pdf"
-                pdf_langs.append(rendition.lang or xml.main_lang)
-
-                zf.write(rendition.file.path, arcname=sps_filename)
-
-                components[sps_filename] = {
-                    "lang": rendition.lang,
-                    "legacy_uri": rendition.original_href,
-                    "component_type": "rendition",
-                }
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                components[rendition.original_name] = {
-                    "failures": format_traceback(exc_traceback),
-                }
-        html_langs = list(self.translations.keys())
-        try:
-            if self.migrated_data.n_paragraphs:
-                html_langs.append(self.main_lang)
-        except Exception as e:
-            pass
-
-        return {
-            "xml_langs": xml_langs,
-            "pdf_langs": pdf_langs,
-            "html_langs": html_langs,
-        }
-
-    def _build_sps_package_add_assets(
-        self, zf, user, xml_with_pre, sps_pkg_name, components
-    ):
-        replacements = {}
-        subdir = os.path.join(
-            self.issue_proc.journal_proc.acron,
-            self.issue_proc.issue_folder,
-        )
-        xml_assets = ArticleAssets(xml_with_pre.xmltree)
-        for xml_graphic in xml_assets.items:
-            try:
-                if replacements.get(xml_graphic.xlink_href):
-                    continue
-
-                basename = os.path.basename(xml_graphic.xlink_href)
-                name, ext = os.path.splitext(basename)
-
-                found = False
-
-                # procura a "imagem" no contexto do "issue"
-                for asset in self.issue_proc.find_asset(basename, name):
-                    found = True
-                    self._build_sps_package_add_asset(
-                        zf,
-                        asset,
-                        xml_graphic,
-                        replacements,
-                        components,
-                        user,
-                        sps_pkg_name,
-                    )
-                if not found:
-                    # procura a "imagem" no contexto da coleção
-                    for asset in MigratedFile.find(
-                        collection=self.collection,
-                        xlink_href=xml_graphic.xlink_href,
-                        subidr=subdir,
-                    ):
-                        found = True
-                        self._build_sps_package_add_asset(
-                            zf,
-                            asset,
-                            xml_graphic,
-                            replacements,
-                            components,
-                            user,
-                            sps_pkg_name,
-                        )
-
-                if not found:
-                    components[xml_graphic.xlink_href] = {
-                        "failures": "Not found",
-                    }
-
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                components[xml_graphic.xlink_href] = {
-                    "failures": format_traceback(exc_traceback),
-                }
-        xml_assets.replace_names(replacements)
-
-    def _build_sps_package_add_asset(
-        self, zf, asset, xml_graphic, replacements, components, user, sps_pkg_name
-    ):
-        try:
-            # obtém o nome do arquivo no padrão sps
-            sps_filename = xml_graphic.name_canonical(sps_pkg_name)
-
-            # indica a troca de href original para o padrão SPS
-            replacements[xml_graphic.xlink_href] = sps_filename
-
-            # adiciona arquivo ao zip
-            zf.write(asset.file.path, arcname=sps_filename)
-
-            component_type = (
-                "supplementary-material"
-                if xml_graphic.is_supplementary_material
-                else "asset"
-            )
-            components[sps_filename] = {
-                "xml_elem_id": xml_graphic.id,
-                "legacy_uri": asset.original_href,
-                "component_type": component_type,
-            }
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            components[xml_graphic.xlink_href] = {
-                "failures": format_traceback(exc_traceback),
-            }
-
-    def _build_sps_package_add_xml(
-        self, zf, user, xml_with_pre, sps_pkg_name, components
-    ):
-        try:
-            sps_xml_name = sps_pkg_name + ".xml"
-            zf.writestr(sps_xml_name, xml_with_pre.tostring())
-            components[sps_xml_name] = {"component_type": "xml"}
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            components[sps_xml_name] = {
-                "component_type": "xml",
-                "failures": format_traceback(exc_traceback),
-            }
 
     def generate_sps_package(
         self,
@@ -1376,14 +1158,18 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
-            components = {}
-            texts = {}
             with TemporaryDirectory() as output_folder:
-                sps_pkg_zip_path = self.build_sps_package(
-                    user,
+
+                xml_with_pre = get_migrated_xml_with_pre(self.migrated_data)
+                logging.info(type(self.migrated_data))
+                builder = PkgZipBuilder(xml_with_pre)
+                sps_pkg_zip_path = builder.build_sps_package(
                     output_folder,
-                    components,
-                    texts,
+                    renditions=list(self.renditions),
+                    translations=self.translations,
+                    main_paragraphs_lang=self.migrated_data.n_paragraphs
+                    and self.main_lang,
+                    issue_proc=self.issue_proc,
                 )
 
                 # FIXME assumindo que isso será executado somente na migração
@@ -1395,40 +1181,40 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
                     sps_pkg_zip_path,
                     origin=package_choices.PKG_ORIGIN_MIGRATION,
                     is_public=True,
-                    components=components,
-                    texts=texts,
+                    original_pkg_components=builder.components,
+                    texts=builder.texts,
                     article_proc=self,
                 )
-
-            detail = dict(
-                texts=texts,
-                components=components,
-                is_pid_provider_synchronized=self.sps_pkg.is_pid_provider_synchronized,
+            self.update_sps_pkg_status()
+            operation.finish(
+                user,
+                completed=bool(self.sps_pkg and self.sps_pkg.is_complete),
+                detail=self.sps_pkg and self.sps_pkg.data or None,
             )
-            if (
-                self.sps_pkg.is_pid_provider_synchronized
-                and self.sps_pkg.valid_texts
-                and self.sps_pkg.valid_components
-            ):
-                self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DONE
-                self.save()
-                operation.finish(user, completed=True, detail=detail)
-            else:
-                self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_PENDING
-                self.save()
-                operation.finish(
-                    user, completed=False, detail=detail
-                )
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_PENDING
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
             operation.finish(
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
+                detail=self.sps_pkg and self.sps_pkg.data or None,
             )
+
+    def update_sps_pkg_status(self):
+        if not self.sps_pkg:
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
+        elif self.sps_pkg.is_complete:
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DONE
+        elif not self.sps_pkg.registered_in_core:
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
+        elif not self.sps_pkg.valid_components:
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
+        else:
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
+        self.save()
 
     @property
     def journal_proc(self):
@@ -1438,3 +1224,24 @@ class ArticleProc(BaseProc, BasicXMLFile, ClusterableModel):
     def article(self):
         if self.sps_pkg is not None:
             return Article.objects.get(sps_pkg=self.sps_pkg)
+
+    def synchronize(self, user):
+        try:
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DOING
+            self.save()
+
+            operation = self.start(user, "synchronize to core")
+            self.sps_pkg.synchronize(user, self)
+            operation.finish(
+                user, completed=self.sps_pkg.registered_in_core
+            )
+
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            self.save()
+            operation.finish(
+                user,
+                exc_traceback=exc_traceback,
+                exception=e,
+            )

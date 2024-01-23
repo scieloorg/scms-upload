@@ -10,8 +10,11 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.pid_provider.xml_sps_lib import (
     split_processing_instruction_doctype_declaration_and_xml,
+    XMLWithPre,
 )
 from scielo_classic_website.classic_ws import Document
+from scielo_classic_website.models.document import GenerateBodyAndBackFromHTMLError
+
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
@@ -19,7 +22,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from package.models import BasicXMLFile
-from proc.models import ArticleProc
+from migration.models import MigratedArticle
 # from tracker.models import EventLogger
 from tracker import choices as tracker_choices
 
@@ -59,11 +62,11 @@ def _fromstring(xml_content):
 
 def body_and_back_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
-    article_proc = instance.bb_parent.article_proc
+    migrated_article = instance.bb_parent.migrated_article
     pkg_path = (
-        f"{article_proc.issue_proc.journal_proc.acron}/"
-        f"{article_proc.issue_proc.issue_folder}/"
-        f"{article_proc.pkg_name}"
+        f"{migrated_article.document.journal.acronym}/"
+        f"{migrated_article.document.issue.issue_label}/"
+        f"{migrated_article.pkg_name}"
     )
     return f"migration/{pkg_path}/" f"bb/{filename}"
 
@@ -132,17 +135,17 @@ class BodyAndBackFile(BasicXMLFile, Orderable):
         except Exception as e:
             raise exceptions.CreateOrUpdateBodyAndBackFileError(
                 _(
-                    "Unable to create_or_update_body and back file {} {} {} {} {}"
+                    "Unable to create_or_update_body and back file {} {} {} {}"
                 ).format(bb_parent, version, type(e), e)
             )
 
 
 def generated_xml_report_directory_path(instance, filename):
-    article_proc = instance.article_proc
+    migrated_article = instance.migrated_article
     pkg_path = (
-        f"{article_proc.issue_proc.journal_proc.acron}/"
-        f"{article_proc.issue_proc.issue_folder}/"
-        f"{article_proc.pkg_name}"
+        f"{migrated_article.document.journal.acronym}/"
+        f"{migrated_article.document.issue.issue_label}/"
+        f"{migrated_article.pkg_name}"
     )
     return f"migration/{pkg_path}/html2xml_report/{filename}"
 
@@ -437,8 +440,8 @@ class Html2xmlAnalysis(models.Model):
 
 
 class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFile):
-    article_proc = models.ForeignKey(
-        ArticleProc, on_delete=models.SET_NULL, null=True, blank=True
+    migrated_article = models.ForeignKey(
+        MigratedArticle, on_delete=models.SET_NULL, null=True, blank=True
     )
     html2xml_status = models.CharField(
         _("Status"),
@@ -486,13 +489,13 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
     )
 
     def autocomplete_label(self):
-        return self.article_proc
+        return self.migrated_article
 
     class Meta:
         indexes = [
             models.Index(fields=["html2xml_status"]),
             models.Index(fields=["quality"]),
-            models.Index(fields=["article_proc"]),
+            models.Index(fields=["migrated_article"]),
         ]
 
     @property
@@ -502,29 +505,28 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
     @classmethod
     def get(
         cls,
-        article_proc=None,
+        migrated_article=None,
     ):
-        if article_proc:
-            return cls.objects.get(article_proc=article_proc)
-        raise ValueError("HTMLXML.get requires article_proc")
+        if migrated_article:
+            return cls.objects.get(migrated_article=migrated_article)
+        raise ValueError("HTMLXML.get requires migrated_article")
 
     @classmethod
     def create_or_update(
         cls,
         user,
-        article_proc,
+        migrated_article,
         html2xml_status=None,
         quality=None,
         n_references=None,
-        n_paragraphs=None,
         record_types=None,
     ):
         try:
-            obj = cls.get(article_proc)
+            obj = cls.get(migrated_article)
             obj.updated_by = user
         except cls.DoesNotExist:
             obj = cls()
-            obj.article_proc = article_proc
+            obj.migrated_article = migrated_article
             obj.creator = user
             obj.html2xml_status = tracker_choices.PROGRESS_STATUS_TODO
             obj.quality = choices.HTML2XML_QA_NOT_EVALUATED
@@ -532,7 +534,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         try:
             obj.html2xml_status = html2xml_status or obj.html2xml_status
             obj.quality = quality or obj.quality
-            obj.n_paragraphs = n_paragraphs or obj.n_paragraphs or 0
+            obj.n_paragraphs = migrated_article.n_paragraphs or 0
             obj.n_references = n_references or obj.n_references or 0
             obj.record_types = record_types or obj.record_types
             obj.save()
@@ -541,40 +543,8 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             raise exceptions.HTMLXMLCreateOrUpdateError(
                 _(
                     "Unable to create or update the record of the conversion of HTML to XML for {} {} {}"
-                ).format(article_proc, type(e), e)
+                ).format(migrated_article, type(e), e)
             )
-
-    @classmethod
-    def items_to_html2xml(
-        cls,
-        collection_acron,
-        force_update,
-    ):
-        """
-        Muda o status de REPROC para TODO
-        E se force_update = True, muda o status de DONE para TODO
-        """
-        params = {}
-        if collection_acron:
-            params["collection__acron"] = collection_acron
-        params[
-            "article_proc__issue_proc__files_status"
-        ] = tracker_choices.PROGRESS_STATUS_DONE
-        params["article_proc__migration_status"] = tracker_choices.PROGRESS_STATUS_DONE
-
-        # requirements
-        q = Q(html2xml_status=tracker_choices.PROGRESS_STATUS_REPROC)
-        if force_update:
-            q |= Q(html2xml_status=tracker_choices.PROGRESS_STATUS_DONE)
-
-        cls.objects.filter(q, **params,).update(
-            html2xml_status=tracker_choices.PROGRESS_STATUS_TODO,
-        )
-
-        return cls.objects.filter(
-            html2xml_status=tracker_choices.PROGRESS_STATUS_TODO,
-            **params,
-        ).iterator()
 
     @property
     def bb_files(self):
@@ -583,28 +553,34 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
     def html_to_xml(
         self,
         user,
+        article_proc,
         body_and_back_xml,
     ):
         try:
             self.html2xml_status = tracker_choices.PROGRESS_STATUS_DOING
-            self.html_translation_langs = "-".join(sorted(self.article_proc.translations.keys()))
-            self.pdf_langs = "-".join(sorted([item.lang or self.article_proc.main_lang for item in self.article_proc.renditions]))
+            self.html_translation_langs = "-".join(sorted(article_proc.translations.keys()))
+            self.pdf_langs = "-".join(sorted([item.lang or article_proc.main_lang for item in article_proc.renditions]))
             self.save()
 
-            document = Document(self.article_proc.migrated_data.data)
-            document._translated_html_by_lang = self.article_proc.translations
+            document = Document(article_proc.migrated_data.data)
+            document._translated_html_by_lang = article_proc.translations
 
-            self._generate_xml_body_and_back(user, document)
-            xml_content = self._generate_xml_from_html(user, document)
-            self.save_file(self.article_proc.pkg_name + ".xml", xml_content)
+            body_and_back = self._generate_xml_body_and_back(user, article_proc, document)
+            xml_content = self._generate_xml_from_html(user, article_proc, document)
 
-            self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
+            if xml_content and body_and_back:
+                self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
+            elif xml_content:
+                self.html2xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+            else:
+                self.html2xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
-            return xml_content
         except Exception as e:
-            self.html2xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+            self.html2xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
             raise e
+        self.generate_report(user, article_proc)
+        return xml_content
 
     @property
     def first_bb_file(self):
@@ -620,51 +596,66 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         except Exception as e:
             return ""
 
-    def generate_report(self, user, xml_content):
-        html = _fromstring(self.first_bb_file)
+    def generate_report(self, user, article_proc):
+        op = article_proc.start(user, "generate html xml report")
+        try:
+            html = _fromstring(self.first_bb_file)
 
-        xml = _fromstring(xml_content)
-        self.evaluate_xml(html, xml)
-        self.save_report(self.html_report_content(self.article_proc))
+            for xml_with_pre in XMLWithPre.create(path=self.file.path):
+                xml = xml_with_pre.xmltree
 
-        if self.attention_demands == 0:
-            self.quality = choices.HTML2XML_QA_AUTO_APPROVED
-        else:
-            self.quality = choices.HTML2XML_QA_NOT_EVALUATED
-        self.save()
+            self.evaluate_xml(html, xml)
+            self.save_report(self.html_report_content(title=article_proc))
 
-    def _generate_xml_body_and_back(self, user, document):
+            if self.attention_demands == 0:
+                self.quality = choices.HTML2XML_QA_AUTO_APPROVED
+            else:
+                self.quality = choices.HTML2XML_QA_NOT_EVALUATED
+            self.save()
+            op.finish(user, completed=True)
+        except Exception as e:
+            op.finish(user, completed=False, detail={"error": str(e)})
+
+    def _generate_xml_body_and_back(self, user, article_proc, document):
         """
         Generate XML body and back from html_translation_langs and p records
         """
         done = False
-        operation = self.article_proc.start(user, "generate xml body and back")
-
-        document.generate_body_and_back_from_html(document._translated_html_by_lang)
-
-        if not document.xml_body_and_back:
+        operation = article_proc.start(user, "generate xml body and back")
+        detail = {}
+        try:
+            document.generate_body_and_back_from_html(document._translated_html_by_lang)
+            done = True
+        except GenerateBodyAndBackFromHTMLError as e:
             # cria xml_body_and_back padrão
             document.xml_body_and_back = ["<article/>"]
+            detail = {"error": str(e)}
+            done = False
 
         # guarda cada versão de body/back
         if document.xml_body_and_back:
-            done = True
             for i, xml_body_and_back in enumerate(document.xml_body_and_back, start=1):
                 BodyAndBackFile.create_or_update(
                     user=user,
                     bb_parent=self,
                     version=i,
                     file_content=xml_body_and_back,
-                    pkg_name=self.article_proc.pkg_name,
+                    pkg_name=article_proc.pkg_name,
                 )
 
-        operation.finish(user, done)
+        operation.finish(user, done, detail=detail)
+        return done
 
-    def _generate_xml_from_html(self, user, document):
-        operation = self.article_proc.start(user, "_generate_xml_from_html")
-        # self.latest_bb_file
-        xml_content = document.generate_full_xml(None).decode("utf-8")
-        operation.finish(user, bool(xml_content))
+    def _generate_xml_from_html(self, user, article_proc, document):
+        operation = article_proc.start(user, "_generate_xml_from_html")
+        xml_content = None
+        detail = {}
+        try:
+            xml_content = document.generate_full_xml(None).decode("utf-8")
+            self.save_file(article_proc.pkg_name + ".xml", xml_content)
+        except Exception as e:
+            detail = {"error": str(e)}
+        operation.finish(user, bool(xml_content), detail=detail)
         return xml_content
 
     def save_report(self, content):
