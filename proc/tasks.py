@@ -287,7 +287,7 @@ def task_generate_sps_packages(
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "task": "proc.tasks.task_get_xmls",
+                "task": "proc.tasks.task_generate_sps_packages",
                 "user_id": user_id,
                 "username": username,
                 "collection_acron": collection_acron,
@@ -427,3 +427,47 @@ def task_create_or_update_article(
                 "username": username,
             },
         )
+
+
+@celery_app.task(bind=True)
+def task_synchronize_to_pid_provider(
+    self,
+    username=None,
+    user_id=None,
+):
+
+    for item in ArticleProc.objects.filter(
+        sps_pkg__isnull=False,
+        sps_pkg__registered_in_core=False,
+    ).iterator():
+        try:
+            subtask_synchronize_to_pid_provider.apply_async(
+                kwargs=dict(
+                    user_id=user_id,
+                    username=username,
+                    item_id=item.id,
+                )
+            )
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "task": "proc.tasks.task_synchronize_to_pid_provider",
+                    "user_id": user_id,
+                    "username": username,
+                },
+            )
+
+
+@celery_app.task(bind=True)
+def subtask_synchronize_to_pid_provider(
+    self,
+    username=None,
+    user_id=None,
+    item_id=None
+):
+    user = _get_user(user_id, username)
+    item = ArticleProc.objects.get(pk=item_id)
+    item.synchronize(user)
