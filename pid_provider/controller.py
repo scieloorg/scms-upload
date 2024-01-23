@@ -1,11 +1,12 @@
 import logging
 import sys
 
-# from django.utils.translation import gettext as _
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from pid_provider.base_pid_provider import BasePidProvider
 from pid_provider.client import PidProviderAPIClient
 from pid_provider.models import PidProviderXML
+from tracker.models import UnexpectedEvent
 
 
 class PidProvider(BasePidProvider):
@@ -16,7 +17,49 @@ class PidProvider(BasePidProvider):
     def __init__(self):
         self.pid_provider_api = PidProviderAPIClient()
 
-    def provide_pid_for_xml_with_pre(
+    def request_pid_for_xml_zip(
+        self,
+        zip_xml_file_path,
+        user,
+        filename=None,
+        origin_date=None,
+        force_update=None,
+        is_published=None,
+    ):
+        try:
+            for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
+                yield self.request_pid_for_xml_with_pre(
+                    xml_with_pre,
+                    xml_with_pre.filename,
+                    user,
+                    origin_date=origin_date,
+                    force_update=force_update,
+                    is_published=is_published,
+                    origin=zip_xml_file_path,
+                )
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                exception=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "operation": "PidProvider.request_pid_for_xml_zip",
+                    "input": dict(
+                        zip_xml_file_path=zip_xml_file_path,
+                        user=user.username,
+                        filename=filename,
+                        origin_date=origin_date,
+                        force_update=force_update,
+                        is_published=is_published,
+                    ),
+                },
+            )
+            yield {
+                "error_msg": f"Unable to provide pid for {zip_xml_file_path} {e}",
+                "error_type": str(type(e)),
+            }
+
+    def request_pid_for_xml_with_pre(
         self,
         xml_with_pre,
         name,
@@ -27,89 +70,70 @@ class PidProvider(BasePidProvider):
         origin=None,
     ):
         """
-        Recebe um xml_with_pre para solicitar o PID da versão 3
+        Recebe um xml_with_pre para solicitar o PID v3
         """
         v3 = xml_with_pre.v3
-        logging.info("")
-        logging.info(f"xml_with_pre.v3: {xml_with_pre.v3}")
-        resp = self.pre_registration(xml_with_pre, name)
+        logging.info(".................................")
+        logging.info(f"PidProvider.request_pid_for_xml_with_pre: {xml_with_pre.v3}")
 
-        if not resp["registered_in_upload"]:
+        registered = PidProvider.get_registration_demand(xml_with_pre)
+        if registered.get("error_type"):
+            return registered
+
+        self.core_registration(xml_with_pre, registered)
+
+        if not registered["registered_in_upload"]:
             # não está registrado em Upload, realizar registro
-            registered = PidProviderXML.register(
+            resp = self.provide_pid_for_xml_with_pre(
                 xml_with_pre,
-                name,
+                xml_with_pre.filename,
                 user,
                 origin_date=origin_date,
                 force_update=force_update,
                 is_published=is_published,
                 origin=origin,
-                registered_in_core=resp.get("registered_in_core"),
+                registered_in_core=registered.get("registered_in_core"),
             )
-            logging.info(f"PidProviderXML.register xml_with_pre.v3: {xml_with_pre.v3}")
-            registered = registered or {}
-            resp["registered_in_upload"] = bool(registered.get("v3"))
-            resp.update(registered)
-            logging.info(f"PidProviderXML.register registered: {registered}")
-            logging.info(f"PidProviderXML.register resp: {resp}")
+            logging.info(f"upload registration: {resp}")
+            resp.pop("registered_in_core")
+            registered["registered_in_upload"] = bool(resp.get("v3"))
+            registered.update(resp)
+            logging.info(f"registered: {registered}")
 
-        resp["synchronized"] = (
-            resp["registered_in_core"] and resp["registered_in_upload"]
+        registered["synchronized"] = (
+            registered["registered_in_core"] and registered["registered_in_upload"]
         )
-        resp["xml_with_pre"] = xml_with_pre
-        resp["filename"] = name
-        logging.info(f"PidProvider.provide_pid_for_xml_with_pre: resp={resp}")
-        logging.info(f"PidProvider.provide_pid_for_xml_with_pre: v3={xml_with_pre.v3}")
-        return resp
+        registered["xml_with_pre"] = xml_with_pre
+        registered["filename"] = name
+        logging.info(f"registered={registered}")
+        logging.info(f"v3={xml_with_pre.v3}")
+        return registered
 
-    def pre_registration(self, xml_with_pre, name):
+    @staticmethod
+    def get_registration_demand(xml_with_pre):
         """
-        Verifica a necessidade de registro no Upload e/ou Core
-        Se aplicável, faz registro no Core
-        Se aplicável, informa necessidade de registro no Upload
+        Obtém a indicação de demanda de registro no Upload e/ou Core
 
         Returns
         -------
-        {'filename': '1518-8787-rsp-38-suppl-65.xml',
-        'origin': '/app/core/media/1518-8787-rsp-38-suppl-65_wScfJap.zip',
-        'v3': 'Lfh9K7RWn4Wt9XFfx3dY8vj',
-        'v2': 'S0034-89102004000700010',
-        'aop_pid': None,
-        'pkg_name': '1518-8787-rsp-38-suppl-65',
-        'created': '2024-01-16T19:35:21.454225+00:00',
-        'updated': '2024-01-18T21:33:11.805681+00:00',
-        'record_status': 'updated',
-        'xml_changed': False}
-
-        ou
-
-        {"error_type": "ERROR ..."}
+        {"registered_in_upload": boolean, "registered_in_core": boolean}
 
         """
-        # retorna os dados se está registrado e é igual a xml_with_pre
-        logging.info(f"xml_with_pre.v3 inicio: {xml_with_pre.v3}")
-        registered = PidProviderXML.is_registered(xml_with_pre)
-
-        if registered.get("error_type"):
-            return registered
-
-        registered = registered or {}
-
-        pid_v3 = registered.get("v3")
-
-        registered["registered_in_upload"] = bool(pid_v3)
+        registered = PidProviderXML.is_registered(xml_with_pre) or {}
+        registered["registered_in_upload"] = bool(registered.get("v3"))
         registered["registered_in_core"] = registered.get("registered_in_core")
+        logging.info(f"PidProvider.get_registration_demand: {registered}")
+        return registered
 
-        logging.info(f"PidProviderXML situacao: {registered}")
-
+    def core_registration(self, xml_with_pre, registered):
+        """
+        Solicita PID v3 para o Core, se necessário
+        """
         if not registered["registered_in_core"]:
-            # registra em Core
-            response = self.pid_provider_api.provide_pid(xml_with_pre, name)
-            logging.info(f"core pid provider xml_with_pre.v3: {xml_with_pre.v3}")
-            if response.get("v3"):
-                # está registrado em core
-                registered.update(response)
-                registered["registered_in_core"] = True
-
-                logging.info(f"PidProviderXML situacao apos core: {registered}")
+            response = self.pid_provider_api.provide_pid(
+                xml_with_pre, xml_with_pre.filename)
+            response = response or {}
+            registered.update(response)
+            registered["registered_in_core"] = bool(response.get("v3"))
+            logging.info(f"PidProvider.core_registration: {registered}")
         return registered
