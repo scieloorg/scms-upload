@@ -186,7 +186,12 @@ class DocumentRecordsImporter:
                     self.journal_issue_and_doc_data["issue"] = doc_records[0]
                     continue
 
-                migrated.append(self.import_document_records(doc_id, doc_records))
+                article_proc = self.import_document_records(doc_id, doc_records)
+                migrated.append({
+                    "pid": article_proc.pid,
+                    "pkg_name": article_proc.pkg_name,
+                    "records": list(article_proc.migrated_data.document.document_records.stats),
+                })
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 failures.append(
