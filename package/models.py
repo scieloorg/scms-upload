@@ -29,12 +29,11 @@ from collection.models import Language
 from core.models import CommonControlField
 from files_storage.models import FileLocation, MinioConfiguration
 from package import choices
-from pid_provider.controller import PidProvider
-from pid_provider.models import PidProviderXML
+from pid_provider.requester import PidRequester
 from tracker.models import UnexpectedEvent
 
 
-pid_provider_app = PidProvider()
+pid_provider_app = PidRequester()
 
 
 class SPSPkgOptimizeError(Exception):
