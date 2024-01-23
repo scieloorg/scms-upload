@@ -10,16 +10,16 @@ from article.models import Article
 from wagtail.admin.navigation import get_site_for_user
 
 
-@hooks.register("insert_global_admin_css", order=100)
-def global_admin_css():
-    """Add /static/css/custom.css to the admin."""
-    return format_html('<link rel="stylesheet" href="{}">', static("css/custom.css"))
+# @hooks.register("insert_global_admin_css", order=100)
+# def global_admin_css():
+#     """Add /static/css/custom.css to the admin."""
+#     return format_html('<link rel="stylesheet" href="{}">', static("css/custom.css"))
 
 
-@hooks.register("insert_global_admin_js", order=100)
-def global_admin_js():
-    """Add /static/css/custom.js to the admin."""
-    return format_html('<script src="{}"></script>', static("/js/custom.js"))
+# @hooks.register("insert_global_admin_js", order=100)
+# def global_admin_js():
+#     """Add /static/css/custom.js to the admin."""
+#     return format_html('<script src="{}"></script>', static("/js/custom.js"))
 
 
 @hooks.register("construct_homepage_summary_items", order=1)
