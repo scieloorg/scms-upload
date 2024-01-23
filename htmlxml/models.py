@@ -13,6 +13,8 @@ from packtools.sps.pid_provider.xml_sps_lib import (
     XMLWithPre,
 )
 from scielo_classic_website.classic_ws import Document
+from scielo_classic_website.models.document import GenerateBodyAndBackFromHTMLError
+
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
@@ -563,16 +565,22 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             document = Document(article_proc.migrated_data.data)
             document._translated_html_by_lang = article_proc.translations
 
-            self._generate_xml_body_and_back(user, article_proc, document)
-            self._generate_xml_from_html(user, article_proc, document)
+            body_and_back = self._generate_xml_body_and_back(user, article_proc, document)
+            xml_content = self._generate_xml_from_html(user, article_proc, document)
 
-            self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
+            if xml_content and body_and_back:
+                self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
+            elif xml_content:
+                self.html2xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+            else:
+                self.html2xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
         except Exception as e:
-            self.html2xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+            self.html2xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
             raise e
         self.generate_report(user, article_proc)
+        return xml_content
 
     @property
     def first_bb_file(self):
@@ -589,19 +597,24 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             return ""
 
     def generate_report(self, user, article_proc):
-        html = _fromstring(self.first_bb_file)
+        op = article_proc.start(user, "generate html xml report")
+        try:
+            html = _fromstring(self.first_bb_file)
 
-        for xml_with_pre in XMLWithPre.create(path=self.file.path):
-            xml = xml_with_pre.xmltree
+            for xml_with_pre in XMLWithPre.create(path=self.file.path):
+                xml = xml_with_pre.xmltree
 
-        self.evaluate_xml(html, xml)
-        self.save_report(self.html_report_content(title=article_proc))
+            self.evaluate_xml(html, xml)
+            self.save_report(self.html_report_content(title=article_proc))
 
-        if self.attention_demands == 0:
-            self.quality = choices.HTML2XML_QA_AUTO_APPROVED
-        else:
-            self.quality = choices.HTML2XML_QA_NOT_EVALUATED
-        self.save()
+            if self.attention_demands == 0:
+                self.quality = choices.HTML2XML_QA_AUTO_APPROVED
+            else:
+                self.quality = choices.HTML2XML_QA_NOT_EVALUATED
+            self.save()
+            op.finish(user, completed=True)
+        except Exception as e:
+            op.finish(user, completed=False, detail={"error": str(e)})
 
     def _generate_xml_body_and_back(self, user, article_proc, document):
         """
@@ -609,16 +622,18 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         """
         done = False
         operation = article_proc.start(user, "generate xml body and back")
-
-        document.generate_body_and_back_from_html(document._translated_html_by_lang)
-
-        if not document.xml_body_and_back:
+        detail = {}
+        try:
+            document.generate_body_and_back_from_html(document._translated_html_by_lang)
+            done = True
+        except GenerateBodyAndBackFromHTMLError as e:
             # cria xml_body_and_back padrão
             document.xml_body_and_back = ["<article/>"]
+            detail = {"error": str(e)}
+            done = False
 
         # guarda cada versão de body/back
         if document.xml_body_and_back:
-            done = True
             for i, xml_body_and_back in enumerate(document.xml_body_and_back, start=1):
                 BodyAndBackFile.create_or_update(
                     user=user,
@@ -628,14 +643,20 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                     pkg_name=article_proc.pkg_name,
                 )
 
-        operation.finish(user, done)
+        operation.finish(user, done, detail=detail)
+        return done
 
     def _generate_xml_from_html(self, user, article_proc, document):
         operation = article_proc.start(user, "_generate_xml_from_html")
-        # self.latest_bb_file
-        xml_content = document.generate_full_xml(None).decode("utf-8")
-        self.save_file(article_proc.pkg_name + ".xml", xml_content)
-        operation.finish(user, bool(xml_content))
+        xml_content = None
+        detail = {}
+        try:
+            xml_content = document.generate_full_xml(None).decode("utf-8")
+            self.save_file(article_proc.pkg_name + ".xml", xml_content)
+        except Exception as e:
+            detail = {"error": str(e)}
+        operation.finish(user, bool(xml_content), detail=detail)
+        return xml_content
 
     def save_report(self, content):
         # content = json.dumps(data)
