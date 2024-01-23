@@ -390,6 +390,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
             models.Index(fields=["registered_in_core"]),
         ]
 
+    autocomplete_search_field = "sps_pkg_name"
+
     def autocomplete_label(self):
         return f"{self.sps_pkg_name} {self.pid_v3}"
 
@@ -466,7 +468,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
             obj.generate_article_html_page(user)
 
-            obj.validate()
+            obj.validate(True)
 
             logging.info(f"Depois de criar sps_pkg.pid_v3: {obj.pid_v3}")
             article_proc.update_sps_pkg_status()
@@ -538,11 +540,11 @@ class SPSPkg(CommonControlField, ClusterableModel):
             response = None
             operation = None
 
-            for response in pid_provider_app.provide_pid_for_xml_zip(
+            for response in pid_provider_app.request_pid_for_xml_zip(
                 zip_xml_file_path, user, is_published=is_public
             ):
                 logging.info(f"package response: {response}")
-                operation = article_proc.start(user, "provide_pid_for_xml_zip")
+                operation = article_proc.start(user, "request_pid_for_xml_zip")
 
                 xml_with_pre = response.pop("xml_with_pre")
 
@@ -726,7 +728,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         zip_xml_file_path = self.file.path
 
         logging.info(f"Synchronize {zip_xml_file_path}")
-        for response in pid_provider_app.provide_pid_for_xml_zip(
+        for response in pid_provider_app.request_pid_for_xml_zip(
             zip_xml_file_path, user, is_published=self.is_public
         ):
             if not response["synchronized"]:
