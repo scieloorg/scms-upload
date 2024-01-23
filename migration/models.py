@@ -528,3 +528,8 @@ class MigratedArticle(MigratedData):
     @property
     def pkg_name(self):
         return self.document.filename_without_extension
+
+    @property
+    def path(self):
+        document = self.document
+        return f"{document.journal.acronym}/{document.issue.issue_label}/{document.filename_without_extension}"

@@ -88,13 +88,9 @@ class PreviewArticlePageFileSaveError(Exception):
 
 def basic_xml_directory_path(instance, filename):
     try:
-        pid = instance.pid
-        subdir = os.path.join(pid[1:10], pid[10:14], pid[14:18], pid[18:])
+        return f"{instance.directory_path}/{filename}"
     except AttributeError:
-        # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
-        name, ext = os.path.splitext(filename)
-        subdir = f"{name[0]}/{name[-1]}"
-    return f"package/xml/{subdir}/{filename}"
+        return f"package/xml/{filename}"
 
 
 class BasicXMLFile(models.Model):
@@ -153,12 +149,15 @@ class BasicXMLFile(models.Model):
 
 
 def pkg_directory_path(instance, filename):
-    try:
-        sps_pkg_name = instance.sps_pkg_name
-    except AttributeError:
-        sps_pkg_name = instance.sps_pkg.sps_pkg_name
+    sps_pkg_name = instance.sps_pkg_name
     subdir = "/".join(sps_pkg_name.split("-"))
-    return f"pkg/{subdir}/{filename}"
+    return f"sps_pkg/{subdir}/{filename}"
+
+
+def preview_page_directory_path(instance, filename):
+    sps_pkg_name = instance.sps_pkg.sps_pkg_name
+    subdir = "/".join(sps_pkg_name.split("-"))
+    return f"sps_pkg/{subdir}/{filename}"
 
 
 class SPSPkgComponent(FileLocation, Orderable):
@@ -255,7 +254,7 @@ class PreviewArticlePage(Orderable):
     # - uri = models.URLField(_("URI"), null=True, blank=True)
     sps_pkg = ParentalKey("SPSPkg", related_name="article_page")
     lang = models.ForeignKey(Language, null=True, blank=True, on_delete=models.SET_NULL)
-    file = models.FileField(upload_to=pkg_directory_path, null=True, blank=True)
+    file = models.FileField(upload_to=preview_page_directory_path, null=True, blank=True)
 
     panels = [
         FieldPanel("lang"),
