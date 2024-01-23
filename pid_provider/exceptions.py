@@ -2,10 +2,6 @@ class APIPidProviderPostError(Exception):
     ...
 
 
-class PidProviderXMLContentError(Exception):
-    ...
-
-
 class ForbiddenPidProviderXMLRegistrationError(Exception):
     ...
 
