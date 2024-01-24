@@ -3,9 +3,11 @@ import logging
 import sys
 from datetime import datetime
 
+from django.core.files.base import ContentFile
 from django.db import models, IntegrityError
 from django.db.models import Q
 from django.utils.translation import gettext as _
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from packtools.sps.pid_provider import v3_gen, xml_sps_adapter
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -25,13 +27,25 @@ LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
+class XMLVersionXmlWithPreError(Exception):
+    ...
+
+
+class XMLVersionLatestError(Exception):
+    ...
+
+
+class XMLVersionGetError(Exception):
+    ...
+
+
 def utcnow():
     return datetime.utcnow()
     # return datetime.utcnow().isoformat().replace("T", " ") + "Z"
 
 
 def xml_directory_path(instance, filename):
-    sps_pkg_name = instance.xml_with_pre.sps_pkg_name
+    sps_pkg_name = instance.pid_provider_xml.pkg_name
     subdirs = sps_pkg_name.split("-")
     subdir_sps_pkg_name = "/".join(subdirs)
     return (
@@ -71,11 +85,11 @@ class XMLVersion(CommonControlField):
             obj.finger_print = xml_with_pre.finger_print
             obj.creator = user
             obj.save()
-            obj.save_file(f"{pid_provider_xml.v3}.xml", xml_with_pre.get_zip_content(f"{sps_pkg_name}.xml"))
+            obj.save_file(f"{pid_provider_xml.v3}.xml", xml_with_pre.tostring())
             obj.save()
             return obj
         except IntegrityError:
-            return cls.get(pid_provider_xml, finger_print)
+            return cls.get(pid_provider_xml, xml_with_pre.finger_print)
 
     def save_file(self, filename, content):
         self.file.save(filename, ContentFile(content))
@@ -708,18 +722,12 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             # exceptions.NotEnoughParametersToGetDocumentRecordError,
             # exceptions.InvalidPidError,
             # outras
-            try:
-                detail = {}
-                if ":" not in origin:
-                    detail["xml"] = xml_adapter.tostring()
-            except Exception as x:
-                pass
             pid_request = PidRequest.register_failure(
                 e,
                 user=user,
                 origin_date=origin_date,
                 origin=origin,
-                detail=detail,
+                detail={},
             )
             response = input_data
             response.update(pid_request.data)
@@ -758,6 +766,8 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         registered._add_data(xml_adapter, user)
         registered._add_journal(xml_adapter)
         registered._add_issue(xml_adapter)
+
+        registered.save()
         registered._add_current_version(xml_adapter, user)
 
         registered.save()
