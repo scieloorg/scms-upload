@@ -9,7 +9,7 @@ from pid_provider.models import PidProviderXML
 from tracker.models import UnexpectedEvent
 
 
-class PidProvider(BasePidProvider):
+class PidRequester(BasePidProvider):
     """
     Recebe XML para validar ou atribuir o ID do tipo v3
     """
@@ -43,7 +43,7 @@ class PidProvider(BasePidProvider):
                 exception=e,
                 exc_traceback=exc_traceback,
                 detail={
-                    "operation": "PidProvider.request_pid_for_xml_zip",
+                    "operation": "PidRequester.request_pid_for_xml_zip",
                     "input": dict(
                         zip_xml_file_path=zip_xml_file_path,
                         user=user.username,
@@ -74,9 +74,9 @@ class PidProvider(BasePidProvider):
         """
         v3 = xml_with_pre.v3
         logging.info(".................................")
-        logging.info(f"PidProvider.request_pid_for_xml_with_pre: {xml_with_pre.v3}")
+        logging.info(f"PidRequester.request_pid_for_xml_with_pre: {xml_with_pre.v3}")
 
-        registered = PidProvider.get_registration_demand(xml_with_pre)
+        registered = PidRequester.get_registration_demand(xml_with_pre)
         if registered.get("error_type"):
             return registered
 
@@ -95,9 +95,9 @@ class PidProvider(BasePidProvider):
                 registered_in_core=registered.get("registered_in_core"),
             )
             logging.info(f"upload registration: {resp}")
-            resp.pop("registered_in_core")
-            registered["registered_in_upload"] = bool(resp.get("v3"))
             registered.update(resp)
+            logging.info(f"registered: {registered}")
+            registered["registered_in_upload"] = bool(resp.get("v3"))
             logging.info(f"registered: {registered}")
 
         registered["synchronized"] = (
@@ -122,18 +122,21 @@ class PidProvider(BasePidProvider):
         registered = PidProviderXML.is_registered(xml_with_pre) or {}
         registered["registered_in_upload"] = bool(registered.get("v3"))
         registered["registered_in_core"] = registered.get("registered_in_core")
-        logging.info(f"PidProvider.get_registration_demand: {registered}")
+        logging.info(f"PidRequester.get_registration_demand: {registered}")
         return registered
 
     def core_registration(self, xml_with_pre, registered):
         """
         Solicita PID v3 para o Core, se necessário
         """
+        if not self.pid_provider_api.enabled:
+            return registered
+
         if not registered["registered_in_core"]:
             response = self.pid_provider_api.provide_pid(
                 xml_with_pre, xml_with_pre.filename)
             response = response or {}
             registered.update(response)
             registered["registered_in_core"] = bool(response.get("v3"))
-            logging.info(f"PidProvider.core_registration: {registered}")
+            logging.info(f"PidRequester.core_registration: {registered}")
         return registered

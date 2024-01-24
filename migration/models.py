@@ -297,7 +297,7 @@ class MigratedData(CommonControlField):
 def migrated_files_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
 
-    return f"migration/{instance.collection.acron}/{instance.original_path}"
+    return f"classic_website/{instance.collection.acron}/{instance.original_path}"
 
 
 class MigratedFile(CommonControlField):
@@ -528,3 +528,8 @@ class MigratedArticle(MigratedData):
     @property
     def pkg_name(self):
         return self.document.filename_without_extension
+
+    @property
+    def path(self):
+        document = self.document
+        return f"{document.journal.acronym}/{document.issue.issue_label}/{document.filename_without_extension}"
