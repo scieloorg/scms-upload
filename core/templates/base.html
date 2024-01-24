@@ -11,16 +11,14 @@
   <meta name="description" content="Project that contains a generic template for content management SciELO context.">
   <meta name="author" content="Jamil Atta Junior">
 
-  <link rel="icon" href="{% static 'images/favicons/favicon.ico' %}">
 
   {% block css %}
 
   <!-- Design System da SciELO. -->
-  <link rel="stylesheet" href="{% static 'css/bootstrap.css' %}">
 
-  <!-- Your stuff: Third-party CSS libraries go here -->{% compress css %}
+  <!-- Your stuff: Third-party CSS libraries go here -->
   <!-- This file stores project-specific CSS -->
-  <link href="{% static 'css/project.css' %}" rel="stylesheet">{% endcompress %}
+>
   {% endblock %}
 
   <!-- Wagtail convention -->
@@ -32,15 +30,12 @@
   {# Placed at the top of the document so pages load faster with defer #}
   {% block javascript %}
   <!-- Design System da SciELO JS -->
-  <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
-  <script src="{% static 'js/scielo-ds-min.js' %}"></script>
+
 
   <!-- Your stuff: Third-party javascript libraries go here -->
 
   <!-- place project specific Javascript in this file -->
-  {% compress js %}
-    <script defer src="{% static 'js/project.js' %}"></script>
-  {% endcompress %}
+
 
   {% endblock javascript %}
 
