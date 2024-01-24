@@ -60,7 +60,7 @@ minio==7.2
 # Upload
 # ------------------------------------------------------------------------------
 lxml==4.9.3 # https://github.com/lxml/lxml
--e git+https://github.com/scieloorg/packtools#egg=packtools
+-e git+https://github.com/scieloorg/packtools.git@3.3.0#egg=packtools
 -e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
 
 # DSM Publication

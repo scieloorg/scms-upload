@@ -44,6 +44,10 @@ class SPSPkgAddPidV3ToZipFileError(Exception):
     ...
 
 
+class AddPidV3ToXMLFileError(Exception):
+    ...
+
+
 def now():
     return datetime.utcnow().isoformat().replace(":", "-").replace(".", "-")
 
