@@ -2,10 +2,7 @@ version: '3'
 
 services:
   django: &django
-    build:
-      context: .
-      dockerfile: ./compose/production/django/Dockerfile
-    image: upload_production_django
+    image: infrascielo/upload
     container_name: upload_production_django
     platform: linux/x86_64
     depends_on:
@@ -26,20 +23,6 @@ services:
           - ./nginx/logs:/var/log/nginx/
       ports:
           - "80:80"
-
-  pgbouncer:
-    image: edoburu/pgbouncer:1.14.0
-    container_name: upload_production_pgbouncer
-    restart: always
-    environment:
-      - DATABASE_URL=postgres://GVRFlLmcCNfGLhsFvSnCioYOPJPYpyfj:BQ4hSUL4rdj5WZLdR8ilDLRQMvCtzo0caMaXDO0olGsmycQjlcZlTVK9DepZR8kk@postgres/uploaddb
-      - MAX_CLIENT_CONN=100
-    ports:
-      - 6434:5432
-    depends_on:
-      - postgres
-    links:
-      - postgres
 
   postgres:
     build:
