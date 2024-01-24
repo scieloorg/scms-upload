@@ -95,9 +95,9 @@ class PidRequester(BasePidProvider):
                 registered_in_core=registered.get("registered_in_core"),
             )
             logging.info(f"upload registration: {resp}")
-            resp.pop("registered_in_core")
-            registered["registered_in_upload"] = bool(resp.get("v3"))
             registered.update(resp)
+            logging.info(f"registered: {registered}")
+            registered["registered_in_upload"] = bool(resp.get("v3"))
             logging.info(f"registered: {registered}")
 
         registered["synchronized"] = (
@@ -129,6 +129,9 @@ class PidRequester(BasePidProvider):
         """
         Solicita PID v3 para o Core, se necessário
         """
+        if not self.pid_provider_api.enabled:
+            return registered
+
         if not registered["registered_in_core"]:
             response = self.pid_provider_api.provide_pid(
                 xml_with_pre, xml_with_pre.filename)
