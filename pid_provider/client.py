@@ -43,6 +43,12 @@ class PidProviderAPIClient:
         self.token = None
 
     @property
+    def enabled(self):
+        if self.config:
+            return bool(self.config.api_username and self.config.api_password)
+        return False
+
+    @property
     def config(self):
         if not hasattr(self, "_config") or not self._config:
             try:
