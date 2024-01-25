@@ -18,7 +18,7 @@ def _get_user(user_id, username):
 
 @celery_app.task(bind=True)
 def task_start(
-    self, user_id=None, username=None, file_path=None, enable=None,
+    self, user_id=None, username=None, file_path=None, enable=False,
     config=None
 ):
     user = _get_user(user_id, username)
