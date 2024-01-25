@@ -549,7 +549,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             operation = None
 
             for response in pid_provider_app.request_pid_for_xml_zip(
-                zip_xml_file_path, user, is_published=is_public
+                zip_xml_file_path, user, is_published=is_public, article_proc=article_proc,
             ):
                 logging.info(f"package response: {response}")
                 operation = article_proc.start(user, "request_pid_for_xml_zip")
