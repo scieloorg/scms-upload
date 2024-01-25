@@ -13,7 +13,7 @@ User = get_user_model()
 def setup(user, file_path=None, config=None):
 
     if config:
-        data = json.loads(config)
+        data = config
     else:
         try:
             file_path = file_path or "./bigbang/.envs/.bigbang"
