@@ -37,7 +37,7 @@ from migration.models import (
     MigratedIssue,
     MigratedJournal,
 )
-from migration.controller import PkgZipBuilder, get_migrated_xml_with_pre
+from migration.controller import PkgZipBuilder, get_migrated_xml_with_pre, XMLVersionXmlWithPreError
 from package import choices as package_choices
 from package.models import SPSPkg
 from proc import exceptions
@@ -1151,7 +1151,6 @@ class ArticleProc(BaseProc, ClusterableModel):
     ):
         try:
             operation = self.start(user, "generate_sps_package")
-
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 

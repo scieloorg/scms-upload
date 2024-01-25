@@ -479,10 +479,22 @@ class PkgZipBuilder:
 
 
 def get_migrated_xml_with_pre(article_proc):
+    origin = None
     try:
-        xml_file_path = HTMLXML.get(migrated_article=article_proc.migrated_data).file.path
+        obj = HTMLXML.get(migrated_article=article_proc.migrated_data)
+        origin = "html"
     except HTMLXML.DoesNotExist:
-        xml_file_path = article_proc.migrated_xml.file.path
+        obj = article_proc.migrated_xml
+        origin = "xml"
 
-    for item in XMLWithPre.create(path=xml_file_path):
-        return item
+    try:
+        xml_file_path = None
+        xml_file_path = obj.file.path
+        for item in XMLWithPre.create(path=xml_file_path):
+            return item
+    except Exception as e:
+        raise XMLVersionXmlWithPreError(
+            _("Unable to get xml with pre from migrated article ({}) {}: {} {}").format(
+                origin, xml_file_path, type(e), e
+            )
+        )
