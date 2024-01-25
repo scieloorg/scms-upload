@@ -79,7 +79,6 @@ class XMLVersion(CommonControlField):
         xml_with_pre,
     ):
         try:
-            logging.info(f"XMLVersion.create {xml_with_pre.finger_print}")
             obj = cls()
             obj.pid_provider_xml = pid_provider_xml
             obj.finger_print = xml_with_pre.finger_print
@@ -89,13 +88,11 @@ class XMLVersion(CommonControlField):
                 f"{pid_provider_xml.v3}.xml", xml_with_pre.tostring(pretty_print=True)
             )
             obj.save()
-            logging.info(f"XMLVersion saved {xml_with_pre.finger_print}")
             return obj
         except IntegrityError:
             return cls.get(pid_provider_xml, xml_with_pre.finger_print)
 
     def save_file(self, filename, content):
-        logging.info(filename)
         self.file.save(filename, ContentFile(content))
 
     @property
@@ -138,11 +135,7 @@ class XMLVersion(CommonControlField):
             )
 
         latest = cls.latest(pid_provider_xml)
-        logging.info(f"latest: {latest}")
-        logging.info(f"latest.finger_print: {latest.finger_print}")
-        logging.info(f"finger_print: {finger_print}")
         if latest.finger_print == finger_print:
-            logging.info("got")
             return latest
         raise cls.DoesNotExist(f"{pid_provider_xml} {finger_print}")
 
@@ -1237,7 +1230,6 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         xml_with_pre : XMLWithPre
 
         """
-        logging.info("PidProviderXML.check_registration_demand")
         xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
 
         try:
