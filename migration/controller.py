@@ -468,7 +468,7 @@ class PkgZipBuilder:
     def _build_sps_package_add_xml(self, zf):
         try:
             sps_xml_name = self.sps_pkg_name + ".xml"
-            zf.writestr(sps_xml_name, self.xml_with_pre.tostring())
+            zf.writestr(sps_xml_name, self.xml_with_pre.tostring(pretty_print=True))
             self.components[sps_xml_name] = {"component_type": "xml"}
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -478,14 +478,18 @@ class PkgZipBuilder:
             }
 
 
-def get_migrated_xml_with_pre(migrated_article):
+def get_migrated_xml_with_pre(article_proc):
+    origin = None
     try:
-        xml_file_path = HTMLXML.get(migrated_article=migrated_article).file.path
-        origin = "HTML"
+        obj = HTMLXML.get(migrated_article=article_proc.migrated_data)
+        origin = "html"
     except HTMLXML.DoesNotExist:
-        xml_file_path = self.migrated_xml.file.path
-        origin = "XML"
+        obj = article_proc.migrated_xml
+        origin = "xml"
+
     try:
+        xml_file_path = None
+        xml_file_path = obj.file.path
         for item in XMLWithPre.create(path=xml_file_path):
             return item
     except Exception as e:

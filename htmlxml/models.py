@@ -55,7 +55,6 @@ def format_code(cols):
 
 
 def _fromstring(xml_content):
-    logging.info(f"_fromstring {type(xml_content)}")
     pref, xml = split_processing_instruction_doctype_declaration_and_xml(xml_content)
     return etree.fromstring(xml)
 
@@ -281,7 +280,7 @@ class Html2xmlAnalysis(models.Model):
         yield "</div>"
 
     def tostring(self, node):
-        return etree.tostring(node, encoding="utf-8").decode("utf-8")
+        return etree.tostring(node, encoding="utf-8", pretty_print=True).decode("utf-8")
 
     def get_a_href_stats(self, html, xml):
         nodes = html.xpath(".//a[@href]")
@@ -633,7 +632,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         except GenerateBodyAndBackFromHTMLError as e:
             # cria xml_body_and_back padrão
             document.xml_body_and_back = ["<article/>"]
-            detail = {"error": str(e)}
+            detail = {"warning": str(e)}
             done = False
 
         # guarda cada versão de body/back

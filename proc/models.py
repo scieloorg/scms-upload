@@ -37,17 +37,13 @@ from migration.models import (
     MigratedIssue,
     MigratedJournal,
 )
-from migration.controller import PkgZipBuilder, get_migrated_xml_with_pre
+from migration.controller import PkgZipBuilder, get_migrated_xml_with_pre, XMLVersionXmlWithPreError
 from package import choices as package_choices
 from package.models import SPSPkg
 from proc import exceptions
 from proc.forms import ProcAdminModelForm
 from tracker import choices as tracker_choices
 from tracker.models import Event, UnexpectedEvent, format_traceback
-
-
-class HTMLXMLCreateOrUpdateError(Exception):
-    ...
 
 
 class JournalEventCreateError(Exception):
@@ -999,17 +995,18 @@ class ArticleProc(BaseProc, ClusterableModel):
             if htmlxml:
                 xml = htmlxml.html_to_xml(user, self, body_and_back_xml)
             else:
-                xml = get_migrated_xml_with_pre(self.migrated_data)
+                xml = get_migrated_xml_with_pre(self)
+
             if xml:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
             else:
-                self.xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+                self.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
             self.save()
+
             operation.finish(
                 user,
                 completed=self.xml_status==tracker_choices.PROGRESS_STATUS_DONE,
             )
-
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
@@ -1154,14 +1151,12 @@ class ArticleProc(BaseProc, ClusterableModel):
     ):
         try:
             operation = self.start(user, "generate_sps_package")
-
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
             with TemporaryDirectory() as output_folder:
 
-                xml_with_pre = get_migrated_xml_with_pre(self.migrated_data)
-                logging.info(type(self.migrated_data))
+                xml_with_pre = get_migrated_xml_with_pre(self)
                 builder = PkgZipBuilder(xml_with_pre)
                 sps_pkg_zip_path = builder.build_sps_package(
                     output_folder,

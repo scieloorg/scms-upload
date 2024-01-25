@@ -44,6 +44,10 @@ class SPSPkgAddPidV3ToZipFileError(Exception):
     ...
 
 
+class AddPidV3ToXMLFileError(Exception):
+    ...
+
+
 def now():
     return datetime.utcnow().isoformat().replace(":", "-").replace(".", "-")
 
@@ -90,7 +94,13 @@ def basic_xml_directory_path(instance, filename):
     try:
         return f"{instance.directory_path}/{filename}"
     except AttributeError:
-        return f"package/xml/{filename}"
+        name, ext = os.path.splitext(filename)
+        if "-" in filename:
+            subdir = name.replace("-", "/")
+            return f"sps_pkg/{subdir}/{filename}"
+        else:
+            subdir = os.path.join(name[0], name[-1], name)
+            return f"xml/{filename}"
 
 
 class BasicXMLFile(models.Model):
@@ -254,7 +264,9 @@ class PreviewArticlePage(Orderable):
     # - uri = models.URLField(_("URI"), null=True, blank=True)
     sps_pkg = ParentalKey("SPSPkg", related_name="article_page")
     lang = models.ForeignKey(Language, null=True, blank=True, on_delete=models.SET_NULL)
-    file = models.FileField(upload_to=preview_page_directory_path, null=True, blank=True)
+    file = models.FileField(
+        upload_to=preview_page_directory_path, null=True, blank=True
+    )
 
     panels = [
         FieldPanel("lang"),
@@ -493,24 +505,22 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 == set(texts.get("html_langs"))
             )
         else:
-            self.valid_texts = set(texts.get("xml_langs")) == set(texts.get("pdf_langs"))
+            self.valid_texts = set(texts.get("xml_langs")) == set(
+                texts.get("pdf_langs")
+            )
         if save:
             self.save()
 
     @property
     def is_complete(self):
-        return (
-            self.registered_in_core
-            and self.valid_texts
-            and self.valid_components
-        )
+        return self.registered_in_core and self.valid_texts and self.valid_components
 
     @property
     def data(self):
         return dict(
             registered_in_core=self.registered_in_core,
             texts=self.texts,
-            components=[item.data for item in self.components.all()]
+            components=[item.data for item in self.components.all()],
         )
 
     @classmethod
@@ -539,7 +549,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             operation = None
 
             for response in pid_provider_app.request_pid_for_xml_zip(
-                zip_xml_file_path, user, is_published=is_public
+                zip_xml_file_path, user, is_published=is_public, article_proc=article_proc,
             ):
                 logging.info(f"package response: {response}")
                 operation = article_proc.start(user, "request_pid_for_xml_zip")
@@ -557,7 +567,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     # atualiza conteúdo de zip
                     with ZipFile(zip_xml_file_path, "a") as zf:
                         zf.writestr(
-                            response["filename"], xml_with_pre.tostring()
+                            response["filename"],
+                            xml_with_pre.tostring(pretty_print=True),
                         )
 
                 operation.finish(
@@ -616,7 +627,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
     @property
     def subdir(self):
-        if not hasattr(self, '_subdir') or not self._subdir:
+        if not hasattr(self, "_subdir") or not self._subdir:
             sps_pkg_name = self.sps_pkg_name
             subdir = sps_pkg_name[:9]
             suffix = sps_pkg_name[10:]
@@ -626,7 +637,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
     def save_package_in_cloud(self, user, original_pkg_components, article_proc):
         self.save()
         xml_with_pre = self._save_components_in_cloud(
-            user, original_pkg_components, article_proc,
+            user,
+            original_pkg_components,
+            article_proc,
         )
         self._local_to_remote(xml_with_pre)
         self._save_xml_in_cloud(user, xml_with_pre, article_proc)
@@ -652,12 +665,19 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
                 component_data = original_pkg_components.get(item) or {}
                 self._save_component_in_cloud(
-                    user, item, content, ext, component_data, failures,
+                    user,
+                    item,
+                    content,
+                    ext,
+                    component_data,
+                    failures,
                 )
         op.finish(user, completed=not failures, detail=failures)
         return xml_with_pre
 
-    def _save_component_in_cloud(self, user, item, content, ext, component_data, failures):
+    def _save_component_in_cloud(
+        self, user, item, content, ext, component_data, failures
+    ):
         try:
             response = minio_push_file_content(
                 content=content,
@@ -699,7 +719,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         filename = self.sps_pkg_name + ".xml"
         try:
             response = minio_push_file_content(
-                content=xml_with_pre.tostring().encode("utf-8"),
+                content=xml_with_pre.tostring(pretty_print=True).encode("utf-8"),
                 mimetype=mimetypes.types_map[".xml"],
                 object_name=f"{self.subdir}/{filename}",
             )
@@ -736,7 +756,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 # atualiza conteúdo de zip
                 with ZipFile(zip_xml_file_path, "a") as zf:
                     zf.writestr(
-                        response["filename"], response["xml_with_pre"].tostring()
+                        response["filename"],
+                        response["xml_with_pre"].tostring(pretty_print=True),
                     )
 
                 self._save_xml_in_cloud(user, response["xml_with_pre"], article_proc)
