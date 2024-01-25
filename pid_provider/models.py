@@ -48,15 +48,14 @@ def xml_directory_path(instance, filename):
     sps_pkg_name = instance.pid_provider_xml.pkg_name
     subdirs = sps_pkg_name.split("-")
     subdir_sps_pkg_name = "/".join(subdirs)
-    return (
-        f"pid_provider/{subdir_sps_pkg_name}/{filename}"
-    )
+    return f"pid_provider/{subdir_sps_pkg_name}/{filename}"
 
 
 class XMLVersion(CommonControlField):
     """
     Tem função de guardar a versão do XML
     """
+
     pid_provider_xml = models.ForeignKey(
         "PidProviderXML", null=True, blank=True, on_delete=models.SET_NULL
     )
@@ -80,18 +79,23 @@ class XMLVersion(CommonControlField):
         xml_with_pre,
     ):
         try:
+            logging.info(f"XMLVersion.create {xml_with_pre.finger_print}")
             obj = cls()
             obj.pid_provider_xml = pid_provider_xml
             obj.finger_print = xml_with_pre.finger_print
             obj.creator = user
             obj.save()
-            obj.save_file(f"{pid_provider_xml.v3}.xml", xml_with_pre.tostring())
+            obj.save_file(
+                f"{pid_provider_xml.v3}.xml", xml_with_pre.tostring(pretty_print=True)
+            )
             obj.save()
+            logging.info(f"XMLVersion saved {xml_with_pre.finger_print}")
             return obj
         except IntegrityError:
             return cls.get(pid_provider_xml, xml_with_pre.finger_print)
 
     def save_file(self, filename, content):
+        logging.info(filename)
         self.file.save(filename, ContentFile(content))
 
     @property
@@ -109,14 +113,16 @@ class XMLVersion(CommonControlField):
     @property
     def xml(self):
         try:
-            return self.xml_with_pre.tostring()
+            return self.xml_with_pre.tostring(pretty_print=True)
         except XMLVersionXmlWithPreError as e:
             return str(e)
 
     @classmethod
     def latest(cls, pid_provider_xml):
         if pid_provider_xml:
-            return cls.objects.filter(pid_provider_xml=pid_provider_xml).latest("created")
+            return cls.objects.filter(pid_provider_xml=pid_provider_xml).latest(
+                "created"
+            )
         raise XMLVersionLatestError(
             "XMLVersion.get requires pid_provider_xml and xml_with_pre parameters"
         )
@@ -132,7 +138,11 @@ class XMLVersion(CommonControlField):
             )
 
         latest = cls.latest(pid_provider_xml)
+        logging.info(f"latest: {latest}")
+        logging.info(f"latest.finger_print: {latest.finger_print}")
+        logging.info(f"finger_print: {finger_print}")
         if latest.finger_print == finger_print:
+            logging.info("got")
             return latest
         raise cls.DoesNotExist(f"{pid_provider_xml} {finger_print}")
 
@@ -959,7 +969,9 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         self.pub_year = xml_adapter.pub_year
 
     def _add_current_version(self, xml_adapter, user):
-        self.current_version = XMLVersion.get_or_create(user, self, xml_adapter.xml_with_pre)
+        self.current_version = XMLVersion.get_or_create(
+            user, self, xml_adapter.xml_with_pre
+        )
 
     def _add_other_pid(self, changed_pids, user):
         # requires registered.current_version is set

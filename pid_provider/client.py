@@ -164,7 +164,9 @@ class PidProviderAPIClient:
             name, ext = os.path.splitext(name)
             zip_xml_file_path = os.path.join(tmpdirname, name + ".zip")
 
-            create_xml_zip_file(zip_xml_file_path, xml_with_pre.tostring())
+            create_xml_zip_file(
+                zip_xml_file_path, xml_with_pre.tostring(pretty_print=True)
+            )
 
             try:
                 return self._post_xml(zip_xml_file_path, self.token, self.timeout)
