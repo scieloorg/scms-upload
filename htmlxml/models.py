@@ -632,7 +632,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         except GenerateBodyAndBackFromHTMLError as e:
             # cria xml_body_and_back padrão
             document.xml_body_and_back = ["<article/>"]
-            detail = {"error": str(e)}
+            detail = {"warning": str(e)}
             done = False
 
         # guarda cada versão de body/back
