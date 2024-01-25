@@ -26,6 +26,6 @@ def task_start(
     if file_path or config:
         setup(user, file_path, config)
 
-    tasks_scheduler.schedule_publication_subtasks(username, enable)
-    tasks_scheduler.schedule_migration_subtasks(username, enable)
-    tasks_scheduler.schedule_task_synchronize_to_pid_provider(username, enable)
+    tasks_scheduler.schedule_publication_subtasks(username, enabled=False)
+    tasks_scheduler.schedule_migration_subtasks(username, enabled=False)
+    tasks_scheduler.schedule_task_synchronize_to_pid_provider(username, enabled=False)
