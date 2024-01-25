@@ -68,7 +68,7 @@ def body_and_back_directory_path(instance, filename):
         f"{migrated_article.document.issue.issue_label}/"
         f"{migrated_article.pkg_name}"
     )
-    return f"migration/{pkg_path}/" f"bb/{filename}"
+    return f"classic_website/{migrated_article.collection.acron}/html2xml/{pkg_path}/bb/{instance.version}/{filename}"
 
 
 class BodyAndBackFile(BasicXMLFile, Orderable):
@@ -147,7 +147,7 @@ def generated_xml_report_directory_path(instance, filename):
         f"{migrated_article.document.issue.issue_label}/"
         f"{migrated_article.pkg_name}"
     )
-    return f"migration/{pkg_path}/html2xml_report/{filename}"
+    return f"classic_website/{migrated_article.collection.acron}/html2xml/{pkg_path}/report/{filename}"
 
 
 class Html2xmlAnalysis(models.Model):
@@ -497,6 +497,10 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             models.Index(fields=["quality"]),
             models.Index(fields=["migrated_article"]),
         ]
+
+    @property
+    def directory_path(self):
+        return f"classic_website/{self.migrated_article.collection.acron}/html2xml/{self.migrated_article.path}"
 
     @property
     def created_updated(self):
