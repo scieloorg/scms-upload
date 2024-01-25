@@ -74,13 +74,17 @@ class PidRequester(BasePidProvider):
         """
         v3 = xml_with_pre.v3
         logging.info(".................................")
-        logging.info(f"PidRequester.request_pid_for_xml_with_pre: {xml_with_pre.v3}")
+        logging.info(
+            f"PidRequester.request_pid_for_xml_with_pre ({name}): {(xml_with_pre.sps_pkg_name, xml_with_pre.v3, xml_with_pre.v2, xml_with_pre.aop_pid)}"
+        )
 
         registered = PidRequester.get_registration_demand(xml_with_pre)
+        logging.info(f"PidRequester.get_registration_demand: {name} {registered}")
         if registered.get("error_type"):
             return registered
 
         self.core_registration(xml_with_pre, registered)
+        xml_changed = registered.get("xml_changed")
 
         if not registered["registered_in_upload"]:
             # não está registrado em Upload, realizar registro
@@ -94,6 +98,18 @@ class PidRequester(BasePidProvider):
                 origin=origin,
                 registered_in_core=registered.get("registered_in_core"),
             )
+            logging.info(f"core xml_changes: {registered.get('xml_changed')}")
+            logging.info(f"upload xml_changes: {resp.get('xml_changed')}")
+            logging.info(
+                (
+                    xml_with_pre.sps_pkg_name,
+                    xml_with_pre.v3,
+                    xml_with_pre.v2,
+                    xml_with_pre.aop_pid,
+                )
+            )
+
+            xml_changed = xml_changed or resp.get("xml_changed")
             logging.info(f"upload registration: {resp}")
             registered.update(resp)
             logging.info(f"registered: {registered}")
@@ -103,10 +119,12 @@ class PidRequester(BasePidProvider):
         registered["synchronized"] = (
             registered["registered_in_core"] and registered["registered_in_upload"]
         )
+        registered["xml_changed"] = xml_changed
         registered["xml_with_pre"] = xml_with_pre
         registered["filename"] = name
         logging.info(f"registered={registered}")
         logging.info(f"v3={xml_with_pre.v3}")
+        logging.info("__." * 10)
         return registered
 
     @staticmethod
@@ -122,7 +140,7 @@ class PidRequester(BasePidProvider):
         registered = PidProviderXML.is_registered(xml_with_pre) or {}
         registered["registered_in_upload"] = bool(registered.get("v3"))
         registered["registered_in_core"] = registered.get("registered_in_core")
-        logging.info(f"PidRequester.get_registration_demand: {registered}")
+
         return registered
 
     def core_registration(self, xml_with_pre, registered):
@@ -134,7 +152,17 @@ class PidRequester(BasePidProvider):
 
         if not registered["registered_in_core"]:
             response = self.pid_provider_api.provide_pid(
-                xml_with_pre, xml_with_pre.filename)
+                xml_with_pre, xml_with_pre.filename
+            )
+            logging.info(f"core xml_changes: {response.get('xml_changed')}")
+            logging.info(
+                (
+                    xml_with_pre.sps_pkg_name,
+                    xml_with_pre.v3,
+                    xml_with_pre.v2,
+                    xml_with_pre.aop_pid,
+                )
+            )
             response = response or {}
             registered.update(response)
             registered["registered_in_core"] = bool(response.get("v3"))
