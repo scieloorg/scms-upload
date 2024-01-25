@@ -94,7 +94,13 @@ def basic_xml_directory_path(instance, filename):
     try:
         return f"{instance.directory_path}/{filename}"
     except AttributeError:
-        return f"package/xml/{filename}"
+        name, ext = os.path.splitext(filename)
+        if "-" in filename:
+            subdir = name.replace("-", "/")
+            return f"sps_pkg/{subdir}/{filename}"
+        else:
+            subdir = os.path.join(name[0], name[-1], name)
+            return f"xml/{filename}"
 
 
 class BasicXMLFile(models.Model):
@@ -560,7 +566,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 if response.get("xml_changed"):
                     # atualiza conteúdo de zip
                     with ZipFile(zip_xml_file_path, "a") as zf:
-                        zf.writestr(response["filename"], xml_with_pre.tostring())
+                        zf.writestr(
+                            response["filename"],
+                            xml_with_pre.tostring(pretty_print=True),
+                        )
 
                 operation.finish(
                     user,
@@ -710,7 +719,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         filename = self.sps_pkg_name + ".xml"
         try:
             response = minio_push_file_content(
-                content=xml_with_pre.tostring().encode("utf-8"),
+                content=xml_with_pre.tostring(pretty_print=True).encode("utf-8"),
                 mimetype=mimetypes.types_map[".xml"],
                 object_name=f"{self.subdir}/{filename}",
             )
@@ -747,7 +756,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 # atualiza conteúdo de zip
                 with ZipFile(zip_xml_file_path, "a") as zf:
                     zf.writestr(
-                        response["filename"], response["xml_with_pre"].tostring()
+                        response["filename"],
+                        response["xml_with_pre"].tostring(pretty_print=True),
                     )
 
                 self._save_xml_in_cloud(user, response["xml_with_pre"], article_proc)
