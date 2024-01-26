@@ -37,7 +37,11 @@ from migration.models import (
     MigratedIssue,
     MigratedJournal,
 )
-from migration.controller import PkgZipBuilder, get_migrated_xml_with_pre, XMLVersionXmlWithPreError
+from migration.controller import (
+    PkgZipBuilder,
+    get_migrated_xml_with_pre,
+    XMLVersionXmlWithPreError,
+)
 from package import choices as package_choices
 from package.models import SPSPkg
 from proc import exceptions
@@ -892,6 +896,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         blank=True,
         null=True,
     )
+
     # article = models.ForeignKey(
     #     "Article", on_delete=models.SET_NULL, null=True, blank=True
     # )
@@ -902,6 +907,14 @@ class ArticleProc(BaseProc, ClusterableModel):
     # renditions = models.ManyToManyField("Rendition")
     xml_status = models.CharField(
         _("XML status"),
+        max_length=8,
+        choices=tracker_choices.PROGRESS_STATUS,
+        default=tracker_choices.PROGRESS_STATUS_TODO,
+        blank=True,
+        null=True,
+    )
+    zip_status = models.CharField(
+        _("Zip status"),
         max_length=8,
         choices=tracker_choices.PROGRESS_STATUS,
         default=tracker_choices.PROGRESS_STATUS_TODO,
@@ -924,6 +937,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     ]
     panel_status = [
         FieldPanel("xml_status"),
+        FieldPanel("zip_status"),
         FieldPanel("sps_pkg_status"),
         FieldPanel("migration_status"),
         FieldPanel("qa_ws_status"),
@@ -949,6 +963,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         indexes = [
             models.Index(fields=["pkg_name"]),
             models.Index(fields=["xml_status"]),
+            models.Index(fields=["zip_status"]),
             models.Index(fields=["sps_pkg_status"]),
         ]
 
@@ -1005,7 +1020,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             operation.finish(
                 user,
-                completed=self.xml_status==tracker_choices.PROGRESS_STATUS_DONE,
+                completed=self.xml_status == tracker_choices.PROGRESS_STATUS_DONE,
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1105,6 +1120,45 @@ class ArticleProc(BaseProc, ClusterableModel):
             **params,
         ).iterator()
 
+    @classmethod
+    def items_to_build_zip(
+        cls,
+        collection_acron,
+        journal_acron,
+        publication_year,
+        issue_folder,
+        force_update,
+    ):
+        """
+        Muda o status de REPROC para TODO
+        E se force_update = True, muda o status de DONE para TODO
+        """
+        params = {}
+        params["xml_status"] = tracker_choices.PROGRESS_STATUS_DONE
+        if collection_acron:
+            params["collection__acron"] = collection_acron
+        if journal_acron:
+            params["issue_proc__journal_proc__acron"] = journal_acron
+        if publication_year:
+            params["issue_proc__issue__publication_year"] = publication_year
+        if issue_folder:
+            params["issue_proc__issue_folder"] = issue_folder
+
+        q = Q(zip_status=tracker_choices.PROGRESS_STATUS_REPROC)
+        if force_update:
+            q |= (
+                Q(zip_status=tracker_choices.PROGRESS_STATUS_DONE)
+                | Q(zip_status=tracker_choices.PROGRESS_STATUS_PENDING)
+                | Q(zip_status=tracker_choices.PROGRESS_STATUS_BLOCKED)
+            )
+        cls.objects.filter(q, **params,).update(
+            zip_status=tracker_choices.PROGRESS_STATUS_TODO,
+        )
+        return cls.objects.filter(
+            zip_status=tracker_choices.PROGRESS_STATUS_TODO,
+            **params,
+        ).iterator()
+
     @property
     def renditions(self):
         return self.issue_proc.issue_files.filter(
@@ -1142,6 +1196,43 @@ class ArticleProc(BaseProc, ClusterableModel):
             xhtmls.setdefault(lang, {})
             xhtmls[lang][part[item.part]] = hc.content
         return xhtmls
+
+    def build_zip_file(self, user):
+        try:
+            operation = self.start(user, "build zip file")
+            self.zip_status = tracker_choices.PROGRESS_STATUS_DOING
+            self.save()
+
+            with TemporaryDirectory() as output_folder:
+
+                xml_with_pre = get_migrated_xml_with_pre(self)
+                builder = PkgZipBuilder(xml_with_pre)
+                zip_path = builder.build_sps_package(
+                    output_folder,
+                    renditions=list(self.renditions),
+                    translations=self.translations,
+                    main_paragraphs_lang=self.migrated_data.n_paragraphs
+                    and self.main_lang,
+                    issue_proc=self.issue_proc,
+                )
+                completed = self.migrated_data.add_zip(zip_path, builder.components)
+
+            operation.finish(user, completed)
+            if completed:
+                self.zip_status = tracker_choices.PROGRESS_STATUS_DONE
+            else:
+                self.zip_status = tracker_choices.PROGRESS_STATUS_TODO
+            self.save()
+
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            self.zip_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            self.save()
+            operation.finish(
+                user,
+                exc_traceback=exc_traceback,
+                exception=e,
+            )
 
     def generate_sps_package(
         self,
@@ -1227,9 +1318,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             operation = self.start(user, "synchronize to core")
             self.sps_pkg.synchronize(user, self)
-            operation.finish(
-                user, completed=self.sps_pkg.registered_in_core
-            )
+            operation.finish(user, completed=self.sps_pkg.registered_in_core)
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
