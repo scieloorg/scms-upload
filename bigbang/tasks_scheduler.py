@@ -26,6 +26,8 @@ ISSUE_REGISTRATION_MINUTES = MINUTES[2]
 IMPORT_ARTICLE_RECORDS_MINUTES = MINUTES[3]
 IMPORT_ARTICLE_FILES_MINUTES = MINUTES[3]
 HTML_TO_XMLS_MINUTES = MINUTES[6]
+BUILD_ZIP_MINUTES = MINUTES[4]
+
 GENERATE_SPS_PACKAGES_MINUTES = MINUTES[4] + "," + MINUTES[9]
 
 ARTICLE_REGISTRATION_MINUTES = MINUTES[1]
@@ -51,6 +53,7 @@ ARTICLE_PUBLICATION_PRIORITY = 4
 IMPORT_ARTICLE_RECORDS_PRIORITY = 6
 IMPORT_ARTICLE_FILES_PRIORITY = 7
 HTML_TO_XMLS_PRIORITY = 9
+BUILD_ZIP_PRIORITY = 8
 GENERATE_SPS_PACKAGES_PRIORITY = 8
 
 SINCHRONIZE_TO_PID_PROVIDER_PRIORITY = 5
@@ -58,6 +61,7 @@ SINCHRONIZE_TO_PID_PROVIDER_PRIORITY = 5
 
 def schedule_migration_subtasks(username, enabled=None):
     _schedule_generate_sps_packages(username, enabled)
+    _schedule_build_zips(username, enabled)
     _schedule_get_xmls(username, enabled)
     _schedule_migrate_document_files_and_records(username, enabled)
     _schedule_issue_registration(username, enabled)
@@ -321,6 +325,29 @@ def _schedule_generate_sps_packages(username, enabled):
         day_of_week="*",
         hour="*",
         minute=GENERATE_SPS_PACKAGES_MINUTES,
+    )
+
+
+def _schedule_build_zips(username, enabled):
+    """
+    Agenda a tarefa de gerar os pacotes SPS dos documentos migrados
+    Deixa a tarefa desabilitada
+    Quando usuário quiser executar, deve preencher os valores e executar
+    """
+    schedule_task(
+        task="proc.tasks.task_build_zip_files",
+        name="build_zips",
+        kwargs=dict(
+            username=username,
+            force_update=False,
+        ),
+        description=_("Build zip files"),
+        priority=BUILD_ZIP_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=BUILD_ZIP_MINUTES,
     )
 
 
