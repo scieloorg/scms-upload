@@ -189,6 +189,7 @@ class ArticleProcModelAdmin(ModelAdmin):
         "pkg_name",
         "issue_proc",
         "xml_status",
+        "zip_status",
         "sps_pkg_status",
         "qa_ws_status",
         "public_ws_status",
@@ -198,6 +199,7 @@ class ArticleProcModelAdmin(ModelAdmin):
     list_filter = (
         "migration_status",
         "xml_status",
+        "zip_status",
         "sps_pkg_status",
         "qa_ws_status",
         "public_ws_status",
