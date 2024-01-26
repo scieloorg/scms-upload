@@ -6,6 +6,7 @@ from datetime import datetime
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from django.core.files.base import ContentFile
 from django.db import models
 from django.db.models import Q
@@ -1095,7 +1096,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         E se force_update = True, muda o status de DONE para TODO
         """
         params = {}
-        params["xml_status"] = tracker_choices.PROGRESS_STATUS_DONE
+        params["zip_status"] = tracker_choices.PROGRESS_STATUS_DONE
         if collection_acron:
             params["collection__acron"] = collection_acron
         if journal_acron:
@@ -1215,14 +1216,15 @@ class ArticleProc(BaseProc, ClusterableModel):
                     and self.main_lang,
                     issue_proc=self.issue_proc,
                 )
-                completed = self.migrated_data.add_zip(zip_path, builder.components)
+                completed = self.migrated_data.add_zip(
+                    zip_path, builder.components, builder.texts)
 
-            operation.finish(user, completed)
             if completed:
                 self.zip_status = tracker_choices.PROGRESS_STATUS_DONE
             else:
                 self.zip_status = tracker_choices.PROGRESS_STATUS_TODO
             self.save()
+            operation.finish(user, completed)
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1245,32 +1247,20 @@ class ArticleProc(BaseProc, ClusterableModel):
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
-            with TemporaryDirectory() as output_folder:
+            # FIXME assumindo que isso será executado somente na migração
+            # verificar se este código pode ser aproveitado pelo fluxo
+            # de ingresso, se sim, ajustar os valores dos parâmetros
+            # origin e is_published
 
-                xml_with_pre = get_migrated_xml_with_pre(self)
-                builder = PkgZipBuilder(xml_with_pre)
-                sps_pkg_zip_path = builder.build_sps_package(
-                    output_folder,
-                    renditions=list(self.renditions),
-                    translations=self.translations,
-                    main_paragraphs_lang=self.migrated_data.n_paragraphs
-                    and self.main_lang,
-                    issue_proc=self.issue_proc,
-                )
-
-                # FIXME assumindo que isso será executado somente na migração
-                # verificar se este código pode ser aproveitado pelo fluxo
-                # de ingresso, se sim, ajustar os valores dos parâmetros
-                # origin e is_published
-                self.sps_pkg = SPSPkg.create_or_update(
-                    user,
-                    sps_pkg_zip_path,
-                    origin=package_choices.PKG_ORIGIN_MIGRATION,
-                    is_public=True,
-                    original_pkg_components=builder.components,
-                    texts=builder.texts,
-                    article_proc=self,
-                )
+            self.sps_pkg = SPSPkg.create_or_update(
+                user,
+                self.migrated_data.zip_file.path,
+                origin=package_choices.PKG_ORIGIN_MIGRATION,
+                is_public=True,
+                original_pkg_components=self.migrated_data.components,
+                texts=self.migrated_data.texts,
+                article_proc=self,
+            )
             self.update_sps_pkg_status()
             operation.finish(
                 user,
@@ -1286,7 +1276,6 @@ class ArticleProc(BaseProc, ClusterableModel):
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
-                detail=self.sps_pkg and self.sps_pkg.data or None,
             )
 
     def update_sps_pkg_status(self):
