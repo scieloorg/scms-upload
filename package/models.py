@@ -554,22 +554,12 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 logging.info(f"package response: {response}")
                 operation = article_proc.start(user, "request_pid_for_xml_zip")
 
-                xml_with_pre = response.pop("xml_with_pre")
-
                 obj = cls._get_or_create(
                     user=user,
                     pid_v3=response["v3"],
                     sps_pkg_name=response["pkg_name"],
                     registered_in_core=response.get("synchronized"),
                 )
-
-                if response.get("xml_changed"):
-                    # atualiza conteúdo de zip
-                    with ZipFile(zip_xml_file_path, "a") as zf:
-                        zf.writestr(
-                            response["filename"],
-                            xml_with_pre.tostring(pretty_print=True),
-                        )
 
                 operation.finish(
                     user,

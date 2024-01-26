@@ -1,5 +1,6 @@
 import logging
 import sys
+from zipfile import ZipFile
 
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
@@ -29,7 +30,7 @@ class PidRequester(BasePidProvider):
     ):
         try:
             for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
-                yield self.request_pid_for_xml_with_pre(
+                response = self.request_pid_for_xml_with_pre(
                     xml_with_pre,
                     xml_with_pre.filename,
                     user,
@@ -39,6 +40,15 @@ class PidRequester(BasePidProvider):
                     origin=zip_xml_file_path,
                     article_proc=article_proc,
                 )
+
+                if response.get("xml_changed"):
+                    # atualiza conteúdo de zip
+                    with ZipFile(zip_xml_file_path, "a") as zf:
+                        zf.writestr(
+                            xml_with_pre.filename,
+                            xml_with_pre.tostring(pretty_print=True),
+                        )
+                yield response
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             UnexpectedEvent.create(
