@@ -509,12 +509,14 @@ class MigratedIssue(MigratedData):
 class MigratedArticle(MigratedData):
     zip_file = models.FileField(upload_to=migrated_files_directory_path, null=True, blank=True)
     components = models.JSONField(blank=True, null=True)
+    texts = models.JSONField(blank=True, null=True)
 
     panels = [
         FieldPanel("isis_updated_date"),
         FieldPanel("isis_created_date"),
         FieldPanel("data"),
         FieldPanel("zip_file"),
+        FieldPanel("texts"),
         FieldPanel("components"),
     ]
 
@@ -548,9 +550,10 @@ class MigratedArticle(MigratedData):
         except Exception as e:
             pass
 
-    def add_zip(self, zip_path, components):
+    def add_zip(self, zip_path, components, texts):
         with open(zip_path, "rb") as fp:
             self.save_file(fp.read())
         self.components = components
+        self.texts = texts
         self.save()
         return True
