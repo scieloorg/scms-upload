@@ -296,8 +296,10 @@ class MigratedData(CommonControlField):
 
 def migrated_files_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
-
-    return f"classic_website/{instance.collection.acron}/{instance.original_path}"
+    try:
+        return f"classic_website/{instance.collection.acron}/{instance.original_path}"
+    except AttributeError:
+        return f"classic_website/{instance.collection.acron}/zip/{instance.path}/{filename}"
 
 
 class MigratedFile(CommonControlField):
@@ -505,10 +507,15 @@ class MigratedIssue(MigratedData):
 
 
 class MigratedArticle(MigratedData):
+    zip_file = models.FileField(upload_to=migrated_files_directory_path, null=True, blank=True)
+    components = models.JSONField(blank=True, null=True)
+
     panels = [
         FieldPanel("isis_updated_date"),
         FieldPanel("isis_created_date"),
         FieldPanel("data"),
+        FieldPanel("zip_file"),
+        FieldPanel("components"),
     ]
 
     @classmethod
@@ -533,3 +540,17 @@ class MigratedArticle(MigratedData):
     def path(self):
         document = self.document
         return f"{document.journal.acronym}/{document.issue.issue_label}/{document.filename_without_extension}"
+
+    def save_file(self, content):
+        try:
+            self.zip_file.delete()
+            self.zip_file.save(self.pkg_name+".zip", ContentFile(content))
+        except Exception as e:
+            pass
+
+    def add_zip(self, zip_path, components):
+        with open(zip_path, "rb") as fp:
+            self.save_file(fp.read())
+        self.components = components
+        self.save()
+        return True
