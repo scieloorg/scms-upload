@@ -28,4 +28,4 @@ def task_start(
 
     tasks_scheduler.schedule_publication_subtasks(username, enabled=enable)
     tasks_scheduler.schedule_migration_subtasks(username, enabled=enable)
-    tasks_scheduler.schedule_task_synchronize_to_pid_provider(username, enabled=enable)
+    # FIXME tasks_scheduler.schedule_task_synchronize_to_pid_provider(username, enabled=enable)
