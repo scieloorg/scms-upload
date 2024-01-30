@@ -31,6 +31,8 @@ class Collection(CommonControlField):
 
     base_form_class = CoreAdminModelForm
 
+    autocomplete_search_field = "name"
+
     def autocomplete_label(self):
         return f"{self.name} ({self.acron})"
 
@@ -77,7 +79,10 @@ class WebSiteConfiguration(CommonControlField):
     )
     enabled = models.BooleanField()
 
-    autocomplete_search_field = "url"
+    autocomplete_search_field = "collection__name"
+
+    def autocomplete_label(self):
+        return f"{self.url})"
 
     def __str__(self):
         return f"{self.url} {self.collection} {self.purpose}"
