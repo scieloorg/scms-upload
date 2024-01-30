@@ -89,6 +89,8 @@ class WebSiteConfiguration(CommonControlField):
     )
     enabled = models.BooleanField()
 
+    autocomplete_search_field = "url"
+
     def __str__(self):
         return f"{self.url} {self.collection} {self.purpose}"
 
