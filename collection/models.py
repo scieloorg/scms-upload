@@ -31,6 +31,8 @@ class Collection(CommonControlField):
 
     base_form_class = CoreAdminModelForm
 
+    autocomplete_search_field = "name"
+
     def autocomplete_label(self):
         return f"{self.name} ({self.acron})"
 
@@ -72,22 +74,15 @@ class WebSiteConfiguration(CommonControlField):
     )
     api_username = models.CharField(max_length=64, null=True, blank=True)
     api_password = models.CharField(max_length=64, null=True, blank=True)
-    api_token = models.CharField(max_length=255, null=True, blank=True)
-
-    db_name = models.CharField(
-        _("Database name"), max_length=255, null=True, blank=True
-    )
-    db_uri = models.CharField(
-        _("Mongodb Info"),
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text=_("mongodb://login:password@host:port/database"),
-    )
     purpose = models.CharField(
         _("Purpose"), max_length=25, choices=choices.WEBSITE_KIND, null=True, blank=True
     )
     enabled = models.BooleanField()
+
+    autocomplete_search_field = "collection__name"
+
+    def autocomplete_label(self):
+        return f"{self.url})"
 
     def __str__(self):
         return f"{self.url} {self.collection} {self.purpose}"
@@ -135,15 +130,12 @@ class WebSiteConfiguration(CommonControlField):
         collection,
         url=None,
         purpose=None,
-        db_uri=None,
-        db_name=None,
         api_url_article=None,
         api_url_issue=None,
         api_url_journal=None,
         api_get_token_url=None,
         api_username=None,
         api_password=None,
-        api_token=None,
         enabled=None,
     ):
         try:
@@ -156,15 +148,12 @@ class WebSiteConfiguration(CommonControlField):
             obj.url = url or obj.url
             obj.purpose = purpose or obj.purpose
 
-        obj.db_name = db_name or obj.db_name
-        obj.db_uri = db_uri or obj.db_uri
         obj.api_url_journal = api_url_journal or obj.api_url_journal
         obj.api_url_issue = api_url_issue or obj.api_url_issue
         obj.api_url_article = api_url_article or obj.api_url_article
         obj.api_get_token_url = api_get_token_url or obj.api_get_token_url
         obj.api_username = api_username or obj.api_username
         obj.api_password = api_password or obj.api_password
-        obj.api_token = api_token or obj.api_token
         obj.enabled = bool(enabled or obj.enabled)
         obj.save()
         return obj

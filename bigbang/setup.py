@@ -41,8 +41,19 @@ def setup(user, file_path=None, config=None):
     MinioConfiguration.get_or_create(user=user, **data["files_storage_config"])
 
     for item in data["websites"]:
-        item["enabled"] = item["enabled"] == "true"
-        WebSiteConfiguration.create_or_update(user=user, collection=collection, **item)
+        WebSiteConfiguration.create_or_update(
+            user=user,
+            collection=collection,
+            url=item.get("url"),
+            purpose=item.get("purpose"),
+            api_url_article=item.get("api_url_article"),
+            api_url_issue=item.get("api_url_issue"),
+            api_url_journal=item.get("api_url_journal"),
+            api_get_token_url=item.get("api_get_token_url"),
+            api_username=item.get("api_username"),
+            api_password=item.get("api_password"),
+            enabled=item.get("enabled"),
+        )
     PidProviderConfig.get_or_create(
         creator=user,
         pid_provider_api_post_xml=data["pid_provider"]["pid_provider"],
