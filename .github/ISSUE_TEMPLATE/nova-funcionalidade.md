@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 ### Descrição da nova funcionalidade
-Eu, como **[tipo de cargo/ usuário / papel em sistema]**, gostaria que **[descrição breve da funcionalidade]**, então **[consequência ou o porque da requisição da atividade]**.
+Eu, como **[tipo de cargo/ usuário / papel em sistema]**, quero que **[descrição breve da funcionalidade]**, para **[consequência ou o porque da requisição da atividade]**.
 
 ### Critérios de aceitação
 
