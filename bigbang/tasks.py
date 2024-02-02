@@ -18,7 +18,10 @@ def _get_user(user_id, username):
 
 @celery_app.task(bind=True)
 def task_start(
-    self, user_id=None, username=None, enable=False,
+    self,
+    user_id=None,
+    username=None,
+    enable=False,
 ):
     tasks_scheduler.schedule_publication_subtasks(username, enabled=enable)
     tasks_scheduler.schedule_migration_subtasks(username, enabled=enable)
@@ -27,13 +30,13 @@ def task_start(
 
 @celery_app.task(bind=True)
 def task_setup(
-    self, 
+    self,
     user_id=None,
     username=None,
     file_path=None,
     config=None,
 ):
-    user = _get_user(user_id, username)    
-    
+    user = _get_user(user_id, username)
+
     if file_path or config:
         setup(user, file_path, config)
