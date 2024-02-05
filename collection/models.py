@@ -99,15 +99,12 @@ class WebSiteConfiguration(CommonControlField):
         AutocompletePanel("collection"),
         FieldPanel("url"),
         FieldPanel("purpose"),
-        FieldPanel("db_uri"),
-        FieldPanel("db_name"),
         FieldPanel("api_url_article"),
         FieldPanel("api_url_issue"),
         FieldPanel("api_url_journal"),
         FieldPanel("api_get_token_url"),
         FieldPanel("api_username"),
         FieldPanel("api_password"),
-        FieldPanel("api_token"),
         FieldPanel("enabled"),
     ]
 
