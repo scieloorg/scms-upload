@@ -131,6 +131,7 @@ LOCAL_APPS = [
     "upload",
     "pid_provider",
     "tracker",
+    "crossref"
 ]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
