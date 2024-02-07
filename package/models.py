@@ -433,9 +433,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
         if not pid_v3:
             return False
         try:
-            obj = cls.objects.get(pid_v3=pid_v3)
+            obj = SPSPkg.objects.get(pid_v3=pid_v3)
             return obj.registered_in_core
-        except cls.DoesNotExist:
+        except SPSPkg.DoesNotExist:
             return False
 
     @classmethod
