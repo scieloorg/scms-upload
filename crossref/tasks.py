@@ -16,7 +16,7 @@ def generate_and_submit_crossref_xml_for_all_articles(
 ):
     user = _get_user(user_id=user_id, username=username)
     articles = Article.objects.filter(sps_pkg__isnull=False)
-    
+
     try:
         data = CrossrefConfiguration.get_data(prefix=prefix)
     except CrossrefConfiguration.DoesNotExist:
@@ -41,7 +41,7 @@ def create_or_update_crossref_record(
     article_id,
     data,
     user,
-):  
+):
     try:
         article = Article.objects.get(pk=article_id)
     except Article.DoesNotExist:

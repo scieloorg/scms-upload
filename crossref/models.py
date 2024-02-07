@@ -32,11 +32,7 @@ def xml_crossref_directory_path(instance, filename):
             filename,
         ]
     except AttributeError:
-        path_parts = [
-            subdir,
-            instance.article.sps_pkg_name.sps_pkg_name,
-            filename
-        ]
+        path_parts = [subdir, instance.article.sps_pkg_name.sps_pkg_name, filename]
     return os.path.join(*path_parts)
 
 
@@ -222,11 +218,12 @@ class XMLCrossref(CommonControlField):
             "registrant": self.registrant or "registrant",
         }
 
+
 class CrossrefConfiguration(CommonControlField):
     prefix = models.CharField(
-        _("Prefix"), 
-        null=True, 
-        blank=True, 
+        _("Prefix"),
+        null=True,
+        blank=True,
         max_length=10,
     )
     depositor_name = models.CharField(
@@ -260,7 +257,8 @@ class CrossrefConfiguration(CommonControlField):
     def data(self):
         return {
             "depositor_name": self.depositor_name or "depositor_name",
-            "depositor_email_address": self.depositor_email_address or "depositor_email_address",
+            "depositor_email_address": self.depositor_email_address
+            or "depositor_email_address",
             "registrant": self.registrant or "registrant",
         }
 

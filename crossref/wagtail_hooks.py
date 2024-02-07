@@ -31,9 +31,8 @@ class CrossrefConfigurationAdmin(ModelAdmin):
         "depositor_email_address",
         "registrant",
     )
-    list_filter = (
-        "prefix",
-    )
+    list_filter = ("prefix",)
     search_fields = list_display
+
 
 modeladmin_register(CrossrefConfigurationAdmin)
