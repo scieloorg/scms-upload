@@ -471,3 +471,74 @@ def subtask_synchronize_to_pid_provider(
     user = _get_user(user_id, username)
     item = ArticleProc.objects.get(pk=item_id)
     item.synchronize(user)
+
+
+@celery_app.task(bind=True)
+def task_build_zip_files(
+    self,
+    user_id=None,
+    username=None,
+    collection_acron=None,
+    journal_acron=None,
+    publication_year=None,
+    issue_folder=None,
+    force_update=False,
+):
+    try:
+        for collection in _get_collections(collection_acron):
+            items = ArticleProc.items_to_build_zip(
+                collection_acron,
+                journal_acron,
+                publication_year,
+                issue_folder,
+                force_update,
+            )
+            for item in items:
+                task_build_zip_file.apply_async(
+                    kwargs={
+                        "username": username,
+                        "user_id": user_id,
+                        "item_id": item.id,
+                    }
+                )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.tasks.task_build_zip_files",
+                "user_id": user_id,
+                "username": username,
+                "collection_acron": collection_acron,
+                "journal_acron": journal_acron,
+                "publication_year": publication_year,
+                "issue_folder": issue_folder,
+                "force_update": force_update,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_build_zip_file(
+    self,
+    item_id=None,
+    username=None,
+    user_id=None,
+):
+    try:
+        user = _get_user(user_id, username)
+        item = ArticleProc.objects.get(pk=item_id)
+        item.build_zip_file(user)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.tasks.task_build_zip_file",
+                "item_id": item_id,
+                "user_id": user_id,
+                "username": username,
+            },
+        )

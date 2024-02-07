@@ -96,8 +96,8 @@ class MigratedDataModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        "collection",
         "pid",
+        "collection",
         "content_type",
         "migration_status",
         "isis_updated_date",
@@ -133,8 +133,8 @@ class MigratedArticleModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        "collection",
         "pid",
+        "collection",
         "migration_status",
         "isis_updated_date",
         "updated",
@@ -165,8 +165,8 @@ class MigratedJournalModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        "collection",
         "pid",
+        "collection",
         "migration_status",
         "isis_updated_date",
         "updated",
@@ -197,8 +197,8 @@ class MigratedIssueModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        "collection",
         "pid",
+        "collection",
         "migration_status",
         "isis_updated_date",
         "updated",
@@ -229,8 +229,8 @@ class MigratedFileModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
-        "collection",
         "original_path",
+        "collection",
         "created",
         "updated",
     )
