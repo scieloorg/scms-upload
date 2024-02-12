@@ -20,6 +20,18 @@ DJANGO_SECRET_KEY=FMiraeekXCSl3zHfg7D4oHx7ufT46HRnwnsawKgTCC53BYajVkVzb8HhOvBOHa
 DJANGO_ADMIN_URL=django-admin/
 DJANGO_ALLOWED_HOSTS=*
 
+# EMAIL
+# ------------------------------------------------------------------------------
+DJANGO_DEFAULT_FROM_EMAIL=upload@scielo.xxx
+DJANGO_EMAIL_HOST=email.scielo.xxx
+DJANGO_EMAIL_HOST_PASSWORD=password
+DJANGO_EMAIL_HOST_USER=user
+DJANGO_EMAIL_PORT=25
+DJANGO_EMAIL_SUBJECT_PREFIX=[SciELO Upload COUNTRY]
+DJANGO_EMAIL_USE_SSL=
+DJANGO_EMAIL_USE_TLS=
+DJANGO_SERVER_EMAIL=upload@scielo.xxx
+
 
 # Wagtail
 # ------------------------------------------------------------------------------
