@@ -14,13 +14,13 @@ def generate_and_submit_crossref_xml_for_all_articles(
     user_id=None,
     username=None,
 ):
-    user = _get_user(user_id=user_id, username=username)
-    articles = Article.objects.filter(sps_pkg__isnull=False)
-
     try:
         data = CrossrefConfiguration.get_data(prefix=prefix)
     except CrossrefConfiguration.DoesNotExist:
         return None
+
+    user = _get_user(user_id=user_id, username=username)
+    articles = Article.objects.filter(sps_pkg__isnull=False, doi_with_lang__doi__icontains=data['prefix'])
 
     for article in articles:
         create_or_update_crossref_record.apply_async(
