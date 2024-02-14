@@ -260,6 +260,7 @@ class CrossrefConfiguration(CommonControlField):
             "depositor_email_address": self.depositor_email_address
             or "depositor_email_address",
             "registrant": self.registrant or "registrant",
+            "prefix": self.prefix,
         }
 
     @classmethod
