@@ -102,6 +102,22 @@ class Package(CommonControlField):
             self.status = choices.PS_REJECTED
             self.save()
 
+    @classmethod
+    def get(cls, pkg_id):
+        return cls.objects.get(pk=pkg_id)
+
+    @classmethod
+    def create(cls, user_id, file, article_id=None, category=None, status=None):
+        obj = cls()
+        obj.article_id = article_id
+        obj.creator_id = user_id
+        obj.created = datetime.utcnow()
+        obj.file = file
+        obj.category = category or choices.PC_SYSTEM_GENERATED
+        obj.status = status or choices.PS_PUBLISHED
+        obj.save()
+        return obj
+
 
 class QAPackage(Package):
     class Meta:
