@@ -149,9 +149,8 @@ def task_validate_article_and_journal_issue_compatibility(
             journal_electronic_issn=journal_dict["electronic_issn"],
             journal_titles=journal_dict["titles"],
         )
-        controller.update_validation_result(
-            validation_result_id=val.id, status=choices.VS_APPROVED
-        )
+        val.update(status=choices.VS_APPROVED)
+
         return True
     except sps_exceptions.ArticleIncompatibleDataError as e:
         if isinstance(e, sps_exceptions.ArticleHasIncompatibleJournalISSNError):
@@ -163,8 +162,7 @@ def task_validate_article_and_journal_issue_compatibility(
         else:
             error_message = _("XML article has incompatible journal data.")
 
-        controller.update_validation_result(
-            validation_result_id=val.id,
+        val.update(
             status=choices.VS_DISAPPROVED,
             message=error_message,
             data={"errors": e.data},
@@ -192,24 +190,21 @@ def task_validate_article_is_unpublished(file_path, package_id):
             authors=article_data["authors"],
         )
     except Exception:
-        controller.update_validation_result(
-            validation_result_id=val.id,
+        val.update(
             status=choices.VS_DISAPPROVED,
             message=_("It was not possible to connect to the site database."),
         )
         return False
 
     if len(similar_docs) > 1:
-        controller.update_validation_result(
-            validation_result_id=val.id,
+        val.update(
             status=choices.VS_DISAPPROVED,
             message=_("XML article refers to a existant document."),
             data={"similar_docs": [s.aid for s in similar_docs]},
         )
         return False
 
-    controller.update_validation_result(
-        validation_result_id=val.id,
+    val.update(
         status=choices.VS_APPROVED,
     )
     return True
@@ -308,15 +303,11 @@ def task_validate_xml_format(file_path, xml_path, package_id):
     try:
         xml_str = file_utils.get_xml_content_from_zip(file_path, xml_path)
         xml_utils.get_etree_from_xml_content(xml_str)
-        controller.update_validation_result(
-            validation_result_id=val.id,
-            status=choices.VS_APPROVED,
-        )
+        val.update(status=choices.VS_APPROVED)
         return True
 
     except (file_utils.BadPackageFileError, file_utils.PackageWithoutXMLFileError):
-        controller.update_validation_result(
-            validation_result_id=val.id,
+        val.update(
             error_category=choices.VE_PACKAGE_FILE_ERROR,
             status=choices.VS_DISAPPROVED,
         )
@@ -328,9 +319,7 @@ def task_validate_xml_format(file_path, xml_path, package_id):
             "row": e.start_row,
             "snippet": xml_utils.get_snippet(xml_str, e.start_row, e.end_row),
         }
-
-        controller.update_validation_result(
-            validation_result_id=val.id,
+        val.update(
             error_category=choices.VE_XML_FORMAT_ERROR,
             message=e.message,
             data=data,
@@ -495,17 +484,16 @@ def task_validate_content_xml(file_path, xml_path, package_id):
                     valor = False
 
                 if valor == "success":
-                    controller.update_validation_result(
-                        vr.id,
-                        status=choices.VS_APPROVED,
-                        message=_(message),
-                    )
+                    status = choices.VS_APPROVED
                 else:
-                    controller.update_validation_result(
-                        vr.id,
-                        status=choices.VS_DISAPPROVED,
-                        message=_(message),
-                    )
+                    status = choices.VS_DISAPPROVED
+
+                vr.update(
+                    error_category=choices.VE_XML_FORMAT_ERROR,
+                    message=_(message),
+                    data=data,
+                    status=status,
+                )
 
 
 @celery_app.task(bind=True, name="Check validation error resolutions")
