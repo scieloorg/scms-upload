@@ -12,7 +12,6 @@ from .controller import (
     update_package_check_finish,
 )
 from .models import Package, choices, ValidationResult
-from .tasks import check_opinions, check_resolutions
 from .utils.package_utils import coerce_package_and_errors, render_html
 
 
@@ -47,10 +46,12 @@ def error_resolution(request):
         package_id = request.POST.get("package_id")
         scope = request.POST.get("scope", "")
 
-        if package_id:
-            check_opinions(package_id) if scope == "analyse" else check_resolutions(
-                package_id
-            )
+        package = get_object_or_404(Package, pk=package_id)
+
+        if scope == "analyse":
+            package.check_opinions()
+        else:
+            package.check_resolutions()
 
         messages.success(request, _("Thank you for submitting your responses."))
 
