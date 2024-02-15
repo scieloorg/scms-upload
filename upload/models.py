@@ -88,6 +88,17 @@ class Package(CommonControlField):
             (ASSIGN_PACKAGE, _("Can assign package")),
         )
 
+    def add_validation_result(
+        self, error_category, status=None, message=None, data=None
+    ):
+        val_res = ValidationResult.create(
+            error_category, self, status, message, data
+        )
+        if val_res.status == choices.VS_DISAPPROVED:
+            self.status = choices.PS_REJECTED
+            self.save()
+        return val_res
+
 
 class QAPackage(Package):
     class Meta:
@@ -157,6 +168,25 @@ class ValidationResult(models.Model):
         )
 
     base_form_class = ValidationResultForm
+
+    @classmethod
+    def create(
+        cls, error_category, package, status=None, message=None, data=None
+    ):
+        val_res = ValidationResult()
+        val_res.category = error_category
+
+        val_res.package = package
+        val_res.status = status
+        val_res.message = message
+        val_res.data = data
+
+        # if val_res.status == choices.VS_DISAPPROVED:
+        #     val_res.package.status = choices.PS_REJECTED
+        #     val_res.package.save()
+
+        val_res.save()
+        return val_res
 
 
 class ErrorResolution(CommonControlField):
