@@ -38,39 +38,6 @@ def update_package_check_finish(package_id):
     return False
 
 
-def update_package_check_errors(package_id):
-    package = get_object_or_404(Package, pk=package_id)
-
-    for vr in package.validationresult_set.filter(status=choices.VS_DISAPPROVED):
-        if vr.resolution.action in (choices.ER_ACTION_TO_FIX, ""):
-            package.status = choices.PS_PENDING_CORRECTION
-            package.save()
-
-            return package.status
-
-    package.status = choices.PS_READY_TO_BE_FINISHED
-    package.save()
-
-    return package.status
-
-
-def update_package_check_opinions(package_id):
-    package = get_object_or_404(Package, pk=package_id)
-
-    for vr in package.validationresult_set.filter(status=choices.VS_DISAPPROVED):
-        opinion = vr.analysis.opinion
-        if opinion in (choices.ER_OPINION_FIX_DEMANDED, ""):
-            package.status = choices.PS_PENDING_CORRECTION
-            package.save()
-
-            return package.status
-
-    package.status = choices.PS_ACCEPTED
-    package.save()
-
-    return package.status
-
-
 def create_package(
     article_id,
     user_id,

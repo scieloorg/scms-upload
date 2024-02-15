@@ -99,14 +99,6 @@ def run_validations(
             )
 
 
-def check_resolutions(package_id):
-    task_check_resolutions.apply_async(kwargs={"package_id": package_id}, countdown=3)
-
-
-def check_opinions(package_id):
-    task_check_opinions.apply_async(kwargs={"package_id": package_id}, countdown=3)
-
-
 def get_or_create_package(pid_v3, user_id):
     return task_get_or_create_package(pid_v3, user_id)
 
@@ -494,16 +486,6 @@ def task_validate_content_xml(file_path, xml_path, package_id):
                     data=data,
                     status=status,
                 )
-
-
-@celery_app.task(bind=True, name="Check validation error resolutions")
-def task_check_resolutions(self, package_id):
-    return controller.update_package_check_errors(package_id)
-
-
-@celery_app.task(bind=True, name="Check validation error resolutions opinions")
-def task_check_opinions(self, package_id):
-    return controller.update_package_check_opinions(package_id)
 
 
 @celery_app.task(name="Get or create package")
