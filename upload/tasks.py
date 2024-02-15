@@ -18,8 +18,10 @@ from issue.models import Issue
 from journal.controller import get_journal_dict_for_validation
 from libs.dsm.publication.documents import get_document, get_similar_documents
 
-from . import choices, controller, exceptions, models
+from . import choices, controller, exceptions
 from .utils import file_utils, package_utils, xml_utils
+from upload.models import Package
+
 
 User = get_user_model()
 
@@ -128,9 +130,9 @@ def task_validate_article_and_journal_issue_compatibility(
     issue = Issue.objects.get(pk=issue_id)
     journal_dict = get_journal_dict_for_validation(issue.official_journal.id)
 
-    val = controller.add_validation_result(
-        error_category=choices.VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR,
+    val = Package.add_validation_result(
         package_id=package_id,
+        error_category=choices.VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR,
         status=choices.VS_CREATED,
     )
 
@@ -167,9 +169,9 @@ def task_validate_article_is_unpublished(file_path, package_id):
     xmltree = sps_package.PackageArticle(file_path).xmltree_article
     article_data = package_utils.get_article_data_for_comparison(xmltree)
 
-    val = controller.add_validation_result(
-        error_category=choices.VE_ARTICLE_IS_NOT_NEW_ERROR,
+    val = Package.add_validation_result(
         package_id=package_id,
+        error_category=choices.VE_ARTICLE_IS_NOT_NEW_ERROR,
         status=choices.VS_CREATED,
     )
 
@@ -285,9 +287,9 @@ def task_compare_packages(package1_file_path, package2_file_path):
 
 @celery_app.task()
 def task_validate_xml_format(file_path, xml_path, package_id):
-    val = controller.add_validation_result(
-        error_category=choices.VE_XML_FORMAT_ERROR,
+    val = Package.add_validation_result(
         package_id=package_id,
+        error_category=choices.VE_XML_FORMAT_ERROR,
         status=choices.VS_CREATED,
         data={"xml_path": xml_path},
     )
@@ -345,9 +347,9 @@ def task_validate_assets(file_path, xml_path, package_id):
 
         if not is_present:
             has_errors = True
-            controller.add_validation_result(
-                choices.VE_ASSET_ERROR,
+            Package.add_validation_result(
                 package_id,
+                error_category=choices.VE_ASSET_ERROR,
                 status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but not present in the package.")}',
                 data={
@@ -358,9 +360,9 @@ def task_validate_assets(file_path, xml_path, package_id):
                 },
             )
 
-            controller.add_validation_result(
-                choices.VE_ASSET_ERROR,
+            Package.add_validation_result(
                 package_id,
+                error_category=choices.VE_ASSET_ERROR,
                 status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but its optimised version not present in the package.")}',
                 data={
@@ -373,9 +375,9 @@ def task_validate_assets(file_path, xml_path, package_id):
                 },
             )
 
-            controller.add_validation_result(
-                choices.VE_ASSET_ERROR,
+            Package.add_validation_result(
                 package_id,
+                error_category=choices.VE_ASSET_ERROR,
                 status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but its thumbnail version not present in the package.")}',
                 data={
@@ -389,9 +391,9 @@ def task_validate_assets(file_path, xml_path, package_id):
             )
 
     if not has_errors:
-        controller.add_validation_result(
-            choices.VE_ASSET_ERROR,
+        Package.add_validation_result(
             package_id,
+            error_category=choices.VE_ASSET_ERROR,
             status=choices.VS_APPROVED,
             data={"xml_path": xml_path},
         )
@@ -415,7 +417,7 @@ def task_validate_renditions(file_path, xml_path, package_id):
         if not is_present:
             has_errors = True
 
-            controller.add_validation_result(
+            Package.add_validation_result(
                 package_id=package_id,
                 error_category=choices.VE_RENDITION_ERROR,
                 status=choices.VS_DISAPPROVED,
@@ -429,9 +431,9 @@ def task_validate_renditions(file_path, xml_path, package_id):
             )
 
     if not has_errors:
-        controller.add_validation_result(
-            error_category=choices.VE_RENDITION_ERROR,
+        Package.add_validation_result(
             package_id=package_id,
+            error_category=choices.VE_RENDITION_ERROR,
             status=choices.VS_APPROVED,
             data={"xml_path": xml_path},
         )
@@ -453,9 +455,9 @@ def task_validate_content_xml(file_path, xml_path, package_id):
                 string_validations = json.dumps(result_ind, default=str)
                 json_validations = json.loads(string_validations)
 
-                vr = controller.add_validation_result(
-                    error_category=choices.VE_DATA_CONSISTENCY_ERROR,
+                vr = Package.add_validation_result(
                     package_id=package_id,
+                    error_category=choices.VE_DATA_CONSISTENCY_ERROR,
                     status=choices.VS_CREATED,
                     data=json_validations,
                 )
@@ -513,8 +515,8 @@ def task_get_or_create_package(pid_v3, user_id):
         article_inst = create_article_from_etree(xml_etree, user_id)
     try:
         # Obtém pacote relacionado ao PIDv3, caso exista
-        return models.Package.objects.get(article__pid_v3=article_inst.pid_v3).id
-    except models.Package.DoesNotExist:
+        return Package.objects.get(article__pid_v3=article_inst.pid_v3).id
+    except Package.DoesNotExist:
         # Cria pacote novo, caso nenhum exista para o PIDv3 informado
         package_file_name = package_utils.create_package_file_from_site_doc(doc)
 

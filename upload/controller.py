@@ -1,8 +1,6 @@
 import logging
 from datetime import datetime
 
-from django.shortcuts import get_object_or_404
-
 from article.controller import create_article
 from collection.models import WebSiteConfiguration
 from libs.dsm.publication.db import exceptions, mk_connection
@@ -16,15 +14,6 @@ from .models import (
     ValidationResult,
     choices,
 )
-
-
-def add_validation_result(
-    error_category, package_id, status=None, message=None, data=None
-):
-    package = get_object_or_404(Package, pk=package_id)
-    return package.add_validation_result(
-        error_category, status, message, data,
-    )
 
 
 def create_package(

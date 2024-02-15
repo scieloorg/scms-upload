@@ -8,9 +8,6 @@ from upload.forms import (
     ValidationResultErrorResolutionOpinionForm,
 )
 
-from .controller import (
-    update_package_check_finish,
-)
 from .models import Package, choices, ValidationResult
 from .utils.package_utils import coerce_package_and_errors, render_html
 

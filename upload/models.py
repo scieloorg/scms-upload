@@ -88,13 +88,15 @@ class Package(CommonControlField):
             (ASSIGN_PACKAGE, _("Can assign package")),
         )
 
+    @classmethod
     def add_validation_result(
-        self, error_category, status=None, message=None, data=None
+        cls, package_id, error_category=None, status=None, message=None, data=None
     ):
+        package = cls.objects.get(pk=package_id)
         val_res = ValidationResult.create(
-            error_category, self, status, message, data
+            error_category, package, status, message, data
         )
-        self.update_status(val_res)
+        package.update_status(val_res)
         return val_res
 
     def update_status(self, validation_result):
