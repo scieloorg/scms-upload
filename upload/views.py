@@ -8,13 +8,7 @@ from upload.forms import (
     ValidationResultErrorResolutionOpinionForm,
 )
 
-from .controller import (
-    update_package_check_finish,
-    upsert_validation_result_error_resolution,
-    upsert_validation_result_error_resolution_opinion,
-)
-from .models import Package, choices
-from .tasks import check_opinions, check_resolutions
+from .models import Package, choices, ValidationResult
 from .utils.package_utils import coerce_package_and_errors, render_html
 
 
@@ -30,23 +24,11 @@ def ajx_error_resolution(request):
             else ValidationResultErrorResolutionForm(request.POST)
         )
 
-        kwargs = {
-            "validation_result_id": data["validation_result_id"].value(),
-            "user": request.user,
-        }
-
-        if scope == "analyse":
-            kwargs.update({"guidance": data["guidance"].value()})
-        else:
-            kwargs.update({"rationale": data["rationale"].value()})
-
         if data.is_valid():
-            if scope == "analyse":
-                kwargs.update({"opinion": data["opinion"].value()})
-                upsert_validation_result_error_resolution_opinion(**kwargs)
-            else:
-                kwargs.update({"action": data["action"].value()})
-                upsert_validation_result_error_resolution(**kwargs)
+            ValidationResult.add_resolution(
+                user=request.user,
+                data=data,
+            )
 
         return JsonResponse({"status": "success"})
 
@@ -61,10 +43,12 @@ def error_resolution(request):
         package_id = request.POST.get("package_id")
         scope = request.POST.get("scope", "")
 
-        if package_id:
-            check_opinions(package_id) if scope == "analyse" else check_resolutions(
-                package_id
-            )
+        package = get_object_or_404(Package, pk=package_id)
+
+        if scope == "analyse":
+            package.check_opinions()
+        else:
+            package.check_resolutions()
 
         messages.success(request, _("Thank you for submitting your responses."))
 
@@ -113,9 +97,9 @@ def finish_deposit(request):
     package_id = request.GET.get("package_id")
 
     if package_id:
-        can_be_finished = update_package_check_finish(package_id)
+        package = get_object_or_404(Package, pk=package_id)
 
-        if can_be_finished:
+        if package.check_finish():
             messages.success(request, _("Package has been submitted to QA"))
         else:
             messages.warning(

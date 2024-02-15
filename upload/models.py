@@ -88,6 +88,69 @@ class Package(CommonControlField):
             (ASSIGN_PACKAGE, _("Can assign package")),
         )
 
+    @classmethod
+    def add_validation_result(
+        cls, package_id, error_category=None, status=None, message=None, data=None
+    ):
+        package = cls.objects.get(pk=package_id)
+        val_res = ValidationResult.create(
+            error_category, package, status, message, data
+        )
+        package.update_status(val_res)
+        return val_res
+
+    def update_status(self, validation_result):
+        if validation_result.status == choices.VS_DISAPPROVED:
+            self.status = choices.PS_REJECTED
+            self.save()
+
+    @classmethod
+    def get(cls, pkg_id):
+        return cls.objects.get(pk=pkg_id)
+
+    @classmethod
+    def create(cls, user_id, file, article_id=None, category=None, status=None):
+        obj = cls()
+        obj.article_id = article_id
+        obj.creator_id = user_id
+        obj.created = datetime.utcnow()
+        obj.file = file
+        obj.category = category or choices.PC_SYSTEM_GENERATED
+        obj.status = status or choices.PS_PUBLISHED
+        obj.save()
+        return obj
+
+    def check_errors(self):
+        for vr in self.validationresult_set.filter(status=choices.VS_DISAPPROVED):
+            if vr.resolution.action in (choices.ER_ACTION_TO_FIX, ""):
+                self.status = choices.PS_PENDING_CORRECTION
+                self.save()
+                return self.status
+
+        self.status = choices.PS_READY_TO_BE_FINISHED
+        self.save()
+        return self.status
+
+    def check_opinions(self):
+        for vr in self.validationresult_set.filter(status=choices.VS_DISAPPROVED):
+            opinion = vr.analysis.opinion
+            if opinion in (choices.ER_OPINION_FIX_DEMANDED, ""):
+                self.status = choices.PS_PENDING_CORRECTION
+                self.save()
+                return self.status
+
+        self.status = choices.PS_ACCEPTED
+        self.save()
+        return self.status
+
+    def check_finish(self):
+        if self.status == choices.PS_READY_TO_BE_FINISHED:
+            self.status = choices.PS_QA
+            self.save()
+            return True
+
+        return False
+
 
 class QAPackage(Package):
     class Meta:
@@ -158,6 +221,49 @@ class ValidationResult(models.Model):
 
     base_form_class = ValidationResultForm
 
+    @classmethod
+    def create(
+        cls, error_category, package, status=None, message=None, data=None
+    ):
+        val_res = ValidationResult()
+        val_res.category = error_category
+        val_res.package = package
+        val_res.status = status
+        val_res.message = message
+        val_res.data = data
+        val_res.save()
+        return val_res
+
+    def update(self, error_category, status=None, message=None, data=None):
+        self.category = error_category
+        self.status = status
+        self.message = message
+        self.data = data
+        self.save()
+
+        self.package.update_status(self)
+
+    @classmethod
+    def add_resolution(cls, user, data):
+        validation_result = cls.objects.get(
+            pk=data["validation_result_id"].value())
+
+        try:
+            opinion = data["opinion"].value()
+            return ErrorResolutionOpinion.create_or_update(
+                user=user,
+                validation_result=validation_result,
+                opinion=opinion,
+                guidance=data["guidance"].value(),
+            )
+        except KeyError:
+            return ErrorResolution.create_or_update(
+                user=user,
+                validation_result=validation_result,
+                action=data["action"].value(),
+                rationale=data["rationale"].value(),
+            )
+
 
 class ErrorResolution(CommonControlField):
     validation_result = models.OneToOneField(
@@ -181,6 +287,32 @@ class ErrorResolution(CommonControlField):
         FieldPanel("rationale"),
     ]
 
+    @classmethod
+    def get(cls, validation_result):
+        return cls.objects.get(validation_result=validation_result)
+
+    @classmethod
+    def create(cls, user, validation_result, action, rationale):
+        obj = cls()
+        obj.creator = user
+        obj.created = datetime.now()
+        obj.validation_result = validation_result
+        obj.action = action
+        obj.rationale = rationale
+        obj.save()
+        return obj
+
+    @classmethod
+    def create_or_update(cls, user, validation_result, action, rationale):
+        try:
+            obj = cls.get(validation_result)
+            obj.updated = datetime.now()
+            obj.updated_by = user
+            obj.save()
+        except cls.DoesNotExist:
+            obj = cls.create(user, validation_result, action, rationale)
+        return obj
+
 
 class ErrorResolutionOpinion(CommonControlField):
     validation_result = models.OneToOneField(
@@ -203,3 +335,29 @@ class ErrorResolutionOpinion(CommonControlField):
         FieldPanel("opinion"),
         FieldPanel("guidance"),
     ]
+
+    @classmethod
+    def get(cls, validation_result):
+        return cls.objects.get(validation_result=validation_result)
+
+    @classmethod
+    def create(cls, user, validation_result, opinion, guidance):
+        obj = cls()
+        obj.creator = user
+        obj.created = datetime.now()
+        obj.validation_result = validation_result
+        obj.opinion = opinion
+        obj.guidance = guidance
+        obj.save()
+        return obj
+
+    @classmethod
+    def create_or_update(cls, user, validation_result, opinion, guidance):
+        try:
+            obj = cls.get(validation_result)
+            obj.updated = datetime.now()
+            obj.updated_by = user
+            obj.save()
+        except cls.DoesNotExist:
+            obj = cls.create(user, validation_result, opinion, guidance)
+        return obj
