@@ -118,6 +118,29 @@ class Package(CommonControlField):
         obj.save()
         return obj
 
+    def check_errors(self):
+        for vr in self.validationresult_set.filter(status=choices.VS_DISAPPROVED):
+            if vr.resolution.action in (choices.ER_ACTION_TO_FIX, ""):
+                self.status = choices.PS_PENDING_CORRECTION
+                self.save()
+                return self.status
+
+        self.status = choices.PS_READY_TO_BE_FINISHED
+        self.save()
+        return self.status
+
+    def check_opinions(self):
+        for vr in self.validationresult_set.filter(status=choices.VS_DISAPPROVED):
+            opinion = vr.analysis.opinion
+            if opinion in (choices.ER_OPINION_FIX_DEMANDED, ""):
+                self.status = choices.PS_PENDING_CORRECTION
+                self.save()
+                return self.status
+
+        self.status = choices.PS_ACCEPTED
+        self.save()
+        return self.status
+
 
 class QAPackage(Package):
     class Meta:
