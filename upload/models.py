@@ -194,6 +194,27 @@ class ValidationResult(models.Model):
 
         self.package.update_status(self)
 
+    @classmethod
+    def add_resolution(cls, user, data):
+        validation_result = cls.objects.get(
+            pk=data["validation_result_id"].value())
+
+        try:
+            opinion = data["opinion"].value()
+            return ErrorResolutionOpinion.create_or_update(
+                user=user,
+                validation_result=validation_result,
+                opinion=opinion,
+                guidance=data["guidance"].value(),
+            )
+        except KeyError:
+            return ErrorResolution.create_or_update(
+                user=user,
+                validation_result=validation_result,
+                action=data["action"].value(),
+                rationale=data["rationale"].value(),
+            )
+
 
 class ErrorResolution(CommonControlField):
     validation_result = models.OneToOneField(
