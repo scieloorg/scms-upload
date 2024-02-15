@@ -27,39 +27,6 @@ def add_validation_result(
     )
 
 
-def upsert_validation_result_error_resolution(
-    validation_result_id, user, action, rationale
-):
-    er = upsert_object(ErrorResolution, validation_result_id, user)
-    er.action = action
-    er.rationale = rationale
-    er.validation_result = ValidationResult.objects.get(pk=validation_result_id)
-    er.save()
-
-
-def upsert_validation_result_error_resolution_opinion(
-    validation_result_id, user, opinion, guidance
-):
-    ero = upsert_object(ErrorResolutionOpinion, validation_result_id, user)
-    ero.opinion = opinion
-    ero.guidance = guidance
-    ero.validation_result = ValidationResult.objects.get(pk=validation_result_id)
-    ero.save()
-
-
-def upsert_object(object_class, validation_result_id, user):
-    try:
-        obj_instance = object_class.objects.get(pk=validation_result_id)
-        obj_instance.updated = datetime.now()
-        obj_instance.updated_by = user
-    except object_class.DoesNotExist:
-        obj_instance = object_class()
-        obj_instance.creator = user
-        obj_instance.created = datetime.now()
-
-    return obj_instance
-
-
 def update_package_check_finish(package_id):
     package = get_object_or_404(Package, pk=package_id)
 
