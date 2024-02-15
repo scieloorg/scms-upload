@@ -217,6 +217,32 @@ class ErrorResolution(CommonControlField):
         FieldPanel("rationale"),
     ]
 
+    @classmethod
+    def get(cls, validation_result):
+        return cls.objects.get(validation_result=validation_result)
+
+    @classmethod
+    def create(cls, user, validation_result, action, rationale):
+        obj = cls()
+        obj.creator = user
+        obj.created = datetime.now()
+        obj.validation_result = validation_result
+        obj.action = action
+        obj.rationale = rationale
+        obj.save()
+        return obj
+
+    @classmethod
+    def create_or_update(cls, user, validation_result, action, rationale):
+        try:
+            obj = cls.get(validation_result)
+            obj.updated = datetime.now()
+            obj.updated_by = user
+            obj.save()
+        except cls.DoesNotExist:
+            obj = cls.create(user, validation_result, action, rationale)
+        return obj
+
 
 class ErrorResolutionOpinion(CommonControlField):
     validation_result = models.OneToOneField(
@@ -239,3 +265,29 @@ class ErrorResolutionOpinion(CommonControlField):
         FieldPanel("opinion"),
         FieldPanel("guidance"),
     ]
+
+    @classmethod
+    def get(cls, validation_result):
+        return cls.objects.get(validation_result=validation_result)
+
+    @classmethod
+    def create(cls, user, validation_result, opinion, guidance):
+        obj = cls()
+        obj.creator = user
+        obj.created = datetime.now()
+        obj.validation_result = validation_result
+        obj.opinion = opinion
+        obj.guidance = guidance
+        obj.save()
+        return obj
+
+    @classmethod
+    def create_or_update(cls, user, validation_result, opinion, guidance):
+        try:
+            obj = cls.get(validation_result)
+            obj.updated = datetime.now()
+            obj.updated_by = user
+            obj.save()
+        except cls.DoesNotExist:
+            obj = cls.create(user, validation_result, opinion, guidance)
+        return obj
