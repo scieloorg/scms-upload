@@ -141,6 +141,14 @@ class Package(CommonControlField):
         self.save()
         return self.status
 
+    def check_finish(self):
+        if self.status == choices.PS_READY_TO_BE_FINISHED:
+            self.status = choices.PS_QA
+            self.save()
+            return True
+
+        return False
+
 
 class QAPackage(Package):
     class Meta:

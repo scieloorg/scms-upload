@@ -100,9 +100,9 @@ def finish_deposit(request):
     package_id = request.GET.get("package_id")
 
     if package_id:
-        can_be_finished = update_package_check_finish(package_id)
+        package = get_object_or_404(Package, pk=package_id)
 
-        if can_be_finished:
+        if package.check_finish():
             messages.success(request, _("Package has been submitted to QA"))
         else:
             messages.warning(

@@ -27,17 +27,6 @@ def add_validation_result(
     )
 
 
-def update_package_check_finish(package_id):
-    package = get_object_or_404(Package, pk=package_id)
-
-    if package.status == choices.PS_READY_TO_BE_FINISHED:
-        package.status = choices.PS_QA
-        package.save()
-        return True
-
-    return False
-
-
 def create_package(
     article_id,
     user_id,
