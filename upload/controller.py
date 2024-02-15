@@ -5,9 +5,9 @@ from django.shortcuts import get_object_or_404
 
 from article.controller import create_article
 from collection.models import WebSiteConfiguration
-from package.models import SPSPkg
-from package import choices as package_choices
 from libs.dsm.publication.db import exceptions, mk_connection
+from package import choices as package_choices
+from package.models import SPSPkg
 
 from .models import (
     ErrorResolution,
