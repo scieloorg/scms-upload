@@ -21,35 +21,10 @@ from .models import (
 def add_validation_result(
     error_category, package_id, status=None, message=None, data=None
 ):
-    val_res = ValidationResult()
-    val_res.category = error_category
-
-    val_res.package = get_object_or_404(Package, pk=package_id)
-    val_res.status = status
-    val_res.message = message
-    val_res.data = data
-
-    if val_res.status == choices.VS_DISAPPROVED:
-        val_res.package.status = choices.PS_REJECTED
-        val_res.package.save()
-
-    val_res.save()
-    return val_res
-
-
-def update_validation_result(validation_result_id, **kwargs):
-    try:
-        val_res = ValidationResult.objects.get(pk=validation_result_id)
-        for k, v in kwargs.items():
-            setattr(val_res, k, v)
-
-        if val_res.status == choices.VS_DISAPPROVED:
-            val_res.package.status = choices.PS_REJECTED
-            val_res.package.save()
-
-        val_res.save()
-    except ValidationResult.DoesNotExist:
-        ...
+    package = get_object_or_404(Package, pk=package_id)
+    return package.add_validation_result(
+        error_category, status, message, data,
+    )
 
 
 def upsert_validation_result_error_resolution(
