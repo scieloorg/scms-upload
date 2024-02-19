@@ -41,7 +41,7 @@ class Package(CommonControlField):
         default=choices.PS_ENQUEUED_FOR_VALIDATION,
     )
     article = models.ForeignKey(
-        Article, blank=True, null=True, on_delete=models.SET_NULL
+        Article, blank=True, null=True, on_delete=models.SET_NULL,
     )
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.SET_NULL)
     assignee = models.ForeignKey(User, blank=True, null=True, on_delete=models.SET_NULL)
@@ -93,10 +93,17 @@ class Package(CommonControlField):
         cls, package_id, error_category=None, status=None, message=None, data=None
     ):
         package = cls.objects.get(pk=package_id)
+        val_res = package._add_validation_result(
+            error_category, status, message, data)
+        return val_res
+
+    def _add_validation_result(
+        self, error_category=None, status=None, message=None, data=None
+    ):
         val_res = ValidationResult.create(
-            error_category, package, status, message, data
+            error_category, self, status, message, data
         )
-        package.update_status(val_res)
+        self.update_status(val_res)
         return val_res
 
     def update_status(self, validation_result):
@@ -105,8 +112,11 @@ class Package(CommonControlField):
             self.save()
 
     @classmethod
-    def get(cls, pkg_id):
-        return cls.objects.get(pk=pkg_id)
+    def get(cls, pkg_id=None, article=None):
+        if pkg_id:
+            return cls.objects.get(pk=pkg_id)
+        if article:
+            return cls.objects.get(article=article)
 
     @classmethod
     def create(cls, user_id, file, article_id=None, category=None, status=None):
@@ -119,6 +129,21 @@ class Package(CommonControlField):
         obj.status = status or choices.PS_PUBLISHED
         obj.save()
         return obj
+
+    @classmethod
+    def create_or_update(cls, user_id, file, article=None, category=None, status=None):
+        try:
+            obj = cls.get(article=article)
+            obj.article = article
+            obj.file = file
+            obj.category = category
+            obj.status = status
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(
+                user_id, file, article_id=article.id, category=category, status=status
+            )
 
     def check_errors(self):
         for vr in self.validationresult_set.filter(status=choices.VS_DISAPPROVED):
