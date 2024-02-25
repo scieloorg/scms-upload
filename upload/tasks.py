@@ -22,6 +22,7 @@ from . import choices, controller, exceptions
 from .utils import file_utils, package_utils, xml_utils
 from upload.models import Package
 
+from upload.xml_validation import validate_xml_content, get_data
 
 User = get_user_model()
 
@@ -539,3 +540,71 @@ def _get_user(request, user_id):
 def task_request_pid_for_accepted_packages(self, user_id):
     user = _get_user(self.request, user_id)
     controller.request_pid_for_accepted_packages(user)
+
+
+@celery_app.task(bind=True)
+def task_validate_original_zip_file(self, package_id, file_path, journal_id, issue_id, article_id):
+
+    for xml_with_pre in XMLWithPre.create(file_path=file_path):
+        xml_path = xml_with_pre.filename
+        break
+
+    if xml_path:
+        # Aciona validação de Assets
+        task_validate_assets.apply_async(
+            kwargs={
+                "file_path": file_path,
+                "xml_path": xml_path,
+                "package_id": package_id,
+            },
+        )
+
+        # Aciona validação de Renditions
+        task_validate_renditions.apply_async(
+            kwargs={
+                "file_path": file_path,
+                "xml_path": xml_path,
+                "package_id": package_id,
+            },
+        )
+
+        # Aciona validacao do conteudo do XML
+
+        task_validate_xml_content.apply_async(
+            kwargs={
+                "file_path": file_path,
+                "xml_path": xml_path,
+                "package_id": package_id,
+                "journal_id": journal_id,
+                "issue_id": issue_id,
+                "article_id": article_id,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_validate_xml_content(self, file_path, xml_path, package_id, journal_id, issue_id, article_id):
+    # VE_BIBLIOMETRICS_DATA_ERROR = "bibliometrics-data-error"
+    # VE_SERVICES_DATA_ERROR = "services-data-error"
+    # VE_DATA_CONSISTENCY_ERROR = "data-consistency-error"
+    # VE_CRITERIA_ISSUES_ERROR = "criteria-issues-error"
+
+    data = {}
+    package = Package.objects.get(pk=package_id)
+    for xml_with_pre in XMLWithPre.create(file_path=file_path):
+        results = validate_xml_content(xml_with_pre.sps_pkg_name, xml_with_pre.xmltree, data)
+
+        for result in results:
+            # ['xpath', 'advice', 'title', 'expected_value', 'got_value', 'message', 'validation_type', 'response']
+            if not result["response"] == "ERROR":
+                continue
+
+            message = result["message"]
+            advice = result["advice"] or ''
+            message = ". ".join(_(message), _(advice))
+            package._add_validation_result(
+                error_category=choices.VE_DATA_CONSISTENCY_ERROR,
+                status=choices.VS_DISAPPROVED,
+                message=message,
+                data=result,
+            )
