@@ -785,7 +785,7 @@ class IssueProc(BaseProc, ClusterableModel):
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
-                detail=result,
+                detail=failures + ok,
             )
 
     @classmethod
