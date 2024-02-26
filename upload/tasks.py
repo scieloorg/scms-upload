@@ -22,7 +22,7 @@ from . import choices, controller, exceptions
 from .utils import file_utils, package_utils, xml_utils
 from upload.models import Package
 
-from upload.xml_validation import validate_xml_content, get_data
+from upload.xml_validation import validate_xml_content, add_app_data, add_sps_data, add_journal_data
 
 User = get_user_model()
 
@@ -569,7 +569,6 @@ def task_validate_original_zip_file(self, package_id, file_path, journal_id, iss
         )
 
         # Aciona validacao do conteudo do XML
-
         task_validate_xml_content.apply_async(
             kwargs={
                 "file_path": file_path,
@@ -589,7 +588,12 @@ def task_validate_xml_content(self, file_path, xml_path, package_id, journal_id,
     # VE_DATA_CONSISTENCY_ERROR = "data-consistency-error"
     # VE_CRITERIA_ISSUES_ERROR = "criteria-issues-error"
 
+    # TODO completar data
     data = {}
+    # add_app_data(data, app_data)
+    # add_journal_data(data, journal, issue)
+    # add_sps_data(data, sps_data)
+
     package = Package.objects.get(pk=package_id)
     for xml_with_pre in XMLWithPre.create(file_path=file_path):
         results = validate_xml_content(xml_with_pre.sps_pkg_name, xml_with_pre.xmltree, data)
