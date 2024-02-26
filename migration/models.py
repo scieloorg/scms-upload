@@ -42,8 +42,11 @@ class HTMLXMLCreateOrUpdateError(Exception):
 
 
 def modified_date(file_path):
-    s = os.stat(file_path)
-    return datetime.fromtimestamp(s.st_mtime)
+    try:
+        s = os.stat(file_path)
+        return datetime.fromtimestamp(s.st_mtime)
+    except Exception as e:
+        return datetime.utcnow()
 
 
 class ClassicWebsiteConfiguration(CommonControlField):
@@ -297,7 +300,11 @@ class MigratedData(CommonControlField):
 def migrated_files_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
 
-    return f"classic_website/{instance.collection.acron}/{instance.original_path}"
+    try:
+        return f"classic_website/{instance.collection.acron}/{instance.original_path}"
+    except (AttributeError, TypeError):
+        logging.exception(e)
+        return f"classic_website/{filename}"
 
 
 class MigratedFile(CommonControlField):
@@ -380,37 +387,37 @@ class MigratedFile(CommonControlField):
                 "MigratedFile.create_or_update requires source_path, collection, original_path"
             )
 
+        basename = os.path.basename(source_path)
+        file_date = modified_date(source_path)
+
         try:
             obj = cls.get(collection, original_path)
+
+            if not force_update and obj.is_up_to_date(file_date):
+                # is already done
+                logging.info("it is already up-to-date")
+                return obj
+
             obj.updated_by = user
         except cls.DoesNotExist:
             obj = cls()
             obj.collection = collection
             obj.original_path = original_path
-            obj.original_name = os.path.basename(original_path)
+            obj.original_name = basename
             obj.original_href = obj.get_original_href(original_path)
             obj.creator = user
-
-        file_date = modified_date(source_path)
-        if not force_update and obj.is_up_to_date(file_date):
-            # is already done
-            logging.info("it is already up-to-date")
-            return
 
         obj.pkg_name = pkg_name or obj.pkg_name
         obj.lang = lang or obj.lang
         obj.part = part or obj.part
         obj.component_type = component_type or obj.component_type
         obj.file_date = file_date
-        try:
-            # cria / atualiza arquivo
-            with open(source_path, "rb") as fp:
-                obj.save_file(os.path.basename(source_path), fp.read())
-            obj.save()
-        except Exception as e:
-            raise MigratedFileCreateOrUpdateError(
-                f"Unable to migrate file ({collection} {original_path}). Exception: {e} {type(e)}"
-            )
+
+        with open(source_path, "rb") as fp:
+            content = fp.read()
+        obj.save_file(basename, content, bool(original_path))
+        obj.save()
+
         return obj
 
     @classmethod
@@ -440,17 +447,13 @@ class MigratedFile(CommonControlField):
         except:
             pass
 
-    def save_file(self, name, content):
+    def save_file(self, name, content, delete=False):
         if self.file:
-            try:
-                with open(self.file.path, "rb") as fp:
-                    c = fp.read()
-                    if c == content:
-                        return
-                    else:
-                        self.file.delete(save=True)
-            except Exception as e:
-                pass
+            if delete:
+                try:
+                    self.file.delete(save=True)
+                except Exception as e:
+                    pass
         self.file.save(name, ContentFile(content))
 
     def is_up_to_date(self, file_date):
