@@ -755,18 +755,19 @@ class IssueProc(BaseProc, ClusterableModel):
             self.files_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
+            result = None
             result = f_get_files_from_classic_website(user, self, force_update)
-            failures = result.get("failures")
-            migrated = result.get("migrated")
 
-            ok = []
+            migrated = result.pop("migrated") or []
+
+            result["migrated"] = []
             for item in migrated:
                 self.issue_files.add(item)
-                ok.append({"file": item.original_path})
+                result["migrated"].append({"file": item.original_path})
 
             self.files_status = (
                 tracker_choices.PROGRESS_STATUS_PENDING
-                if failures
+                if result["failures"]
                 else tracker_choices.PROGRESS_STATUS_DONE
             )
             self.save()
@@ -774,7 +775,7 @@ class IssueProc(BaseProc, ClusterableModel):
                 user,
                 completed=(self.files_status == tracker_choices.PROGRESS_STATUS_DONE),
                 message="Files",
-                detail=failures + ok,
+                detail=result,
             )
 
         except Exception as e:
@@ -829,7 +830,7 @@ class IssueProc(BaseProc, ClusterableModel):
 
             self.docs_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
-
+            result = None
             result = f_get_article_records_from_classic_website(
                 user, self, ArticleProc, force_update
             )

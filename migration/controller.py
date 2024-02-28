@@ -98,46 +98,56 @@ class IssueFolderImporter:
 
         failures = []
         migrated = []
-        classic_issue_files = classic_website.get_issue_files(
+        files_and_exceptions = classic_website.get_issue_files_and_exceptions(
             journal_acron,
             issue_proc.issue_folder,
         )
-        for file in classic_issue_files:
-            # {"type": "pdf", "key": name, "path": path, "name": basename, "lang": lang}
-            # {"type": "xml", "key": name, "path": path, "name": basename, }
-            # {"type": "html", "key": name, "path": path, "name": basename, "lang": lang, "part": label}
-            # {"type": "asset", "path": item, "name": os.path.basename(item)}
-            try:
-                component_type = IssueFolderImporter.check_component_type(file)
 
-                part = file.get("part")
-                if part == "before":
-                    # html antes das referencias
-                    part = "1"
-                elif part == "after":
-                    # html após das referencias
-                    part = "2"
+        classic_issue_files = files_and_exceptions["files"]
+        exceptions = files_and_exceptions["exceptions"]
+        # {"message": e.message, "type": str(type(e))}
 
-                migrated_file = MigratedFile.create_or_update(
-                    user=self.user,
-                    collection=collection,
-                    original_path=IssueFolderImporter._get_classic_website_rel_path(
-                        file["path"]
-                    ),
-                    source_path=file["path"],
-                    component_type=component_type,
-                    lang=file.get("lang"),
-                    part=part,
-                    pkg_name=file.get("key"),
-                    force_update=self.force_update,
-                )
-                migrated.append(migrated_file)
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                failures.append(
-                    {"file": file, "exc_traceback": format_traceback(exc_traceback)}
-                )
-        return {"migrated": migrated, "failures": failures}
+        try:
+            for file in classic_issue_files:
+                # {"type": "pdf", "key": name, "path": path, "name": basename, "lang": lang}
+                # {"type": "xml", "key": name, "path": path, "name": basename, }
+                # {"type": "html", "key": name, "path": path, "name": basename, "lang": lang, "part": label}
+                # {"type": "asset", "path": item, "name": os.path.basename(item)}
+                try:
+                    component_type = IssueFolderImporter.check_component_type(file)
+
+                    part = file.get("part")
+                    if part == "before":
+                        # html antes das referencias
+                        part = "1"
+                    elif part == "after":
+                        # html após das referencias
+                        part = "2"
+
+                    migrated_file = MigratedFile.create_or_update(
+                        user=self.user,
+                        collection=collection,
+                        original_path=IssueFolderImporter._get_classic_website_rel_path(
+                            file["path"]
+                        ),
+                        source_path=file["path"],
+                        component_type=component_type,
+                        lang=file.get("lang"),
+                        part=part,
+                        pkg_name=file.get("key"),
+                        force_update=self.force_update,
+                    )
+                    migrated.append(migrated_file)
+                except Exception as e:
+                    failures.append(
+                        {"file": file, "message": str(e), "type": str(type(e))}
+                    )
+        except Exception as e:
+            failures.append({
+                "files from": f"{journal_acron} {issue_proc.issue_folder}",
+                "message": str(e), "type": str(type(e))}
+            )
+        return {"migrated": migrated, "failures": failures, "exceptions": exceptions}
 
 
 def get_article_records_from_classic_website(
