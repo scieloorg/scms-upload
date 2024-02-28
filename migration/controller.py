@@ -147,7 +147,7 @@ class IssueFolderImporter:
                 "files from": f"{journal_acron} {issue_proc.issue_folder}",
                 "message": str(e), "type": str(type(e))}
             )
-        return {"migrated": migrated, "failures": failures}
+        return {"migrated": migrated, "failures": failures, "exceptions": exceptions}
 
 
 def get_article_records_from_classic_website(
