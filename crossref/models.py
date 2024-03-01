@@ -271,6 +271,54 @@ class CrossrefConfiguration(CommonControlField):
             return cls().data
 
 
+class CrossrefDOIDepositRecord(CommonControlField):
+    xml_crossref = models.ForeignKey(
+        XMLCrossref,
+        on_delete=models.SET_NULL,
+        null=True,
+        unique=True,
+    )
+    status = models.BooleanField(
+        default=False,
+        null=True, 
+        blank=True,
+    )
+    date_post = models.DateField(_("Date Post"), blank=False, null=False, auto_now_add=True)
+
+    @classmethod
+    def get(
+        cls,
+        xml_crossref,
+    ):
+        if xml_crossref:
+            return cls.objects.get(xml_crossref=xml_crossref)
+        raise ValueError("CrossrefDOIDepositRecord.get required xml_crossref paramenter")
+
+    @classmethod
+    def create(
+        cls,
+        xml_crossref,
+    ):
+        try:
+            obj = cls(
+                xml_crossref=xml_crossref,
+            )
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(xml_crossref=xml_crossref)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        xml_crossref,
+    ):
+        try:
+            return cls.get(xml_crossref=xml_crossref)
+        except cls.DoesNotExist:
+            return cls.create(xml_crossref=xml_crossref)
+
+
 class ReportCrossref(CommonControlField):
     file = models.FileField(
         upload_to=csv_crossref_directory_path,
