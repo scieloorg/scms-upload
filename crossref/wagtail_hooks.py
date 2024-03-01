@@ -7,7 +7,7 @@ from wagtail.contrib.modeladmin.options import (
 )
 from wagtail.contrib.modeladmin.views import CreateView
 
-from .models import CrossrefConfiguration
+from .models import CrossrefConfiguration, CrossrefDOIDepositRecord
 
 
 class CrossrefCreateView(CreateView):
@@ -21,7 +21,7 @@ class CrossrefConfigurationAdmin(ModelAdmin):
     create_view_class = CrossrefCreateView
     menu_label = "Crossref"
     menu_icon = "folder-open-inverse"
-    menu_order = 500
+    menu_order = 100
     add_to_settings_menu = False
     exclude_from_explorer = False
 
@@ -35,4 +35,23 @@ class CrossrefConfigurationAdmin(ModelAdmin):
     search_fields = list_display
 
 
-modeladmin_register(CrossrefConfigurationAdmin)
+class CrossrefDOIDepositRecordAdmin(ModelAdmin):
+    model = CrossrefDOIDepositRecord
+    menu_label = "Crossref Doi Record"
+    menu_icon = "folder-open-inverse"
+    menu_order = 100
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+
+
+class CrossrefGroupAdmin(ModelAdminGroup):
+    menu_label = "Crossref"
+    menu_icon = "folder-open-inverse"
+    menu_order = 500
+    items = (
+        CrossrefConfigurationAdmin,
+        CrossrefDOIDepositRecordAdmin,
+    )
+
+
+modeladmin_register(CrossrefGroupAdmin)
