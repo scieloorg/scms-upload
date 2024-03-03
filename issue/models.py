@@ -42,9 +42,9 @@ class Issue(CommonControlField, IssuePublicationDate):
     journal = models.ForeignKey(
         Journal, on_delete=models.SET_NULL, null=True, blank=True
     )
-    volume = models.CharField(_("Volume"), max_length=4, null=True, blank=True)
-    number = models.CharField(_("Number"), max_length=4, null=True, blank=True)
-    supplement = models.CharField(_("Supplement"), max_length=4, null=True, blank=True)
+    volume = models.CharField(_("Volume"), max_length=16, null=True, blank=True)
+    number = models.CharField(_("Number"), max_length=16, null=True, blank=True)
+    supplement = models.CharField(_("Supplement"), max_length=16, null=True, blank=True)
     publication_year = models.CharField(_("Year"), max_length=4, null=True, blank=True)
 
     @staticmethod
