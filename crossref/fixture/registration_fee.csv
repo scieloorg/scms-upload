@@ -1,0 +1,14 @@
+record_type,fee_current_year,fee_back_year
+"Journal articles",1.0,0.15
+"Book Title",1.0,0.15
+"Conference proceedings and conference papers",1.0,0.15
+"Technical reports and working papers",1.0,0.15
+"Theses and dissertations",1.0,0.15
+"Peer Reviews (registered by the title owner)",0.25,0.25
+"Peer Reviews (registered by not the title owner)",1.0,1.0
+"Grants",2.0,0.3
+"Preprints",0.25,0.15
+"Book Chapters",0.25,0.15
+"Standards",0.15,0.15
+"Databases and datasets",0.06,0.06
+"Components",0.06,0.06
