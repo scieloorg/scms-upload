@@ -144,7 +144,8 @@ def receive_package(package):
         return response
     except GetXMLItemsError as exc:
         # identifica os erros do arquivo Zip / XML
-        return _identify_file_error(package)
+        _identify_file_error(package)
+        return package
 
 
 def _identify_file_error(package):
