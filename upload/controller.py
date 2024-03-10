@@ -145,10 +145,10 @@ def _identify_file_error(package):
         xml_path = None
         xml_str = file_utils.get_xml_content_from_zip(package.file.path, xml_path)
         xml_utils.get_etree_from_xml_content(xml_str)
-    except (file_utils.BadPackageFileError, file_utils.PackageWithoutXMLFileError) as e:
+    except (file_utils.BadPackageFileError, file_utils.PackageWithoutXMLFileError) as exc:
         package._add_validation_result(
             error_category=choices.VE_PACKAGE_FILE_ERROR,
-            message=e.message,
+            message=exc.message,
             status=choices.VS_DISAPPROVED,
             data={"exception": str(exc), "exception_type": str(type(exc))},
         )
@@ -160,7 +160,7 @@ def _identify_file_error(package):
             "row": e.start_row,
             "snippet": xml_utils.get_snippet(xml_str, e.start_row, e.end_row),
         }
-        val.update(
+        package._add_validation_result(
             error_category=choices.VE_XML_FORMAT_ERROR,
             message=e.message,
             data=data,
