@@ -485,7 +485,7 @@ def task_validate_content_xml(file_path, xml_path, package_id):
                 vr.update(
                     error_category=choices.VE_XML_FORMAT_ERROR,
                     message=_(message),
-                    data=data,
+                    data=json_validations,
                     status=status,
                 )
 

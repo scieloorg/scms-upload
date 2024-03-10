@@ -302,7 +302,7 @@ def migrated_files_directory_path(instance, filename):
 
     try:
         return f"classic_website/{instance.collection.acron}/{instance.original_path}"
-    except (AttributeError, TypeError):
+    except (AttributeError, TypeError) as e:
         logging.exception(e)
         return f"classic_website/{filename}"
 
