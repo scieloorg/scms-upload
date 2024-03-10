@@ -9,6 +9,7 @@ from packtools.sps.utils import file_utils as sps_file_utils
 from packtools.sps.validation import article as sps_validation_article
 from packtools.sps.validation import journal as sps_validation_journal
 from packtools.validator import ValidationReportXML
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from article.choices import AS_CHANGE_SUBMITTED
 from article.controller import create_article_from_etree, update_article
@@ -486,7 +487,7 @@ def task_validate_content_xml(file_path, xml_path, package_id):
                 vr.update(
                     error_category=choices.VE_XML_FORMAT_ERROR,
                     message=_(message),
-                    data=data,
+                    data=json_validations,
                     status=status,
                 )
 
