@@ -127,6 +127,9 @@ class Journal(CommonControlField, ClusterableModel):
     short_title = models.CharField(
         _("Short Title"), max_length=100, null=True, blank=True
     )
+    title = models.CharField(
+        _("Title"), max_length=265, null=True, blank=True
+    )
     official_journal = models.ForeignKey(
         "OfficialJournal",
         null=True,
@@ -136,10 +139,10 @@ class Journal(CommonControlField, ClusterableModel):
     )
 
     def __unicode__(self):
-        return self.short_title or str(self.official_journal)
+        return self.title or self.short_title or str(self.official_journal)
 
     def __str__(self):
-        return self.short_title or str(self.official_journal)
+        return self.title or self.short_title or str(self.official_journal)
 
     base_form_class = OfficialJournalForm
 
@@ -165,7 +168,7 @@ class Journal(CommonControlField, ClusterableModel):
     )
 
     def autocomplete_label(self):
-        return self.official_journal.title
+        return self.title or self.official_journal.title
 
     @property
     def logo_url(self):
@@ -182,6 +185,8 @@ class Journal(CommonControlField, ClusterableModel):
         cls,
         user,
         official_journal=None,
+        title=None,
+        short_title=None,
     ):
         logging.info(f"Journal.create_or_update({official_journal}")
         try:
@@ -196,6 +201,9 @@ class Journal(CommonControlField, ClusterableModel):
             logging.info("create {}".format(obj))
 
         obj.official_journal = official_journal or obj.official_journal
+        obj.title = title or obj.title
+        obj.short_title = short_title or obj.short_title
+
         obj.save()
         logging.info(f"return {obj}")
         return obj
