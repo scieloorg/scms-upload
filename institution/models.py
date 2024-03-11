@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.translation import gettext as _
 from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.models import CommonControlField
 from location.models import Location
@@ -48,8 +49,13 @@ class Institution(CommonControlField, ClusterableModel):
         FieldPanel("logo"),
     ]
 
+    autocomplete_search_field = "name"
+
+    def autocomplete_label(self):
+        return str(self)
+
     def __unicode__(self):
-        return "%s | %s | %s | %s | %s" % (
+        return "%s | %s | %s | %s | %s | %s" % (
             self.name,
             self.acronym,
             self.level_1,
@@ -59,7 +65,7 @@ class Institution(CommonControlField, ClusterableModel):
         )
 
     def __str__(self):
-        return "%s | %s | %s | %s | %s" % (
+        return "%s | %s | %s | %s | %s | %s" % (
             self.name,
             self.acronym,
             self.level_1,
@@ -133,7 +139,7 @@ class InstitutionHistory(models.Model):
     final_date = models.DateField(_("Final Date"), null=True, blank=True)
 
     panels = [
-        FieldPanel("institution", heading=_("Institution")),
+        AutocompletePanel("institution", heading=_("Institution")),
         FieldPanel("initial_date"),
         FieldPanel("final_date"),
     ]
