@@ -210,8 +210,8 @@ class Journal(CommonControlField, ClusterableModel):
 
 
 class Owner(Orderable, InstitutionHistory):
-    page = ParentalKey(Journal, related_name="owner")
+    journal = ParentalKey(Journal, related_name="owner", null=True, blank=True, on_delete=models.SET_NULL)
 
 
 class Publisher(Orderable, InstitutionHistory):
-    page = ParentalKey(Journal, related_name="publisher")
+    journal = ParentalKey(Journal, related_name="publisher", null=True, blank=True, on_delete=models.SET_NULL)
