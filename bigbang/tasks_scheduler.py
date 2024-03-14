@@ -251,6 +251,8 @@ def _schedule_migrate_document_files_and_records(username, enabled):
         name="task_migrate_document_files",
         kwargs=dict(
             username=username,
+            journal_acron=None,
+            publication_year=None,
             force_update=False,
         ),
         description=_("Migra arquivos dos documentos"),
@@ -266,6 +268,8 @@ def _schedule_migrate_document_files_and_records(username, enabled):
         name="task_migrate_document_records",
         kwargs=dict(
             username=username,
+            journal_acron=None,
+            publication_year=None,
             force_update=False,
         ),
         description=_("Migra registros dos documentos"),
