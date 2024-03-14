@@ -716,7 +716,7 @@ class IssueProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
-    def files_to_migrate(cls, collection, force_update):
+    def files_to_migrate(cls, collection, journal_acron, publication_year, force_update):
         """
         Muda o status de PROGRESS_STATUS_REPROC para PROGRESS_STATUS_TODO
         E se force_update = True, muda o status de PROGRESS_STATUS_DONE para PROGRESS_STATUS_TODO
@@ -735,10 +735,17 @@ class IssueProc(BaseProc, ClusterableModel):
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         ).update(files_status=tracker_choices.PROGRESS_STATUS_TODO)
 
+        params = {}
+        if publication_year:
+            params['issue__publication_year'] = publication_year
+        if journal_acron:
+            params['journal_proc__acron'] = journal_acron
+
         return cls.objects.filter(
             files_status=tracker_choices.PROGRESS_STATUS_TODO,
             collection=collection,
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
+            **params,
         ).iterator()
 
     def get_files_from_classic_website(
@@ -790,7 +797,7 @@ class IssueProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
-    def docs_to_migrate(cls, collection, force_update):
+    def docs_to_migrate(cls, collection, journal_acron, publication_year, force_update):
         """
         Muda o status de PROGRESS_STATUS_REPROC para PROGRESS_STATUS_TODO
         E se force_update = True, muda o status de PROGRESS_STATUS_DONE para PROGRESS_STATUS_TODO
@@ -809,10 +816,17 @@ class IssueProc(BaseProc, ClusterableModel):
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         ).update(docs_status=tracker_choices.PROGRESS_STATUS_TODO)
 
+        params = {}
+        if publication_year:
+            params['issue__publication_year'] = publication_year
+        if journal_acron:
+            params['journal_proc__acron'] = journal_acron
+
         return cls.objects.filter(
             docs_status=tracker_choices.PROGRESS_STATUS_TODO,
             collection=collection,
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
+            **params,
         ).iterator()
 
     def get_article_records_from_classic_website(
