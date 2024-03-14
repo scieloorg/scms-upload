@@ -501,6 +501,10 @@ def get_migrated_xml_with_pre(article_proc):
         xml_file_path = None
         xml_file_path = obj.file.path
         for item in XMLWithPre.create(path=xml_file_path):
+            if article_proc.pid and item.v2 != article_proc.pid:
+                # corrige ou adiciona pid v2 no XML migrado nativo ou obtido do html
+                # usando o valor do pid v2 do site clássico
+                item.v2 = article_proc.pid
             return item
     except Exception as e:
         raise XMLVersionXmlWithPreError(
