@@ -262,11 +262,15 @@ def task_migrate_document_files(
     user_id=None,
     username=None,
     collection_acron=None,
+    journal_acron=None,
+    publication_year=None,
     force_update=False,
 ):
     try:
+        publication_year = publication_year and str(publication_year)
         for collection in _get_collections(collection_acron):
-            items = IssueProc.files_to_migrate(collection, force_update)
+            items = IssueProc.files_to_migrate(
+                collection, journal_acron, publication_year, force_update)
             for item in items:
                 # Importa os arquivos das pastas */acron/volnum/*
                 task_import_one_issue_files.apply_async(
@@ -328,11 +332,16 @@ def task_migrate_document_records(
     user_id=None,
     username=None,
     collection_acron=None,
+    journal_acron=None,
+    publication_year=None,
     force_update=False,
 ):
     try:
+        publication_year = publication_year and str(publication_year)
+
         for collection in _get_collections(collection_acron):
-            items = IssueProc.docs_to_migrate(collection, force_update)
+            items = IssueProc.docs_to_migrate(
+                collection, journal_acron, publication_year, force_update)
             for item in items:
                 # Importa os registros de documentos
                 task_import_one_issue_document_records.apply_async(
