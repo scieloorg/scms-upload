@@ -93,6 +93,10 @@ class XMLVersion(CommonControlField):
             return cls.get(pid_provider_xml, xml_with_pre.finger_print)
 
     def save_file(self, filename, content):
+        try:
+            self.file.delete(save=True)
+        except Exception as e:
+            pass
         self.file.save(filename, ContentFile(content))
 
     @property
