@@ -531,6 +531,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
     )
 
     class Meta:
+        ordering = ["-updated", "-created", "pkg_name"]
         indexes = [
             models.Index(fields=["pkg_name"]),
             models.Index(fields=["v3"]),
@@ -563,7 +564,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
     def public_items(cls, from_date):
         now = datetime.utcnow().isoformat()[:10]
         return cls.objects.filter(
-            Q(available_since__lte=now)
+            (Q(available_since__isnull=True) | Q(available_since__lte=now))
             & (Q(created__gte=from_date) | Q(updated__gte=from_date)),
             current_version__pid_provider_xml__v3__isnull=False,
         ).iterator()
@@ -1265,6 +1266,24 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             logging.exception(e)
             return {"error_msg": str(e), "error_type": str(type(e))}
         return {}
+
+    def fix_pid_v2(self, user, correct_pid_v2):
+        try:
+            if correct_pid_v2 == self.v2:
+                return self.data
+            xml_with_pre = self.current_version.xml_with_pre
+            try:
+                self.current_version.delete()
+            except Exception as e:
+                pass
+            xml_with_pre.v2 = correct_pid_v2
+            self.current_version = XMLVersion.get_or_create(user, self, xml_with_pre)
+            self.v2 = correct_pid_v2
+            self.save()
+            return self.data
+        except Exception as e:
+            raise exceptions.PidProviderXMLFixPidV2Error(
+                f"Unable to fix pid v2 for {self.v3} {e} {type(e)}")
 
 
 class CollectionPidRequest(CommonControlField):
