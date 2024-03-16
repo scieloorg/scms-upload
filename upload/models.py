@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, MultiFieldPanel, TabbedInterface, ObjectList
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article.models import Article
@@ -203,3 +203,84 @@ class ErrorResolutionOpinion(CommonControlField):
         FieldPanel("opinion"),
         FieldPanel("guidance"),
     ]
+
+
+class ReviewPdf(CommonControlField):
+    marks = models.BooleanField(default=False, verbose_name=_("Marks by the editor/author."))
+    bibliographic_caption = models.BooleanField(default=False, verbose_name=_("Bibliographic caption with journal information such as volume, number, supplement, special issue and year of publication."))
+
+    table_of_contents = models.BooleanField(default=False, verbose_name=_("For regular publication, Table of contents pagination matches the PDF."))
+    pagination = models.BooleanField(default=False, verbose_name=_("For AOP, Pagination appears as 1-X (it cannot have sequential pagination)."))
+    elocation = models.BooleanField(default=False, verbose_name=_("For PC, Contains elocation-id (unique for each document) also optional pagination for 1-X printing (cannot have sequential pagination)."))
+    periodicity = models.BooleanField(default=False, verbose_name=_("For regular publication, Periodicity information is included."))
+    doi = models.BooleanField(default=False, verbose_name=_("For all types of publication, DOI is included in the PDF (mandatory). The DOI number must be unique for each document."))
+    doi_translation = models.BooleanField(default=False, verbose_name=_("For all types of publication, When there is a translation if there is a different DOI for translation. If it appears in the PDF, it must be marked in the XML."))
+    doi_characters = models.BooleanField(default=False, verbose_name=_("There are no characters that could \"break\" the DOI registration in CrossRef."))
+    license = models.BooleanField(default=False, verbose_name=_("For all types of publication, Creative Commons (CC) license is included in the PDF (required)."))
+    history_dates = models.BooleanField(default=False, verbose_name=_("For all types of publication, Articles that have undergone peer review must contain at least the complete history dates (day + month + year) of acceptance and approval."))
+    label_affiliation = models.BooleanField(default=False, verbose_name=_("For all modalities, Affiliation is correct and has its respective label between author and affiliation (mandatory)."))
+    orcid = models.BooleanField(default=False, verbose_name=_("For all modalities, There is at least one author with ORCID (any author), if so, check if there is a visible number (In the model: 0000-0000-0000-0000 [allows letter]) or ORCID icon linked to the page from the author's ORCID."))
+    taxonomy = models.BooleanField(default=False, verbose_name=_("Exists taxonomy information."))
+    role = models.BooleanField(default=False, verbose_name=_("If there is an indication of author contributions, the marking in <role> is correct."))
+    credit = models.BooleanField(default=False, verbose_name=_("If Taxonomy CRediT, Tag attribute was marked correctly."))
+    availability = models.BooleanField(default=False, verbose_name=_("Data availability information has been marked with the correct tags."))
+    opinion = models.BooleanField(default=False, verbose_name=_("When an opinion is published, Marking follows guidelines and correct labeling."))
+    preprint = models.BooleanField(default=False, verbose_name=_("Preprint information was marked with the correct tags."))
+
+    panels_general = [
+        FieldPanel("marks"),
+        FieldPanel("bibliographic_caption"),
+    ]
+
+    panels_pagination = [
+        FieldPanel("table_of_contents"),
+        FieldPanel("pagination"),
+        FieldPanel("elocation"),
+    ]
+
+    panels_doi = [
+        FieldPanel("doi"),
+        FieldPanel("doi_translation"),
+        FieldPanel("doi_characters"),
+    ]
+
+    panels_license = [
+        FieldPanel("license"),
+    ]
+
+    panels_history_dates = [
+        FieldPanel("history_dates"),
+    ]
+
+    panels_label_affiliation = [
+        FieldPanel("label_affiliation"),
+    ]
+
+    panels_orcid = [
+        FieldPanel("orcid"),
+    ]
+
+    panels_credit = [
+        FieldPanel("taxonomy"),
+        FieldPanel("role"),
+        FieldPanel("credit"),
+    ]
+
+    panels_availability = [
+        FieldPanel("availability"),
+    ]
+
+    
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(panels_general, heading=_("General")),
+            ObjectList(panels_pagination, heading=_("Pagination")),
+            ObjectList(panels_doi, heading=_("DOI")),
+            ObjectList(panels_license, heading=_("License")),
+            ObjectList(panels_history_dates, heading=_("History dates")),
+            ObjectList(panels_label_affiliation, heading=_("Label affiliation")),
+            ObjectList(panels_orcid, heading=_("ORCID")),
+            ObjectList(panels_credit, heading=_("Author contributions (CRediT)")),
+            ObjectList(panels_availability, heading=_("Data availability")),
+        ]
+    )
