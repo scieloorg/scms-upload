@@ -25,6 +25,7 @@ from .models import (
     QAPackage,
     ValidationResult,
     choices,
+    ReviewPdf
 )
 from .permission_helper import UploadPermissionHelper
 from .tasks import run_validations
@@ -371,14 +372,24 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         return qs.none()
 
 
+class ReviewPdfAdmin(ModelAdmin):
+    model = ReviewPdf
+    menu_label = _("Review Pdf")
+    menu_icon = "folder"
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+    list_display = ("marks")
+
+
 class UploadModelAdminGroup(ModelAdminGroup):
     menu_icon = "folder"
     menu_label = "Upload"
-    items = (PackageAdmin, ValidationResultAdmin, QualityAnalysisPackageAdmin)
+    items = (PackageAdmin, ValidationResultAdmin, QualityAnalysisPackageAdmin, ReviewPdfAdmin)
     menu_order = get_menu_order("upload")
 
 
-# modeladmin_register(UploadModelAdminGroup)
+modeladmin_register(UploadModelAdminGroup)
 
 
 @hooks.register("register_admin_urls")
