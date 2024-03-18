@@ -387,3 +387,12 @@ NOCAPTCHA = True
 
 RECAPTCHA_PUBLIC_KEY = env.str("RECAPTCHA_PUBLIC_KEY", default="")
 RECAPTCHA_PRIVATE_KEY = env.str("RECAPTCHA_PRIVATE_KEY", default="")
+
+# Name of Groups
+JOURNAL_TEAM = "Journal Team"
+XML_PROVIDER = "Xml Providers"
+ADMIN_SCIELO = "Administrator SciELO"
+
+WAGTAIL_USER_EDIT_FORM = 'core.users.forms.CustomUserEditForm'
+WAGTAIL_USER_CREATION_FORM = 'core.users.forms.CustomUserCreationForm'
+WAGTAIL_USER_CUSTOM_FIELDS = ['journal']
