@@ -295,7 +295,6 @@ class MigrationModelAdmin(ModelAdminGroup):
         MigratedArticleModelAdmin,
         MigratedFileModelAdmin,
     )
-    menu_order = get_menu_order("migration")
 
 
 modeladmin_register(MigrationModelAdmin)
