@@ -494,7 +494,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
     base_form_class = CoreAdminModelForm
 
     panel_a = [
-        FieldPanel("registered_in_core", read_only=True),
+        FieldPanel("registered_in_core"),
         FieldPanel("issn_electronic", read_only=True),
         FieldPanel("issn_print", read_only=True),
         FieldPanel("pub_year", read_only=True),
@@ -662,7 +662,11 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
             # analisa se aceita ou rejeita registro
             updated_data = cls.skip_registration(
-                xml_adapter, registered, force_update, origin_date, registered_in_core,
+                xml_adapter,
+                registered,
+                force_update,
+                origin_date,
+                registered_in_core,
             )
             if updated_data:
                 return updated_data
@@ -686,7 +690,11 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
             # compara de novo, após completar pids
             updated_data = cls.skip_registration(
-                xml_adapter, registered, force_update, origin_date, registered_in_core,
+                xml_adapter,
+                registered,
+                force_update,
+                origin_date,
+                registered_in_core,
             )
             if updated_data:
                 # XML da entrada e registrado divergem: não tem e tem pids,
@@ -797,7 +805,9 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         return registered
 
     @classmethod
-    def skip_registration(cls, xml_adapter, registered, force_update, origin_date, registered_in_core):
+    def skip_registration(
+        cls, xml_adapter, registered, force_update, origin_date, registered_in_core
+    ):
         """
         XML é versão AOP, mas
         documento está registrado com versão VoR (fascículo),
@@ -1283,10 +1293,16 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             return self.data
         except Exception as e:
             raise exceptions.PidProviderXMLFixPidV2Error(
-                f"Unable to fix pid v2 for {self.v3} {e} {type(e)}")
+                f"Unable to fix pid v2 for {self.v3} {e} {type(e)}"
+            )
 
 
 class CollectionPidRequest(CommonControlField):
+    """
+    Uso exclusivo no Core
+    para controlar a entrada de XML provenientes do AM
+    registrando cada coleção e a data da coleta
+    """
     collection = models.ForeignKey(
         Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -1356,3 +1372,134 @@ class CollectionPidRequest(CommonControlField):
             return obj
         except cls.DoesNotExist:
             return cls.create(user, collection, end_date)
+
+
+class FixPidV2(CommonControlField):
+    """
+    Uso exclusivo da aplicação Upload
+    Para gerenciar os pids v2 que foram ou não corrigidos no Upload e no Core
+    """
+
+    pid_provider_xml = models.ForeignKey(
+        PidProviderXML, on_delete=models.SET_NULL, null=True, blank=True, unique=True
+    )
+    incorrect_pid_v2 = models.CharField(
+        _("Incorrect v2"), max_length=24, null=True, blank=True
+    )
+    correct_pid_v2 = models.CharField(
+        _("Correct v2"), max_length=24, null=True, blank=True
+    )
+    fixed_in_upload = models.BooleanField(null=True, blank=True, default=None)
+    fixed_in_core = models.BooleanField(null=True, blank=True, default=None)
+
+    base_form_class = CoreAdminModelForm
+
+    panels = [
+        FieldPanel("incorrect_pid_v2", read_only=True),
+        FieldPanel("correct_pid_v2", read_only=True),
+        FieldPanel("fixed_in_core"),
+        FieldPanel("fixed_in_upload"),
+    ]
+
+    class Meta:
+        ordering = ["-updated", "-created"]
+
+        indexes = [
+            models.Index(fields=["incorrect_pid_v2"]),
+            models.Index(fields=["correct_pid_v2"]),
+            models.Index(fields=["fixed_in_core"]),
+            models.Index(fields=["fixed_in_upload"]),
+        ]
+
+    def __str__(self):
+        return f"{self.pid_provider_xml.v3}"
+
+    @staticmethod
+    def autocomplete_custom_queryset_filter(search_term):
+        return FixPidV2.objects.filter(pid_provider_xml__v3__icontains=search_term)
+
+    def autocomplete_label(self):
+        return f"{self.pid_provider_xml.v3}"
+
+    @classmethod
+    def get(cls, pid_provider_xml=None):
+        if pid_provider_xml:
+            return cls.objects.get(pid_provider_xml=pid_provider_xml)
+        raise ValueError("FixPidV2.get requires pid_v3")
+
+    @classmethod
+    def create(
+        cls,
+        user,
+        pid_provider_xml=None,
+        incorrect_pid_v2=None,
+        correct_pid_v2=None,
+        fixed_in_core=None,
+        fixed_in_upload=None,
+    ):
+        if correct_pid_v2 == incorrect_pid_v2 or not correct_pid_v2 or not incorrect_pid_v2:
+            raise ValueError(
+                f"FixPidV2.create: Unable to register correct_pid_v2={correct_pid_v2} and incorrect_pid_v2={incorrect_pid_v2} to be fixed"
+            )
+        try:
+            obj = cls()
+            obj.pid_provider_xml = pid_provider_xml
+            obj.incorrect_pid_v2 = incorrect_pid_v2
+            obj.correct_pid_v2 = correct_pid_v2
+            obj.fixed_in_core = fixed_in_core
+            obj.fixed_in_upload = fixed_in_upload
+            obj.creator = user
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(pid_provider_xml)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        user,
+        pid_provider_xml=None,
+        incorrect_pid_v2=None,
+        correct_pid_v2=None,
+        fixed_in_core=None,
+        fixed_in_upload=None,
+    ):
+        try:
+            obj = cls.get(
+                pid_provider_xml=pid_provider_xml,
+            )
+            obj.updated_by = user
+            obj.fixed_in_core = fixed_in_core or obj.fixed_in_core
+            obj.fixed_in_upload = fixed_in_upload or obj.fixed_in_upload
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(
+                user,
+                pid_provider_xml,
+                incorrect_pid_v2,
+                correct_pid_v2,
+                fixed_in_core,
+                fixed_in_upload,
+            )
+
+    @classmethod
+    def get_or_create(
+        cls,
+        user,
+        pid_provider_xml,
+        correct_pid_v2,
+    ):
+        try:
+            return cls.objects.get(
+                pid_provider_xml=pid_provider_xml,
+            )
+        except cls.DoesNotExist:
+            return cls.create(
+                user,
+                pid_provider_xml,
+                pid_provider_xml.v2,
+                correct_pid_v2,
+                fixed_in_core=None,
+                fixed_in_upload=None,
+            )
