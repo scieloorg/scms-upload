@@ -40,3 +40,7 @@ class InvalidPidError(Exception):
 
 class PidProviderXMLFixPidV2Error(Exception):
     ...
+
+
+class APIPidProviderFixPidV2Error(Exception):
+    ...
