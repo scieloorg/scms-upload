@@ -24,7 +24,7 @@ LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 class PidProviderAPIClient:
     """
-    Interface com o pid provider
+    Interface com o pid provider do Core
     """
 
     def __init__(
@@ -44,9 +44,10 @@ class PidProviderAPIClient:
 
     @property
     def enabled(self):
-        if self.config:
+        try:
             return bool(self.config.api_username and self.config.api_password)
-        return False
+        except (AttributeError, ValueError, TypeError):
+            return False
 
     @property
     def config(self):
@@ -57,6 +58,18 @@ class PidProviderAPIClient:
                 logging.exception(f"PidProviderConfig.get_or_create {e}")
                 self._config = None
         return self._config
+
+    @property
+    def fix_pid_v2_url(self):
+        if not hasattr(self, "_fix_pid_v2_url") or not self._fix_pid_v2_url:
+            try:
+                if self.pid_provider_api_post_xml:
+                    self._fix_pid_v2_url = self.pid_provider_api_post_xml.replace(
+                        "pid_provider", "fix_pid_v2"
+                    )
+            except AttributeError as e:
+                raise exceptions.APIPidProviderConfigError(e)
+        return self._fix_pid_v2_url
 
     @property
     def pid_provider_api_post_xml(self):
@@ -247,3 +260,60 @@ class PidProviderAPIClient:
                     break
             except KeyError:
                 pass
+
+    def fix_pid_v2(self, pid_v3, correct_pid_v2):
+        """
+        name : str
+            nome do arquivo xml
+        """
+        try:
+
+            self.token = self.token or self._get_token(
+                username=self.api_username,
+                password=self.api_password,
+                timeout=self.timeout,
+            )
+            response = self._post_fix_pid_v2(pid_v3, correct_pid_v2, self.token, self.timeout)
+            response["fixed_in_core"] = response.get("v2") == correct_pid_v2
+            return response
+        except (
+            exceptions.GetAPITokenError,
+            exceptions.APIPidProviderPostError,
+            exceptions.APIPidProviderConfigError,
+        ) as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            return {
+                "error_msg": str(e),
+                "error_type": str(type(e)),
+                "traceback": [
+                    str(item) for item in traceback.extract_tb(exc_traceback)
+                ],
+            }
+
+    def _post_fix_pid_v2(self, pid_v3, correct_pid_v2, token, timeout):
+        header = {
+            "Authorization": "Bearer " + token,
+            # "content-type": "multi-part/form-data",
+            # "content-type": "application/json",
+        }
+        try:
+            uri = self.fix_pid_v2_url
+            return post_data(
+                uri,
+                data={"pid_v3": pid_v3, "correct_pid_v2": correct_pid_v2},
+                headers=header,
+                timeout=timeout,
+                verify=False,
+                json=True,
+            )
+        except Exception as e:
+            logging.exception(e)
+            raise exceptions.APIPidProviderFixPidV2Error(
+                _("Unable to get pid from pid provider {} {} {} {} {}").format(
+                    uri,
+                    pid_v3,
+                    correct_pid_v2,
+                    type(e),
+                    e,
+                )
+            )
