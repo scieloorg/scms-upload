@@ -1,6 +1,6 @@
 pytz==2023.3  # https://github.com/stub42/pytz
 python-slugify==8.0.1  # https://github.com/un33k/python-slugify
-Pillow==10.1.0  # https://github.com/python-pillow/Pillow
+Pillow==10.2.0  # https://github.com/python-pillow/Pillow
 rcssmin==1.1.1 #django-compressor < 1.1.2 # https://github.com/ndparker/rcssmin
 argon2-cffi==23.1.0  # https://github.com/hynek/argon2_cffi
 whitenoise==6.6.0  # https://github.com/evansd/whitenoise
@@ -82,3 +82,4 @@ tornado>=6.3.2 # not directly required, pinned by Snyk to avoid a vulnerability
 # ------------------------------------------------------------------------------
 tenacity==8.2.3  # https://pypi.org/project/tenacity/
 urllib3==2.1.0
+dnspython>=2.6.1 # not directly required, pinned by Snyk to avoid a vulnerability
