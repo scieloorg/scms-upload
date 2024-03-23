@@ -1,17 +1,19 @@
 import logging
 import sys
 
+from django.db.models import Q
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from pid_provider.base_pid_provider import BasePidProvider
 from pid_provider.client import PidProviderAPIClient
-from pid_provider.models import PidProviderXML
+from pid_provider.models import PidProviderXML, FixPidV2
 from tracker.models import UnexpectedEvent
 
 
 class PidRequester(BasePidProvider):
     """
-    Recebe XML para validar ou atribuir o ID do tipo v3
+    Uso exclusivo da aplicação Upload
+    Realiza solicitações para Pid Provider do Core
     """
 
     def __init__(self):
@@ -163,3 +165,58 @@ class PidRequester(BasePidProvider):
             )
 
         return registered
+
+    def fix_pid_v2(
+        self,
+        user,
+        pid_v3,
+        correct_pid_v2,
+    ):
+        """
+        Corrige pid_v2
+        """
+        fixed = {
+            "pid_v3": pid_v3,
+            "correct_pid_v2": correct_pid_v2,
+        }
+
+        pid_provider_xml = PidProviderXML.objects.get(v3=pid_v3)
+        fixed["pid_v2"] = pid_provider_xml.v2
+        try:
+            item_to_fix = FixPidV2.get_or_create(
+                user, pid_provider_xml, correct_pid_v2)
+        except ValueError as e:
+            return {
+                "error_message": str(e),
+                "error_type": str(type(e)),
+                "pid_v3": pid_v3,
+                "correct_pid_v2": correct_pid_v2,
+            }
+
+        if not item_to_fix.fixed_in_upload:
+            # atualiza v2 em pid_provider_xml
+            response = pid_provider_xml.fix_pid_v2(user, correct_pid_v2)
+            fixed["fixed_in_upload"] = response.get("v2") == correct_pid_v2
+
+        if not item_to_fix.fixed_in_core:
+            # atualiza v2 em pid_provider_xml do CORE
+            # core - fix pid v2
+            response = self.pid_provider_api.fix_pid_v2(pid_v3, correct_pid_v2)
+            logging.info(f"Resposta de Core.fix_pid_v2 {fixed}: {response}")
+            fixed.update(response or {})
+
+        fixed_in_upload = fixed.get("fixed_in_upload")
+        fixed_in_core = fixed.get("fixed_in_core")
+        if fixed_in_upload or fixed_in_core:
+            obj = FixPidV2.create_or_update(
+                user,
+                pid_provider_xml=pid_provider_xml,
+                incorrect_pid_v2=item_to_fix.incorrect_pid_v2,
+                correct_pid_v2=item_to_fix.correct_pid_v2,
+                fixed_in_core=fixed_in_core or item_to_fix.fixed_in_core,
+                fixed_in_upload=fixed_in_upload or item_to_fix.fixed_in_upload,
+            )
+            fixed["fixed_in_upload"] = obj.fixed_in_upload
+            fixed["fixed_in_core"] = obj.fixed_in_core
+        logging.info(fixed)
+        return fixed
