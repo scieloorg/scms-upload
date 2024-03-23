@@ -1172,6 +1172,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             with TemporaryDirectory() as output_folder:
 
                 xml_with_pre = get_migrated_xml_with_pre(self)
+
                 builder = PkgZipBuilder(xml_with_pre)
                 sps_pkg_zip_path = builder.build_sps_package(
                     output_folder,
@@ -1186,6 +1187,9 @@ class ArticleProc(BaseProc, ClusterableModel):
                 # verificar se este código pode ser aproveitado pelo fluxo
                 # de ingresso, se sim, ajustar os valores dos parâmetros
                 # origin e is_published
+
+                self.fix_pid_v2(user)
+
                 self.sps_pkg = SPSPkg.create_or_update(
                     user,
                     sps_pkg_zip_path,
@@ -1212,6 +1216,11 @@ class ArticleProc(BaseProc, ClusterableModel):
                 exception=e,
                 detail=self.sps_pkg and self.sps_pkg.data or None,
             )
+
+    def fix_pid_v2(self, user):
+        if self.sps_pkg:
+            self.sps_pkg.fix_pid_v2(
+                user, correct_pid_v2=self.migrated_data.pid)
 
     def update_sps_pkg_status(self):
         if not self.sps_pkg:
