@@ -465,7 +465,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
     ):
         try:
             operation = article_proc.start(user, "SPSPkg.create_or_update")
-
             obj = cls.add_pid_v3_to_zip(user, sps_pkg_zip_path, is_public, article_proc)
             obj.origin = origin or obj.origin
             obj.is_public = is_public or obj.is_public
@@ -537,6 +536,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 except cls.DoesNotExist:
                     pass
             yield item
+
+    def fix_pid_v2(self, user, correct_pid_v2):
+        return pid_provider_app.fix_pid_v2(user, self.pid_v3, correct_pid_v2)
 
     @classmethod
     def add_pid_v3_to_zip(cls, user, zip_xml_file_path, is_public, article_proc):
