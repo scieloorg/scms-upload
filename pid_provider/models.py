@@ -1171,7 +1171,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         Parameters
         ----------
         xml_adapter: PidProviderXMLAdapter
-        registered: XMLArticle
+        registered: PidProviderXML
 
         Returns
         -------
@@ -1233,7 +1233,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         Arguments
         ---------
         xml_adapter: PidProviderXMLAdapter
-        registered: XMLArticle
+        registered: PidProviderXML
         """
         if registered:
             # recupera do registrado
@@ -1254,7 +1254,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         Arguments
         ---------
         xml_adapter: PidProviderXMLAdapter
-        registered: XMLArticle
+        registered: PidProviderXML
         """
         if registered and registered.aop_pid:
             xml_adapter.aop_pid = registered.aop_pid
@@ -1267,7 +1267,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         Arguments
         ---------
         xml_adapter: PidProviderXMLAdapter
-        registered: XMLArticle
+        registered: PidProviderXML
 
         """
         if registered and registered.v2 and xml_adapter.v2 != registered.v2:
