@@ -109,7 +109,7 @@ class PidProviderAPIClient:
                 raise exceptions.APIPidProviderConfigError(e)
         return self._api_password
 
-    def provide_pid(self, xml_with_pre, name):
+    def provide_pid(self, xml_with_pre, name, created=None):
         """
         name : str
             nome do arquivo xml
@@ -123,7 +123,7 @@ class PidProviderAPIClient:
             )
             response = self._prepare_and_post_xml(xml_with_pre, name, self.token)
 
-            self._process_post_xml_response(response, xml_with_pre)
+            self._process_post_xml_response(response, xml_with_pre, created)
             try:
                 return response[0]
             except IndexError:
@@ -176,6 +176,8 @@ class PidProviderAPIClient:
         with TemporaryDirectory() as tmpdirname:
             name, ext = os.path.splitext(name)
             zip_xml_file_path = os.path.join(tmpdirname, name + ".zip")
+
+            logging.info(f"Posting xml with {xml_with_pre.data}")
 
             create_xml_zip_file(
                 zip_xml_file_path, xml_with_pre.tostring(pretty_print=True)
@@ -233,14 +235,25 @@ class PidProviderAPIClient:
                 )
             )
 
-    def _process_post_xml_response(self, response, xml_with_pre):
+    def _process_post_xml_response(self, response, xml_with_pre, created=None):
         if not response:
             return
         logging.info(f"_process_post_xml_response: {response}")
         for item in response:
+
             if not item.get("xml_changed"):
+                # dados em Upload é o mais atualizado
                 return
+
             try:
+                # atualiza xml_with_pre com valor do XML registrado no Core
+                if not item.get("force_xml_changed"):
+                    # exceto 'force_xml_changed=True' ou
+                    # exceto se o registro do Core foi criado posteriormente
+                    if created and created < item["created"]:
+                        # não atualizar com os dados do Core
+                        return
+
                 for pid_type, pid_value in item["xml_changed"].items():
                     try:
                         if pid_type == "pid_v3":
@@ -249,15 +262,10 @@ class PidProviderAPIClient:
                             xml_with_pre.v2 = pid_value
                         elif pid_type == "aop_pid":
                             xml_with_pre.aop_pid = pid_value
+                        item["do_upload_registration"] = True
                     except Exception as e:
                         pass
-
-            except KeyError:
-                pass
-            try:
-                # atualiza xml_with_pre com valor do XML registrado no core
-                for xml_with_pre in XMLWithPre.create(uri=item["xml_uri"]):
-                    break
+                return
             except KeyError:
                 pass
 
