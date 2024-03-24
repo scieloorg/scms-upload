@@ -425,6 +425,9 @@ class OtherPid(CommonControlField):
                 obj.save()
 
             return obj
+        raise ValueError(
+            "OtherPid.get_or_create requires pid_in_xml and pid_type and version and user and pid_provider_xml"
+        )
 
     @property
     def created_updated(self):
@@ -633,9 +636,10 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         for label, xml_, registered_ in items:
             if xml_ not in pids[label]:
                 # pid no xml é novo
-                if cls._is_registered_pid(v3=xml_):
+                owner = cls._is_registered_pid(v3=xml_)
+                if owner:
                     # e está registrado para outro XML
-                    raise ValueError(f"PID {xml_} is already registered")
+                    raise ValueError(f"PID {xml_} is already registered for {owner}")
                 elif registered:
                     # indica a mudança do pid
                     changed_pids.append(
@@ -648,9 +652,12 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
         if xml_adapter.aop_pid and xml_adapter.aop_pid not in pids["aop_pid"]:
             # pid no xml é novo
-            if cls._is_registered_pid(aop_pid=xml_adapter.aop_pid):
+            owner = cls._is_registered_pid(aop_pid=xml_adapter.aop_pid)
+            if owner:
                 # e está registrado para outro XML
-                raise ValueError(f"PID {xml_adapter.aop_pid} is already registered")
+                raise ValueError(
+                    f"PID {xml_adapter.aop_pid} is already registered for {owner}"
+                )
             elif registered:
                 # indica a mudança do pid
                 changed_pids.append(
@@ -707,12 +714,23 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
         """
         try:
+            detail = xml_with_pre.data
+            logging.info(f"PidProviderXML.register: {detail}")
+
             input_data = {}
             input_data["xml_with_pre"] = xml_with_pre
             input_data["filename"] = filename
             input_data["origin"] = origin
 
-            logging.info(f"PidProviderXML.register ....  {origin or filename}")
+            if not xml_with_pre.v3:
+                raise exceptions.InvalidPidError(
+                    f"Unable to register {filename}, because v3 is invalid"
+                )
+
+            if not xml_with_pre.v2:
+                raise exceptions.InvalidPidError(
+                    f"Unable to register {filename}, because v2 is invalid"
+                )
 
             # adaptador do xml with pre
             xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
@@ -731,39 +749,11 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             if updated_data:
                 return updated_data
 
-            # verfica os PIDs encontrados no XML / atualiza-os se necessário
-            changed_pids = cls._complete_pids(xml_adapter, registered)
+            # valida os PIDs do XML
+            # - não podem ter conflito com outros registros
+            # - identifica mudança
+            changed_pids = cls._check_pids(xml_adapter, registered)
 
-            if not xml_adapter.v3:
-                raise exceptions.InvalidPidError(
-                    f"Unable to register {filename}, because v3 is invalid"
-                )
-
-            if not xml_adapter.v2:
-                raise exceptions.InvalidPidError(
-                    f"Unable to register {filename}, because v2 is invalid"
-                )
-
-            xml_changed = {
-                change["pid_type"]: change["pid_assigned"] for change in changed_pids
-            }
-
-            # compara de novo, após completar pids
-            updated_data = cls.skip_registration(
-                xml_adapter,
-                registered,
-                force_update,
-                origin_date,
-                registered_in_core,
-            )
-            if updated_data:
-                # XML da entrada e registrado divergem: não tem e tem pids,
-                # no entanto, após completar com pids, ficam idênticos
-                updated_data["xml_changed"] = xml_changed
-                updated_data.update(input_data)
-                if xml_with_pre.v3 == registered.v3:
-                    logging.info("skip_registration second")
-                    return updated_data
             # cria ou atualiza registro
             registered = cls._save(
                 registered,
@@ -777,7 +767,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
             # data to return
             data = registered.data.copy()
-            data["xml_changed"] = xml_changed
+            data["changed_pids"] = changed_pids
 
             pid_request = PidRequest.cancel_failure(
                 user=user,
@@ -815,7 +805,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
                 user=user,
                 origin_date=origin_date,
                 origin=origin,
-                detail={},
+                detail=detail,
             )
             response = input_data
             response.update(pid_request.data)
@@ -856,11 +846,9 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         registered._add_issue(xml_adapter)
 
         registered.save()
-        registered._add_current_version(xml_adapter, user)
-
-        registered.save()
 
         registered._add_other_pid(changed_pids, user)
+        registered._add_current_version(xml_adapter, user)
 
         return registered
 
@@ -1060,25 +1048,23 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         )
 
     def _add_other_pid(self, changed_pids, user):
-        # requires registered.current_version is set
+        # registrados passam a ser other pid
+        # os pids do XML passam a ser os vigentes
         if not changed_pids:
             return
-        if not self.current_version:
-            raise ValueError(
-                "PidProviderXML._add_other_pid requires current_version is set"
-            )
         for change_args in changed_pids:
-            if change_args["pid_in_xml"]:
-                # somente registra as mudanças de um pid_in_xml não vazio
-                change_args["user"] = user
-                change_args["version"] = self.current_version
-                change_args["pid_provider_xml"] = self
-                change_args.pop("pid_assigned")
-                OtherPid.get_or_create(**change_args)
-                self.other_pid_count = OtherPid.objects.filter(
-                    pid_provider_xml=self
-                ).count()
-                self.save()
+
+            change_args["pid_in_xml"] = change_args.pop("registered")
+
+            change_args["user"] = user
+            change_args["version"] = self.current_version
+            change_args["pid_provider_xml"] = self
+
+            OtherPid.get_or_create(**change_args)
+            self.other_pid_count = OtherPid.objects.filter(
+                pid_provider_xml=self
+            ).count()
+            self.save()
 
     @classmethod
     def _get_unique_v3(cls):
@@ -1108,14 +1094,14 @@ class PidProviderXML(CommonControlField, ClusterableModel):
                 found = cls.objects.filter(**kwargs)[0]
             except IndexError:
                 try:
-                    OtherPid.objects.get(pid_in_xml=v3 or v2 or aop_pid)
-                    return True
+                    obj = OtherPid.objects.get(pid_in_xml=v3 or v2 or aop_pid)
+                    return obj.pid_provider_xml
                 except OtherPid.DoesNotExist:
-                    return False
+                    return None
                 except OtherPid.MultipleObjectsReturned:
-                    return True
+                    return obj.pid_provider_xml
             else:
-                return True
+                return found
 
     @classmethod
     def _v2_generates(cls, xml_adapter):
@@ -1144,8 +1130,6 @@ class PidProviderXML(CommonControlField, ClusterableModel):
     def complete_pids(
         cls,
         xml_with_pre,
-        filename,
-        user,
     ):
         """
         Evaluate the XML data and complete xml_with_pre with PID v3, v2, aop_pid
@@ -1173,10 +1157,6 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
         """
         try:
-            input_data = xml_with_pre.data
-
-            logging.info(f"PidProviderXML.complete_pids ....  {input_data}")
-
             # adaptador do xml with pre
             xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
 
@@ -1186,16 +1166,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             # verfica os PIDs encontrados no XML / atualiza-os se necessário
             changed_pids = cls._complete_pids(xml_adapter, registered)
 
-            if not xml_adapter.v3:
-                raise exceptions.InvalidPidError(
-                    f"Unable to register {filename}, because v3 is invalid"
-                )
-
-            if not xml_adapter.v2:
-                raise exceptions.InvalidPidError(
-                    f"Unable to register {filename}, because v2 is invalid"
-                )
-
+            logging.info(f"PidProviderXML.complete_pids: input={xml_with_pre.data} | output={changed_pids}")
             return changed_pids
 
         except Exception as e:
@@ -1256,19 +1227,10 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         after = (xml_adapter.v3, xml_adapter.v2, xml_adapter.aop_pid)
 
         # verifica se houve mudança nos PIDs do XML
-        changes = []
+        changes = {}
         for label, bef, aft in zip(("pid_v3", "pid_v2", "aop_pid"), before, after):
             if bef != aft:
-                changes.append(
-                    dict(
-                        pid_type=label,
-                        pid_in_xml=bef,
-                        pid_assigned=aft,
-                    )
-                )
-        if changes:
-            LOGGER.info(f"changes: {changes}")
-
+                changes[label] = aft
         return changes
 
     @classmethod
@@ -1283,6 +1245,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
         for item in OtherPid.objects.filter(pid_provider_xml=self).iterator():
             d[item.pid_type].append(item.pid_in_xml)
+        return d
 
     @classmethod
     def _add_pid_v3(cls, xml_adapter, registered):
@@ -1295,14 +1258,14 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         xml_adapter: PidProviderXMLAdapter
         registered: PidProviderXML
         """
-        if registered:
-            # recupera do registrado
-            xml_adapter.v3 = registered.v3
-        else:
-            # se v3 de xml está ausente ou já está registrado para outro xml
-            if not cls._is_valid_pid(xml_adapter.v3) or cls._is_registered_pid(
-                v3=xml_adapter.v3
-            ):
+        if (
+            not xml_adapter.v3
+            or not cls._is_valid_pid(xml_adapter.v3)
+            or cls._is_registered_pid(v3=xml_adapter.v3)
+        ):
+            if registered:
+                xml_adapter.v3 = registered.v3
+            else:
                 # obtém um v3 inédito
                 xml_adapter.v3 = cls._get_unique_v3()
 
@@ -1330,10 +1293,15 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         registered: PidProviderXML
 
         """
-        if registered and registered.v2 and xml_adapter.v2 != registered.v2:
-            xml_adapter.v2 = registered.v2
-        if not cls._is_valid_pid(xml_adapter.v2):
-            xml_adapter.v2 = cls._get_unique_v2(xml_adapter)
+        if (
+            not xml_adapter.v2
+            or not cls._is_valid_pid(xml_adapter.v2)
+            or cls._is_registered_pid(v2=xml_adapter.v2)
+        ):
+            if registered:
+                xml_adapter.v2 = registered.v2
+            else:
+                xml_adapter.v2 = cls._get_unique_v2(xml_adapter)
 
     @classmethod
     def validate_query_params(cls, query_params):
@@ -1427,8 +1395,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
                     xml_with_pre.aop_pid = registered.aop_pid
 
                 data = registered.data
-                data["is_registered"] = True
-                data["is_equal"] = registered.is_equal_to(xml_adapter)
+                data["do_upload_registration"] = not registered.is_equal_to(xml_adapter)
                 return data
         except (
             exceptions.NotEnoughParametersToGetDocumentRecordError,
