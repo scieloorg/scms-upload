@@ -107,6 +107,7 @@ class PidProviderXMLAdmin(ModelAdmin):
         "article_pub_year",
         "pub_year",
         "other_pid_count",
+        "registered_in_core",
     )
     search_fields = (
         "pkg_name",
