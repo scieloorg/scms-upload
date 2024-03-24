@@ -1032,10 +1032,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         while True:
             generated = v3_gen.generates()
             if not cls._is_registered_pid(v3=generated):
-                try:
-                    OtherPid.objects.get(pid_type="pid_v3", pid_in_xml=generated)
-                except OtherPid.DoesNotExist:
-                    return generated
+                return generated
 
     @classmethod
     def _is_registered_pid(cls, v2=None, v3=None, aop_pid=None):
@@ -1050,7 +1047,13 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             try:
                 found = cls.objects.filter(**kwargs)[0]
             except IndexError:
-                return False
+                try:
+                    OtherPid.objects.get(pid_in_xml=v3 or v2 or aop_pid)
+                    return True
+                except OtherPid.DoesNotExist:
+                    return False
+                except OtherPid.MultipleObjectsReturned:
+                    return True
             else:
                 return True
 
