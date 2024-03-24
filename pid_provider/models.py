@@ -1078,6 +1078,80 @@ class PidProviderXML(CommonControlField, ClusterableModel):
                 return generated
 
     @classmethod
+    def complete_pids(
+        cls,
+        xml_with_pre,
+        filename,
+        user,
+    ):
+        """
+        Evaluate the XML data and complete xml_with_pre with PID v3, v2, aop_pid
+
+        Parameters
+        ----------
+        xml : XMLWithPre
+        filename : str
+        user : User
+
+        Returns
+        -------
+            {
+                "v3": self.v3,
+                "v2": self.v2,
+                "aop_pid": self.aop_pid,
+                "xml_uri": self.xml_uri,
+                "article": self.article,
+                "created": self.created.isoformat(),
+                "updated": self.updated.isoformat(),
+                "xml_changed": boolean,
+                "record_status": created | updated | retrieved
+            }
+
+
+        """
+        try:
+            input_data = xml_with_pre.data
+
+            logging.info(f"PidProviderXML.complete_pids ....  {input_data}")
+
+            # adaptador do xml with pre
+            xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
+
+            # consulta se documento já está registrado
+            registered = cls._query_document(xml_adapter)
+
+            # verfica os PIDs encontrados no XML / atualiza-os se necessário
+            changed_pids = cls._complete_pids(xml_adapter, registered)
+
+            if not xml_adapter.v3:
+                raise exceptions.InvalidPidError(
+                    f"Unable to register {filename}, because v3 is invalid"
+                )
+
+            if not xml_adapter.v2:
+                raise exceptions.InvalidPidError(
+                    f"Unable to register {filename}, because v2 is invalid"
+                )
+
+            return changed_pids
+
+        except Exception as e:
+            # except (
+            #     exceptions.NotEnoughParametersToGetDocumentRecordError,
+            #     exceptions.QueryDocumentMultipleObjectsReturnedError,
+            # ) as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                exception=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "operation": "PidProviderXML.complete_pids",
+                    "detail": xml_with_pre.data,
+                },
+            )
+            return {"error_message": str(e), "error_type": str(type(e))}
+
+    @classmethod
     def _complete_pids(cls, xml_adapter, registered):
         """
         No XML pode conter ou não os PIDS v2, v3 e aop_pid.
@@ -1098,7 +1172,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
         Returns
         -------
-        bool
+        list of dict: keys=(pid_type, pid_in_xml, pid_assigned)
 
         """
         before = (xml_adapter.v3, xml_adapter.v2, xml_adapter.aop_pid)
@@ -1318,6 +1392,7 @@ class CollectionPidRequest(CommonControlField):
     para controlar a entrada de XML provenientes do AM
     registrando cada coleção e a data da coleta
     """
+
     collection = models.ForeignKey(
         Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -1452,7 +1527,11 @@ class FixPidV2(CommonControlField):
         fixed_in_core=None,
         fixed_in_upload=None,
     ):
-        if correct_pid_v2 == incorrect_pid_v2 or not correct_pid_v2 or not incorrect_pid_v2:
+        if (
+            correct_pid_v2 == incorrect_pid_v2
+            or not correct_pid_v2
+            or not incorrect_pid_v2
+        ):
             raise ValueError(
                 f"FixPidV2.create: Unable to register correct_pid_v2={correct_pid_v2} and incorrect_pid_v2={incorrect_pid_v2} to be fixed"
             )
