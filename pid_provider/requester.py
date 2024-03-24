@@ -88,10 +88,12 @@ class PidRequester(BasePidProvider):
         self.core_registration(xml_with_pre, registered, article_proc, user)
         xml_changed = registered.get("xml_changed")
 
-        if not registered["registered_in_upload"]:
-            # não está registrado em Upload, realizar registro
-
+        if registered.get("do_upload_registration"):
+            # Cria ou atualiza registro de PidProviderXML de Upload, se:
+            # - está registrado no upload mas o conteúdo mudou, atualiza
+            # - ou não está registrado no Upload, então cria
             op = article_proc.start(user, ">>> upload registration")
+
             resp = self.provide_pid_for_xml_with_pre(
                 xml_with_pre,
                 xml_with_pre.filename,
@@ -118,7 +120,9 @@ class PidRequester(BasePidProvider):
         registered["xml_with_pre"] = xml_with_pre
         registered["filename"] = name
 
-        main_op.finish(user, completed=True, detail={"registered": registered})
+        detail = registered.copy()
+        detail["xml_with_pre"] = xml_with_pre.data
+        main_op.finish(user, completed=True, detail={"registered": detail})
         return registered
 
     @staticmethod
@@ -128,14 +132,25 @@ class PidRequester(BasePidProvider):
 
         Returns
         -------
-        {"registered_in_upload": boolean, "registered_in_core": boolean}
+        {"do_core_registration": boolean, "do_upload_registration": boolean}
 
         """
         op = article_proc.start(user, ">>> get registration demand")
 
         registered = PidProviderXML.is_registered(xml_with_pre) or {}
-        registered["registered_in_upload"] = bool(registered.get("v3"))
-        registered["registered_in_core"] = registered.get("registered_in_core")
+
+        if registered.get("is_equal"):
+            # xml recebido é igual ao registrado
+            registered["do_upload_registration"] = False
+            registered["do_core_registration"] = not registered.get("registered_in_core")
+            registered["registered_in_upload"] = True
+        else:
+            # registrado no upload e xml recebido é diferente ao registrado
+            # xml recebido não está registrado no upload
+            registered["do_upload_registration"] = True
+            registered["do_core_registration"] = True
+            registered["registered_in_core"] = False
+            registered["registered_in_upload"] = False
 
         op.finish(user, completed=True, detail={"registered": registered})
 
@@ -145,7 +160,13 @@ class PidRequester(BasePidProvider):
         """
         Solicita PID v3 para o Core, se necessário
         """
-        if not registered["registered_in_core"]:
+        if registered["do_core_registration"]:
+
+            if registered.get("is_registered") and not xml_with_pre.v3:
+                raise ValueError(
+                    f"Unable to execute core registration for xml_with_pre without v3"
+                )
+
             op = article_proc.start(user, ">>> core registration")
 
             if not self.pid_provider_api.enabled:
@@ -153,8 +174,9 @@ class PidRequester(BasePidProvider):
                 return registered
 
             response = self.pid_provider_api.provide_pid(
-                xml_with_pre, xml_with_pre.filename
+                xml_with_pre, xml_with_pre.filename, created=registered.get("created")
             )
+
             response = response or {}
             registered.update(response)
             registered["registered_in_core"] = bool(response.get("v3"))
@@ -163,8 +185,6 @@ class PidRequester(BasePidProvider):
                 completed=True,
                 detail={"registered": registered, "response": response},
             )
-
-        return registered
 
     def fix_pid_v2(
         self,

@@ -822,8 +822,8 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             logging.info(f"Do not skip update: not registered")
             return
 
-        if registered_in_core and not registered.registered_in_core:
-            logging.info(f"Do not skip update: registered_in_core")
+        if registered_in_core != registered.registered_in_core:
+            logging.info(f"Do not skip update: need to update registered_in_core")
             return
 
         # verifica se é necessário atualizar
@@ -1267,15 +1267,30 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
         try:
             registered = cls._query_document(xml_adapter)
-            if registered and registered.is_equal_to(xml_adapter):
-                return registered.data
+            if registered:
+                # recupera os valores de pid v3, v2, aop_pid do registro PidProviderXML
+                # e adiciona / atualiza o xml_with_pre, o que garante que
+                # o XML tenha os pids ao ingressar no Core
+                # manterá estes valores, evitando que gere novos valores
+                # por não estarem presentes no XML
+                if registered.v3:
+                    xml_with_pre.v3 = registered.v3
+                if registered.v2:
+                    xml_with_pre.v2 = registered.v2
+                if registered.aop_pid:
+                    xml_with_pre.aop_pid = registered.aop_pid
+
+                data = registered.data
+                data["is_registered"] = True
+                data["is_equal"] = registered.is_equal_to(xml_adapter)
+                return data
         except (
             exceptions.NotEnoughParametersToGetDocumentRecordError,
             exceptions.QueryDocumentMultipleObjectsReturnedError,
         ) as e:
             logging.exception(e)
             return {"error_msg": str(e), "error_type": str(type(e))}
-        return {}
+        return {"is_registered": False}
 
     def fix_pid_v2(self, user, correct_pid_v2):
         try:
