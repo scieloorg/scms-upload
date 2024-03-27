@@ -281,7 +281,7 @@ class PidProviderAPIClient:
         """
         try:
             if not self.fix_pid_v2_url:
-                return {"fix-pid-v2": "unavailable"}
+                return {"fix-pid-v2": "unavailable", "fixed_in_core": False}
 
             self.token = self.token or self._get_token(
                 username=self.api_username,
