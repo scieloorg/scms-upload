@@ -428,6 +428,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
     def get(cls, pid_v3):
         return cls.objects.get(pid_v3=pid_v3)
 
+    def set_registered_in_core(self, value):
+        PidRequester.set_registered_in_core(self.pid_v3, value)
+
     @staticmethod
     def is_registered_in_core(pid_v3):
         if not pid_v3:

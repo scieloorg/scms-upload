@@ -77,6 +77,9 @@ class PidRequester(BasePidProvider):
         """
         Recebe um xml_with_pre para solicitar o PID v3
         """
+        # identifica as mudanças no xml_with_pre
+        xml_changed = {}
+
         main_op = article_proc.start(user, "request_pid_for_xml_with_pre")
         registered = PidRequester.get_registration_demand(
             xml_with_pre, article_proc, user
@@ -84,8 +87,6 @@ class PidRequester(BasePidProvider):
 
         if registered.get("error_type"):
             return registered
-
-        xml_changed = {}
 
         # Solicita pid para Core
         self.core_registration(xml_with_pre, registered, article_proc, user)
@@ -250,3 +251,13 @@ class PidRequester(BasePidProvider):
             fixed["fixed_in_core"] = obj.fixed_in_core
         logging.info(fixed)
         return fixed
+
+    @staticmethod
+    def set_registered_in_core(pid_v3, value):
+        try:
+            PidProviderXML.objects.filter(
+                registered_in_core=bool(not value),
+                v3=pid_v3,
+            ).update(registered_in_core=value)
+        except Exception as e:
+            logging.exception(e)
