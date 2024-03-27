@@ -1327,6 +1327,16 @@ class PidProviderXML(CommonControlField, ClusterableModel):
     def _is_valid_pid(cls, value):
         return bool(value and len(value) == 23)
 
+    def get_pids(self):
+        d = {}
+        d["pid_v3"] = [self.v3]
+        d["pid_v2"] = [self.v2]
+        d["aop_pid"] = [self.aop_pid]
+
+        for item in OtherPid.objects.filter(pid_provider_xml=self).iterator():
+            d[item.pid_type].append(item.pid_in_xml)
+        return d
+
     @classmethod
     def _add_pid_v3(cls, xml_adapter, registered):
         """
