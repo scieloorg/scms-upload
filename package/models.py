@@ -601,14 +601,24 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     package = SPPackage.from_file(zip_file_path, workdir)
                     package.optimise(new_package_file_path=target, preserve_files=False)
 
+                # saved optimised
                 with open(target, "rb") as fp:
-                    # saved optimised
-                    self.file.save(filename, ContentFile(fp.read()))
+                    self.save_file(filename, fp.read())
         except Exception as e:
+            # saved original
             with open(zip_file_path, "rb") as fp:
-                # saved original
-                self.file.save(filename, ContentFile(fp.read()))
+                self.save_file(filename, fp.read())
         self.save()
+
+    def save_file(self, name, content):
+        try:
+            self.file.delete(save=True)
+        except Exception as e:
+            pass
+        try:
+            self.file.save(name, ContentFile(content))
+        except Exception as e:
+            raise Exception(f"Unable to save {name}. Exception: {e}")
 
     def generate_article_html_page(self, user):
         try:
