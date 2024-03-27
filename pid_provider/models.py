@@ -1164,63 +1164,6 @@ class PidProviderXML(CommonControlField, ClusterableModel):
                 return generated
 
     @classmethod
-    def _complete_pids(cls, xml_adapter, registered):
-        """
-        No XML pode conter ou não os PIDS v2, v3 e aop_pid.
-        Na base de dados o documento do XML pode ou não estar registrado.
-
-        O resultado deste procedimento é que seja garantido que os
-        valores dos PIDs no XML sejam inéditos ou recuperados da base de dados.
-
-        Se no XML existir os PIDs, os valores são verificados na base de dados,
-        se são inéditos, não haverá mudança no XML, mas se os PIDs do XML
-        conflitarem com os PIDs registrados ou seus valores forem inválidos,
-        haverá mudança nos PIDs.
-
-        Parameters
-        ----------
-        xml_adapter: PidProviderXMLAdapter
-        registered: XMLArticle
-
-        Returns
-        -------
-        bool
-
-        """
-        before = (xml_adapter.v3, xml_adapter.v2, xml_adapter.aop_pid)
-
-        # garante que não há espaços extras
-        if xml_adapter.v3:
-            xml_adapter.v3 = xml_adapter.v3.strip()
-        if xml_adapter.v2:
-            xml_adapter.v2 = xml_adapter.v2.strip()
-        if xml_adapter.aop_pid:
-            xml_adapter.aop_pid = xml_adapter.aop_pid.strip()
-
-        # adiciona os pids faltantes ao XML fornecido
-        cls._add_pid_v3(xml_adapter, registered)
-        cls._add_pid_v2(xml_adapter, registered)
-        cls._add_aop_pid(xml_adapter, registered)
-
-        after = (xml_adapter.v3, xml_adapter.v2, xml_adapter.aop_pid)
-
-        # verifica se houve mudança nos PIDs do XML
-        changes = []
-        for label, bef, aft in zip(("pid_v3", "pid_v2", "aop_pid"), before, after):
-            if bef != aft:
-                changes.append(
-                    dict(
-                        pid_type=label,
-                        pid_in_xml=bef,
-                        pid_assigned=aft,
-                    )
-                )
-        if changes:
-            LOGGER.info(f"changes: {changes}")
-
-        return changes
-
-    @classmethod
     def complete_pids(
         cls,
         xml_with_pre,
@@ -1521,6 +1464,7 @@ class CollectionPidRequest(CommonControlField):
     para controlar a entrada de XML provenientes do AM
     registrando cada coleção e a data da coleta
     """
+
     collection = models.ForeignKey(
         Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -1655,7 +1599,11 @@ class FixPidV2(CommonControlField):
         fixed_in_core=None,
         fixed_in_upload=None,
     ):
-        if correct_pid_v2 == incorrect_pid_v2 or not correct_pid_v2 or not incorrect_pid_v2:
+        if (
+            correct_pid_v2 == incorrect_pid_v2
+            or not correct_pid_v2
+            or not incorrect_pid_v2
+        ):
             raise ValueError(
                 f"FixPidV2.create: Unable to register correct_pid_v2={correct_pid_v2} and incorrect_pid_v2={incorrect_pid_v2} to be fixed"
             )
