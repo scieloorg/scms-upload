@@ -1,22 +1,22 @@
 
 WAGTAIL_MENU_APPS_ORDER = [
-    "collection",
-    "pid_provider",
-    "migration",
-    "processing",
     "Tarefas",
+    "unexpected-error",
+    "processing",
+    "migration",
     "journal",
     "issue",
-    "institution",
     "article",
-    "researcher",
+    "institution",
     "location",
-    "unexpected-error",
+    "researcher",
+    "collection",
+    "pid_provider",
     "Configurações",
     "Relatórios",
-    "Ajuda",
     "Images",
     "Documentos",
+    "Ajuda",
 ]
 
 def get_menu_order(app_name):
