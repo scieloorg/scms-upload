@@ -4,7 +4,7 @@ from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
 from wagtail.contrib.modeladmin.views import CreateView
 
 from .models import Researcher
-
+from config.menu import get_menu_order
 
 class ResearcherCreateView(CreateView):
     def form_valid(self, form):
@@ -17,7 +17,7 @@ class ResearcherAdmin(ModelAdmin):
     create_view_class = ResearcherCreateView
     menu_label = _("Researcher")
     menu_icon = "folder"
-    menu_order = 200
+    menu_order = get_menu_order("researcher")
     add_to_settings_menu = False
     exclude_from_explorer = False
 

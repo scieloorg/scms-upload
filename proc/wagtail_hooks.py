@@ -213,8 +213,7 @@ class ArticleProcModelAdmin(ModelAdmin):
 class ProcessModelAdminGroup(ModelAdminGroup):
     menu_label = _("Processing")
     menu_icon = "folder-open-inverse"
-    # menu_order = get_menu_order("article")
-    menu_order = 400
+    menu_order = get_menu_order("processing")
     items = (
         JournalProcModelAdmin,
         IssueProcModelAdmin,

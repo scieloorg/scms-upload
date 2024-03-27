@@ -122,8 +122,8 @@ class ClassicWebsiteConfigurationModelAdmin(ModelAdmin):
 class CollectionModelAdminGroup(ModelAdminGroup):
     menu_label = _("Collections")
     menu_icon = "folder-open-inverse"
-    # menu_order = get_menu_order("collection")
-    menu_order = 100
+    menu_order = get_menu_order("collection")
+    # menu_order = 100
     items = (
         CollectionModelAdmin,
         WebSiteConfigurationModelAdmin,

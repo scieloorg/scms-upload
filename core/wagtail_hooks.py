@@ -8,7 +8,7 @@ from journal.models import Journal
 from collection.models import Collection
 from article.models import Article
 from wagtail.admin.navigation import get_site_for_user
-
+from config.menu import get_menu_order, WAGTAIL_MENU_APPS_ORDER
 
 # @hooks.register("insert_global_admin_css", order=100)
 # def global_admin_css():
@@ -77,3 +77,16 @@ def add_items_summary_items(request, items):
     items.append(CollectionSummaryItem(request))
     items.append(JournalSummaryItem(request))
     items.append(ArticleSummaryItem(request))
+
+
+@hooks.register('construct_main_menu')
+def reorder_menu_items(request, menu_items):
+    for item in menu_items:
+        if item.label in WAGTAIL_MENU_APPS_ORDER:
+            item.order = get_menu_order(item.label)
+    
+
+@hooks.register('construct_main_menu')
+def remove_menu_items(request, menu_items):
+    if not request.user.is_superuser:
+        menu_items[:] = [item for item in menu_items if item.name not in ['documents', 'explorer', 'reports']]
