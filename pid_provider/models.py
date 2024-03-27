@@ -1284,7 +1284,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             d[item.pid_type].append(item.pid_in_xml)
         return d
 
-    @classmethod
+     @classmethod
     def _add_pid_v3(cls, xml_adapter, registered):
         """
         Atribui v3 ao xml_adapter,
@@ -1293,16 +1293,16 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         Arguments
         ---------
         xml_adapter: PidProviderXMLAdapter
-        registered: XMLArticle
+        registered: PidProviderXML
         """
-        if registered:
-            # recupera do registrado
-            xml_adapter.v3 = registered.v3
-        else:
-            # se v3 de xml está ausente ou já está registrado para outro xml
-            if not cls._is_valid_pid(xml_adapter.v3) or cls._is_registered_pid(
-                v3=xml_adapter.v3
-            ):
+        if (
+            not xml_adapter.v3
+            or not cls._is_valid_pid(xml_adapter.v3)
+            or cls._is_registered_pid(v3=xml_adapter.v3)
+        ):
+            if registered:
+                xml_adapter.v3 = registered.v3
+            else:
                 # obtém um v3 inédito
                 xml_adapter.v3 = cls._get_unique_v3()
 
@@ -1314,7 +1314,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         Arguments
         ---------
         xml_adapter: PidProviderXMLAdapter
-        registered: XMLArticle
+        registered: PidProviderXML
         """
         if registered and registered.aop_pid:
             xml_adapter.aop_pid = registered.aop_pid
@@ -1327,13 +1327,18 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         Arguments
         ---------
         xml_adapter: PidProviderXMLAdapter
-        registered: XMLArticle
+        registered: PidProviderXML
 
         """
-        if registered and registered.v2 and xml_adapter.v2 != registered.v2:
-            xml_adapter.v2 = registered.v2
-        if not cls._is_valid_pid(xml_adapter.v2):
-            xml_adapter.v2 = cls._get_unique_v2(xml_adapter)
+        if (
+            not xml_adapter.v2
+            or not cls._is_valid_pid(xml_adapter.v2)
+            or cls._is_registered_pid(v2=xml_adapter.v2)
+        ):
+            if registered:
+                xml_adapter.v2 = registered.v2
+            else:
+                xml_adapter.v2 = cls._get_unique_v2(xml_adapter)
 
     @classmethod
     def validate_query_params(cls, query_params):
