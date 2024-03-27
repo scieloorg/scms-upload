@@ -852,7 +852,6 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         registered,
         xml_adapter,
         user,
-        changed_pids,
         origin_date=None,
         available_since=None,
         registered_in_core=None,
@@ -881,11 +880,8 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         registered._add_issue(xml_adapter)
 
         registered.save()
+
         registered._add_current_version(xml_adapter, user)
-
-        registered.save()
-
-        registered._add_other_pid(changed_pids, user)
 
         return registered
 
@@ -1284,7 +1280,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             d[item.pid_type].append(item.pid_in_xml)
         return d
 
-     @classmethod
+    @classmethod
     def _add_pid_v3(cls, xml_adapter, registered):
         """
         Atribui v3 ao xml_adapter,
