@@ -603,6 +603,88 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         return self.volume is None and self.number is None and self.suppl is None
 
     @classmethod
+    def _check_pids(cls, user, xml_adapter, registered):
+        """
+        No XML tem que conter os pids pertencentes ao registrado ou
+        caso não é registrado, tem que ter pids inéditos.
+        Também pode acontecer de o XML registrado ter mais de um pid v3, v2, ...
+        Pode haver necessidade de atualizar o valor de pid v3, v2, ...
+        Mudança em pid não é recomendado, mas pode acontecer
+
+        Parameters
+        ----------
+        xml_adapter: PidProviderXMLAdapter
+        registered: PidProviderXML
+
+        Returns
+        -------
+        list of dict: keys=(pid_type, pid_in_xml, registered)
+
+        """
+        changed_pids = []
+        pids = {"pid_v3": [], "pid_v2": [], "aop_pid": []}
+        if registered:
+            pids = registered.get_pids()
+
+        if xml_adapter.v3 not in pids["pid_v3"]:
+            # pid no xml é novo
+            owner = cls._is_registered_pid(v3=xml_adapter.v3)
+            if owner:
+                # e está registrado para outro XML
+                raise ValueError(
+                    f"PID {xml_adapter.v3} is already registered for {owner}"
+                )
+            elif registered:
+                # indica a mudança do pid
+                item = {
+                    "pid_type": "pid_v3",
+                    "pid_in_xml": xml_adapter.v3,
+                    "registered": registered.v3,
+                }
+                registered.v3 = xml_adapter.v3
+                registered._add_other_pid([item.copy()], user)
+                changed_pids.append(item)
+
+        if xml_adapter.v2 not in pids["pid_v2"]:
+            # pid no xml é novo
+            owner = cls._is_registered_pid(v2=xml_adapter.v2)
+            if owner:
+                # e está registrado para outro XML
+                raise ValueError(
+                    f"PID {xml_adapter.v2} is already registered for {owner}"
+                )
+            elif registered:
+                # indica a mudança do pid
+                item = {
+                    "pid_type": "pid_v2",
+                    "pid_in_xml": xml_adapter.v2,
+                    "registered": registered.v2,
+                }
+                registered.v2 = xml_adapter.v2
+                registered._add_other_pid([item.copy()], user)
+                changed_pids.append(item)
+
+        if xml_adapter.aop_pid and xml_adapter.aop_pid not in pids["aop_pid"]:
+            # pid no xml é novo
+            owner = cls._is_registered_pid(aop_pid=xml_adapter.aop_pid)
+            if owner:
+                # e está registrado para outro XML
+                raise ValueError(
+                    f"PID {xml_adapter.aop_pid} is already registered for {owner}"
+                )
+            elif registered:
+                # indica a mudança do pid
+                item = {
+                    "pid_type": "aop_pid",
+                    "pid_in_xml": xml_adapter.aop_pid,
+                    "registered": registered.aop_pid,
+                }
+                registered.aop_pid = xml_adapter.aop_pid
+                registered._add_other_pid([item.copy()], user)
+                changed_pids.append(item)
+        return changed_pids
+
+    @classmethod
     def register(
         cls,
         xml_with_pre,
