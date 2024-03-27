@@ -69,7 +69,7 @@ class XMLVersion(CommonControlField):
         ]
 
     def __str__(self):
-        return self.pid_provider_xml.v3
+        return f"{self.pid_provider_xml.pkg_name} {self.created}"
 
     @classmethod
     def create(
