@@ -1135,6 +1135,113 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         return changes
 
     @classmethod
+    def complete_pids(
+        cls,
+        xml_with_pre,
+    ):
+        """
+        Evaluate the XML data and complete xml_with_pre with PID v3, v2, aop_pid
+
+        Parameters
+        ----------
+        xml : XMLWithPre
+        filename : str
+        user : User
+
+        Returns
+        -------
+            {
+                "v3": self.v3,
+                "v2": self.v2,
+                "aop_pid": self.aop_pid,
+                "xml_uri": self.xml_uri,
+                "article": self.article,
+                "created": self.created.isoformat(),
+                "updated": self.updated.isoformat(),
+                "xml_changed": boolean,
+                "record_status": created | updated | retrieved
+            }
+        """
+        try:
+            # adaptador do xml with pre
+            xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
+
+            # consulta se documento já está registrado
+            registered = cls._query_document(xml_adapter)
+
+            # verfica os PIDs encontrados no XML / atualiza-os se necessário
+            changed_pids = cls._complete_pids(xml_adapter, registered)
+
+            logging.info(
+                f"PidProviderXML.complete_pids: input={xml_with_pre.data} | output={changed_pids}"
+            )
+            return changed_pids
+
+        except Exception as e:
+            # except (
+            #     exceptions.NotEnoughParametersToGetDocumentRecordError,
+            #     exceptions.QueryDocumentMultipleObjectsReturnedError,
+            # ) as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                exception=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "operation": "PidProviderXML.complete_pids",
+                    "detail": xml_with_pre.data,
+                },
+            )
+            return {"error_message": str(e), "error_type": str(type(e))}
+
+    @classmethod
+    def _complete_pids(cls, xml_adapter, registered):
+        """
+        No XML pode conter ou não os PIDS v2, v3 e aop_pid.
+        Na base de dados o documento do XML pode ou não estar registrado.
+
+        O resultado deste procedimento é que seja garantido que os
+        valores dos PIDs no XML sejam inéditos ou recuperados da base de dados.
+
+        Se no XML existir os PIDs, os valores são verificados na base de dados,
+        se são inéditos, não haverá mudança no XML, mas se os PIDs do XML
+        conflitarem com os PIDs registrados ou seus valores forem inválidos,
+        haverá mudança nos PIDs.
+
+        Parameters
+        ----------
+        xml_adapter: PidProviderXMLAdapter
+        registered: PidProviderXML
+
+        Returns
+        -------
+        list of dict: keys=(pid_type, pid_in_xml, pid_assigned)
+
+        """
+        before = (xml_adapter.v3, xml_adapter.v2, xml_adapter.aop_pid)
+
+        # garante que não há espaços extras
+        if xml_adapter.v3:
+            xml_adapter.v3 = xml_adapter.v3.strip()
+        if xml_adapter.v2:
+            xml_adapter.v2 = xml_adapter.v2.strip()
+        if xml_adapter.aop_pid:
+            xml_adapter.aop_pid = xml_adapter.aop_pid.strip()
+
+        # adiciona os pids faltantes ao XML fornecido
+        cls._add_pid_v3(xml_adapter, registered)
+        cls._add_pid_v2(xml_adapter, registered)
+        cls._add_aop_pid(xml_adapter, registered)
+
+        after = (xml_adapter.v3, xml_adapter.v2, xml_adapter.aop_pid)
+
+        # verifica se houve mudança nos PIDs do XML
+        changes = {}
+        for label, bef, aft in zip(("pid_v3", "pid_v2", "aop_pid"), before, after):
+            if bef != aft:
+                changes[label] = aft
+        return changes
+
+    @classmethod
     def _is_valid_pid(cls, value):
         return bool(value and len(value) == 23)
 
