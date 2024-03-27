@@ -425,6 +425,9 @@ class OtherPid(CommonControlField):
                 obj.save()
 
             return obj
+        raise ValueError(
+            f"OtherPid.get_or_create requires pid_in_xml ({pid_in_xml}) and pid_type ({pid_type}) and version ({version}) and user ({user}) and pid_provider_xml ({pid_provider_xml})"
+        )
 
     @property
     def created_updated(self):
@@ -1080,27 +1083,25 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         self.current_version = XMLVersion.get_or_create(
             user, self, xml_adapter.xml_with_pre
         )
+        self.save()
 
     def _add_other_pid(self, changed_pids, user):
-        # requires registered.current_version is set
+        # registrados passam a ser other pid
+        # os pids do XML passam a ser os vigentes
         if not changed_pids:
             return
-        if not self.current_version:
-            raise ValueError(
-                "PidProviderXML._add_other_pid requires current_version is set"
-            )
+        self.save()
         for change_args in changed_pids:
-            if change_args["pid_in_xml"]:
-                # somente registra as mudanças de um pid_in_xml não vazio
-                change_args["user"] = user
-                change_args["version"] = self.current_version
-                change_args["pid_provider_xml"] = self
-                change_args.pop("pid_assigned")
-                OtherPid.get_or_create(**change_args)
-                self.other_pid_count = OtherPid.objects.filter(
-                    pid_provider_xml=self
-                ).count()
-                self.save()
+
+            change_args["pid_in_xml"] = change_args.pop("registered")
+
+            change_args["user"] = user
+            change_args["version"] = self.current_version
+            change_args["pid_provider_xml"] = self
+
+            OtherPid.get_or_create(**change_args)
+        self.other_pid_count = OtherPid.objects.filter(pid_provider_xml=self).count()
+        self.save()
 
     @classmethod
     def _get_unique_v3(cls):
