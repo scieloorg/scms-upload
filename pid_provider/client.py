@@ -63,12 +63,12 @@ class PidProviderAPIClient:
     def fix_pid_v2_url(self):
         if not hasattr(self, "_fix_pid_v2_url") or not self._fix_pid_v2_url:
             try:
-                if self.pid_provider_api_post_xml:
-                    self._fix_pid_v2_url = self.pid_provider_api_post_xml.replace(
-                        "pid_provider", "fix_pid_v2"
-                    )
-            except AttributeError as e:
-                raise exceptions.APIPidProviderConfigError(e)
+                self._fix_pid_v2_url = None
+                endpoint = self.config.endpoint.filter(name='fix-pid-v2')[0]
+                if endpoint.enabled:
+                    self._fix_pid_v2_url = endpoint.url
+            except IndexError:
+                pass
         return self._fix_pid_v2_url
 
     @property
@@ -280,6 +280,8 @@ class PidProviderAPIClient:
             nome do arquivo xml
         """
         try:
+            if not self.fix_pid_v2_url:
+                return {"fix-pid-v2": "unavailable"}
 
             self.token = self.token or self._get_token(
                 username=self.api_username,
