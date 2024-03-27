@@ -1132,9 +1132,15 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             try:
                 found = cls.objects.filter(**kwargs)[0]
             except IndexError:
-                return False
+                try:
+                    obj = OtherPid.objects.get(pid_in_xml=v3 or v2 or aop_pid)
+                    return obj.pid_provider_xml
+                except OtherPid.DoesNotExist:
+                    return None
+                except OtherPid.MultipleObjectsReturned:
+                    return obj.pid_provider_xml
             else:
-                return True
+                return found
 
     @classmethod
     def _v2_generates(cls, xml_adapter):
