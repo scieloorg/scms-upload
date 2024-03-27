@@ -956,7 +956,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         )
 
     @classmethod
-    def get_registered(cls, xml_with_pre, origin):
+    def get_registered(cls, xml_with_pre, origin=None):
         """
         Get registered
 
@@ -985,7 +985,9 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             registered = cls._query_document(xml_adapter)
             if not registered:
                 raise cls.DoesNotExist
-            return registered.data
+            response = registered.data.copy()
+            response["registered"] = True
+            return response
         except cls.DoesNotExist:
             return {"filename": xml_with_pre.filename, "registered": False}
         except Exception as e:
@@ -1000,7 +1002,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
                 detail={
                     "operation": "PidProviderXML.get_registered",
                     "detail": dict(
-                        origin=origin,
+                        origin=origin or xml_with_pre.filename,
                     ),
                 },
             )
@@ -1434,7 +1436,25 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             registered = cls._query_document(xml_adapter)
             if registered:
                 data = registered.data
-                data["is_equal"] = registered.is_equal_to(xml_adapter)
+
+                xml_changed = {}
+                # Completa os valores ausentes de pid com recuperados ou com inéditos
+                try:
+                    before = (xml_with_pre.v3, xml_with_pre.v2, xml_with_pre.aop_pid)
+                    xml_with_pre.v3 = xml_with_pre.v3 or data["v3"]
+                    xml_with_pre.v2 = xml_with_pre.v2 or data["v2"]
+                    if data["aop_pid"]:
+                        xml_with_pre.aop_pid = data["aop_pid"]
+
+                    # verifica se houve mudança nos PIDs do XML
+                    after = (xml_with_pre.v3, xml_with_pre.v2, xml_with_pre.aop_pid)
+                    for label, bef, aft in zip(("pid_v3", "pid_v2", "aop_pid"), before, after):
+                        if bef != aft:
+                            xml_changed[label] = aft
+                except KeyError:
+                    pass
+                data["is_equal"] = registered.is_equal_to(xml_with_pre)
+                data["xml_changed"] = xml_changed
                 return data
         except (
             exceptions.NotEnoughParametersToGetDocumentRecordError,

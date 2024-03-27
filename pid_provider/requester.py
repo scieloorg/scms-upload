@@ -86,21 +86,6 @@ class PidRequester(BasePidProvider):
             return registered
 
         xml_changed = {}
-        # Completa os valores ausentes de pid com recuperados ou com inéditos
-        try:
-            before = (xml_with_pre.v3, xml_with_pre.v2, xml_with_pre.aop_pid)
-            xml_with_pre.v3 = xml_with_pre.v3 or registered["v3"]
-            xml_with_pre.v2 = xml_with_pre.v2 or registered["v2"]
-            if registered["aop_pid"]:
-                xml_with_pre.aop_pid = registered["aop_pid"]
-
-            # verifica se houve mudança nos PIDs do XML
-            after = (xml_with_pre.v3, xml_with_pre.v2, xml_with_pre.aop_pid)
-            for label, bef, aft in zip(("pid_v3", "pid_v2", "aop_pid"), before, after):
-                if bef != aft:
-                    xml_changed[label] = aft
-        except KeyError:
-            pass
 
         # Solicita pid para Core
         self.core_registration(xml_with_pre, registered, article_proc, user)
@@ -156,7 +141,9 @@ class PidRequester(BasePidProvider):
         """
         op = article_proc.start(user, ">>> get registration demand")
 
-        registered = PidProviderXML.is_registered(xml_with_pre) or {}
+        registered = PidProviderXML.is_registered(xml_with_pre)
+        if registered.get("error_type"):
+            return registered
 
         if registered.get("is_equal"):
             # xml recebido é igual ao registrado
