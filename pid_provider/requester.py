@@ -77,6 +77,9 @@ class PidRequester(BasePidProvider):
         """
         Recebe um xml_with_pre para solicitar o PID v3
         """
+        # identifica as mudanças no xml_with_pre
+        xml_changed = {}
+
         main_op = article_proc.start(user, "request_pid_for_xml_with_pre")
         registered = PidRequester.get_registration_demand(
             xml_with_pre, article_proc, user
@@ -84,23 +87,6 @@ class PidRequester(BasePidProvider):
 
         if registered.get("error_type"):
             return registered
-
-        xml_changed = {}
-        # Completa os valores ausentes de pid com recuperados ou com inéditos
-        try:
-            before = (xml_with_pre.v3, xml_with_pre.v2, xml_with_pre.aop_pid)
-            xml_with_pre.v3 = xml_with_pre.v3 or registered["v3"]
-            xml_with_pre.v2 = xml_with_pre.v2 or registered["v2"]
-            if registered["aop_pid"]:
-                xml_with_pre.aop_pid = registered["aop_pid"]
-
-            # verifica se houve mudança nos PIDs do XML
-            after = (xml_with_pre.v3, xml_with_pre.v2, xml_with_pre.aop_pid)
-            for label, bef, aft in zip(("pid_v3", "pid_v2", "aop_pid"), before, after):
-                if bef != aft:
-                    xml_changed[label] = aft
-        except KeyError:
-            pass
 
         # Solicita pid para Core
         self.core_registration(xml_with_pre, registered, article_proc, user)
@@ -156,7 +142,9 @@ class PidRequester(BasePidProvider):
         """
         op = article_proc.start(user, ">>> get registration demand")
 
-        registered = PidProviderXML.is_registered(xml_with_pre) or {}
+        registered = PidProviderXML.is_registered(xml_with_pre)
+        if registered.get("error_type"):
+            return registered
 
         if registered.get("is_equal"):
             # xml recebido é igual ao registrado
@@ -263,3 +251,13 @@ class PidRequester(BasePidProvider):
             fixed["fixed_in_core"] = obj.fixed_in_core
         logging.info(fixed)
         return fixed
+
+    @staticmethod
+    def set_registered_in_core(pid_v3, value):
+        try:
+            PidProviderXML.objects.filter(
+                registered_in_core=bool(not value),
+                v3=pid_v3,
+            ).update(registered_in_core=value)
+        except Exception as e:
+            logging.exception(e)
