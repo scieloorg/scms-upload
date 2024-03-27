@@ -732,12 +732,23 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
         """
         try:
+            detail = xml_with_pre.data
+            logging.info(f"PidProviderXML.register: {detail}")
+
             input_data = {}
             input_data["xml_with_pre"] = xml_with_pre
             input_data["filename"] = filename
             input_data["origin"] = origin
 
-            logging.info(f"PidProviderXML.register ....  {origin or filename}")
+            if not xml_with_pre.v3:
+                raise exceptions.InvalidPidError(
+                    f"Unable to register {filename}, because v3 is invalid"
+                )
+
+            if not xml_with_pre.v2:
+                raise exceptions.InvalidPidError(
+                    f"Unable to register {filename}, because v2 is invalid"
+                )
 
             # adaptador do xml with pre
             xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
@@ -756,45 +767,16 @@ class PidProviderXML(CommonControlField, ClusterableModel):
             if updated_data:
                 return updated_data
 
-            # verfica os PIDs encontrados no XML / atualiza-os se necessário
-            changed_pids = cls._complete_pids(xml_adapter, registered)
+            # valida os PIDs do XML
+            # - não podem ter conflito com outros registros
+            # - identifica mudança
+            changed_pids = cls._check_pids(user, xml_adapter, registered)
 
-            if not xml_adapter.v3:
-                raise exceptions.InvalidPidError(
-                    f"Unable to register {filename}, because v3 is invalid"
-                )
-
-            if not xml_adapter.v2:
-                raise exceptions.InvalidPidError(
-                    f"Unable to register {filename}, because v2 is invalid"
-                )
-
-            xml_changed = {
-                change["pid_type"]: change["pid_assigned"] for change in changed_pids
-            }
-
-            # compara de novo, após completar pids
-            updated_data = cls.skip_registration(
-                xml_adapter,
-                registered,
-                force_update,
-                origin_date,
-                registered_in_core,
-            )
-            if updated_data:
-                # XML da entrada e registrado divergem: não tem e tem pids,
-                # no entanto, após completar com pids, ficam idênticos
-                updated_data["xml_changed"] = xml_changed
-                updated_data.update(input_data)
-                if xml_with_pre.v3 == registered.v3:
-                    logging.info("skip_registration second")
-                    return updated_data
             # cria ou atualiza registro
             registered = cls._save(
                 registered,
                 xml_adapter,
                 user,
-                changed_pids,
                 origin_date,
                 available_since,
                 registered_in_core,
@@ -802,7 +784,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
             # data to return
             data = registered.data.copy()
-            data["xml_changed"] = xml_changed
+            data["changed_pids"] = changed_pids
 
             pid_request = PidRequest.cancel_failure(
                 user=user,
@@ -840,7 +822,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
                 user=user,
                 origin_date=origin_date,
                 origin=origin,
-                detail={},
+                detail=detail,
             )
             response = input_data
             response.update(pid_request.data)
