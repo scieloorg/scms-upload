@@ -15,7 +15,7 @@ from config.menu import get_menu_order
 from package.models import SPSPkg
 from htmlxml.models import HTMLXML
 
-from .models import ArticleProc, IssueProc, JournalProc
+from .models import ArticleProc, IssueProc, JournalProc, ArticleProcReport
 
 
 class ProcCreateView(CreateView):
@@ -210,6 +210,36 @@ class ArticleProcModelAdmin(ModelAdmin):
     )
 
 
+class ArticleProcReportModelAdmin(ModelAdmin):
+    model = ArticleProcReport
+    menu_label = _("Article Processing Report")
+    inspect_view_enabled = True
+    menu_icon = "doc-full"
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+
+    list_display = (
+        "article_proc",
+        "sps_pkg_name",
+        "task_name",
+        "file",
+        "report_date",
+        "updated",
+        "created",
+    )
+    list_filter = (
+        "task_name",
+    )
+    search_fields = (
+        "article_proc__pid",
+        "article_proc__collection__name",
+        "sps_pkg_name",
+        "task_name",
+        "report_date",
+    )
+
+
 class ProcessModelAdminGroup(ModelAdminGroup):
     menu_label = _("Processing")
     menu_icon = "folder-open-inverse"
@@ -221,6 +251,7 @@ class ProcessModelAdminGroup(ModelAdminGroup):
         HTMLXMLModelAdmin,
         SPSPkgModelAdmin,
         ArticleProcModelAdmin,
+        ArticleProcReportModelAdmin,
     )
 
 

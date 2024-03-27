@@ -37,7 +37,11 @@ from migration.models import (
     MigratedIssue,
     MigratedJournal,
 )
-from migration.controller import PkgZipBuilder, get_migrated_xml_with_pre, XMLVersionXmlWithPreError
+from migration.controller import (
+    PkgZipBuilder,
+    get_migrated_xml_with_pre,
+    XMLVersionXmlWithPreError,
+)
 from package import choices as package_choices
 from package.models import SPSPkg
 from proc import exceptions
@@ -177,6 +181,120 @@ class Operation(CommonControlField):
             raise OperationFinishError(
                 f"Unable to finish ({self.name}). Input: {error}. EXCEPTION: {type(exc)} {exc}"
             )
+
+
+def proc_report_directory_path(instance, filename):
+    try:
+        subdir = instance.sps_pkg_name.replace("-", "/")
+        year = instance.created.isoformat()[:8]
+        return f"sps_pkg/{subdir}/reports/{year}/{filename}"
+    except AttributeError:
+        return f"reports/{filename}"
+
+
+class ArticleProcReport(CommonControlField):
+    article_proc = models.ForeignKey(
+        "ArticleProc", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    sps_pkg_name = models.CharField(
+        _("SPS package name"), max_length=32, null=True, blank=True
+    )
+    task_name = models.CharField(
+        _("Procedure name"), max_length=32, null=True, blank=True
+    )
+    file = models.FileField(upload_to=proc_report_directory_path, null=True, blank=True)
+    report_date = models.CharField(
+        _("Identification"), max_length=34, null=True, blank=True
+    )
+
+    panel_files = [
+        FieldPanel("sps_pkg_name"),
+        FieldPanel("task_name"),
+        FieldPanel("report_date"),
+        FieldPanel("file"),
+    ]
+
+    def __str__(self):
+        return f"{self.sps_pkg_name} {self.task_name} {self.report_date}"
+
+    class Meta:
+        verbose_name = _("Article processing report")
+        verbose_name_plural = _("Article processing reports")
+        indexes = [
+            models.Index(fields=["sps_pkg_name"]),
+            models.Index(fields=["task_name"]),
+            models.Index(fields=["report_date"]),
+        ]
+
+    @staticmethod
+    def autocomplete_custom_queryset_filter(search_term):
+        return State.objects.filter(
+            Q(sps_pkg_name__icontains=search_term)
+            | Q(task_name__icontains=search_term)
+            | Q(report_date__icontains=search_term)
+        )
+
+    def autocomplete_label(self):
+        return str(self)
+
+    def save_file(self, name, content):
+        try:
+            self.file.delete(save=True)
+        except Exception as e:
+            pass
+        try:
+            self.file.save(name, ContentFile(content))
+        except Exception as e:
+            raise Exception(f"Unable to save {name}. Exception: {e}")
+
+    @classmethod
+    def get(cls, article_proc=None, task_name=None, report_date=None):
+        if article_proc and task_name and report_date:
+            try:
+                return cls.objects.get(
+                    article_proc=article_proc,
+                    task_name=task_name,
+                    report_date=report_date,
+                )
+            except cls.MultipleObjectsReturned:
+                return cls.objects.filter(
+                    article_proc=article_proc,
+                    task_name=task_name,
+                    report_date=report_date,
+                ).first()
+        raise ValueError(
+            "ArticleProcReport.get requires article_proc and task_name and report_date"
+        )
+
+    @classmethod
+    def create(cls, user, article_proc, task_name, report_date, file_content):
+        if article_proc and task_name and report_date:
+            try:
+                obj = cls()
+                obj.task_name = task_name
+                obj.acronym = acronym
+                obj.creator = user
+                obj.save()
+                return obj
+            except IntegrityError:
+                return cls.get(article_proc, task_name, report_date)
+        raise ValueError(
+            "ArticleProcReport.create requires article_proc and task_name and report_date"
+        )
+
+    @classmethod
+    def create_or_update(cls, user, article_proc, task_name, report_date, file_content):
+        try:
+            obj = cls.get(
+                article_proc=article_proc, task_name=task_name, report_date=report_date
+            )
+            obj.updated_by = user
+            obj.task_name = task_name or obj.task_name
+            obj.report_date = report_date or obj.report_date
+            obj.save()
+        except cls.DoesNotExist:
+            obj = cls.create(user, article_proc, task_name, report_date, file_content)
+        return obj
 
 
 class JournalProcResult(Operation, Orderable):
@@ -716,7 +834,9 @@ class IssueProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
-    def files_to_migrate(cls, collection, journal_acron, publication_year, force_update):
+    def files_to_migrate(
+        cls, collection, journal_acron, publication_year, force_update
+    ):
         """
         Muda o status de PROGRESS_STATUS_REPROC para PROGRESS_STATUS_TODO
         E se force_update = True, muda o status de PROGRESS_STATUS_DONE para PROGRESS_STATUS_TODO
@@ -737,9 +857,9 @@ class IssueProc(BaseProc, ClusterableModel):
 
         params = {}
         if publication_year:
-            params['issue__publication_year'] = publication_year
+            params["issue__publication_year"] = publication_year
         if journal_acron:
-            params['journal_proc__acron'] = journal_acron
+            params["journal_proc__acron"] = journal_acron
 
         return cls.objects.filter(
             files_status=tracker_choices.PROGRESS_STATUS_TODO,
@@ -818,9 +938,9 @@ class IssueProc(BaseProc, ClusterableModel):
 
         params = {}
         if publication_year:
-            params['issue__publication_year'] = publication_year
+            params["issue__publication_year"] = publication_year
         if journal_acron:
-            params['journal_proc__acron'] = journal_acron
+            params["journal_proc__acron"] = journal_acron
 
         return cls.objects.filter(
             docs_status=tracker_choices.PROGRESS_STATUS_TODO,
@@ -1020,7 +1140,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             operation.finish(
                 user,
-                completed=self.xml_status==tracker_choices.PROGRESS_STATUS_DONE,
+                completed=self.xml_status == tracker_choices.PROGRESS_STATUS_DONE,
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1219,8 +1339,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
     def fix_pid_v2(self, user):
         if self.sps_pkg:
-            self.sps_pkg.fix_pid_v2(
-                user, correct_pid_v2=self.migrated_data.pid)
+            self.sps_pkg.fix_pid_v2(user, correct_pid_v2=self.migrated_data.pid)
 
     def update_sps_pkg_status(self):
         if not self.sps_pkg:
@@ -1251,9 +1370,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             operation = self.start(user, "synchronize to core")
             self.sps_pkg.synchronize(user, self)
-            operation.finish(
-                user, completed=self.sps_pkg.registered_in_core
-            )
+            operation.finish(user, completed=self.sps_pkg.registered_in_core)
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
