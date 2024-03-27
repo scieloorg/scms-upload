@@ -85,10 +85,29 @@ class PidRequester(BasePidProvider):
         if registered.get("error_type"):
             return registered
 
-        self.core_registration(xml_with_pre, registered, article_proc, user)
-        xml_changed = registered.get("xml_changed")
+        xml_changed = {}
+        # Completa os valores ausentes de pid com recuperados ou com inéditos
+        try:
+            before = (xml_with_pre.v3, xml_with_pre.v2, xml_with_pre.aop_pid)
+            xml_with_pre.v3 = xml_with_pre.v3 or registered["v3"]
+            xml_with_pre.v2 = xml_with_pre.v2 or registered["v2"]
+            if registered["aop_pid"]:
+                xml_with_pre.aop_pid = registered["aop_pid"]
 
-        if registered.get("do_upload_registration"):
+            # verifica se houve mudança nos PIDs do XML
+            after = (xml_with_pre.v3, xml_with_pre.v2, xml_with_pre.aop_pid)
+            for label, bef, aft in zip(("pid_v3", "pid_v2", "aop_pid"), before, after):
+                if bef != aft:
+                    xml_changed[label] = aft
+        except KeyError:
+            pass
+
+        # Solicita pid para Core
+        self.core_registration(xml_with_pre, registered, article_proc, user)
+        xml_changed = xml_changed or registered.get("xml_changed")
+
+        # Atualiza registro de Upload
+        if registered["do_upload_registration"] or xml_changed:
             # Cria ou atualiza registro de PidProviderXML de Upload, se:
             # - está registrado no upload mas o conteúdo mudou, atualiza
             # - ou não está registrado no Upload, então cria
@@ -114,7 +133,7 @@ class PidRequester(BasePidProvider):
             )
 
         registered["synchronized"] = (
-            registered["registered_in_core"] and registered["registered_in_upload"]
+            registered.get("registered_in_core") and registered.get("registered_in_upload")
         )
         registered["xml_changed"] = xml_changed
         registered["xml_with_pre"] = xml_with_pre
@@ -141,16 +160,12 @@ class PidRequester(BasePidProvider):
 
         if registered.get("is_equal"):
             # xml recebido é igual ao registrado
-            registered["do_upload_registration"] = False
             registered["do_core_registration"] = not registered.get("registered_in_core")
-            registered["registered_in_upload"] = True
+            registered["do_upload_registration"] = registered["do_core_registration"]
         else:
-            # registrado no upload e xml recebido é diferente ao registrado
-            # xml recebido não está registrado no upload
-            registered["do_upload_registration"] = True
+            # xml recebido é diferente ao registrado ou não está no upload
             registered["do_core_registration"] = True
-            registered["registered_in_core"] = False
-            registered["registered_in_upload"] = False
+            registered["do_upload_registration"] = True
 
         op.finish(user, completed=True, detail={"registered": registered})
 
@@ -162,16 +177,18 @@ class PidRequester(BasePidProvider):
         """
         if registered["do_core_registration"]:
 
-            if registered.get("is_registered") and not xml_with_pre.v3:
-                raise ValueError(
-                    f"Unable to execute core registration for xml_with_pre without v3"
-                )
+            registered["registered_in_core"] = False
 
             op = article_proc.start(user, ">>> core registration")
 
             if not self.pid_provider_api.enabled:
                 op.finish(user, completed=False, detail={"core_pid_provider": "off"})
                 return registered
+
+            if registered.get("v3") and not xml_with_pre.v3:
+                raise ValueError(
+                    f"Unable to execute core registration for xml_with_pre without v3"
+                )
 
             response = self.pid_provider_api.provide_pid(
                 xml_with_pre, xml_with_pre.filename, created=registered.get("created")
@@ -200,8 +217,14 @@ class PidRequester(BasePidProvider):
             "correct_pid_v2": correct_pid_v2,
         }
 
-        pid_provider_xml = PidProviderXML.objects.get(v3=pid_v3)
-        fixed["pid_v2"] = pid_provider_xml.v2
+        try:
+            pid_provider_xml = PidProviderXML.objects.get(
+                v3=pid_v3, v2__contains=correct_pid_v2[:14])
+            fixed["pid_v2"] = pid_provider_xml.v2
+        except PidProviderXML.DoesNotExist:
+            return fixed
+        except PidProviderXML.MultipleObjectsReturned:
+            return fixed
         try:
             item_to_fix = FixPidV2.get_or_create(
                 user, pid_provider_xml, correct_pid_v2)
