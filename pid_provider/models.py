@@ -1419,20 +1419,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         try:
             registered = cls._query_document(xml_adapter)
             if registered:
-                # recupera os valores de pid v3, v2, aop_pid do registro PidProviderXML
-                # e adiciona / atualiza o xml_with_pre, o que garante que
-                # o XML tenha os pids ao ingressar no Core
-                # manterá estes valores, evitando que gere novos valores
-                # por não estarem presentes no XML
-                if registered.v3:
-                    xml_with_pre.v3 = registered.v3
-                if registered.v2:
-                    xml_with_pre.v2 = registered.v2
-                if registered.aop_pid:
-                    xml_with_pre.aop_pid = registered.aop_pid
-
                 data = registered.data
-                data["is_registered"] = True
                 data["is_equal"] = registered.is_equal_to(xml_adapter)
                 return data
         except (
@@ -1441,7 +1428,7 @@ class PidProviderXML(CommonControlField, ClusterableModel):
         ) as e:
             logging.exception(e)
             return {"error_msg": str(e), "error_type": str(type(e))}
-        return {"is_registered": False}
+        return {}
 
     def fix_pid_v2(self, user, correct_pid_v2):
         try:
