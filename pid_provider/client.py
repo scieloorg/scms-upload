@@ -238,20 +238,25 @@ class PidProviderAPIClient:
     def _process_post_xml_response(self, response, xml_with_pre, created=None):
         if not response:
             return
-        logging.info(f"_process_post_xml_response: {response}")
         for item in response:
+            logging.info(f"_process_post_xml_response ({xml_with_pre.data}): {item}")
 
             if not item.get("xml_changed"):
-                # dados em Upload é o mais atualizado
+                # pids do xml_with_pre não mudaram
+                logging.info("No xml changes")
                 return
 
             try:
                 # atualiza xml_with_pre com valor do XML registrado no Core
-                if not item.get("force_xml_changed"):
-                    # exceto 'force_xml_changed=True' ou
+                if not item.get("apply_xml_changes"):
+                    # exceto 'apply_xml_changes=True' ou
                     # exceto se o registro do Core foi criado posteriormente
                     if created and created < item["created"]:
                         # não atualizar com os dados do Core
+                        logging.info({
+                            "created_at_upload": created,
+                            "created_at_core": item['created'],
+                        })
                         return
 
                 for pid_type, pid_value in item["xml_changed"].items():
@@ -262,7 +267,7 @@ class PidProviderAPIClient:
                             xml_with_pre.v2 = pid_value
                         elif pid_type == "aop_pid":
                             xml_with_pre.aop_pid = pid_value
-                        item["do_upload_registration"] = True
+                        logging.info("XML changed")
                     except Exception as e:
                         pass
                 return
