@@ -23,7 +23,7 @@ def create_or_update_journal(
         journal_proc.migration_status != tracker_choices.PROGRESS_STATUS_TODO
         and not force_update
     ):
-        return
+        return journal_proc.journal
     collection = journal_proc.collection
     journal_data = journal_proc.migrated_data.data
 
@@ -56,6 +56,7 @@ def create_or_update_journal(
         migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         force_update=force_update,
     )
+    return journal
 
 
 def create_or_update_issue(
@@ -70,7 +71,7 @@ def create_or_update_issue(
         issue_proc.migration_status != tracker_choices.PROGRESS_STATUS_TODO
         and not force_update
     ):
-        return
+        return issue_proc.issue
     classic_website_issue = classic_ws.Issue(issue_proc.migrated_data.data)
 
     journal_proc = JournalProc.get(
@@ -96,6 +97,7 @@ def create_or_update_issue(
         migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         force_update=force_update,
     )
+    return issue
 
 
 def create_or_update_article(
@@ -110,9 +112,10 @@ def create_or_update_article(
         article_proc.migration_status != tracker_choices.PROGRESS_STATUS_TODO
         and not force_update
     ):
-        return
+        return article_proc.article
 
-    create_article(article_proc.sps_pkg, user, force_update)
+    article = create_article(article_proc.sps_pkg, user, force_update)
     article_proc.migration_status = tracker_choices.PROGRESS_STATUS_DONE
     article_proc.updated_by = user
     article_proc.save()
+    return article["article"]
