@@ -23,6 +23,7 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from package.models import BasicXMLFile
 from migration.models import MigratedArticle
+
 # from tracker.models import EventLogger
 from tracker import choices as tracker_choices
 
@@ -133,9 +134,9 @@ class BodyAndBackFile(BasicXMLFile, Orderable):
             return obj
         except Exception as e:
             raise exceptions.CreateOrUpdateBodyAndBackFileError(
-                _(
-                    "Unable to create_or_update_body and back file {} {} {} {}"
-                ).format(bb_parent, version, type(e), e)
+                _("Unable to create_or_update_body and back file {} {} {} {}").format(
+                    bb_parent, version, type(e), e
+                )
             )
 
 
@@ -561,14 +562,25 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
     ):
         try:
             self.html2xml_status = tracker_choices.PROGRESS_STATUS_DOING
-            self.html_translation_langs = "-".join(sorted(article_proc.translations.keys()))
-            self.pdf_langs = "-".join(sorted([item.lang or article_proc.main_lang for item in article_proc.renditions]))
+            self.html_translation_langs = "-".join(
+                sorted(article_proc.translations.keys())
+            )
+            self.pdf_langs = "-".join(
+                sorted(
+                    [
+                        item.lang or article_proc.main_lang
+                        for item in article_proc.renditions
+                    ]
+                )
+            )
             self.save()
 
             document = Document(article_proc.migrated_data.data)
             document._translated_html_by_lang = article_proc.translations
 
-            body_and_back = self._generate_xml_body_and_back(user, article_proc, document)
+            body_and_back = self._generate_xml_body_and_back(
+                user, article_proc, document
+            )
             xml_content = self._generate_xml_from_html(user, article_proc, document)
 
             if xml_content and body_and_back:
