@@ -81,14 +81,15 @@ class Operation(CommonControlField):
     base_form_class = ProcAdminModelForm
 
     panels = [
-        FieldPanel("name"),
+        FieldPanel("name", read_only=True),
         FieldPanel("created", read_only=True),
         FieldPanel("updated", read_only=True),
-        FieldPanel("completed"),
-        FieldPanel("detail"),
+        FieldPanel("completed", read_only=True),
+        FieldPanel("detail", read_only=True),
     ]
 
     class Meta:
+        ordering = ['-created']
         indexes = [
             models.Index(fields=["name"]),
         ]
@@ -121,7 +122,7 @@ class Operation(CommonControlField):
 
             # obtém todos os ítens criados após este evento
             rows = []
-            for row in cls.objects.filter(proc=proc, created__gte=item.created).iterator():
+            for row in cls.objects.filter(proc=proc, created__gte=item.created).order_by('created').iterator():
                 rows.append(row.data)
 
             try:
@@ -431,7 +432,7 @@ class BaseProc(CommonControlField):
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
@@ -710,14 +711,14 @@ class JournalProc(BaseProc, ClusterableModel):
     base_form_class = ProcAdminModelForm
 
     panel_proc_result = [
-        InlinePanel("journal_proc_result", label=_("Proc result")),
+        InlinePanel("journal_proc_result", label=_("Event")),
     ]
     MigratedDataClass = MigratedJournal
 
     edit_handler = TabbedInterface(
         [
             ObjectList(BaseProc.panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
@@ -843,12 +844,12 @@ class IssueProc(BaseProc, ClusterableModel):
         AutocompletePanel("issue_files"),
     ]
     panel_proc_result = [
-        InlinePanel("issue_proc_result"),
+        InlinePanel("issue_proc_result", label=_("Event")),
     ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
@@ -1139,13 +1140,13 @@ class ArticleProc(BaseProc, ClusterableModel):
     #     AutocompletePanel("events"),
     # ]
     panel_proc_result = [
-        InlinePanel("article_proc_result"),
+        InlinePanel("article_proc_result", label=_("Event")),
     ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
             ObjectList(panel_files, heading=_("Files")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
