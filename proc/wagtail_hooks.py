@@ -15,7 +15,7 @@ from config.menu import get_menu_order
 from package.models import SPSPkg
 from htmlxml.models import HTMLXML
 
-from .models import ArticleProc, IssueProc, JournalProc, ArticleProcReport
+from .models import ArticleProc, IssueProc, JournalProc, ProcReport
 
 
 class ProcCreateView(CreateView):
@@ -210,31 +210,33 @@ class ArticleProcModelAdmin(ModelAdmin):
     )
 
 
-class ArticleProcReportModelAdmin(ModelAdmin):
-    model = ArticleProcReport
-    menu_label = _("Article Processing Report")
+class ProcReportModelAdmin(ModelAdmin):
+    model = ProcReport
+    menu_label = _("Processing Report")
     inspect_view_enabled = True
     menu_icon = "doc-full"
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
 
+    list_per_page = 50
+
     list_display = (
-        "article_proc",
-        "sps_pkg_name",
+        "pid",
+        "collection",
         "task_name",
-        "file",
         "report_date",
         "updated",
         "created",
     )
     list_filter = (
         "task_name",
+        "collection",
+        "item_type",
     )
     search_fields = (
-        "article_proc__pid",
-        "article_proc__collection__name",
-        "sps_pkg_name",
+        "pid",
+        "collection__name",
         "task_name",
         "report_date",
     )
@@ -251,7 +253,7 @@ class ProcessModelAdminGroup(ModelAdminGroup):
         HTMLXMLModelAdmin,
         SPSPkgModelAdmin,
         ArticleProcModelAdmin,
-        ArticleProcReportModelAdmin,
+        ProcReportModelAdmin,
     )
 
 

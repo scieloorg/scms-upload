@@ -97,12 +97,63 @@ class Operation(CommonControlField):
         return f"{self.name} {self.started} {self.finished} {self.completed}"
 
     @property
+    def data(self):
+        return dict(
+            name=self.name,
+            completed=self.completed,
+            event=self.event and self.event.data,
+            detail=self.detail,
+            created=self.created.isoformat(),
+        )
+
+    @property
     def started(self):
         return self.created and self.created.isoformat() or ""
 
     @property
     def finished(self):
         return self.updated and self.updated.isoformat() or ""
+
+    @classmethod
+    def create(cls, user, proc, name):
+        for item in cls.objects.filter(proc=proc, name=name).order_by('created'):
+            # obtém o primeiro ocorrência de proc e name
+
+            # obtém todos os ítens criados após este evento
+            rows = []
+            for row in cls.objects.filter(proc=proc, created__gte=item.created).iterator():
+                rows.append(row.data)
+
+            try:
+                # converte para json
+                file_content = json.dumps(rows)
+                file_extension = ".json"
+            except Exception as e:
+                # caso não seja serializável, converte para str
+                file_content = str(rows)
+                file_extension = ".txt"
+                logging.info(proc.pid)
+                logging.exception(e)
+
+            try:
+                report_date = item.created.isoformat()
+                # cria um arquivo com o conteúdo
+                ProcReport.create_or_update(
+                    user, proc, name, report_date, file_content, file_extension,
+                )
+                # apaga todas as ocorrências que foram armazenadas no arquivo
+                cls.objects.filter(proc=proc, created__gte=item.created).delete()
+            except Exception as e:
+                logging.info(proc.pid)
+                logging.exception(e)
+            break
+
+        obj = cls()
+        obj.proc = proc
+        obj.name = name
+        obj.creator = user
+        obj.save()
+        return obj
 
     @classmethod
     def start(
@@ -112,12 +163,7 @@ class Operation(CommonControlField):
         name=None,
     ):
         try:
-            obj = cls()
-            obj.proc = proc
-            obj.name = name
-            obj.creator = user
-            obj.save()
-            return obj
+            return cls.create(user, proc, name)
         except Exception as exc:
             raise OperationStartError(
                 f"Unable to create Operation ({name}). EXCEPTION: {type(exc)}  {exc}"
@@ -185,20 +231,19 @@ class Operation(CommonControlField):
 
 def proc_report_directory_path(instance, filename):
     try:
-        subdir = instance.sps_pkg_name.replace("-", "/")
-        year = instance.created.isoformat()[:8]
-        return f"sps_pkg/{subdir}/reports/{year}/{filename}"
+        subdir = instance.directory_path
+        YYYY = instance.report_date[:4]
+        return f"archive/{subdir}/proc/{YYYY}/{filename}"
     except AttributeError:
-        return f"reports/{filename}"
+        return f"archive/{filename}"
 
 
-class ArticleProcReport(CommonControlField):
-    article_proc = models.ForeignKey(
-        "ArticleProc", on_delete=models.SET_NULL, null=True, blank=True
+class ProcReport(CommonControlField):
+    collection = models.ForeignKey(
+        Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
-    sps_pkg_name = models.CharField(
-        _("SPS package name"), max_length=32, null=True, blank=True
-    )
+
+    pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
     task_name = models.CharField(
         _("Procedure name"), max_length=32, null=True, blank=True
     )
@@ -206,30 +251,33 @@ class ArticleProcReport(CommonControlField):
     report_date = models.CharField(
         _("Identification"), max_length=34, null=True, blank=True
     )
+    item_type = models.CharField(_("Item type"), max_length=16, null=True, blank=True)
 
     panel_files = [
-        FieldPanel("sps_pkg_name"),
         FieldPanel("task_name"),
         FieldPanel("report_date"),
         FieldPanel("file"),
     ]
 
     def __str__(self):
-        return f"{self.sps_pkg_name} {self.task_name} {self.report_date}"
+        return f"{self.collection.acron} {self.pid} {self.task_name} {self.report_date}"
 
     class Meta:
-        verbose_name = _("Article processing report")
-        verbose_name_plural = _("Article processing reports")
+        verbose_name = _("Processing report")
+        verbose_name_plural = _("Processing reports")
         indexes = [
-            models.Index(fields=["sps_pkg_name"]),
+            models.Index(fields=["item_type"]),
+            models.Index(fields=["pid"]),
             models.Index(fields=["task_name"]),
             models.Index(fields=["report_date"]),
         ]
 
     @staticmethod
     def autocomplete_custom_queryset_filter(search_term):
-        return State.objects.filter(
-            Q(sps_pkg_name__icontains=search_term)
+        return ProcReport.objects.filter(
+            Q(pid__icontains=search_term)
+            | Q(collection__acron__icontains=search_term)
+            | Q(collection__name__icontains=search_term)
             | Q(task_name__icontains=search_term)
             | Q(report_date__icontains=search_term)
         )
@@ -248,53 +296,75 @@ class ArticleProcReport(CommonControlField):
             raise Exception(f"Unable to save {name}. Exception: {e}")
 
     @classmethod
-    def get(cls, article_proc=None, task_name=None, report_date=None):
-        if article_proc and task_name and report_date:
+    def get(cls, proc=None, task_name=None, report_date=None):
+        if proc and task_name and report_date:
             try:
                 return cls.objects.get(
-                    article_proc=article_proc,
+                    collection=proc.collection, pid=proc.pid,
                     task_name=task_name,
                     report_date=report_date,
                 )
             except cls.MultipleObjectsReturned:
                 return cls.objects.filter(
-                    article_proc=article_proc,
+                    collection=proc.collection, pid=proc.pid,
                     task_name=task_name,
                     report_date=report_date,
                 ).first()
         raise ValueError(
-            "ArticleProcReport.get requires article_proc and task_name and report_date"
+            "ProcReport.get requires proc and task_name and report_date"
         )
 
+    @staticmethod
+    def get_item_type(pid):
+        if len(pid) == 23:
+            return "article"
+        if len(pid) == 9:
+            return "journal"
+        return "issue"
+
     @classmethod
-    def create(cls, user, article_proc, task_name, report_date, file_content):
-        if article_proc and task_name and report_date:
+    def create(cls, user, proc, task_name, report_date, file_content, file_extension):
+        if proc and task_name and report_date and file_content and file_extension:
             try:
                 obj = cls()
+                obj.collection = proc.collection
+                obj.pid = proc.pid
                 obj.task_name = task_name
-                obj.acronym = acronym
+                obj.item_type = ProcReport.get_item_type(proc.pid)
+                obj.report_date = report_date
                 obj.creator = user
                 obj.save()
+                obj.save_file(f"{task_name}{file_extension}", file_content)
                 return obj
             except IntegrityError:
-                return cls.get(article_proc, task_name, report_date)
+                return cls.get(proc, task_name, report_date)
         raise ValueError(
-            "ArticleProcReport.create requires article_proc and task_name and report_date"
+            "ProcReport.create requires proc and task_name and report_date and file_content and file_extension"
         )
 
     @classmethod
-    def create_or_update(cls, user, article_proc, task_name, report_date, file_content):
+    def create_or_update(cls, user, proc, task_name, report_date, file_content, file_extension):
         try:
             obj = cls.get(
-                article_proc=article_proc, task_name=task_name, report_date=report_date
+                proc=proc, task_name=task_name, report_date=report_date
             )
             obj.updated_by = user
             obj.task_name = task_name or obj.task_name
             obj.report_date = report_date or obj.report_date
             obj.save()
+            obj.save_file(f"{task_name}{file_extension}", file_content)
         except cls.DoesNotExist:
-            obj = cls.create(user, article_proc, task_name, report_date, file_content)
+            obj = cls.create(user, proc, task_name, report_date, file_content, file_extension)
         return obj
+
+    @property
+    def directory_path(self):
+        pid = self.pid
+        if len(self.pid) == 23:
+            pid = self.pid[1:]
+        paths = [self.collection.acron, pid[:9], pid[9:13], pid[13:17], pid[17:]]
+        paths = [path for path in paths if path]
+        return os.path.join(*paths)
 
 
 class JournalProcResult(Operation, Orderable):
@@ -1053,6 +1123,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     )
 
     ProcResult = ArticleProcResult
+
     panel_files = [
         FieldPanel("pkg_name"),
         AutocompletePanel("sps_pkg"),
