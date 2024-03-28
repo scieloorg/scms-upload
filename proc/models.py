@@ -255,9 +255,9 @@ class ProcReport(CommonControlField):
     item_type = models.CharField(_("Item type"), max_length=16, null=True, blank=True)
 
     panel_files = [
-        FieldPanel("task_name"),
-        FieldPanel("report_date"),
-        FieldPanel("file"),
+        FieldPanel("task_name", read_only=True),
+        FieldPanel("report_date", read_only=True),
+        FieldPanel("file", read_only=True),
     ]
 
     def __str__(self):
@@ -505,6 +505,7 @@ class BaseProc(CommonControlField):
                     obj.migration_status == tracker_choices.PROGRESS_STATUS_TODO
                 ),
                 message=None,
+                detail=obj.migrated_data,
             )
             return obj
         except Exception as e:
@@ -572,13 +573,13 @@ class BaseProc(CommonControlField):
 
             operation = self.start(user, f"create or update {item_name}")
 
-            callable_register_data(user, self, force_update)
-
+            registered = callable_register_data(user, self, force_update)
             operation.finish(
                 user,
                 completed=(
                     self.migration_status == tracker_choices.PROGRESS_STATUS_DONE
                 ),
+                detail=registered and registered.data,
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1126,8 +1127,8 @@ class ArticleProc(BaseProc, ClusterableModel):
     ProcResult = ArticleProcResult
 
     panel_files = [
-        FieldPanel("pkg_name"),
-        AutocompletePanel("sps_pkg"),
+        FieldPanel("pkg_name", read_only=True),
+        AutocompletePanel("sps_pkg", read_only=True),
     ]
     panel_status = [
         FieldPanel("xml_status"),
@@ -1201,8 +1202,8 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             if htmlxml:
                 xml = htmlxml.html_to_xml(user, self, body_and_back_xml)
-            else:
-                xml = get_migrated_xml_with_pre(self)
+
+            xml = get_migrated_xml_with_pre(self)
 
             if xml:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -1213,6 +1214,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             operation.finish(
                 user,
                 completed=self.xml_status == tracker_choices.PROGRESS_STATUS_DONE,
+                detail=xml and xml.data,
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1395,7 +1397,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             operation.finish(
                 user,
                 completed=bool(self.sps_pkg and self.sps_pkg.is_complete),
-                detail=self.sps_pkg and self.sps_pkg.data or None,
+                detail=self.sps_pkg and self.sps_pkg.data,
             )
 
         except Exception as e:
@@ -1406,7 +1408,7 @@ class ArticleProc(BaseProc, ClusterableModel):
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
-                detail=self.sps_pkg and self.sps_pkg.data or None,
+                detail=self.sps_pkg and self.sps_pkg.data,
             )
 
     def fix_pid_v2(self, user):
