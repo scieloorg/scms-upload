@@ -627,7 +627,14 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             else:
                 self.quality = choices.HTML2XML_QA_NOT_EVALUATED
             self.save()
-            op.finish(user, completed=True)
+            op.finish(
+                user,
+                completed=True,
+                detail={
+                    "attention_demands": self.attention_demands,
+                    "quality": self.quality,
+                },
+            )
         except Exception as e:
             op.finish(user, completed=False, detail={"error": str(e)})
 
