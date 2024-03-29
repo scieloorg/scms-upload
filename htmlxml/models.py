@@ -644,9 +644,12 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         """
         done = False
         operation = article_proc.start(user, "generate xml body and back")
+
+        languages = document._translated_html_by_lang
         detail = {}
+        detail.update(languages)
         try:
-            document.generate_body_and_back_from_html(document._translated_html_by_lang)
+            document.generate_body_and_back_from_html(languages)
             done = True
         except GenerateBodyAndBackFromHTMLError as e:
             # cria xml_body_and_back padrão
@@ -664,7 +667,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                     file_content=xml_body_and_back,
                     pkg_name=article_proc.pkg_name,
                 )
-
+                detail["xml_to_html_steps"] = i
         operation.finish(user, done, detail=detail)
         return done
 
@@ -674,7 +677,9 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         detail = {}
         try:
             xml_content = document.generate_full_xml(None).decode("utf-8")
-            self.save_file(article_proc.pkg_name + ".xml", xml_content)
+            xml_file = article_proc.pkg_name + ".xml"
+            self.save_file(xml_file, xml_content)
+            detail["xml"] = xml_file
         except Exception as e:
             detail = {"error": str(e)}
         operation.finish(user, bool(xml_content), detail=detail)

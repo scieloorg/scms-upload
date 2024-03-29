@@ -89,6 +89,7 @@ class Operation(CommonControlField):
     ]
 
     class Meta:
+        # isso faz com que em InlinePanel mostre do mais recente para o mais antigo
         ordering = ['-created']
         indexes = [
             models.Index(fields=["name"]),
@@ -1201,7 +1202,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             self.save()
 
             if htmlxml:
-                xml = htmlxml.html_to_xml(user, self, body_and_back_xml)
+                htmlxml.html_to_xml(user, self, body_and_back_xml)
 
             xml = get_migrated_xml_with_pre(self)
 
