@@ -4,7 +4,6 @@ import sys
 import json
 from datetime import datetime
 from tempfile import TemporaryDirectory
-from zipfile import ZipFile
 
 from django.core.files.base import ContentFile
 from django.db import models
@@ -81,14 +80,16 @@ class Operation(CommonControlField):
     base_form_class = ProcAdminModelForm
 
     panels = [
-        FieldPanel("name"),
+        FieldPanel("name", read_only=True),
         FieldPanel("created", read_only=True),
         FieldPanel("updated", read_only=True),
-        FieldPanel("completed"),
-        FieldPanel("detail"),
+        FieldPanel("completed", read_only=True),
+        FieldPanel("detail", read_only=True),
     ]
 
     class Meta:
+        # isso faz com que em InlinePanel mostre do mais recente para o mais antigo
+        ordering = ['-created']
         indexes = [
             models.Index(fields=["name"]),
         ]
@@ -121,7 +122,7 @@ class Operation(CommonControlField):
 
             # obtém todos os ítens criados após este evento
             rows = []
-            for row in cls.objects.filter(proc=proc, created__gte=item.created).iterator():
+            for row in cls.objects.filter(proc=proc, created__gte=item.created).order_by('created').iterator():
                 rows.append(row.data)
 
             try:
@@ -254,15 +255,17 @@ class ProcReport(CommonControlField):
     item_type = models.CharField(_("Item type"), max_length=16, null=True, blank=True)
 
     panel_files = [
-        FieldPanel("task_name"),
-        FieldPanel("report_date"),
-        FieldPanel("file"),
+        FieldPanel("task_name", read_only=True),
+        FieldPanel("report_date", read_only=True),
+        FieldPanel("file", read_only=True),
     ]
 
     def __str__(self):
         return f"{self.collection.acron} {self.pid} {self.task_name} {self.report_date}"
 
     class Meta:
+        ordering = ['-created']
+
         verbose_name = _("Processing report")
         verbose_name_plural = _("Processing reports")
         indexes = [
@@ -410,6 +413,8 @@ class BaseProc(CommonControlField):
 
     class Meta:
         abstract = True
+        ordering = ['-updated']
+
         indexes = [
             models.Index(fields=["pid"]),
         ]
@@ -431,7 +436,7 @@ class BaseProc(CommonControlField):
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
@@ -504,6 +509,7 @@ class BaseProc(CommonControlField):
                     obj.migration_status == tracker_choices.PROGRESS_STATUS_TODO
                 ),
                 message=None,
+                detail=obj.migrated_data,
             )
             return obj
         except Exception as e:
@@ -571,13 +577,13 @@ class BaseProc(CommonControlField):
 
             operation = self.start(user, f"create or update {item_name}")
 
-            callable_register_data(user, self, force_update)
-
+            registered = callable_register_data(user, self, force_update)
             operation.finish(
                 user,
                 completed=(
                     self.migration_status == tracker_choices.PROGRESS_STATUS_DONE
                 ),
+                detail=registered and registered.data,
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -710,18 +716,19 @@ class JournalProc(BaseProc, ClusterableModel):
     base_form_class = ProcAdminModelForm
 
     panel_proc_result = [
-        InlinePanel("journal_proc_result", label=_("Proc result")),
+        InlinePanel("journal_proc_result", label=_("Event")),
     ]
     MigratedDataClass = MigratedJournal
 
     edit_handler = TabbedInterface(
         [
             ObjectList(BaseProc.panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
     class Meta:
+        ordering = ['-updated']
         indexes = [
             models.Index(fields=["acron"]),
         ]
@@ -843,12 +850,12 @@ class IssueProc(BaseProc, ClusterableModel):
         AutocompletePanel("issue_files"),
     ]
     panel_proc_result = [
-        InlinePanel("issue_proc_result"),
+        InlinePanel("issue_proc_result", label=_("Event")),
     ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
@@ -873,6 +880,7 @@ class IssueProc(BaseProc, ClusterableModel):
         )
 
     class Meta:
+        ordering = ['-updated']
         indexes = [
             models.Index(fields=["issue_folder"]),
             models.Index(fields=["docs_status"]),
@@ -1125,8 +1133,8 @@ class ArticleProc(BaseProc, ClusterableModel):
     ProcResult = ArticleProcResult
 
     panel_files = [
-        FieldPanel("pkg_name"),
-        AutocompletePanel("sps_pkg"),
+        FieldPanel("pkg_name", read_only=True),
+        AutocompletePanel("sps_pkg", read_only=True),
     ]
     panel_status = [
         FieldPanel("xml_status"),
@@ -1139,19 +1147,20 @@ class ArticleProc(BaseProc, ClusterableModel):
     #     AutocompletePanel("events"),
     # ]
     panel_proc_result = [
-        InlinePanel("article_proc_result"),
+        InlinePanel("article_proc_result", label=_("Event")),
     ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
             ObjectList(panel_files, heading=_("Files")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
     MigratedDataClass = MigratedArticle
 
     class Meta:
+        ordering = ['-updated']
         indexes = [
             models.Index(fields=["pkg_name"]),
             models.Index(fields=["xml_status"]),
@@ -1199,9 +1208,9 @@ class ArticleProc(BaseProc, ClusterableModel):
             self.save()
 
             if htmlxml:
-                xml = htmlxml.html_to_xml(user, self, body_and_back_xml)
-            else:
-                xml = get_migrated_xml_with_pre(self)
+                htmlxml.html_to_xml(user, self, body_and_back_xml)
+
+            xml = get_migrated_xml_with_pre(self)
 
             if xml:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -1212,6 +1221,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             operation.finish(
                 user,
                 completed=self.xml_status == tracker_choices.PROGRESS_STATUS_DONE,
+                detail=xml and xml.data,
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1394,7 +1404,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             operation.finish(
                 user,
                 completed=bool(self.sps_pkg and self.sps_pkg.is_complete),
-                detail=self.sps_pkg and self.sps_pkg.data or None,
+                detail=self.sps_pkg and self.sps_pkg.data,
             )
 
         except Exception as e:
@@ -1405,7 +1415,7 @@ class ArticleProc(BaseProc, ClusterableModel):
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
-                detail=self.sps_pkg and self.sps_pkg.data or None,
+                detail=self.sps_pkg and self.sps_pkg.data,
             )
 
     def fix_pid_v2(self, user):
@@ -1422,7 +1432,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         elif not self.sps_pkg.valid_components:
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
         else:
-            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_PENDING
         self.save()
 
     @property

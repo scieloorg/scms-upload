@@ -98,7 +98,8 @@ class UnexpectedEvent(models.Model):
             try:
                 json.dumps(detail)
                 obj.detail = detail
-            except:
+            except Exception as json_e:
+                logging.exception(json_e)
                 obj.detail = str(detail)
             if exc_traceback:
                 obj.traceback = traceback.format_tb(exc_traceback)

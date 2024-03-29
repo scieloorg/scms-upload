@@ -23,6 +23,7 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from package.models import BasicXMLFile
 from migration.models import MigratedArticle
+
 # from tracker.models import EventLogger
 from tracker import choices as tracker_choices
 
@@ -84,6 +85,7 @@ class BodyAndBackFile(BasicXMLFile, Orderable):
     ]
 
     class Meta:
+
         indexes = [
             models.Index(fields=["version"]),
         ]
@@ -133,9 +135,9 @@ class BodyAndBackFile(BasicXMLFile, Orderable):
             return obj
         except Exception as e:
             raise exceptions.CreateOrUpdateBodyAndBackFileError(
-                _(
-                    "Unable to create_or_update_body and back file {} {} {} {}"
-                ).format(bb_parent, version, type(e), e)
+                _("Unable to create_or_update_body and back file {} {} {} {}").format(
+                    bb_parent, version, type(e), e
+                )
             )
 
 
@@ -214,6 +216,7 @@ class Html2xmlAnalysis(models.Model):
     ]
 
     class Meta:
+
         indexes = [
             models.Index(fields=["attention_demands"]),
         ]
@@ -491,6 +494,8 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         return self.migrated_article
 
     class Meta:
+        ordering = ['-updated']
+
         indexes = [
             models.Index(fields=["html2xml_status"]),
             models.Index(fields=["quality"]),
@@ -561,14 +566,25 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
     ):
         try:
             self.html2xml_status = tracker_choices.PROGRESS_STATUS_DOING
-            self.html_translation_langs = "-".join(sorted(article_proc.translations.keys()))
-            self.pdf_langs = "-".join(sorted([item.lang or article_proc.main_lang for item in article_proc.renditions]))
+            self.html_translation_langs = "-".join(
+                sorted(article_proc.translations.keys())
+            )
+            self.pdf_langs = "-".join(
+                sorted(
+                    [
+                        item.lang or article_proc.main_lang
+                        for item in article_proc.renditions
+                    ]
+                )
+            )
             self.save()
 
             document = Document(article_proc.migrated_data.data)
             document._translated_html_by_lang = article_proc.translations
 
-            body_and_back = self._generate_xml_body_and_back(user, article_proc, document)
+            body_and_back = self._generate_xml_body_and_back(
+                user, article_proc, document
+            )
             xml_content = self._generate_xml_from_html(user, article_proc, document)
 
             if xml_content and body_and_back:
@@ -615,7 +631,14 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             else:
                 self.quality = choices.HTML2XML_QA_NOT_EVALUATED
             self.save()
-            op.finish(user, completed=True)
+            op.finish(
+                user,
+                completed=True,
+                detail={
+                    "attention_demands": self.attention_demands,
+                    "quality": self.quality,
+                },
+            )
         except Exception as e:
             op.finish(user, completed=False, detail={"error": str(e)})
 
@@ -625,9 +648,12 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         """
         done = False
         operation = article_proc.start(user, "generate xml body and back")
+
+        languages = document._translated_html_by_lang
         detail = {}
+        detail.update(languages)
         try:
-            document.generate_body_and_back_from_html(document._translated_html_by_lang)
+            document.generate_body_and_back_from_html(languages)
             done = True
         except GenerateBodyAndBackFromHTMLError as e:
             # cria xml_body_and_back padrão
@@ -645,7 +671,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                     file_content=xml_body_and_back,
                     pkg_name=article_proc.pkg_name,
                 )
-
+                detail["xml_to_html_steps"] = i
         operation.finish(user, done, detail=detail)
         return done
 
@@ -655,7 +681,9 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         detail = {}
         try:
             xml_content = document.generate_full_xml(None).decode("utf-8")
-            self.save_file(article_proc.pkg_name + ".xml", xml_content)
+            xml_file = article_proc.pkg_name + ".xml"
+            self.save_file(xml_file, xml_content)
+            detail["xml"] = xml_file
         except Exception as e:
             detail = {"error": str(e)}
         operation.finish(user, bool(xml_content), detail=detail)
