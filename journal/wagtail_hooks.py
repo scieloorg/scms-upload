@@ -69,14 +69,12 @@ class JournalAdmin(ModelAdmin):
 class JournalModelAdminGroup(ModelAdminGroup):
     menu_icon = "folder"
     menu_label = _("Journals")
-    # menu_order = get_menu_order("journal")
-    menu_order = 200
+    menu_order = get_menu_order("journal")
     items = (
         OfficialJournalAdmin,
         JournalAdmin,
         # JournalProcAdmin,
     )
-    menu_order = get_menu_order("journal")
 
 
 modeladmin_register(JournalModelAdminGroup)

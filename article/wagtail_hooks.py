@@ -120,7 +120,7 @@ class ArticleModelAdmin(ModelAdmin):
     inspect_view_enabled = True
     inspect_view_class = ArticleAdminInspectView
     menu_icon = "doc-full"
-    menu_order = 200
+    menu_order = get_menu_order("article")
     add_to_settings_menu = False
     exclude_from_explorer = False
 

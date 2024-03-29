@@ -24,7 +24,7 @@ LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 class PidProviderAPIClient:
     """
-    Interface com o pid provider
+    Interface com o pid provider do Core
     """
 
     def __init__(
@@ -44,9 +44,10 @@ class PidProviderAPIClient:
 
     @property
     def enabled(self):
-        if self.config:
+        try:
             return bool(self.config.api_username and self.config.api_password)
-        return False
+        except (AttributeError, ValueError, TypeError):
+            return False
 
     @property
     def config(self):
@@ -57,6 +58,18 @@ class PidProviderAPIClient:
                 logging.exception(f"PidProviderConfig.get_or_create {e}")
                 self._config = None
         return self._config
+
+    @property
+    def fix_pid_v2_url(self):
+        if not hasattr(self, "_fix_pid_v2_url") or not self._fix_pid_v2_url:
+            try:
+                self._fix_pid_v2_url = None
+                endpoint = self.config.endpoint.filter(name='fix-pid-v2')[0]
+                if endpoint.enabled:
+                    self._fix_pid_v2_url = endpoint.url
+            except IndexError:
+                pass
+        return self._fix_pid_v2_url
 
     @property
     def pid_provider_api_post_xml(self):
@@ -96,7 +109,7 @@ class PidProviderAPIClient:
                 raise exceptions.APIPidProviderConfigError(e)
         return self._api_password
 
-    def provide_pid(self, xml_with_pre, name):
+    def provide_pid(self, xml_with_pre, name, created=None):
         """
         name : str
             nome do arquivo xml
@@ -110,7 +123,7 @@ class PidProviderAPIClient:
             )
             response = self._prepare_and_post_xml(xml_with_pre, name, self.token)
 
-            self._process_post_xml_response(response, xml_with_pre)
+            self._process_post_xml_response(response, xml_with_pre, created)
             try:
                 return response[0]
             except IndexError:
@@ -163,6 +176,8 @@ class PidProviderAPIClient:
         with TemporaryDirectory() as tmpdirname:
             name, ext = os.path.splitext(name)
             zip_xml_file_path = os.path.join(tmpdirname, name + ".zip")
+
+            logging.info(f"Posting xml with {xml_with_pre.data}")
 
             create_xml_zip_file(
                 zip_xml_file_path, xml_with_pre.tostring(pretty_print=True)
@@ -220,14 +235,30 @@ class PidProviderAPIClient:
                 )
             )
 
-    def _process_post_xml_response(self, response, xml_with_pre):
+    def _process_post_xml_response(self, response, xml_with_pre, created=None):
         if not response:
             return
-        logging.info(f"_process_post_xml_response: {response}")
         for item in response:
+            logging.info(f"_process_post_xml_response ({xml_with_pre.data}): {item}")
+
             if not item.get("xml_changed"):
+                # pids do xml_with_pre não mudaram
+                logging.info("No xml changes")
                 return
+
             try:
+                # atualiza xml_with_pre com valor do XML registrado no Core
+                if not item.get("apply_xml_changes"):
+                    # exceto 'apply_xml_changes=True' ou
+                    # exceto se o registro do Core foi criado posteriormente
+                    if created and created < item["created"]:
+                        # não atualizar com os dados do Core
+                        logging.info({
+                            "created_at_upload": created,
+                            "created_at_core": item['created'],
+                        })
+                        return
+
                 for pid_type, pid_value in item["xml_changed"].items():
                     try:
                         if pid_type == "pid_v3":
@@ -236,14 +267,68 @@ class PidProviderAPIClient:
                             xml_with_pre.v2 = pid_value
                         elif pid_type == "aop_pid":
                             xml_with_pre.aop_pid = pid_value
+                        logging.info("XML changed")
                     except Exception as e:
                         pass
+                return
+            except KeyError:
+                pass
 
-            except KeyError:
-                pass
-            try:
-                # atualiza xml_with_pre com valor do XML registrado no core
-                for xml_with_pre in XMLWithPre.create(uri=item["xml_uri"]):
-                    break
-            except KeyError:
-                pass
+    def fix_pid_v2(self, pid_v3, correct_pid_v2):
+        """
+        name : str
+            nome do arquivo xml
+        """
+        try:
+            if not self.fix_pid_v2_url:
+                return {"fix-pid-v2": "unavailable", "fixed_in_core": False}
+
+            self.token = self.token or self._get_token(
+                username=self.api_username,
+                password=self.api_password,
+                timeout=self.timeout,
+            )
+            response = self._post_fix_pid_v2(pid_v3, correct_pid_v2, self.token, self.timeout)
+            response["fixed_in_core"] = response.get("v2") == correct_pid_v2
+            return response
+        except (
+            exceptions.GetAPITokenError,
+            exceptions.APIPidProviderPostError,
+            exceptions.APIPidProviderConfigError,
+        ) as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            return {
+                "error_msg": str(e),
+                "error_type": str(type(e)),
+                "traceback": [
+                    str(item) for item in traceback.extract_tb(exc_traceback)
+                ],
+            }
+
+    def _post_fix_pid_v2(self, pid_v3, correct_pid_v2, token, timeout):
+        header = {
+            "Authorization": "Bearer " + token,
+            # "content-type": "multi-part/form-data",
+            # "content-type": "application/json",
+        }
+        try:
+            uri = self.fix_pid_v2_url
+            return post_data(
+                uri,
+                data={"pid_v3": pid_v3, "correct_pid_v2": correct_pid_v2},
+                headers=header,
+                timeout=timeout,
+                verify=False,
+                json=True,
+            )
+        except Exception as e:
+            logging.exception(e)
+            raise exceptions.APIPidProviderFixPidV2Error(
+                _("Unable to get pid from pid provider {} {} {} {} {}").format(
+                    uri,
+                    pid_v3,
+                    correct_pid_v2,
+                    type(e),
+                    e,
+                )
+            )

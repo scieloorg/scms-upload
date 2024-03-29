@@ -261,6 +261,7 @@ def task_generate_sps_packages(
     force_update=False,
     body_and_back_xml=False,
     html_to_xml=False,
+    force_core_update=True,
 ):
     try:
         for collection in _get_collections(collection_acron):
@@ -279,6 +280,7 @@ def task_generate_sps_packages(
                         "item_id": item.id,
                         "body_and_back_xml": body_and_back_xml,
                         "html_to_xml": html_to_xml,
+                        "force_core_update": force_core_update,
                     }
                 )
     except Exception as e:
@@ -297,6 +299,7 @@ def task_generate_sps_packages(
                 "force_update": force_update,
                 "body_and_back_xml": body_and_back_xml,
                 "html_to_xml": html_to_xml,
+                "force_core_update": force_core_update,
             },
         )
 
@@ -309,10 +312,13 @@ def task_generate_sps_package(
     html_to_xml=False,
     username=None,
     user_id=None,
+    force_core_update=None,
 ):
     try:
         user = _get_user(user_id, username)
         item = ArticleProc.objects.get(pk=item_id)
+        if force_core_update and item.sps_pkg:
+            item.sps_pkg.set_registered_in_core(False)
         item.generate_sps_package(
             user,
             body_and_back_xml,
