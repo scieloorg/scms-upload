@@ -4,7 +4,7 @@ import os
 import sys
 from datetime import datetime
 from tempfile import TemporaryDirectory
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from django.core.files.base import ContentFile
 from django.db.models import Q
@@ -569,7 +569,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
                 if response.get("xml_changed"):
                     # atualiza conteúdo de zip
-                    with ZipFile(zip_xml_file_path, "a") as zf:
+                    with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
                         zf.writestr(
                             response["filename"],
                             xml_with_pre.tostring(pretty_print=True),
@@ -767,7 +767,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
             if response.get("v3") and self.pid_v3 != response.get("v3"):
                 # atualiza conteúdo de zip
-                with ZipFile(zip_xml_file_path, "a") as zf:
+                with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
                     zf.writestr(
                         response["filename"],
                         response["xml_with_pre"].tostring(pretty_print=True),

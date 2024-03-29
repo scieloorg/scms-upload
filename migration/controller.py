@@ -327,7 +327,7 @@ class PkgZipBuilder:
         sps_pkg_zip_path = os.path.join(output_folder, f"{self.sps_pkg_name}.zip")
 
         # cria pacote zip
-        with ZipFile(sps_pkg_zip_path, "w") as zf:
+        with ZipFile(sps_pkg_zip_path, "w", compression=ZIP_DEFLATED) as zf:
 
             # A partir do XML, obtém os nomes dos arquivos dos ativos digitais
             self._build_sps_package_add_assets(zf, issue_proc)
