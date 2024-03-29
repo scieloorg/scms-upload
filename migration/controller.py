@@ -3,7 +3,7 @@ import os
 import sys
 from copy import deepcopy
 from datetime import datetime
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from django.utils.translation import gettext_lazy as _
 from scielo_classic_website import classic_ws
