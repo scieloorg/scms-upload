@@ -264,6 +264,8 @@ class ProcReport(CommonControlField):
         return f"{self.collection.acron} {self.pid} {self.task_name} {self.report_date}"
 
     class Meta:
+        ordering = ['-created']
+
         verbose_name = _("Processing report")
         verbose_name_plural = _("Processing reports")
         indexes = [
@@ -411,6 +413,8 @@ class BaseProc(CommonControlField):
 
     class Meta:
         abstract = True
+        ordering = ['-updated']
+
         indexes = [
             models.Index(fields=["pid"]),
         ]
@@ -724,6 +728,7 @@ class JournalProc(BaseProc, ClusterableModel):
     )
 
     class Meta:
+        ordering = ['-updated']
         indexes = [
             models.Index(fields=["acron"]),
         ]
@@ -875,6 +880,7 @@ class IssueProc(BaseProc, ClusterableModel):
         )
 
     class Meta:
+        ordering = ['-updated']
         indexes = [
             models.Index(fields=["issue_folder"]),
             models.Index(fields=["docs_status"]),
@@ -1154,6 +1160,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     MigratedDataClass = MigratedArticle
 
     class Meta:
+        ordering = ['-updated']
         indexes = [
             models.Index(fields=["pkg_name"]),
             models.Index(fields=["xml_status"]),

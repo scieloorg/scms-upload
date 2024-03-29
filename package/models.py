@@ -392,6 +392,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
     )
 
     class Meta:
+        ordering = ['-updated']
+
         indexes = [
             models.Index(fields=["pid_v3"]),
             models.Index(fields=["sps_pkg_name"]),

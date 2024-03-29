@@ -85,6 +85,7 @@ class BodyAndBackFile(BasicXMLFile, Orderable):
     ]
 
     class Meta:
+
         indexes = [
             models.Index(fields=["version"]),
         ]
@@ -215,6 +216,7 @@ class Html2xmlAnalysis(models.Model):
     ]
 
     class Meta:
+
         indexes = [
             models.Index(fields=["attention_demands"]),
         ]
@@ -492,6 +494,8 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         return self.migrated_article
 
     class Meta:
+        ordering = ['-updated']
+
         indexes = [
             models.Index(fields=["html2xml_status"]),
             models.Index(fields=["quality"]),
