@@ -688,7 +688,12 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     component_data,
                     failures,
                 )
-        op.finish(user, completed=not failures, detail=failures)
+        items = [
+            dict(basename=c.basename, uri=c.uri)
+            for c in self.components.all()
+        ]
+        detail = {"items": items, "failures": failures}
+        op.finish(user, completed=not failures, detail=detail)
         return xml_with_pre
 
     def _save_component_in_cloud(
@@ -705,8 +710,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
             uri = None
             failures.append(
                 dict(
-                    item_id=item,
-                    response=response,
+                    basename=item,
+                    error=str(e),
                 )
             )
         self.components.add(
