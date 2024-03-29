@@ -482,7 +482,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
             obj.validate(True)
 
-            logging.info(f"Depois de criar sps_pkg.pid_v3: {obj.pid_v3}")
             article_proc.update_sps_pkg_status()
             operation.finish(user, completed=obj.is_complete, detail=obj.data)
 
@@ -741,7 +740,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
             uri = response["uri"]
         except Exception as e:
             uri = None
-            op.finish(user, completed=False, detail=response)
         self.xml_uri = uri
         self.save()
         self.components.add(
@@ -755,7 +753,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 legacy_uri=None,
             )
         )
-        op.finish(user, completed=True)
+        op.finish(user, completed=bool(uri), detail=response)
 
     def synchronize(self, user, article_proc):
         zip_xml_file_path = self.file.path
