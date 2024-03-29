@@ -167,6 +167,17 @@ class Journal(CommonControlField, ClusterableModel):
         ]
     )
 
+    @property
+    def data(self):
+        return dict(
+            title=self.title,
+            issn_print=self.official_journal.issn_print,
+            issn_electronic=self.official_journal.issn_electronic,
+            foundation_year=self.official_journal.foundation_year,
+            created=created.isoformat(),
+            updated=updated.isoformat(),
+        )
+
     def autocomplete_label(self):
         return self.title or self.official_journal.title
 

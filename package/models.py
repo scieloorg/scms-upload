@@ -4,7 +4,7 @@ import os
 import sys
 from datetime import datetime
 from tempfile import TemporaryDirectory
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from django.core.files.base import ContentFile
 from django.db.models import Q
@@ -392,6 +392,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
     )
 
     class Meta:
+        ordering = ['-updated']
+
         indexes = [
             models.Index(fields=["pid_v3"]),
             models.Index(fields=["sps_pkg_name"]),
@@ -482,7 +484,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
             obj.validate(True)
 
-            logging.info(f"Depois de criar sps_pkg.pid_v3: {obj.pid_v3}")
             article_proc.update_sps_pkg_status()
             operation.finish(user, completed=obj.is_complete, detail=obj.data)
 
@@ -570,7 +571,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
                 if response.get("xml_changed"):
                     # atualiza conteúdo de zip
-                    with ZipFile(zip_xml_file_path, "a") as zf:
+                    with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
                         zf.writestr(
                             response["filename"],
                             xml_with_pre.tostring(pretty_print=True),
@@ -687,7 +688,12 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     component_data,
                     failures,
                 )
-        op.finish(user, completed=not failures, detail=failures)
+        items = [
+            dict(basename=c.basename, uri=c.uri)
+            for c in self.components.all()
+        ]
+        detail = {"items": items, "failures": failures}
+        op.finish(user, completed=not failures, detail=detail)
         return xml_with_pre
 
     def _save_component_in_cloud(
@@ -704,8 +710,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
             uri = None
             failures.append(
                 dict(
-                    item_id=item,
-                    response=response,
+                    basename=item,
+                    error=str(e),
                 )
             )
         self.components.add(
@@ -741,7 +747,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
             uri = response["uri"]
         except Exception as e:
             uri = None
-            op.finish(user, completed=False, detail=response)
         self.xml_uri = uri
         self.save()
         self.components.add(
@@ -755,7 +760,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 legacy_uri=None,
             )
         )
-        op.finish(user, completed=True)
+        op.finish(user, completed=bool(uri), detail=response)
 
     def synchronize(self, user, article_proc):
         zip_xml_file_path = self.file.path
@@ -769,7 +774,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
             if response.get("v3") and self.pid_v3 != response.get("v3"):
                 # atualiza conteúdo de zip
-                with ZipFile(zip_xml_file_path, "a") as zf:
+                with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
                     zf.writestr(
                         response["filename"],
                         response["xml_with_pre"].tostring(pretty_print=True),
