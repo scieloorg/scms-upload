@@ -9,6 +9,7 @@ from wagtail.fields import RichTextField
 from wagtail.snippets.models import register_snippet
 
 from . import choices
+from .exceptions import PressReleaseInvalidURL
 
 User = get_user_model()
 
@@ -332,3 +333,55 @@ class FlexibleDateFieldAdapter:
     @year.setter
     def year(self, value):
         self._year = int(value)
+
+
+class PressRelease(CommonControlField):
+    journal = models.ForeignKey(
+        "journal.Journal",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+    )
+    issue = models.ForeignKey(
+        "issue.Issue",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+    )
+    article = models.ForeignKey(
+        "article.Article",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True
+    )
+    title = models.TextField(_("Title"),
+        blank=True,
+        null=True
+    )
+    language = models.ForeignKey(
+        "collection.Language",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True
+    )
+    content = RichTextField(
+        null=True, 
+        blank=True,
+    )
+    url = models.URLField(
+        max_length=255,
+        null=True, 
+        blank=True,
+    )
+    media_content = models.URLField(
+        max_length=255,
+        null=True, 
+        blank=True,
+    )
+    publication_date = models.DateTimeField(
+        null=True, 
+        blank=True,
+    )
+
+    def __str__(self) -> str:
+        return f"{self.title}"
