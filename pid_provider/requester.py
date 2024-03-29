@@ -86,6 +86,7 @@ class PidRequester(BasePidProvider):
         )
 
         if registered.get("error_type"):
+            main_op.finish(user, completed=False, detail=registered)
             return registered
 
         # Solicita pid para Core
@@ -114,7 +115,7 @@ class PidRequester(BasePidProvider):
             registered["registered_in_upload"] = bool(resp.get("v3"))
             op.finish(
                 user,
-                completed=True,
+                completed=registered["registered_in_upload"],
                 detail={"registered": registered, "response": resp},
             )
 
@@ -127,7 +128,7 @@ class PidRequester(BasePidProvider):
 
         detail = registered.copy()
         detail["xml_with_pre"] = xml_with_pre.data
-        main_op.finish(user, completed=True, detail={"registered": detail})
+        main_op.finish(user, completed=registered["synchronized"], detail=detail)
         return registered
 
     @staticmethod
@@ -144,6 +145,7 @@ class PidRequester(BasePidProvider):
 
         registered = PidProviderXML.is_registered(xml_with_pre)
         if registered.get("error_type"):
+            op.finish(user, completed=False, detail=registered)
             return registered
 
         if registered.get("is_equal"):
@@ -155,7 +157,7 @@ class PidRequester(BasePidProvider):
             registered["do_core_registration"] = True
             registered["do_upload_registration"] = True
 
-        op.finish(user, completed=True, detail={"registered": registered})
+        op.finish(user, completed=True, detail=registered)
 
         return registered
 
@@ -187,7 +189,7 @@ class PidRequester(BasePidProvider):
             registered["registered_in_core"] = bool(response.get("v3"))
             op.finish(
                 user,
-                completed=True,
+                completed=registered["registered_in_core"],
                 detail={"registered": registered, "response": response},
             )
 
