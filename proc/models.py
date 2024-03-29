@@ -1425,7 +1425,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         elif not self.sps_pkg.valid_components:
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
         else:
-            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DONE
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_PENDING
         self.save()
 
     @property
