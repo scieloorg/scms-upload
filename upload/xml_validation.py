@@ -22,6 +22,9 @@ from packtools.sps.validation.dates import ArticleDatesValidation
 from packtools.sps.validation.journal_meta import JournalMetaValidation
 from packtools.sps.validation.preprint import PreprintValidation
 from packtools.sps.validation.related_articles import RelatedArticlesValidation
+
+from upload import choices
+from upload.models import ValidationResult
 from tracker.models import UnexpectedEvent
 
 
@@ -84,28 +87,38 @@ def add_sps_data(data, sps_data):
 
 
 def validate_xml_content(sps_pkg_name, xmltree, data):
+    # TODO adicionar error_category
+    # VE_XML_CONTENT_ERROR: generic usage
+    # VE_BIBLIOMETRICS_DATA_ERROR: used in metrics
+    # VE_SERVICES_DATA_ERROR: used in reports
+    # VE_DATA_CONSISTENCY_ERROR: data consistency
+    # VE_CRITERIA_ISSUES_ERROR: required by the criteria document
 
-    functions = (
-        validate_affiliations,
-        validate_languages,
-        validate_article_attributes,
-        validate_article_id_other,
-        validate_subjects,
-        validate_article_type,
-        validate_authors,
-        validate_data_availability,
-        validate_doi,
-        validate_article_languages,
-        validate_licenses,
-        validate_toc_sections,
-        validate_xref,
-        validate_dates,
-        validate_journal,
-        validate_preprint,
-        validate_related_articles,
+    error_category_and_function_items = (
+        (choices.VE_BIBLIOMETRICS_DATA_ERROR, validate_affiliations),
+        (choices.VE_BIBLIOMETRICS_DATA_ERROR, validate_authors),
+        (choices.VE_BIBLIOMETRICS_DATA_ERROR, validate_languages),
+        (choices.VE_CRITERIA_ISSUES_ERROR, validate_article_attributes),
+        (choices.VE_CRITERIA_ISSUES_ERROR, validate_data_availability),
+        (choices.VE_CRITERIA_ISSUES_ERROR, validate_licenses),
+        (choices.VE_DATA_CONSISTENCY_ERROR, validate_article_id_other),
+        (choices.VE_DATA_CONSISTENCY_ERROR, validate_article_languages),
+        (choices.VE_DATA_CONSISTENCY_ERROR, validate_article_type),
+        (choices.VE_DATA_CONSISTENCY_ERROR, validate_dates),
+        (choices.VE_DATA_CONSISTENCY_ERROR, validate_doi),
+        (choices.VE_DATA_CONSISTENCY_ERROR, validate_journal),
+        (choices.VE_DATA_CONSISTENCY_ERROR, validate_preprint),
+        (choices.VE_DATA_CONSISTENCY_ERROR, validate_related_articles),
+        (choices.VE_DATA_CONSISTENCY_ERROR, validate_subjects),
+        (choices.VE_DATA_CONSISTENCY_ERROR, validate_toc_sections),
+        (choices.VE_DATA_CONSISTENCY_ERROR, validate_xref),
     )
-    for f in functions:
-        yield from f(sps_pkg_name, xmltree, data)
+    for error_category, f in error_category_and_function_items:
+        for item in f(sps_pkg_name, xmltree, data):
+            if item["validation_type"] in ("value in list", "value", "match"):
+                error_category = choices.VE_DATA_CONSISTENCY_ERROR
+            item["error_category"] = item.get("error_category") or error_category
+            yield item
 
 
 def validate_affiliations(sps_pkg_name, xmltree, data):

@@ -2,6 +2,7 @@ import json
 
 from django.contrib import messages
 from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import include, path
 from django.utils.translation import gettext as _
 from wagtail import hooks
@@ -27,77 +28,55 @@ from .models import (
     choices,
 )
 from .permission_helper import UploadPermissionHelper
-from .tasks import run_validations
+from .controller import receive_package
 from .utils import package_utils
+from upload.tasks import task_validate_original_zip_file
 
 
 class PackageCreateView(CreateView):
-    def get_instance(self):
-        package_obj = super().get_instance()
-
-        pkg_category = self.request.GET.get("package_category")
-        if pkg_category:
-            package_obj.category = pkg_category
-
-        article_id = self.request.GET.get("article_id")
-        if article_id:
-            try:
-                package_obj.article = Article.objects.get(pk=article_id)
-            except Article.DoesNotExist:
-                ...
-
-        return package_obj
 
     def form_valid(self, form):
-        article_data = self.request.POST.get("article")
-        article_json = json.loads(article_data) or {}
-        article_id = article_json.get("pk")
-        try:
-            article = Article.objects.get(pk=article_id)
-        except (Article.DoesNotExist, ValueError):
-            article = None
 
-        issue_data = self.request.POST.get("issue")
-        issue_json = json.loads(issue_data) or {}
-        issue_id = issue_json.get("pk")
-        try:
-            issue = Issue.objects.get(pk=issue_id)
-        except (Issue.DoesNotExist, ValueError):
-            issue = None
+        package = form.save_all(self.request.user)
 
-        self.object = form.save_all(self.request.user, article, issue)
+        response = receive_package(package)
 
-        if self.object.category in (choices.PC_UPDATE, choices.PC_ERRATUM):
-            if self.object.article is None:
-                messages.error(
-                    self.request,
-                    _("It is necessary to select an Article."),
-                )
-                return HttpResponseRedirect(self.request.META["HTTP_REFERER"])
-            else:
-                messages.success(
-                    self.request,
-                    _("Package to change article has been successfully submitted."),
-                )
+        if response.get("error_type") == choices.VE_PACKAGE_FILE_ERROR:
+            # error no arquivo
+            messages.error(self.request, response.get("error"))
+            return HttpResponseRedirect(self.request.META["HTTP_REFERER"])
 
-        if self.object.category == choices.PC_NEW_DOCUMENT:
-            if self.object.issue is None:
-                messages.error(self.request, _("It is necessary to select an Issue."))
-                return HttpResponseRedirect(self.request.META["HTTP_REFERER"])
-            else:
-                messages.success(
-                    self.request,
-                    _("Package to create article has been successfully submitted."),
-                )
+        if response.get("error"):
+            # error
+            messages.error(self.request, response.get("error"))
+            return redirect(f"/admin/upload/package/inspect/{package.id}")
 
-        run_validations(
-            self.object.file.name,
-            self.object.id,
-            self.object.category,
-            article_id,
-            issue_id,
+        messages.success(
+            self.request,
+            _("Package has been successfully submitted and will be analyzed"),
         )
 
+        # dispara a tarefa que realiza as validações de
+        # assets, renditions, XML content etc
+
+        try:
+            journal_id = response["journal"].id
+        except (KeyError, AttributeError):
+            journal_id = None
+        try:
+            issue_id = response["issue"].id
+        except (KeyError, AttributeError):
+            issue_id = None
+
+        task_validate_original_zip_file.apply_async(
+            kwargs=dict(
+                package_id=package.id,
+                file_path=package.file.path,
+                journal_id=journal_id,
+                issue_id=issue_id,
+                article_id=package.article and package.article.id or None,
+            )
+        )
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -378,7 +357,7 @@ class UploadModelAdminGroup(ModelAdminGroup):
     menu_order = get_menu_order("upload")
 
 
-# modeladmin_register(UploadModelAdminGroup)
+modeladmin_register(UploadModelAdminGroup)
 
 
 @hooks.register("register_admin_urls")
