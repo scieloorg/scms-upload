@@ -2,6 +2,7 @@ import logging
 import sys
 from datetime import datetime
 
+from django.utils.translation import gettext as _
 from packtools.sps.models.journal_meta import Title, ISSN
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre, GetXMLItemsError
 from packtools.sps.models.front_articlemeta_issue import ArticleMetaIssue
@@ -21,11 +22,19 @@ from .models import (
     choices,
 )
 from .utils import file_utils, package_utils, xml_utils
+
+from upload import xml_validation
 from pid_provider.requester import PidRequester
 from article.models import Article
 from issue.models import Issue
 from journal.models import OfficialJournal, Journal
 from tracker.models import UnexpectedEvent
+from upload.xml_validation import (
+    validate_xml_content,
+    add_app_data,
+    add_sps_data,
+    add_journal_data,
+)
 
 pp = PidRequester()
 
@@ -122,7 +131,7 @@ def receive_package(package):
                     data={},
                 )
                 # falhou, retorna response
-                return package
+                return response
         # sucesso, retorna package
         package._add_validation_result(
             error_category=choices.VE_XML_FORMAT_ERROR,
@@ -132,11 +141,10 @@ def receive_package(package):
                 "xml_path": package.file.path,
             },
         )
-        return package
+        return response
     except GetXMLItemsError as exc:
         # identifica os erros do arquivo Zip / XML
-        _identify_file_error(package)
-        return package
+        return _identify_file_error(package)
 
 
 def _identify_file_error(package):
@@ -145,13 +153,18 @@ def _identify_file_error(package):
         xml_path = None
         xml_str = file_utils.get_xml_content_from_zip(package.file.path, xml_path)
         xml_utils.get_etree_from_xml_content(xml_str)
-    except (file_utils.BadPackageFileError, file_utils.PackageWithoutXMLFileError) as exc:
+        return {}
+    except (
+        file_utils.BadPackageFileError,
+        file_utils.PackageWithoutXMLFileError,
+    ) as exc:
         package._add_validation_result(
             error_category=choices.VE_PACKAGE_FILE_ERROR,
             message=exc.message,
             status=choices.VS_DISAPPROVED,
             data={"exception": str(exc), "exception_type": str(type(exc))},
         )
+        return {"error": str(exc), "error_type": choices.VE_PACKAGE_FILE_ERROR}
 
     except xml_utils.XMLFormatError as e:
         data = {
@@ -166,6 +179,7 @@ def _identify_file_error(package):
             data=data,
             status=choices.VS_DISAPPROVED,
         )
+        return {"error": str(e), "error_type": choices.VE_XML_FORMAT_ERROR}
 
 
 def _check_article_and_journal(xml_with_pre):
@@ -198,7 +212,9 @@ def _check_article_and_journal(xml_with_pre):
     if article:
         # verifica a consistência dos dados de journal e issue
         # no XML e na base de dados
-        _compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(article, response)
+        _compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(
+            article, response
+        )
         if response.get("error"):
             # inconsistências encontradas
             return _handle_error(response, article, article_previous_status)
@@ -241,7 +257,9 @@ def _get_article_previous_status(article, response):
         response["package_category"] = choices.PC_ERRATUM
         return article_previos_status
     else:
-        response["error"] = f"Unexpected package. Article has no need to be updated / corrected. Article status: {article_previos_status}"
+        response[
+            "error"
+        ] = f"Unexpected package. Article has no need to be updated / corrected. Article status: {article_previos_status}"
         response["error_type"] = choices.VE_FORBIDDEN_UPDATE_ERROR
         response["package_category"] = choices.PC_UPDATE
 
@@ -284,12 +302,12 @@ def _get_journal(journal_title, issn_electronic, issn_print):
 
     if not j and journal_title:
         try:
-            j = OfficialJournal.objects.get(journal_title=journal_title)
+            j = OfficialJournal.objects.get(title=journal_title)
         except OfficialJournal.DoesNotExist:
             pass
 
     if j:
-        return Journal.objects.get(official=j)
+        return Journal.objects.get(official_journal=j)
     raise Journal.DoesNotExist(f"{journal_title} {issn_electronic} {issn_print}")
 
 
@@ -301,11 +319,11 @@ def _check_journal(origin, xmltree):
         xml = ISSN(xmltree)
         issn_electronic = xml.epub
         issn_print = xml.ppub
-
         return dict(journal=_get_journal(journal_title, issn_electronic, issn_print))
-    except Journal.DoesNotExist:
+    except Journal.DoesNotExist as exc:
+        logging.exception(exc)
         return dict(
-            error=f"Journal in XML is not registered in Upload: {journal_title} {issn_electronic} (electronic) {issn_print} (print)",
+            error=f"Journal in XML is not registered in Upload: {journal_title} (electronic: {issn_electronic}, print: {issn_print})",
             error_type=choices.VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR,
         )
     except Exception as e:
@@ -347,7 +365,9 @@ def _check_issue(origin, xmltree, journal):
         return {"error": str(e), "error_type": choices.VE_UNEXPECTED_ERROR}
 
 
-def _compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(article, response):
+def _compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(
+    article, response
+):
     issue = response["issue"]
     journal = response["journal"]
     if article.issue is issue and article.journal is journal:
@@ -365,4 +385,112 @@ def _compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(articl
                 error=f"{article.journal} {article.issue} (registered) differs from {journal} {issue} (XML)",
                 error_type=choices.VE_DATA_CONSISTENCY_ERROR,
             )
+        )
+
+
+def validate_xml_content(package, journal, issue):
+    # VE_BIBLIOMETRICS_DATA_ERROR = "bibliometrics-data-error"
+    # VE_SERVICES_DATA_ERROR = "services-data-error"
+    # VE_DATA_CONSISTENCY_ERROR = "data-consistency-error"
+    # VE_CRITERIA_ISSUES_ERROR = "criteria-issues-error"
+
+    # TODO completar data
+    data = {}
+    # add_app_data(data, app_data)
+    # add_journal_data(data, journal, issue)
+    # add_sps_data(data, sps_data)
+
+    try:
+        for xml_with_pre in XMLWithPre.create(path=package.file.path):
+            _validate_xml_content(package, xml_with_pre, data)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            exception=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "operation": "upload.controller.validate_xml_content",
+                "detail": dict(file_path=package.file.path),
+            },
+        )
+
+
+def _validate_xml_content(package, xml_with_pre, data):
+    # TODO completar data
+    data = {}
+    # xml_validation.add_app_data(data, app_data)
+    # xml_validation.add_journal_data(data, journal, issue)
+    # xml_validation.add_sps_data(data, sps_data)
+
+    try:
+        results = xml_validation.validate_xml_content(
+            xml_with_pre.sps_pkg_name, xml_with_pre.xmltree, data
+        )
+        for result in results:
+            _handle_xml_content_validation_result(package, xml_with_pre.sps_pkg_name, result)
+        try:
+            error = ValidationResult.objects.filter(
+                package=package,
+                status=choices.VS_DISAPPROVED,
+                category__in=choices.VALIDATION_REPORT_ITEMS[choices.VR_INDIVIDUAL_CONTENT],
+            )[0]
+            package.status = choices.PS_VALIDATED_WITH_ERRORS
+        except IndexError:
+            # nenhum erro
+            package.status = choices.PS_VALIDATED_WITHOUT_ERRORS
+        package.save()
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            exception=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "operation": "upload.controller._validate_xml_content",
+                "detail": {
+                    "file": package.file.path,
+                    "item": xml_with_pre.sps_pkg_name,
+                    "exception": str(e),
+                    "exception_type": str(type(e)),
+                },
+            },
+        )
+
+
+def _handle_xml_content_validation_result(package, sps_pkg_name, result):
+    # ['xpath', 'advice', 'title', 'expected_value', 'got_value', 'message', 'validation_type', 'response']
+
+    try:
+        if result["response"] == "OK":
+            status = choices.VS_APPROVED
+        else:
+            status = choices.VS_DISAPPROVED
+
+        # VE_BIBLIOMETRICS_DATA_ERROR, VE_SERVICES_DATA_ERROR,
+        # VE_DATA_CONSISTENCY_ERROR, VE_CRITERIA_ISSUES_ERROR,
+        error_category = result.get("error_category") or choices.VE_XML_CONTENT_ERROR
+
+        message = result["message"]
+        advice = result["advice"] or ""
+        message = ". ".join([_(message), _(advice)])
+        package._add_validation_result(
+            error_category=error_category,
+            status=status,
+            message=message,
+            data=result,
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            exception=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "operation": "upload.controller._handle_xml_content_validation_result",
+                "detail": {
+                    "file": package.file.path,
+                    "item": sps_pkg_name,
+                    "result": result,
+                    "exception": str(e),
+                    "exception_type": str(type(e)),
+                },
+            },
         )
