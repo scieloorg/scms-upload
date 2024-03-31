@@ -12,7 +12,9 @@ from journal.models import Journal, OfficialJournal
 
 # Create your tests here.
 class ControllerTest(TestCase):
-    def test__compare_journal_and_issue_from_xml_to_journal_and_issue_from_article_journal_and_issue_differ(self):
+    def test__compare_journal_and_issue_from_xml_to_journal_and_issue_from_article_journal_and_issue_differ(
+        self,
+    ):
         response = {"journal": "not journal", "issue": "not issue"}
         article = Mock(spec=Article)
         article.issue = "issue"
@@ -23,11 +25,15 @@ class ControllerTest(TestCase):
             "error": f"{article.journal} {article.issue} (registered) differs from {journal} {issue} (XML)",
             "error_type": choices.VE_DATA_CONSISTENCY_ERROR,
         }
-        controller._compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(article, response)
+        controller._compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(
+            article, response
+        )
         self.assertEqual(expected["error"], response["error"])
         self.assertEqual(expected["error_type"], response["error_type"])
 
-    def test__compare_journal_and_issue_from_xml_to_journal_and_issue_from_article_issue_differs(self):
+    def test__compare_journal_and_issue_from_xml_to_journal_and_issue_from_article_issue_differs(
+        self,
+    ):
         response = {"journal": "Journal", "issue": "Not same issue"}
         article = Mock(spec=Article)
         article.issue = "Issue"
@@ -38,11 +44,15 @@ class ControllerTest(TestCase):
             "error": f"{article.journal} {article.issue} (registered) differs from {journal} {issue} (XML)",
             "error_type": choices.VE_DATA_CONSISTENCY_ERROR,
         }
-        controller._compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(article, response)
+        controller._compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(
+            article, response
+        )
         self.assertEqual(expected["error"], response["error"])
         self.assertEqual(expected["error_type"], response["error_type"])
 
-    def test__compare_journal_and_issue_from_xml_to_journal_and_issue_from_article_journal_differs(self):
+    def test__compare_journal_and_issue_from_xml_to_journal_and_issue_from_article_journal_differs(
+        self,
+    ):
         response = {"journal": "not journal", "issue": "issue"}
         article = Mock(spec=Article)
         article.issue = "issue"
@@ -53,11 +63,15 @@ class ControllerTest(TestCase):
             "error": f"{article.journal} (registered) differs from {journal} (XML)",
             "error_type": choices.VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR,
         }
-        controller._compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(article, response)
+        controller._compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(
+            article, response
+        )
         self.assertEqual(expected["error"], response["error"])
         self.assertEqual(expected["error_type"], response["error_type"])
 
-    def test__compare_journal_and_issue_from_xml_to_journal_and_issue_from_article_journal_and_issue_compatible(self):
+    def test__compare_journal_and_issue_from_xml_to_journal_and_issue_from_article_journal_and_issue_compatible(
+        self,
+    ):
         response = {"journal": "journal", "issue": "issue"}
         article = Mock(spec=Article)
         article.issue = "issue"
@@ -67,7 +81,9 @@ class ControllerTest(TestCase):
         expected = {
             "package_status": choices.PS_ENQUEUED_FOR_VALIDATION,
         }
-        controller._compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(article, response)
+        controller._compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(
+            article, response
+        )
         self.assertIsNone(response.get("error"))
         self.assertEqual(expected["package_status"], response["package_status"])
 
@@ -274,7 +290,9 @@ class GetJournalTest(TestCase):
 
     @patch("upload.controller.OfficialJournal.objects.get")
     @patch("upload.controller.Journal.objects.get")
-    def test__get_journal_with_journal_title(self, mock_journal_get, mock_official_j_get):
+    def test__get_journal_with_journal_title(
+        self, mock_journal_get, mock_official_j_get
+    ):
         journal = Journal()
         official_j = OfficialJournal()
         mock_journal_get.return_value = journal
@@ -289,7 +307,9 @@ class GetJournalTest(TestCase):
 
     @patch("upload.controller.OfficialJournal.objects.get")
     @patch("upload.controller.Journal.objects.get")
-    def test__get_journal_with_issn_print_after_raise_exception_does_not_exist_for_issn_electronic(self, mock_journal_get, mock_official_j_get):
+    def test__get_journal_with_issn_print_after_raise_exception_does_not_exist_for_issn_electronic(
+        self, mock_journal_get, mock_official_j_get
+    ):
         journal = Journal()
         official_j = OfficialJournal()
         mock_journal_get.return_value = journal
@@ -307,13 +327,15 @@ class GetJournalTest(TestCase):
             [
                 call(issn_electronic="EEEEEEE"),
                 call(issn_print="XXXXXXX"),
-            ]
+            ],
         )
         mock_journal_get.assert_called_with(official=official_j)
 
     @patch("upload.controller.OfficialJournal.objects.get")
     @patch("upload.controller.Journal.objects.get")
-    def test__get_journal_raises_multiple_object_returned(self, mock_journal_get, mock_official_j_get):
+    def test__get_journal_raises_multiple_object_returned(
+        self, mock_journal_get, mock_official_j_get
+    ):
         journal = Journal()
         official_j = OfficialJournal()
         mock_journal_get.return_value = journal
@@ -328,14 +350,13 @@ class GetJournalTest(TestCase):
             mock_official_j_get.mock_calls,
             [
                 call(issn_electronic="EEEEEEE"),
-            ]
+            ],
         )
         mock_journal_get.assert_not_called()
 
 
 @patch("upload.controller.Article")
 class GetArticlePreviousStatusTest(TestCase):
-
     def test_get_article_previous_status_require_update(self, mock_article):
         response = {}
         article = Mock(spec=Article)
@@ -354,7 +375,9 @@ class GetArticlePreviousStatusTest(TestCase):
         self.assertEqual(article.status, article_choices.AS_CHANGE_SUBMITTED)
         self.assertEqual(response["package_category"], choices.PC_ERRATUM)
 
-    def test_get_article_previous_status_not_required_erratum_and_not_require_update(self, mock_article):
+    def test_get_article_previous_status_not_required_erratum_and_not_require_update(
+        self, mock_article
+    ):
         response = {}
         article = Mock(spec=Article)
         article.status = "no matter what"
@@ -362,7 +385,10 @@ class GetArticlePreviousStatusTest(TestCase):
         self.assertIsNone(result)
         self.assertEqual("no matter what", article.status)
         self.assertEqual(response["package_category"], choices.PC_UPDATE)
-        self.assertEqual(f"Unexpected package. Article has no need to be updated / corrected. Article status: no matter what", response["error"])
+        self.assertEqual(
+            f"Unexpected package. Article has no need to be updated / corrected. Article status: no matter what",
+            response["error"],
+        )
         self.assertEqual(choices.VE_FORBIDDEN_UPDATE_ERROR, response["error_type"])
 
 
@@ -371,8 +397,9 @@ class GetArticlePreviousStatusTest(TestCase):
 @patch("upload.controller.Article.objects.get")
 @patch("upload.controller.PidRequester.is_registered_xml_with_pre")
 class CheckArticleAndJournalTest(TestCase):
-
-    def test__check_article_and_journal__registered_and_allowed_to_be_updated(self, mock_xml_with_pre, mock_article_get, mock_issue_get, mock_journal_get):
+    def test__check_article_and_journal__registered_and_allowed_to_be_updated(
+        self, mock_xml_with_pre, mock_article_get, mock_issue_get, mock_journal_get
+    ):
 
         mock_xml_with_pre.return_value = {"v3": "yjukillojhk"}
 
@@ -417,7 +444,9 @@ class CheckArticleAndJournalTest(TestCase):
         self.assertEqual(choices.PS_ENQUEUED_FOR_VALIDATION, result["package_status"])
         self.assertEqual(choices.PC_UPDATE, result["package_category"])
 
-    def test__check_article_and_journal__new_document(self, mock_xml_with_pre, mock_article_get, mock_issue_get, mock_journal_get):
+    def test__check_article_and_journal__new_document(
+        self, mock_xml_with_pre, mock_article_get, mock_issue_get, mock_journal_get
+    ):
 
         mock_xml_with_pre.return_value = {}
 

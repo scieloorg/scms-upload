@@ -41,7 +41,10 @@ class Package(CommonControlField):
         default=choices.PS_ENQUEUED_FOR_VALIDATION,
     )
     article = models.ForeignKey(
-        Article, blank=True, null=True, on_delete=models.SET_NULL,
+        Article,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
     )
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.SET_NULL)
     assignee = models.ForeignKey(User, blank=True, null=True, on_delete=models.SET_NULL)
@@ -93,16 +96,13 @@ class Package(CommonControlField):
         cls, package_id, error_category=None, status=None, message=None, data=None
     ):
         package = cls.objects.get(pk=package_id)
-        val_res = package._add_validation_result(
-            error_category, status, message, data)
+        val_res = package._add_validation_result(error_category, status, message, data)
         return val_res
 
     def _add_validation_result(
         self, error_category=None, status=None, message=None, data=None
     ):
-        val_res = ValidationResult.create(
-            error_category, self, status, message, data
-        )
+        val_res = ValidationResult.create(error_category, self, status, message, data)
         self.update_status(val_res)
         return val_res
 
@@ -247,9 +247,7 @@ class ValidationResult(models.Model):
     base_form_class = ValidationResultForm
 
     @classmethod
-    def create(
-        cls, error_category, package, status=None, message=None, data=None
-    ):
+    def create(cls, error_category, package, status=None, message=None, data=None):
         val_res = ValidationResult()
         val_res.category = error_category
         val_res.package = package
@@ -270,8 +268,7 @@ class ValidationResult(models.Model):
 
     @classmethod
     def add_resolution(cls, user, data):
-        validation_result = cls.objects.get(
-            pk=data["validation_result_id"].value())
+        validation_result = cls.objects.get(pk=data["validation_result_id"].value())
 
         try:
             opinion = data["opinion"].value()

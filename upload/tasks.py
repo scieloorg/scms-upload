@@ -23,7 +23,12 @@ from . import choices, controller, exceptions
 from .utils import file_utils, package_utils, xml_utils
 from upload.models import Package
 
-from upload.xml_validation import validate_xml_content, add_app_data, add_sps_data, add_journal_data
+from upload.xml_validation import (
+    validate_xml_content,
+    add_app_data,
+    add_sps_data,
+    add_journal_data,
+)
 
 User = get_user_model()
 
@@ -544,7 +549,9 @@ def task_request_pid_for_accepted_packages(self, user_id):
 
 
 @celery_app.task(bind=True)
-def task_validate_original_zip_file(self, package_id, file_path, journal_id, issue_id, article_id):
+def task_validate_original_zip_file(
+    self, package_id, file_path, journal_id, issue_id, article_id
+):
 
     for xml_with_pre in XMLWithPre.create(file_path=file_path):
         xml_path = xml_with_pre.filename
@@ -583,7 +590,9 @@ def task_validate_original_zip_file(self, package_id, file_path, journal_id, iss
 
 
 @celery_app.task(bind=True)
-def task_validate_xml_content(self, file_path, xml_path, package_id, journal_id, issue_id, article_id):
+def task_validate_xml_content(
+    self, file_path, xml_path, package_id, journal_id, issue_id, article_id
+):
     # VE_BIBLIOMETRICS_DATA_ERROR = "bibliometrics-data-error"
     # VE_SERVICES_DATA_ERROR = "services-data-error"
     # VE_DATA_CONSISTENCY_ERROR = "data-consistency-error"
@@ -597,7 +606,9 @@ def task_validate_xml_content(self, file_path, xml_path, package_id, journal_id,
 
     package = Package.objects.get(pk=package_id)
     for xml_with_pre in XMLWithPre.create(file_path=file_path):
-        results = validate_xml_content(xml_with_pre.sps_pkg_name, xml_with_pre.xmltree, data)
+        results = validate_xml_content(
+            xml_with_pre.sps_pkg_name, xml_with_pre.xmltree, data
+        )
 
         for result in results:
             # ['xpath', 'advice', 'title', 'expected_value', 'got_value', 'message', 'validation_type', 'response']
@@ -605,7 +616,7 @@ def task_validate_xml_content(self, file_path, xml_path, package_id, journal_id,
                 continue
 
             message = result["message"]
-            advice = result["advice"] or ''
+            advice = result["advice"] or ""
             message = ". ".join(_(message), _(advice))
             package._add_validation_result(
                 error_category=choices.VE_DATA_CONSISTENCY_ERROR,

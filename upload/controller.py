@@ -145,7 +145,10 @@ def _identify_file_error(package):
         xml_path = None
         xml_str = file_utils.get_xml_content_from_zip(package.file.path, xml_path)
         xml_utils.get_etree_from_xml_content(xml_str)
-    except (file_utils.BadPackageFileError, file_utils.PackageWithoutXMLFileError) as exc:
+    except (
+        file_utils.BadPackageFileError,
+        file_utils.PackageWithoutXMLFileError,
+    ) as exc:
         package._add_validation_result(
             error_category=choices.VE_PACKAGE_FILE_ERROR,
             message=exc.message,
@@ -198,7 +201,9 @@ def _check_article_and_journal(xml_with_pre):
     if article:
         # verifica a consistência dos dados de journal e issue
         # no XML e na base de dados
-        _compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(article, response)
+        _compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(
+            article, response
+        )
         if response.get("error"):
             # inconsistências encontradas
             return _handle_error(response, article, article_previous_status)
@@ -241,7 +246,9 @@ def _get_article_previous_status(article, response):
         response["package_category"] = choices.PC_ERRATUM
         return article_previos_status
     else:
-        response["error"] = f"Unexpected package. Article has no need to be updated / corrected. Article status: {article_previos_status}"
+        response[
+            "error"
+        ] = f"Unexpected package. Article has no need to be updated / corrected. Article status: {article_previos_status}"
         response["error_type"] = choices.VE_FORBIDDEN_UPDATE_ERROR
         response["package_category"] = choices.PC_UPDATE
 
@@ -347,7 +354,9 @@ def _check_issue(origin, xmltree, journal):
         return {"error": str(e), "error_type": choices.VE_UNEXPECTED_ERROR}
 
 
-def _compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(article, response):
+def _compare_journal_and_issue_from_xml_to_journal_and_issue_from_article(
+    article, response
+):
     issue = response["issue"]
     journal = response["journal"]
     if article.issue is issue and article.journal is journal:
