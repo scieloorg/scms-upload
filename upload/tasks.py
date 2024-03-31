@@ -1,4 +1,6 @@
 import json
+import sys
+import logging
 
 from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
@@ -16,23 +18,20 @@ from article.controller import create_article_from_etree, update_article
 from article.models import Article
 from config import celery_app
 from issue.models import Issue
+from journal.models import Journal
 from journal.controller import get_journal_dict_for_validation
 from libs.dsm.publication.documents import get_document, get_similar_documents
 
+from tracker.models import UnexpectedEvent
 from . import choices, controller, exceptions
 from .utils import file_utils, package_utils, xml_utils
 from upload.models import Package
 
-from upload.xml_validation import (
-    validate_xml_content,
-    add_app_data,
-    add_sps_data,
-    add_journal_data,
-)
 
 User = get_user_model()
 
 
+# TODO REMOVE
 def run_validations(
     filename, package_id, package_category, article_id=None, issue_id=None
 ):
@@ -447,6 +446,7 @@ def task_validate_renditions(file_path, xml_path, package_id):
         return True
 
 
+# TODO REMOVE
 @celery_app.task(name="Validate XML")
 def task_validate_content_xml(file_path, xml_path, package_id):
     xml_str = file_utils.get_xml_content_from_zip(file_path)
@@ -553,15 +553,16 @@ def task_validate_original_zip_file(
     self, package_id, file_path, journal_id, issue_id, article_id
 ):
 
-    for xml_with_pre in XMLWithPre.create(file_path=file_path):
+    for xml_with_pre in XMLWithPre.create(path=file_path):
         xml_path = xml_with_pre.filename
-        break
 
-    if xml_path:
+        # FIXME nao usar o otimizado neste momento
+        optimised_filepath = task_optimise_package(file_path)
+
         # Aciona validação de Assets
         task_validate_assets.apply_async(
             kwargs={
-                "file_path": file_path,
+                "file_path": optimised_filepath,
                 "xml_path": xml_path,
                 "package_id": package_id,
             },
@@ -570,7 +571,7 @@ def task_validate_original_zip_file(
         # Aciona validação de Renditions
         task_validate_renditions.apply_async(
             kwargs={
-                "file_path": file_path,
+                "file_path": optimised_filepath,
                 "xml_path": xml_path,
                 "package_id": package_id,
             },
@@ -593,34 +594,27 @@ def task_validate_original_zip_file(
 def task_validate_xml_content(
     self, file_path, xml_path, package_id, journal_id, issue_id, article_id
 ):
-    # VE_BIBLIOMETRICS_DATA_ERROR = "bibliometrics-data-error"
-    # VE_SERVICES_DATA_ERROR = "services-data-error"
-    # VE_DATA_CONSISTENCY_ERROR = "data-consistency-error"
-    # VE_CRITERIA_ISSUES_ERROR = "criteria-issues-error"
+    try:
+        package = Package.objects.get(pk=package_id)
+        if journal_id:
+            journal = Journal.objects.get(pk=journal_id)
+        else:
+            journal = None
 
-    # TODO completar data
-    data = {}
-    # add_app_data(data, app_data)
-    # add_journal_data(data, journal, issue)
-    # add_sps_data(data, sps_data)
+        if issue_id:
+            issue = Issue.objects.get(pk=issue_id)
+        else:
+            issue = None
 
-    package = Package.objects.get(pk=package_id)
-    for xml_with_pre in XMLWithPre.create(file_path=file_path):
-        results = validate_xml_content(
-            xml_with_pre.sps_pkg_name, xml_with_pre.xmltree, data
+        controller.validate_xml_content(package, journal, issue)
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            exception=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "operation": "upload.tasks.task_validate_xml_content",
+                "detail": dict(file_path=file_path, xml_path=xml_path),
+            },
         )
-
-        for result in results:
-            # ['xpath', 'advice', 'title', 'expected_value', 'got_value', 'message', 'validation_type', 'response']
-            if not result["response"] == "ERROR":
-                continue
-
-            message = result["message"]
-            advice = result["advice"] or ""
-            message = ". ".join(_(message), _(advice))
-            package._add_validation_result(
-                error_category=choices.VE_DATA_CONSISTENCY_ERROR,
-                status=choices.VS_DISAPPROVED,
-                message=message,
-                data=result,
-            )
