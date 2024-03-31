@@ -27,7 +27,6 @@ from . import choices, controller, exceptions
 from .utils import file_utils, package_utils, xml_utils
 from upload.models import Package
 
-from upload.xml_validation import validate_xml_content, add_app_data, add_sps_data, add_journal_data
 
 User = get_user_model()
 
