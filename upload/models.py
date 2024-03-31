@@ -57,9 +57,6 @@ class Package(CommonControlField):
 
     panels = [
         FieldPanel("file"),
-        FieldPanel("category"),
-        AutocompletePanel("article"),
-        AutocompletePanel("issue"),
     ]
 
     def __str__(self):
@@ -145,26 +142,27 @@ class Package(CommonControlField):
                 user_id, file, article_id=article.id, category=category, status=status
             )
 
-    def check_errors(self):
-        for vr in self.validationresult_set.filter(status=choices.VS_DISAPPROVED):
-            if vr.resolution.action in (choices.ER_ACTION_TO_FIX, ""):
-                self.status = choices.PS_PENDING_CORRECTION
-                self.save()
-                return self.status
-
-        self.status = choices.PS_READY_TO_BE_FINISHED
+    def check_resolutions(self):
+        try:
+            item = self.validationresult_set.filter(
+                status=choices.VS_DISAPPROVED,
+                resolution__action__in=[choices.ER_ACTION_TO_FIX, ""],
+            )[0]
+            self.status = choices.PS_PENDING_CORRECTION
+        except IndexError:
+            self.status = choices.PS_READY_TO_BE_FINISHED
         self.save()
         return self.status
 
     def check_opinions(self):
-        for vr in self.validationresult_set.filter(status=choices.VS_DISAPPROVED):
-            opinion = vr.analysis.opinion
-            if opinion in (choices.ER_OPINION_FIX_DEMANDED, ""):
-                self.status = choices.PS_PENDING_CORRECTION
-                self.save()
-                return self.status
-
-        self.status = choices.PS_ACCEPTED
+        try:
+            item = self.validationresult_set.filter(
+                status=choices.VS_DISAPPROVED,
+                analysis__opinion__in=[choices.ER_OPINION_FIX_DEMANDED, ""],
+            )[0]
+            self.status = choices.PS_PENDING_CORRECTION
+        except IndexError:
+            self.status = choices.PS_ACCEPTED
         self.save()
         return self.status
 
@@ -186,7 +184,7 @@ class ValidationResult(models.Model):
     id = models.AutoField(primary_key=True)
     category = models.CharField(
         _("Error category"),
-        max_length=64,
+        max_length=32,
         choices=choices.VALIDATION_ERROR_CATEGORY,
         null=False,
         blank=False,
@@ -299,6 +297,7 @@ class ErrorResolution(CommonControlField):
         _("Action"),
         max_length=32,
         choices=choices.ERROR_RESOLUTION_ACTION,
+        default=choices.ER_ACTION_TO_FIX,
         null=True,
         blank=True,
     )
@@ -330,6 +329,8 @@ class ErrorResolution(CommonControlField):
             obj = cls.get(validation_result)
             obj.updated = datetime.now()
             obj.updated_by = user
+            obj.action = action
+            obj.rationale = rationale
             obj.save()
         except cls.DoesNotExist:
             obj = cls.create(user, validation_result, action, rationale)
