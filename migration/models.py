@@ -448,12 +448,10 @@ class MigratedFile(CommonControlField):
             pass
 
     def save_file(self, name, content, delete=False):
-        if self.file:
-            if delete:
-                try:
-                    self.file.delete(save=True)
-                except Exception as e:
-                    pass
+        try:
+            self.file.delete(save=True)
+        except Exception as e:
+            pass
         self.file.save(name, ContentFile(content))
 
     def is_up_to_date(self, file_date):

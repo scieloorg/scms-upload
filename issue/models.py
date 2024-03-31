@@ -47,6 +47,18 @@ class Issue(CommonControlField, IssuePublicationDate):
     supplement = models.CharField(_("Supplement"), max_length=16, null=True, blank=True)
     publication_year = models.CharField(_("Year"), max_length=4, null=True, blank=True)
 
+    @property
+    def data(self):
+        return dict(
+            journal=self.journal.data,
+            volume=self.volume,
+            number=self.number,
+            supplement=self.supplement,
+            publication_year=self.publication_year,
+            created=created.isoformat(),
+            updated=updated.isoformat(),
+        )
+
     @staticmethod
     def autocomplete_custom_queryset_filter(search_term):
         parts = search_term.split()
@@ -60,7 +72,12 @@ class Issue(CommonControlField, IssuePublicationDate):
         )
 
     def autocomplete_label(self):
-        return f"{self.journal.title} {self.volume or self.number}"
+        return "%s %s%s%s" % (
+            self.journal,
+            self.volume and f"v{self.volume}",
+            self.number and f"n{self.number}",
+            self.supplement and f"s{self.supplement}",
+        )
 
     panels = [
         AutocompletePanel("journal"),

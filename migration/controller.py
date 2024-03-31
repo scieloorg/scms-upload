@@ -3,7 +3,7 @@ import os
 import sys
 from copy import deepcopy
 from datetime import datetime
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from django.utils.translation import gettext_lazy as _
 from scielo_classic_website import classic_ws
@@ -327,7 +327,7 @@ class PkgZipBuilder:
         sps_pkg_zip_path = os.path.join(output_folder, f"{self.sps_pkg_name}.zip")
 
         # cria pacote zip
-        with ZipFile(sps_pkg_zip_path, "w") as zf:
+        with ZipFile(sps_pkg_zip_path, "w", compression=ZIP_DEFLATED) as zf:
 
             # A partir do XML, obtém os nomes dos arquivos dos ativos digitais
             self._build_sps_package_add_assets(zf, issue_proc)
@@ -501,6 +501,16 @@ def get_migrated_xml_with_pre(article_proc):
         xml_file_path = None
         xml_file_path = obj.file.path
         for item in XMLWithPre.create(path=xml_file_path):
+            if article_proc.pid and item.v2 != article_proc.pid:
+                # corrige ou adiciona pid v2 no XML nativo ou obtido do html
+                # usando o valor do pid v2 do site clássico
+                item.v2 = article_proc.pid
+
+            order = str(int(article_proc.pid[-5:]))
+            if not item.order or str(int(item.order)) != order:
+                # corrige ou adiciona other pid no XML nativo ou obtido do html
+                # usando o valor do "order" do site clássico
+                item.order = article_proc.pid[-5:]
             return item
     except Exception as e:
         raise XMLVersionXmlWithPreError(

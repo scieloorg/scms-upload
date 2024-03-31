@@ -117,13 +117,25 @@ class Article(ClusterableModel, CommonControlField):
 
     base_form_class = ArticleForm
 
-    autocomplete_search_field = "pid_v3"
+    autocomplete_search_field = "sps_pkg__sps_pkg_name"
 
     def autocomplete_label(self):
-        return self.pid_v3
+        return self.sps_pkg.sps_pkg_name
 
     def __str__(self):
-        return f"{self.pid_v3}"
+        return f"{self.sps_pkg.sps_pkg_name}"
+
+    @property
+    def data(self):
+        # TODO completar com itens que identifique o artigo
+        return dict(
+            xml=self.sps_pkg and self.sps_pkg.xml_uri,
+            issue=self.issue.data,
+            journal=self.journal.data,
+            pid_v3=self.pid_v3,
+            created=created.isoformat(),
+            updated=updated.isoformat(),
+        )
 
     @classmethod
     def get(cls, pid_v3):

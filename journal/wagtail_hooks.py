@@ -47,29 +47,34 @@ class OfficialJournalAdmin(ModelAdmin):
     )
 
 
+class JournalCreateView(CreateView):
+    def form_valid(self, form):
+        self.object = form.save_all(self.request.user)
+        return HttpResponseRedirect(self.get_success_url())
+
+
 class JournalAdmin(ModelAdmin):
     model = Journal
     menu_label = _("Journal")
+    create_view_class = JournalCreateView
     menu_icon = "folder"
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
 
-    list_display = ("official_journal", "short_title")
-    search_fields = ("official_journal__title", "short_title")
+    list_display = ("title", "short_title")
+    search_fields = ("official_journal__issn_electronic", "official_journal__issn_print", "short_title")
 
 
 class JournalModelAdminGroup(ModelAdminGroup):
     menu_icon = "folder"
     menu_label = _("Journals")
-    # menu_order = get_menu_order("journal")
-    menu_order = 200
+    menu_order = get_menu_order("journal")
     items = (
         OfficialJournalAdmin,
         JournalAdmin,
         # JournalProcAdmin,
     )
-    menu_order = get_menu_order("journal")
 
 
 modeladmin_register(JournalModelAdminGroup)

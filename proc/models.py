@@ -4,7 +4,6 @@ import sys
 import json
 from datetime import datetime
 from tempfile import TemporaryDirectory
-from zipfile import ZipFile
 
 from django.core.files.base import ContentFile
 from django.db import models
@@ -37,7 +36,11 @@ from migration.models import (
     MigratedIssue,
     MigratedJournal,
 )
-from migration.controller import PkgZipBuilder, get_migrated_xml_with_pre, XMLVersionXmlWithPreError
+from migration.controller import (
+    PkgZipBuilder,
+    get_migrated_xml_with_pre,
+    XMLVersionXmlWithPreError,
+)
 from package import choices as package_choices
 from package.models import SPSPkg
 from proc import exceptions
@@ -77,20 +80,32 @@ class Operation(CommonControlField):
     base_form_class = ProcAdminModelForm
 
     panels = [
-        FieldPanel("name"),
+        FieldPanel("name", read_only=True),
         FieldPanel("created", read_only=True),
         FieldPanel("updated", read_only=True),
-        FieldPanel("completed"),
-        FieldPanel("detail"),
+        FieldPanel("completed", read_only=True),
+        FieldPanel("detail", read_only=True),
     ]
 
     class Meta:
+        # isso faz com que em InlinePanel mostre do mais recente para o mais antigo
+        ordering = ['-created']
         indexes = [
             models.Index(fields=["name"]),
         ]
 
     def __str__(self):
         return f"{self.name} {self.started} {self.finished} {self.completed}"
+
+    @property
+    def data(self):
+        return dict(
+            name=self.name,
+            completed=self.completed,
+            event=self.event and self.event.data,
+            detail=self.detail,
+            created=self.created.isoformat(),
+        )
 
     @property
     def started(self):
@@ -101,6 +116,47 @@ class Operation(CommonControlField):
         return self.updated and self.updated.isoformat() or ""
 
     @classmethod
+    def create(cls, user, proc, name):
+        for item in cls.objects.filter(proc=proc, name=name).order_by('created'):
+            # obtém o primeiro ocorrência de proc e name
+
+            # obtém todos os ítens criados após este evento
+            rows = []
+            for row in cls.objects.filter(proc=proc, created__gte=item.created).order_by('created').iterator():
+                rows.append(row.data)
+
+            try:
+                # converte para json
+                file_content = json.dumps(rows)
+                file_extension = ".json"
+            except Exception as e:
+                # caso não seja serializável, converte para str
+                file_content = str(rows)
+                file_extension = ".txt"
+                logging.info(proc.pid)
+                logging.exception(e)
+
+            try:
+                report_date = item.created.isoformat()
+                # cria um arquivo com o conteúdo
+                ProcReport.create_or_update(
+                    user, proc, name, report_date, file_content, file_extension,
+                )
+                # apaga todas as ocorrências que foram armazenadas no arquivo
+                cls.objects.filter(proc=proc, created__gte=item.created).delete()
+            except Exception as e:
+                logging.info(proc.pid)
+                logging.exception(e)
+            break
+
+        obj = cls()
+        obj.proc = proc
+        obj.name = name
+        obj.creator = user
+        obj.save()
+        return obj
+
+    @classmethod
     def start(
         cls,
         user,
@@ -108,12 +164,7 @@ class Operation(CommonControlField):
         name=None,
     ):
         try:
-            obj = cls()
-            obj.proc = proc
-            obj.name = name
-            obj.creator = user
-            obj.save()
-            return obj
+            return cls.create(user, proc, name)
         except Exception as exc:
             raise OperationStartError(
                 f"Unable to create Operation ({name}). EXCEPTION: {type(exc)}  {exc}"
@@ -179,6 +230,146 @@ class Operation(CommonControlField):
             )
 
 
+def proc_report_directory_path(instance, filename):
+    try:
+        subdir = instance.directory_path
+        YYYY = instance.report_date[:4]
+        return f"archive/{subdir}/proc/{YYYY}/{filename}"
+    except AttributeError:
+        return f"archive/{filename}"
+
+
+class ProcReport(CommonControlField):
+    collection = models.ForeignKey(
+        Collection, on_delete=models.SET_NULL, null=True, blank=True
+    )
+
+    pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
+    task_name = models.CharField(
+        _("Procedure name"), max_length=32, null=True, blank=True
+    )
+    file = models.FileField(upload_to=proc_report_directory_path, null=True, blank=True)
+    report_date = models.CharField(
+        _("Identification"), max_length=34, null=True, blank=True
+    )
+    item_type = models.CharField(_("Item type"), max_length=16, null=True, blank=True)
+
+    panel_files = [
+        FieldPanel("task_name", read_only=True),
+        FieldPanel("report_date", read_only=True),
+        FieldPanel("file", read_only=True),
+    ]
+
+    def __str__(self):
+        return f"{self.collection.acron} {self.pid} {self.task_name} {self.report_date}"
+
+    class Meta:
+        ordering = ['-created']
+
+        verbose_name = _("Processing report")
+        verbose_name_plural = _("Processing reports")
+        indexes = [
+            models.Index(fields=["item_type"]),
+            models.Index(fields=["pid"]),
+            models.Index(fields=["task_name"]),
+            models.Index(fields=["report_date"]),
+        ]
+
+    @staticmethod
+    def autocomplete_custom_queryset_filter(search_term):
+        return ProcReport.objects.filter(
+            Q(pid__icontains=search_term)
+            | Q(collection__acron__icontains=search_term)
+            | Q(collection__name__icontains=search_term)
+            | Q(task_name__icontains=search_term)
+            | Q(report_date__icontains=search_term)
+        )
+
+    def autocomplete_label(self):
+        return str(self)
+
+    def save_file(self, name, content):
+        try:
+            self.file.delete(save=True)
+        except Exception as e:
+            pass
+        try:
+            self.file.save(name, ContentFile(content))
+        except Exception as e:
+            raise Exception(f"Unable to save {name}. Exception: {e}")
+
+    @classmethod
+    def get(cls, proc=None, task_name=None, report_date=None):
+        if proc and task_name and report_date:
+            try:
+                return cls.objects.get(
+                    collection=proc.collection, pid=proc.pid,
+                    task_name=task_name,
+                    report_date=report_date,
+                )
+            except cls.MultipleObjectsReturned:
+                return cls.objects.filter(
+                    collection=proc.collection, pid=proc.pid,
+                    task_name=task_name,
+                    report_date=report_date,
+                ).first()
+        raise ValueError(
+            "ProcReport.get requires proc and task_name and report_date"
+        )
+
+    @staticmethod
+    def get_item_type(pid):
+        if len(pid) == 23:
+            return "article"
+        if len(pid) == 9:
+            return "journal"
+        return "issue"
+
+    @classmethod
+    def create(cls, user, proc, task_name, report_date, file_content, file_extension):
+        if proc and task_name and report_date and file_content and file_extension:
+            try:
+                obj = cls()
+                obj.collection = proc.collection
+                obj.pid = proc.pid
+                obj.task_name = task_name
+                obj.item_type = ProcReport.get_item_type(proc.pid)
+                obj.report_date = report_date
+                obj.creator = user
+                obj.save()
+                obj.save_file(f"{task_name}{file_extension}", file_content)
+                return obj
+            except IntegrityError:
+                return cls.get(proc, task_name, report_date)
+        raise ValueError(
+            "ProcReport.create requires proc and task_name and report_date and file_content and file_extension"
+        )
+
+    @classmethod
+    def create_or_update(cls, user, proc, task_name, report_date, file_content, file_extension):
+        try:
+            obj = cls.get(
+                proc=proc, task_name=task_name, report_date=report_date
+            )
+            obj.updated_by = user
+            obj.task_name = task_name or obj.task_name
+            obj.report_date = report_date or obj.report_date
+            obj.save()
+            obj.save_file(f"{task_name}{file_extension}", file_content)
+        except cls.DoesNotExist:
+            obj = cls.create(user, proc, task_name, report_date, file_content, file_extension)
+        return obj
+
+    @property
+    def directory_path(self):
+        pid = self.pid
+        if len(self.pid) == 23:
+            pid = self.pid[1:]
+        paths = [self.collection.acron, pid[:9], pid[9:13], pid[13:17], pid[17:]]
+        paths = [path for path in paths if path]
+        return os.path.join(*paths)
+
+
 class JournalProcResult(Operation, Orderable):
     proc = ParentalKey("JournalProc", related_name="journal_proc_result")
 
@@ -222,6 +413,8 @@ class BaseProc(CommonControlField):
 
     class Meta:
         abstract = True
+        ordering = ['-updated']
+
         indexes = [
             models.Index(fields=["pid"]),
         ]
@@ -243,7 +436,7 @@ class BaseProc(CommonControlField):
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
@@ -316,6 +509,7 @@ class BaseProc(CommonControlField):
                     obj.migration_status == tracker_choices.PROGRESS_STATUS_TODO
                 ),
                 message=None,
+                detail=obj.migrated_data,
             )
             return obj
         except Exception as e:
@@ -383,13 +577,13 @@ class BaseProc(CommonControlField):
 
             operation = self.start(user, f"create or update {item_name}")
 
-            callable_register_data(user, self, force_update)
-
+            registered = callable_register_data(user, self, force_update)
             operation.finish(
                 user,
                 completed=(
                     self.migration_status == tracker_choices.PROGRESS_STATUS_DONE
                 ),
+                detail=registered and registered.data,
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -522,18 +716,19 @@ class JournalProc(BaseProc, ClusterableModel):
     base_form_class = ProcAdminModelForm
 
     panel_proc_result = [
-        InlinePanel("journal_proc_result", label=_("Proc result")),
+        InlinePanel("journal_proc_result", label=_("Event")),
     ]
     MigratedDataClass = MigratedJournal
 
     edit_handler = TabbedInterface(
         [
             ObjectList(BaseProc.panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
     class Meta:
+        ordering = ['-updated']
         indexes = [
             models.Index(fields=["acron"]),
         ]
@@ -655,12 +850,12 @@ class IssueProc(BaseProc, ClusterableModel):
         AutocompletePanel("issue_files"),
     ]
     panel_proc_result = [
-        InlinePanel("issue_proc_result"),
+        InlinePanel("issue_proc_result", label=_("Event")),
     ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
@@ -685,6 +880,7 @@ class IssueProc(BaseProc, ClusterableModel):
         )
 
     class Meta:
+        ordering = ['-updated']
         indexes = [
             models.Index(fields=["issue_folder"]),
             models.Index(fields=["docs_status"]),
@@ -716,7 +912,9 @@ class IssueProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
-    def files_to_migrate(cls, collection, force_update):
+    def files_to_migrate(
+        cls, collection, journal_acron, publication_year, force_update
+    ):
         """
         Muda o status de PROGRESS_STATUS_REPROC para PROGRESS_STATUS_TODO
         E se force_update = True, muda o status de PROGRESS_STATUS_DONE para PROGRESS_STATUS_TODO
@@ -735,10 +933,17 @@ class IssueProc(BaseProc, ClusterableModel):
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         ).update(files_status=tracker_choices.PROGRESS_STATUS_TODO)
 
+        params = {}
+        if publication_year:
+            params["issue__publication_year"] = publication_year
+        if journal_acron:
+            params["journal_proc__acron"] = journal_acron
+
         return cls.objects.filter(
             files_status=tracker_choices.PROGRESS_STATUS_TODO,
             collection=collection,
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
+            **params,
         ).iterator()
 
     def get_files_from_classic_website(
@@ -790,7 +995,7 @@ class IssueProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
-    def docs_to_migrate(cls, collection, force_update):
+    def docs_to_migrate(cls, collection, journal_acron, publication_year, force_update):
         """
         Muda o status de PROGRESS_STATUS_REPROC para PROGRESS_STATUS_TODO
         E se force_update = True, muda o status de PROGRESS_STATUS_DONE para PROGRESS_STATUS_TODO
@@ -809,10 +1014,17 @@ class IssueProc(BaseProc, ClusterableModel):
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         ).update(docs_status=tracker_choices.PROGRESS_STATUS_TODO)
 
+        params = {}
+        if publication_year:
+            params["issue__publication_year"] = publication_year
+        if journal_acron:
+            params["journal_proc__acron"] = journal_acron
+
         return cls.objects.filter(
             docs_status=tracker_choices.PROGRESS_STATUS_TODO,
             collection=collection,
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
+            **params,
         ).iterator()
 
     def get_article_records_from_classic_website(
@@ -919,9 +1131,10 @@ class ArticleProc(BaseProc, ClusterableModel):
     )
 
     ProcResult = ArticleProcResult
+
     panel_files = [
-        FieldPanel("pkg_name"),
-        AutocompletePanel("sps_pkg"),
+        FieldPanel("pkg_name", read_only=True),
+        AutocompletePanel("sps_pkg", read_only=True),
     ]
     panel_status = [
         FieldPanel("xml_status"),
@@ -934,19 +1147,20 @@ class ArticleProc(BaseProc, ClusterableModel):
     #     AutocompletePanel("events"),
     # ]
     panel_proc_result = [
-        InlinePanel("article_proc_result"),
+        InlinePanel("article_proc_result", label=_("Event")),
     ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
             ObjectList(panel_files, heading=_("Files")),
-            ObjectList(panel_proc_result, heading=_("Result")),
+            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
         ]
     )
 
     MigratedDataClass = MigratedArticle
 
     class Meta:
+        ordering = ['-updated']
         indexes = [
             models.Index(fields=["pkg_name"]),
             models.Index(fields=["xml_status"]),
@@ -994,9 +1208,9 @@ class ArticleProc(BaseProc, ClusterableModel):
             self.save()
 
             if htmlxml:
-                xml = htmlxml.html_to_xml(user, self, body_and_back_xml)
-            else:
-                xml = get_migrated_xml_with_pre(self)
+                htmlxml.html_to_xml(user, self, body_and_back_xml)
+
+            xml = get_migrated_xml_with_pre(self)
 
             if xml:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -1006,7 +1220,8 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             operation.finish(
                 user,
-                completed=self.xml_status==tracker_choices.PROGRESS_STATUS_DONE,
+                completed=self.xml_status == tracker_choices.PROGRESS_STATUS_DONE,
+                detail=xml and xml.data,
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1158,6 +1373,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             with TemporaryDirectory() as output_folder:
 
                 xml_with_pre = get_migrated_xml_with_pre(self)
+
                 builder = PkgZipBuilder(xml_with_pre)
                 sps_pkg_zip_path = builder.build_sps_package(
                     output_folder,
@@ -1172,6 +1388,9 @@ class ArticleProc(BaseProc, ClusterableModel):
                 # verificar se este código pode ser aproveitado pelo fluxo
                 # de ingresso, se sim, ajustar os valores dos parâmetros
                 # origin e is_published
+
+                self.fix_pid_v2(user)
+
                 self.sps_pkg = SPSPkg.create_or_update(
                     user,
                     sps_pkg_zip_path,
@@ -1185,7 +1404,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             operation.finish(
                 user,
                 completed=bool(self.sps_pkg and self.sps_pkg.is_complete),
-                detail=self.sps_pkg and self.sps_pkg.data or None,
+                detail=self.sps_pkg and self.sps_pkg.data,
             )
 
         except Exception as e:
@@ -1196,8 +1415,12 @@ class ArticleProc(BaseProc, ClusterableModel):
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
-                detail=self.sps_pkg and self.sps_pkg.data or None,
+                detail=self.sps_pkg and self.sps_pkg.data,
             )
+
+    def fix_pid_v2(self, user):
+        if self.sps_pkg:
+            self.sps_pkg.fix_pid_v2(user, correct_pid_v2=self.migrated_data.pid)
 
     def update_sps_pkg_status(self):
         if not self.sps_pkg:
@@ -1209,7 +1432,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         elif not self.sps_pkg.valid_components:
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
         else:
-            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_PENDING
         self.save()
 
     @property
@@ -1228,9 +1451,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             operation = self.start(user, "synchronize to core")
             self.sps_pkg.synchronize(user, self)
-            operation.finish(
-                user, completed=self.sps_pkg.registered_in_core
-            )
+            operation.finish(user, completed=self.sps_pkg.registered_in_core)
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
