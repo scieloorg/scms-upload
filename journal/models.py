@@ -130,6 +130,7 @@ class Journal(CommonControlField, ClusterableModel):
     title = models.CharField(
         _("Title"), max_length=265, null=True, blank=True
     )
+    journal_acron = models.TextField(_("Journal Acronym"), null=True, blank=True)
     official_journal = models.ForeignKey(
         "OfficialJournal",
         null=True,
@@ -149,6 +150,7 @@ class Journal(CommonControlField, ClusterableModel):
     panels_identification = [
         AutocompletePanel("official_journal"),
         FieldPanel("short_title"),
+        FieldPanel("journal_acron"),
     ]
 
     panels_owner = [
