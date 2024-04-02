@@ -477,3 +477,81 @@ def subtask_synchronize_to_pid_provider(
     user = _get_user(user_id, username)
     item = ArticleProc.objects.get(pk=item_id)
     item.synchronize(user)
+
+
+@celery_app.task(bind=True)
+def task_create_or_update_article_proc_from_uploaded_packages(
+    self,
+    user_id=None,
+    username=None,
+):
+    """
+    Percorre os registros Package e cria ArticleProc
+
+    Parameters
+    ----------
+    user_id : int
+        identificacao do usuário
+    username : str
+        identificacao do usuário
+    """
+    try:
+        for package in ArticleProc.items_to_ingress():
+            # dispara tarefas para criar/atualizar os registros
+            # OfficialJournal, JournalProc e Journal
+            task_create_or_update_article_proc_from_uploaded_package.apply_async(
+                kwargs=dict(
+                    user_id=user_id,
+                    username=username,
+                    package_id=package.id,
+                )
+            )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.tasks.task_create_or_update_article_proc_from_uploaded_packages",
+                "user_id": user_id,
+                "username": username,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_create_or_update_article_proc_from_uploaded_package(
+    self,
+    user_id=None,
+    username=None,
+    package_id=None,
+):
+    """
+    Para um dado registro de upload.models.Package,
+    cria ou atualiza os registros de ArticleProc
+
+    Parameters
+    ----------
+    user_id : int
+        identificacao do usuário
+    username : str
+        identificacao do usuário
+    package_id : int
+        id de upload.models.Package
+
+    """
+    try:
+        user = _get_user(user_id, username)
+        ArticleProc.ingress(user, package_id)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.tasks.task_create_or_update_article_proc_from_uploaded_package",
+                "user_id": user_id,
+                "username": username,
+                "package_id": package_id,
+            },
+        )
