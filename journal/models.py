@@ -174,8 +174,8 @@ class Journal(CommonControlField, ClusterableModel):
             issn_print=self.official_journal.issn_print,
             issn_electronic=self.official_journal.issn_electronic,
             foundation_year=self.official_journal.foundation_year,
-            created=created.isoformat(),
-            updated=updated.isoformat(),
+            created=self.created.isoformat(),
+            updated=self.updated.isoformat(),
         )
 
     def autocomplete_label(self):
@@ -218,6 +218,10 @@ class Journal(CommonControlField, ClusterableModel):
         obj.save()
         logging.info(f"return {obj}")
         return obj
+
+    @property
+    def any_issn(self):
+        return self.official_journal and (self.official_journal.issn_electronic or self.official_journal.issn_print)
 
 
 class Owner(Orderable, InstitutionHistory):
