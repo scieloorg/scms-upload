@@ -12,6 +12,7 @@ from wagtail.contrib.modeladmin.options import (
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
 from config.menu import get_menu_order
+from config.settings.base import JOURNAL_TEAM, XML_PROVIDER, ADMIN_SCIELO
 
 from .button_helper import ArticleButtonHelper, RequestArticleChangeButtonHelper
 from .models import Article, RelatedItem, RequestArticleChange, choices
@@ -160,6 +161,22 @@ class ArticleModelAdmin(ModelAdmin):
         "fpage",
         "lpage",
     )
+    
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        
+        user_groups = request.user.groups.values_list('name', flat=True)
+
+        is_xml_provider = XML_PROVIDER in user_groups
+        is_journal_team = JOURNAL_TEAM in user_groups
+        is_admin_scielo= ADMIN_SCIELO in user_groups
+        is_superuser = request.user.is_superuser
+
+        if is_xml_provider or is_journal_team:
+            return queryset.filter(journal__in=request.user.journal.all())
+        elif is_superuser or is_admin_scielo:
+            return queryset
+        return queryset.none()
 
 
 class RelatedItemModelAdmin(ModelAdmin):
