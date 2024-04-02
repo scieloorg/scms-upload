@@ -81,8 +81,10 @@ class PidRequester(BasePidProvider):
         xml_changed = {}
 
         main_op = article_proc.start(user, "request_pid_for_xml_with_pre")
+
+        op = article_proc.start(user, ">>> get registration demand")
         registered = PidRequester.get_registration_demand(
-            xml_with_pre, article_proc, user
+            xml_with_pre, op, user
         )
 
         if registered.get("error_type"):
@@ -132,7 +134,7 @@ class PidRequester(BasePidProvider):
         return registered
 
     @staticmethod
-    def get_registration_demand(xml_with_pre, article_proc, user):
+    def get_registration_demand(xml_with_pre, op, user):
         """
         Obtém a indicação de demanda de registro no Upload e/ou Core
 
@@ -141,11 +143,11 @@ class PidRequester(BasePidProvider):
         {"do_core_registration": boolean, "do_upload_registration": boolean}
 
         """
-        op = article_proc.start(user, ">>> get registration demand")
 
         registered = PidProviderXML.is_registered(xml_with_pre)
         if registered.get("error_type"):
-            op.finish(user, completed=False, detail=registered)
+            if op:
+                op.finish(user, completed=False, detail=registered)
             return registered
 
         if registered.get("is_equal"):
@@ -157,7 +159,8 @@ class PidRequester(BasePidProvider):
             registered["do_core_registration"] = True
             registered["do_upload_registration"] = True
 
-        op.finish(user, completed=True, detail=registered)
+        if op:
+            op.finish(user, completed=True, detail=registered)
 
         return registered
 
