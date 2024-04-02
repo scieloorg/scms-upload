@@ -51,6 +51,19 @@ def format_traceback(exc_traceback):
     return traceback.format_tb(exc_traceback)
 
 
+def serialize_detail(detail):
+    d = detail.copy()
+    for k, v in d.items():
+        try:
+            json.dumps(v)
+        except Exception as e:
+            try:
+                d[k] = v.data
+            except AttributeError:
+                d[k] = str(v)
+    return d
+
+
 class UnexpectedEvent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created = models.DateTimeField(verbose_name=_("Creation date"), auto_now_add=True)
