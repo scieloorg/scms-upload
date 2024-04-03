@@ -8,9 +8,11 @@ from collection.choices import QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from proc.models import ArticleProc, IssueProc, JournalProc
+from core.models import PressRelease
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
 from publication.api.journal import publish_journal
+from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
 from tracker.models import UnexpectedEvent
 
@@ -20,12 +22,14 @@ SCIELO_MODELS = {
     "journal": JournalProc,
     "issue": IssueProc,
     "article": ArticleProc,
+    "pressrelease": PressRelease
 }
 
 PUBLISH_FUNCTIONS = {
     "journal": publish_journal,
     "issue": publish_issue,
     "article": publish_article,
+    "pressrelease": publish_pressrelease
 }
 
 
@@ -253,6 +257,82 @@ def task_publish_item(
         SciELOModel = SCIELO_MODELS.get(model_name)
         item = SciELOModel.objects.get(pk=item_id)
         item.publish(user, PUBLISH_FUNCTIONS.get(model_name), website_kind, api_data)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail=dict(
+                item_id=item_id,
+                model_name=model_name,
+            ),
+        )
+
+
+@celery_app.task(bind=True)
+def task_publish_collection_inline(
+    self,
+    user_id=None,
+    username=None,
+    website_kind=None,
+    collection_acron=None,
+):
+    for collection in _get_collections(collection_acron):
+        task_publish_model_inline.apply_async(
+            kwargs=dict(
+                user_id=user_id,
+                username=username,
+                website_kind=website_kind,
+                collection_acron=collection.acron,
+            )
+        )
+
+
+@celery_app.task(bind=True)
+def task_publish_model_inline(
+    self,
+    user_id=None,
+    username=None,
+    website_kind=None,
+    collection_acron=None,
+):
+    website_kind = website_kind or QA
+    collection = Collection.get(acron=collection_acron)
+    user = _get_user(user_id, username)
+
+    website = WebSiteConfiguration.get(
+        collection=collection,
+        purpose=website_kind,
+    )
+    for ws in website.endpoint.all().iterator():
+        SciELOModel = SCIELO_MODELS.get(ws.name)
+        
+        api = PublicationAPI(
+                post_data_url=ws.url,
+                get_token_url=website.api_get_token_url,
+                username=website.api_username,
+                password=website.api_password,
+            )
+        api.get_token()
+        
+        for item in SciELOModel.objects.all():
+            task_publish_item.apply_async(
+                kwargs=dict(
+                    item_id=item.id,
+                    api_data=api.data,
+                    model_name="pressrelease",
+                    )
+                )
+
+
+def task_publish_item_inline(
+    item_id,
+    api_data,
+    model_name,
+):
+    try:
+        SciELOModel = SCIELO_MODELS.get(model_name)
+        callable_publish = PUBLISH_FUNCTIONS.get(model_name)(SciELOModel, api_data)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
