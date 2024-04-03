@@ -2,6 +2,8 @@ import logging
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
@@ -56,7 +58,7 @@ class Collection(CommonControlField):
             return collection
 
 
-class WebSiteConfiguration(CommonControlField):
+class WebSiteConfiguration(CommonControlField, ClusterableModel):
     collection = models.ForeignKey(
         Collection, null=True, blank=True, on_delete=models.SET_NULL
     )
@@ -107,6 +109,7 @@ class WebSiteConfiguration(CommonControlField):
         FieldPanel("api_username"),
         FieldPanel("api_password"),
         FieldPanel("enabled"),
+        InlinePanel("endpoint", label=_("EndPoints"), classname="collapsed"),
     ]
 
     @classmethod
@@ -131,11 +134,16 @@ class WebSiteConfiguration(CommonControlField):
         api_url_article=None,
         api_url_issue=None,
         api_url_journal=None,
+        api_url=None,
         api_get_token_url=None,
         api_username=None,
         api_password=None,
         enabled=None,
     ):
+        """
+        api_url:
+            [{"url": "https://example.com", "name": "example"}]
+        """
         try:
             obj = cls.get(url, collection, purpose)
             obj.updated_by = user
@@ -153,6 +161,19 @@ class WebSiteConfiguration(CommonControlField):
         obj.api_username = api_username or obj.api_username
         obj.api_password = api_password or obj.api_password
         obj.enabled = bool(enabled or obj.enabled)
+
+        obj.save()
+        data = []
+        for api in api_url:
+            if api:
+                we, created = WebSiteConfigurationEndpoint.objects.get_or_create(
+                    url=api.get("url"),
+                    name=api.get("name"),
+                    enabled=True,
+                    creator=user,
+                )
+                data.append(we)
+        obj.endpoint.set(data)
         obj.save()
         return obj
 
@@ -223,3 +244,37 @@ class Language(CommonControlField):
             return obj
 
     base_form_class = CoreAdminModelForm
+
+
+class WebSiteConfigurationEndpoint(CommonControlField):
+    """
+    Registro de Endpoints para WebSiteConfiguration
+    """
+
+    config = ParentalKey(
+        "WebSiteConfiguration",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="endpoint",
+    )
+    name = models.CharField(_("Endpoint name"), max_length=255, null=True, blank=True)
+    url = models.URLField(
+        _("Endpoint URL"), max_length=128, null=True, blank=True
+    )
+    enabled = models.BooleanField(default=False)
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("url"),
+        FieldPanel("enabled"),
+    ]
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["enabled"]),
+        ]
+
+    def __str__(self):
+        return f"{self.url} {self.enabled}"
