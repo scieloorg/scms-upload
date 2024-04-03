@@ -9,6 +9,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 from article.models import Article
 from core.models import CommonControlField
 from issue.models import Issue
+from journal.models import Journal
 
 from . import choices
 from .forms import UploadPackageForm, ValidationResultForm
@@ -46,6 +47,7 @@ class Package(CommonControlField):
         null=True,
         on_delete=models.SET_NULL,
     )
+    journal = models.ForeignKey(Journal, blank=True, null=True, on_delete=models.SET_NULL)
     issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.SET_NULL)
     assignee = models.ForeignKey(User, blank=True, null=True, on_delete=models.SET_NULL)
     expiration_date = models.DateField(_("Expiration date"), null=True, blank=True)
@@ -173,6 +175,19 @@ class Package(CommonControlField):
             return True
 
         return False
+
+    @property
+    def data(self):
+        return dict(
+            file=self.file.name,
+            status=self.status,
+            category=self.category,
+            journal=self.journal and self.journal.data,
+            issue=self.issue and self.issue.data,
+            article=self.article and self.article.data,
+            assignee=str(self.assignee),
+            expiration_date=str(expiration_date),
+        )
 
 
 class QAPackage(Package):

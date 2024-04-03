@@ -55,8 +55,8 @@ class Issue(CommonControlField, IssuePublicationDate):
             number=self.number,
             supplement=self.supplement,
             publication_year=self.publication_year,
-            created=created.isoformat(),
-            updated=updated.isoformat(),
+            created=self.created.isoformat(),
+            updated=self.updated.isoformat(),
         )
 
     @staticmethod

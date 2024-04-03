@@ -1,6 +1,7 @@
 import logging
 import sys
 from datetime import datetime
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from django.utils.translation import gettext as _
 from packtools.sps.models.journal_meta import Title, ISSN
@@ -28,7 +29,7 @@ from pid_provider.requester import PidRequester
 from article.models import Article
 from issue.models import Issue
 from journal.models import OfficialJournal, Journal
-from tracker.models import UnexpectedEvent
+from tracker.models import UnexpectedEvent, serialize_detail
 from upload.xml_validation import (
     validate_xml_content,
     add_app_data,
@@ -114,10 +115,20 @@ def request_pid_for_accepted_packages(user):
 
 def receive_package(package):
     try:
-        for xml_with_pre in XMLWithPre.create(path=package.file.path):
+        zip_xml_file_path = package.file.path
+        for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
             response = _check_article_and_journal(xml_with_pre)
+            if response.get("xml_changed"):
+                # atualiza conteúdo de zip
+                with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
+                    zf.writestr(
+                        xml_with_pre.filename,
+                        xml_with_pre.tostring(pretty_print=True),
+                    )
 
             package.article = response.get("article")
+            package.issue = response.get("issue")
+            package.journal = response.get("journal")
             package.category = response.get("package_category")
             package.status = response.get("package_status")
             package.save()
@@ -128,7 +139,7 @@ def receive_package(package):
                     error_category=error_category,
                     status=choices.VS_DISAPPROVED,
                     message=response["error"],
-                    data={},
+                    data=serialize_detail(response),
                 )
                 # falhou, retorna response
                 return response
@@ -205,6 +216,7 @@ def _check_article_and_journal(xml_with_pre):
     _check_xml_journal_and_xml_issue_are_registered(
         xml_with_pre.filename, xmltree, response
     )
+
     # caso encontrado erro, sair da função
     if response.get("error"):
         return _handle_error(response, article, article_previous_status)
@@ -222,9 +234,11 @@ def _check_article_and_journal(xml_with_pre):
             # sem problemas
             response["package_status"] = choices.PS_ENQUEUED_FOR_VALIDATION
             response.update({"article": article})
+
             return response
     # documento novo
     response["package_status"] = choices.PS_ENQUEUED_FOR_VALIDATION
+
     return response
 
 
@@ -275,15 +289,11 @@ def _check_xml_journal_and_xml_issue_are_registered(filename, xmltree, response)
     """
     Verifica se journal e issue do XML estão registrados no sistema
     """
-    try:
-        resp = {}
-        resp = _check_journal(filename, xmltree)
-        journal = resp["journal"]
-        resp = _check_issue(filename, xmltree, journal)
-        issue = resp["issue"]
-        response.update({"journal": journal, "issue": issue})
-    except KeyError:
-        response.update(resp)
+    resp = {}
+    resp = _check_journal(filename, xmltree)
+    response.update(resp)
+    resp = _check_issue(filename, xmltree, resp["journal"])
+    response.update(resp)
 
 
 def _get_journal(journal_title, issn_electronic, issn_print):
@@ -342,7 +352,6 @@ def _check_journal(origin, xmltree):
 def _check_issue(origin, xmltree, journal):
     try:
         xml = ArticleMetaIssue(xmltree)
-        logging.info(xml.data)
         if any((xml.volume, xml.suppl, xml.number)):
             return {"issue": Issue.get(journal, xml.volume, xml.suppl, xml.number)}
         else:
@@ -427,12 +436,16 @@ def _validate_xml_content(package, xml_with_pre, data):
             xml_with_pre.sps_pkg_name, xml_with_pre.xmltree, data
         )
         for result in results:
-            _handle_xml_content_validation_result(package, xml_with_pre.sps_pkg_name, result)
+            _handle_xml_content_validation_result(
+                package, xml_with_pre.sps_pkg_name, result
+            )
         try:
             error = ValidationResult.objects.filter(
                 package=package,
                 status=choices.VS_DISAPPROVED,
-                category__in=choices.VALIDATION_REPORT_ITEMS[choices.VR_INDIVIDUAL_CONTENT],
+                category__in=choices.VALIDATION_REPORT_ITEMS[
+                    choices.VR_INDIVIDUAL_CONTENT
+                ],
             )[0]
             package.status = choices.PS_VALIDATED_WITH_ERRORS
         except IndexError:

@@ -10,7 +10,6 @@ from scielo_classic_website import classic_ws
 
 from htmlxml.models import HTMLXML
 from migration.models import MigratedFile
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
 
@@ -486,35 +485,3 @@ class PkgZipBuilder:
                 "component_type": "xml",
                 "failures": format_traceback(exc_traceback),
             }
-
-
-def get_migrated_xml_with_pre(article_proc):
-    origin = None
-    try:
-        obj = HTMLXML.get(migrated_article=article_proc.migrated_data)
-        origin = "html"
-    except HTMLXML.DoesNotExist:
-        obj = article_proc.migrated_xml
-        origin = "xml"
-
-    try:
-        xml_file_path = None
-        xml_file_path = obj.file.path
-        for item in XMLWithPre.create(path=xml_file_path):
-            if article_proc.pid and item.v2 != article_proc.pid:
-                # corrige ou adiciona pid v2 no XML nativo ou obtido do html
-                # usando o valor do pid v2 do site clássico
-                item.v2 = article_proc.pid
-
-            order = str(int(article_proc.pid[-5:]))
-            if not item.order or str(int(item.order)) != order:
-                # corrige ou adiciona other pid no XML nativo ou obtido do html
-                # usando o valor do "order" do site clássico
-                item.order = article_proc.pid[-5:]
-            return item
-    except Exception as e:
-        raise XMLVersionXmlWithPreError(
-            _("Unable to get xml with pre from migrated article ({}) {}: {} {}").format(
-                origin, xml_file_path, type(e), e
-            )
-        )

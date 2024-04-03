@@ -12,6 +12,10 @@ from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from scielo_classic_website.htmlbody.html_body import HTMLContent
+from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
+from htmlxml.models import HTMLXML
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
+
 from wagtail.admin.panels import (
     FieldPanel,
     InlinePanel,
@@ -38,7 +42,6 @@ from migration.models import (
 )
 from migration.controller import (
     PkgZipBuilder,
-    get_migrated_xml_with_pre,
     XMLVersionXmlWithPreError,
 )
 from package import choices as package_choices
@@ -47,6 +50,8 @@ from proc import exceptions
 from proc.forms import ProcAdminModelForm
 from tracker import choices as tracker_choices
 from tracker.models import Event, UnexpectedEvent, format_traceback
+from upload.models import Package
+from upload import choices as upload_choices
 
 
 class JournalEventCreateError(Exception):
@@ -147,7 +152,6 @@ class Operation(CommonControlField):
             except Exception as e:
                 logging.info(proc.pid)
                 logging.exception(e)
-            break
 
         obj = cls()
         obj.proc = proc
@@ -568,12 +572,13 @@ class BaseProc(CommonControlField):
         user,
         force_update,
         callable_register_data,
+        item_name=None,
     ):
         try:
             try:
                 item_name = self.migrated_data.content_type
             except AttributeError:
-                item_name = ""
+                item_name = item_name or ""
 
             operation = self.start(user, f"create or update {item_name}")
 
@@ -1095,6 +1100,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     migrated_data = models.ForeignKey(
         MigratedArticle, on_delete=models.SET_NULL, null=True, blank=True
     )
+    package = models.ForeignKey(Package, on_delete=models.SET_NULL, null=True, blank=True)
     issue_proc = models.ForeignKey(
         IssueProc, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -1189,8 +1195,8 @@ class ArticleProc(BaseProc, ClusterableModel):
         try:
             self.updated_by = user
             self.issue_proc = issue_proc
-            self.pkg_name = pkg_name
-            self.main_lang = main_lang
+            self.pkg_name = pkg_name or self.pkg_name
+            self.main_lang = main_lang or self.main_lang
             self.migration_status = migration_status or self.migration_status
             self.save()
 
@@ -1210,7 +1216,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             if htmlxml:
                 htmlxml.html_to_xml(user, self, body_and_back_xml)
 
-            xml = get_migrated_xml_with_pre(self)
+            xml = self.get_xml_with_pre(self.get_xml_path())
 
             if xml:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -1281,6 +1287,64 @@ class ArticleProc(BaseProc, ClusterableModel):
             xml_status=tracker_choices.PROGRESS_STATUS_TODO,
             **params,
         ).iterator()
+
+    @classmethod
+    def items_to_ingress(
+        cls,
+    ):
+        """
+        """
+        return Package.objects.filter(
+            status=upload_choices.PS_ACCEPTED,
+            journal__isnull=False,
+            issue__isnull=False,
+        ).iterator()
+
+    @classmethod
+    def ingress(
+        cls,
+        user,
+        package_id,
+    ):
+        """
+        """
+        try:
+            article_proc = None
+            op = None
+            package = Package.objects.get(pk=package_id)
+            for xml_with_pre in XMLWithPre.create(path=package.file.path):
+                logging.info(package.data)
+                logging.info(f"journal={package.journal}")
+                article_proc = cls.get_or_create(
+                    user,
+                    collection=JournalProc.objects.get(journal=package.journal).collection,
+                    pid=xml_with_pre.v2,
+                )
+                op = article_proc.start(user, "get data from uploaded package")
+                article_proc.package = package
+
+                article_proc.update(
+                    issue_proc=package.issue and IssueProc.objects.get(issue=package.issue),
+                    pkg_name=article_proc.pkg_name or xml_with_pre.filename,
+                    migration_status=tracker_choices.PROGRESS_STATUS_TODO,
+                    user=user,
+                )
+                op.finish(
+                    user,
+                    completed=article_proc.migration_status == tracker_choices.PROGRESS_STATUS_DONE,
+                    detail=package.data,
+                )
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            if article_proc:
+                article_proc.xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+                article_proc.save()
+            if op:
+                op.finish(
+                    user,
+                    exc_traceback=exc_traceback,
+                    exception=e,
+                )
 
     @classmethod
     def items_to_build_sps_pkg(
@@ -1372,7 +1436,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             with TemporaryDirectory() as output_folder:
 
-                xml_with_pre = get_migrated_xml_with_pre(self)
+                xml_with_pre = self.get_xml_with_pre()
 
                 builder = PkgZipBuilder(xml_with_pre)
                 sps_pkg_zip_path = builder.build_sps_package(
@@ -1461,4 +1525,34 @@ class ArticleProc(BaseProc, ClusterableModel):
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
+            )
+
+    def get_xml_path(self):
+        if self.package:
+            return self.package.file.path
+        try:
+            obj = HTMLXML.get(migrated_article=self.migrated_data)
+        except HTMLXML.DoesNotExist:
+            obj = self.migrated_xml
+        return obj.file.path
+
+    def get_xml_with_pre(self, xml_file_path):
+        try:
+            for item in XMLWithPre.create(path=xml_file_path):
+                if self.pid and item.v2 != self.pid:
+                    # corrige ou adiciona pid v2 no XML nativo ou obtido do html
+                    # usando o valor do pid v2 do site clássico
+                    item.v2 = self.pid
+
+                order = str(int(self.pid[-5:]))
+                if not item.order or str(int(item.order)) != order:
+                    # corrige ou adiciona other pid no XML nativo ou obtido do html
+                    # usando o valor do "order" do site clássico
+                    item.order = self.pid[-5:]
+                return item
+        except Exception as e:
+            raise XMLVersionXmlWithPreError(
+                _("Unable to get xml with pre from migrated article {}: {} {}").format(
+                    xml_file_path, type(e), e
+                )
             )
