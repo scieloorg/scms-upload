@@ -316,7 +316,7 @@ def task_publish_model_inline(
         api.get_token()
         
         for item in SciELOModel.objects.all():
-            task_publish_item.apply_async(
+            task_publish_item_inline.apply_async(
                 kwargs=dict(
                     item_id=item.id,
                     api_data=api.data,
