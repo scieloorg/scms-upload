@@ -26,18 +26,9 @@
         "purpose":"PUBLIC",
         "db_name":"prod",
         "db_uri":null,
-        "api_url_article":{
-            "url":"http://192.168.1.97:8015/api/v1/article",
-            "name":"article"
-        },
-        "api_url_issue":{
-            "url":"http://192.168.1.97:8015/api/v1/issue",
-            "name":"isssue"
-        },
-        "api_url_journal":{
-            "url":"http://192.168.1.97:8015/api/v1/journal",
-            "name":"journal"
-        },
+        "api_url_article": "http://192.168.1.97:8015/api/v1/article",
+        "api_url_issue": "http://192.168.1.97:8015/api/v1/issue",
+        "api_url_journal": "http://192.168.1.97:8015/api/v1/journal",
         "api_url":[{
             "url":"http://192.168.1.97:8015/api/v1/press-release",
             "name":"pressrelease"
