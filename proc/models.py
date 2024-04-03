@@ -13,6 +13,7 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from scielo_classic_website.htmlbody.html_body import HTMLContent
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
+from htmlxml.models import HTMLXML
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from wagtail.admin.panels import (
@@ -41,7 +42,6 @@ from migration.models import (
 )
 from migration.controller import (
     PkgZipBuilder,
-    get_migrated_xml_with_pre,
     XMLVersionXmlWithPreError,
 )
 from package import choices as package_choices
@@ -1216,7 +1216,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             if htmlxml:
                 htmlxml.html_to_xml(user, self, body_and_back_xml)
 
-            xml = get_migrated_xml_with_pre(self)
+            xml = self.get_xml_with_pre(self.get_xml_path())
 
             if xml:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -1436,7 +1436,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             with TemporaryDirectory() as output_folder:
 
-                xml_with_pre = get_migrated_xml_with_pre(self)
+                xml_with_pre = self.get_xml_with_pre()
 
                 builder = PkgZipBuilder(xml_with_pre)
                 sps_pkg_zip_path = builder.build_sps_package(
@@ -1525,4 +1525,34 @@ class ArticleProc(BaseProc, ClusterableModel):
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
+            )
+
+    def get_xml_path(self):
+        if self.package:
+            return self.package.file.path
+        try:
+            obj = HTMLXML.get(migrated_article=self.migrated_data)
+        except HTMLXML.DoesNotExist:
+            obj = self.migrated_xml
+        return obj.file.path
+
+    def get_xml_with_pre(self, xml_file_path):
+        try:
+            for item in XMLWithPre.create(path=xml_file_path):
+                if self.pid and item.v2 != self.pid:
+                    # corrige ou adiciona pid v2 no XML nativo ou obtido do html
+                    # usando o valor do pid v2 do site clássico
+                    item.v2 = self.pid
+
+                order = str(int(self.pid[-5:]))
+                if not item.order or str(int(item.order)) != order:
+                    # corrige ou adiciona other pid no XML nativo ou obtido do html
+                    # usando o valor do "order" do site clássico
+                    item.order = self.pid[-5:]
+                return item
+        except Exception as e:
+            raise XMLVersionXmlWithPreError(
+                _("Unable to get xml with pre from migrated article {}: {} {}").format(
+                    xml_file_path, type(e), e
+                )
             )
