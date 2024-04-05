@@ -11,7 +11,7 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 
 from collection import choices
-from core.choices import ENDPOINTS, LANGUAGE
+from core.choices import LANGUAGE
 from collection.utils import language_iso
 
 class LanguageGetOrCreateError(Exception):
