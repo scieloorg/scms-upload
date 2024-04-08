@@ -23,6 +23,7 @@ from packtools.sps.validation.journal_meta import JournalMetaValidation
 from packtools.sps.validation.preprint import PreprintValidation
 from packtools.sps.validation.related_articles import RelatedArticlesValidation
 
+from core.utils.requester import fetch_data
 from upload import choices
 from upload.models import ValidationResult
 from tracker.models import UnexpectedEvent
@@ -69,21 +70,21 @@ def add_journal_data(data, journal, issue):
 
 
 def add_sps_data(data, sps_data):
+    """
+    results: [
+        {
+            "key": "value",
+            "value": {"key": "value"}
+        }
+    ]
+    """
     # TODO
     # depende do SPS / JATS / Critérios
-    data["dtd_versions"] = []
-    data["sps_versions"] = []
-    data["article_types"] = []
-    data["expected_article_type_vs_subject_similarity"] = 0
-    data["data_availability_specific_uses"] = []
-
-    data["credit_taxonomy"] = []
-
-    data["article_type_correspondences"] = []
-
-    data["future_date"] = ""
-    data["events_order"] = []
-    data["required_events"] = []
+    url = "https://core.scielo.org/api/v1/xml_validation/"
+    content = fetch_data(url, json=True, timeout=1)
+    results = content.get("results")
+    for c in results:
+        data[c.get("key")] = c.get("value")
 
 
 def validate_xml_content(sps_pkg_name, xmltree, data):
