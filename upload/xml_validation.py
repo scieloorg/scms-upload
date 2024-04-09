@@ -69,7 +69,7 @@ def add_journal_data(data, journal, issue):
     data["expected_license_code"] = journal.license_code
 
 
-def add_sps_data(data, sps_data):
+def add_sps_data(data, version, sps_data):
     """
     results: [
         {
@@ -81,7 +81,7 @@ def add_sps_data(data, sps_data):
     # TODO
     # depende do SPS / JATS / Critérios
     url = "https://core.scielo.org/api/v1/xml_validation/"
-    content = fetch_data(url, json=True, timeout=1)
+    content = fetch_data(url, params={'version': version}, json=True, timeout=1)
     results = content.get("results")
     for c in results:
         data[c.get("key")] = c.get("value")
