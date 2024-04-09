@@ -304,7 +304,7 @@ def task_publish_model_inline(
         collection=collection,
         purpose=website_kind,
     )
-    for ws in website.endpoint.all().iterator():
+    for ws in website.endpoint.all().filter(name="pressrelease"):
         SciELOModel = SCIELO_MODELS.get(ws.name)
         
         api = PublicationAPI(
@@ -332,7 +332,7 @@ def task_publish_item_inline(
 ):
     try:
         SciELOModel = SCIELO_MODELS.get(model_name)
-        callable_publish = PUBLISH_FUNCTIONS.get(model_name)(SciELOModel, api_data)
+        PUBLISH_FUNCTIONS.get(model_name)(SciELOModel, api_data)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
