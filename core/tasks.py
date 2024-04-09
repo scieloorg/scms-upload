@@ -33,7 +33,7 @@ def try_fetch_and_register_press_release(self, journal_acronym=None, pressreleas
     journals_query = Journal.objects.filter(query_condition)
 
     dict_aux = {}
-    if pressrelease_lang:
+    if pressrelease_lang and pressrelease_lang in RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY:
         dict_aux[pressrelease_lang] = RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY[pressrelease_lang]
         
     dict_aux = RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY    
