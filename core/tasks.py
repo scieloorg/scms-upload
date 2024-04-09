@@ -1,7 +1,8 @@
 import logging
 import feedparser
-from datetime import datetime
 from config import celery_app
+from datetime import datetime
+from django.db.models import Q
 
 from core.utils.requester import fetch_data
 from core.models import PressRelease
@@ -28,8 +29,15 @@ RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY = {
 
 
 @celery_app.task(bind=True)
-def try_fetch_and_register_press_release(self, username=None, user_id=None):
-    for journal in Journal.objects.all():
+def try_fetch_and_register_press_release(self, journal_acronym=None, username=None, user_id=None):
+    query_condition = Q()
+    
+    if journal_acronym:
+        query_condition = Q(journal_acron=journal_acronym)
+
+    journals_query = Journal.objects.filter(query_condition)
+
+    for journal in journals_query:
         for lang, url in RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY.items():
             if journal.journal_acron:
                 press_release_url_by_lang = url.get("url").format(lang, journal.journal_acron)
