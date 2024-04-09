@@ -418,7 +418,7 @@ class PressRelease(CommonControlField):
     @classmethod
     def get(cls, url):
         if not url:
-            raise PressReleaseInvalidURL(" PressRelease requires url paramenter")
+            raise PressReleaseInvalidURL(" PressRelease requires url parameter")
         return cls.objects.get(url=url)
 
     @classmethod
