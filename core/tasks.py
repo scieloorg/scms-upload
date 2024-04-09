@@ -27,18 +27,18 @@ RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY = {
 }
 
 
-
 @celery_app.task(bind=True)
-def try_fetch_and_register_press_release(self, journal_acronym=None, username=None, user_id=None):
-    query_condition = Q()
-    
-    if journal_acronym:
-        query_condition = Q(journal_acron=journal_acronym)
-
+def try_fetch_and_register_press_release(self, journal_acronym=None, pressrelease_lang=None, username=None, user_id=None):
+    query_condition = Q(journal_acron=journal_acronym) if journal_acronym else Q()
     journals_query = Journal.objects.filter(query_condition)
 
+    dict_aux = {}
+    if pressrelease_lang:
+        dict_aux[pressrelease_lang] = RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY[pressrelease_lang]
+        
+    dict_aux = RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY    
     for journal in journals_query:
-        for lang, url in RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY.items():
+        for lang, url in dict_aux.items():
             if journal.journal_acron:
                 press_release_url_by_lang = url.get("url").format(lang, journal.journal_acron)
 
