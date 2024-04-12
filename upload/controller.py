@@ -342,7 +342,7 @@ def fetch_core_api_and_create_or_update_issue(request, xmltree, journal):
                 "issn_print": issn_print,
                 "issn_electronic": issn_electronic, 
                 "number": xml.number, 
-                # "season": xml.suppl,
+                "supplement": xml.suppl,
                 "volume": xml.volume
                 },
             json=True
@@ -358,7 +358,7 @@ def fetch_core_api_and_create_or_update_issue(request, xmltree, journal):
             issue = Issue.get_or_create(
                 journal=journal,
                 volume=issue.get("volume"),    
-                supplement=None,
+                supplement=issue.get("supplement"),
                 number=issue.get("number"),
                 publication_year=issue.get("year"),
                 user=user
