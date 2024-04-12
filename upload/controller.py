@@ -27,6 +27,7 @@ from .utils import file_utils, package_utils, xml_utils
 from upload import xml_validation
 from pid_provider.requester import PidRequester
 from article.models import Article
+from core.utils.requester import fetch_data
 from issue.models import Issue
 from journal.models import OfficialJournal, Journal
 from tracker.models import UnexpectedEvent, serialize_detail
@@ -113,11 +114,11 @@ def request_pid_for_accepted_packages(user):
             )
 
 
-def receive_package(package):
+def receive_package(request, package):
     try:
         zip_xml_file_path = package.file.path
         for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
-            response = _check_article_and_journal(xml_with_pre)
+            response = _check_article_and_journal(request, xml_with_pre)
             if response.get("xml_changed"):
                 # atualiza conteúdo de zip
                 with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
@@ -193,7 +194,7 @@ def _identify_file_error(package):
         return {"error": str(e), "error_type": choices.VE_XML_FORMAT_ERROR}
 
 
-def _check_article_and_journal(xml_with_pre):
+def _check_article_and_journal(request, xml_with_pre):
     # verifica se o XML está registrado no sistema
     response = pp.is_registered_xml_with_pre(xml_with_pre, xml_with_pre.filename)
 
@@ -213,7 +214,7 @@ def _check_article_and_journal(xml_with_pre):
     xmltree = xml_with_pre.xmltree
 
     # verifica se journal e issue estão registrados
-    _check_xml_journal_and_xml_issue_are_registered(
+    _check_xml_journal_and_xml_issue_are_registered(request, 
         xml_with_pre.filename, xmltree, response
     )
 
@@ -285,7 +286,7 @@ def _rollback_article_status(article, article_previos_status):
         article.save()
 
 
-def _check_xml_journal_and_xml_issue_are_registered(filename, xmltree, response):
+def _check_xml_journal_and_xml_issue_are_registered(request, filename, xmltree, response):
     """
     Verifica se journal e issue do XML estão registrados no sistema
     """
