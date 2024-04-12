@@ -39,7 +39,7 @@ class PackageCreateView(CreateView):
 
         package = form.save_all(self.request.user)
 
-        response = receive_package(package)
+        response = receive_package(self.request, package)
 
         if response.get("error_type") == choices.VE_PACKAGE_FILE_ERROR:
             # error no arquivo
