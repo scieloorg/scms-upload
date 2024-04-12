@@ -213,6 +213,9 @@ def _check_article_and_journal(request, xml_with_pre):
 
     xmltree = xml_with_pre.xmltree
 
+    #Verifica e atribui journal e issue pela api
+    _verify_journal_and_issue_in_upload(request, xmltree)
+
     # verifica se journal e issue estão registrados
     _check_xml_journal_and_xml_issue_are_registered(request, 
         xml_with_pre.filename, xmltree, response
@@ -284,6 +287,83 @@ def _rollback_article_status(article, article_previos_status):
         # rollback
         article.status = article_previos_status
         article.save()
+
+
+def _verify_journal_and_issue_in_upload(request, xmltree):
+    journal = fetch_core_api_and_create_or_update_journal(request, xmltree)
+    fetch_core_api_and_create_or_update_issue(request, xmltree, journal)
+
+
+def fetch_core_api_and_create_or_update_journal(request, xmltree):
+    user = request.user
+    xml = Title(xmltree)
+    journal_title = xml.journal_title
+
+    xml = ISSN(xmltree)
+    issn_electronic = xml.epub
+    issn_print = xml.ppub
+
+    response = fetch_data(
+        url=f"http://0.0.0.0:8009/api/v1/journal/", 
+        params={
+            "title": journal_title,
+            "issn_print": issn_print, 
+            "issn_electronic": issn_electronic},
+        json=True
+    )
+    for journal in response.get("results"):
+        official_journal = OfficialJournal.create_or_update(
+            title=journal.get("official").get("title"),
+            title_iso=journal.get("official").get("iso_short_title"),
+            issn_print=journal.get("official").get("issn_print"),
+            issn_electronic=journal.get("official").get("issn_electronic"),
+            issnl=journal.get("official").get("issnl"),
+            foundation_year=None,
+            user=user,
+        )
+        journal = Journal.create_or_update(
+            official_journal=official_journal,
+            title=journal.get("title"),
+            short_title=journal.get("short_title"),
+            user=user,
+        )
+        return journal
+
+
+def fetch_core_api_and_create_or_update_issue(request, xmltree, journal):
+    user = request.user
+    xml = ArticleMetaIssue(xmltree)
+    if journal and any((xml.volume, xml.suppl, xml.number)):
+        issn_print = journal.official_journal.issn_print
+        issn_electronic = journal.official_journal.issn_electronic
+        response = fetch_data(
+            url=f"http://0.0.0.0:8009/api/v1/issue/", 
+            params={
+                "issn_print": issn_print,
+                "issn_electronic": issn_electronic, 
+                "number": xml.number, 
+                # "season": xml.suppl,
+                "volume": xml.volume
+                },
+            json=True
+        )
+
+        for issue in response.get("results"):
+            official_journal = OfficialJournal.get(
+                issn_electronic=issue.get("journal").get("issn_electronic"),
+                issn_print=issue.get("journal").get("issn_print"),
+                issnl=issue.get("journal").get("issn_issnl"),
+                )
+            journal = Journal.get(official_journal=official_journal)
+            issue = Issue.get_or_create(
+                journal=journal,
+                volume=issue.get("volume"),    
+                supplement=None,
+                number=issue.get("number"),
+                publication_year=issue.get("year"),
+                user=user
+            )
+            return issue 
 
 
 def _check_xml_journal_and_xml_issue_are_registered(request, filename, xmltree, response):
