@@ -148,6 +148,53 @@
             </tbody>
         </table>
     </div>
+
+    <div class="nice-padding">
+        <h3>{% trans "Reports" %}</h3>
+        <table class="listing">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Count</th>
+                    <th>Result</th>
+                    <th>Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in reports %}
+                    <tr>
+                        <td class='title'><h2>{{ report.title }}</h2></td>
+                        <td>{{ report.count }}</td>
+                        <td>{{ report.conclusion }}</td>
+                        <td>
+                            <a class="button is-small" href="/admin/upload/validationreport/edit/{{ report.id }}">{% trans 'View report' %}</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                {% for report in xml_error_reports %}
+                    <tr>
+                        <td class='title'><h2>{{ report.title }}</h2></td>
+                        <td>{{ report.count }}</td>
+                        <td>{{ report.conclusion }}</td>
+                        <td>
+                            <a class="button is-small" href="/admin/upload/xmlerrorreport/edit/{{ report.id }}">{% trans 'View report' %}</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                {% for report in xml_info_reports %}
+                    <tr>
+                        <td class='title'><h2>{{ report.title }}</h2></td>
+                        <td>{{ report.count }}</td>
+                        <td>{{ report.conclusion }}</td>
+                        <td>
+                            <a class="button is-small" href="/admin/upload/xmlinforeport/edit/{{ report.id }}">{% trans 'View report' %}</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
     {% endif %}
     
     {% if validation_results.xml_or_dtd.status == 'approved' %}
