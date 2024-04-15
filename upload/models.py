@@ -237,6 +237,9 @@ class Package(CommonControlField, ClusterableModel):
         if choices.REPORT_CONCLUSION_REJECTED in status:
             self.status = choices.PS_PENDING_CORRECTION
             self.save()
+        elif len(status) == 1 and choices.REPORT_CONCLUSION_APPROVED in status:
+            self.status = choices.PS_ACCEPTED
+            self.save()
 
 
 class QAPackage(Package):
