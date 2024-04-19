@@ -304,7 +304,7 @@ def fetch_core_api_and_create_or_update_journal(request, xmltree):
     issn_print = xml.ppub
 
     response = fetch_data(
-        url=f"http://0.0.0.0:8009/api/v1/journal/", 
+        url=f"https://core.scielo.org/api/v1/journal/", 
         params={
             "title": journal_title,
             "issn_print": issn_print, 
@@ -337,7 +337,7 @@ def fetch_core_api_and_create_or_update_issue(request, xmltree, journal):
         issn_print = journal.official_journal.issn_print
         issn_electronic = journal.official_journal.issn_electronic
         response = fetch_data(
-            url=f"http://0.0.0.0:8009/api/v1/issue/", 
+            url=f"https://core.scielo.org/api/v1/issue/", 
             params={
                 "issn_print": issn_print,
                 "issn_electronic": issn_electronic, 
