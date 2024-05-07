@@ -174,8 +174,8 @@ class Journal(CommonControlField, ClusterableModel):
             issn_print=self.official_journal.issn_print,
             issn_electronic=self.official_journal.issn_electronic,
             foundation_year=self.official_journal.foundation_year,
-            created=created.isoformat(),
-            updated=updated.isoformat(),
+            created=self.created.isoformat(),
+            updated=self.updated.isoformat(),
         )
 
     def autocomplete_label(self):
