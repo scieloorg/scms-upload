@@ -13,10 +13,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 
-from article.models import Article
 from core.models import CommonControlField
-from issue.models import Issue
-from journal.models import Journal
 
 from . import choices
 from .forms import (
@@ -68,15 +65,13 @@ class Package(CommonControlField, ClusterableModel):
         default=choices.PS_ENQUEUED_FOR_VALIDATION,
     )
     article = models.ForeignKey(
-        Article,
+        "article.Article",
         blank=True,
         null=True,
         on_delete=models.SET_NULL,
     )
-    journal = models.ForeignKey(
-        Journal, blank=True, null=True, on_delete=models.SET_NULL
-    )
-    issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.SET_NULL)
+    journal = models.ForeignKey("journal.Journal", blank=True, null=True, on_delete=models.SET_NULL)
+    issue = models.ForeignKey("issue.Issue", blank=True, null=True, on_delete=models.SET_NULL)
     assignee = models.ForeignKey(User, blank=True, null=True, on_delete=models.SET_NULL)
     expiration_date = models.DateField(_("Expiration date"), null=True, blank=True)
 

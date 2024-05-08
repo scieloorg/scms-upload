@@ -26,3 +26,29 @@ JOURNAL_AVAILABILTY_STATUS = [
     (UNKNOWN, _("Unknown")),
     (CURRENT, _("Current")),
 ]
+
+INDEXING_INTERRUPTION_REASON = [
+    ("ceased", _("Ceased journal")),
+    ("not-open-access", _("Not open access")),
+    ("by-committee", _("by the committee")),
+    ("by-editor", _("by the editor")),
+]
+
+
+JOURNAL_EVENT_TYPE = [
+    ("ADMITTED", _("Admitted to the collection")),
+    ("INTERRUPTED", _("Indexing interrupted")),
+]
+
+
+STUDY_AREA = [
+    ("Agricultural Sciences", _("Agricultural Sciences")),
+    ("Applied Social Sciences", _("Applied Social Sciences")),
+    ("Biological Sciences", _("Biological Sciences")),
+    ("Engineering", _("Engineering")),
+    ("Exact and Earth Sciences", _("Exact and Earth Sciences")),
+    ("Health Sciences", _("Health Sciences")),
+    ("Human Sciences", _("Human Sciences")),
+    ("Linguistics, Letters and Arts", _("Linguistic, Literature and Arts")),
+    ("Psicanalise", _("Psicanalise")),
+]
