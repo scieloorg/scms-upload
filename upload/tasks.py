@@ -12,6 +12,7 @@ from packtools.sps.validation import article as sps_validation_article
 from packtools.sps.validation import journal as sps_validation_journal
 from packtools.validator import ValidationReportXML
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
+from packtools.sps.validation.xml_structure import StructureValidator
 
 from article.choices import AS_CHANGE_SUBMITTED
 from article.controller import create_article_from_etree, update_article
@@ -25,7 +26,7 @@ from libs.dsm.publication.documents import get_document, get_similar_documents
 from tracker.models import UnexpectedEvent
 from . import choices, controller, exceptions
 from .utils import file_utils, package_utils, xml_utils
-from upload.models import Package
+from upload.models import Package, ValidationReport
 
 
 User = get_user_model()
@@ -347,14 +348,26 @@ def task_validate_assets(file_path, xml_path, package_id):
     )
 
     has_errors = False
+    package = Package.objects.get(pk=package_id)
 
+    report = ValidationReport.get_or_create(
+        package.creator, package, _("Assets Report"), choices.VAL_CAT_ASSET
+    )
+
+    items = []
     for asset_result in package_utils.evaluate_assets(article_assets, package_files):
         asset, is_present = asset_result
 
+        items.append(
+            {
+                "name": asset.name,
+                "id": asset.id,
+                "type": asset.type,
+            }
+        )
         if not is_present:
             has_errors = True
-            Package.add_validation_result(
-                package_id,
+            package._add_validation_result(
                 error_category=choices.VE_ASSET_ERROR,
                 status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but not present in the package.")}',
@@ -365,9 +378,19 @@ def task_validate_assets(file_path, xml_path, package_id):
                     "missing_file": asset.name,
                 },
             )
+            validation_result = report.add_validation_result(
+                status=choices.VALIDATION_RESULT_FAILURE,
+                message=f'{asset.name} {_("file is mentioned in the XML but not present in the package.")}',
+                data={
+                    "xml_path": xml_path,
+                    "id": asset.id,
+                    "type": asset.type,
+                    "missing_file": asset.name,
+                },
+                subject=asset.name,
+            )
 
-            Package.add_validation_result(
-                package_id,
+            package._add_validation_result(
                 error_category=choices.VE_ASSET_ERROR,
                 status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but its optimised version not present in the package.")}',
@@ -380,9 +403,21 @@ def task_validate_assets(file_path, xml_path, package_id):
                     ),
                 },
             )
+            validation_result = report.add_validation_result(
+                status=choices.VALIDATION_RESULT_FAILURE,
+                message=f'{asset.name} {_("file is mentioned in the XML but its optimised version not present in the package.")}',
+                data={
+                    "xml_path": xml_path,
+                    "id": asset.id,
+                    "type": "optimised",
+                    "missing_file": file_utils.generate_filepath_with_new_extension(
+                        asset.name, ".png"
+                    ),
+                },
+                subject=asset.name,
+            )
 
-            Package.add_validation_result(
-                package_id,
+            package._add_validation_result(
                 error_category=choices.VE_ASSET_ERROR,
                 status=choices.VS_DISAPPROVED,
                 message=f'{asset.name} {_("file is mentioned in the XML but its thumbnail version not present in the package.")}',
@@ -395,15 +430,35 @@ def task_validate_assets(file_path, xml_path, package_id):
                     ),
                 },
             )
+            validation_result = report.add_validation_result(
+                status=choices.VALIDATION_RESULT_FAILURE,
+                message=f'{asset.name} {_("file is mentioned in the XML but its thumbnail version not present in the package.")}',
+                data={
+                    "xml_path": xml_path,
+                    "id": asset.id,
+                    "type": "thumbnail",
+                    "missing_file": file_utils.generate_filepath_with_new_extension(
+                        asset.name, ".thumbnail.jpg"
+                    ),
+                },
+                subject=asset.name,
+            )
 
     if not has_errors:
-        Package.add_validation_result(
-            package_id,
+        package._add_validation_result(
             error_category=choices.VE_ASSET_ERROR,
             status=choices.VS_APPROVED,
             data={"xml_path": xml_path},
         )
+        validation_result = report.add_validation_result(
+            status=choices.VALIDATION_RESULT_SUCCESS,
+            message=_("Package has all the expected asset files"),
+            data=items,
+            subject=_("assets"),
+        )
+        report.finish()
         return True
+    report.finish()
 
 
 @celery_app.task()
@@ -414,17 +469,29 @@ def task_validate_renditions(file_path, xml_path, package_id):
     )
 
     has_errors = False
+    package = Package.objects.get(pk=package_id)
 
+    report = ValidationReport.get_or_create(
+        package.creator, package, _("Renditions Report"), choices.VAL_CAT_RENDITION
+    )
+
+    items = []
     for rendition_result in package_utils.evaluate_renditions(
         article_renditions, package_files
     ):
         rendition, expected_filename, is_present = rendition_result
 
+        items.append(
+            {
+                "language": rendition.language,
+                "expected_filename": expected_filename,
+                "is_present": is_present,
+            }
+        )
         if not is_present:
             has_errors = True
 
-            Package.add_validation_result(
-                package_id=package_id,
+            package._add_validation_result(
                 error_category=choices.VE_RENDITION_ERROR,
                 status=choices.VS_DISAPPROVED,
                 message=f'{rendition.language} {_("language is mentioned in the XML but its PDF file not present in the package.")}',
@@ -435,15 +502,33 @@ def task_validate_renditions(file_path, xml_path, package_id):
                     "missing_file": expected_filename,
                 },
             )
+            validation_result = report.add_validation_result(
+                status=choices.VALIDATION_RESULT_FAILURE,
+                message=f'{rendition.language} {_("language is mentioned in the XML but its PDF file not present in the package.")}',
+                data={
+                    "xml_path": xml_path,
+                    "language": rendition.language,
+                    "is_main_language": rendition.is_main_language,
+                    "missing_file": expected_filename,
+                },
+                subject=rendition.language,
+            )
 
     if not has_errors:
-        Package.add_validation_result(
-            package_id=package_id,
+        package._add_validation_result(
             error_category=choices.VE_RENDITION_ERROR,
             status=choices.VS_APPROVED,
             data={"xml_path": xml_path},
         )
+        validation_result = report.add_validation_result(
+            status=choices.VALIDATION_RESULT_SUCCESS,
+            message=_("Package has all the expected rendition files"),
+            data=items,
+            subject=_("Renditions"),
+        )
+        report.finish()
         return True
+    report.finish()
 
 
 # TODO REMOVE
@@ -556,6 +641,11 @@ def task_validate_original_zip_file(
     for xml_with_pre in XMLWithPre.create(path=file_path):
         xml_path = xml_with_pre.filename
 
+        logging.info(f"xmlpre: {xml_with_pre.xmlpre}")
+        package = Package.objects.get(pk=package_id)
+        package.name = xml_with_pre.sps_pkg_name
+        package.save()
+
         # FIXME nao usar o otimizado neste momento
         optimised_filepath = task_optimise_package(file_path)
 
@@ -577,6 +667,17 @@ def task_validate_original_zip_file(
             },
         )
 
+        task_validate_xml_structure.apply_async(
+            kwargs={
+                "file_path": file_path,
+                "xml_path": xml_path,
+                "package_id": package_id,
+                "journal_id": journal_id,
+                "issue_id": issue_id,
+                "article_id": article_id,
+            },
+        )
+
         # Aciona validacao do conteudo do XML
         task_validate_xml_content.apply_async(
             kwargs={
@@ -588,6 +689,59 @@ def task_validate_original_zip_file(
                 "article_id": article_id,
             },
         )
+
+
+@celery_app.task(bind=True)
+def task_validate_xml_structure(
+    self, file_path, xml_path, package_id, journal_id, issue_id, article_id
+):
+    package = Package.objects.get(pk=package_id)
+    for xml_with_pre in XMLWithPre.create(path=file_path):
+        # {'is_valid': True,
+        #    'errors_number': 0,
+        #    'doctype_validation_result': [],
+        #    'dtd_is_valid': True,
+        #    'dtd_errors': [],
+        #    'style_is_valid': True,
+        #    'style_errors': []}
+        sv = StructureValidator(xml_with_pre)
+        summary = sv.validate()
+
+        report = ValidationReport.get_or_create(
+            package.creator, package, _("DTD Report"), choices.VAL_CAT_XML_FORMAT
+        )
+        for item in summary["dtd_errors"]:
+            validation_result = report.add_validation_result(
+                status=choices.VALIDATION_RESULT_FAILURE,
+                message=item["message"],
+                data={
+                    "apparent_line": item.get("apparent_line"),
+                },
+            )
+        if summary["dtd_is_valid"]:
+            validation_result = report.add_validation_result(
+                status=choices.VALIDATION_RESULT_SUCCESS,
+                message=_("No error found"),
+            )
+        report.finish()
+
+        report = ValidationReport.get_or_create(
+            package.creator, package, _("Style checker Report"), choices.VAL_CAT_STYLE
+        )
+        for item in summary["style_errors"]:
+            validation_result = report.add_validation_result(
+                status=choices.VALIDATION_RESULT_FAILURE,
+                message=item["message"],
+                data={
+                    "apparent_line": item.get("apparent_line"),
+                },
+            )
+        if summary["style_is_valid"]:
+            validation_result = report.add_validation_result(
+                status=choices.VALIDATION_RESULT_SUCCESS,
+                message=_("No error found"),
+            )
+        report.finish()
 
 
 @celery_app.task(bind=True)

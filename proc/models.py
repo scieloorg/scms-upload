@@ -5,8 +5,9 @@ import json
 from datetime import datetime
 from tempfile import TemporaryDirectory
 
+from django.apps import apps
 from django.core.files.base import ContentFile
-from django.db import models
+from django.db import models, IntegrityError
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -26,13 +27,11 @@ from wagtail.admin.panels import (
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
-from article.models import Article
+
 from collection import choices as collection_choices
 from collection.models import Collection
 from core.models import CommonControlField
-from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
-from journal.models import Journal
 from migration.models import (
     MigratedArticle,
     MigratedData,
@@ -715,7 +714,7 @@ class JournalProc(BaseProc, ClusterableModel):
         blank=True,
         choices=JOURNAL_AVAILABILTY_STATUS,
     )
-    journal = models.ForeignKey(Journal, on_delete=models.SET_NULL, null=True)
+    journal = models.ForeignKey("journal.Journal", on_delete=models.SET_NULL, null=True)
 
     ProcResult = JournalProcResult
     base_form_class = ProcAdminModelForm
@@ -820,7 +819,7 @@ class IssueProc(BaseProc, ClusterableModel):
     journal_proc = models.ForeignKey(
         JournalProc, on_delete=models.SET_NULL, null=True, blank=True
     )
-    issue = models.ForeignKey(Issue, on_delete=models.SET_NULL, null=True)
+    issue = models.ForeignKey("issue.Issue", on_delete=models.SET_NULL, null=True)
     issue_folder = models.CharField(
         _("Issue Folder"), max_length=23, null=False, blank=False
     )
@@ -1506,6 +1505,8 @@ class ArticleProc(BaseProc, ClusterableModel):
     @property
     def article(self):
         if self.sps_pkg is not None:
+            # Importa modelo article sem a necessidade de utilizar import e evitar importacoes circulares
+            Article = apps.get_model("article", "Article")
             return Article.objects.get(sps_pkg=self.sps_pkg)
 
     def synchronize(self, user):

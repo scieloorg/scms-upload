@@ -9,12 +9,15 @@ from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, Objec
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
-from core.models import CommonControlField
+from proc.models import JournalProc
+from core.choices import MONTHS
+from core.forms import CoreAdminModelForm
+from core.models import CommonControlField, RichTextWithLang
 from institution.models import InstitutionHistory
 
 from . import choices
 from .forms import OfficialJournalForm
-
+from . exceptions import MissionCreateOrUpdateError, MissionGetError, SubjectCreationOrUpdateError
 
 class OfficialJournal(CommonControlField):
     """
@@ -137,7 +140,14 @@ class Journal(CommonControlField, ClusterableModel):
         related_name="+",
         on_delete=models.SET_NULL,
     )
-
+    submission_online_url = models.URLField(
+        _("Submission online URL"), null=True, blank=True
+    )
+    subject = models.ManyToManyField(
+        "Subject",
+        verbose_name=_("Study Areas"),
+        blank=True,
+    )
     def __unicode__(self):
         return self.title or self.short_title or str(self.official_journal)
 
@@ -159,11 +169,16 @@ class Journal(CommonControlField, ClusterableModel):
         InlinePanel("publisher", label=_("Publisher"), classname="collapsed"),
     ]
 
+    panels_mission = [
+        InlinePanel("mission", label=_("Mission"), classname="collapsed"),
+    ]
+
     edit_handler = TabbedInterface(
         [
             ObjectList(panels_identification, heading=_("Identification")),
             ObjectList(panels_owner, heading=_("Owners")),
             ObjectList(panels_publisher, heading=_("Publisher")),
+            ObjectList(panels_mission, heading=_("Mission")),
         ]
     )
 
@@ -230,3 +245,249 @@ class Owner(Orderable, InstitutionHistory):
 
 class Publisher(Orderable, InstitutionHistory):
     journal = ParentalKey(Journal, related_name="publisher", null=True, blank=True, on_delete=models.SET_NULL)
+
+
+class Sponsor(Orderable, InstitutionHistory):
+    journal = ParentalKey(Journal, related_name="sponsor", null=True, blank=True, on_delete=models.SET_NULL)
+
+
+class Mission(Orderable, RichTextWithLang, CommonControlField):
+    journal = ParentalKey(
+        Journal, on_delete=models.SET_NULL, related_name="mission", null=True
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=[
+                    "journal",
+                ]
+            ),
+            models.Index(
+                fields=[
+                    "language",
+                ]
+            ),
+        ]
+
+    @property
+    def data(self):
+        d = {}
+
+        if self.journal:
+            d.update(self.journal.data)
+
+        return d
+
+    @classmethod
+    def get(
+        cls,
+        journal,
+        language,
+    ):
+        if journal and language:
+            return cls.objects.filter(journal=journal, language=language)
+        raise MissionGetError("Mission.get requires journal and language parameters")
+
+    @classmethod
+    def create_or_update(
+        cls,
+        user,
+        journal,
+        language,
+        mission_text,
+    ):
+        if not mission_text:
+            raise MissionCreateOrUpdateError(
+                "Mission.create_or_update requires mission_rich_text parameter"
+            )
+        try:
+            obj = cls.get(journal, language)
+            obj.updated_by = user
+        except IndexError:
+            obj = cls()
+            obj.creator = user
+        except (MissionGetError, cls.MultipleObjectsReturned) as e:
+            raise MissionCreateOrUpdateError(
+                _("Unable to create or update journal {}").format(e)
+            )
+        obj.text = mission_text or obj.text
+        obj.language = language or obj.language
+        obj.journal = journal or obj.journal
+        obj.save()
+        return obj
+    
+
+class JournalHistory(CommonControlField, Orderable):
+    journal_proc = ParentalKey(
+        JournalProc,
+        on_delete=models.SET_NULL,
+        related_name="journal_history",
+        null=True,
+    )
+
+    year = models.CharField(_("Event year"), max_length=4, null=True, blank=True)
+    month = models.CharField(
+        _("Event month"),
+        max_length=2,
+        choices=MONTHS,
+        null=True,
+        blank=True,
+    )
+    day = models.CharField(_("Event day"), max_length=2, null=True, blank=True)
+
+    event_type = models.CharField(
+        _("Event type"),
+        null=True,
+        blank=True,
+        max_length=16,
+        choices=choices.JOURNAL_EVENT_TYPE,
+    )
+    interruption_reason = models.CharField(
+        _("Indexing interruption reason"),
+        null=True,
+        blank=True,
+        max_length=16,
+        choices=choices.INDEXING_INTERRUPTION_REASON,
+    )
+
+    base_form_class = CoreAdminModelForm
+
+    panels = [
+        FieldPanel("year"),
+        FieldPanel("month"),
+        FieldPanel("day"),
+        FieldPanel("event_type"),
+        FieldPanel("interruption_reason"),
+    ]
+
+    class Meta:
+        verbose_name = _("Event")
+        verbose_name_plural = _("Events")
+        indexes = [
+            models.Index(
+                fields=[
+                    "event_type",
+                ]
+            ),
+        ]
+
+    @property
+    def data(self):
+        d = {
+            "event_type": self.event_type,
+            "interruption_reason": self.interruption_reason,
+            "year": self.year,
+            "month": self.month,
+            "day": self.day,
+        }
+
+        return d
+
+    @property
+    def date(self):
+        return f"{self.year}-{self.month}-{self.day}"
+
+    def __str__(self):
+        return f"{self.event_type} {self.interruption_reason} {self.year}/{self.month}/{self.day}"
+
+    @classmethod
+    def am_to_core(
+        cls,
+        scielo_journal,
+        initial_year,
+        initial_month,
+        initial_day,
+        final_year,
+        final_month,
+        final_day,
+        event_type,
+        interruption_reason,
+    ):
+        """
+        Funcao para API article meta.
+        Atualiza o Type Event de JournalHistory.
+        """
+        reasons = {
+            None: "ceased",
+            "not-open-access": "not-open-access",
+            "suspended-by-committee": "by-committee",
+            "suspended-by-editor": "by-editor",
+        }
+        try:
+            obj = cls.objects.get(
+                scielo_journal=scielo_journal,
+                year=initial_year,
+                month=initial_month,
+                day=initial_day,
+            )
+        except cls.DoesNotExist:
+            obj = cls()
+            obj.scielo_journal = scielo_journal
+            obj.year = initial_year
+            obj.month = initial_month
+            obj.day = initial_day
+        obj.event_type = "ADMITTED"
+        obj.save()
+
+        if final_year and event_type:
+            try:
+                obj = cls.objects.get(
+                    scielo_journal=scielo_journal,
+                    year=final_year,
+                    month=final_month,
+                    day=final_day,
+                )
+            except cls.DoesNotExist:
+                obj = cls()
+                obj.scielo_journal = scielo_journal
+                obj.year = final_year
+                obj.month = final_month
+                obj.day = final_day
+            obj.event_type = "INTERRUPTED"
+            obj.interruption_reason = reasons.get(interruption_reason)
+            obj.save()
+
+
+class Subject(CommonControlField):
+    code = models.CharField(max_length=30, null=True, blank=True)
+    value = models.CharField(max_length=100, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.value}"
+
+    @classmethod
+    def load(cls, user):
+        if not cls.objects.exists():
+            for item in choices.STUDY_AREA:
+                code, _ = item
+                cls.create_or_update(
+                    code=code,
+                    user=user,
+                )
+
+    @classmethod
+    def get(cls, code):
+        if not code:
+            raise ValueError("Subject.get requires code parameter")
+        return cls.objects.get(code=code)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        code,
+        user,
+    ):
+        try:
+            obj = cls.get(code=code)
+        except cls.DoesNotExist:
+            obj = cls()
+            obj.code = code
+            obj.creator = user
+        except SubjectCreationOrUpdateError as e:
+            raise SubjectCreationOrUpdateError(code=code, message=e)
+
+        obj.value = dict(choices.STUDY_AREA).get(code) or obj.value
+        obj.updated = user
+        obj.save()
+        return obj
