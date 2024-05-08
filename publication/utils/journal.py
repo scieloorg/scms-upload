@@ -1,5 +1,4 @@
 from datetime import datetime
-from scielo_classic_website.models.journal import Journal as ClassicJournal
 
 
 def build_journal(journal_proc, builder):
