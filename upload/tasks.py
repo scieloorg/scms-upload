@@ -715,7 +715,7 @@ def task_validate_xml_structure(
                 status=choices.VALIDATION_RESULT_FAILURE,
                 message=item["message"],
                 data={
-                    "apparent_line": apparent_line,
+                    "apparent_line": item.get("apparent_line"),
                 },
             )
         if summary["dtd_is_valid"]:
@@ -733,7 +733,7 @@ def task_validate_xml_structure(
                 status=choices.VALIDATION_RESULT_FAILURE,
                 message=item["message"],
                 data={
-                    "apparent_line": apparent_line,
+                    "apparent_line": item.get("apparent_line"),
                 },
             )
         if summary["style_is_valid"]:
