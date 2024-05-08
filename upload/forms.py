@@ -26,6 +26,10 @@ class ValidationResultForm(WagtailAdminModelForm):
         return vr_obj
 
 
+ErrorNegativeReactionForm = ValidationResultForm
+ErrorNegativeReactionDecisionForm = ValidationResultForm
+
+
 class ValidationResultErrorResolutionForm(forms.Form):
     validation_result_id = forms.IntegerField()
     rationale = forms.CharField(widget=forms.Textarea, required=False)
