@@ -74,10 +74,15 @@ def create_or_update_issue(
         return issue_proc.issue
     classic_website_issue = classic_ws.Issue(issue_proc.migrated_data.data)
 
-    journal_proc = JournalProc.get(
-        collection=issue_proc.collection,
-        pid=classic_website_issue.journal,
-    )
+    try:
+        journal_proc = JournalProc.get(
+            collection=issue_proc.collection,
+            pid=classic_website_issue.journal,
+        )
+    except JournalProc.DoesNotExist:
+        raise ValueError(
+            f"Unable to get journal_proc for issue_proc: {issue_proc}, collection: {issue_proc.collection}, pid={classic_website_issue.journal}"
+        )
     if not journal_proc.journal:
         raise ValueError(f"Missing JournalProc.journal for {journal_proc}")
 
