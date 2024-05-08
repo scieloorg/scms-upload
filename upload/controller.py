@@ -36,6 +36,7 @@ from upload.xml_validation import (
     add_sps_data,
     add_journal_data,
 )
+from upload.models import XMLErrorReport, XMLInfoReport
 
 pp = PidRequester()
 
@@ -432,26 +433,30 @@ def _validate_xml_content(package, xml_with_pre, data):
     # xml_validation.add_sps_data(data, sps_data)
 
     try:
+        info_report = XMLInfoReport.get_or_create(
+            package.creator, package, _("XML Info Report"), choices.VAL_CAT_XML_CONTENT
+        )
+        info_report.conclusion = choices.REPORT_CONCLUSION_WIP
+        info_report.save()
+
+        error_report = XMLErrorReport.get_or_create(
+            package.creator, package, _("XML Error Report"), choices.VAL_CAT_XML_CONTENT
+        )
+        error_report.conclusion = choices.REPORT_CONCLUSION_WIP
+        error_report.save()
+
         results = xml_validation.validate_xml_content(
             xml_with_pre.sps_pkg_name, xml_with_pre.xmltree, data
         )
         for result in results:
             _handle_xml_content_validation_result(
-                package, xml_with_pre.sps_pkg_name, result
+                package,
+                xml_with_pre.sps_pkg_name,
+                result,
+                info_report,
+                error_report,
             )
-        try:
-            error = ValidationResult.objects.filter(
-                package=package,
-                status=choices.VS_DISAPPROVED,
-                category__in=choices.VALIDATION_REPORT_ITEMS[
-                    choices.VR_INDIVIDUAL_CONTENT
-                ],
-            )[0]
-            package.status = choices.PS_VALIDATED_WITH_ERRORS
-        except IndexError:
-            # nenhum erro
-            package.status = choices.PS_VALIDATED_WITHOUT_ERRORS
-        package.save()
+        package.finish_xml_reports()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -469,14 +474,32 @@ def _validate_xml_content(package, xml_with_pre, data):
         )
 
 
-def _handle_xml_content_validation_result(package, sps_pkg_name, result):
+def _handle_xml_content_validation_result(
+    package, sps_pkg_name, result, info_report, error_report
+):
     # ['xpath', 'advice', 'title', 'expected_value', 'got_value', 'message', 'validation_type', 'response']
 
     try:
         if result["response"] == "OK":
+            report = info_report
             status = choices.VS_APPROVED
+            status_ = choices.VALIDATION_RESULT_SUCCESS
         else:
             status = choices.VS_DISAPPROVED
+            status_ = choices.VALIDATION_RESULT_FAILURE
+
+            group = result.get("group") or result.get("item")
+            if group:
+                report = XMLErrorReport.get_or_create(
+                    package.creator,
+                    package,
+                    _("XML Error Report") + f": {group}",
+                    group,
+                )
+                report.conclusion = report.conclusion or choices.REPORT_CONCLUSION_WIP
+                report.save()
+            else:
+                report = error_report
 
         # VE_BIBLIOMETRICS_DATA_ERROR, VE_SERVICES_DATA_ERROR,
         # VE_DATA_CONSISTENCY_ERROR, VE_CRITERIA_ISSUES_ERROR,
@@ -491,6 +514,24 @@ def _handle_xml_content_validation_result(package, sps_pkg_name, result):
             message=message,
             data=result,
         )
+        validation_result = report.add_validation_result(
+            status=status_,
+            message=result.get("message"),
+            data=result,
+            subject=result.get("item"),
+        )
+        validation_result.focus = result.get("title")
+        validation_result.attribute = result.get("sub_item")
+        validation_result.parent = result.get("parent")
+        validation_result.parent_id = result.get("parent_id")
+        validation_result.validation_type = result.get("validation_type")
+
+        if status_ == choices.VALIDATION_RESULT_FAILURE:
+            validation_result.advice = result.get("advice")
+            validation_result.expected_value = result.get("expected_value")
+            validation_result.got_value = result.get("got_value")
+        validation_result.save()
+        return validation_result
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
