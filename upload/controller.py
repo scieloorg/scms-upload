@@ -117,8 +117,9 @@ def request_pid_for_accepted_packages(user):
 def receive_package(request, package):
     try:
         zip_xml_file_path = package.file.path
+        user = request.user
         for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
-            response = _check_article_and_journal(request, xml_with_pre)
+            response = _check_article_and_journal(xml_with_pre, user=user)
             if response.get("xml_changed"):
                 # atualiza conteúdo de zip
                 with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
@@ -194,7 +195,7 @@ def _identify_file_error(package):
         return {"error": str(e), "error_type": choices.VE_XML_FORMAT_ERROR}
 
 
-def _check_article_and_journal(request, xml_with_pre):
+def _check_article_and_journal(xml_with_pre, user=None):
     # verifica se o XML está registrado no sistema
     response = pp.is_registered_xml_with_pre(xml_with_pre, xml_with_pre.filename)
 
@@ -214,10 +215,10 @@ def _check_article_and_journal(request, xml_with_pre):
     xmltree = xml_with_pre.xmltree
 
     #Verifica e atribui journal e issue pela api
-    _verify_journal_and_issue_in_upload(request, xmltree)
+    _verify_journal_and_issue_in_upload(xmltree, user=user)
 
     # verifica se journal e issue estão registrados
-    _check_xml_journal_and_xml_issue_are_registered(request, 
+    _check_xml_journal_and_xml_issue_are_registered( 
         xml_with_pre.filename, xmltree, response
     )
 
@@ -289,13 +290,12 @@ def _rollback_article_status(article, article_previos_status):
         article.save()
 
 
-def _verify_journal_and_issue_in_upload(request, xmltree):
-    journal = fetch_core_api_and_create_or_update_journal(request, xmltree)
-    fetch_core_api_and_create_or_update_issue(request, xmltree, journal)
+def _verify_journal_and_issue_in_upload(xmltree, user):
+    journal = fetch_core_api_and_create_or_update_journal(xmltree, user)
+    fetch_core_api_and_create_or_update_issue(user, xmltree, journal)
 
 
-def fetch_core_api_and_create_or_update_journal(request, xmltree):
-    user = request.user
+def fetch_core_api_and_create_or_update_journal(xmltree, user):
     xml = Title(xmltree)
     journal_title = xml.journal_title
 
@@ -331,7 +331,6 @@ def fetch_core_api_and_create_or_update_journal(request, xmltree):
 
 
 def fetch_core_api_and_create_or_update_issue(request, xmltree, journal):
-    user = request.user
     xml = ArticleMetaIssue(xmltree)
     if journal and any((xml.volume, xml.suppl, xml.number)):
         issn_print = journal.official_journal.issn_print
@@ -366,7 +365,7 @@ def fetch_core_api_and_create_or_update_issue(request, xmltree, journal):
             return issue 
 
 
-def _check_xml_journal_and_xml_issue_are_registered(request, filename, xmltree, response):
+def _check_xml_journal_and_xml_issue_are_registered(filename, xmltree, response):
     """
     Verifica se journal e issue do XML estão registrados no sistema
     """
