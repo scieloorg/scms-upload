@@ -386,10 +386,10 @@ class JournalHistory(CommonControlField, Orderable):
 
     @property
     def date(self):
-        f"{self.year}-{self.month}-{self.day}"
+        return f"{self.year}-{self.month}-{self.day}"
 
     def __str__(self):
-        return f"{self.event_type} {self.interruption_reason} {self.year}/{self.month}/{self.day or '01'}"
+        return f"{self.event_type} {self.interruption_reason} {self.year}/{self.month}/{self.day}"
 
     @classmethod
     def am_to_core(
