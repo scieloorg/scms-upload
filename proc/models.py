@@ -1505,6 +1505,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     @property
     def article(self):
         if self.sps_pkg is not None:
+            # Importa modelo article sem a necessidade de utilizar import e evitar importacoes circulares
             Article = apps.get_model("article", "Article")
             return Article.objects.get(sps_pkg=self.sps_pkg)
 
