@@ -5,11 +5,12 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
+from core.choices import LANGUAGE
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 
 from collection import choices
-
+from collection.utils import language_iso
 
 class LanguageGetOrCreateError(Exception):
     ...
@@ -180,9 +181,16 @@ class Language(CommonControlField):
 
     def autocomplete_label(self):
         return self.code2
+    
+    
+    @classmethod
+    def load(cls, user=None):
+        for k, v in LANGUAGE:
+            cls.get_or_create(name=v, code2=k, creator=user)
 
     @classmethod
     def get(cls, name=None, code2=None):
+        code2 = language_iso(code=code2)
         if code2:
             if not code2.isalpha() or len(code2) != 2:
                 raise ValueError(f"Language.get_or_create invalid code2 {code2}")

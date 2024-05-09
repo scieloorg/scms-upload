@@ -59,7 +59,7 @@ minio==7.2.5
 # Upload
 # ------------------------------------------------------------------------------
 lxml==4.9.4 # https://github.com/lxml/lxml
--e git+https://github.com/scieloorg/packtools.git@4.1.1#egg=packtools
+-e git+https://github.com/scieloorg/packtools.git@4.4.0#egg=packtools
 -e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
 
 # DSM Publication
@@ -78,3 +78,7 @@ tornado>=6.3.2 # not directly required, pinned by Snyk to avoid a vulnerability
 # ------------------------------------------------------------------------------
 tenacity==8.2.3  # https://pypi.org/project/tenacity/
 urllib3==2.2.1
+
+# iso639-langs
+# ------------------------------------------------------------------------------
+iso639-lang==2.2.3

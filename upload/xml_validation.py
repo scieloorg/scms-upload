@@ -23,6 +23,7 @@ from packtools.sps.validation.journal_meta import JournalMetaValidation
 from packtools.sps.validation.preprint import PreprintValidation
 from packtools.sps.validation.related_articles import RelatedArticlesValidation
 
+from core.utils.requester import fetch_data
 from upload import choices
 from upload.models import ValidationResult
 from tracker.models import UnexpectedEvent
@@ -68,22 +69,22 @@ def add_journal_data(data, journal, issue):
     data["expected_license_code"] = journal.license_code
 
 
-def add_sps_data(data, sps_data):
+def add_sps_data(data, version, sps_data):
+    """
+    results: [
+        {
+            "key": "value",
+            "value": {"key": "value"}
+        }
+    ]
+    """
     # TODO
     # depende do SPS / JATS / Critérios
-    data["dtd_versions"] = []
-    data["sps_versions"] = []
-    data["article_types"] = []
-    data["expected_article_type_vs_subject_similarity"] = 0
-    data["data_availability_specific_uses"] = []
-
-    data["credit_taxonomy"] = []
-
-    data["article_type_correspondences"] = []
-
-    data["future_date"] = ""
-    data["events_order"] = []
-    data["required_events"] = []
+    url = "https://core.scielo.org/api/v1/xml_validation/"
+    content = fetch_data(url, params={'version': version}, json=True, timeout=1)
+    results = content.get("results")
+    for c in results:
+        data[c.get("key")] = c.get("value")
 
 
 def validate_xml_content(sps_pkg_name, xmltree, data):
@@ -94,30 +95,34 @@ def validate_xml_content(sps_pkg_name, xmltree, data):
     # VE_DATA_CONSISTENCY_ERROR: data consistency
     # VE_CRITERIA_ISSUES_ERROR: required by the criteria document
 
-    error_category_and_function_items = (
-        (choices.VE_BIBLIOMETRICS_DATA_ERROR, validate_affiliations),
-        (choices.VE_BIBLIOMETRICS_DATA_ERROR, validate_authors),
-        (choices.VE_BIBLIOMETRICS_DATA_ERROR, validate_languages),
-        (choices.VE_CRITERIA_ISSUES_ERROR, validate_article_attributes),
-        (choices.VE_CRITERIA_ISSUES_ERROR, validate_data_availability),
-        (choices.VE_CRITERIA_ISSUES_ERROR, validate_licenses),
-        (choices.VE_DATA_CONSISTENCY_ERROR, validate_article_id_other),
-        (choices.VE_DATA_CONSISTENCY_ERROR, validate_article_languages),
-        (choices.VE_DATA_CONSISTENCY_ERROR, validate_article_type),
-        (choices.VE_DATA_CONSISTENCY_ERROR, validate_dates),
-        (choices.VE_DATA_CONSISTENCY_ERROR, validate_doi),
-        (choices.VE_DATA_CONSISTENCY_ERROR, validate_journal),
-        (choices.VE_DATA_CONSISTENCY_ERROR, validate_preprint),
-        (choices.VE_DATA_CONSISTENCY_ERROR, validate_related_articles),
-        (choices.VE_DATA_CONSISTENCY_ERROR, validate_subjects),
-        (choices.VE_DATA_CONSISTENCY_ERROR, validate_toc_sections),
-        (choices.VE_DATA_CONSISTENCY_ERROR, validate_xref),
+    validation_group_and_function_items = (
+        ("affiliations", validate_affiliations),
+        ("authors", validate_authors),
+        ("article", validate_languages),
+        ("article", validate_article_attributes),
+        ("open science", validate_data_availability),
+        ("open science", validate_licenses),
+        ("article", validate_article_id_other),
+        ("article", validate_article_languages),
+        ("article", validate_article_type),
+        ("dates", validate_dates),
+        ("article", validate_doi),
+        ("journal", validate_journal),
+        ("open science", validate_preprint),
+        ("related", validate_related_articles),
+        ("article", validate_subjects),
+        ("article", validate_toc_sections),
+        ("text", validate_xref),
+        # outras conforme forem adicionadas ao packtools
     )
-    for error_category, f in error_category_and_function_items:
+
+    for validation_group, f in validation_group_and_function_items:
         for item in f(sps_pkg_name, xmltree, data):
+            error_category = None
             if item["validation_type"] in ("value in list", "value", "match"):
                 error_category = choices.VE_DATA_CONSISTENCY_ERROR
             item["error_category"] = item.get("error_category") or error_category
+            item["group"] = validation_group
             yield item
 
 
