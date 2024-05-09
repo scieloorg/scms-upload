@@ -195,7 +195,7 @@ def _identify_file_error(package):
         return {"error": str(e), "error_type": choices.VE_XML_FORMAT_ERROR}
 
 
-def _check_article_and_journal(xml_with_pre, user=None):
+def _check_article_and_journal(xml_with_pre, user):
     # verifica se o XML está registrado no sistema
     response = pp.is_registered_xml_with_pre(xml_with_pre, xml_with_pre.filename)
 
