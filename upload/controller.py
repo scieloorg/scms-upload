@@ -27,6 +27,7 @@ from .utils import file_utils, package_utils, xml_utils
 from upload import xml_validation
 from pid_provider.requester import PidRequester
 from article.models import Article
+from core.utils.requester import fetch_data
 from issue.models import Issue
 from journal.models import OfficialJournal, Journal
 from tracker.models import UnexpectedEvent, serialize_detail
@@ -114,11 +115,12 @@ def request_pid_for_accepted_packages(user):
             )
 
 
-def receive_package(package):
+def receive_package(request, package):
     try:
         zip_xml_file_path = package.file.path
+        user = request.user
         for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
-            response = _check_article_and_journal(xml_with_pre)
+            response = _check_article_and_journal(xml_with_pre, user=user)
             if response.get("xml_changed"):
                 # atualiza conteúdo de zip
                 with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
@@ -194,7 +196,7 @@ def _identify_file_error(package):
         return {"error": str(e), "error_type": choices.VE_XML_FORMAT_ERROR}
 
 
-def _check_article_and_journal(xml_with_pre):
+def _check_article_and_journal(xml_with_pre, user):
     # verifica se o XML está registrado no sistema
     response = pp.is_registered_xml_with_pre(xml_with_pre, xml_with_pre.filename)
 
@@ -213,8 +215,11 @@ def _check_article_and_journal(xml_with_pre):
 
     xmltree = xml_with_pre.xmltree
 
+    #Verifica e atribui journal e issue pela api
+    _verify_journal_and_issue_in_upload(xmltree, user=user)
+
     # verifica se journal e issue estão registrados
-    _check_xml_journal_and_xml_issue_are_registered(
+    _check_xml_journal_and_xml_issue_are_registered( 
         xml_with_pre.filename, xmltree, response
     )
 
@@ -284,6 +289,81 @@ def _rollback_article_status(article, article_previos_status):
         # rollback
         article.status = article_previos_status
         article.save()
+
+
+def _verify_journal_and_issue_in_upload(xmltree, user):
+    journal = fetch_core_api_and_create_or_update_journal(xmltree, user)
+    fetch_core_api_and_create_or_update_issue(user, xmltree, journal)
+
+
+def fetch_core_api_and_create_or_update_journal(xmltree, user):
+    xml = Title(xmltree)
+    journal_title = xml.journal_title
+
+    xml = ISSN(xmltree)
+    issn_electronic = xml.epub
+    issn_print = xml.ppub
+
+    response = fetch_data(
+        url=f"https://core.scielo.org/api/v1/journal/", 
+        params={
+            "title": journal_title,
+            "issn_print": issn_print, 
+            "issn_electronic": issn_electronic},
+        json=True
+    )
+    for journal in response.get("results"):
+        official_journal = OfficialJournal.create_or_update(
+            title=journal.get("official").get("title"),
+            title_iso=journal.get("official").get("iso_short_title"),
+            issn_print=journal.get("official").get("issn_print"),
+            issn_electronic=journal.get("official").get("issn_electronic"),
+            issnl=journal.get("official").get("issnl"),
+            foundation_year=None,
+            user=user,
+        )
+        journal = Journal.create_or_update(
+            official_journal=official_journal,
+            title=journal.get("title"),
+            short_title=journal.get("short_title"),
+            user=user,
+        )
+        return journal
+
+
+def fetch_core_api_and_create_or_update_issue(request, xmltree, journal):
+    xml = ArticleMetaIssue(xmltree)
+    if journal and any((xml.volume, xml.suppl, xml.number)):
+        issn_print = journal.official_journal.issn_print
+        issn_electronic = journal.official_journal.issn_electronic
+        response = fetch_data(
+            url=f"https://core.scielo.org/api/v1/issue/", 
+            params={
+                "issn_print": issn_print,
+                "issn_electronic": issn_electronic, 
+                "number": xml.number, 
+                "supplement": xml.suppl,
+                "volume": xml.volume
+                },
+            json=True
+        )
+
+        for issue in response.get("results"):
+            official_journal = OfficialJournal.get(
+                issn_electronic=issue.get("journal").get("issn_electronic"),
+                issn_print=issue.get("journal").get("issn_print"),
+                issnl=issue.get("journal").get("issn_issnl"),
+                )
+            journal = Journal.get(official_journal=official_journal)
+            issue = Issue.get_or_create(
+                journal=journal,
+                volume=issue.get("volume"),    
+                supplement=issue.get("supplement"),
+                number=issue.get("number"),
+                publication_year=issue.get("year"),
+                user=user
+            )
+            return issue 
 
 
 def _check_xml_journal_and_xml_issue_are_registered(filename, xmltree, response):
