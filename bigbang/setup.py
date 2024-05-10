@@ -49,6 +49,7 @@ def setup(user, file_path=None, config=None):
             api_url_article=item.get("api_url_article"),
             api_url_issue=item.get("api_url_issue"),
             api_url_journal=item.get("api_url_journal"),
+            api_url=item.get("api_url"),
             api_get_token_url=item.get("api_get_token_url"),
             api_username=item.get("api_username"),
             api_password=item.get("api_password"),

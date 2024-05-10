@@ -2,13 +2,14 @@ import os
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
-from django.db import models
+from django.db import models, IntegrityError
 from django.utils.translation import gettext as _
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
 from wagtail.snippets.models import register_snippet
 
 from . import choices
+from .exceptions import PressReleaseInvalidURL
 
 User = get_user_model()
 
@@ -332,3 +333,166 @@ class FlexibleDateFieldAdapter:
     @year.setter
     def year(self, value):
         self._year = int(value)
+
+
+class PressRelease(CommonControlField):
+    journal = models.ForeignKey(
+        "journal.Journal",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+    )
+    issue = models.ForeignKey(
+        "issue.Issue",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+    )
+    article = models.ForeignKey(
+        "article.Article",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True
+    )
+    title = models.TextField(_("Title"),
+        blank=True,
+        null=True
+    )
+    doi = models.TextField(
+        blank=True,
+        null=True        
+    )
+    language = models.ForeignKey(
+        "collection.Language",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True
+    )
+    content = RichTextField(
+        null=True, 
+        blank=True,
+    )
+    url = models.URLField(
+        max_length=255,
+        null=True, 
+        blank=True,
+    )
+    media_content = models.URLField(
+        max_length=255,
+        null=True, 
+        blank=True,
+    )
+    publication_date = models.DateTimeField(
+        null=True, 
+        blank=True,
+    )
+
+    class Meta:
+        unique_together = [("url",)]
+
+    def update(
+        self,
+        journal,
+        issue,
+        article,
+        title,
+        language,
+        content,
+        media_content,
+        publication_date,
+        user,
+    ):
+        self.journal = journal
+        self.issue = issue 
+        self.article = article
+        self.title = title
+        self.language = language
+        self.content = content
+        self.media_content = media_content
+        self.publication_date = publication_date
+        self.updated_by = user
+        self.save()
+        return self
+
+
+    @classmethod
+    def get(cls, url):
+        if not url:
+            raise PressReleaseInvalidURL(" PressRelease requires url parameter")
+        return cls.objects.get(url=url)
+
+    @classmethod
+    def create(
+        cls,
+        url,
+        journal,
+        issue,
+        article,
+        language,
+        title,
+        content,
+        media_content,
+        publication_date,
+        user,
+        ):
+        try:
+            obj = cls(
+                url=url,
+                journal=journal,
+                issue=issue,
+                article=article,
+                language=language,
+                title=title,
+                content=content,
+                media_content=media_content,
+                publication_date=publication_date,
+                creator=user,
+            )
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(url=url)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        url,
+        user,
+        journal=None,
+        issue=None,
+        article=None,
+        language=None,
+        title=None,
+        content=None,
+        media_content=None,
+        publication_date=None,
+        ):
+        try:
+            obj = cls.get(url=url)
+            return obj.update(
+                journal=journal,
+                issue=issue,
+                article=article,
+                language=language,
+                title=title,
+                content=content,
+                media_content=media_content,
+                publication_date=publication_date,
+                user=user,
+            )
+        except cls.DoesNotExist:
+            return cls.create(
+                url=url,
+                journal=journal,
+                issue=issue,
+                article=article,
+                language=language,
+                title=title,
+                content=content,
+                media_content=media_content,
+                publication_date=publication_date,
+                user=user,
+            )
+
+    def __str__(self) -> str:
+        return f"{self.title}"
