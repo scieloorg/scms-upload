@@ -133,8 +133,8 @@ class Article(ClusterableModel, CommonControlField):
             issue=self.issue.data,
             journal=self.journal.data,
             pid_v3=self.pid_v3,
-            created=created.isoformat(),
-            updated=updated.isoformat(),
+            created=self.created.isoformat(),
+            updated=self.updated.isoformat(),
         )
 
     @classmethod
