@@ -1,24 +1,12 @@
 import logging
 
-from django.contrib.auth import get_user_model
 
 from config import celery_app
+from core.utils.get_user import _get_user
 from pid_provider.provider import PidProvider
 from pid_provider.requester import PidRequester
 from proc.models import ArticleProc
 
-
-User = get_user_model()
-
-
-def _get_user(request, username=None, user_id=None):
-    try:
-        return User.objects.get(pk=request.user.id)
-    except AttributeError:
-        if user_id:
-            return User.objects.get(pk=user_id)
-        if username:
-            return User.objects.get(username=username)
 
 
 @celery_app.task(bind=True, name="provide_pid_for_file")
