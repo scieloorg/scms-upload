@@ -1,37 +1,16 @@
 import logging
 import sys
 
-from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from collection.models import Collection
+from core.utils.get_user import _get_user
 from config import celery_app
 from htmlxml.models import HTMLXML
 from proc.models import ArticleProc, IssueProc, JournalProc
 from tracker.models import UnexpectedEvent
 
 from . import controller
-
-User = get_user_model()
-
-
-def _get_user(user_id, username):
-    try:
-        if user_id:
-            return User.objects.get(pk=user_id)
-        if username:
-            return User.objects.get(username=username)
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "migration.tasks._get_user",
-                "user_id": user_id,
-                "username": username,
-            },
-        )
 
 
 def _get_collections(collection_acron):
@@ -126,7 +105,7 @@ def task_migrate_title_record(
     Cria um registro MigratedData (source="journal")
     """
     try:
-        user = _get_user(user_id, username)
+        user = _get_user(self.request, user_id, username)
         collection = Collection.get(acron=collection_acron)
         JournalProc.register_classic_website_data(
             user,
@@ -227,7 +206,7 @@ def task_migrate_issue_record(
     Cria um registro MigratedData (source="issue")
     """
     try:
-        user = _get_user(user_id, username)
+        user = _get_user(self.request, user_id, username)
         collection = Collection.get(acron=collection_acron)
 
         IssueProc.register_classic_website_data(
@@ -305,7 +284,7 @@ def task_import_one_issue_files(
     force_update=False,
 ):
     try:
-        user = _get_user(user_id, username)
+        user = _get_user(self.request, user_id, username)
         item = IssueProc.objects.get(pk=item_id)
         item.get_files_from_classic_website(
             user, force_update, controller.import_one_issue_files
@@ -379,7 +358,7 @@ def task_import_one_issue_document_records(
     Cria ou atualiza os registros de ArticleProc
     """
     try:
-        user = _get_user(user_id, username)
+        user = _get_user(self.request, user_id, username)
         item = IssueProc.objects.get(pk=item_id)
         item.get_article_records_from_classic_website(
             user, force_update, controller.get_article_records_from_classic_website
@@ -446,7 +425,7 @@ def task_get_xml(
     body_and_back_xml=None,
 ):
     try:
-        user = _get_user(user_id, username)
+        user = _get_user(self.request, user_id, username)
 
         item = ArticleProc.objects.get(pk=item_id)
         try:
