@@ -342,11 +342,13 @@ class CheckArticleAvailability(CommonControlField):
         self,
         url,
         status,
-        user
+        user,
+        date=None,
     ):
         obj = ScieloSiteStatus.create_or_update(
             url=url,
             status=status,
+            date=date,
             user=user,
         )
         self.site_status.add(obj) 
@@ -360,7 +362,7 @@ class CheckArticleAvailability(CommonControlField):
         status,
         url,
         user,
-
+        date=None,
     ):
         obj = cls(
             article=article,
@@ -371,6 +373,7 @@ class CheckArticleAvailability(CommonControlField):
             url=url,
             status=status,
             user=user,
+            date=date,
         )
         return obj
 
@@ -379,13 +382,15 @@ class CheckArticleAvailability(CommonControlField):
         article,
         status,
         url,
-        user,            
+        user,
+        date=None,
     ):
         try:
             obj = cls.get(article=article)
             obj.create_or_update_scielo_site_status(
             url=url,
             status=status,
+            date=date,
             user=user,
         )
             return obj
@@ -394,6 +399,7 @@ class CheckArticleAvailability(CommonControlField):
                 article=article,
                 status=status,
                 url=url,
+                date=date,
                 user=user
             )
 
@@ -405,8 +411,9 @@ class ScieloSiteStatus(CommonControlField):
     def update(
         self,
         status,
+        date=None,
     ):
-        self.check_date = datetime.datetime.now()
+        self.check_date = date or datetime.datetime.now()
         self.available = status
         self.save()
         return self
@@ -423,9 +430,11 @@ class ScieloSiteStatus(CommonControlField):
         url,
         status,
         user,
+        date=None,
     ):
+        date = date or datetime.datetime.now()
         obj = cls(
-            check_date=datetime.datetime.now(),
+            check_date=date,
             url_site_scielo=url,
             available=status,
             creator=user
@@ -439,14 +448,19 @@ class ScieloSiteStatus(CommonControlField):
         url,
         status,
         user,
+        date=None,
     ):
         try:
             obj = cls.get(url=url)
-            obj.update(status=status)
+            obj.update(
+                status=status,
+                date=date
+                )
             return obj
         except cls.DoesNotExist:
             return cls.create(
                 url=url,
                 status=status,
                 user=user,
+                date=date
             )
