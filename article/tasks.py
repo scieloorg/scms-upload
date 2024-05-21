@@ -39,7 +39,7 @@ def initiate_article_availability_check(
     articles = Article.objects.filter(query)
 
     for article in articles.iterator():
-        for article_per_lang in ['pt', 'en']:
+        for article_per_lang in article.doi_with_lang.lang:
             process_article_availability.apply_async(
                 kwargs=dict(
                     user_id=user_id,
