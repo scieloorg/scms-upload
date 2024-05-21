@@ -1,4 +1,5 @@
 import logging
+import datetime
 
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -314,3 +315,138 @@ class RequestArticleChange(CommonControlField):
         return f"{self.article or self.pid_v3} - {self.deadline}"
 
     base_form_class = RequestArticleChangeForm
+
+
+class CheckArticleAvailability(CommonControlField):
+    """
+        Modelo para armazenar o status de disponibilidade nos sites,
+        tanto na nova versao, quanto na antiga, do scielo.br.
+    """
+    article = models.ForeignKey(
+        Article, 
+        on_delete=models.SET_NULL,
+        null=True,
+    )
+    site_status = models.ManyToManyField(
+        "ScieloSiteStatus"
+    )
+
+    def __str__(self):
+        return f"{self.article.pid_v3}"
+    
+    @classmethod
+    def get(cls, article):
+        return cls.objects.get(article=article)
+    
+    def create_or_update_scielo_site_status(
+        self,
+        url,
+        status,
+        user
+    ):
+        obj = ScieloSiteStatus.create_or_update(
+            url=url,
+            status=status,
+            user=user,
+        )
+        self.site_status.add(obj) 
+        self.save()
+
+
+    @classmethod
+    def create(
+        cls,
+        article,
+        status,
+        url,
+        user,
+
+    ):
+        obj = cls(
+            article=article,
+            creator=user,
+        )
+        obj.save()
+        obj.create_or_update_scielo_site_status(
+            url=url,
+            status=status,
+            user=user,
+        )
+        return obj
+
+    @classmethod
+    def create_or_update(cls,
+        article,
+        status,
+        url,
+        user,            
+    ):
+        try:
+            obj = cls.get(article=article)
+            obj.create_or_update_scielo_site_status(
+            url=url,
+            status=status,
+            user=user,
+        )
+            return obj
+        except cls.DoesNotExist:
+            cls.create(
+                article=article,
+                status=status,
+                url=url,
+                user=user
+            )
+
+class ScieloSiteStatus(CommonControlField):
+    check_date = models.DateTimeField(null=True, blank=True)
+    url_site_scielo = models.SlugField(max_length=500, unique=True)
+    available = models.BooleanField(default=False)
+
+    def update(
+        self,
+        status,
+    ):
+        self.check_date = datetime.datetime.now()
+        self.available = status
+        self.save()
+        return self
+
+
+    @classmethod
+    def get(cls, url):
+        return cls.objects.get(url_site_scielo=url)
+
+
+    @classmethod
+    def create(
+        cls,
+        url,
+        status,
+        user,
+    ):
+        obj = cls(
+            check_date=datetime.datetime.now(),
+            url_site_scielo=url,
+            available=status,
+            creator=user
+        )
+        obj.save()
+        return obj
+
+    @classmethod
+    def create_or_update(
+        cls,
+        url,
+        status,
+        user,
+    ):
+        try:
+            obj = cls.get(url=url)
+            obj.update(status=status)
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(
+                url=url,
+                status=status,
+                user=user,
+            )
