@@ -14,7 +14,7 @@ from wagtail.contrib.modeladmin.views import CreateView, InspectView
 from config.menu import get_menu_order
 
 from .button_helper import ArticleButtonHelper, RequestArticleChangeButtonHelper
-from .models import Article, RelatedItem, RequestArticleChange, choices
+from .models import Article, RelatedItem, RequestArticleChange, choices, ScieloSiteStatus
 from .permission_helper import ArticlePermissionHelper
 
 # from upload import exceptions as upload_exceptions
@@ -243,8 +243,33 @@ class ArticleModelAdminGroup(ModelAdminGroup):
         # RequestArticleChangeModelAdmin,
     )
 
+class ScieloSiteStatusAdmin(ModelAdmin):
+    model = ScieloSiteStatus
+    menu_label = "Scielo Site Status"
+    menu_icon = "doc-full"
+    list_display = (
+        "article",
+        "url_site_scielo",
+        "available",
+        "check_date",
+    )
+    search_fields= (
+        "url_site_scielo",
+        "checkarticleavailability__article__pid_v3"
+    )
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+    
+    def article(self, obj):
+        return list(obj.checkarticleavailability_set.all())
 
-# modeladmin_register(ArticleModelAdminGroup)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(available=False)
+
+
+modeladmin_register(ScieloSiteStatusAdmin)
 modeladmin_register(ArticleModelAdmin)
 
 
