@@ -250,12 +250,17 @@ class ScieloSiteStatusAdmin(ModelAdmin):
     list_display = (
         "article",
         "url_site_scielo",
-        "available",
+        "status",
         "check_date",
+        "available",
+        "type",
     )
     search_fields= (
         "url_site_scielo",
         "checkarticleavailability__article__pid_v3"
+    )
+    list_filter = (
+        "type",
     )
     menu_order = 200
     add_to_settings_menu = False
