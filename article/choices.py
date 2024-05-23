@@ -1,4 +1,5 @@
 from django.utils.translation import gettext as _
+from core.utils.requester import NonRetryableError, RetryableError
 
 # Model RequestArticleChange, Field change_type
 RCT_UPDATE = "update"
@@ -124,3 +125,13 @@ ARTICLE_STATUS = (
     (AS_SCHEDULED_TO_PUBLISH, _("Scheduled to publish")),
     (AS_PUBLISHED, _("Published")),
 )
+
+VERIFY_ARTICLE_TYPE = [
+    ("TEXT", _("Text")),
+    ("PDF", _("pdf")),
+]
+
+VERIFY_HTTP_ERROR_CODE = [
+    (RetryableError, _("Excessively long response time. Retry later")),
+    (NonRetryableError, _("Site not found.")),
+]
