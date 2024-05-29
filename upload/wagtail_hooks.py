@@ -16,26 +16,27 @@ from wagtail.contrib.modeladmin.views import CreateView, InspectView
 from article.models import Article
 from config.menu import get_menu_order
 from issue.models import Issue
+from upload.tasks import task_validate_original_zip_file
 from upload.utils import file_utils
 from upload.utils.xml_utils import XMLFormatError
+from upload.views import XMLErrorReportEditView
 
 from .button_helper import UploadButtonHelper
+from .controller import receive_package
 from .models import (
     ErrorResolutionOpinion,
     Package,
     QAPackage,
-    ValidationResult,
     ValidationReport,
-    choices,
+    ValidationResult,
     XMLError,
     XMLErrorReport,
     XMLInfo,
     XMLInfoReport,
+    choices,
 )
 from .permission_helper import UploadPermissionHelper
-from .controller import receive_package
 from .utils import package_utils
-from upload.tasks import task_validate_original_zip_file
 
 
 class PackageCreateView(CreateView):
@@ -133,6 +134,7 @@ class PackageAdminInspectView(InspectView):
             "reports": list(self.instance.reports),
             "xml_error_reports": list(self.instance.xml_error_reports),
             "xml_info_reports": list(self.instance.xml_info_reports),
+            "summary": self.instance.summary,
         }
 
         optz_file_path, optz_dir = self.get_optimized_package_filepath_and_directory()
@@ -231,16 +233,13 @@ class PackageAdmin(ModelAdmin):
     exclude_from_explorer = False
 
     list_display = (
-        "article",
-        "issue",
-        "category",
         "file",
+        "blocking_errors",
+        "error_percentage",
+        "" "category",
         "status",
-        "assignee",
         "creator",
-        "created",
         "updated",
-        "updated_by",
         "expiration_date",
     )
     list_filter = (
@@ -324,7 +323,7 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
     model = QAPackage
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
-    menu_label = _("Waiting for QA")
+    menu_label = _("Quality analysis")
     menu_icon = "folder"
     menu_order = 200
     inspect_view_enabled = True
@@ -336,12 +335,16 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
     list_display = (
         "file",
         "assignee",
-        "creator",
-        "created",
+        "validations",
+        "errors",
+        "blocking_errors",
+        "error_percentage",
+        "category",
+        "status",
         "updated",
-        "updated_by",
+        "expiration_date",
     )
-    list_filter = ("assignee",)
+    list_filter = ("assignee", "status", "category")
     search_fields = (
         "file",
         "assignee__username",
@@ -353,7 +356,9 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         qs = super().get_queryset(request)
 
         if self.permission_helper.user_can_access_all_packages(request.user, None):
-            return qs.filter(status=choices.PS_QA)
+            return qs.filter(
+                status__in=[choices.PS_QA, choices.PS_VALIDATED_WITH_ERRORS]
+            )
 
         return qs.none()
 
@@ -372,11 +377,11 @@ class ValidationReportAdmin(ModelAdmin):
         "package",
         "category",
         "title",
-        "conclusion",
+        "creation",
     )
     list_filter = (
         "category",
-        "conclusion",
+        "creation",
     )
     search_fields = (
         "title",
@@ -397,6 +402,8 @@ class ValidationReportAdmin(ModelAdmin):
 class XMLErrorReportAdmin(ModelAdmin):
     model = XMLErrorReport
     permission_helper_class = UploadPermissionHelper
+    edit_view_class = XMLErrorReportEditView
+
     # create_view_class = XMLErrorReportCreateView
     inspect_view_enabled = True
     # inspect_view_class = XMLErrorReportAdminInspectView
@@ -408,11 +415,12 @@ class XMLErrorReportAdmin(ModelAdmin):
         "package",
         "category",
         "title",
-        "conclusion",
+        "creation",
+        "total_to_fix",
     )
     list_filter = (
         "category",
-        "conclusion",
+        "creation",
     )
     search_fields = (
         "title",
@@ -445,7 +453,6 @@ class XMLErrorAdmin(ModelAdmin):
         "attribute",
         "focus",
         "message",
-        "advice",
         "report",
     )
     list_filter = (
@@ -487,11 +494,11 @@ class XMLInfoReportAdmin(ModelAdmin):
         "package",
         "category",
         "title",
-        "conclusion",
+        "creation",
     )
     list_filter = (
         "category",
-        "conclusion",
+        "creation",
     )
     search_fields = (
         "title",
@@ -556,18 +563,31 @@ class UploadModelAdminGroup(ModelAdminGroup):
     menu_label = "Upload"
     items = (
         PackageAdmin,
-        ValidationReportAdmin,
-        XMLErrorReportAdmin,
-        XMLErrorAdmin,
-        # XMLInfoAdmin,
-        XMLInfoReportAdmin,
-        ValidationResultAdmin,
         QualityAnalysisPackageAdmin,
+        XMLErrorAdmin,
+        # ValidationResultAdmin é necessário para apresentar 'inspect' de Package
+        ValidationResultAdmin,
     )
     menu_order = get_menu_order("upload")
 
 
 modeladmin_register(UploadModelAdminGroup)
+
+
+class UploadReportsModelAdminGroup(ModelAdminGroup):
+    menu_icon = "folder"
+    menu_label = _("Upload reports")
+    items = (
+        # os itens a seguir possibilitam que na página Package.inspect
+        # funcionem os links para os relatórios
+        ValidationReportAdmin,
+        XMLErrorReportAdmin,
+        XMLInfoReportAdmin,
+    )
+    menu_order = get_menu_order("upload")
+
+
+modeladmin_register(UploadReportsModelAdminGroup)
 
 
 @hooks.register("register_admin_urls")
