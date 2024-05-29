@@ -1,15 +1,35 @@
+import logging
+
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
+from wagtail.contrib.modeladmin.views import CreateView, EditView, InspectView
 
 from upload.forms import (
     ValidationResultErrorResolutionForm,
     ValidationResultErrorResolutionOpinionForm,
 )
 
-from .models import Package, choices, ValidationResult
+from .models import Package, ValidationResult, choices
 from .utils.package_utils import coerce_package_and_errors, render_html
+
+
+class XMLErrorReportEditView(EditView):
+    def form_valid(self, form):
+
+        report = form.save_all(self.request.user)
+
+        messages.success(
+            self.request,
+            _("Success ..."),
+        )
+
+        # dispara a tarefa que realiza as validações de
+        # assets, renditions, XML content etc
+        return redirect(
+            f"/admin/upload/package/inspect/{report.package.id}/?#xer{report.id}"
+        )
 
 
 def ajx_error_resolution(request):
@@ -99,7 +119,7 @@ def finish_deposit(request):
     if package_id:
         package = get_object_or_404(Package, pk=package_id)
 
-        if package.check_finish():
+        if package.finish_deposit():
             messages.success(request, _("Package has been submitted to QA"))
         else:
             messages.warning(
@@ -110,6 +130,26 @@ def finish_deposit(request):
             )
 
     return redirect(f"/admin/upload/package/inspect/{package_id}")
+
+
+def download_errors(request):
+    """
+    This view function enables the user to finish deposit of a package through the graphic-interface.
+    """
+    package_id = request.GET.get("package_id")
+
+    if package_id:
+        package = get_object_or_404(Package, pk=package_id)
+
+    try:
+        errors = package.get_errors_report_content()
+        response = HttpResponse(errors["content"], content_type="text/csv")
+        response["Content-Disposition"] = "inline; filename=" + errors["filename"]
+        logging.info(errors)
+        return response
+    except Exception as e:
+        logging.exception(e)
+        raise Http404
 
 
 def preview_document(request):
