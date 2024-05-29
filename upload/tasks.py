@@ -1,33 +1,32 @@
 import json
-import sys
 import logging
+import sys
 
 from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
 from packtools.sps import exceptions as sps_exceptions
 from packtools.sps.models import package as sps_package
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from packtools.sps.utils import file_utils as sps_file_utils
 from packtools.sps.validation import article as sps_validation_article
 from packtools.sps.validation import journal as sps_validation_journal
-from packtools.validator import ValidationReportXML
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from packtools.sps.validation.xml_structure import StructureValidator
+from packtools.validator import ValidationReportXML
 
 from article.choices import AS_CHANGE_SUBMITTED
 from article.controller import create_article_from_etree, update_article
 from article.models import Article
 from config import celery_app
 from issue.models import Issue
-from journal.models import Journal
 from journal.controller import get_journal_dict_for_validation
+from journal.models import Journal
 from libs.dsm.publication.documents import get_document, get_similar_documents
-
 from tracker.models import UnexpectedEvent
-from . import choices, controller, exceptions
-from .utils import file_utils, package_utils, xml_utils
 from upload.models import Package, ValidationReport
 
+from . import choices, controller, exceptions
+from .utils import file_utils, package_utils, xml_utils
 
 User = get_user_model()
 
@@ -456,9 +455,12 @@ def task_validate_assets(file_path, xml_path, package_id):
             data=items,
             subject=_("assets"),
         )
-        report.finish()
-        return True
-    report.finish()
+
+    report.finish_validations()
+    # devido às tarefas serem executadas concorrentemente,
+    # necessário verificar se todas tarefas finalizaram e
+    # então finalizar o pacote
+    package.finish_validations()
 
 
 @celery_app.task()
@@ -526,9 +528,12 @@ def task_validate_renditions(file_path, xml_path, package_id):
             data=items,
             subject=_("Renditions"),
         )
-        report.finish()
-        return True
-    report.finish()
+
+    report.finish_validations()
+    # devido às tarefas serem executadas concorrentemente,
+    # necessário verificar se todas tarefas finalizaram e
+    # então finalizar o pacote
+    package.finish_validations()
 
 
 # TODO REMOVE
@@ -716,6 +721,7 @@ def task_validate_xml_structure(
                 message=item["message"],
                 data={
                     "apparent_line": item.get("apparent_line"),
+                    "message": item["message"],
                 },
             )
         if summary["dtd_is_valid"]:
@@ -723,7 +729,7 @@ def task_validate_xml_structure(
                 status=choices.VALIDATION_RESULT_SUCCESS,
                 message=_("No error found"),
             )
-        report.finish()
+        report.finish_validations()
 
         report = ValidationReport.get_or_create(
             package.creator, package, _("Style checker Report"), choices.VAL_CAT_STYLE
@@ -734,6 +740,7 @@ def task_validate_xml_structure(
                 message=item["message"],
                 data={
                     "apparent_line": item.get("apparent_line"),
+                    "message": item["message"],
                 },
             )
         if summary["style_is_valid"]:
@@ -741,7 +748,11 @@ def task_validate_xml_structure(
                 status=choices.VALIDATION_RESULT_SUCCESS,
                 message=_("No error found"),
             )
-        report.finish()
+        report.finish_validations()
+        # devido às tarefas serem executadas concorrentemente,
+        # necessário verificar se todas tarefas finalizaram e
+        # então finalizar o pacote
+        package.finish_validations()
 
 
 @celery_app.task(bind=True)
