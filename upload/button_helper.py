@@ -62,7 +62,7 @@ class UploadButtonHelper(ButtonHelper):
             classnames.extend(UploadButtonHelper.index_button_classnames)
 
         if (
-            obj.status == choices.PS_READY_TO_BE_FINISHED
+            obj.status == choices.PS_PENDING_DEPOSIT
             and ph.user_can_finish_deposit(usr, obj)
             and url_name == "upload_package_modeladmin_inspect"
         ):
@@ -72,7 +72,10 @@ class UploadButtonHelper(ButtonHelper):
             btns.append(self.view_published_document(obj, classnames))
 
         if obj.assignee is None:
-            if obj.status == choices.PS_QA and ph.user_can_assign_package(usr, obj):
+            if (
+                obj.status == choices.PS_PENDING_QA_DECISION
+                and ph.user_can_assign_package(usr, obj)
+            ):
                 btns.append(self.assign(obj, classnames))
         elif obj.assignee != usr:
             btns.append(self.assign(obj, classnames, _("Reassign")))

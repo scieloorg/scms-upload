@@ -1,15 +1,54 @@
 from django.utils.translation import gettext as _
 
 # Model Package, Field status
+
+"""
+# SYSTEM
+1. PS_SUBMITTED --> primeira avaliação --> 2
+
+# SYSTEM
+2.1. PS_ENQUEUED_FOR_VALIDATION --> 3
+2.2. PS_REJECTED --> 10
+
+# SYSTEM
+3.1. PS_APPROVED --> 4
+3.2. PS_REJECTED --> 10
+3.3. PS_VALIDATED_WITH_ERRORS --> 7
+
+# QA USER
+4.1. PS_PUBLISHED --> FIM
+4.2. PS_SCHEDULED_FOR_PUBLICATION --> 4.1
+
+# XML PRODUCTOR USER
+5.1. PS_PENDING_CORRECTION --> 10
+5.2. PS_PENDING_QA_DECISION --> 6
+
+# QA USER
+6.1. PS_PENDING_CORRECTION --> 10
+6.2. PS_APPROVED_WITH_ERRORS --> 4
+
+# SYSTEM / CONFIGURAÇÃO DO FLUXO
+7.1. PS_PENDING_DEPOSIT --> 5 (MENOR TOLERÂNCIA) - GARGALO NOS PRODUTORES
+7.2. PS_PENDING_QA_DECISION --> 6 (MAIS TOLERANTE - GARGALO NA UNIDADE SCIELO)
+
+# ANY USER
+8.1. PS_REQUIRED_ERRATUM --> 11
+8.2. PS_REQUIRED_UPDATE --> 11
+
+# EDITOR | ?
+11.1. ASSIGN XML PRODUCTOR --> 10
+
+10. produtor de XML terá que corrigir e re-submeter
+"""
 PS_SUBMITTED = "submitted"
 PS_ENQUEUED_FOR_VALIDATION = "enqueued-for-validation"
 PS_VALIDATED_WITH_ERRORS = "validated-with-errors"
-PS_VALIDATED_WITHOUT_ERRORS = "validated-without-errors"
+PS_APPROVED_WITH_ERRORS = "approved-with-errors"
 PS_PENDING_CORRECTION = "pending-correction"
-PS_READY_TO_BE_FINISHED = "ready-to-be-finished"
-PS_QA = "quality-analysis"
+PS_PENDING_DEPOSIT = "pending-deposit"
+PS_PENDING_QA_DECISION = "pending-qa-decision"
 PS_REJECTED = "rejected"
-PS_ACCEPTED = "accepted"
+PS_APPROVED = "approved"
 PS_SCHEDULED_FOR_PUBLICATION = "scheduled-for-publication"
 PS_PUBLISHED = "published"
 
@@ -20,14 +59,22 @@ PACKAGE_STATUS = (
     (PS_SUBMITTED, _("Submitted")),
     (PS_ENQUEUED_FOR_VALIDATION, _("Enqueued for validation")),
     (PS_VALIDATED_WITH_ERRORS, _("Validated with errors")),
-    (PS_VALIDATED_WITHOUT_ERRORS, _("Validated without errors")),
+    (PS_APPROVED_WITH_ERRORS, _("Approved with errors")),
     (PS_PENDING_CORRECTION, _("Pending for correction")),
-    (PS_READY_TO_BE_FINISHED, _("Ready to be finished")),
-    (PS_QA, _("Waiting for quality analysis")),
+    (PS_PENDING_DEPOSIT, _("Pending deposit")),
+    (PS_PENDING_QA_DECISION, _("Pending quality analysis decision")),
+    (PS_PENDING_CORRECTION, _("Pending for correction")),
     (PS_REJECTED, _("Rejected")),
-    (PS_ACCEPTED, _("Accepted")),
+    (PS_APPROVED, _("Approved")),
     (PS_SCHEDULED_FOR_PUBLICATION, _("Scheduled for publication")),
     (PS_PUBLISHED, _("Published")),
+)
+
+QA_DECISION = (
+    (PS_APPROVED_WITH_ERRORS, _("Approved with errors")),
+    (PS_PENDING_CORRECTION, _("Pending for correction")),
+    (PS_REJECTED, _("Rejected")),
+    (PS_APPROVED, _("Approved")),
 )
 
 # Model Package, Field category
@@ -173,44 +220,46 @@ VALIDATION_CATEGORY = (
     (VAL_CAT_RENDITION, "RENDITION"),
 )
 
-
-# Model ValidationResult, Field status
-REPORT_CONCLUSION_REJECTED = "rejected"
-REPORT_CONCLUSION_ACCEPTED_WITH_ERRORS = "has-errors"
-REPORT_CONCLUSION_APPROVED = "approved"
-REPORT_CONCLUSION_NONE = ""
-REPORT_CONCLUSION_WIP = "doing"
-REPORT_CONCLUSION_DONE = "done"
-
-REPORT_CONCLUSION = (
-    (REPORT_CONCLUSION_DONE, "done"),
-    (REPORT_CONCLUSION_WIP, "doing"),
-    (REPORT_CONCLUSION_NONE, ""),
-    (REPORT_CONCLUSION_REJECTED, "rejected"),
-    (REPORT_CONCLUSION_ACCEPTED_WITH_ERRORS, "has-errors"),
-    (REPORT_CONCLUSION_APPROVED, "approved"),
+ZERO_TOLERANCE = (
+    VAL_CAT_PACKAGE_FILE,
+    VAL_CAT_FORBIDDEN_UPDATE,
+    VAL_CAT_ARTICLE_JOURNAL_COMPATIBILITY,
+    VAL_CAT_XML_FORMAT,
 )
 
 # Model ValidationResult, Field status
-VALIDATION_RESULT_SUCCESS = "success"
-VALIDATION_RESULT_FAILURE = "failure"
-VALIDATION_RESULT_UNKNOWN = "unknown"
+REPORT_CREATION_NONE = ""
+REPORT_CREATION_WIP = "doing"
+REPORT_CREATION_DONE = "done"
+
+REPORT_CREATION = (
+    (REPORT_CREATION_DONE, "done"),
+    (REPORT_CREATION_WIP, "doing"),
+    (REPORT_CREATION_NONE, ""),
+)
+
+# Model ValidationResult, Field status
+VALIDATION_RESULT_SUCCESS = "OK"
+VALIDATION_RESULT_FAILURE = "ERROR"
+VALIDATION_RESULT_UNKNOWN = "UKN"
+VALIDATION_RESULT_WARNING = "WARN"
 
 VALIDATION_RESULT = (
-    (VALIDATION_RESULT_SUCCESS, "success"),
-    (VALIDATION_RESULT_FAILURE, "failure"),
-    (VALIDATION_RESULT_UNKNOWN, "unknown"),
+    (VALIDATION_RESULT_FAILURE, _("error")),
+    (VALIDATION_RESULT_UNKNOWN, _("unknown")),
+    (VALIDATION_RESULT_WARNING, _("warning")),
+    (VALIDATION_RESULT_SUCCESS, _("ok")),
 )
 
 # Model ErrorResolution, Field action
-ER_REACTION_FIX = "fix"
-ER_REACTION_JUSTIFY = "justify"
+ER_REACTION_FIX = "to-fix"
+ER_REACTION_NOT_TO_FIX = "not-to-fix"
 ER_REACTION_ABSENT_DATA = "absence"
 
 ERROR_REACTION = (
-    (ER_REACTION_FIX, _("I will fix this error")),
-    (ER_REACTION_ABSENT_DATA, _("Data is absent")),
-    (ER_REACTION_JUSTIFY, _("I am adding a justification not to correct")),
+    (ER_REACTION_FIX, _("XML producer will fix this error")),
+    (ER_REACTION_ABSENT_DATA, _("XML producer informs the data is absent")),
+    (ER_REACTION_NOT_TO_FIX, _("XML producer concludes that it is not an error")),
 )
 
 
