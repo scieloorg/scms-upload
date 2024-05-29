@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     ajx_error_resolution,
     assign,
+    download_errors,
     error_resolution,
     finish_deposit,
     preview_document,
@@ -20,4 +21,5 @@ urlpatterns = [
     path("preview-document", view=preview_document, name="preview_document"),
     path("validation-report", view=validation_report, name="validation_report"),
     path("finish", view=finish_deposit, name="finish_deposit"),
+    path("download-errors", view=download_errors, name="download_errors"),
 ]
