@@ -25,35 +25,12 @@ from upload.models import ValidationReport, XMLErrorReport, XMLInfoReport
 from upload.xml_validation import validate_xml_content
 
 from .models import (
-    ErrorResolution,
-    ErrorResolutionOpinion,
     Package,
-    ValidationResult,
     choices,
 )
 from .utils import file_utils, package_utils, xml_utils
 
 pp = PidRequester()
-
-
-def create_package(
-    article_id,
-    user_id,
-    file_name,
-    category=choices.PC_SYSTEM_GENERATED,
-    status=choices.PS_PUBLISHED,
-):
-    package = Package()
-    package.article_id = article_id
-    package.creator_id = user_id
-    package.created = datetime.utcnow()
-    package.file = file_name
-    package.category = category
-    package.status = status
-
-    package.save()
-
-    return package
 
 
 def get_last_package(article_id, **kwargs):
@@ -67,55 +44,14 @@ def get_last_package(article_id, **kwargs):
         return
 
 
-def establish_site_connection(url="scielo.br"):
-    try:
-        host = WebSiteConfiguration.objects.get(url__icontains=url).db_uri
-    except WebSiteConfiguration.DoesNotExist:
-        return False
-
-    try:
-        mk_connection(host=host)
-    except exceptions.DBConnectError:
-        return False
-
-    return True
-
-
-def request_pid_for_accepted_packages(user):
-    # FIXME Usar package.SPSPkg no lugar de Package
-    for pkg in Package.objects.filter(
-        status__in=[choices.PS_APPROVED, choices.PS_APPROVED_WITH_ERRORS],
-        article__isnull=True,
-    ).iterator():
-        # FIXME indicar se é atualização (True) ou novo (False)
-        is_published = None
-
-        sps_pkg = SPSPkg.create_or_update(
-            user,
-            pkg.file.path,
-            package_choices.PKG_ORIGIN_INGRESS_WITH_VALIDATION,
-            reset_failures=True,
-            is_published=is_published,
-        )
-
-        response = create_article(user, sps_pkg)
-        try:
-            pkg.article = response["article"]
-            pkg.save()
-        except KeyError:
-            # TODO registrar em algum modelo os erros para que o usuário
-            # fique ciente de que houve erro
-            logging.exception(
-                f"Unable to create / update article {response['error_msg']}"
-            )
-
-
 def receive_package(request, package):
     try:
         zip_xml_file_path = package.file.path
         user = request.user
+        response = {}
         for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
             response = _check_article_and_journal(xml_with_pre, user=user)
+            logging.info(response)
             if response.get("xml_changed"):
                 # atualiza conteúdo de zip
                 with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
@@ -133,23 +69,20 @@ def receive_package(request, package):
 
             error_category = response.get("error_type")
             if error_category:
-                package._add_validation_result(
-                    error_category=error_category,
-                    status=choices.VS_DISAPPROVED,
+                report = ValidationReport.get_or_create(
+                    user=user,
+                    package=package,
+                    title=_("Package file"),
+                    category=choices.VAL_CAT_PACKAGE_FILE,
+                )
+                report.add_validation_result(
+                    status=choices.VALIDATION_RESULT_FAILURE,
                     message=response["error"],
                     data=serialize_detail(response),
+                    subject=choices.VAL_CAT_PACKAGE_FILE,
                 )
                 # falhou, retorna response
                 return response
-        # sucesso, retorna package
-        package._add_validation_result(
-            error_category=choices.VE_XML_FORMAT_ERROR,
-            status=choices.VS_APPROVED,
-            message=None,
-            data={
-                "xml_path": package.file.path,
-            },
-        )
         return response
     except GetXMLItemsError as exc:
         # identifica os erros do arquivo Zip / XML
@@ -189,8 +122,6 @@ def _identify_file_error(package):
             status=choices.VS_DISAPPROVED,
         )
         error = {"error": str(e), "error_type": choices.VE_XML_FORMAT_ERROR}
-
-    package._add_validation_result(**result)
 
     report = ValidationReport.get_or_create(
         package.creator, package, _("File Report"), choices.VAL_CAT_PACKAGE_FILE
@@ -568,9 +499,7 @@ def _handle_xml_content_validation_result(
         status_ = result["response"]
         if status_ == "OK":
             report = info_report
-            status = choices.VS_APPROVED
         else:
-            status = choices.VS_DISAPPROVED
 
             group = result.get("group") or result.get("item")
             if not group and result.get("exception_type"):
@@ -592,12 +521,7 @@ def _handle_xml_content_validation_result(
         message = result.get("message") or ""
         advice = result.get("advice") or ""
         message = ". ".join([_(message), _(advice)])
-        package._add_validation_result(
-            error_category=error_category,
-            status=status,
-            message=message,
-            data=result,
-        )
+
         validation_result = report.add_validation_result(
             status=status_,
             message=result.get("message"),

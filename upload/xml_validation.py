@@ -25,7 +25,6 @@ from packtools.sps.validation.related_articles import RelatedArticlesValidation
 from core.utils.requester import fetch_data
 from tracker.models import UnexpectedEvent
 from upload import choices
-from upload.models import ValidationResult
 
 
 def doi_callable_get_data(doi):

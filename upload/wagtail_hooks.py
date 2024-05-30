@@ -24,11 +24,8 @@ from upload.views import XMLErrorReportEditView
 from .button_helper import UploadButtonHelper
 from .controller import receive_package
 from .models import (
-    ErrorResolutionOpinion,
     Package,
     QAPackage,
-    ValidationReport,
-    ValidationResult,
     XMLError,
     XMLErrorReport,
     XMLInfo,
@@ -141,81 +138,6 @@ class PackageAdminInspectView(InspectView):
         data["optimized_pkg"] = optz_file_path
         self.set_pdf_paths(data, optz_dir)
 
-        for vr in self.instance.validationresult_set.all():
-            vr_name = vr.report_name()
-            if vr_name not in data["validation_results"]:
-                data["validation_results"][vr_name] = {"status": vr.status}
-
-            if vr.status == choices.VS_DISAPPROVED:
-                if data["validation_results"][vr_name] != choices.VS_DISAPPROVED:
-                    data["validation_results"][vr_name].update({"status": vr.status})
-
-                if hasattr(vr, "analysis"):
-                    data["validation_results"]["qa"] = self.instance.status
-
-            if vr_name == choices.VR_XML_OR_DTD:
-                if "xmls" not in data["validation_results"][vr_name]:
-                    data["validation_results"][vr_name]["xmls"] = []
-
-                if vr.data and isinstance(vr.data, dict):
-                    data["validation_results"][vr_name]["xmls"].append(
-                        {
-                            "xml_name": vr.data.get("xml_path"),
-                            "base_uri": file_utils.os.path.join(
-                                optz_dir, vr.data.get("xml_path")
-                            ),
-                            "inspect_uri": ValidationResultAdmin().url_helper.get_action_url(
-                                "inspect", vr.id
-                            ),
-                        }
-                    )
-
-        return super().get_context_data(**data)
-
-
-class ValidationResultCreateView(CreateView):
-    def get_instance(self):
-        vr_object = super().get_instance()
-
-        status = self.request.GET.get("status")
-        if status and status in (choices.VS_APPROVED, choices.VS_DISAPPROVED):
-            vr_object.status = status
-
-        pkg_id = self.request.GET.get("package_id")
-        if pkg_id:
-            try:
-                vr_object.package = Package.objects.get(pk=pkg_id)
-            except Package.DoesNotExist:
-                ...
-
-        return vr_object
-
-    def form_valid(self, form):
-        self.object = form.save_all(self.request.user)
-
-        op = ErrorResolutionOpinion()
-        op.creator = self.request.user
-        op.opinion = choices.ER_OPINION_FIX_DEMANDED
-        op.validation_result_id = self.object.id
-        op.package_id = self.object.package_id
-        op.guidance = _("This error was reported by an user.")
-        op.save()
-
-        self.object.validation_result_opinion = op
-        self.object.save()
-
-        return HttpResponseRedirect(self.get_success_url())
-
-
-class ValidationResultAdminInspectView(InspectView):
-    def get_context_data(self):
-        try:
-            data = self.instance.data.copy()
-        except AttributeError:
-            data = {}
-        data[
-            "package_url"
-        ] = f"/admin/upload/package/inspect/{self.instance.package.id}"
         return super().get_context_data(**data)
 
 
@@ -274,51 +196,6 @@ class PackageAdmin(ModelAdmin):
         return qs.filter(creator=request.user)
 
 
-class ValidationResultAdmin(ModelAdmin):
-    model = ValidationResult
-    permission_helper_class = UploadPermissionHelper
-    create_view_class = ValidationResultCreateView
-    inspect_view_enabled = True
-    inspect_view_class = ValidationResultAdminInspectView
-    menu_label = _("Validation results")
-    menu_icon = "error"
-    menu_order = 200
-    add_to_settings_menu = False
-    exclude_from_explorer = False
-    list_display = (
-        "report_name",
-        "category",
-        "status",
-        "package",
-        "message",
-    )
-    list_filter = (
-        "category",
-        "status",
-    )
-    search_fields = (
-        "message",
-        "package__name",
-        "package__file",
-    )
-    inspect_view_fields = {
-        "package",
-        "category",
-        "message",
-        "data",
-        "status",
-    }
-
-    def get_queryset(self, request):
-        if (
-            request.user.is_superuser
-            or self.permission_helper.user_can_access_all_packages(request.user, None)
-        ):
-            return super().get_queryset(request)
-
-        return super().get_queryset(request).filter(package__creator=request.user)
-
-
 class QualityAnalysisPackageAdmin(ModelAdmin):
     model = QAPackage
     button_helper_class = UploadButtonHelper
@@ -361,42 +238,6 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
             )
 
         return qs.none()
-
-
-class ValidationReportAdmin(ModelAdmin):
-    model = ValidationReport
-    permission_helper_class = UploadPermissionHelper
-    # create_view_class = ValidationReportCreateView
-    inspect_view_enabled = True
-    # inspect_view_class = ValidationReportAdminInspectView
-    menu_label = _("Validation Reports")
-    menu_icon = "error"
-    add_to_settings_menu = False
-    exclude_from_explorer = False
-    list_display = (
-        "package",
-        "category",
-        "title",
-        "creation",
-    )
-    list_filter = (
-        "category",
-        "creation",
-    )
-    search_fields = (
-        "title",
-        "package__name",
-        "package__file",
-    )
-
-    def get_queryset(self, request):
-        if (
-            request.user.is_superuser
-            or self.permission_helper.user_can_access_all_packages(request.user, None)
-        ):
-            return super().get_queryset(request)
-
-        return super().get_queryset(request).filter(package__creator=request.user)
 
 
 class XMLErrorReportAdmin(ModelAdmin):
@@ -565,8 +406,6 @@ class UploadModelAdminGroup(ModelAdminGroup):
         PackageAdmin,
         QualityAnalysisPackageAdmin,
         XMLErrorAdmin,
-        # ValidationResultAdmin é necessário para apresentar 'inspect' de Package
-        ValidationResultAdmin,
     )
     menu_order = get_menu_order("upload")
 
@@ -580,7 +419,6 @@ class UploadReportsModelAdminGroup(ModelAdminGroup):
     items = (
         # os itens a seguir possibilitam que na página Package.inspect
         # funcionem os links para os relatórios
-        ValidationReportAdmin,
         XMLErrorReportAdmin,
         XMLInfoReportAdmin,
     )

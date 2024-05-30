@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 import sys
@@ -13,6 +14,8 @@ from packtools.sps.validation import article as sps_validation_article
 from packtools.sps.validation import journal as sps_validation_journal
 from packtools.sps.validation.xml_structure import StructureValidator
 from packtools.validator import ValidationReportXML
+from packtools.sps.models.article_assets import ArticleAssets
+from packtools.sps.models.article_renditions import ArticleRenditions
 
 from article.choices import AS_CHANGE_SUBMITTED
 from article.controller import create_article_from_etree, update_article
@@ -123,11 +126,7 @@ def task_optimise_package(file_path):
 
 
 @celery_app.task()
-def task_validate_assets(file_path, xml_path, package_id):
-    package_files = file_utils.get_file_list_from_zip(file_path)
-    article_assets = package_utils.get_article_assets_from_zipped_xml(
-        file_path, xml_path
-    )
+def task_validate_assets(package_id, xml_path, package_files, xml_assets):
 
     has_errors = False
     package = Package.objects.get(pk=package_id)
@@ -137,101 +136,21 @@ def task_validate_assets(file_path, xml_path, package_id):
     )
 
     items = []
-    for asset_result in package_utils.evaluate_assets(article_assets, package_files):
-        asset, is_present = asset_result
 
-        items.append(
-            {
-                "name": asset.name,
-                "id": asset.id,
-                "type": asset.type,
-            }
-        )
+    for asset in xml_assets:
+        is_present = asset["name"] in package_files
+        asset.update({"xml_path": xml_path})
+
         if not is_present:
             has_errors = True
-            package._add_validation_result(
-                error_category=choices.VE_ASSET_ERROR,
-                status=choices.VS_DISAPPROVED,
-                message=f'{asset.name} {_("file is mentioned in the XML but not present in the package.")}',
-                data={
-                    "xml_path": xml_path,
-                    "id": asset.id,
-                    "type": asset.type,
-                    "missing_file": asset.name,
-                },
-            )
             validation_result = report.add_validation_result(
                 status=choices.VALIDATION_RESULT_FAILURE,
-                message=f'{asset.name} {_("file is mentioned in the XML but not present in the package.")}',
-                data={
-                    "xml_path": xml_path,
-                    "id": asset.id,
-                    "type": asset.type,
-                    "missing_file": asset.name,
-                },
-                subject=asset.name,
-            )
-
-            package._add_validation_result(
-                error_category=choices.VE_ASSET_ERROR,
-                status=choices.VS_DISAPPROVED,
-                message=f'{asset.name} {_("file is mentioned in the XML but its optimised version not present in the package.")}',
-                data={
-                    "xml_path": xml_path,
-                    "id": asset.id,
-                    "type": "optimised",
-                    "missing_file": file_utils.generate_filepath_with_new_extension(
-                        asset.name, ".png"
-                    ),
-                },
-            )
-            validation_result = report.add_validation_result(
-                status=choices.VALIDATION_RESULT_FAILURE,
-                message=f'{asset.name} {_("file is mentioned in the XML but its optimised version not present in the package.")}',
-                data={
-                    "xml_path": xml_path,
-                    "id": asset.id,
-                    "type": "optimised",
-                    "missing_file": file_utils.generate_filepath_with_new_extension(
-                        asset.name, ".png"
-                    ),
-                },
-                subject=asset.name,
-            )
-
-            package._add_validation_result(
-                error_category=choices.VE_ASSET_ERROR,
-                status=choices.VS_DISAPPROVED,
-                message=f'{asset.name} {_("file is mentioned in the XML but its thumbnail version not present in the package.")}',
-                data={
-                    "xml_path": xml_path,
-                    "id": asset.id,
-                    "type": "thumbnail",
-                    "missing_file": file_utils.generate_filepath_with_new_extension(
-                        asset.name, ".thumbnail.jpg"
-                    ),
-                },
-            )
-            validation_result = report.add_validation_result(
-                status=choices.VALIDATION_RESULT_FAILURE,
-                message=f'{asset.name} {_("file is mentioned in the XML but its thumbnail version not present in the package.")}',
-                data={
-                    "xml_path": xml_path,
-                    "id": asset.id,
-                    "type": "thumbnail",
-                    "missing_file": file_utils.generate_filepath_with_new_extension(
-                        asset.name, ".thumbnail.jpg"
-                    ),
-                },
-                subject=asset.name,
+                message=f'{asset["name"]} {_("file is mentioned in the XML but not present in the package.")}',
+                data=asset,
+                subject=asset["name"],
             )
 
     if not has_errors:
-        package._add_validation_result(
-            error_category=choices.VE_ASSET_ERROR,
-            status=choices.VS_APPROVED,
-            data={"xml_path": xml_path},
-        )
         validation_result = report.add_validation_result(
             status=choices.VALIDATION_RESULT_SUCCESS,
             message=_("Package has all the expected asset files"),
@@ -247,11 +166,7 @@ def task_validate_assets(file_path, xml_path, package_id):
 
 
 @celery_app.task()
-def task_validate_renditions(file_path, xml_path, package_id):
-    package_files = file_utils.get_file_list_from_zip(file_path)
-    article_renditions = package_utils.get_article_renditions_from_zipped_xml(
-        file_path, xml_path
-    )
+def task_validate_renditions(package_id, xml_path, package_files, xml_renditions):
 
     has_errors = False
     package = Package.objects.get(pk=package_id)
@@ -261,50 +176,22 @@ def task_validate_renditions(file_path, xml_path, package_id):
     )
 
     items = []
-    for rendition_result in package_utils.evaluate_renditions(
-        article_renditions, package_files
-    ):
-        rendition, expected_filename, is_present = rendition_result
-
-        items.append(
-            {
-                "language": rendition.language,
-                "expected_filename": expected_filename,
-                "is_present": is_present,
-            }
-        )
+    for xml_rendition in xml_renditions:
+        is_present = xml_rendition["filename"] in package_files
+        xml_rendition.update({
+            "xml_path": xml_path,
+        })
+        items.append(xml_rendition)
         if not is_present:
             has_errors = True
-
-            package._add_validation_result(
-                error_category=choices.VE_RENDITION_ERROR,
-                status=choices.VS_DISAPPROVED,
-                message=f'{rendition.language} {_("language is mentioned in the XML but its PDF file not present in the package.")}',
-                data={
-                    "xml_path": xml_path,
-                    "language": rendition.language,
-                    "is_main_language": rendition.is_main_language,
-                    "missing_file": expected_filename,
-                },
-            )
             validation_result = report.add_validation_result(
                 status=choices.VALIDATION_RESULT_FAILURE,
-                message=f'{rendition.language} {_("language is mentioned in the XML but its PDF file not present in the package.")}',
-                data={
-                    "xml_path": xml_path,
-                    "language": rendition.language,
-                    "is_main_language": rendition.is_main_language,
-                    "missing_file": expected_filename,
-                },
-                subject=rendition.language,
+                message=f'{xml_rendition["language"]} {_("language is mentioned in the XML but its PDF file not present in the package.")}',
+                data=xml_rendition,
+                subject=xml_rendition["language"],
             )
 
     if not has_errors:
-        package._add_validation_result(
-            error_category=choices.VE_RENDITION_ERROR,
-            status=choices.VS_APPROVED,
-            data={"xml_path": xml_path},
-        )
         validation_result = report.add_validation_result(
             status=choices.VALIDATION_RESULT_SUCCESS,
             message=_("Package has all the expected rendition files"),
@@ -335,21 +222,45 @@ def task_validate_original_zip_file(
         # FIXME nao usar o otimizado neste momento
         optimised_filepath = task_optimise_package(file_path)
 
+        for optimised_xml_with_pre in XMLWithPre.create(path=optimised_filepath):
+            package_files = [os.path.basename(item) for item in optimised_xml_with_pre.files]
+
+            article_renditions = []
+            for item in ArticleRenditions(optimised_xml_with_pre.xmltree).article_renditions:
+                filename = (
+                    f"{xml_path}.pdf" if item.is_main_language else f"{xml_path}-{item.language}".pdf
+                )
+                article_renditions.append({"filename": filename, "language": item.language})
+
+            article_assets = []
+            for asset in ArticleAssets(optimised_xml_with_pre.xmltree).article_assets:
+                article_assets.append(
+                    {
+                        "name": asset.name,
+                        "id": asset.id,
+                        "type": asset.type,
+                    }
+                )
+            # considerando que 1 zip tenha 1 artigo
+            break
+
         # Aciona validação de Assets
         task_validate_assets.apply_async(
             kwargs={
-                "file_path": optimised_filepath,
-                "xml_path": xml_path,
                 "package_id": package_id,
+                "xml_path": xml_path,
+                "package_files": package_files,
+                "xml_assets": article_assets,
             },
         )
 
         # Aciona validação de Renditions
         task_validate_renditions.apply_async(
             kwargs={
-                "file_path": optimised_filepath,
-                "xml_path": xml_path,
                 "package_id": package_id,
+                "xml_path": xml_path,
+                "package_files": package_files,
+                "xml_renditions": article_renditions,
             },
         )
 

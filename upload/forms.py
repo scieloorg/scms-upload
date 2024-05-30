@@ -43,10 +43,11 @@ class ValidationResultForm(WagtailAdminModelForm):
 class XMLErrorReportForm(WagtailAdminModelForm):
     def clean(self):
         cleaned_data = super().clean()
-        if not cleaned_data.get("xml_producer_ack"):
-            self.add_error(
-                "xml_producer_ack", _("Inform if you finish or not the errors review")
-            )
+        if cleaned_data:
+            if not cleaned_data.get("xml_producer_ack"):
+                self.add_error(
+                    "xml_producer_ack", _("Inform if you finish or not the errors review")
+                )
 
     def save_all(self, user):
         vr_obj = super().save(commit=False)
@@ -66,15 +67,3 @@ class XMLErrorReportForm(WagtailAdminModelForm):
                 report.conclusion = choices.REPORT_CONCLUSION_DONE
             report.package.save()
         return report
-
-
-class ValidationResultErrorResolutionForm(forms.Form):
-    validation_result_id = forms.IntegerField()
-    rationale = forms.CharField(widget=forms.Textarea, required=False)
-    action = forms.CharField(widget=forms.Select, required=False)
-
-
-class ValidationResultErrorResolutionOpinionForm(forms.Form):
-    validation_result_id = forms.IntegerField()
-    guidance = forms.CharField(widget=forms.Textarea, required=False)
-    opinion = forms.CharField(widget=forms.Select, required=False)
