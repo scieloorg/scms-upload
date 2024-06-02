@@ -213,6 +213,7 @@ def task_validate_original_zip_file(
 
     for xml_with_pre in XMLWithPre.create(path=file_path):
         xml_path = xml_with_pre.filename
+        name, ext = os.path.splitext(xml_path)
 
         logging.info(f"xmlpre: {xml_with_pre.xmlpre}")
         package = Package.objects.get(pk=package_id)
@@ -228,7 +229,7 @@ def task_validate_original_zip_file(
             article_renditions = []
             for item in ArticleRenditions(optimised_xml_with_pre.xmltree).article_renditions:
                 filename = (
-                    f"{xml_path}.pdf" if item.is_main_language else f"{xml_path}-{item.language}".pdf
+                    f"{name}.pdf" if item.is_main_language else f"{name}-{item.language}.pdf"
                 )
                 article_renditions.append({"filename": filename, "language": item.language})
 
