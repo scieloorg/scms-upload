@@ -27,6 +27,16 @@ class XMLErrorReportEditView(EditView):
         )
 
 
+class QAPackageEditView(EditView):
+    def form_valid(self, form):
+        saved = form.save_all(self.request.user)
+        messages.success(
+            self.request,
+            _("Success ..."),
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
 def finish_deposit(request):
     """
     This view function enables the user to finish deposit of a package through the graphic-interface.
@@ -42,10 +52,24 @@ def finish_deposit(request):
             messages.warning(
                 request,
                 _(
-                    "Package could not be submitted to QA due to validation errors. Go to Error Resolution page for more details."
+                    "Package could not be submitted to QA due to validation errors."
                 ),
             )
-
+            messages.warning(
+                request,
+                _(
+                    "Fix the downloaded errors and submit the corrected package"
+                ),
+            )
+            try:
+                errors = package.get_errors_report_content()
+                response = HttpResponse(errors["content"], content_type="text/csv")
+                response["Content-Disposition"] = "inline; filename=" + errors["filename"]
+                logging.info(errors)
+                return response
+            except Exception as e:
+                logging.exception(e)
+                raise Http404
     return redirect(f"/admin/upload/package/inspect/{package_id}")
 
 
@@ -82,16 +106,6 @@ def preview_document(request):
 
         document_html = render_html(package.file.name, xml_path, language)
 
-        for vr in package.validationresult_set.all():
-            if (
-                vr.report_name() == choices.VR_XML_OR_DTD
-                and vr.status == choices.VS_DISAPPROVED
-            ):
-                messages.error(
-                    request, _("It is not possible to preview HTML of an invalid XML.")
-                )
-                return redirect(request.META.get("HTTP_REFERER"))
-
         return render(
             request=request,
             template_name="modeladmin/upload/package/preview_document.html",
@@ -102,21 +116,24 @@ def preview_document(request):
 
 
 def assign(request):
+    """
+    Assign review to a team member or decide about the package
+    """
     package_id = request.GET.get("package_id")
     user = request.user
 
     if not user.has_perm("upload.assign_package"):
-        messages.error(request, _("You do have permission to assign packages."))
+        messages.error(request, _("You do not have permission to assign packages."))
     elif package_id:
         package = get_object_or_404(Package, pk=package_id)
         is_reassign = package.assignee is not None
 
-        package.assignee = user
-        package.save()
+        # package.assignee = user
+        # package.save()
 
-        if not is_reassign:
-            messages.success(request, _("Package has been assigned with success."))
-        else:
-            messages.warning(request, _("Package has been reassigned with success."))
+        # if not is_reassign:
+        #     messages.success(request, _("Package has been assigned with success."))
+        # else:
+        #     messages.warning(request, _("Package has been reassigned with success."))
 
-    return redirect(request.META.get("HTTP_REFERER"))
+    return redirect(f"/admin/upload/qapackage/edit/{package_id}")
