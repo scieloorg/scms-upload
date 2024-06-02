@@ -19,7 +19,7 @@ from issue.models import Issue
 from upload.tasks import task_validate_original_zip_file
 from upload.utils import file_utils
 from upload.utils.xml_utils import XMLFormatError
-from upload.views import XMLErrorReportEditView
+from upload.views import XMLErrorReportEditView, QAPackageEditView
 
 from .button_helper import UploadButtonHelper
 from .controller import receive_package
@@ -30,6 +30,8 @@ from .models import (
     XMLErrorReport,
     XMLInfo,
     XMLInfoReport,
+    ValidationReport,
+    PkgValidationResult,
     choices,
 )
 from .permission_helper import UploadPermissionHelper
@@ -158,7 +160,7 @@ class PackageAdmin(ModelAdmin):
         "file",
         "blocking_errors",
         "error_percentage",
-        "" "category",
+        "category",
         "status",
         "creator",
         "updated",
@@ -203,6 +205,7 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
     menu_label = _("Quality analysis")
     menu_icon = "folder"
     menu_order = 200
+    edit_view_class = QAPackageEditView
     inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
@@ -212,21 +215,27 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
     list_display = (
         "file",
         "assignee",
-        "validations",
-        "errors",
-        "blocking_errors",
+        "analyst",
+        "creator",
+        "updated_by",
+        "absent_data_percentage",
         "error_percentage",
         "category",
         "status",
         "updated",
         "expiration_date",
     )
-    list_filter = ("assignee", "status", "category")
+    list_filter = ("status", "category")
     search_fields = (
         "file",
         "assignee__username",
+        "analyst__user__username",
         "creator__username",
         "updated_by__username",
+        "assignee__email",
+        "analyst__user__email",
+        "creator__email",
+        "updated_by__email",
     )
 
     def get_queryset(self, request):
@@ -234,7 +243,12 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
 
         if self.permission_helper.user_can_access_all_packages(request.user, None):
             return qs.filter(
-                status__in=[choices.PS_QA, choices.PS_VALIDATED_WITH_ERRORS]
+                status__in=[
+                    choices.PS_PENDING_QA_DECISION,
+                    choices.PS_VALIDATED_WITH_ERRORS,
+                    choices.PS_APPROVED_WITH_ERRORS,
+                    choices.PS_REJECTED,
+                ]
             )
 
         return qs.none()
@@ -257,7 +271,6 @@ class XMLErrorReportAdmin(ModelAdmin):
         "category",
         "title",
         "creation",
-        "total_to_fix",
     )
     list_filter = (
         "category",
@@ -399,6 +412,77 @@ class XMLInfoAdmin(ModelAdmin):
         return super().get_queryset(request).filter(package__creator=request.user)
 
 
+class ValidationReportAdmin(ModelAdmin):
+    model = ValidationReport
+    permission_helper_class = UploadPermissionHelper
+    # create_view_class = ValidationReportCreateView
+    inspect_view_enabled = True
+    # inspect_view_class = ValidationReportAdminInspectView
+    menu_label = _("Validation Reports")
+    menu_icon = "error"
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+    list_display = (
+        "package",
+        "category",
+        "title",
+        "creation",
+    )
+    list_filter = (
+        "category",
+        "creation",
+    )
+    search_fields = (
+        "title",
+        "package__name",
+        "package__file",
+    )
+
+    def get_queryset(self, request):
+        if (
+            request.user.is_superuser
+            or self.permission_helper.user_can_access_all_packages(request.user, None)
+        ):
+            return super().get_queryset(request)
+
+        return super().get_queryset(request).filter(package__creator=request.user)
+
+
+class ValidationAdmin(ModelAdmin):
+    model = PkgValidationResult
+    permission_helper_class = UploadPermissionHelper
+    # create_view_class = ValidationCreateView
+    inspect_view_enabled = True
+    # inspect_view_class = ValidationAdminInspectView
+    menu_label = _("Validations")
+    menu_icon = "error"
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+    list_display = (
+        "subject",
+        "status",
+        "message",
+        "created",
+    )
+    list_filter = (
+        "status",
+    )
+    search_fields = (
+        "subject",
+        "status",
+        "message",
+    )
+
+    def get_queryset(self, request):
+        if (
+            request.user.is_superuser
+            or self.permission_helper.user_can_access_all_packages(request.user, None)
+        ):
+            return super().get_queryset(request)
+
+        return super().get_queryset(request).filter(package__creator=request.user)
+
+
 class UploadModelAdminGroup(ModelAdminGroup):
     menu_icon = "folder"
     menu_label = "Upload"
@@ -421,6 +505,8 @@ class UploadReportsModelAdminGroup(ModelAdminGroup):
         # funcionem os links para os relatórios
         XMLErrorReportAdmin,
         XMLInfoReportAdmin,
+        ValidationAdmin,
+        ValidationReportAdmin
     )
     menu_order = get_menu_order("upload")
 
