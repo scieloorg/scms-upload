@@ -333,6 +333,10 @@ class Mission(Orderable, RichTextWithLang, CommonControlField):
         obj.save()
         return obj
 
+    @property
+    def collections(self):
+        return JournalHistory.journal_collections(journal=self)
+
 
 class JournalHistory(CommonControlField, Orderable):
     journal = ParentalKey(
