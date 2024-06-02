@@ -1,5 +1,4 @@
 import csv
-import json
 import logging
 import os
 from datetime import date, datetime, timedelta
@@ -8,25 +7,24 @@ from tempfile import TemporaryDirectory
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
-from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.models import CommonControlField
-
-from . import choices
-from .forms import UploadPackageForm, ValidationResultForm, XMLErrorReportForm
-from .permission_helper import (
-    ACCESS_ALL_PACKAGES,
-    ANALYSE_VALIDATION_ERROR_RESOLUTION,
-    ASSIGN_PACKAGE,
-    FINISH_DEPOSIT,
-    SEND_VALIDATION_ERROR_RESOLUTION,
+from team.models import CollectionTeamMember
+from upload import choices
+from upload.forms import (
+    QAPackageForm,
+    UploadPackageForm,
+    ValidationResultForm,
+    XMLErrorReportForm,
 )
-from .utils import file_utils
+from upload.permission_helper import ACCESS_ALL_PACKAGES, ASSIGN_PACKAGE, FINISH_DEPOSIT
+from upload.utils import file_utils
 
 User = get_user_model()
 
@@ -35,16 +33,6 @@ def now():
     return (
         datetime.utcnow().isoformat().replace(":", "").replace(" ", "").replace(".", "")
     )
-
-
-def _get_tolerance_level():
-    # TODO make it configurable
-    return 1
-
-
-def _get_tolerance_level_to_absent_data():
-    # TODO make it configurable
-    return 1
 
 
 def upload_package_directory_path(instance, filename):
@@ -89,6 +77,9 @@ class Package(CommonControlField, ClusterableModel):
         null=True,
         blank=True,
     )
+    analyst = models.ForeignKey(
+        CollectionTeamMember, blank=True, null=True, on_delete=models.SET_NULL
+    )
     article = models.ForeignKey(
         "article.Article",
         blank=True,
@@ -109,6 +100,7 @@ class Package(CommonControlField, ClusterableModel):
     errors = models.PositiveIntegerField(default=0)
     blocking_errors = models.PositiveIntegerField(default=0)
 
+    absent_data_percentage = models.FloatField(default=0)
     error_percentage = models.FloatField(default=0)
     xml_errors_declared_to_fix_percentage = models.FloatField(default=0)
     xml_errors_declared_not_to_fix_percentage = models.FloatField(default=0)
@@ -181,6 +173,11 @@ class Package(CommonControlField, ClusterableModel):
             models.Index(
                 fields=[
                     "error_percentage",
+                ]
+            ),
+            models.Index(
+                fields=[
+                    "absent_data_percentage",
                 ]
             ),
             models.Index(
@@ -321,12 +318,19 @@ class Package(CommonControlField, ClusterableModel):
             self.validations += report.validations
             self.errors += report.errors
             self.blocking_errors += report.blocking_errors
-        for report in self.xml_error_report.all():
-            self.validations += report.validations
-            self.errors += report.errors
-            self.warnings += report.warnings
         for report in self.xml_info_report.all():
             self.validations += report.validations
+
+        xml_errors = XMLError.objects.filter(report__package=self)
+        count = xml_errors.count()
+        self.validations += count
+        self.errors += count
+        self.warnings += xml_errors.filter(
+            status=choices.VALIDATION_RESULT_WARNING
+        ).count()
+        absent_data = xml_errors.filter(
+            Q(validation_type="exist") | Q(got_value__isnull=True)
+        ).count()
 
         # verifica status a partir destes números
         if self.blocking_errors:
@@ -344,15 +348,23 @@ class Package(CommonControlField, ClusterableModel):
         self.error_percentage = round(
             (self.errors + self.warnings) * 100 / self.validations, 2
         )
-
-        # estabelece o status do pacote baseado
-        # na presença dos erros e da tolerancia
-        if self.status == choices.PS_VALIDATED_WITH_ERRORS:
-            if _get_tolerance_level() == 0:
-                self.status = choices.PS_PENDING_DEPOSIT
-            else:
-                self.status = choices.PS_PENDING_QA_DECISION
+        self.absent_data_percentage = round(absent_data * 100 / self.validations, 2)
         self.save()
+
+    @property
+    def xml_producer_is_allowed_to_finish_deposit(self):
+        # compara a porcentagem de erros que o produtor de XML declarou que não corrigirá
+        # com a porcentagem máxima aceita de erros
+        # compara a porcentagem de ausência de dados
+        # que o produtor de XML declarou a ocorrência
+        # com a porcentagem máxima aceita de dados faltantes
+        return (
+            self.errors == 0
+            and self.xml_errors_declared_not_to_fix_percentage
+            <= self.journal.max_error_percentage_accepted
+            and self.absent_data_percentage
+            <= self.journal.max_absent_data_percentage_accepted
+        )
 
     def generate_error_report_content(self):
         first = XMLError.objects.filter(report__package=self).first()
@@ -417,9 +429,7 @@ class Package(CommonControlField, ClusterableModel):
             # "xml_errors_not_to_fix": self.xml_errors_not_to_fix,
             # "xml_errors_absent_data": self.xml_errors_absent_data,
             "is_error_review_finished": self.is_error_review_finished,
-            "allow_finish_deposit_with_errors": _get_tolerance_level() != 0,
-            "allow_finish_deposit_with_absent_data": _get_tolerance_level_to_absent_data()
-            != 0,
+            "xml_producer_is_allowed_to_finish_deposit": self.xml_producer_is_allowed_to_finish_deposit,
         }
 
     @property
@@ -432,11 +442,7 @@ class Package(CommonControlField, ClusterableModel):
         modifica o status do pacote de PS_VALIDATED_WITH_ERRORS para
         PS_PENDING_QA_DECISION ou PS_PENDING_CORRECTION
         """
-        if _get_tolerance_level() == 0:
-            self.status = choices.PS_PENDING_CORRECTION
-        elif self.xml_errors_declared_to_fix_percentage:
-            self.status = choices.PS_PENDING_CORRECTION
-        else:
+        if self.xml_producer_is_allowed_to_finish_deposit:
             self.status = choices.PS_PENDING_QA_DECISION
         self.save()
         return True
@@ -494,10 +500,11 @@ class Package(CommonControlField, ClusterableModel):
 class QAPackage(Package):
 
     panels = [
+        AutocompletePanel("analyst"),
         FieldPanel("qa_decision"),
     ]
 
-    base_form_class = UploadPackageForm
+    base_form_class = QAPackageForm
 
     class Meta:
         proxy = True
@@ -696,7 +703,7 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
         blank=True,
     )
     got_value = models.JSONField(_("Got value"), null=True, blank=True)
-    advice = models.CharField(_("Advice"), null=True, blank=True, max_length=128)
+    advice = models.CharField(_("Advice"), null=True, blank=True, max_length=256)
     reaction = models.CharField(
         _("Reaction"),
         max_length=16,
