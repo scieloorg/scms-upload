@@ -168,8 +168,9 @@
                     <div class="12">
 
                     {% if status == 'pending-correction' or status == 'rejected' %}
-                        {% trans 'The XML producer must correct the package and submit again' %}
-
+                        <div class="help-block help-critical"><svg class="icon icon-critical icon" aria-hidden="true"><use href="#icon-critical"></use></svg>
+                            {% trans 'The XML producer must correct the package and submit again' %}
+                        </div>
                     {% elif perms.upload.send_validation_error_resolution and status == 'pending-deposit' %}
                         {% if summary.xml_errors_to_fix %}
                             
@@ -182,60 +183,58 @@
 
                             <a class="report-link" href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
                                 <!-- User must finish the error review -->
-                                {% trans 'I will correct the errors, then submit the corrected package' %}
+                                {% trans 'The XML producer must correct the errors, then submit the corrected package' %}
                             </a>
 
-                        {% elif summary.xml_errors_not_to_fix %}
-                            {% if summary.allow_finish_deposit_with_errors and summary.is_error_review_finished %}
-                                <a class="report-link" href="{% url 'upload:finish_deposit' %}?package_id={{ package_id }}">
-                                    {% trans 'I declare that the' %}{{ summary.xml_errors_not_to_fix }}{% trans 'are not errors' %}.
-                                </a>
+                        {% elif summary.xml_errors_not_to_fix or summary.xml_errors_absent_data %}
+                            {% if summary.is_error_review_finished and summary.xml_producer_is_allowed_to_finish_deposit %}
+                                <!-- a class="report-link" href="{% url 'upload:finish_deposit' %}?package_id={{ package_id }}" -->
+                                <div class="help-block help-warning"><svg class="icon icon-warning icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
+                                    {% if summary.xml_errors_not_to_fix %}
+                                        {% trans 'The XML producer concluded that' %} {{ summary.xml_errors_not_to_fix }} {% trans 'are not errors ' %}.
+                                    {% endif %}
+                                </div>
+                                <div class="help-block help-warning"><svg class="icon icon-warning icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
+                                    {% if summary.xml_errors_absent_data %}
+                                        {% trans 'The XML producer concluded that' %} {{ summary.xml_errors_absent_data }} {% trans 'are errors caused by absent data' %}.
+                                    {% endif %}
+                                </div>
                             {% elif summary.is_error_review_finished %}
                                 <!-- not allowed to finish deposit with errors -->
-                                {% trans 'The XML producer must correct the package and submit again' %}
+                                <div class="help-block help-critical"><svg class="icon icon-critical icon" aria-hidden="true"><use href="#icon-critical"></use></svg>
+                                    {% trans 'The XML producer must correct the package and submit again' %}
+                                </div>
                             {% else %}
                                 <a class="report-link" href="#xer2">
                                     <!-- User must finish the error review -->
                                     {% trans 'Review and comment the errors' %}
                                 </a>
                             {% endif %}
-
-                        {% elif summary.xml_errors_absent_data %}
-                            {% if summary.allow_finish_deposit_with_absent_data and summary.is_error_review_finished %}
-                                <a class="report-link" href="{% url 'upload:finish_deposit' %}?package_id={{ package_id }}">
-                                    {% trans 'I declare that the' %}{{ summary.xml_errors_absent_data }}{% trans 'are errors caused by absent data' %}.
-                                </a>
-                            {% elif summary.is_error_review_finished %}
-                                <!-- not allowed to finish deposit with absent data -->
-                                {% trans 'The XML producer must correct the package and submit again' %}
-                            {% else %}
-                                <a class="report-link" href="#xer2">
-                                    <!-- User must finish the error review -->
-                                    {% trans 'Review and comment the errors' %}
-                                </a>
-                            {% endif %}
-
-                        {% elif summary.errors %}
-                            <a class="report-link" href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
-                                <!-- User must finish the error review -->
-                                {% trans 'I will correct the errors, then submit the corrected package' %}
-                            </a>
                         
                         {% else %}
-                            <a class="report-link" href="{% url 'upload:finish_deposit' %}?package_id={{ package_id }}">
-                                {% trans 'Finish deposit' %}
-                            </a>
+                            <div class="help-block help-info"><svg class="icon icon-help icon" aria-hidden="true"><use href="#icon-help"></use></svg>
+                              {% trans 'Finish deposit' %}
+                            </div>
                         {% endif %}
                     {% elif perms.upload.analyse_validation_error_resolution %}
                         {% if status == 'pending-qa-decision' %}
-                            {% trans 'The XML producer reviewed the errors and commented them' %}
-                        {% elif status == 'validated-with-errors' %}
-                            {% trans 'The XML producer is reviewing the errors' %}
-                        {% endif %}
-                        <a class="report-link" href="/admin/upload/qapackage/edit/{{ package_id }}">{% trans 'Add quality analysis conclusion' %}</a>
+                            <div class="help-block help-info"><svg class="icon icon-help icon" aria-hidden="true"><use href="#icon-help"></use></svg>
+                                {% trans 'The XML producer reviewed the errors and commented them' %}
+                            </div>
+                            <div class="help-block help-info"><svg class="icon icon-help icon" aria-hidden="true"><use href="#icon-help"></use></svg>
+                                {% trans 'Assign quality analysis and/or Add quality analysis conclusion' %}
+                            </div>
 
+                        {% elif status == 'validated-with-errors' %}
+                            <div class="help-block help-warning"><svg class="icon icon-warning icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
+                                {% trans 'The XML producer should review and comment the errors, but exceptionally the quality analyst is allowed to reject or accept the package with errors before XML producer finishes the review' %}
+                            </div>
+                        {% endif %}
+                        
                     {% else %}
-                        {% trans '{{ status }}' %}
+                        <div class="help-block help-warning"><svg class="icon icon-warning icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
+                            {% trans '{{ status }}' %}
+                        </div>
                     {% endif %}
                 </div>
             </div>
