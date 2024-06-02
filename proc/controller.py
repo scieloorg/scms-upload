@@ -6,7 +6,7 @@ from scielo_classic_website import classic_ws
 from article.controller import create_article
 from core.controller import parse_yyyymmdd
 from issue.models import Issue
-from journal.models import Journal, OfficialJournal
+from journal.models import Journal, OfficialJournal, JournalHistory
 from proc.models import JournalProc
 from tracker import choices as tracker_choices
 
@@ -56,7 +56,37 @@ def create_or_update_journal(
         migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         force_update=force_update,
     )
+
+    create_journal_history(user, journal, journal_proc, classic_website_journal)
     return journal
+
+
+def create_journal_history(user, journal, journal_proc, classic_website_journal):
+    status_items = {
+        "D": "INTERRUPTED",
+        "S": "INTERRUPTED",
+        "C": "ADMITTED",
+    }
+    for event in classic_website_journal.status_history:
+        # obtém year, month, day
+        _date = event["date"]
+        year, month, day = parse_yyyymmdd(_date)
+
+        # obtém event_type
+        _status = event["status"]
+        event_type = status_items.get(_status)
+
+        # obtém interruption_reason
+        _reason = event.get("reason")
+        interruption_reason = None
+        if _status == "D":
+            interruption_reason = "ceased"
+        else:
+            interruption_reason = _reason
+
+        JournalHistory.create_or_update(
+            user, journal, journal_proc.collection, event_type, year, month, day, interruption_reason
+        )
 
 
 def create_or_update_issue(

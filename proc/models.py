@@ -774,6 +774,14 @@ class JournalProc(BaseProc, ClusterableModel):
                 )
             )
 
+    @property
+    def max_error_percentage_accepted(self):
+        return self.collection.max_error_percentage_accepted
+
+    @property
+    def max_absent_data_percentage_accepted(self):
+        return self.collection.max_absent_data_percentage_accepted
+
 
 ################################################
 class IssueGetOrCreateError(Exception):
@@ -1435,7 +1443,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             with TemporaryDirectory() as output_folder:
 
-                xml_with_pre = self.get_xml_with_pre()
+                xml_with_pre = self.get_xml_with_pre(self.get_xml_path())
 
                 builder = PkgZipBuilder(xml_with_pre)
                 sps_pkg_zip_path = builder.build_sps_package(

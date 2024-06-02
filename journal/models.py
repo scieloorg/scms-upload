@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from django.db import models
+from django.db import models, IntegrityError
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -9,7 +9,7 @@ from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, Objec
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
-from proc.models import JournalProc
+from collection.models import Collection
 from core.choices import MONTHS
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField, RichTextWithLang
@@ -238,6 +238,22 @@ class Journal(CommonControlField, ClusterableModel):
     def any_issn(self):
         return self.official_journal and (self.official_journal.issn_electronic or self.official_journal.issn_print)
 
+    @property
+    def max_error_percentage_accepted(self):
+        values = []
+        for collection in JournalHistory.journal_collections(journal=self):
+            values.append(collection.max_error_percentage_accepted)
+        # obtém o valor mais rígido se participa de mais de 1 coleção
+        return min(values) or 0
+
+    @property
+    def max_absent_data_percentage_accepted(self):
+        values = []
+        for collection in JournalHistory.journal_collections(journal=self):
+            values.append(collection.max_absent_data_percentage_accepted)
+        # obtém o valor mais rígido se participa de mais de 1 coleção
+        return min(values) or 0
+
 
 class Owner(Orderable, InstitutionHistory):
     journal = ParentalKey(Journal, related_name="owner", null=True, blank=True, on_delete=models.SET_NULL)
@@ -316,16 +332,22 @@ class Mission(Orderable, RichTextWithLang, CommonControlField):
         obj.journal = journal or obj.journal
         obj.save()
         return obj
-    
+
 
 class JournalHistory(CommonControlField, Orderable):
-    journal_proc = ParentalKey(
-        JournalProc,
+    journal = ParentalKey(
+        Journal,
         on_delete=models.SET_NULL,
-        related_name="journal_history",
         null=True,
+        blank=True,
+        related_name="journal_history",
     )
-
+    collection = models.ForeignKey(
+        Collection,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
     year = models.CharField(_("Event year"), max_length=4, null=True, blank=True)
     month = models.CharField(
         _("Event month"),
@@ -347,7 +369,7 @@ class JournalHistory(CommonControlField, Orderable):
         _("Indexing interruption reason"),
         null=True,
         blank=True,
-        max_length=16,
+        max_length=24,
         choices=choices.INDEXING_INTERRUPTION_REASON,
     )
 
@@ -364,6 +386,7 @@ class JournalHistory(CommonControlField, Orderable):
     class Meta:
         verbose_name = _("Event")
         verbose_name_plural = _("Events")
+        unique_together = ("journal", "collection", "event_type", "year", "month", "day")
         indexes = [
             models.Index(
                 fields=[
@@ -371,6 +394,52 @@ class JournalHistory(CommonControlField, Orderable):
                 ]
             ),
         ]
+
+    @classmethod
+    def get(cls, journal, collection, event_type, year, month, day, interruption_reason=None):
+        return cls.objects.get(
+            journal=journal,
+            collection=collection,
+            event_type=event_type,
+            year=year,
+            month=month,
+            day=day,
+        )
+
+    @classmethod
+    def create(cls, user, journal, collection, event_type, year, month, day, interruption_reason=None):
+        try:
+            obj = cls()
+            obj.journal = journal
+            obj.collection = collection
+            obj.event_type = event_type
+            obj.year = year
+            obj.month = month
+            obj.day = day
+            obj.interruption_reason = interruption_reason
+            obj.creator = user
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(journal, collection, event_type, year, month, day)
+
+    @classmethod
+    def create_or_update(cls, user, journal, collection, event_type, year, month, day, interruption_reason=None):
+        try:
+            obj = cls.get(journal, collection, event_type, year, month, day)
+            obj.interruption_reason = interruption_reason
+            obj.creator = obj.creator or user
+            obj.updated_by = obj.updated_by or user
+            obj.save()
+        except cls.DoesNotExist:
+            return cls.create(
+                user, journal, collection, event_type, year, month, day, interruption_reason
+            )
+
+    @staticmethod
+    def journal_collections(journal):
+        for item in JournalHistory.objects.filter(journal=journal).iterator():
+            yield item.collection
 
     @property
     def data(self):
@@ -386,7 +455,15 @@ class JournalHistory(CommonControlField, Orderable):
 
     @property
     def date(self):
-        return f"{self.year}-{self.month}-{self.day}"
+        return f"{self.year}-{str(self.month).zfill(2)}-{str(self.day).zfill(2)}"
+
+    @property
+    def opac_event_type(self):
+        if self.event_type == "ADMITTED":
+            return "current"
+        if 'suspended' in self.interruption_reason:
+            return 'suspended'
+        return 'inprogress'
 
     def __str__(self):
         return f"{self.event_type} {self.interruption_reason} {self.year}/{self.month}/{self.day}"
@@ -408,12 +485,6 @@ class JournalHistory(CommonControlField, Orderable):
         Funcao para API article meta.
         Atualiza o Type Event de JournalHistory.
         """
-        reasons = {
-            None: "ceased",
-            "not-open-access": "not-open-access",
-            "suspended-by-committee": "by-committee",
-            "suspended-by-editor": "by-editor",
-        }
         try:
             obj = cls.objects.get(
                 scielo_journal=scielo_journal,

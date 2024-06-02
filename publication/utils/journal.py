@@ -25,9 +25,9 @@ def build_journal(journal_proc, builder):
         # builder.add_event_to_timeline(item["status"], item["date"], item.get("reason"))
     for journal_history in journal.journal_history.all():
         builder.add_event_to_timeline(
-            journal_history.event_type,
-            journal.date,
-            journal.reason,
+            journal_history.opac_event_type,
+            journal_history.date,
+            journal_history.interruption_reason,
         )
     builder.add_journal_issns(
         scielo_issn=journal_id,
