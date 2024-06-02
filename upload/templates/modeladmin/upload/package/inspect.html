@@ -48,7 +48,7 @@
                         <td>
 
                             {% if report.creation == 'doing' %}
-                                <a class="report-link" href Reload page="">{% trans 'Processing...' %}</a>
+                                <a class="report-link" href="">{% trans 'Processing...' %}</a>
                             {% else %}
                                 <a class="report-link" href="/admin/upload/validationreport/edit/{{ report.id }}">
                                     {% if perms.upload.send_validation_error_resolution and report.errors %}
@@ -88,7 +88,7 @@
                         <td>
                             <a name="xer{{ report.id }}"/>
                             {% if report.creation == 'doing' %}
-                                <a class="report-link" href="">{% trans 'Processing... Reload page' %}</a>
+                                <a class="report-link" href="#xer{{ report.id }}">{% trans 'Processing... Reload page' %}</a>
                             {% elif perms.upload.send_validation_error_resolution %}
                                 <a class="report-link" href="/admin/upload/xmlerrorreport/edit/{{ report.id }}">
                                     {% trans 'Review errors' %}
@@ -140,8 +140,9 @@
 
     {% if perms.upload.send_validation_error_resolution or perms.upload.analyse_validation_error_resolution %}
         {% if not summary.is_validation_finished %}
+            <a name="bottom"/>
             <div class="nice-padding row">
-                <a class="report-link" href="">
+                <a class="report-link" href="#bottom">
                     {% trans 'Processing validations... Reload page. ' %}
                 </a>
             </div>
@@ -175,7 +176,7 @@
                         {% if summary.xml_errors_to_fix %}
                             
                             {% if not summary.is_error_review_finished %}
-                                <a class="report-link" href="#xer2">
+                                <a class="report-link" href="?#xer2">
                                     <!-- User must finish the error review -->
                                     {% trans 'Review and comment the errors' %}
                                 </a>
@@ -205,7 +206,7 @@
                                     {% trans 'The XML producer must correct the package and submit again' %}
                                 </div>
                             {% else %}
-                                <a class="report-link" href="#xer2">
+                                <a class="report-link" href="?#xer2">
                                     <!-- User must finish the error review -->
                                     {% trans 'Review and comment the errors' %}
                                 </a>
