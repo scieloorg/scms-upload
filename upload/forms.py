@@ -9,23 +9,36 @@ from upload import choices
 
 
 class UploadPackageForm(WagtailAdminModelForm):
-    def save(self, commit=True):
-        upload_package = super().save(commit=False)
-        if upload_package.qa_decision:
-            upload_package.status = self.instance.qa_decision
-        upload_package.save()
-        return upload_package
 
     def save_all(self, user):
         upload_package = super().save(commit=False)
 
         if self.instance.pk is None:
             upload_package.creator = user
-            upload_package.save()
 
         self.save()
 
         return upload_package
+
+
+class QAPackageForm(WagtailAdminModelForm):
+
+    def save_all(self, user):
+        qa_package = super().save(commit=False)
+
+        if self.instance.pk is not None:
+            qa_package.updated_by = user
+        else:
+            qa_package.creator = user
+
+        if qa_package.qa_decision:
+            qa_package.status = qa_package.qa_decision
+
+        if qa_package.analyst:
+            qa_package.assignee = qa_package.analyst.user
+        self.save()
+
+        return qa_package
 
 
 class ValidationResultForm(WagtailAdminModelForm):
