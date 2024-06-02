@@ -63,20 +63,16 @@ class XMLErrorReportForm(WagtailAdminModelForm):
                 )
 
     def save_all(self, user):
-        vr_obj = super().save(commit=False)
+        obj = super().save(commit=False)
 
         if self.instance.pk is None:
-            vr_obj.creator = user
+            obj.creator = user
 
+        if obj.package.creator == obj.updated_by:
+            obj.package.calculate_xml_error_declaration_numbers()
+            obj.package.save()
+
+            if obj.xml_producer_ack:
+                obj.conclusion = choices.REPORT_CONCLUSION_DONE
         self.save()
-
-        return vr_obj
-
-    def save(self, commit=True):
-        report = super().save(commit=False)
-        if report.package.creator == report.updated_by:
-            report.package.calculate_xml_error_declaration_numbers()
-            if report.xml_producer_ack:
-                report.conclusion = choices.REPORT_CONCLUSION_DONE
-            report.package.save()
-        return report
+        return obj
