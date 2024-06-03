@@ -30,8 +30,8 @@ JOURNAL_AVAILABILTY_STATUS = [
 INDEXING_INTERRUPTION_REASON = [
     ("ceased", _("Ceased journal")),
     ("not-open-access", _("Not open access")),
-    ("by-committee", _("by the committee")),
-    ("by-editor", _("by the editor")),
+    ("suspended-by-committee", _("by the committee")),
+    ("suspended-by-editor", _("by the editor")),
 ]
 
 

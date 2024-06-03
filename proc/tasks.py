@@ -480,10 +480,11 @@ def subtask_synchronize_to_pid_provider(
 
 
 @celery_app.task(bind=True)
-def task_create_or_update_article_proc_from_uploaded_packages(
+def task_create_or_update_article_proc_from_approved_packages(
     self,
     user_id=None,
     username=None,
+    force_update=None,
 ):
     """
     Percorre os registros Package e cria ArticleProc
@@ -496,14 +497,15 @@ def task_create_or_update_article_proc_from_uploaded_packages(
         identificacao do usuário
     """
     try:
-        for package in ArticleProc.items_to_ingress():
+        for package in ArticleProc.get_approved_packages():
             # dispara tarefas para criar/atualizar os registros
             # OfficialJournal, JournalProc e Journal
-            task_create_or_update_article_proc_from_uploaded_package.apply_async(
+            task_create_or_update_article_proc_from_approved_package.apply_async(
                 kwargs=dict(
                     user_id=user_id,
                     username=username,
                     package_id=package.id,
+                    force_update=force_update,
                 )
             )
     except Exception as e:
@@ -512,7 +514,7 @@ def task_create_or_update_article_proc_from_uploaded_packages(
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "task": "proc.tasks.task_create_or_update_article_proc_from_uploaded_packages",
+                "task": "proc.tasks.task_create_or_update_article_proc_from_approved_packages",
                 "user_id": user_id,
                 "username": username,
             },
@@ -520,11 +522,12 @@ def task_create_or_update_article_proc_from_uploaded_packages(
 
 
 @celery_app.task(bind=True)
-def task_create_or_update_article_proc_from_uploaded_package(
+def task_create_or_update_article_proc_from_approved_package(
     self,
     user_id=None,
     username=None,
     package_id=None,
+    force_update=None,
 ):
     """
     Para um dado registro de upload.models.Package,
@@ -542,14 +545,15 @@ def task_create_or_update_article_proc_from_uploaded_package(
     """
     try:
         user = _get_user(user_id, username)
-        ArticleProc.ingress(user, package_id)
+        ArticleProc.create_or_update_article_proc_from_approved_package(
+            user, package_id, force_update)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "task": "proc.tasks.task_create_or_update_article_proc_from_uploaded_package",
+                "task": "proc.tasks.task_create_or_update_article_proc_from_approved_package",
                 "user_id": user_id,
                 "username": username,
                 "package_id": package_id,

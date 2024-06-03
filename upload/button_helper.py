@@ -13,7 +13,7 @@ class UploadButtonHelper(ButtonHelper):
     ]
 
     def assign(self, obj, classnames, label=None):
-        text = label or _("Assign")
+        text = label or _("Accept / Reject the package or assign this task")
         return {
             "url": reverse("upload:assign") + "?package_id=%s" % str(obj.id),
             "label": text,
@@ -47,13 +47,17 @@ class UploadButtonHelper(ButtonHelper):
         This function is used to gather all available buttons.
         We append our custom button to the btns list.
         """
-        btns = super().get_buttons_for_obj(
-            obj, exclude, classnames_add, classnames_exclude
-        )
-
         ph = self.permission_helper
         usr = self.request.user
         url_name = self.request.resolver_match.url_name
+
+        if ph.user_can_assign_package(usr, obj):
+            exclude = ["edit"]
+        else:
+            exclude = ["edit", "delete"]
+        btns = super().get_buttons_for_obj(
+            obj, exclude, classnames_add, classnames_exclude
+        )
 
         classnames = []
         if url_name.endswith("_modeladmin_inspect"):
@@ -61,20 +65,20 @@ class UploadButtonHelper(ButtonHelper):
         if url_name.endswith("_modeladmin_index"):
             classnames.extend(UploadButtonHelper.index_button_classnames)
 
-        if (
-            obj.status == choices.PS_READY_TO_BE_FINISHED
-            and ph.user_can_finish_deposit(usr, obj)
-            and url_name == "upload_package_modeladmin_inspect"
-        ):
-            btns.append(self.finish_deposit_button(obj, classnames))
+        if obj.is_validation_finished:
+            if (
+                obj.status in (choices.PS_PENDING_DEPOSIT, choices.PS_VALIDATED_WITH_ERRORS)
+                and ph.user_can_finish_deposit(usr, obj)
+                and url_name == "upload_package_modeladmin_inspect"
+            ):
+                btns.append(self.finish_deposit_button(obj, classnames))
+
+            if (
+                obj.status in (choices.PS_PENDING_QA_DECISION, choices.PS_VALIDATED_WITH_ERRORS)
+                and ph.user_can_assign_package(usr, obj)
+            ):
+                btns.append(self.assign(obj, classnames))
 
         if obj.status == choices.PS_PUBLISHED:
             btns.append(self.view_published_document(obj, classnames))
-
-        if obj.assignee is None:
-            if obj.status == choices.PS_QA and ph.user_can_assign_package(usr, obj):
-                btns.append(self.assign(obj, classnames))
-        elif obj.assignee != usr:
-            btns.append(self.assign(obj, classnames, _("Reassign")))
-
         return btns

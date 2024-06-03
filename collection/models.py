@@ -1,5 +1,6 @@
 import logging
 
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import FieldPanel, InlinePanel
@@ -10,7 +11,8 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 
 from collection import choices
-from collection.utils import language_iso
+
+
 
 class LanguageGetOrCreateError(Exception):
     ...
@@ -27,10 +29,19 @@ class Collection(CommonControlField):
     def __str__(self):
         return self.acron
 
-    acron = models.TextField(_("Collection Acronym"), null=True, blank=True)
+    acron = models.CharField(_("Collection Acronym"), max_length=10, null=True, blank=True)
     name = models.TextField(_("Collection Name"), null=True, blank=True)
+    max_error_percentage_accepted = models.FloatField(default=0, null=True, blank=True)
+    max_absent_data_percentage_accepted = models.FloatField(default=0, null=True, blank=True)
 
     base_form_class = CoreAdminModelForm
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("acron"),
+        FieldPanel("max_error_percentage_accepted"),
+        FieldPanel("max_absent_data_percentage_accepted"),
+    ]
 
     autocomplete_search_field = "name"
 

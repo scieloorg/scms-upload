@@ -1,5 +1,5 @@
 from django.contrib.auth.models import AbstractUser
-from django.db.models import CharField
+from django.db.models import CharField, Q
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
@@ -25,17 +25,21 @@ class User(AbstractUser):
         """
         return reverse("users:detail", kwargs={"username": self.username})
 
-    autocomplete_search_field = "username"
+    # autocomplete_search_field = "username"
 
     def autocomplete_label(self):
-        label = self.username
-        user_groups = sorted([g.name for g in self.groups.all()])
+        if self.name:
+            return self.name
+        if self.first_name or self.last_name:
+            return f"{self.first_name} {self.last_name}"
+        if self.email:
+            return self.email
+        if self.username:
+            return self.username
 
-        full_name = f"{self.first_name} {self.last_name}"
-        if full_name != " ":
-            label += f" ({full_name})"
-
-        if len(user_groups) > 0:
-            label += f" - {', '.join(user_groups)}"
-
-        return label
+    @staticmethod
+    def autocomplete_custom_queryset_filter(text):
+        return User.objects.filter(
+            Q(username__icontains=text) |
+            Q(email__icontains=text) |
+            Q(name__icontains=text))

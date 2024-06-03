@@ -207,6 +207,8 @@ class ArticleProcModelAdmin(ModelAdmin):
         "pid",
         "sps_pkg__sps_pkg_name",
         "pkg_name",
+        "issue_proc__issue_folder",
+        "issue_proc__journal_proc__acron",
     )
 
 

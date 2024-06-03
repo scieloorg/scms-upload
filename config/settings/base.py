@@ -128,6 +128,7 @@ LOCAL_APPS = [
     "proc",
     "publication",
     "researcher",
+    "team",
     "upload",
     "pid_provider",
     "tracker",

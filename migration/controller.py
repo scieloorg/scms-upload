@@ -269,24 +269,14 @@ class DocumentRecordsImporter:
         return pid
 
     def create_scielo_data_record_and_article_proc(self, classic_ws_doc, records):
-        article_proc = self.ArticleProcClass.register_classic_website_data(
+        article_proc = self.ArticleProcClass.create_or_update_article_proc(
             user=self.user,
             collection=self.collection,
-            pid=classic_ws_doc.scielo_pid_v2,
-            data=records,
-            content_type="article",
-            force_update=self.force_update,
-        )
-
-        if article_proc.migration_status != tracker_choices.PROGRESS_STATUS_TODO:
-            return article_proc
-
-        article_proc.update(
+            pid_v2=classic_ws_doc.scielo_pid_v2,
             issue_proc=self.issue_proc,
             pkg_name=classic_ws_doc.filename_without_extension,
-            migration_status=tracker_choices.PROGRESS_STATUS_TODO,
-            user=self.user,
             main_lang=classic_ws_doc.original_language,
+            records=records,
             force_update=self.force_update,
         )
         if classic_ws_doc.file_type == "html":

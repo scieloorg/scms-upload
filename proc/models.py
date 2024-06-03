@@ -93,7 +93,7 @@ class Operation(CommonControlField):
 
     class Meta:
         # isso faz com que em InlinePanel mostre do mais recente para o mais antigo
-        ordering = ['-created']
+        ordering = ["-created"]
         indexes = [
             models.Index(fields=["name"]),
         ]
@@ -121,12 +121,16 @@ class Operation(CommonControlField):
 
     @classmethod
     def create(cls, user, proc, name):
-        for item in cls.objects.filter(proc=proc, name=name).order_by('created'):
+        for item in cls.objects.filter(proc=proc, name=name).order_by("created"):
             # obtém o primeiro ocorrência de proc e name
 
             # obtém todos os ítens criados após este evento
             rows = []
-            for row in cls.objects.filter(proc=proc, created__gte=item.created).order_by('created').iterator():
+            for row in (
+                cls.objects.filter(proc=proc, created__gte=item.created)
+                .order_by("created")
+                .iterator()
+            ):
                 rows.append(row.data)
 
             try:
@@ -144,7 +148,12 @@ class Operation(CommonControlField):
                 report_date = item.created.isoformat()
                 # cria um arquivo com o conteúdo
                 ProcReport.create_or_update(
-                    user, proc, name, report_date, file_content, file_extension,
+                    user,
+                    proc,
+                    name,
+                    report_date,
+                    file_content,
+                    file_extension,
                 )
                 # apaga todas as ocorrências que foram armazenadas no arquivo
                 cls.objects.filter(proc=proc, created__gte=item.created).delete()
@@ -267,7 +276,7 @@ class ProcReport(CommonControlField):
         return f"{self.collection.acron} {self.pid} {self.task_name} {self.report_date}"
 
     class Meta:
-        ordering = ['-created']
+        ordering = ["-created"]
 
         verbose_name = _("Processing report")
         verbose_name_plural = _("Processing reports")
@@ -306,19 +315,19 @@ class ProcReport(CommonControlField):
         if proc and task_name and report_date:
             try:
                 return cls.objects.get(
-                    collection=proc.collection, pid=proc.pid,
+                    collection=proc.collection,
+                    pid=proc.pid,
                     task_name=task_name,
                     report_date=report_date,
                 )
             except cls.MultipleObjectsReturned:
                 return cls.objects.filter(
-                    collection=proc.collection, pid=proc.pid,
+                    collection=proc.collection,
+                    pid=proc.pid,
                     task_name=task_name,
                     report_date=report_date,
                 ).first()
-        raise ValueError(
-            "ProcReport.get requires proc and task_name and report_date"
-        )
+        raise ValueError("ProcReport.get requires proc and task_name and report_date")
 
     @staticmethod
     def get_item_type(pid):
@@ -349,18 +358,20 @@ class ProcReport(CommonControlField):
         )
 
     @classmethod
-    def create_or_update(cls, user, proc, task_name, report_date, file_content, file_extension):
+    def create_or_update(
+        cls, user, proc, task_name, report_date, file_content, file_extension
+    ):
         try:
-            obj = cls.get(
-                proc=proc, task_name=task_name, report_date=report_date
-            )
+            obj = cls.get(proc=proc, task_name=task_name, report_date=report_date)
             obj.updated_by = user
             obj.task_name = task_name or obj.task_name
             obj.report_date = report_date or obj.report_date
             obj.save()
             obj.save_file(f"{task_name}{file_extension}", file_content)
         except cls.DoesNotExist:
-            obj = cls.create(user, proc, task_name, report_date, file_content, file_extension)
+            obj = cls.create(
+                user, proc, task_name, report_date, file_content, file_extension
+            )
         return obj
 
     @property
@@ -416,7 +427,7 @@ class BaseProc(CommonControlField):
 
     class Meta:
         abstract = True
-        ordering = ['-updated']
+        ordering = ["-updated"]
 
         indexes = [
             models.Index(fields=["pid"]),
@@ -484,6 +495,7 @@ class BaseProc(CommonControlField):
         data,
         content_type,
         force_update=False,
+        package=None,
     ):
         try:
             obj = None
@@ -495,16 +507,29 @@ class BaseProc(CommonControlField):
             ):
                 return obj
 
-            operation = obj.start(user, "get data from classic website")
-            obj.migrated_data = cls.MigratedDataClass.register_classic_website_data(
-                user,
-                collection,
-                pid,
-                data,
-                content_type,
-                force_update,
-            )
-            obj.migration_status = obj.migrated_data.migration_status
+            if data:
+                # migrated data
+                detail = data
+                title = f"Create {content_type.title()}Proc from classic website data"
+                operation = obj.start(user, title)
+                obj.migrated_data = cls.MigratedDataClass.register_classic_website_data(
+                    user,
+                    collection,
+                    pid,
+                    data,
+                    content_type,
+                    force_update,
+                )
+                obj.migration_status = obj.migrated_data.migration_status
+            elif package:
+                detail = package.data
+                title = f"Create {content_type.title()}Proc from uploaded package"
+                operation = obj.start(user, title)
+                # fluxo novo, sem conteúdo migrado
+                obj.migrated_data = None
+                # sinaliza que precisa executar ArticleProc.update
+                obj.migration_status = tracker_choices.PROGRESS_STATUS_TODO
+
             obj.save()
             operation.finish(
                 user,
@@ -512,7 +537,7 @@ class BaseProc(CommonControlField):
                     obj.migration_status == tracker_choices.PROGRESS_STATUS_TODO
                 ),
                 message=None,
-                detail=obj.migrated_data,
+                detail=detail,
             )
             return obj
         except Exception as e:
@@ -539,7 +564,6 @@ class BaseProc(CommonControlField):
         """
         params = dict(
             collection=collection,
-            migrated_data__content_type=content_type,
         )
         if content_type == "article":
             params["sps_pkg__pid_v3__isnull"] = False
@@ -574,12 +598,7 @@ class BaseProc(CommonControlField):
         item_name=None,
     ):
         try:
-            try:
-                item_name = self.migrated_data.content_type
-            except AttributeError:
-                item_name = item_name or ""
-
-            operation = self.start(user, f"create or update {item_name}")
+            operation = self.start(user, f"create or update {self.pid}")
 
             registered = callable_register_data(user, self, force_update)
             operation.finish(
@@ -599,7 +618,6 @@ class BaseProc(CommonControlField):
         BaseProc
         """
         params = params or {}
-        params["migrated_data__content_type"] = content_type
         params["migration_status"] = tracker_choices.PROGRESS_STATUS_DONE
         if content_type == "article":
             params["sps_pkg__pid_v3__isnull"] = False
@@ -671,7 +689,6 @@ class BaseProc(CommonControlField):
         cls, user, content_type, force_update=None, params=None
     ):
         params = params or {}
-        params["migrated_data__content_type"] = content_type
         params["qa_ws_status"] = tracker_choices.PROGRESS_STATUS_DONE
         if content_type == "article":
             params["sps_pkg_status"] = False
@@ -732,7 +749,7 @@ class JournalProc(BaseProc, ClusterableModel):
     )
 
     class Meta:
-        ordering = ['-updated']
+        ordering = ["-updated"]
         indexes = [
             models.Index(fields=["acron"]),
         ]
@@ -773,6 +790,14 @@ class JournalProc(BaseProc, ClusterableModel):
                     self.collection, acron, type(e), e
                 )
             )
+
+    @property
+    def max_error_percentage_accepted(self):
+        return self.collection.max_error_percentage_accepted
+
+    @property
+    def max_absent_data_percentage_accepted(self):
+        return self.collection.max_absent_data_percentage_accepted
 
 
 ################################################
@@ -884,7 +909,7 @@ class IssueProc(BaseProc, ClusterableModel):
         )
 
     class Meta:
-        ordering = ['-updated']
+        ordering = ["-updated"]
         indexes = [
             models.Index(fields=["issue_folder"]),
             models.Index(fields=["docs_status"]),
@@ -1099,7 +1124,9 @@ class ArticleProc(BaseProc, ClusterableModel):
     migrated_data = models.ForeignKey(
         MigratedArticle, on_delete=models.SET_NULL, null=True, blank=True
     )
-    package = models.ForeignKey(Package, on_delete=models.SET_NULL, null=True, blank=True)
+    package = models.ForeignKey(
+        Package, on_delete=models.SET_NULL, null=True, blank=True
+    )
     issue_proc = models.ForeignKey(
         IssueProc, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -1165,7 +1192,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     MigratedDataClass = MigratedArticle
 
     class Meta:
-        ordering = ['-updated']
+        ordering = ["-updated"]
         indexes = [
             models.Index(fields=["pkg_name"]),
             models.Index(fields=["xml_status"]),
@@ -1206,6 +1233,41 @@ class ArticleProc(BaseProc, ClusterableModel):
                 )
             )
 
+    @staticmethod
+    def create_or_update_article_proc(
+        user,
+        collection,
+        pid_v2,
+        issue_proc,
+        pkg_name,
+        main_lang,
+        records=None,
+        force_update=False,
+        package=None,
+    ):
+        article_proc = ArticleProc.register_classic_website_data(
+            user=user,
+            collection=collection,
+            pid=pid_v2,
+            data=records,
+            content_type="article",
+            force_update=force_update,
+            package=package,
+        )
+
+        if article_proc.migration_status != tracker_choices.PROGRESS_STATUS_TODO:
+            return article_proc
+
+        article_proc.update(
+            issue_proc=issue_proc,
+            pkg_name=pkg_name,
+            migration_status=tracker_choices.PROGRESS_STATUS_TODO,
+            user=user,
+            main_lang=main_lang,
+            force_update=force_update,
+        )
+        return article_proc
+
     def get_xml(self, user, htmlxml, body_and_back_xml):
         try:
             operation = self.start(user, "get xml")
@@ -1215,7 +1277,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             if htmlxml:
                 htmlxml.html_to_xml(user, self, body_and_back_xml)
 
-            xml = self.get_xml_with_pre(self.get_xml_path())
+            xml = self.get_xml_with_pre()
 
             if xml:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -1252,8 +1314,6 @@ class ArticleProc(BaseProc, ClusterableModel):
         E se force_update = True, muda o status de DONE para TODO
         """
         params = {}
-        params["issue_proc__files_status"] = tracker_choices.PROGRESS_STATUS_DONE
-        params["issue_proc__docs_status"] = tracker_choices.PROGRESS_STATUS_DONE
 
         if collection_acron:
             params["collection__acron"] = collection_acron
@@ -1264,16 +1324,20 @@ class ArticleProc(BaseProc, ClusterableModel):
         if issue_folder:
             params["issue_proc__issue_folder"] = issue_folder
 
-        q = Q(xml_status=tracker_choices.PROGRESS_STATUS_REPROC)
-
+        params["xml_status"] = tracker_choices.PROGRESS_STATUS_REPROC
         if force_update:
-            q |= (
-                Q(xml_status=tracker_choices.PROGRESS_STATUS_DONE)
-                | Q(xml_status=tracker_choices.PROGRESS_STATUS_PENDING)
-                | Q(xml_status=tracker_choices.PROGRESS_STATUS_BLOCKED)
-            )
+            params["xml_status__in"] = [
+                tracker_choices.PROGRESS_STATUS_REPROC,
+                tracker_choices.PROGRESS_STATUS_DONE,
+                tracker_choices.PROGRESS_STATUS_PENDING,
+                tracker_choices.PROGRESS_STATUS_BLOCKED,
+            ]
 
-        cls.objects.filter(q, **params).update(
+        cls.objects.filter(
+            Q(package__isnull=False)
+            | Q(issue_proc__files_status=tracker_choices.PROGRESS_STATUS_DONE),
+            **params,
+        ).update(
             xml_status=tracker_choices.PROGRESS_STATUS_TODO,
         )
 
@@ -1288,51 +1352,52 @@ class ArticleProc(BaseProc, ClusterableModel):
         ).iterator()
 
     @classmethod
-    def items_to_ingress(
+    def get_approved_packages(
         cls,
     ):
-        """
-        """
+        """ """
         return Package.objects.filter(
-            status=upload_choices.PS_ACCEPTED,
+            status__in=(
+                upload_choices.PS_APPROVED_WITH_ERRORS,
+                upload_choices.PS_APPROVED,
+            ),
             journal__isnull=False,
             issue__isnull=False,
         ).iterator()
 
     @classmethod
-    def ingress(
+    def create_or_update_article_proc_from_approved_package(
         cls,
         user,
         package_id,
+        force_update=None,
     ):
-        """
-        """
+        """ """
         try:
             article_proc = None
             op = None
             package = Package.objects.get(pk=package_id)
             for xml_with_pre in XMLWithPre.create(path=package.file.path):
+                xml = ArticleAndSubArticles(xml_with_pre.xmltree)
+
                 logging.info(package.data)
                 logging.info(f"journal={package.journal}")
-                article_proc = cls.get_or_create(
-                    user,
-                    collection=JournalProc.objects.get(journal=package.journal).collection,
-                    pid=xml_with_pre.v2,
-                )
-                op = article_proc.start(user, "get data from uploaded package")
-                article_proc.package = package
+                for journal_collection in journal.collections:
+                    article_proc = cls.create_or_update_article_proc(
+                        user=user,
+                        collection=journal_collection,
+                        pid_v2=xml_with_pre.v2,
+                        issue_proc=package.issue
+                        and IssueProc.objects.get(
+                            collection=journal_collection, issue=package.issue
+                        ),
+                        pkg_name=xml_with_pre.sps_pkg,
+                        main_lang=xml.main_lang,
+                        # records=None,
+                        force_update=force_update,
+                        package=package,
+                    )
 
-                article_proc.update(
-                    issue_proc=package.issue and IssueProc.objects.get(issue=package.issue),
-                    pkg_name=article_proc.pkg_name or xml_with_pre.filename,
-                    migration_status=tracker_choices.PROGRESS_STATUS_TODO,
-                    user=user,
-                )
-                op.finish(
-                    user,
-                    completed=article_proc.migration_status == tracker_choices.PROGRESS_STATUS_DONE,
-                    detail=package.data,
-                )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             if article_proc:
@@ -1531,14 +1596,18 @@ class ArticleProc(BaseProc, ClusterableModel):
     def get_xml_path(self):
         if self.package:
             return self.package.file.path
-        try:
-            obj = HTMLXML.get(migrated_article=self.migrated_data)
-        except HTMLXML.DoesNotExist:
-            obj = self.migrated_xml
-        return obj.file.path
+        if self.migrated_xml:
+            return self.migrated_xml.path
+        if self.migrated_data:
+            try:
+                obj = HTMLXML.get(migrated_article=self.migrated_data)
+                return obj.file.path
+            except HTMLXML.DoesNotExist:
+                return
 
-    def get_xml_with_pre(self, xml_file_path):
+    def get_xml_with_pre(self, xml_file_path=None):
         try:
+            xml_file_path = xml_file_path or self.get_xml_path()
             for item in XMLWithPre.create(path=xml_file_path):
                 if self.pid and item.v2 != self.pid:
                     # corrige ou adiciona pid v2 no XML nativo ou obtido do html
