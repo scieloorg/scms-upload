@@ -170,7 +170,10 @@
 
                     {% if status == 'pending-correction' or status == 'rejected' %}
                         <div class="help-block help-critical"><svg class="icon icon-critical icon" aria-hidden="true"><use href="#icon-critical"></use></svg>
-                            {% trans 'The XML producer must correct the package and submit again' %}
+                            <a class="report-link" href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
+                                <!-- User must finish the error review -->
+                                {% trans 'The XML producer must correct the errors, then submit the corrected package' %}
+                            </a>
                         </div>
                     {% elif perms.upload.send_validation_error_resolution and status == 'pending-deposit' %}
                         {% if summary.xml_errors_to_fix %}
@@ -188,7 +191,7 @@
                             </a>
 
                         {% elif summary.xml_errors_not_to_fix or summary.xml_errors_absent_data %}
-                            {% if summary.is_error_review_finished and summary.xml_producer_is_allowed_to_finish_deposit %}
+                            {% if summary.is_error_review_finished and summary.is_acceptable_package %}
                                 <!-- a class="report-link" href="{% url 'upload:finish_deposit' %}?package_id={{ package_id }}" -->
                                 <div class="help-block help-warning"><svg class="icon icon-warning icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
                                     {% if summary.xml_errors_not_to_fix %}
@@ -204,6 +207,10 @@
                                 <!-- not allowed to finish deposit with errors -->
                                 <div class="help-block help-critical"><svg class="icon icon-critical icon" aria-hidden="true"><use href="#icon-critical"></use></svg>
                                     {% trans 'The XML producer must correct the package and submit again' %}
+                                    <a class="report-link" href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
+                                        <!-- User must finish the error review -->
+                                        {% trans 'The XML producer must correct the errors, then submit the corrected package' %}
+                                    </a>
                                 </div>
                             {% else %}
                                 <a class="report-link" href="?#xer2">

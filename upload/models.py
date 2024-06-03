@@ -110,7 +110,6 @@ class Package(CommonControlField, ClusterableModel):
     xml_errors_to_fix = 0
     xml_errors_not_to_fix = 0
     xml_errors_absent_data = 0
-    is_error_review_finished = 0
 
     panels = [
         FieldPanel("file"),
@@ -352,12 +351,15 @@ class Package(CommonControlField, ClusterableModel):
         self.save()
 
     @property
-    def xml_producer_is_allowed_to_finish_deposit(self):
+    def is_acceptable_package(self):
         # compara a porcentagem de erros que o produtor de XML declarou que não corrigirá
         # com a porcentagem máxima aceita de erros
         # compara a porcentagem de ausência de dados
         # que o produtor de XML declarou a ocorrência
         # com a porcentagem máxima aceita de dados faltantes
+        if self.xml_errors_declared_to_fix_percentage:
+            # não é aceitável porque o produtor declarou que tem erros
+            return False
         return (
             self.errors == 0
             and self.xml_errors_declared_not_to_fix_percentage
@@ -429,12 +431,12 @@ class Package(CommonControlField, ClusterableModel):
             # "xml_errors_not_to_fix": self.xml_errors_not_to_fix,
             # "xml_errors_absent_data": self.xml_errors_absent_data,
             "is_error_review_finished": self.is_error_review_finished,
-            "xml_producer_is_allowed_to_finish_deposit": self.xml_producer_is_allowed_to_finish_deposit,
+            "is_acceptable_package": self.is_acceptable_package,
         }
 
     @property
     def is_error_review_finished(self):
-        return not self.xml_error_report.filter(xml_producer_ack__isnull=False).exists()
+        return not self.xml_error_report.filter(xml_producer_ack=False).exists()
 
     def finish_deposit(self):
         """
@@ -442,10 +444,28 @@ class Package(CommonControlField, ClusterableModel):
         modifica o status do pacote de PS_VALIDATED_WITH_ERRORS para
         PS_PENDING_QA_DECISION ou PS_PENDING_CORRECTION
         """
-        if self.xml_producer_is_allowed_to_finish_deposit:
+        if self.errors == 0:
+            self.status = choices.PS_APPROVED
+            self.save()
+            return True
+
+        if not self.is_error_review_finished:
+            return False
+
+        if self.xml_errors_declared_to_fix_percentage:
+            self.status = choices.PS_PENDING_CORRECTION
+            self.save()
+            return False
+
+        if self.is_acceptable_package:
+            # acceptable package according to error tolerance
             self.status = choices.PS_PENDING_QA_DECISION
+            self.save()
+            return True
+
+        self.status = choices.PS_PENDING_CORRECTION
         self.save()
-        return True
+        return False
 
     def get_errors_report_content(self):
         filename = self.name + f"-errors-to-fix-{now()}.csv"
@@ -486,7 +506,7 @@ class Package(CommonControlField, ClusterableModel):
                     report__package=self, reaction=choices.ER_REACTION_FIX
                 ).iterator():
                     data = dict(default_data)
-                    data.update(item.data)
+                    data.update(item.info)
                     _data = {k: data[k] for k in fieldnames}
                     writer.writerow(_data)
 
@@ -750,6 +770,23 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
             ),
         ]
 
+    @property
+    def info(self):
+        return dict(
+            status=self.status,
+            subject=self.subject,
+            attribute=self.attribute,
+            focus=self.focus,
+            parent=self.parent,
+            parent_id=self.parent_id,
+            data=self.data,
+            expected_value=self.expected_value,
+            got_value=self.got_value,
+            message=self.message,
+            advice=self.advice,
+            reaction=self.reaction,
+        )
+
 
 class BaseValidationReport(CommonControlField):
     title = models.CharField(_("Title"), null=True, blank=True, max_length=128)
@@ -951,11 +988,11 @@ class XMLInfoReport(BaseValidationReport, ClusterableModel):
             target = os.path.join(targetdir, filename)
 
             with open(target, "w", newline="") as csvfile:
-                fieldnames = list(item.data.keys())
+                fieldnames = list(item.info.keys())
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
                 for item in self._validation_results.all():
-                    writer.writerow(item.data)
+                    writer.writerow(item.info)
 
             # saved optimised
             with open(target, "rb") as fp:

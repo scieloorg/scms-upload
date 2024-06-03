@@ -47,30 +47,32 @@ def finish_deposit(request):
         package = get_object_or_404(Package, pk=package_id)
 
         if package.finish_deposit():
-            messages.success(request, _("Package has been submitted to QA"))
-        else:
-            messages.warning(
+            messages.success(request, _("Package has been deposited"))
+            return redirect("/admin/upload/package/")
+
+        if not package.is_error_review_finished:
+            messages.error(
                 request,
                 _(
-                    "Package could not be submitted to QA due to validation errors."
+                    "XML producer must review the errors and comment them"
                 ),
             )
-            messages.warning(
+            return redirect(f"/admin/upload/package/inspect/{package_id}")
+
+        if not package.is_acceptable_package:
+            messages.error(
                 request,
                 _(
-                    "Fix the downloaded errors and submit the corrected package"
+                    "Package could not be deposited due to validation errors"
                 ),
             )
-            try:
-                errors = package.get_errors_report_content()
-                response = HttpResponse(errors["content"], content_type="text/csv")
-                response["Content-Disposition"] = "inline; filename=" + errors["filename"]
-                logging.info(errors)
-                return response
-            except Exception as e:
-                logging.exception(e)
-                raise Http404
-    return redirect(f"/admin/upload/package/inspect/{package_id}")
+            messages.error(
+                request,
+                _(
+                    "Review the downloaded report and submit the corrected package"
+                ),
+            )
+        return redirect(f"/admin/upload/package/inspect/{package_id}")
 
 
 def download_errors(request):
