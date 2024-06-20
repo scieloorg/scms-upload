@@ -124,3 +124,6 @@ clean_project_images:  ## Remove all images with "upload" on name
 
 volume_down:  ## Remove all volume
 	@docker-compose -f $(compose) down -v
+
+clean_celery_logs:
+	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' scielo_core_local_celeryworker)
