@@ -1,5 +1,5 @@
 pytz==2023.3.post1  # https://github.com/stub42/pytz
-Pillow==10.2.0  # https://github.com/python-pillow/Pillow
+Pillow==10.3.0  # https://github.com/python-pillow/Pillow
 argon2-cffi==23.1.0  # https://github.com/hynek/argon2_cffi
 whitenoise==6.6.0  # https://github.com/evansd/whitenoise
 redis==5.0.1  # https://github.com/redis/redis-py
@@ -32,7 +32,7 @@ django_celery_results==2.5.1
 
 # Wagtail
 # ------------------------------------------------------------------------------
-wagtail==5.2.3  # https://github.com/wagtail/wagtail
+wagtail==6.0.5  # https://github.com/wagtail/wagtail
 
 # Wagtail Recaptcha
 # ------------------------------------------------------------------------------
@@ -77,8 +77,11 @@ tornado>=6.3.2 # not directly required, pinned by Snyk to avoid a vulnerability
 # Tenacity
 # ------------------------------------------------------------------------------
 tenacity==8.2.3  # https://pypi.org/project/tenacity/
-urllib3==2.2.1
+urllib3==2.2.2
 
 # feedparser
 # ------------------------------------------------------------------------------
 feedparser==6.0.11
+dnspython>=2.6.1 # not directly required, pinned by Snyk to avoid a vulnerability
+requests>=2.32.2 # not directly required, pinned by Snyk to avoid a vulnerability
+sqlparse>=0.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
