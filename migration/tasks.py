@@ -344,13 +344,11 @@ def task_migrate_document_records(
                 collection, journal_acron, publication_year, force_update)
             for item in items:
                 # Importa os registros de documentos
-                task_import_one_issue_document_records.apply_async(
-                    kwargs=dict(
+                task_import_one_issue_document_records(
                         item_id=item.id,
                         user_id=user_id,
                         username=username,
                         force_update=force_update,
-                    )
                 )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -367,9 +365,8 @@ def task_migrate_document_records(
         )
 
 
-@celery_app.task(bind=True)
+# @celery_app.task(bind=True)
 def task_import_one_issue_document_records(
-    self,
     item_id,
     user_id=None,
     username=None,
