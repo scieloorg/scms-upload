@@ -5,32 +5,12 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from collection.models import Collection
+from core.utils.get_user import _get_user
 from config import celery_app
 from proc.models import ArticleProc, IssueProc, JournalProc
 from tracker.models import UnexpectedEvent
 
 from . import controller
-
-User = get_user_model()
-
-
-def _get_user(user_id, username):
-    try:
-        if user_id:
-            return User.objects.get(pk=user_id)
-        if username:
-            return User.objects.get(username=username)
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "proc.tasks._get_user",
-                "user_id": user_id,
-                "username": username,
-            },
-        )
 
 
 def _get_collections(collection_acron):
@@ -133,7 +113,7 @@ def task_create_or_update_journal(
 
     """
     try:
-        user = _get_user(user_id, username)
+        user = _get_user(self.request, user_id, username)
         item = JournalProc.objects.get(pk=item_id)
         item.create_or_update_item(
             user, force_update, controller.create_or_update_journal
@@ -230,7 +210,7 @@ def task_create_or_update_issue(
 
     """
     try:
-        user = _get_user(user_id, username)
+        user = _get_user(self.request, user_id, username)
         item = IssueProc.objects.get(pk=item_id)
         item.create_or_update_item(
             user, force_update, controller.create_or_update_issue
@@ -315,7 +295,7 @@ def task_generate_sps_package(
     force_core_update=None,
 ):
     try:
-        user = _get_user(user_id, username)
+        user = _get_user(self.request, user_id, username)
         item = ArticleProc.objects.get(pk=item_id)
         if force_core_update and item.sps_pkg:
             item.sps_pkg.set_registered_in_core(False)
@@ -416,7 +396,7 @@ def task_create_or_update_article(
 
     """
     try:
-        user = _get_user(user_id, username)
+        user = _get_user(self.request, user_id, username)
         item = ArticleProc.objects.get(pk=item_id)
         item.create_or_update_item(
             user, force_update, controller.create_or_update_article
@@ -474,6 +454,6 @@ def subtask_synchronize_to_pid_provider(
     user_id=None,
     item_id=None
 ):
-    user = _get_user(user_id, username)
+    user = _get_user(self.request, user_id, username)
     item = ArticleProc.objects.get(pk=item_id)
     item.synchronize(user)

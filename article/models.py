@@ -1,7 +1,8 @@
 import logging
+import datetime
 
 from django.contrib.auth import get_user_model
-from django.db import models
+from django.db import models, IntegrityError
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -27,6 +28,10 @@ from .forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
 
 User = get_user_model()
+
+
+def verify_type_of_url(type):
+    return dict(choices.VERIFY_ARTICLE_TYPE).get("PDF") if type else dict(choices.VERIFY_ARTICLE_TYPE).get("TEXT")
 
 
 class Article(ClusterableModel, CommonControlField):
@@ -314,3 +319,198 @@ class RequestArticleChange(CommonControlField):
         return f"{self.article or self.pid_v3} - {self.deadline}"
 
     base_form_class = RequestArticleChangeForm
+
+
+class CheckArticleAvailability(CommonControlField):
+    """
+        Modelo para armazenar o status de disponibilidade nos sites,
+        tanto na nova versao, quanto na antiga, do scielo.br.
+    """
+    article = models.ForeignKey(
+        Article, 
+        on_delete=models.SET_NULL,
+        null=True,
+        unique=True,
+    )
+    site_status = models.ManyToManyField(
+        "ScieloSiteStatus"
+    )
+
+    def __str__(self):
+        return f"{self.article.pid_v3}"
+    
+    @classmethod
+    def get(cls, article):
+        return cls.objects.get(article=article)
+    
+    def create_or_update_scielo_site_status(
+        self,
+        url,
+        status,
+        type,
+        available,
+        user,
+        date=None,
+    ):
+        obj = ScieloSiteStatus.create_or_update(
+            url=url,
+            status=status,
+            type=type,
+            available=available,
+            date=date,
+            user=user,
+        )
+        self.site_status.add(obj) 
+        self.save()
+
+
+    @classmethod
+    def create(
+        cls,
+        article,
+        status,
+        available,
+        url,
+        type,
+        user,
+        date=None,
+    ):
+        try:
+            obj = cls(
+                article=article,
+                creator=user,
+            )
+            obj.save()
+        except IntegrityError:
+            obj = cls.get(article=article)
+        obj.create_or_update_scielo_site_status(
+            url=url,
+            status=status,
+            type=type,
+            available=available,
+            user=user,
+            date=date,
+        )
+        return obj
+
+    @classmethod
+    def create_or_update(cls,
+        article,
+        status,
+        available,
+        url,
+        type,
+        user,
+        date=None,
+    ):
+        try:
+            obj = cls.get(article=article)
+            obj.create_or_update_scielo_site_status(
+            url=url,
+            status=status,
+            type=type,
+            available=available,
+            date=date,
+            user=user,
+        )
+            return obj
+        except cls.DoesNotExist:
+            cls.create(
+                article=article,
+                status=status,
+                available=available,
+                url=url,
+                type=type,
+                date=date,
+                user=user
+            )
+
+class ScieloSiteStatus(CommonControlField):
+    check_date = models.DateTimeField(null=True, blank=True)
+    url_site_scielo = models.SlugField(max_length=500, unique=True)
+    status = models.CharField(
+        max_length=80, 
+        null=True, 
+        blank=True
+    )
+    type = models.CharField(
+        max_length=10, 
+        choices=choices.VERIFY_ARTICLE_TYPE, 
+        null=True, 
+        blank=True,
+    )
+    available = models.BooleanField(default=False)
+
+    def update(
+        self,
+        status,
+        type,
+        available,
+        date=None,
+    ):
+        self.check_date = date or datetime.datetime.now()
+        self.status = status
+        self.available = available
+        self.type = verify_type_of_url(type)
+        self.save()
+        return self
+
+    class Meta:
+        verbose_name = "Scielo Site Status"
+        verbose_name_plural = "Scielo Site Status"
+
+    @classmethod
+    def get(cls, url):
+        return cls.objects.get(url_site_scielo=url)
+
+
+    @classmethod
+    def create(
+        cls,
+        url,
+        status,
+        type,
+        available,
+        user,
+        date=None,
+    ):
+        date = date or datetime.datetime.now()
+        obj = cls(
+            check_date=date,
+            url_site_scielo=url,
+            status=status,
+            type=verify_type_of_url(type),
+            available=available,
+            creator=user
+        )
+        obj.save()
+        return obj
+
+    @classmethod
+    def create_or_update(
+        cls,
+        url,
+        status,
+        type,
+        available,
+        user,
+        date=None,
+    ):
+        try:
+            obj = cls.get(url=url)
+            obj.update(
+                status=status,
+                type=type,
+                available=available,
+                date=date
+                )
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(
+                url=url,
+                status=status,
+                type=type,
+                available=available,
+                user=user,
+                date=date
+            )

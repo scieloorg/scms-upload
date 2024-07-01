@@ -1,7 +1,6 @@
 import json
 
 from celery.result import AsyncResult
-from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
 from packtools.sps import exceptions as sps_exceptions
 from packtools.sps.models import package as sps_package
@@ -13,6 +12,7 @@ from packtools.validator import ValidationReportXML
 from article.choices import AS_CHANGE_SUBMITTED
 from article.controller import create_article_from_etree, update_article
 from article.models import Article
+from core.utils.get_user import _get_user
 from config import celery_app
 from issue.models import Issue
 from journal.controller import get_journal_dict_for_validation
@@ -21,9 +21,6 @@ from libs.dsm.publication.documents import get_document, get_similar_documents
 from . import choices, controller, exceptions
 from .utils import file_utils, package_utils, xml_utils
 from upload.models import Package
-
-
-User = get_user_model()
 
 
 def run_validations(
@@ -526,13 +523,6 @@ def task_get_or_create_package(pid_v3, user_id):
             user_id=user_id,
             file_name=package_file_name,
         ).id
-
-
-def _get_user(request, user_id):
-    try:
-        return User.objects.get(pk=request.user.id)
-    except AttributeError:
-        return User.objects.get(pk=user_id)
 
 
 @celery_app.task(bind=True, name="request_pid_for_accepted_packages")
