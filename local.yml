@@ -23,18 +23,6 @@ services:
       - "8007:8000"
     command: /start
 
-  minio:
-    image: 'minio/minio:RELEASE.2022-09-17T00-09-45Z'
-    container_name: upload_production_minio
-    hostname: opac-minio
-    ports:
-        - '9000:9000'
-        - '9001:9001'
-    env_file:
-      - ./.envs/.local/.minio
-    volumes:
-        - '../minio/data:/data'
-    command: server --console-address ":9001" /data
   pgbouncer:
     image: edoburu/pgbouncer:1.14.0
     restart: always
