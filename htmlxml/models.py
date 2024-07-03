@@ -488,6 +488,9 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         ]
     )
 
+    def __str__(self):
+        return f"{self.migrated_article}"
+
     def autocomplete_label(self):
         return self.migrated_article
 
