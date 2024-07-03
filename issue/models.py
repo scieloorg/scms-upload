@@ -21,24 +21,6 @@ class Issue(CommonControlField, IssuePublicationDate):
     Class that represent Issue
     """
 
-    def __unicode__(self):
-        return "%s %s %s%s%s" % (
-            self.journal,
-            self.publication_year,
-            self.volume and f"v{self.volume}",
-            self.number and f"n{self.number}",
-            self.supplement and f"s{self.supplement}",
-        )
-
-    def __str__(self):
-        return "%s %s %s%s%s" % (
-            self.journal,
-            self.publication_year,
-            self.volume and f"v{self.volume}",
-            self.number and f"n{self.number}",
-            self.supplement and f"s{self.supplement}",
-        )
-
     journal = models.ForeignKey(
         Journal, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -46,6 +28,25 @@ class Issue(CommonControlField, IssuePublicationDate):
     number = models.CharField(_("Number"), max_length=16, null=True, blank=True)
     supplement = models.CharField(_("Supplement"), max_length=16, null=True, blank=True)
     publication_year = models.CharField(_("Year"), max_length=4, null=True, blank=True)
+    total_documents = models.PositiveSmallIntegerField(null=True, blank=True)
+    is_continuous_publishing_model = models.BooleanField(null=True, blank=True)
+
+    def __unicode__(self):
+        return "%s %s" % (
+            self.journal,
+            self.issue_folder,
+        )
+
+    def __str__(self):
+        return "%s %s" % (
+            self.journal,
+            self.issue_folder,
+        )
+
+    @property
+    def issue_folder(self):
+        labels = [(self.volume, "v"), (self.number, "n"), (self.supplement, "s")]
+        return "".join([f"{prefix}{value}" for value, prefix in labels if value])
 
     @property
     def data(self):
@@ -83,6 +84,8 @@ class Issue(CommonControlField, IssuePublicationDate):
         FieldPanel("volume"),
         FieldPanel("number"),
         FieldPanel("supplement"),
+        FieldPanel("is_continuous_publishing_model"),
+        FieldPanel("total_documents"),
     ]
 
     base_form_class = IssueForm
@@ -118,7 +121,17 @@ class Issue(CommonControlField, IssuePublicationDate):
             ).first()
 
     @classmethod
-    def create(cls, user, journal, volume, supplement, number, publication_year):
+    def create(
+        cls,
+        user,
+        journal,
+        volume,
+        supplement,
+        number,
+        publication_year,
+        is_continuous_publishing_model=None,
+        total_documents=None,
+    ):
         try:
             obj = cls()
             obj.journal = journal
@@ -126,6 +139,8 @@ class Issue(CommonControlField, IssuePublicationDate):
             obj.supplement = supplement
             obj.number = number
             obj.publication_year = publication_year
+            obj.is_continuous_publishing_model = is_continuous_publishing_model
+            obj.total_documents = total_documents
             obj.creator = user
             obj.save()
             return obj
@@ -143,15 +158,36 @@ class Issue(CommonControlField, IssuePublicationDate):
             raise IssueGetOrCreateError(f"Unable to get or create issue {e} {data}")
 
     @classmethod
-    def get_or_create(cls, journal, volume, supplement, number, publication_year, user):
+    def get_or_create(
+        cls,
+        journal,
+        volume,
+        supplement,
+        number,
+        publication_year,
+        user,
+        is_continuous_publishing_model=None,
+        total_documents=None,
+    ):
         try:
-            return cls.get(
+            obj = cls.get(
                 journal=journal,
                 volume=volume,
                 supplement=supplement,
                 number=number,
             )
+            obj.is_continuous_publishing_model = is_continuous_publishing_model
+            obj.total_documents = total_documents
+            obj.publication_year = publication_year
+            return obj
         except cls.DoesNotExist:
             return cls.create(
-                user, journal, volume, supplement, number, publication_year
+                user,
+                journal,
+                volume,
+                supplement,
+                number,
+                publication_year,
+                is_continuous_publishing_model,
+                total_documents,
             )
