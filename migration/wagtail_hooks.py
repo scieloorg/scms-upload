@@ -12,6 +12,7 @@ from wagtail.contrib.modeladmin.views import CreateView
 from config.menu import get_menu_order
 from migration.models import (
     ClassicWebsiteConfiguration,
+    IdFileRecord,
     MigratedArticle,
     MigratedData,
     MigratedFile,
@@ -136,11 +137,15 @@ class MigratedArticleModelAdmin(ModelAdmin):
         "collection",
         "pid",
         "migration_status",
+        "file_type",
         "isis_updated_date",
         "updated",
         "created",
     )
-    list_filter = ("migration_status",)
+    list_filter = (
+        "file_type",
+        "migration_status",
+    )
     search_fields = ("pid", "collection__acron", "collection__name")
     inspect_view_fields = (
         "updated",
@@ -281,6 +286,38 @@ class MigratedFileModelAdmin(ModelAdmin):
 #     )
 
 
+class IdFileRecordModelAdmin(ModelAdmin):
+    model = IdFileRecord
+    menu_label = _("Article id file")
+    menu_icon = "doc-full"
+    menu_order = 300
+    add_to_settings_menu = False
+    exclude_from_explorer = True
+    inspect_view_enabled = False
+
+    list_per_page = 10
+    list_display = (
+        "item_pid",
+        "item_type",
+        "issue_folder",
+        "article_filename",
+        "article_filetype",
+        "updated",
+        "created",
+    )
+    list_filter = (
+        "item_type",
+        "article_filetype",
+    )
+    search_fields = (
+        "item_pid",
+        "parent__journal__title",
+        "parent__collection__acron",
+        "parent__collection__name",
+        "issue_folder",
+    )
+
+
 class MigrationModelAdmin(ModelAdminGroup):
     menu_icon = "folder"
     menu_label = _("Migration")
@@ -292,6 +329,7 @@ class MigrationModelAdmin(ModelAdminGroup):
         MigratedDataModelAdmin,
         MigratedJournalModelAdmin,
         MigratedIssueModelAdmin,
+        IdFileRecordModelAdmin,
         MigratedArticleModelAdmin,
         MigratedFileModelAdmin,
     )

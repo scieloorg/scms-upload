@@ -125,14 +125,13 @@ class ArticleModelAdmin(ModelAdmin):
     exclude_from_explorer = False
 
     list_display = (
+        "__str__",
         "pid_v3",
         # "pid_v2",
         # "doi_list",
         # "aop_pid",
         # "article_type",
         "status",
-        "issue",
-        "journal",
         "created",
         "updated",
         # "updated_by",
@@ -141,6 +140,8 @@ class ArticleModelAdmin(ModelAdmin):
     search_fields = (
         "pid_v3",
         "issue__publication_year",
+        "journal__title",
+        "sps_pkg__sps_pkg_name",
     )
     inspect_view_fields = (
         "created",
@@ -153,7 +154,6 @@ class ArticleModelAdmin(ModelAdmin):
         "doi_with_lang",
         "article_type",
         "status",
-        "issue",
         # "author",
         # "title_with_lang",
         "elocation_id",
