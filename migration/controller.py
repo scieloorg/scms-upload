@@ -10,13 +10,131 @@ from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from scielo_classic_website import classic_ws
+from scielo_classic_website.controller import pids_and_their_records
 
+from article.controller import create_article
+from core.controller import parse_yyyymmdd
 from htmlxml.models import HTMLXML
-from migration.models import MigratedFile
+from issue.models import Issue
+from journal.models import Journal, OfficialJournal
+from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 
 from .models import ClassicWebsiteConfiguration
+
+
+def create_or_update_journal(
+    user,
+    journal_proc,
+    force_update,
+):
+    """
+    Create/update OfficialJournal, JournalProc e Journal
+    """
+    if not tracker_choices.allowed_to_run(journal_proc.migration_status, force_update):
+        return journal_proc.journal
+    collection = journal_proc.collection
+    journal_data = journal_proc.migrated_data.data
+
+    # obtém classic website journal
+    classic_website_journal = classic_ws.Journal(journal_data)
+
+    year, month, day = parse_yyyymmdd(classic_website_journal.first_year)
+    official_journal = OfficialJournal.create_or_update(
+        user=user,
+        issn_electronic=classic_website_journal.electronic_issn,
+        issn_print=classic_website_journal.print_issn,
+        title=classic_website_journal.title,
+        title_iso=classic_website_journal.title_iso,
+        foundation_year=year,
+    )
+    journal = Journal.create_or_update(
+        user=user,
+        official_journal=official_journal,
+    )
+    # TODO
+    # for publisher_name in classic_website_journal.raw_publisher_names:
+    #     journal.add_publisher(user, publisher_name)
+
+    journal_proc.update(
+        user=user,
+        journal=journal,
+        acron=classic_website_journal.acronym,
+        title=classic_website_journal.title,
+        availability_status=classic_website_journal.current_status,
+        migration_status=tracker_choices.PROGRESS_STATUS_DONE,
+        force_update=force_update,
+    )
+
+    return journal
+
+
+def create_or_update_issue(
+    user,
+    issue_proc,
+    force_update,
+    JournalProc,
+):
+    """
+    Create/update Issue
+    """
+    if not tracker_choices.allowed_to_run(issue_proc.migration_status, force_update):
+        return issue_proc.issue
+    classic_website_issue = classic_ws.Issue(issue_proc.migrated_data.data)
+
+    try:
+        journal_proc = JournalProc.get(
+            collection=issue_proc.collection,
+            pid=classic_website_issue.journal,
+        )
+    except JournalProc.DoesNotExist:
+        raise ValueError(
+            f"Unable to get journal_proc for issue_proc: collection={issue_proc.collection}, pid={classic_website_issue.journal}"
+        )
+    if not journal_proc.journal:
+        raise ValueError(f"Missing JournalProc.journal for {journal_proc}")
+
+    issue = Issue.get_or_create(
+        journal=journal_proc.journal,
+        publication_year=classic_website_issue.publication_year,
+        volume=classic_website_issue.volume,
+        number=classic_website_issue.number,
+        supplement=classic_website_issue.supplement,
+        user=user,
+        is_continuous_publishing_model=bool(
+            not classic_website_issue.number and not classic_website_issue.supplement
+        ),
+        total_documents=classic_website_issue.total_documents,
+    )
+    issue_proc.update(
+        user=user,
+        journal_proc=journal_proc,
+        issue_folder=classic_website_issue.issue_label,
+        issue=issue,
+        migration_status=tracker_choices.PROGRESS_STATUS_DONE,
+        force_update=force_update,
+    )
+    return issue
+
+
+def create_or_update_article(
+    user,
+    article_proc,
+    force_update,
+):
+    """
+    Create/update Issue
+    """
+    if not tracker_choices.allowed_to_run(article_proc.migration_status, force_update):
+        logging.info(f"article_proc.migration_status={article_proc.migration_status}")
+        return article_proc.article
+
+    article = create_article(article_proc.sps_pkg, user, force_update)
+    article_proc.migration_status = tracker_choices.PROGRESS_STATUS_DONE
+    article_proc.updated_by = user
+    article_proc.save()
+    return article["article"]
 
 
 class XMLVersionXmlWithPreError(Exception):
@@ -524,3 +642,159 @@ def get_migrated_xml_with_pre(article_proc):
                 origin, xml_file_path, type(e), e
             )
         )
+
+
+def register_acron_id_file_content(
+    user,
+    journal_proc,
+    force_update,
+):
+
+    try:
+        # Importa os registros de documentos
+        operation = journal_proc.start(user, "register_acron_id_file_content")
+        journal = journal_proc.journal
+        collection = journal_proc.collection
+        journal_acron = journal_proc.acron
+
+        classic_website = get_classic_website(collection.acron)
+        source_path = os.path.join(
+            classic_website.classic_website_paths.bases_work_path,
+            journal_acron,
+            journal_acron + ".id",
+        )
+        if os.path.isfile(source_path):
+
+            journal_id_file = JournalAcronIdFile.create_or_update(
+                user=user,
+                collection=collection,
+                journal=journal,
+                source_path=source_path,
+                force_update=force_update,
+            )
+            has_items = journal_id_file.id_file_records.filter(deleted=False).exists()
+            if not has_items:
+                # todos estão como delete = True
+                for item in read_bases_work_acron_id_file(
+                    user,
+                    source_path,
+                    classic_website,
+                    journal_proc,
+                ):
+                    journal_id_file.id_file_records.add(
+                        IdFileRecord.create_or_update(user, journal_id_file, **item)
+                    )
+            operation.finish(
+                user, completed=bool(journal_id_file.id_file_records.count())
+            )
+        else:
+            operation.finish(
+                user, completed=False, message=_(f"{source_path} does not exist")
+            )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "migration.controller.register_acron_id_file_content",
+                "user_id": user.id,
+                "username": user.username,
+                "collection_acron": journal_proc.collection.acron,
+                "journal_acron": journal_proc.acron,
+            },
+        )
+
+
+def read_bases_work_acron_id_file(user, source_path, classic_website, journal_proc):
+    data = {}
+    classic_ws_issue = None
+    classic_ws_doc = None
+    for item_pid, item_records in pids_and_their_records(source_path, "article"):
+        info = {"item_pid": item_pid}
+        operation = journal_proc.start(
+            user, f"get data from {os.path.basename(source_path)} for {item_pid}"
+        )
+        if len(item_records) == 1:
+            data["issue"] = item_records[0]
+            classic_ws_issue = classic_ws.Issue(data["issue"])
+            info["classic_ws_issue_pid"] = classic_ws_issue.pid
+            d = dict(
+                item_type="issue",
+                item_pid=item_pid,
+                data=data["issue"],
+                issue_folder=classic_ws_issue.issue_label,
+                article_filename=None,
+            )
+            yield d
+            operation.finish(
+                user,
+                completed=True,
+                detail={"item_type": "issue", "issue_folder": d["issue_folder"]},
+            )
+            continue
+
+        if not classic_ws_issue:
+            # raise ValueError(f"{source_path} must have 'i' record for {item_pid}")
+
+            operation.finish(
+                user,
+                completed=False,
+                detail={"classic_ws_issue": None},
+            )
+            continue
+
+        # item = documento
+        data["article"] = item_records
+        # instancia Document com os dados de journal, issue e article
+        classic_ws_doc = classic_ws.Document(data)
+
+        try:
+            scielo_pid_v2 = classic_ws_doc.scielo_pid_v2
+        except AttributeError:
+            logging.info(f"Missing scielo_pid_v2 for {item_pid}")
+            logging.exception(data)
+
+        info.update(
+            dict(
+                item_type="article",
+                classic_ws_doc_pid=scielo_pid_v2,
+                issue_folder=classic_ws_doc.issue.issue_label,
+                article_filename=classic_ws_doc.filename_without_extension,
+                article_filetype=classic_ws_doc.file_type,
+                processing_date=classic_ws_doc.processing_date,
+            )
+        )
+
+        if (
+            classic_ws_issue.pid not in item_pid
+            or item_pid != classic_ws_doc.scielo_pid_v2
+        ):
+            # raise ValueError(f"{classic_ws_issue.pid} and {item_pid} do not match")
+            detail = {"error": "unmatched issue_pid and item_pid"}
+            detail.update(info)
+            operation.finish(user, completed=False, detail=detail)
+            continue
+
+        # se houver bases-work/p/<pid>, obtém os registros de parágrafo
+        ign_pid, p_records = classic_website.get_p_records(item_pid)
+        p_records = list(p_records)
+        if p_records:
+            # adiciona registros p aos registros do artigo
+            info["external_p_records_count"] = len(p_records)
+            yield dict(
+                item_type="paragraph",
+                item_pid=item_pid,
+                data=p_records,
+                issue_folder=classic_ws_issue.issue_label,
+            )
+
+        yield dict(
+            item_type="article",
+            item_pid=item_pid,
+            data=item_records,
+            issue_folder=classic_ws_doc.issue.issue_label,
+            article_filename=classic_ws_doc.filename_without_extension,
+            article_filetype=classic_ws_doc.file_type,
+        )
+        operation.finish(user, completed=True, detail=info)
