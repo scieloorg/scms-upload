@@ -1,12 +1,12 @@
+import json
 import logging
 import os
 import sys
-import json
 from datetime import datetime
 from tempfile import TemporaryDirectory
 
 from django.core.files.base import ContentFile
-from django.db import models, IntegrityError
+from django.db import IntegrityError, models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -29,17 +29,17 @@ from core.models import CommonControlField
 from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
 from journal.models import Journal
+from migration.controller import (
+    PkgZipBuilder,
+    XMLVersionXmlWithPreError,
+    get_migrated_xml_with_pre,
+)
 from migration.models import (
     MigratedArticle,
     MigratedData,
     MigratedFile,
     MigratedIssue,
     MigratedJournal,
-)
-from migration.controller import (
-    PkgZipBuilder,
-    get_migrated_xml_with_pre,
-    XMLVersionXmlWithPreError,
 )
 from package import choices as package_choices
 from package.models import SPSPkg

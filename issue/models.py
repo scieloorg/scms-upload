@@ -1,6 +1,6 @@
 import logging
 
-from django.db import models, IntegrityError
+from django.db import IntegrityError, models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import FieldPanel

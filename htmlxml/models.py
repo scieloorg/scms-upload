@@ -9,21 +9,19 @@ from lxml import etree
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.pid_provider.xml_sps_lib import (
-    split_processing_instruction_doctype_declaration_and_xml,
     XMLWithPre,
+    split_processing_instruction_doctype_declaration_and_xml,
 )
 from scielo_classic_website.classic_ws import Document
 from scielo_classic_website.models.document import GenerateBodyAndBackFromHTMLError
-
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
-from package.models import BasicXMLFile
 from migration.models import MigratedArticle
-
+from package.models import BasicXMLFile
 # from tracker.models import EventLogger
 from tracker import choices as tracker_choices
 

@@ -12,8 +12,8 @@ from wagtail.contrib.modeladmin.options import (
 from wagtail.contrib.modeladmin.views import CreateView, InspectView
 
 from config.menu import get_menu_order
-from package.models import SPSPkg
 from htmlxml.models import HTMLXML
+from package.models import SPSPkg
 
 from .models import ArticleProc, IssueProc, JournalProc, ProcReport
 

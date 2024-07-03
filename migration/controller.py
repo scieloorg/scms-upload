@@ -3,17 +3,16 @@ import os
 import sys
 from copy import deepcopy
 from datetime import datetime
-from zipfile import ZipFile, ZIP_DEFLATED
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.utils.translation import gettext_lazy as _
+from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
+from packtools.sps.models.v2.article_assets import ArticleAssets
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from scielo_classic_website import classic_ws
 
 from htmlxml.models import HTMLXML
 from migration.models import MigratedFile
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
-from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
-from packtools.sps.models.v2.article_assets import ArticleAssets
-
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 

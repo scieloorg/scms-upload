@@ -7,8 +7,8 @@ from django.utils.translation import gettext_lazy as _
 from collection.choices import QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
-from proc.models import ArticleProc, IssueProc, JournalProc
 from core.models import PressRelease
+from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
 from publication.api.journal import publish_journal

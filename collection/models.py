@@ -7,12 +7,11 @@ from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
+from collection import choices
+from collection.utils import language_iso
+from core.choices import LANGUAGE
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
-
-from collection import choices
-from core.choices import LANGUAGE
-from collection.utils import language_iso
 
 
 class LanguageGetOrCreateError(Exception):
