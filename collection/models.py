@@ -164,7 +164,7 @@ class WebSiteConfiguration(CommonControlField, ClusterableModel):
 
         obj.save()
         data = []
-        for api in api_url:
+        for api in api_url or []:
             if api:
                 we, created = WebSiteConfigurationEndpoint.objects.get_or_create(
                     url=api.get("url"),
