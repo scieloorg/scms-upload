@@ -6,7 +6,7 @@ from publication.api.publication import PublicationAPI
 from publication.utils.journal import build_journal
 
 
-def publish_journal(user, journal_proc, api_data):
+def publish_journal(journal_proc, api_data):
     logging.info(f"publish_journal {journal_proc}")
     payload = {}
 

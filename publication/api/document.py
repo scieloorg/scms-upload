@@ -7,7 +7,7 @@ from publication.api.publication import PublicationAPI
 from publication.utils.document import build_article
 
 
-def publish_article(user, article_proc, api_data):
+def publish_article(article_proc, api_data):
     data = {}
     builder = ArticlePayload(data)
     build_article(article_proc.article, article_proc.journal_proc, builder)

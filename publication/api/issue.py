@@ -6,7 +6,7 @@ from publication.api.publication import PublicationAPI
 from publication.utils.issue import build_issue
 
 
-def publish_issue(user, issue_proc, api_data):
+def publish_issue(issue_proc, api_data):
     data = {}
     builder = IssuePayload(data)
     build_issue(issue_proc, issue_proc.journal_proc.pid, builder)
