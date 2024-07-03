@@ -270,7 +270,8 @@ def task_migrate_document_files(
         publication_year = publication_year and str(publication_year)
         for collection in _get_collections(collection_acron):
             items = IssueProc.files_to_migrate(
-                collection, journal_acron, publication_year, force_update)
+                collection, journal_acron, publication_year, force_update
+            )
             for item in items:
                 # Importa os arquivos das pastas */acron/volnum/*
                 task_import_one_issue_files.apply_async(
@@ -341,14 +342,15 @@ def task_migrate_document_records(
 
         for collection in _get_collections(collection_acron):
             items = IssueProc.docs_to_migrate(
-                collection, journal_acron, publication_year, force_update)
+                collection, journal_acron, publication_year, force_update
+            )
             for item in items:
                 # Importa os registros de documentos
                 task_import_one_issue_document_records(
-                        item_id=item.id,
-                        user_id=user_id,
-                        username=username,
-                        force_update=force_update,
+                    item_id=item.id,
+                    user_id=user_id,
+                    username=username,
+                    force_update=force_update,
                 )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()

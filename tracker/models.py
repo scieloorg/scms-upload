@@ -88,9 +88,9 @@ class UnexpectedEvent(models.Model):
         try:
             e = e or exception
             if e:
-                logging.info("-"*10)
+                logging.info("-" * 10)
                 logging.exception(e)
-                logging.info("="*10)
+                logging.info("=" * 10)
 
             obj = cls()
             obj.exception_msg = str(e)

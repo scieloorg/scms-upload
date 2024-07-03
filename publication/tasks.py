@@ -22,14 +22,14 @@ SCIELO_MODELS = {
     "journal": JournalProc,
     "issue": IssueProc,
     "article": ArticleProc,
-    "pressrelease": PressRelease
+    "pressrelease": PressRelease,
 }
 
 PUBLISH_FUNCTIONS = {
     "journal": publish_journal,
     "issue": publish_issue,
     "article": publish_article,
-    "pressrelease": publish_pressrelease
+    "pressrelease": publish_pressrelease,
 }
 
 
@@ -306,23 +306,23 @@ def task_publish_model_inline(
     )
     for ws in website.endpoint.all().filter(name="pressrelease"):
         SciELOModel = SCIELO_MODELS.get(ws.name)
-        
+
         api = PublicationAPI(
-                post_data_url=ws.url,
-                get_token_url=website.api_get_token_url,
-                username=website.api_username,
-                password=website.api_password,
-            )
+            post_data_url=ws.url,
+            get_token_url=website.api_get_token_url,
+            username=website.api_username,
+            password=website.api_password,
+        )
         api.get_token()
-        
+
         for item in SciELOModel.objects.all():
             task_publish_item_inline.apply_async(
                 kwargs=dict(
                     item_id=item.id,
                     api_data=api.data,
                     model_name="pressrelease",
-                    )
                 )
+            )
 
 
 def task_publish_item_inline(

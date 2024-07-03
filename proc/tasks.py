@@ -469,10 +469,7 @@ def task_synchronize_to_pid_provider(
 
 @celery_app.task(bind=True)
 def subtask_synchronize_to_pid_provider(
-    self,
-    username=None,
-    user_id=None,
-    item_id=None
+    self, username=None, user_id=None, item_id=None
 ):
     user = _get_user(user_id, username)
     item = ArticleProc.objects.get(pk=item_id)

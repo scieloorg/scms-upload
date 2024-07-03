@@ -518,7 +518,7 @@ class MigratedArticle(MigratedData):
 
     @property
     def document(self):
-        if not hasattr(self, '_document') or not self._document:
+        if not hasattr(self, "_document") or not self._document:
             self._document = classic_ws.Document(self.data)
         return self._document
 

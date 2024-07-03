@@ -143,9 +143,12 @@ class IssueFolderImporter:
                         {"file": file, "message": str(e), "type": str(type(e))}
                     )
         except Exception as e:
-            failures.append({
-                "files from": f"{journal_acron} {issue_proc.issue_folder}",
-                "message": str(e), "type": str(type(e))}
+            failures.append(
+                {
+                    "files from": f"{journal_acron} {issue_proc.issue_folder}",
+                    "message": str(e),
+                    "type": str(type(e)),
+                }
             )
         return {"migrated": migrated, "failures": failures, "exceptions": exceptions}
 
@@ -197,11 +200,15 @@ class DocumentRecordsImporter:
                     continue
 
                 article_proc = self.import_document_records(doc_id, doc_records)
-                migrated.append({
-                    "pid": article_proc.pid,
-                    "pkg_name": article_proc.pkg_name,
-                    "records": list(article_proc.migrated_data.document.document_records.stats),
-                })
+                migrated.append(
+                    {
+                        "pid": article_proc.pid,
+                        "pkg_name": article_proc.pkg_name,
+                        "records": list(
+                            article_proc.migrated_data.document.document_records.stats
+                        ),
+                    }
+                )
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 failures.append(

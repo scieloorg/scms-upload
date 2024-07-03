@@ -67,9 +67,7 @@ class Issue(CommonControlField, IssuePublicationDate):
                 Q(journal__title__icontains=parts[0])
                 | Q(publication_year__icontains=parts[-1])
             )
-        return Issue.objects.filter(
-            Q(journal__title__icontains=parts[0])
-        )
+        return Issue.objects.filter(Q(journal__title__icontains=parts[0]))
 
     def autocomplete_label(self):
         return "%s %s%s%s" % (
@@ -132,9 +130,7 @@ class Issue(CommonControlField, IssuePublicationDate):
             obj.save()
             return obj
         except IntegrityError:
-            return cls.get(
-                journal, volume, supplement, number
-            )
+            return cls.get(journal, volume, supplement, number)
         except Exception as e:
             data = dict(
                 journal=journal,
@@ -157,6 +153,5 @@ class Issue(CommonControlField, IssuePublicationDate):
             )
         except cls.DoesNotExist:
             return cls.create(
-                user,
-                journal, volume, supplement, number, publication_year
+                user, journal, volume, supplement, number, publication_year
             )

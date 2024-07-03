@@ -494,7 +494,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         return self.migrated_article
 
     class Meta:
-        ordering = ['-updated']
+        ordering = ["-updated"]
 
         indexes = [
             models.Index(fields=["html2xml_status"]),

@@ -89,7 +89,7 @@ class Operation(CommonControlField):
 
     class Meta:
         # isso faz com que em InlinePanel mostre do mais recente para o mais antigo
-        ordering = ['-created']
+        ordering = ["-created"]
         indexes = [
             models.Index(fields=["name"]),
         ]
@@ -117,12 +117,16 @@ class Operation(CommonControlField):
 
     @classmethod
     def create(cls, user, proc, name):
-        for item in cls.objects.filter(proc=proc, name=name).order_by('created'):
+        for item in cls.objects.filter(proc=proc, name=name).order_by("created"):
             # obtém o primeiro ocorrência de proc e name
 
             # obtém todos os ítens criados após este evento
             rows = []
-            for row in cls.objects.filter(proc=proc, created__gte=item.created).order_by('created').iterator():
+            for row in (
+                cls.objects.filter(proc=proc, created__gte=item.created)
+                .order_by("created")
+                .iterator()
+            ):
                 rows.append(row.data)
 
             try:
@@ -140,7 +144,12 @@ class Operation(CommonControlField):
                 report_date = item.created.isoformat()
                 # cria um arquivo com o conteúdo
                 ProcReport.create_or_update(
-                    user, proc, name, report_date, file_content, file_extension,
+                    user,
+                    proc,
+                    name,
+                    report_date,
+                    file_content,
+                    file_extension,
                 )
                 # apaga todas as ocorrências que foram armazenadas no arquivo
                 cls.objects.filter(proc=proc, created__gte=item.created).delete()
@@ -264,7 +273,7 @@ class ProcReport(CommonControlField):
         return f"{self.collection.acron} {self.pid} {self.task_name} {self.report_date}"
 
     class Meta:
-        ordering = ['-created']
+        ordering = ["-created"]
 
         verbose_name = _("Processing report")
         verbose_name_plural = _("Processing reports")
@@ -303,19 +312,19 @@ class ProcReport(CommonControlField):
         if proc and task_name and report_date:
             try:
                 return cls.objects.get(
-                    collection=proc.collection, pid=proc.pid,
+                    collection=proc.collection,
+                    pid=proc.pid,
                     task_name=task_name,
                     report_date=report_date,
                 )
             except cls.MultipleObjectsReturned:
                 return cls.objects.filter(
-                    collection=proc.collection, pid=proc.pid,
+                    collection=proc.collection,
+                    pid=proc.pid,
                     task_name=task_name,
                     report_date=report_date,
                 ).first()
-        raise ValueError(
-            "ProcReport.get requires proc and task_name and report_date"
-        )
+        raise ValueError("ProcReport.get requires proc and task_name and report_date")
 
     @staticmethod
     def get_item_type(pid):
@@ -346,18 +355,20 @@ class ProcReport(CommonControlField):
         )
 
     @classmethod
-    def create_or_update(cls, user, proc, task_name, report_date, file_content, file_extension):
+    def create_or_update(
+        cls, user, proc, task_name, report_date, file_content, file_extension
+    ):
         try:
-            obj = cls.get(
-                proc=proc, task_name=task_name, report_date=report_date
-            )
+            obj = cls.get(proc=proc, task_name=task_name, report_date=report_date)
             obj.updated_by = user
             obj.task_name = task_name or obj.task_name
             obj.report_date = report_date or obj.report_date
             obj.save()
             obj.save_file(f"{task_name}{file_extension}", file_content)
         except cls.DoesNotExist:
-            obj = cls.create(user, proc, task_name, report_date, file_content, file_extension)
+            obj = cls.create(
+                user, proc, task_name, report_date, file_content, file_extension
+            )
         return obj
 
     @property
@@ -413,7 +424,7 @@ class BaseProc(CommonControlField):
 
     class Meta:
         abstract = True
-        ordering = ['-updated']
+        ordering = ["-updated"]
 
         indexes = [
             models.Index(fields=["pid"]),
@@ -728,7 +739,7 @@ class JournalProc(BaseProc, ClusterableModel):
     )
 
     class Meta:
-        ordering = ['-updated']
+        ordering = ["-updated"]
         indexes = [
             models.Index(fields=["acron"]),
         ]
@@ -880,7 +891,7 @@ class IssueProc(BaseProc, ClusterableModel):
         )
 
     class Meta:
-        ordering = ['-updated']
+        ordering = ["-updated"]
         indexes = [
             models.Index(fields=["issue_folder"]),
             models.Index(fields=["docs_status"]),
@@ -1160,7 +1171,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     MigratedDataClass = MigratedArticle
 
     class Meta:
-        ordering = ['-updated']
+        ordering = ["-updated"]
         indexes = [
             models.Index(fields=["pkg_name"]),
             models.Index(fields=["xml_status"]),
