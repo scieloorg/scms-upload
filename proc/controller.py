@@ -5,12 +5,14 @@ from migration import controller
 from proc.models import IssueProc, JournalProc
 from publication.api.issue import publish_issue
 from publication.api.journal import publish_journal
+from publication.api.publication import get_api_data
 from tracker.models import UnexpectedEvent
 
 
 def migrate_and_publish_journals(
     user, collection, classic_website, force_update, import_acron_id_file=False
 ):
+    api_data = get_api_data(collection, "journal", website_kind="QA")
     for (
         scielo_issn,
         journal_data,
@@ -37,7 +39,12 @@ def migrate_and_publish_journals(
                     journal_proc,
                     force_update,
                 )
-            journal_proc.publish(user, publish_journal, force_update=force_update)
+            journal_proc.publish(
+                user,
+                publish_journal,
+                api_data=api_data,
+                force_update=force_update,
+            )
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -62,6 +69,7 @@ def migrate_and_publish_issues(
     force_update,
     get_files_from_classic_website=False,
 ):
+    api_data = get_api_data(collection, "issue", website_kind="QA")
     for (
         pid,
         issue_data,
@@ -83,7 +91,12 @@ def migrate_and_publish_issues(
                 controller.create_or_update_issue,
                 JournalProc=JournalProc,
             )
-            issue_proc.publish(user, publish_issue, force_update=force_update)
+            issue_proc.publish(
+                user,
+                publish_issue,
+                api_data=api_data,
+                force_update=force_update,
+            )
 
             if get_files_from_classic_website:
                 issue_proc.get_files_from_classic_website(

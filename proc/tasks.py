@@ -14,9 +14,7 @@ from migration.models import JournalAcronIdFile
 from proc.controller import migrate_and_publish_issues, migrate_and_publish_journals
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
-from publication.api.issue import publish_issue
-from publication.api.journal import publish_journal
-from publication.api.publication import PublicationAPI
+from publication.api.publication import get_api_data
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
 
@@ -97,12 +95,14 @@ def task_migrate_and_publish(
             )
 
             # migra os documentos
+            article_api_data = get_api_data(collection, "article")
             for journal_proc in JournalProc.journals_with_modified_articles(collection):
                 task_migrate_journal_articles.apply_async(
                     kwargs=dict(
                         user_id=user_id,
                         username=username,
                         journal_proc_id=journal_proc.id,
+                        article_api_data=article_api_data,
                     )
                 )
 
@@ -130,6 +130,7 @@ def task_migrate_journal_articles(
     publication_year=None,
     issue_folder=None,
     force_update=None,
+    article_api_data=None,
 ):
     """
     Migra todos ou uma seleção de artigos de um dado journal
@@ -188,6 +189,7 @@ def task_migrate_journal_articles(
                     username=username,
                     issue_proc_id=issue_proc.id,
                     force_update=force_update,
+                    article_api_data=article_api_data,
                 )
             )
 
@@ -208,6 +210,7 @@ def task_migrate_journal_articles(
                         username=username,
                         issue_proc_id=issue_proc.id,
                         force_update=force_update,
+                        article_api_data=article_api_data,
                     )
                 )
 
@@ -233,6 +236,7 @@ def task_migrate_issue_articles(
     username=None,
     issue_proc_id=None,
     force_update=None,
+    article_api_data=None,
 ):
     try:
         user = _get_user(user_id, username)
@@ -249,6 +253,7 @@ def task_migrate_issue_articles(
                     username=username,
                     article_proc_id=article_proc.id,
                     force_update=force_update,
+                    article_api_data=article_api_data,
                 )
             )
     except Exception as e:
@@ -273,6 +278,7 @@ def task_migrate_and_publish_article(
     username=None,
     article_proc_id=None,
     force_update=None,
+    article_api_data=None,
 ):
     try:
         user = _get_user(user_id, username)
@@ -280,7 +286,7 @@ def task_migrate_and_publish_article(
         article_proc = ArticleProc.objects.get(pk=article_proc_id)
         article = article_proc.migrate_article(user, force_update)
         if article:
-            article_proc.publish(user, publish_article, force_update=force_update)
+            article_proc.publish(user, publish_article, api_data=article_api_data, force_update=force_update)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -391,7 +397,10 @@ def task_migrate_and_publish_articles(
         if journal_acron:
             params["journal__acron"] = journal_acron
 
+        article_api_data = None
         for journal_proc in JournalProc.objects.filter(**params):
+
+            article_api_data = article_api_data or get_api_data(journal_proc.collection, "article")
             # como é custoso obter os registros de acron,
             # somente se force_import é True, reexecuta a leitura de acron.id
             controller.register_acron_id_file_content(
@@ -407,6 +416,7 @@ def task_migrate_and_publish_articles(
                     publication_year=publication_year,
                     issue_folder=issue_folder,
                     force_update=force_update or force_import,
+                    article_api_data=article_api_data,
                     # from_datetime=from_datetime,
                 )
             )
