@@ -90,183 +90,183 @@ def _get_api_data(collection, website_kind, item_name):
     return api.data
 
 
-@celery_app.task(bind=True)
-def task_publish(
-    self,
-    user_id=None,
-    username=None,
-    website_kind=None,
-    collection_acron=None,
-    force_update=None,
-):
+# @celery_app.task(bind=True)
+# def task_publish(
+#     self,
+#     user_id=None,
+#     username=None,
+#     website_kind=None,
+#     collection_acron=None,
+#     force_update=None,
+# ):
 
-    website_kind = website_kind or QA
-    for collection in _get_collections(collection_acron):
-        if not collection.acron:
-            continue
-        task_publish_collection.apply_async(
-            kwargs=dict(
-                user_id=user_id,
-                username=username,
-                website_kind=website_kind,
-                collection_acron=collection.acron,
-                force_update=force_update,
-            )
-        )
-
-
-@celery_app.task(bind=True)
-def task_publish_journals(
-    self,
-    user_id=None,
-    username=None,
-    website_kind=None,
-    collection_acron=None,
-    force_update=None,
-):
-
-    for collection in _get_collections(collection_acron):
-        task_publish_model.apply_async(
-            kwargs=dict(
-                user_id=user_id,
-                username=username,
-                website_kind=website_kind,
-                collection_acron=collection.acron,
-                force_update=force_update,
-                model_name="journal",
-            )
-        )
+#     website_kind = website_kind or QA
+#     for collection in _get_collections(collection_acron):
+#         if not collection.acron:
+#             continue
+#         task_publish_collection.apply_async(
+#             kwargs=dict(
+#                 user_id=user_id,
+#                 username=username,
+#                 website_kind=website_kind,
+#                 collection_acron=collection.acron,
+#                 force_update=force_update,
+#             )
+#         )
 
 
-@celery_app.task(bind=True)
-def task_publish_issues(
-    self,
-    user_id=None,
-    username=None,
-    website_kind=None,
-    collection_acron=None,
-    force_update=None,
-):
-    for collection in _get_collections(collection_acron):
-        task_publish_model.apply_async(
-            kwargs=dict(
-                user_id=user_id,
-                username=username,
-                website_kind=website_kind,
-                collection_acron=collection.acron,
-                force_update=force_update,
-                model_name="issue",
-            )
-        )
+# @celery_app.task(bind=True)
+# def task_publish_journals(
+#     self,
+#     user_id=None,
+#     username=None,
+#     website_kind=None,
+#     collection_acron=None,
+#     force_update=None,
+# ):
+
+#     for collection in _get_collections(collection_acron):
+#         task_publish_model.apply_async(
+#             kwargs=dict(
+#                 user_id=user_id,
+#                 username=username,
+#                 website_kind=website_kind,
+#                 collection_acron=collection.acron,
+#                 force_update=force_update,
+#                 model_name="journal",
+#             )
+#         )
 
 
-@celery_app.task(bind=True)
-def task_publish_articles(
-    self,
-    user_id=None,
-    username=None,
-    website_kind=None,
-    collection_acron=None,
-    force_update=None,
-):
-    for collection in _get_collections(collection_acron):
-        task_publish_model.apply_async(
-            kwargs=dict(
-                user_id=user_id,
-                username=username,
-                website_kind=website_kind,
-                collection_acron=collection.acron,
-                force_update=force_update,
-                model_name="article",
-            )
-        )
+# @celery_app.task(bind=True)
+# def task_publish_issues(
+#     self,
+#     user_id=None,
+#     username=None,
+#     website_kind=None,
+#     collection_acron=None,
+#     force_update=None,
+# ):
+#     for collection in _get_collections(collection_acron):
+#         task_publish_model.apply_async(
+#             kwargs=dict(
+#                 user_id=user_id,
+#                 username=username,
+#                 website_kind=website_kind,
+#                 collection_acron=collection.acron,
+#                 force_update=force_update,
+#                 model_name="issue",
+#             )
+#         )
 
 
-@celery_app.task(bind=True)
-def task_publish_collection(
-    self,
-    user_id=None,
-    username=None,
-    website_kind=None,
-    collection_acron=None,
-    force_update=None,
-):
-
-    for collection in _get_collections(collection_acron):
-        for model_name in ("journal", "issue", "article"):
-            task_publish_model.apply_async(
-                kwargs=dict(
-                    user_id=user_id,
-                    username=username,
-                    website_kind=website_kind,
-                    collection_acron=collection.acron,
-                    force_update=force_update,
-                    model_name=model_name,
-                )
-            )
+# @celery_app.task(bind=True)
+# def task_publish_articles(
+#     self,
+#     user_id=None,
+#     username=None,
+#     website_kind=None,
+#     collection_acron=None,
+#     force_update=None,
+# ):
+#     for collection in _get_collections(collection_acron):
+#         task_publish_model.apply_async(
+#             kwargs=dict(
+#                 user_id=user_id,
+#                 username=username,
+#                 website_kind=website_kind,
+#                 collection_acron=collection.acron,
+#                 force_update=force_update,
+#                 model_name="article",
+#             )
+#         )
 
 
-@celery_app.task(bind=True)
-def task_publish_model(
-    self,
-    user_id=None,
-    username=None,
-    website_kind=None,
-    collection_acron=None,
-    force_update=None,
-    model_name=None,
-):
+# @celery_app.task(bind=True)
+# def task_publish_collection(
+#     self,
+#     user_id=None,
+#     username=None,
+#     website_kind=None,
+#     collection_acron=None,
+#     force_update=None,
+# ):
 
-    website_kind = website_kind or QA
-    model_name = model_name or "article"
-    collection = Collection.get(acron=collection_acron)
-    user = _get_user(user_id, username)
-
-    SciELOModel = SCIELO_MODELS.get(model_name)
-
-    api_data = _get_api_data(collection, website_kind, model_name)
-
-    for item in SciELOModel.items_to_publish(
-        user, website_kind, model_name, collection
-    ):
-        task_publish_item.apply_async(
-            kwargs=dict(
-                user_id=user_id,
-                username=username,
-                item_id=item.id,
-                api_data=api_data,
-                model_name=model_name,
-                website_kind=website_kind,
-            )
-        )
+#     for collection in _get_collections(collection_acron):
+#         for model_name in ("journal", "issue", "article"):
+#             task_publish_model.apply_async(
+#                 kwargs=dict(
+#                     user_id=user_id,
+#                     username=username,
+#                     website_kind=website_kind,
+#                     collection_acron=collection.acron,
+#                     force_update=force_update,
+#                     model_name=model_name,
+#                 )
+#             )
 
 
-@celery_app.task(bind=True)
-def task_publish_item(
-    self,
-    user_id,
-    username,
-    item_id,
-    api_data,
-    model_name,
-    website_kind,
-):
-    try:
-        item = None
-        user = _get_user(user_id, username)
-        SciELOModel = SCIELO_MODELS.get(model_name)
-        item = SciELOModel.objects.get(pk=item_id)
-        item.publish(user, PUBLISH_FUNCTIONS.get(model_name), website_kind, api_data)
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail=dict(
-                item_id=item_id,
-                model_name=model_name,
-            ),
-        )
+# @celery_app.task(bind=True)
+# def task_publish_model(
+#     self,
+#     user_id=None,
+#     username=None,
+#     website_kind=None,
+#     collection_acron=None,
+#     force_update=None,
+#     model_name=None,
+# ):
+
+#     website_kind = website_kind or QA
+#     model_name = model_name or "article"
+#     collection = Collection.get(acron=collection_acron)
+#     user = _get_user(user_id, username)
+
+#     SciELOModel = SCIELO_MODELS.get(model_name)
+
+#     api_data = _get_api_data(collection, website_kind, model_name)
+
+#     for item in SciELOModel.items_to_publish(
+#         user, website_kind, model_name, collection
+#     ):
+#         task_publish_item.apply_async(
+#             kwargs=dict(
+#                 user_id=user_id,
+#                 username=username,
+#                 item_id=item.id,
+#                 api_data=api_data,
+#                 model_name=model_name,
+#                 website_kind=website_kind,
+#             )
+#         )
+
+
+# @celery_app.task(bind=True)
+# def task_publish_item(
+#     self,
+#     user_id,
+#     username,
+#     item_id,
+#     api_data,
+#     model_name,
+#     website_kind,
+# ):
+#     try:
+#         item = None
+#         user = _get_user(user_id, username)
+#         SciELOModel = SCIELO_MODELS.get(model_name)
+#         item = SciELOModel.objects.get(pk=item_id)
+#         item.publish(user, PUBLISH_FUNCTIONS.get(model_name), website_kind, api_data)
+#     except Exception as e:
+#         exc_type, exc_value, exc_traceback = sys.exc_info()
+#         UnexpectedEvent.create(
+#             e=e,
+#             exc_traceback=exc_traceback,
+#             detail=dict(
+#                 item_id=item_id,
+#                 model_name=model_name,
+#             ),
+#         )
 
 
 @celery_app.task(bind=True)
