@@ -24,7 +24,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article.models import Article
 from collection import choices as collection_choices
-from collection.models import Collection, WebSiteConfiguration
+from collection.models import Collection
 from core.models import CommonControlField
 from htmlxml.models import HTMLXML
 from issue.models import Issue
@@ -48,10 +48,7 @@ from package import choices as package_choices
 from package.models import SPSPkg
 from proc import exceptions
 from proc.forms import ProcAdminModelForm
-from publication.api.document import publish_article
-from publication.api.issue import publish_issue
-from publication.api.journal import publish_journal
-from publication.api.publication import PublicationAPI
+from publication.api.publication import get_api_data
 from tracker import choices as tracker_choices
 from tracker.models import Event, UnexpectedEvent, format_traceback
 
@@ -112,7 +109,7 @@ class Operation(CommonControlField):
         cls.archive_events(user, proc, name)
         obj = cls()
         obj.proc = proc
-        obj.name = name[:32]
+        obj.name = name[:64]
         obj.creator = user
         obj.save()
         return obj
@@ -207,6 +204,12 @@ class Operation(CommonControlField):
                 detail=detail,
             )
             detail = event.data
+
+        if detail:
+            try:
+                json.dumps(detail)
+            except Exception as exc_detail:
+                detail = str(detail)
 
         self.detail = detail
         self.completed = completed
@@ -659,8 +662,10 @@ class BaseProc(CommonControlField):
             self.qa_ws_status = tracker_choices.PROGRESS_STATUS_DOING
         else:
             self.public_ws_status = tracker_choices.PROGRESS_STATUS_DOING
+        self.save()
 
-        api_data = api_data or self.get_api_data(website_kind)
+        api_data = api_data or get_api_data(
+            self.collection, self.migrated_data.content_type, website_kind)
         operation = self.start(
             user, f"publish {self.migrated_data.content_type} {self} on {website_kind}"
         )
@@ -728,26 +733,6 @@ class BaseProc(CommonControlField):
         )
         # seleciona itens para publicar em produção
         return items
-
-    def get_api_data(self, website_kind=None):
-        website_kind = website_kind or collection_choices.QA
-        website = WebSiteConfiguration.get(
-            collection=self.collection,
-            purpose=website_kind,
-        )
-        API_URLS = {
-            "journal": website.api_url_journal,
-            "issue": website.api_url_issue,
-            "article": website.api_url_article,
-        }
-        api = PublicationAPI(
-            post_data_url=API_URLS.get(self.migrated_data.content_type),
-            get_token_url=website.api_get_token_url,
-            username=website.api_username,
-            password=website.api_password,
-        )
-        api.get_token()
-        return api.data
 
 
 class JournalProc(BaseProc, ClusterableModel):
@@ -1137,6 +1122,12 @@ class IssueProc(BaseProc, ClusterableModel):
         )
 
     def migrate_document_records(self, user, force_update=None):
+
+        doit = tracker_choices.allowed_to_run(self.docs_status, force_update)
+        if not doit:
+            logging.info(f"Skip migrate_document_records {self.pid}")
+            return
+
         operation = self.start(user, "migrate_document_records")
         done = 0
         journal_data = self.journal_proc.migrated_data.data
@@ -1182,6 +1173,11 @@ class IssueProc(BaseProc, ClusterableModel):
                 "total_documents_expected": self.issue.total_documents,
             },
         )
+        if total_docs == done:
+            self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
+        else:
+            self.docs_status = tracker_choices.PROGRESS_STATUS_PENDING
+        self.save()
 
     def create_or_update_article_proc(self, user, pid, data, force_update):
         article_proc = ArticleProc.register_classic_website_data(
