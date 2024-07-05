@@ -5,7 +5,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
-from wagtail.admin.panels import FieldPanel, InlinePanel, TabbedInterface, ObjectList
+from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
@@ -124,12 +124,11 @@ class Journal(CommonControlField, ClusterableModel):
     """
     Journal para site novo
     """
+
     short_title = models.CharField(
         _("Short Title"), max_length=100, null=True, blank=True
     )
-    title = models.CharField(
-        _("Title"), max_length=265, null=True, blank=True
-    )
+    title = models.CharField(_("Title"), max_length=265, null=True, blank=True)
     journal_acron = models.TextField(_("Journal Acronym"), null=True, blank=True)
     official_journal = models.ForeignKey(
         "OfficialJournal",
@@ -223,8 +222,16 @@ class Journal(CommonControlField, ClusterableModel):
 
 
 class Owner(Orderable, InstitutionHistory):
-    journal = ParentalKey(Journal, related_name="owner", null=True, blank=True, on_delete=models.SET_NULL)
+    journal = ParentalKey(
+        Journal, related_name="owner", null=True, blank=True, on_delete=models.SET_NULL
+    )
 
 
 class Publisher(Orderable, InstitutionHistory):
-    journal = ParentalKey(Journal, related_name="publisher", null=True, blank=True, on_delete=models.SET_NULL)
+    journal = ParentalKey(
+        Journal,
+        related_name="publisher",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
