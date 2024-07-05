@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 from django.core.files.base import ContentFile
-from django.db import models
+from django.db import IntegrityError, models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -16,6 +16,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 from collection.models import Collection
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
+from journal.models import Journal
 from tracker import choices as tracker_choices
 
 from . import exceptions
@@ -301,9 +302,13 @@ def migrated_files_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
 
     try:
-        return f"classic_website/{instance.collection.acron}/{instance.original_path}"
+        path = instance.original_path
     except (AttributeError, TypeError) as e:
-        logging.exception(e)
+        path = instance.source_path
+
+    try:
+        return f"classic_website/{instance.collection.acron}/{path}"
+    except (AttributeError, TypeError) as e:
         return f"classic_website/{filename}"
 
 
@@ -506,11 +511,24 @@ class MigratedIssue(MigratedData):
 
 
 class MigratedArticle(MigratedData):
+    file_type = models.CharField(
+        _("File type"),
+        max_length=4,
+        default=None,
+        null=True,
+        blank=True,
+    )
+
     panels = [
+        FieldPanel("file_type"),
         FieldPanel("isis_updated_date"),
         FieldPanel("isis_created_date"),
         FieldPanel("data"),
     ]
+
+    def __str__(self):
+        document = self.document
+        return f"{document.journal.acronym} {document.issue.issue_label} {document.filename_without_extension}"
 
     @classmethod
     def get_data_from_classic_website(cls, data):
@@ -518,9 +536,7 @@ class MigratedArticle(MigratedData):
 
     @property
     def document(self):
-        if not hasattr(self, '_document') or not self._document:
-            self._document = classic_ws.Document(self.data)
-        return self._document
+        return classic_ws.Document(self.data)
 
     @property
     def n_paragraphs(self):
@@ -534,3 +550,402 @@ class MigratedArticle(MigratedData):
     def path(self):
         document = self.document
         return f"{document.journal.acronym}/{document.issue.issue_label}/{document.filename_without_extension}"
+
+
+class JournalAcronIdFile(CommonControlField, ClusterableModel):
+    collection = models.ForeignKey(
+        Collection, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    journal = models.ForeignKey(
+        Journal, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    file = models.FileField(
+        upload_to=migrated_files_directory_path, null=True, blank=True
+    )
+    # bases/pdf/acron/volnum/pt_a01.pdf
+    source_path = models.TextField(_("Source"), null=True, blank=True)
+
+    file_size = models.IntegerField(null=True, blank=True)
+
+    autocomplete_search_field = "source_path"
+
+    def __str__(self):
+        return f"{self.source_path}"
+
+    def autocomplete_label(self):
+        return f"{self.source_path}"
+
+    class Meta:
+        unique_together = [("collection", "journal", "source_path")]
+        indexes = [
+            models.Index(fields=["source_path"]),
+        ]
+
+    @classmethod
+    def get(
+        cls,
+        collection,
+        journal,
+        source_path,
+    ):
+        if collection and journal and source_path:
+            return cls.objects.get(
+                collection=collection, journal=journal, source_path=source_path
+            )
+        d = dict(
+            collection=collection,
+            journal=journal,
+            source_path=source_path,
+        )
+        raise ValueError(f"JournalAcronIdFile.create requires all parameters. Got {d}")
+
+    @classmethod
+    def create(
+        cls,
+        user,
+        collection,
+        journal,
+        source_path,
+    ):
+        if not user and not journal and not collection and not source_path:
+            d = dict(
+                user=user,
+                collection=collection,
+                journal=journal,
+                source_path=source_path,
+            )
+            raise ValueError(
+                f"JournalAcronIdFile.create requires all parameters. Got {d}"
+            )
+
+        try:
+            obj = cls()
+            obj.collection = collection
+            obj.journal = journal
+            obj.source_path = source_path
+            obj.creator = user
+            obj.file_size = JournalAcronIdFile.get_file_size(source_path)
+            obj.save()
+
+            with open(source_path, "rb") as fp:
+                basename = os.path.basename(source_path)
+                obj.save_file(basename, fp.read(), True)
+                obj.save()
+
+            return obj
+        except IntegrityError:
+            return cls.get(collection, journal, source_path)
+
+    def save_file(self, name, content, delete=False):
+        try:
+            self.file.delete(save=True)
+        except Exception as e:
+            pass
+        self.file.save(name, ContentFile(content))
+
+    @classmethod
+    def create_or_update(
+        cls,
+        user,
+        collection,
+        journal,
+        source_path,
+        force_update=None,
+    ):
+        try:
+            obj = cls.get(collection, journal, source_path)
+            file_size = JournalAcronIdFile.get_file_size(source_path)
+
+            doit = any((force_update, not obj.is_up_to_date(file_size)))
+            if not doit:
+                logging.info(f"skip update {source_path}")
+                return obj
+
+            obj.updated_by = user
+            obj.updated = datetime.utcnow()
+            obj.file_size = file_size
+            obj.save()
+
+            with open(source_path, "rb") as fp:
+                basename = os.path.basename(source_path)
+                obj.save_file(basename, fp.read(), True)
+                obj.save()
+
+            obj.id_file_records.all().update(deleted=True)
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(user, collection, journal, source_path)
+
+    @staticmethod
+    def get_file_size(source_path):
+        return os.stat(source_path).st_size
+
+    def is_up_to_date(self, file_size):
+        logging.info(f"{self.file.path} {file_size} {self.file_size}")
+        return bool(self.file_size and self.file_size == file_size)
+
+    @classmethod
+    def modified_articles(cls, collection=None, journal=None, issue_folder=None):
+        params = {}
+        if collection:
+            params["collection"] = collection
+        if journal:
+            params["journal"] = journal
+
+        for journal_acron_id_file in cls.objects.filter(**params):
+            from_datetime = (
+                journal_acron_id_file.updated or journal_acron_id_file.created
+            )
+            items = IdFileRecord.modified_records(
+                collection=journal_acron_id_file.collection,
+                journal=journal_acron_id_file.journal,
+                issue_folder=issue_folder,
+                from_datetime=from_datetime,
+            )
+            if items.exists():
+                yield from items
+
+    @classmethod
+    def issues_with_modified_articles(cls, collection=None, journal=None):
+        params = {}
+        if collection:
+            params["collection"] = collection
+        if journal:
+            params["journal"] = journal
+
+        for journal_acron_id_file in cls.objects.filter(**params):
+            from_datetime = (
+                journal_acron_id_file.updated or journal_acron_id_file.created
+            )
+            items = IdFileRecord.modified_records(
+                collection=journal_acron_id_file.collection,
+                journal=journal_acron_id_file.journal,
+                from_datetime=from_datetime,
+            )
+            if items.exists():
+                yield from items.values(
+                    "parent__journal__id", "parent__collection__id", "issue_folder"
+                ).distinct()
+
+    @classmethod
+    def journals_with_modified_articles(cls, collection=None, journal=None):
+        params = {}
+        if collection:
+            params["collection"] = collection
+        if journal:
+            params["journal"] = journal
+
+        for journal_acron_id_file in cls.objects.filter(**params):
+            from_datetime = (
+                journal_acron_id_file.updated or journal_acron_id_file.created
+            )
+            items = IdFileRecord.modified_records(
+                collection=journal_acron_id_file.collection,
+                journal=journal_acron_id_file.journal,
+                from_datetime=from_datetime,
+            )
+            if items.exists():
+                yield journal_acron_id_file
+
+
+class IdFileRecord(CommonControlField, Orderable):
+    parent = ParentalKey(
+        JournalAcronIdFile, on_delete=models.CASCADE, related_name="id_file_records"
+    )
+    data = models.JSONField()
+    item_pid = models.CharField(_("PID"), max_length=23)
+    item_type = models.CharField(_("Type"), max_length=10)
+    issue_folder = models.CharField(_("Issue folder"), max_length=30)
+    article_filename = models.CharField(
+        _("Filename"), max_length=30, null=True, blank=True
+    )
+    article_filetype = models.CharField(
+        _("File type"), max_length=4, null=True, blank=True
+    )
+    processing_date = models.CharField(max_length=8, null=True, blank=True)
+    deleted = models.BooleanField(default=False)
+
+    panels = [
+        FieldPanel("item_pid", read_only=True),
+        FieldPanel("item_type", read_only=True),
+        FieldPanel("issue_folder", read_only=True),
+        FieldPanel("article_filename", read_only=True),
+        FieldPanel("article_filetype", read_only=True),
+        FieldPanel("data", read_only=True),
+    ]
+
+    class Meta:
+        unique_together = [("parent", "item_type", "item_pid")]
+        indexes = [
+            models.Index(fields=["parent"]),
+            models.Index(fields=["item_pid"]),
+            models.Index(fields=["item_type"]),
+            models.Index(fields=["issue_folder"]),
+        ]
+
+    def __str__(self):
+        return f"{self.item_pid}"
+
+    @classmethod
+    def get(
+        cls,
+        parent,
+        item_type,
+        item_pid,
+    ):
+        if parent and item_type and item_pid:
+            return cls.objects.get(
+                parent=parent, item_type=item_type, item_pid=item_pid
+            )
+        d = dict(
+            parent=parent,
+            item_type=item_type,
+            item_pid=item_pid,
+        )
+        raise ValueError(f"JournalAcronIdFile.get requires all parameters. Got {d}")
+
+    @classmethod
+    def create(
+        cls,
+        user,
+        parent,
+        item_type,
+        item_pid,
+        data,
+        issue_folder,
+        article_filename=None,
+        article_filetype=None,
+        processing_date=None,
+    ):
+        if not user and not item_type and not parent and not item_pid:
+            d = dict(
+                user=user,
+                parent=parent,
+                item_type=item_type,
+                item_pid=item_pid,
+            )
+            raise ValueError(
+                f"JournalAcronIdFile.create requires all parameters. Got {d}"
+            )
+
+        try:
+            obj = cls(
+                creator=user,
+                parent=parent,
+                item_type=item_type,
+                item_pid=item_pid,
+                data=data,
+                issue_folder=issue_folder,
+                article_filename=article_filename,
+                article_filetype=article_filetype,
+                processing_date=processing_date,
+            )
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(parent, item_type, item_pid)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        user,
+        parent,
+        item_type,
+        item_pid,
+        data,
+        issue_folder,
+        article_filename=None,
+        article_filetype=None,
+        processing_date=None,
+    ):
+        if not user and not item_type and not parent and not item_pid:
+            d = dict(
+                user=user,
+                parent=parent,
+                item_type=item_type,
+                item_pid=item_pid,
+            )
+            raise ValueError(
+                f"JournalAcronIdFile.create requires all parameters. Got {d}"
+            )
+
+        try:
+            obj = cls.get(parent, item_type, item_pid)
+            if processing_date and obj.processing_date == processing_date:
+                obj.deleted = False
+                obj.save()
+                return obj
+            obj.updated_by = user
+            obj.updated = datetime.utcnow()
+            obj.data = data
+            obj.issue_folder = issue_folder
+            obj.article_filename = article_filename
+            obj.article_filetype = article_filetype
+            obj.processing_date = processing_date
+            obj.deleted = False
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(
+                user,
+                parent,
+                item_type,
+                item_pid,
+                data,
+                issue_folder,
+                article_filename,
+                article_filetype,
+                processing_date,
+            )
+
+    def get_record_data(self, journal_data=None, issue_data=None):
+        data = {}
+        data["title"] = journal_data
+        if not issue_data:
+            issue_data = (
+                IdFileRecord.objects.filter(
+                    item_pid=self.item_pid[1:-5],
+                    item_type="issue",
+                )
+                .first()
+                .data
+            )
+        data["issue"] = issue_data
+        try:
+            p_records = (
+                IdFileRecord.objects.filter(
+                    item_pid=self.item_pid,
+                    item_type="paragraph",
+                )
+                .first()
+                .data
+            )
+        except AttributeError:
+            p_records = []
+        data["article"] = self.data + list(p_records)
+        return {
+            "data": data,
+            "pid": self.item_pid,
+            "issue_folder": self.issue_folder,
+            "deleted": self.deleted,
+        }
+
+    @classmethod
+    def modified_records(
+        cls, collection=None, journal=None, issue_folder=None, from_datetime=None
+    ):
+        params = {}
+        if collection:
+            params["parent__collection"] = collection
+        if journal:
+            params["parent__journal"] = journal
+        if issue_folder:
+            params["issue_folder"] = issue_folder
+        if from_datetime:
+            return cls.objects.filter(
+                Q(created__gte=from_datetime) | Q(updated__gte=from_datetime),
+                item_type="article",
+                **params,
+            )
+        else:
+            return cls.objects.filter(item_type="article", **params)

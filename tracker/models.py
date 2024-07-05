@@ -1,8 +1,8 @@
-from datetime import datetime
 import json
 import logging
 import traceback
 import uuid
+from datetime import datetime
 
 from django.core.files.base import ContentFile
 from django.db import models
@@ -10,12 +10,11 @@ from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
-from wagtailautocomplete.edit_handlers import AutocompletePanel
 from wagtail.models import Orderable
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
-
 from tracker import choices
 
 
@@ -87,10 +86,7 @@ class UnexpectedEvent(models.Model):
     ):
         try:
             e = e or exception
-            if e:
-                logging.info("-"*10)
-                logging.exception(e)
-                logging.info("="*10)
+            logging.exception(e)
 
             obj = cls()
             obj.exception_msg = str(e)
@@ -99,7 +95,6 @@ class UnexpectedEvent(models.Model):
                 json.dumps(detail)
                 obj.detail = detail
             except Exception as json_e:
-                logging.exception(json_e)
                 obj.detail = str(detail)
             if exc_traceback:
                 obj.traceback = traceback.format_tb(exc_traceback)
@@ -175,6 +170,7 @@ class Event(CommonControlField):
                     exc_traceback=exc_traceback,
                 )
                 obj.save()
+            return obj
         except Exception as exc:
             data = dict(
                 message_type=message_type,
@@ -187,7 +183,6 @@ class Event(CommonControlField):
             raise EventCreateError(
                 f"Unable to create Event ({message} {e}) Input {data}. EXCEPTION: {exc}"
             )
-        return obj
 
 
 def tracker_file_directory_path(instance, filename):

@@ -35,12 +35,11 @@ class IssueAdmin(ModelAdmin):
         "number",
         "supplement",
     )
-    list_filter = (
-        "journal",
-        "publication_year",
-    )
+    list_filter = ("publication_year",)
     search_fields = (
         "journal__official_journal__title",
+        "journal__official_journal__issn_electronic",
+        "journal__official_journal__issn_print",
         "publication_year",
         "volume",
         "number",

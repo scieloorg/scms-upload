@@ -1,126 +1,118 @@
 import logging
+import sys
 
-from django.utils.translation import gettext_lazy as _
-from scielo_classic_website import classic_ws
-
-from article.controller import create_article
-from core.controller import parse_yyyymmdd
-from issue.models import Issue
-from journal.models import Journal, OfficialJournal
-from proc.models import JournalProc
-from tracker import choices as tracker_choices
+from migration import controller
+from proc.models import IssueProc, JournalProc
+from publication.api.issue import publish_issue
+from publication.api.journal import publish_journal
+from publication.api.publication import get_api_data
+from tracker.models import UnexpectedEvent
 
 
-def create_or_update_journal(
-    user,
-    journal_proc,
-    force_update,
+def migrate_and_publish_journals(
+    user, collection, classic_website, force_update, import_acron_id_file=False
 ):
-    """
-    Create/update OfficialJournal, JournalProc e Journal
-    """
-    if (
-        journal_proc.migration_status != tracker_choices.PROGRESS_STATUS_TODO
-        and not force_update
-    ):
-        return journal_proc.journal
-    collection = journal_proc.collection
-    journal_data = journal_proc.migrated_data.data
+    api_data = get_api_data(collection, "journal", website_kind="QA")
+    for (
+        scielo_issn,
+        journal_data,
+    ) in classic_website.get_journals_pids_and_records():
+        # para cada registro da base de dados "title",
+        # cria um registro MigratedData (source="journal")
+        try:
+            journal_proc = JournalProc.register_classic_website_data(
+                user,
+                collection,
+                scielo_issn,
+                journal_data[0],
+                "journal",
+                force_update,
+            )
+            # cria ou atualiza Journal e atualiza journal_proc
+            journal_proc.create_or_update_item(
+                user, force_update, controller.create_or_update_journal
+            )
+            # acron.id
+            if import_acron_id_file:
+                controller.register_acron_id_file_content(
+                    user,
+                    journal_proc,
+                    force_update,
+                )
+            journal_proc.publish(
+                user,
+                publish_journal,
+                api_data=api_data,
+                force_update=force_update,
+            )
 
-    # obtém classic website journal
-    classic_website_journal = classic_ws.Journal(journal_data)
-
-    year, month, day = parse_yyyymmdd(classic_website_journal.first_year)
-    official_journal = OfficialJournal.create_or_update(
-        user=user,
-        issn_electronic=classic_website_journal.electronic_issn,
-        issn_print=classic_website_journal.print_issn,
-        title=classic_website_journal.title,
-        title_iso=classic_website_journal.title_iso,
-        foundation_year=year,
-    )
-    journal = Journal.create_or_update(
-        user=user,
-        official_journal=official_journal,
-    )
-    # TODO
-    # for publisher_name in classic_website_journal.raw_publisher_names:
-    #     journal.add_publisher(user, publisher_name)
-
-    journal_proc.update(
-        user=user,
-        journal=journal,
-        acron=classic_website_journal.acronym,
-        title=classic_website_journal.title,
-        availability_status=classic_website_journal.current_status,
-        migration_status=tracker_choices.PROGRESS_STATUS_DONE,
-        force_update=force_update,
-    )
-    return journal
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "task": "proc.controller.migrate_and_publish_journals",
+                    "user_id": user.id,
+                    "username": user.username,
+                    "collection": collection.acron,
+                    "pid": scielo_issn,
+                    "force_update": force_update,
+                },
+            )
 
 
-def create_or_update_issue(
+def migrate_and_publish_issues(
     user,
-    issue_proc,
+    collection,
+    classic_website,
     force_update,
+    get_files_from_classic_website=False,
 ):
-    """
-    Create/update Issue
-    """
-    if (
-        issue_proc.migration_status != tracker_choices.PROGRESS_STATUS_TODO
-        and not force_update
-    ):
-        return issue_proc.issue
-    classic_website_issue = classic_ws.Issue(issue_proc.migrated_data.data)
+    api_data = get_api_data(collection, "issue", website_kind="QA")
+    for (
+        pid,
+        issue_data,
+    ) in classic_website.get_issues_pids_and_records():
+        # para cada registro da base de dados "issue",
+        # cria um registro MigratedData (source="issue")
+        try:
+            issue_proc = IssueProc.register_classic_website_data(
+                user,
+                collection,
+                pid,
+                issue_data[0],
+                "issue",
+                force_update,
+            )
+            issue_proc.create_or_update_item(
+                user,
+                force_update,
+                controller.create_or_update_issue,
+                JournalProc=JournalProc,
+            )
+            issue_proc.publish(
+                user,
+                publish_issue,
+                api_data=api_data,
+                force_update=force_update,
+            )
 
-    try:
-        journal_proc = JournalProc.get(
-            collection=issue_proc.collection,
-            pid=classic_website_issue.journal,
-        )
-    except JournalProc.DoesNotExist:
-        raise ValueError(
-            f"Unable to get journal_proc for issue_proc: {issue_proc}, collection: {issue_proc.collection}, pid={classic_website_issue.journal}"
-        )
-    if not journal_proc.journal:
-        raise ValueError(f"Missing JournalProc.journal for {journal_proc}")
-
-    issue = Issue.get_or_create(
-        journal=journal_proc.journal,
-        publication_year=classic_website_issue.publication_year,
-        volume=classic_website_issue.volume,
-        number=classic_website_issue.number,
-        supplement=classic_website_issue.supplement,
-        user=user,
-    )
-    issue_proc.update(
-        user=user,
-        journal_proc=journal_proc,
-        issue_folder=classic_website_issue.issue_label,
-        issue=issue,
-        migration_status=tracker_choices.PROGRESS_STATUS_DONE,
-        force_update=force_update,
-    )
-    return issue
-
-
-def create_or_update_article(
-    user,
-    article_proc,
-    force_update,
-):
-    """
-    Create/update Issue
-    """
-    if (
-        article_proc.migration_status != tracker_choices.PROGRESS_STATUS_TODO
-        and not force_update
-    ):
-        return article_proc.article
-
-    article = create_article(article_proc.sps_pkg, user, force_update)
-    article_proc.migration_status = tracker_choices.PROGRESS_STATUS_DONE
-    article_proc.updated_by = user
-    article_proc.save()
-    return article["article"]
+            if get_files_from_classic_website:
+                issue_proc.get_files_from_classic_website(
+                    user, force_update, controller.import_one_issue_files
+                )
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "task": "proc.controller.migrate_and_publish_issues",
+                    "user_id": user.id,
+                    "username": user.username,
+                    "collection": collection.acron,
+                    "pid": pid,
+                    "force_update": force_update,
+                },
+            )

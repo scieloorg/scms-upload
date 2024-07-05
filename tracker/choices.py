@@ -1,6 +1,5 @@
 from django.utils.translation import gettext_lazy as _
 
-
 ERROR = "ERROR"
 EXCEPTION = "EXCEPTION"
 INFO = "INFO"
@@ -31,3 +30,14 @@ PROGRESS_STATUS = (
     (PROGRESS_STATUS_PENDING, _("Pending")),
     (PROGRESS_STATUS_IGNORED, _("ignored")),
 )
+
+
+def allowed_to_run(status, force_update):
+    if force_update:
+        return True
+    return status in (
+        PROGRESS_STATUS_TODO,
+        PROGRESS_STATUS_REPROC,
+        PROGRESS_STATUS_PENDING,
+        PROGRESS_STATUS_BLOCKED,
+    )

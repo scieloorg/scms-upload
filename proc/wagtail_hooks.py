@@ -9,16 +9,22 @@ from wagtail.contrib.modeladmin.options import (
     ModelAdminGroup,
     modeladmin_register,
 )
-from wagtail.contrib.modeladmin.views import CreateView, InspectView
+from wagtail.contrib.modeladmin.views import CreateView, EditView, InspectView
 
 from config.menu import get_menu_order
-from package.models import SPSPkg
 from htmlxml.models import HTMLXML
+from package.models import SPSPkg
 
 from .models import ArticleProc, IssueProc, JournalProc, ProcReport
 
 
 class ProcCreateView(CreateView):
+    def form_valid(self, form):
+        self.object = form.save_all(self.request.user)
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class ProcEditView(EditView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())
@@ -37,6 +43,7 @@ class JournalProcModelAdmin(ModelAdmin):
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
+    edit_view_class = ProcEditView
 
     list_display = (
         "journal",
@@ -66,6 +73,7 @@ class IssueProcModelAdmin(ModelAdmin):
     inspect_view_enabled = True
     menu_label = _("Issue Processing")
     create_view_class = ProcCreateView
+    edit_view_class = ProcEditView
     menu_icon = "folder"
     # menu_order = get_menu_order("issue")
     menu_order = 300
@@ -148,6 +156,7 @@ class SPSPkgModelAdmin(ModelAdmin):
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
+    list_per_page = 10
 
     list_display = (
         "sps_pkg_name",
@@ -184,7 +193,8 @@ class ArticleProcModelAdmin(ModelAdmin):
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
-
+    edit_view_class = ProcEditView
+    list_per_page = 10
     list_display = (
         "pkg_name",
         "issue_proc",

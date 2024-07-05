@@ -1,12 +1,12 @@
+import json
 import logging
 import os
 import sys
-import json
 from datetime import datetime
 from tempfile import TemporaryDirectory
 
 from django.core.files.base import ContentFile
-from django.db import models, IntegrityError
+from django.db import IntegrityError, models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -26,43 +26,31 @@ from article.models import Article
 from collection import choices as collection_choices
 from collection.models import Collection
 from core.models import CommonControlField
+from htmlxml.models import HTMLXML
 from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
 from journal.models import Journal
+from migration.controller import (
+    PkgZipBuilder,
+    XMLVersionXmlWithPreError,
+    create_or_update_article,
+    get_migrated_xml_with_pre,
+)
 from migration.models import (
+    JournalAcronIdFile,
     MigratedArticle,
     MigratedData,
     MigratedFile,
     MigratedIssue,
     MigratedJournal,
 )
-from migration.controller import (
-    PkgZipBuilder,
-    get_migrated_xml_with_pre,
-    XMLVersionXmlWithPreError,
-)
 from package import choices as package_choices
 from package.models import SPSPkg
 from proc import exceptions
 from proc.forms import ProcAdminModelForm
+from publication.api.publication import get_api_data
 from tracker import choices as tracker_choices
 from tracker.models import Event, UnexpectedEvent, format_traceback
-
-
-class JournalEventCreateError(Exception):
-    ...
-
-
-class JournalEventReportCreateError(Exception):
-    ...
-
-
-class OperationStartError(Exception):
-    ...
-
-
-class OperationFinishError(Exception):
-    ...
 
 
 class Operation(CommonControlField):
@@ -89,7 +77,7 @@ class Operation(CommonControlField):
 
     class Meta:
         # isso faz com que em InlinePanel mostre do mais recente para o mais antigo
-        ordering = ['-created']
+        ordering = ["-created"]
         indexes = [
             models.Index(fields=["name"]),
         ]
@@ -117,44 +105,65 @@ class Operation(CommonControlField):
 
     @classmethod
     def create(cls, user, proc, name):
-        for item in cls.objects.filter(proc=proc, name=name).order_by('created'):
-            # obtém o primeiro ocorrência de proc e name
-
-            # obtém todos os ítens criados após este evento
-            rows = []
-            for row in cls.objects.filter(proc=proc, created__gte=item.created).order_by('created').iterator():
-                rows.append(row.data)
-
-            try:
-                # converte para json
-                file_content = json.dumps(rows)
-                file_extension = ".json"
-            except Exception as e:
-                # caso não seja serializável, converte para str
-                file_content = str(rows)
-                file_extension = ".txt"
-                logging.info(proc.pid)
-                logging.exception(e)
-
-            try:
-                report_date = item.created.isoformat()
-                # cria um arquivo com o conteúdo
-                ProcReport.create_or_update(
-                    user, proc, name, report_date, file_content, file_extension,
-                )
-                # apaga todas as ocorrências que foram armazenadas no arquivo
-                cls.objects.filter(proc=proc, created__gte=item.created).delete()
-            except Exception as e:
-                logging.info(proc.pid)
-                logging.exception(e)
-            break
-
+        # FUTURE
+        cls.archive_events(user, proc, name)
         obj = cls()
         obj.proc = proc
-        obj.name = name
+        obj.name = name[:64]
         obj.creator = user
         obj.save()
         return obj
+        # try:
+        #     return cls.objects.get(proc=proc, name=name)
+        # except cls.MultipleObjectsReturned:
+        #     return cls.objects.filter(proc=proc, name=name).order_by("-created").first()
+        # except cls.DoesNotExist:
+        #     obj = cls()
+        #     obj.proc = proc
+        #     obj.name = name
+        #     obj.creator = user
+        #     obj.save()
+        #     return obj
+
+    @classmethod
+    def archive_events(cls, user, proc, name):
+        # obtém o primeiro ocorrência de proc e name
+        item = cls.objects.filter(proc=proc, name=name).order_by("created").first()
+        if not item:
+            return
+
+        # obtém todos os ítens criados após este evento
+        rows = []
+        for row in cls.objects.filter(proc=proc, created__gte=item.created).order_by(
+            "created"
+        ):
+            rows.append(row.data)
+
+        try:
+            # converte para json
+            file_content = json.dumps(rows)
+            file_extension = ".json"
+        except Exception as e:
+            # caso não seja serializável, converte para str
+            file_content = str(rows)
+            file_extension = ".txt"
+
+        report_date = item.created.isoformat()
+        # cria um arquivo com o conteúdo
+        ProcReport.create_or_update(
+            user,
+            proc,
+            name,
+            report_date,
+            file_content,
+            file_extension,
+        )
+        # apaga todas as ocorrências que foram armazenadas no arquivo
+        created = item.created
+        try:
+            cls.objects.filter(proc=proc, created__gte=created).delete()
+        except Exception as e:
+            pass
 
     @classmethod
     def start(
@@ -163,12 +172,7 @@ class Operation(CommonControlField):
         proc,
         name=None,
     ):
-        try:
-            return cls.create(user, proc, name)
-        except Exception as exc:
-            raise OperationStartError(
-                f"Unable to create Operation ({name}). EXCEPTION: {type(exc)}  {exc}"
-            )
+        return cls.create(user, proc, name)
 
     def finish(
         self,
@@ -180,54 +184,37 @@ class Operation(CommonControlField):
         exc_traceback=None,
         detail=None,
     ):
-        try:
-            if exception:
-                logging.exception(exception)
-            if not message_type:
-                if not completed:
-                    message_type = "ERROR"
+        if not message_type:
+            if not completed:
+                message_type = "ERROR"
 
-            detail = detail or {}
-            if message_type or exception or exc_traceback:
-                self.event = Event.create(
-                    user=user,
-                    message_type=message_type,
-                    message=message,
-                    e=exception,
-                    exc_traceback=exc_traceback,
-                    detail=detail,
-                )
-                detail = self.event.data
+        if detail:
             try:
                 json.dumps(detail)
-                self.detail = detail
-            except TypeError:
-                self.detail = str(detail)
-            self.completed = completed
-            self.updated_by = user
-            self.save()
-            return self
-        except Exception as exc:
-            logging.exception(exc)
-            data = dict(
-                completed=completed,
-                exception=exception,
+            except Exception as exc_detail:
+                detail = str(detail)
+
+        if message_type or exception or exc_traceback:
+            event = Event.create(
+                user=user,
                 message_type=message_type,
                 message=message,
+                e=exception,
                 exc_traceback=exc_traceback,
                 detail=detail,
             )
-            error = []
-            for k, v in data.items():
-                try:
-                    json.dumps(v)
-                    error.append(k)
-                except TypeError:
-                    pass
+            detail = event.data
 
-            raise OperationFinishError(
-                f"Unable to finish ({self.name}). Input: {error}. EXCEPTION: {type(exc)} {exc}"
-            )
+        if detail:
+            try:
+                json.dumps(detail)
+            except Exception as exc_detail:
+                detail = str(detail)
+
+        self.detail = detail
+        self.completed = completed
+        self.updated_by = user
+        self.save()
 
 
 def proc_report_directory_path(instance, filename):
@@ -246,7 +233,7 @@ class ProcReport(CommonControlField):
 
     pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
     task_name = models.CharField(
-        _("Procedure name"), max_length=32, null=True, blank=True
+        _("Procedure name"), max_length=64, null=True, blank=True
     )
     file = models.FileField(upload_to=proc_report_directory_path, null=True, blank=True)
     report_date = models.CharField(
@@ -264,7 +251,7 @@ class ProcReport(CommonControlField):
         return f"{self.collection.acron} {self.pid} {self.task_name} {self.report_date}"
 
     class Meta:
-        ordering = ['-created']
+        ordering = ["-created"]
 
         verbose_name = _("Processing report")
         verbose_name_plural = _("Processing reports")
@@ -293,29 +280,26 @@ class ProcReport(CommonControlField):
             self.file.delete(save=True)
         except Exception as e:
             pass
-        try:
-            self.file.save(name, ContentFile(content))
-        except Exception as e:
-            raise Exception(f"Unable to save {name}. Exception: {e}")
+        self.file.save(name, ContentFile(content))
 
     @classmethod
     def get(cls, proc=None, task_name=None, report_date=None):
         if proc and task_name and report_date:
             try:
                 return cls.objects.get(
-                    collection=proc.collection, pid=proc.pid,
+                    collection=proc.collection,
+                    pid=proc.pid,
                     task_name=task_name,
                     report_date=report_date,
                 )
             except cls.MultipleObjectsReturned:
                 return cls.objects.filter(
-                    collection=proc.collection, pid=proc.pid,
+                    collection=proc.collection,
+                    pid=proc.pid,
                     task_name=task_name,
                     report_date=report_date,
                 ).first()
-        raise ValueError(
-            "ProcReport.get requires proc and task_name and report_date"
-        )
+        raise ValueError("ProcReport.get requires proc and task_name and report_date")
 
     @staticmethod
     def get_item_type(pid):
@@ -346,18 +330,20 @@ class ProcReport(CommonControlField):
         )
 
     @classmethod
-    def create_or_update(cls, user, proc, task_name, report_date, file_content, file_extension):
+    def create_or_update(
+        cls, user, proc, task_name, report_date, file_content, file_extension
+    ):
         try:
-            obj = cls.get(
-                proc=proc, task_name=task_name, report_date=report_date
-            )
+            obj = cls.get(proc=proc, task_name=task_name, report_date=report_date)
             obj.updated_by = user
             obj.task_name = task_name or obj.task_name
             obj.report_date = report_date or obj.report_date
             obj.save()
             obj.save_file(f"{task_name}{file_extension}", file_content)
         except cls.DoesNotExist:
-            obj = cls.create(user, proc, task_name, report_date, file_content, file_extension)
+            obj = cls.create(
+                user, proc, task_name, report_date, file_content, file_extension
+            )
         return obj
 
     @property
@@ -413,7 +399,7 @@ class BaseProc(CommonControlField):
 
     class Meta:
         abstract = True
-        ordering = ['-updated']
+        ordering = ["-updated"]
 
         indexes = [
             models.Index(fields=["pid"]),
@@ -446,6 +432,15 @@ class BaseProc(CommonControlField):
     def __str__(self):
         return f"{self.collection} {self.pid}"
 
+    def set_status(self):
+        if self.migration_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.qa_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
+
+        if self.qa_ws_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.public_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
+
+        self.save()
+
     @classmethod
     def get(cls, collection, pid):
         if collection and pid:
@@ -472,6 +467,14 @@ class BaseProc(CommonControlField):
         # return operation
         return self.ProcResult.start(user, self, name)
 
+    @property
+    def data(self):
+        return {
+            "migration_status": self.migration_status,
+            "created": self.created.isoformat(),
+            "updated": self.updated.isoformat(),
+        }
+
     @classmethod
     def register_classic_website_data(
         cls,
@@ -492,7 +495,7 @@ class BaseProc(CommonControlField):
             ):
                 return obj
 
-            operation = obj.start(user, "get data from classic website")
+            operation = obj.start(user, f"get data from classic website {pid}")
             obj.migrated_data = cls.MigratedDataClass.register_classic_website_data(
                 user,
                 collection,
@@ -561,23 +564,23 @@ class BaseProc(CommonControlField):
         return cls.objects.filter(
             migration_status=tracker_choices.PROGRESS_STATUS_TODO,
             **params,
-        ).iterator()
+        )
 
     def create_or_update_item(
         self,
         user,
         force_update,
         callable_register_data,
+        **kwargs,
     ):
         try:
+            operation = None
             try:
                 item_name = self.migrated_data.content_type
             except AttributeError:
                 item_name = ""
-
             operation = self.start(user, f"create or update {item_name}")
-
-            registered = callable_register_data(user, self, force_update)
+            registered = callable_register_data(user, self, force_update, **kwargs)
             operation.finish(
                 user,
                 completed=(
@@ -585,12 +588,25 @@ class BaseProc(CommonControlField):
                 ),
                 detail=registered and registered.data,
             )
+            return registered
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            operation.finish(user, exc_traceback=exc_traceback, exception=e)
+            if operation:
+                operation.finish(user, exc_traceback=exc_traceback, exception=e)
+            else:
+                params = dict(
+                    user=user,
+                    force_update=force_update,
+                    callable_register_data=callable_register_data,
+                )
+                UnexpectedEvent.create(
+                    e=e,
+                    exc_traceback=exc_traceback,
+                    detail=str(params),
+                )
 
     @classmethod
-    def items_to_publish_on_qa(cls, user, content_type, force_update=None, params=None):
+    def items_to_publish_on_qa(cls, content_type, force_update=None, params=None):
         """
         BaseProc
         """
@@ -620,12 +636,40 @@ class BaseProc(CommonControlField):
             qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO, **params
         )
         # seleciona itens para publicar em produção
-        return items.iterator()
+        return items
 
-    def publish(self, user, callable_publish, website_kind, api_data):
-        operation = self.start(user, f"publication on {website_kind}")
-        response = callable_publish(user, self, api_data)
-        logging.info(f"Publish response: {response}")
+    def publish(
+        self,
+        user,
+        callable_publish,
+        website_kind=None,
+        api_data=None,
+        force_update=None,
+    ):
+        website_kind = website_kind or collection_choices.QA
+
+        doit = False
+        if website_kind == collection_choices.QA:
+            doit = tracker_choices.allowed_to_run(self.qa_ws_status, force_update)
+        else:
+            doit = tracker_choices.allowed_to_run(self.public_ws_status, force_update)
+
+        if not doit:
+            logging.info(f"Skip publish on {website_kind} {self.pid}")
+            return
+
+        if website_kind == collection_choices.QA:
+            self.qa_ws_status = tracker_choices.PROGRESS_STATUS_DOING
+        else:
+            self.public_ws_status = tracker_choices.PROGRESS_STATUS_DOING
+        self.save()
+
+        api_data = api_data or get_api_data(
+            self.collection, self.migrated_data.content_type, website_kind)
+        operation = self.start(
+            user, f"publish {self.migrated_data.content_type} {self} on {website_kind}"
+        )
+        response = callable_publish(self, api_data)
         completed = bool(response.get("result") == "OK")
         if completed:
             self.update_publication_stage()
@@ -635,19 +679,18 @@ class BaseProc(CommonControlField):
         """
         Estabele o próxim estágio, após ser publicado no QA ou no Público
         """
-        if self.public_ws_status == tracker_choices.PROGRESS_STATUS_TODO:
-            self.public_ws_status = tracker_choices.PROGRESS_STATUS_DONE
-            self.save()
-        elif self.qa_ws_status == tracker_choices.PROGRESS_STATUS_TODO:
+        if self.qa_ws_status == tracker_choices.PROGRESS_STATUS_DOING:
             self.qa_ws_status = tracker_choices.PROGRESS_STATUS_DONE
             if self.migrated_data:
                 self.public_ws_status = tracker_choices.PROGRESS_STATUS_TODO
+            self.save()
+        elif self.public_ws_status == tracker_choices.PROGRESS_STATUS_TODO:
+            self.public_ws_status = tracker_choices.PROGRESS_STATUS_DONE
             self.save()
 
     @classmethod
     def items_to_publish(
         cls,
-        user,
         website_kind,
         content_type,
         collection=None,
@@ -659,13 +702,11 @@ class BaseProc(CommonControlField):
             params["collection"] = collection
 
         if website_kind == collection_choices.QA:
-            return cls.items_to_publish_on_qa(user, content_type, force_update, params)
-        return cls.items_to_publish_on_public(user, content_type, force_update, params)
+            return cls.items_to_publish_on_qa(content_type, force_update, params)
+        return cls.items_to_publish_on_public(content_type, force_update, params)
 
     @classmethod
-    def items_to_publish_on_public(
-        cls, user, content_type, force_update=None, params=None
-    ):
+    def items_to_publish_on_public(cls, content_type, force_update=None, params=None):
         params = params or {}
         params["migrated_data__content_type"] = content_type
         params["qa_ws_status"] = tracker_choices.PROGRESS_STATUS_DONE
@@ -691,7 +732,7 @@ class BaseProc(CommonControlField):
             public_ws_status=tracker_choices.PROGRESS_STATUS_TODO, **params
         )
         # seleciona itens para publicar em produção
-        return items.iterator()
+        return items
 
 
 class JournalProc(BaseProc, ClusterableModel):
@@ -728,10 +769,16 @@ class JournalProc(BaseProc, ClusterableModel):
     )
 
     class Meta:
-        ordering = ['-updated']
+        ordering = ["-updated"]
         indexes = [
             models.Index(fields=["acron"]),
         ]
+
+    def __unicode__(self):
+        return f"{self.acron} ({self.collection.name})"
+
+    def __str__(self):
+        return f"{self.acron} ({self.collection.name})"
 
     @staticmethod
     def autocomplete_custom_queryset_filter(search_term):
@@ -768,6 +815,26 @@ class JournalProc(BaseProc, ClusterableModel):
                 _("Unable to update journal {} {} {} {}").format(
                     self.collection, acron, type(e), e
                 )
+            )
+
+    def issues_with_modified_articles(self):
+        for item in JournalAcronIdFile.issues_with_modified_articles(
+            collection=self.collection, journal=self.journal
+        ):
+            yield from IssueProc.objects.filter(
+                collection=self.collection,
+                journal_proc=self,
+                issue_folder=item["issue_folder"],
+            )
+
+    @classmethod
+    def journals_with_modified_articles(cls, collection=None, journal=None):
+        for item in JournalAcronIdFile.journals_with_modified_articles(
+            collection=collection, journal=journal
+        ):
+            yield from JournalProc.objects.filter(
+                collection=item.collection,
+                journal=item.journal,
             )
 
 
@@ -807,10 +874,10 @@ class IssueProc(BaseProc, ClusterableModel):
     )
 
     def __unicode__(self):
-        return f"{self.journal_proc} {self.issue_folder}"
+        return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection.name})"
 
     def __str__(self):
-        return f"{self.journal_proc} {self.issue_folder}"
+        return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection.name})"
 
     journal_proc = models.ForeignKey(
         JournalProc, on_delete=models.SET_NULL, null=True, blank=True
@@ -859,6 +926,25 @@ class IssueProc(BaseProc, ClusterableModel):
         ]
     )
 
+    def set_status(self):
+        if self.migration_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.qa_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
+
+        if self.qa_ws_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.public_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
+
+        if self.docs_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            for item in ArticleProc.objects.filter(issue_proc=self):
+                item.migration_status = tracker_choices.PROGRESS_STATUS_REPROC
+                item.set_status()
+
+        if self.files_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            for item in ArticleProc.objects.filter(issue_proc=self):
+                item.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
+                item.set_status()
+
+        self.save()
+
     @staticmethod
     def autocomplete_custom_queryset_filter(search_term):
         return IssueProc.objects.filter(
@@ -880,7 +966,7 @@ class IssueProc(BaseProc, ClusterableModel):
         )
 
     class Meta:
-        ordering = ['-updated']
+        ordering = ["-updated"]
         indexes = [
             models.Index(fields=["issue_folder"]),
             models.Index(fields=["docs_status"]),
@@ -913,7 +999,7 @@ class IssueProc(BaseProc, ClusterableModel):
 
     @classmethod
     def files_to_migrate(
-        cls, collection, journal_acron, publication_year, force_update
+        cls, collection, journal_acron, publication_year=None, force_update=None
     ):
         """
         Muda o status de PROGRESS_STATUS_REPROC para PROGRESS_STATUS_TODO
@@ -944,17 +1030,17 @@ class IssueProc(BaseProc, ClusterableModel):
             collection=collection,
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
             **params,
-        ).iterator()
+        )
 
     def get_files_from_classic_website(
         self, user, force_update, f_get_files_from_classic_website
     ):
         try:
-            if (
-                self.files_status != tracker_choices.PROGRESS_STATUS_TODO
-                and not force_update
-            ):
+            doit = tracker_choices.allowed_to_run(self.files_status, force_update)
+            if not doit:
+                logging.info(f"Skip get_files_from_classic_website {self.pid}")
                 return
+
             operation = self.start(user, "get_files_from_classic_website")
 
             self.files_status = tracker_choices.PROGRESS_STATUS_DOING
@@ -1025,52 +1111,7 @@ class IssueProc(BaseProc, ClusterableModel):
             collection=collection,
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
             **params,
-        ).iterator()
-
-    def get_article_records_from_classic_website(
-        self, user, force_update, f_get_article_records_from_classic_website
-    ):
-        if self.docs_status != tracker_choices.PROGRESS_STATUS_TODO:
-            if not force_update:
-                logging.warning(
-                    f"No document records will be migrated. {self} "
-                    f"docs_status='{self.docs_status}' and force_update=False"
-                )
-                return
-        try:
-            operation = self.start(user, "get_article_records_from_classic_website")
-
-            self.docs_status = tracker_choices.PROGRESS_STATUS_DOING
-            self.save()
-            result = None
-            result = f_get_article_records_from_classic_website(
-                user, self, ArticleProc, force_update
-            )
-            failures = result.get("failures")
-            migrated = result.get("migrated")
-
-            self.docs_status = (
-                tracker_choices.PROGRESS_STATUS_PENDING
-                if failures
-                else tracker_choices.PROGRESS_STATUS_DONE
-            )
-            self.save()
-            operation.finish(
-                user,
-                completed=(self.docs_status == tracker_choices.PROGRESS_STATUS_DONE),
-                message="article records",
-                detail=result,
-            )
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
-            self.save()
-            operation.finish(
-                user,
-                exc_traceback=exc_traceback,
-                exception=e,
-                detail=result,
-            )
+        )
 
     def find_asset(self, basename, name=None):
         if not name:
@@ -1078,7 +1119,101 @@ class IssueProc(BaseProc, ClusterableModel):
         # procura a "imagem" no contexto do "issue"
         return self.issue_files.filter(
             Q(original_name=basename) | Q(original_name__startswith=name + ".")
-        ).iterator()
+        )
+
+    def migrate_document_records(self, user, force_update=None):
+
+        doit = tracker_choices.allowed_to_run(self.docs_status, force_update)
+        if not doit:
+            logging.info(f"Skip migrate_document_records {self.pid}")
+            return
+
+        operation = self.start(user, "migrate_document_records")
+        done = 0
+        journal_data = self.journal_proc.migrated_data.data
+
+        # registros novos ou atualizados
+        id_file_records = list(
+            JournalAcronIdFile.modified_articles(
+                collection=self.journal_proc.collection,
+                journal=self.journal_proc.journal,
+                issue_folder=self.issue_folder,
+            )
+        )
+
+        for record in id_file_records:
+            try:
+                logging.info(f"migrate_document_records: {record.item_pid}")
+                data = record.get_record_data(journal_data)
+                article_proc = self.create_or_update_article_proc(
+                    user, record.item_pid, data["data"], force_update
+                )
+                done += 1
+            except Exception as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                UnexpectedEvent.create(
+                    e=e,
+                    exc_traceback=exc_traceback,
+                    detail={
+                        "task": "proc.controller.migrate_document_records",
+                        "user_id": user.id,
+                        "username": user.username,
+                        "collection": self.journal_proc.collection.acron,
+                        "journal": str(self.journal_proc.journal),
+                        "force_update": force_update,
+                    },
+                )
+        got = len(id_file_records)
+        total_docs = self.issue.total_documents or got
+        operation.finish(
+            user,
+            completed=total_docs == done,
+            detail={
+                "total_documents": got,
+                "total_documents_expected": self.issue.total_documents,
+            },
+        )
+        if total_docs == done:
+            self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
+        else:
+            self.docs_status = tracker_choices.PROGRESS_STATUS_PENDING
+        self.save()
+
+    def create_or_update_article_proc(self, user, pid, data, force_update):
+        article_proc = ArticleProc.register_classic_website_data(
+            user=user,
+            collection=self.collection,
+            pid=pid,
+            data=data,
+            content_type="article",
+            force_update=force_update,
+        )
+        if article_proc:
+            migrated_article = article_proc.migrated_data
+            document = migrated_article.document
+
+            if not migrated_article.file_type:
+                migrated_article.file_type = document.file_type
+                migrated_article.save()
+
+            d = dict(
+                issue_proc=self,
+                pkg_name=document.filename_without_extension,
+                migration_status=tracker_choices.PROGRESS_STATUS_TODO,
+                user=user,
+                main_lang=document.original_language,
+                force_update=force_update,
+            )
+            logging.info(f"article_proc.... {d}")
+            article_proc.update(
+                issue_proc=self,
+                pkg_name=document.filename_without_extension,
+                migration_status=tracker_choices.PROGRESS_STATUS_TODO,
+                user=user,
+                main_lang=document.original_language,
+                force_update=force_update,
+            )
+        return article_proc
 
 
 class ArticleEventCreateError(Exception):
@@ -1130,6 +1265,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         null=True,
     )
 
+    base_form_class = ProcAdminModelForm
     ProcResult = ArticleProcResult
 
     panel_files = [
@@ -1160,19 +1296,36 @@ class ArticleProc(BaseProc, ClusterableModel):
     MigratedDataClass = MigratedArticle
 
     class Meta:
-        ordering = ['-updated']
+        ordering = ["-updated"]
         indexes = [
             models.Index(fields=["pkg_name"]),
             models.Index(fields=["xml_status"]),
             models.Index(fields=["sps_pkg_status"]),
         ]
 
+    def set_status(self):
+        if self.xml_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
+
+        if self.sps_pkg_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.migration_status = tracker_choices.PROGRESS_STATUS_REPROC
+
+        if self.migration_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.qa_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
+
+        if self.qa_ws_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.public_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
+
+        self.save()
+
     @property
     def identification(self):
         return f"{self.issue_proc} {self.pkg_name}"
 
     def __str__(self):
-        return self.identification
+        if self.sps_pkg:
+            return self.sps_pkg.sps_pkg_name
+        return f"{self.issue_proc} {self.pkg_name}"
 
     def autocomplete_label(self):
         return self.identification
@@ -1201,13 +1354,32 @@ class ArticleProc(BaseProc, ClusterableModel):
                 )
             )
 
-    def get_xml(self, user, htmlxml, body_and_back_xml):
+    def get_xml(self, user, body_and_back_xml):
         try:
+
+            doit = tracker_choices.allowed_to_run(self.xml_status, body_and_back_xml)
+            if not doit:
+                logging.info(f"Skip get_xml {self.pid}")
+                return self.xml_status == tracker_choices.PROGRESS_STATUS_DONE
+
             operation = self.start(user, "get xml")
+
             self.xml_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
-            if htmlxml:
+            if not self.migrated_data.file_type:
+                self.migrated_data.file_type = self.migrated_data.document.file_type
+                self.migrated_data.save()
+
+            if self.migrated_data.file_type == "html":
+                migrated_data = self.migrated_data
+                classic_ws_doc = migrated_data.document
+                htmlxml = HTMLXML.create_or_update(
+                    user=user,
+                    migrated_article=migrated_data,
+                    n_references=len(classic_ws_doc.citations or []),
+                    record_types="|".join(classic_ws_doc.record_types or []),
+                )
                 htmlxml.html_to_xml(user, self, body_and_back_xml)
 
             xml = get_migrated_xml_with_pre(self)
@@ -1215,14 +1387,12 @@ class ArticleProc(BaseProc, ClusterableModel):
             if xml:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
             else:
-                self.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
+                self.xml_status = tracker_choices.PROGRESS_STATUS_PENDING
             self.save()
 
-            operation.finish(
-                user,
-                completed=self.xml_status == tracker_choices.PROGRESS_STATUS_DONE,
-                detail=xml and xml.data,
-            )
+            completed = self.xml_status == tracker_choices.PROGRESS_STATUS_DONE
+            operation.finish(user, completed=completed, detail=xml and xml.data)
+            return completed
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
@@ -1232,6 +1402,7 @@ class ArticleProc(BaseProc, ClusterableModel):
                 exc_traceback=exc_traceback,
                 exception=e,
             )
+            return self.xml_status == tracker_choices.PROGRESS_STATUS_TODO
 
     @classmethod
     def items_to_get_xml(
@@ -1280,7 +1451,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         return cls.objects.filter(
             xml_status=tracker_choices.PROGRESS_STATUS_TODO,
             **params,
-        ).iterator()
+        )
 
     @classmethod
     def items_to_build_sps_pkg(
@@ -1319,13 +1490,13 @@ class ArticleProc(BaseProc, ClusterableModel):
         return cls.objects.filter(
             sps_pkg_status=tracker_choices.PROGRESS_STATUS_TODO,
             **params,
-        ).iterator()
+        )
 
     @property
     def renditions(self):
         return self.issue_proc.issue_files.filter(
             pkg_name=self.pkg_name, component_type="rendition"
-        ).iterator()
+        )
 
     @property
     def migrated_xml(self):
@@ -1364,8 +1535,16 @@ class ArticleProc(BaseProc, ClusterableModel):
         user,
         body_and_back_xml=False,
         html_to_xml=False,
+        force_update=False,
     ):
         try:
+
+            force_update = force_update or body_and_back_xml or html_to_xml
+            doit = tracker_choices.allowed_to_run(self.sps_pkg_status, force_update)
+            if not doit:
+                logging.info(f"Skip generate_sps_package {self.pid}")
+                return self.sps_pkg_status == tracker_choices.PROGRESS_STATUS_DONE
+
             operation = self.start(user, "generate_sps_package")
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
@@ -1401,12 +1580,13 @@ class ArticleProc(BaseProc, ClusterableModel):
                     article_proc=self,
                 )
             self.update_sps_pkg_status()
+            completed = bool(self.sps_pkg and self.sps_pkg.is_complete)
             operation.finish(
                 user,
-                completed=bool(self.sps_pkg and self.sps_pkg.is_complete),
+                completed=completed,
                 detail=self.sps_pkg and self.sps_pkg.data,
             )
-
+            return completed
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_BLOCKED
@@ -1441,8 +1621,30 @@ class ArticleProc(BaseProc, ClusterableModel):
 
     @property
     def article(self):
-        if self.sps_pkg is not None:
-            return Article.objects.get(sps_pkg=self.sps_pkg)
+        try:
+            if self.sps_pkg.pid_v3:
+                return Article.objects.get(pid_v3=self.sps_pkg.pid_v3)
+        except (AttributeError, Article.DoesNotExist) as e:
+            logging.info(f"Not found ArticleProc.article: {self.sps_pkg} {e}")
+
+    def migrate_article(self, user, force_update):
+        body_and_back_xml = force_update
+        html_to_xml = force_update
+        if not self.get_xml(user, body_and_back_xml):
+            return None
+
+        if not self.generate_sps_package(
+            user,
+            body_and_back_xml,
+            html_to_xml,
+        ):
+            return None
+
+        if self.sps_pkg:
+            article = self.create_or_update_item(
+                user, force_update, create_or_update_article
+            )
+            return article
 
     def synchronize(self, user):
         try:
