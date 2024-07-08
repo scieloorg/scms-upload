@@ -112,7 +112,8 @@ ARTICLE_TYPE = (
 AS_CHANGE_SUBMITTED = "change-submitted"
 AS_REQUIRE_UPDATE = "required-update"
 AS_REQUIRE_ERRATUM = "required-erratum"
-AS_READ_TO_PUBLISH = "read-to-publish"
+AS_PREPARE_TO_PUBLISH = "prepare-to-publish"
+AS_READY_TO_PUBLISH = "ready-to-publish"
 AS_SCHEDULED_TO_PUBLISH = "scheduled-to-publish"
 AS_PUBLISHED = "published"
 
@@ -120,7 +121,8 @@ ARTICLE_STATUS = (
     (AS_CHANGE_SUBMITTED, _("Change submitted")),
     (AS_REQUIRE_UPDATE, _("Required update")),
     (AS_REQUIRE_ERRATUM, _("Required erratum")),
-    (AS_READ_TO_PUBLISH, _("Ready to publish")),
+    (AS_PREPARE_TO_PUBLISH, _("Prepare to publish")),
+    (AS_READY_TO_PUBLISH, _("Ready to publish")),
     (AS_SCHEDULED_TO_PUBLISH, _("Scheduled to publish")),
     (AS_PUBLISHED, _("Published")),
 )
