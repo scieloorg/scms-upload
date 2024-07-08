@@ -9,11 +9,93 @@ from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInte
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
-from core.models import CommonControlField
+from core.models import CommonControlField, TextModel
 from institution.models import InstitutionHistory
 
 from . import choices
 from .forms import OfficialJournalForm
+
+
+class JournalSection(TextModel, CommonControlField):
+    parent = models.ForeignKey(
+        "Journal", blank=True, null=True, on_delete=models.SET_NULL
+    )
+    code = models.CharField(max_length=16, null=True, blank=True)
+
+    class Meta:
+        unique_together = [("parent", "language", "code", "text")]
+        indexes = [
+            models.Index(
+                fields=[
+                    "text",
+                ]
+            ),
+            models.Index(
+                fields=[
+                    "code",
+                ]
+            ),
+        ]
+
+    autocomplete_search_field = "text"
+
+    def autocomplete_label(self):
+        if self.code:
+            return f"{self.code} {self.language} {self.text}"
+        return f"{self.parent.title} {self.language} {self.text}"
+
+    @classmethod
+    def get(cls, parent, language, code, text):
+        try:
+            if code:
+                return cls.objects.get(parent=parent, language=language, code=code)
+            else:
+                return cls.objects.get(parent=parent, language=language, text=text)
+        except cls.MultipleObjectsReturned:
+            if code:
+                return cls.objects.filter(parent=parent, language=language, code=code).first()
+            else:
+                return cls.objects.filter(parent=parent, language=language, text=text).first()
+
+    @classmethod
+    def create(cls, user, parent, language, code, text):
+        try:
+            obj = cls(creator=user, parent=parent, language=language, code=code, text=text)
+            obj.save()
+            return obj
+        except IntegrityError as e:
+            return cls.get(parent=parent, language=language, code=code, text=text)
+
+    @classmethod
+    def create_or_update(cls, user, parent, language=None, code=None, text=None):
+        if not language:
+            data = {
+                "parent": str(parent),
+            }
+        try:
+            obj = cls.get(parent=parent, language=language, code=code, text=text)
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(user, parent, language, code=code, text=text)
+
+    @property
+    def data(self):
+        return {"language": self.language, "code": self.code, "text": self.text}
+
+    @staticmethod
+    def sections(journal):
+        for item in JournalSection.objects.filter(journal=journal):
+            yield item.data
+
+    @staticmethod
+    def sections_by_code(journal):
+        if JournalSection.objects.filter(journal=journal, code__isnull=False).exists():
+            items = {}
+            for item in JournalSection.objects.filter(journal=journal):
+                items.setdefault(item.code, [])
+                items[item.code].append(item.data)
+        return []
 
 
 class OfficialJournal(CommonControlField):
