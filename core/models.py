@@ -55,11 +55,55 @@ class CommonControlField(models.Model):
         abstract = True
 
 
-class RichTextWithLang(models.Model):
-    text = RichTextField(null=False, blank=False)
-    language = models.CharField(
-        _("Language"), max_length=2, choices=choices.LANGUAGE, null=False, blank=False
-    )
+class BaseTextModel(models.Model):
+    language = models.ForeignKey("collection.Language", null=True, blank=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    def get(cls, parent, language):
+        return cls.objects.get(parent=parent, language=language)
+
+    @classmethod
+    def create(cls, user, parent, language, **kwargs):
+        try:
+            obj = cls(creator=user, parent=parent, language=language, **kwargs)
+            obj.save()
+            return obj
+        except IntegrityError as e:
+            return cls.get(parent=parent, language=language)
+
+    @classmethod
+    def create_or_update(cls, user, parent, language=None, **kwargs):
+        if not language:
+            data = {
+                "parent": str(parent),
+            }
+            data.update(kwargs)
+
+        try:
+            obj = cls.get(parent=parent, language=language)
+            for name, value in kwargs.items():
+                try:
+                    obj.setattr(name, value)
+                except AttributeError:
+                    pass
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(user, parent, language, **kwargs)
+
+    @property
+    def data(self):
+        d = {}
+        d.update(self.language.data)
+        d["text"] = self.text
+        return d
+
+
+class TextModel(BaseTextModel):
+    text = models.CharField(max_length=100, null=False, blank=False)
 
     panels = [FieldPanel("text"), FieldPanel("language")]
 
@@ -67,45 +111,8 @@ class RichTextWithLang(models.Model):
         abstract = True
 
 
-class TextWithLangAndValidity(models.Model):
-    text = models.TextField(_("Text"), null=False, blank=False)
-    language = models.CharField(
-        _("Language"), max_length=2, choices=choices.LANGUAGE, null=False, blank=False
-    )
-    initial_date = models.DateField(null=True, blank=True)
-    final_date = models.DateField(null=True, blank=True)
-
-    panels = [
-        FieldPanel("text"),
-        FieldPanel("language"),
-        FieldPanel("initial_date"),
-        FieldPanel("final_date"),
-    ]
-
-    class Meta:
-        abstract = True
-
-
-class RichTextWithLangAndValidity(RichTextWithLang):
-    initial_date = models.DateField(null=True, blank=True)
-    final_date = models.DateField(null=True, blank=True)
-
-    panels = [
-        FieldPanel("text"),
-        FieldPanel("language"),
-        FieldPanel("initial_date"),
-        FieldPanel("final_date"),
-    ]
-
-    class Meta:
-        abstract = True
-
-
-class TextWithLang(models.Model):
-    text = models.TextField(_("Text"), null=False, blank=False)
-    language = models.CharField(
-        _("Language"), max_length=2, choices=choices.LANGUAGE, null=False, blank=False
-    )
+class HTMLTextModel(BaseTextModel):
+    text = RichTextField(null=False, blank=False)
 
     panels = [FieldPanel("text"), FieldPanel("language")]
 
