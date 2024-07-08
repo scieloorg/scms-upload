@@ -1,24 +1,35 @@
 import logging
+from datetime import datetime
 
 from django.contrib.auth import get_user_model
-from django.db import models
+from django.db import IntegrityError, models
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
+from packtools.sps.models.dates import ArticleDates
+from packtools.sps.models.article_titles import ArticleTitles
+from packtools.sps.models.article_toc_sections import ArticleTocSections
 from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
-from core.models import CommonControlField
+from article.forms import (
+    ArticleForm,
+    RelatedItemForm,
+    RequestArticleChangeForm,
+)
+from collection import choices as collection_choices
+from collection.models import Collection, Language
+from core.models import CommonControlField, HTMLTextModel
 from doi.models import DOIWithLang
-from issue.models import Issue
-from journal.models import Journal, OfficialJournal
+from issue.models import Issue, TOC, IssueSection
+from journal.models import Journal, OfficialJournal, JournalSection
 from package.models import SPSPkg
 from researcher.models import Researcher
 
 from . import choices
-from .forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
 
 User = get_user_model()
@@ -36,14 +47,15 @@ class Article(ClusterableModel, CommonControlField):
     )
     # PID v3
     pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True)
+    pid_v2 = models.CharField(_("PID v2"), max_length=23, blank=True, null=True)
 
     # Article type
     article_type = models.CharField(
         _("Article type"),
         max_length=32,
         choices=choices.ARTICLE_TYPE,
-        blank=False,
-        null=False,
+        blank=True,
+        null=True,
     )
 
     # Article status
@@ -53,6 +65,10 @@ class Article(ClusterableModel, CommonControlField):
         choices=choices.ARTICLE_STATUS,
         blank=True,
         null=True,
+    )
+    position = models.PositiveSmallIntegerField(_("Position"), blank=True, null=True)
+    first_publication_date = models.DateField(
+        null=True, blank=True
     )
 
     # Page
@@ -71,6 +87,8 @@ class Article(ClusterableModel, CommonControlField):
         "self", symmetrical=False, through="RelatedItem", related_name="related_to"
     )
 
+    sections = models.ManyToManyField(JournalSection, verbose_name=_("sections"))
+
     panel_article_ids = MultiFieldPanel(
         heading="Article identifiers", classname="collapsible"
     )
@@ -78,17 +96,17 @@ class Article(ClusterableModel, CommonControlField):
         # FieldPanel("pid_v2"),
         FieldPanel("pid_v3"),
         # FieldPanel("aop_pid"),
-        InlinePanel(relation_name="doi_with_lang", label="DOI with Language"),
+        # InlinePanel(relation_name="doi_with_lang", label="DOI with Language"),
     ]
 
     panel_article_details = MultiFieldPanel(
         heading="Article details", classname="collapsible"
     )
     panel_article_details.children = [
+        FieldPanel("first_publication_date"),
         FieldPanel("article_type"),
         FieldPanel("status"),
         InlinePanel(relation_name="title_with_lang", label="Title with Language"),
-        InlinePanel(relation_name="author", label="Authors"),
         FieldPanel("elocation_id"),
         FieldPanel("fpage"),
         FieldPanel("lpage"),
@@ -100,25 +118,59 @@ class Article(ClusterableModel, CommonControlField):
         FieldPanel("issue", classname="collapsible"),
     ]
 
+    base_form_class = ArticleForm
+
     class Meta:
         indexes = [
             models.Index(fields=["pid_v3"]),
+            models.Index(fields=["status"]),
         ]
+        ordering = ["position", "fpage", "-first_publication_date"]
 
         permissions = (
             (MAKE_ARTICLE_CHANGE, _("Can make article change")),
             (REQUEST_ARTICLE_CHANGE, _("Can request article change")),
         )
 
-    base_form_class = ArticleForm
-
-    autocomplete_search_field = "sps_pkg__sps_pkg_name"
+    @classmethod
+    def autocomplete_custom_queryset_filter(cls, term):
+        return cls.objects.filter(
+            Q(sps_pkg__sps_pkg_name__endswith=term)
+            | Q(title_with_lang__text__icontains=term)
+        )
 
     def autocomplete_label(self):
-        return self.sps_pkg.sps_pkg_name
+        return str(self)
 
     def __str__(self):
-        return f"{self.sps_pkg.sps_pkg_name}"
+        return self.sps_pkg.sps_pkg_name
+
+    def change_status_to_submitted(self):
+        if self.status in (choices.AS_REQUIRE_UPDATE, choices.AS_REQUIRE_ERRATUM):
+            self.status = choices.AS_CHANGE_SUBMITTED
+            self.save()
+            return True
+        else:
+            return False
+
+    @property
+    def pdfs(self):
+        return self.sps_pkg.pdfs
+
+    @property
+    def htmls(self):
+        return self.sps_pkg.htmls
+
+    @property
+    def xml(self):
+        return self.sps_pkg.xml_uri
+
+    @property
+    def order(self):
+        try:
+            return int(self.fpage)
+        except (TypeError, ValueError):
+            return self.position
 
     @property
     def data(self):
@@ -139,7 +191,7 @@ class Article(ClusterableModel, CommonControlField):
         raise ValueError("Article.get requires pid_v3")
 
     @classmethod
-    def create_or_update(cls, user, sps_pkg):
+    def create_or_update(cls, user, sps_pkg, issue=None, journal=None):
         if not sps_pkg or sps_pkg.pid_v3 is None:
             raise ValueError("create_article requires sps_pkg with pid_v3")
 
@@ -152,28 +204,26 @@ class Article(ClusterableModel, CommonControlField):
             obj.creator = user
 
         obj.sps_pkg = sps_pkg
+        obj.pid_v2 = sps_pkg.xml_with_pre.v2
+        obj.article_type = sps_pkg.xml_with_pre.xmltree.find(".").get("article_type")
+
+        if journal:
+            obj.journal = journal
+        else:
+            obj.add_journal(user)
+        if issue:
+            obj.issue = issue
+        else:
+            obj.add_issue(user)
+
+        obj.status = choices.AS_READY_TO_PUBLISH
+        obj.add_pages()
+        obj.add_sections(user)
+        obj.add_article_publication_date()
         obj.save()
 
+        obj.add_article_titles(user)
         return obj
-
-    # def link_to_article_proc(self, user, force_update):
-    #     qa_ws_status = None
-    #     if force_update:
-    #         qa_ws_status = collection_choices.WS_READY_TO_QA
-    #     for collection in self.collections:
-    #         article_proc = ArticleProc.objects.get(collection=collection)
-    #         article_proc.article = self
-    #         article_proc.save()
-
-    # @property
-    # def collections(self):
-    #     if not self.journal:
-    #         raise ValueError("Unable to get collections. Missing article.journal")
-    #     for journal_proc in JournalProc.objects.filter(journal=self.journal).iterator():
-    #         yield journal_proc.collection
-
-    def add_type(self, article_type):
-        self.article_type = article_type
 
     def add_related_item(self, target_doi, target_article_type):
         self.save()
@@ -185,11 +235,12 @@ class Article(ClusterableModel, CommonControlField):
         # item.save()
         # self.related_items.add(item)
 
-    def add_pages(self, fpage=None, fpage_seq=None, lpage=None, elocation_id=None):
-        self.fpage = fpage
-        self.fpage_seq = fpage_seq
-        self.lpage = lpage
-        self.elocation_id = elocation_id
+    def add_pages(self):
+        xml_with_pre = self.sps_pkg.xml_with_pre
+        self.fpage = xml_with_pre.fpage
+        self.fpage_seq = xml_with_pre.fpage_seq
+        self.lpage = xml_with_pre.lpage
+        self.elocation_id = xml_with_pre.elocation_id
 
     def add_issue(self, user):
         xml_with_pre = self.sps_pkg.xml_with_pre
@@ -209,9 +260,55 @@ class Article(ClusterableModel, CommonControlField):
             ),
         )
 
+    def add_article_titles(self, user):
+        titles = ArticleTitles(
+            xmltree=self.sps_pkg.xml_with_pre.xmltree,
+        ).article_title_list
+        self.title_with_lang.all().delete()
+        for title in titles:
+            obj = ArticleTitle.create_or_update(
+                user,
+                parent=self,
+                text=title.get("html_text"),
+                language=Language.get(code2=title.get("language") or title.get("lang"))
+            )
+            self.title_with_lang.add(obj)
 
-class ArticleAuthor(Orderable, Researcher):
-    author = ParentalKey("Article", on_delete=models.CASCADE, related_name="author")
+    def add_sections(self, user):
+        self.save()
+        self.sections.all().delete()
+
+        items = ArticleTocSections(
+            xmltree=self.sps_pkg.xml_with_pre.xmltree,
+        ).article_section
+
+        issue_section = None
+        for item in items:
+            section = JournalSection.create_or_update(
+                user,
+                parent=self.journal,
+                language=Language.get(code2=item.get("lang")),
+                text=item.get("text"),
+                code=item.get("code")
+            )
+            self.sections.add(section)
+
+    def add_article_publication_date(self):
+        if self.sps_pkg.xml_with_pre.article_publication_date:
+            self.first_publication_date = datetime.strptime(
+                self.sps_pkg.xml_with_pre.article_publication_date, "%Y-%m-%d"
+            )
+
+    @property
+    def multilingual_sections(self):
+        sections = [item.text for item in self.sections.all()]
+        for issue_section in IssueSection.objects.filter(
+            Q(main_section__text__in=sections) | Q(translations__text__in=sections),
+            toc__issue=self.issue,
+        ):
+            yield issue_section.main_section.data
+            for item in issue_section.translations.all():
+                yield item.data
 
 
 class ArticleDOIWithLang(Orderable, DOIWithLang):
@@ -220,24 +317,8 @@ class ArticleDOIWithLang(Orderable, DOIWithLang):
     )
 
 
-class Title(CommonControlField):
-    title = models.TextField(_("Title"))
-    lang = models.CharField(_("Language"), max_length=64)
-
-    panels = [
-        FieldPanel("title"),
-        FieldPanel("lang"),
-    ]
-
-    def __str__(self):
-        return f"{self.lang.upper()}: {self.title}"
-
-    class Meta:
-        abstract = True
-
-
-class ArticleTitle(Orderable, Title):
-    title_with_lang = ParentalKey(
+class ArticleTitle(HTMLTextModel, CommonControlField):
+    parent = ParentalKey(
         "Article", on_delete=models.CASCADE, related_name="title_with_lang"
     )
 
