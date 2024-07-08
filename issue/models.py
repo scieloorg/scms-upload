@@ -3,13 +3,16 @@ import logging
 from django.db import IntegrityError, models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.panels import FieldPanel
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
+from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
+from wagtail.models import Orderable
 
 from core.models import CommonControlField, IssuePublicationDate
-from journal.models import Journal
+from journal.models import Journal, JournalSection
 
-from .forms import IssueForm
+from issue.forms import IssueForm, TOCForm
 
 
 class IssueGetOrCreateError(Exception):
@@ -191,3 +194,80 @@ class Issue(CommonControlField, IssuePublicationDate):
                 is_continuous_publishing_model,
                 total_documents,
             )
+
+
+class TOC(CommonControlField, ClusterableModel):
+    # Somente para issues cujos artigos não tem página numérica
+    issue = models.ForeignKey(Issue, blank=True, null=True, on_delete=models.SET_NULL)
+    ordered = models.BooleanField(default=False)
+
+    panels = [
+        InlinePanel("issue_sections", label=_("Sections")),
+    ]
+
+    base_form_class = TOCForm
+
+    @classmethod
+    def create(cls, user, issue, ordered):
+        try:
+            obj = cls(creator=user, issue=issue, ordered=ordered)
+            obj.save()
+            return obj
+        except IntegrityError as e:
+            return cls.get(issue)
+
+    @classmethod
+    def create_or_update(cls, user, issue, ordered):
+        try:
+            obj = cls.get(issue)
+            obj.ordered = ordered
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(user, issue, ordered)
+
+    @classmethod
+    def get(cls, issue):
+        return cls.objects.get(issue=issue)
+
+    @property
+    def ordered_sections(self):
+        sections = {}
+        for item in IssueSection.objects.filter(toc=self):
+            sections.setdefault(item["order"], [])
+            sections[item["order"]].append(item)
+        return sections
+
+
+class IssueSection(CommonControlField, Orderable):
+    toc = ParentalKey(TOC, on_delete=models.CASCADE, related_name="issue_sections")
+    main_section = models.ForeignKey(JournalSection, null=True, blank=True, on_delete=models.SET_NULL, related_name="main_section_toc")
+    translations = models.ManyToManyField(JournalSection, related_name="translated_section_toc")
+    position = models.PositiveSmallIntegerField(_("Position"), blank=True, null=True)
+
+    panels = [
+        AutocompletePanel("main_section"),
+        AutocompletePanel("translations"),
+    ]
+
+    @classmethod
+    def create(cls, user, toc, main_section):
+        try:
+            obj = cls(creator=user, toc=toc, main_section=main_section)
+            obj.save()
+            return obj
+        except IntegrityError as e:
+            return cls.get(toc, main_section)
+
+    @classmethod
+    def create_or_update(cls, user, toc, main_section):
+        try:
+            obj = cls.get(toc, main_section)
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(user, toc, main_section)
+
+    @classmethod
+    def get(cls, toc, main_section):
+        return cls.objects.get(toc=toc, main_section=main_section)
