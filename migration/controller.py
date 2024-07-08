@@ -12,11 +12,12 @@ from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from scielo_classic_website import classic_ws
 from scielo_classic_website.controller import pids_and_their_records
 
-from article.controller import create_article
+from article.models import Article
 from core.controller import parse_yyyymmdd
+from collection.models import Language
 from htmlxml.models import HTMLXML
-from issue.models import Issue
-from journal.models import Journal, OfficialJournal
+from issue.models import Issue, IssueSection, TOC
+from journal.models import Journal, OfficialJournal, JournalSection
 from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
@@ -28,6 +29,7 @@ def create_or_update_journal(
     user,
     journal_proc,
     force_update,
+    **kwargs,
 ):
     """
     Create/update OfficialJournal, JournalProc e Journal
@@ -115,6 +117,24 @@ def create_or_update_issue(
         migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         force_update=force_update,
     )
+
+    toc = TOC.create_or_update(
+        user, issue, ordered=True,
+    )
+    for code, sections in classic_website_issue.sections_by_code.items():
+        issue_section = None
+        for section in sections:
+            sec = JournalSection.create_or_update(
+                user,
+                issue_proc.journal_proc.journal,
+                language=Language.get_or_create(creator=user, code2=section.get("language")),
+                code=section.get("code"),
+                text=section.get("text")
+            )
+            if issue_section is None:
+                issue_section = IssueSection.create_or_update(user, toc, sec)
+            else:
+                issue_section.translations.add(sec)
     return issue
 
 
@@ -122,6 +142,7 @@ def create_or_update_article(
     user,
     article_proc,
     force_update,
+    **kwargs,
 ):
     """
     Create/update Issue
@@ -130,11 +151,17 @@ def create_or_update_article(
         logging.info(f"article_proc.migration_status={article_proc.migration_status}")
         return article_proc.article
 
-    article = create_article(article_proc.sps_pkg, user, force_update)
+    article = Article.create_or_update(
+        user,
+        article_proc.sps_pkg,
+        issue=article_proc.issue_proc.issue,
+        journal=article_proc.issue_proc.journal_proc.journal,
+    )
+    article_proc.migrated_data.migration_status = tracker_choices.PROGRESS_STATUS_DONE
     article_proc.migration_status = tracker_choices.PROGRESS_STATUS_DONE
     article_proc.updated_by = user
     article_proc.save()
-    return article["article"]
+    return article
 
 
 class XMLVersionXmlWithPreError(Exception):
@@ -668,7 +695,7 @@ def register_acron_id_file_content(
             journal_id_file = JournalAcronIdFile.create_or_update(
                 user=user,
                 collection=collection,
-                journal=journal,
+                journal_acron=journal_acron,
                 source_path=source_path,
                 force_update=force_update,
             )
