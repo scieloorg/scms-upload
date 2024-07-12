@@ -127,3 +127,9 @@ volume_down:  ## Remove all volume
 
 clean_celery_logs:
 	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' scielo_core_local_celeryworker)
+
+exclude_upload_production_django:  ## Exclude all productions containers
+	@docker rmi -f $(shell docker images --filter=reference='upload_production*' -q)
+	@echo "Exclude all upload production containers"
+
+update: stop rm exclude_upload_production_django up
