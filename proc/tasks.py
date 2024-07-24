@@ -10,7 +10,6 @@ from collection.choices import QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from migration import controller
-from migration.models import JournalAcronIdFile
 from proc.controller import migrate_and_publish_issues, migrate_and_publish_journals
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
@@ -246,7 +245,6 @@ def task_migrate_issue_articles(
         for article_proc in ArticleProc.objects.filter(
             issue_proc=issue_proc
         ).iterator():
-            logging.info(f"task_migrate_issue_articles: {article_proc}")
             task_migrate_and_publish_article.apply_async(
                 kwargs=dict(
                     user_id=user_id,
@@ -282,8 +280,8 @@ def task_migrate_and_publish_article(
 ):
     try:
         user = _get_user(user_id, username)
-        logging.info(f"article_proc_id: {article_proc_id}")
         article_proc = ArticleProc.objects.get(pk=article_proc_id)
+        logging.info(f"task_migrate_issue_article: {article_proc}")
         article = article_proc.migrate_article(user, force_update)
         if article:
             article_proc.publish(user, publish_article, api_data=article_api_data, force_update=force_update)

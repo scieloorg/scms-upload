@@ -10,13 +10,13 @@ from publication.utils.document import build_article
 def publish_article(article_proc, api_data):
     data = {}
     builder = ArticlePayload(data)
-    build_article(article_proc.article, article_proc.journal_proc, builder)
+    build_article(builder, article_proc.article, article_proc.issue_proc.journal_proc.pid)
 
     api = PublicationAPI(**api_data)
     kwargs = dict(
         article_id=data.get("_id"),
         issue_id=data.get("issue_id"),
-        order=data.get("order"),
+        order=article_proc.article.order,
         article_url=data.get("xml"),
     )
     return api.post_data(data, kwargs)
@@ -129,7 +129,7 @@ class ArticlePayload:
         _translated_title["language"] = language
         self.data["translated_titles"].append(_translated_title)
 
-    def add_section(self, language, text):
+    def add_section(self, language, text, code):
         # sections"] = EmbeddedDocumentListField(TranslatedSection))
         if self.data["translated_sections"] is None:
             self.data["translated_sections"] = []

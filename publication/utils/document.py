@@ -17,7 +17,7 @@ from packtools.sps.models.related_articles import RelatedItems
 from publication.utils.issue import get_bundle_id
 
 
-def build_article(article, journal_proc, builder):
+def build_article(builder, article, journal_id):
     sps_pkg = article.sps_pkg
     xml_with_pre = sps_pkg.xml_with_pre
 
@@ -34,7 +34,7 @@ def build_article(article, journal_proc, builder):
     builder.add_dates(article.created, article.updated)
     builder.add_issue(
         get_bundle_id(
-            issn_id=journal_proc.pid,
+            issn_id=journal_id,
             year=article.issue.publication_year,
             volume=article.issue.volume,
             number=article.issue.number,
@@ -76,7 +76,8 @@ def build_article(article, journal_proc, builder):
     for item in article_xml.get_translated_title():
         builder.add_translated_title(**item)
 
-    for item in article_xml.get_section():
+    for item in article.multilingual_sections:
+        # pega as seções a partir do Article
         builder.add_section(**item)
 
     for item in article_xml.get_keywords():

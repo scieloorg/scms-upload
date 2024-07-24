@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 
 from django.utils.translation import gettext_lazy as _
-
 from packtools.sps.models.article_ids import ArticleIds
 
 from . import exceptions
