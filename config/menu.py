@@ -1,16 +1,18 @@
 WAGTAIL_MENU_APPS_ORDER = [
+    None,
+    "upload",
+    "processing",
     "Tarefas",
     "unexpected-error",
-    "processing",
-    "migration",
-    "journal",
-    "issue",
     "article",
+    "issue",
+    "journal",
+    "collection",
+    "migration",
+    "pid_provider",
     "institution",
     "location",
     "researcher",
-    "collection",
-    "pid_provider",
     "Configurações",
     "Relatórios",
     "Images",
@@ -21,6 +23,6 @@ WAGTAIL_MENU_APPS_ORDER = [
 
 def get_menu_order(app_name):
     try:
-        return WAGTAIL_MENU_APPS_ORDER.index(app_name) + 1
+        return WAGTAIL_MENU_APPS_ORDER.index(app_name)
     except:
         return 9000
