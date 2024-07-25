@@ -5,21 +5,16 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
+from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
-from wagtail.admin.panels import (
-    FieldPanel,
-    InlinePanel,
-    MultiFieldPanel,
-)
-from wagtailautocomplete.edit_handlers import AutocompletePanel
 from wagtail.models import Orderable
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.models import CommonControlField
 from doi.models import DOIWithLang
 from issue.models import Issue
 from journal.models import Journal, OfficialJournal
 from package.models import SPSPkg
-
 from researcher.models import Researcher
 
 from . import choices

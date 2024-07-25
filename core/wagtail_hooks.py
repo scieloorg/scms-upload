@@ -3,12 +3,13 @@
 from django.templatetags.static import static
 from django.utils.html import format_html
 from wagtail import hooks
-from wagtail.admin.site_summary import SummaryItem
-from journal.models import Journal
-from collection.models import Collection
-from article.models import Article
 from wagtail.admin.navigation import get_site_for_user
-from config.menu import get_menu_order, WAGTAIL_MENU_APPS_ORDER
+from wagtail.admin.site_summary import SummaryItem
+
+from article.models import Article
+from collection.models import Collection
+from config.menu import WAGTAIL_MENU_APPS_ORDER, get_menu_order
+from journal.models import Journal
 
 # @hooks.register("insert_global_admin_css", order=100)
 # def global_admin_css():

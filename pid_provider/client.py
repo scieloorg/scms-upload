@@ -17,7 +17,6 @@ from core.utils.requester import post_data
 from pid_provider import exceptions
 from pid_provider.models import PidProviderConfig
 
-
 LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 

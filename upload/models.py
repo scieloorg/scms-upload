@@ -1,4 +1,4 @@
-from datetime import date, timedelta, datetime
+from datetime import date, datetime, timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import models
