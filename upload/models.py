@@ -222,9 +222,7 @@ class ValidationResult(models.Model):
     base_form_class = ValidationResultForm
 
     @classmethod
-    def create(
-        cls, error_category, package, status=None, message=None, data=None
-    ):
+    def create(cls, error_category, package, status=None, message=None, data=None):
         val_res = ValidationResult()
         val_res.category = error_category
         val_res.package = package
@@ -245,8 +243,7 @@ class ValidationResult(models.Model):
 
     @classmethod
     def add_resolution(cls, user, data):
-        validation_result = cls.objects.get(
-            pk=data["validation_result_id"].value())
+        validation_result = cls.objects.get(pk=data["validation_result_id"].value())
 
         try:
             opinion = data["opinion"].value()

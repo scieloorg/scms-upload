@@ -221,10 +221,14 @@ class PidProviderEndpoint(CommonControlField):
         on_delete=models.SET_NULL,
         related_name="endpoint",
     )
-    name = models.CharField(_("Endpoint name"), max_length=16, null=True, blank=True, choices=choices.ENDPOINTS)
-    url = models.URLField(
-        _("Endpoint URL"), max_length=128, null=True, blank=True
+    name = models.CharField(
+        _("Endpoint name"),
+        max_length=16,
+        null=True,
+        blank=True,
+        choices=choices.ENDPOINTS,
     )
+    url = models.URLField(_("Endpoint URL"), max_length=128, null=True, blank=True)
     enabled = models.BooleanField(default=False)
 
     panels = [
@@ -1446,7 +1450,9 @@ class PidProviderXML(CommonControlField, ClusterableModel):
 
                     # verifica se houve mudança nos PIDs do XML
                     after = (xml_with_pre.v3, xml_with_pre.v2, xml_with_pre.aop_pid)
-                    for label, bef, aft in zip(("pid_v3", "pid_v2", "aop_pid"), before, after):
+                    for label, bef, aft in zip(
+                        ("pid_v3", "pid_v2", "aop_pid"), before, after
+                    ):
                         if bef != aft:
                             xml_changed[label] = aft
                 except KeyError:

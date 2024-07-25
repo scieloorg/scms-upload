@@ -349,41 +349,29 @@ class PressRelease(CommonControlField):
         null=True,
     )
     article = models.ForeignKey(
-        "article.Article",
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True
+        "article.Article", on_delete=models.SET_NULL, blank=True, null=True
     )
-    title = models.TextField(_("Title"),
-        blank=True,
-        null=True
-    )
-    doi = models.TextField(
-        blank=True,
-        null=True        
-    )
+    title = models.TextField(_("Title"), blank=True, null=True)
+    doi = models.TextField(blank=True, null=True)
     language = models.ForeignKey(
-        "collection.Language",
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True
+        "collection.Language", on_delete=models.SET_NULL, blank=True, null=True
     )
     content = RichTextField(
-        null=True, 
+        null=True,
         blank=True,
     )
     url = models.URLField(
         max_length=255,
-        null=True, 
+        null=True,
         blank=True,
     )
     media_content = models.URLField(
         max_length=255,
-        null=True, 
+        null=True,
         blank=True,
     )
     publication_date = models.DateTimeField(
-        null=True, 
+        null=True,
         blank=True,
     )
 
@@ -403,7 +391,7 @@ class PressRelease(CommonControlField):
         user,
     ):
         self.journal = journal
-        self.issue = issue 
+        self.issue = issue
         self.article = article
         self.title = title
         self.language = language
@@ -413,7 +401,6 @@ class PressRelease(CommonControlField):
         self.updated_by = user
         self.save()
         return self
-
 
     @classmethod
     def get(cls, url):
@@ -434,7 +421,7 @@ class PressRelease(CommonControlField):
         media_content,
         publication_date,
         user,
-        ):
+    ):
         try:
             obj = cls(
                 url=url,
@@ -466,7 +453,7 @@ class PressRelease(CommonControlField):
         content=None,
         media_content=None,
         publication_date=None,
-        ):
+    ):
         try:
             obj = cls.get(url=url)
             return obj.update(

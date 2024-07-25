@@ -119,9 +119,9 @@ class PidRequester(BasePidProvider):
                 detail={"registered": registered, "response": resp},
             )
 
-        registered["synchronized"] = (
-            registered.get("registered_in_core") and registered.get("registered_in_upload")
-        )
+        registered["synchronized"] = registered.get(
+            "registered_in_core"
+        ) and registered.get("registered_in_upload")
         registered["xml_changed"] = xml_changed
         registered["xml_with_pre"] = xml_with_pre
         registered["filename"] = name
@@ -150,7 +150,9 @@ class PidRequester(BasePidProvider):
 
         if registered.get("is_equal"):
             # xml recebido é igual ao registrado
-            registered["do_core_registration"] = not registered.get("registered_in_core")
+            registered["do_core_registration"] = not registered.get(
+                "registered_in_core"
+            )
             registered["do_upload_registration"] = registered["do_core_registration"]
         else:
             # xml recebido é diferente ao registrado ou não está no upload
@@ -209,15 +211,15 @@ class PidRequester(BasePidProvider):
 
         try:
             pid_provider_xml = PidProviderXML.objects.get(
-                v3=pid_v3, v2__contains=correct_pid_v2[:14])
+                v3=pid_v3, v2__contains=correct_pid_v2[:14]
+            )
             fixed["pid_v2"] = pid_provider_xml.v2
         except PidProviderXML.DoesNotExist:
             return fixed
         except PidProviderXML.MultipleObjectsReturned:
             return fixed
         try:
-            item_to_fix = FixPidV2.get_or_create(
-                user, pid_provider_xml, correct_pid_v2)
+            item_to_fix = FixPidV2.get_or_create(user, pid_provider_xml, correct_pid_v2)
         except ValueError as e:
             return {
                 "error_message": str(e),

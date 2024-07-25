@@ -63,7 +63,7 @@ class PidProviderAPIClient:
         if not hasattr(self, "_fix_pid_v2_url") or not self._fix_pid_v2_url:
             try:
                 self._fix_pid_v2_url = None
-                endpoint = self.config.endpoint.filter(name='fix-pid-v2')[0]
+                endpoint = self.config.endpoint.filter(name="fix-pid-v2")[0]
                 if endpoint.enabled:
                     self._fix_pid_v2_url = endpoint.url
             except IndexError:
@@ -252,10 +252,12 @@ class PidProviderAPIClient:
                     # exceto se o registro do Core foi criado posteriormente
                     if created and created < item["created"]:
                         # não atualizar com os dados do Core
-                        logging.info({
-                            "created_at_upload": created,
-                            "created_at_core": item['created'],
-                        })
+                        logging.info(
+                            {
+                                "created_at_upload": created,
+                                "created_at_core": item["created"],
+                            }
+                        )
                         return
 
                 for pid_type, pid_value in item["xml_changed"].items():
@@ -287,7 +289,9 @@ class PidProviderAPIClient:
                 password=self.api_password,
                 timeout=self.timeout,
             )
-            response = self._post_fix_pid_v2(pid_v3, correct_pid_v2, self.token, self.timeout)
+            response = self._post_fix_pid_v2(
+                pid_v3, correct_pid_v2, self.token, self.timeout
+            )
             response["fixed_in_core"] = response.get("v2") == correct_pid_v2
             return response
         except (
