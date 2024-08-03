@@ -101,7 +101,7 @@ def post_data(
     wait=wait_exponential(multiplier=1, min=1, max=5),
     stop=stop_after_attempt(5),
 )
-def fetch_data(url, headers=None, json=False, timeout=2, verify=True):
+def fetch_data(url, params=None, headers=None, json=False, timeout=2, verify=True):
     """
     Get the resource with HTTP
     Retry: Wait 2^x * 1 second between each retry starting with 4 seconds,
@@ -119,7 +119,9 @@ def fetch_data(url, headers=None, json=False, timeout=2, verify=True):
 
     try:
         logger.info("Fetching the URL: %s" % url)
-        response = requests.get(url, headers=headers, timeout=timeout, verify=verify)
+        response = requests.get(
+            url, params=params, headers=headers, timeout=timeout, verify=verify
+        )
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
         logger.error("Erro fetching the content: %s, retry..., erro: %s" % (url, exc))
         raise RetryableError(exc) from exc
