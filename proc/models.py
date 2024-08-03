@@ -105,11 +105,11 @@ class Operation(CommonControlField):
 
     @classmethod
     def create(cls, user, proc, name):
-        # FUTURE
-        cls.archive_events(user, proc, name)
+        name = name[:64]
+        cls.exclude_events(user, proc, name)
         obj = cls()
         obj.proc = proc
-        obj.name = name[:64]
+        obj.name = name
         obj.creator = user
         obj.save()
         return obj
@@ -126,42 +126,10 @@ class Operation(CommonControlField):
         #     return obj
 
     @classmethod
-    def archive_events(cls, user, proc, name):
-        # obtém o primeiro ocorrência de proc e name
-        item = cls.objects.filter(proc=proc, name=name).order_by("created").first()
-        if not item:
-            return
-
-        # obtém todos os ítens criados após este evento
-        rows = []
-        for row in cls.objects.filter(proc=proc, created__gte=item.created).order_by(
-            "created"
-        ):
-            rows.append(row.data)
-
-        try:
-            # converte para json
-            file_content = json.dumps(rows)
-            file_extension = ".json"
-        except Exception as e:
-            # caso não seja serializável, converte para str
-            file_content = str(rows)
-            file_extension = ".txt"
-
-        report_date = item.created.isoformat()
-        # cria um arquivo com o conteúdo
-        ProcReport.create_or_update(
-            user,
-            proc,
-            name,
-            report_date,
-            file_content,
-            file_extension,
-        )
+    def exclude_events(cls, user, proc, name):
         # apaga todas as ocorrências que foram armazenadas no arquivo
-        created = item.created
         try:
-            cls.objects.filter(proc=proc, created__gte=created).delete()
+            cls.objects.filter(proc=proc, name=name).delete()
         except Exception as e:
             pass
 
@@ -820,7 +788,7 @@ class JournalProc(BaseProc, ClusterableModel):
 
     def issues_with_modified_articles(self):
         for item in JournalAcronIdFile.issues_with_modified_articles(
-            collection=self.collection, journal=self.journal
+            collection=self.collection, journal_acron=self.acron
         ):
             yield from IssueProc.objects.filter(
                 collection=self.collection,
@@ -829,13 +797,13 @@ class JournalProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
-    def journals_with_modified_articles(cls, collection=None, journal=None):
+    def journals_with_modified_articles(cls, collection=None, journal_acron=None):
         for item in JournalAcronIdFile.journals_with_modified_articles(
-            collection=collection, journal=journal
+            collection=collection, journal_acron=journal_acron
         ):
             yield from JournalProc.objects.filter(
                 collection=item.collection,
-                journal=item.journal,
+                acron=item.journal_acron,
             )
 
 
@@ -875,10 +843,10 @@ class IssueProc(BaseProc, ClusterableModel):
     )
 
     def __unicode__(self):
-        return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection.name})"
+        return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection})"
 
     def __str__(self):
-        return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection.name})"
+        return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection})"
 
     journal_proc = models.ForeignKey(
         JournalProc, on_delete=models.SET_NULL, null=True, blank=True
@@ -1137,7 +1105,7 @@ class IssueProc(BaseProc, ClusterableModel):
         id_file_records = list(
             JournalAcronIdFile.modified_articles(
                 collection=self.journal_proc.collection,
-                journal=self.journal_proc.journal,
+                journal_acron=self.journal_proc.acron,
                 issue_folder=self.issue_folder,
             )
         )
@@ -1215,6 +1183,17 @@ class IssueProc(BaseProc, ClusterableModel):
                 force_update=force_update,
             )
         return article_proc
+
+    @staticmethod
+    def get_or_generate_issue_pid(issue):
+        try:
+            issue_proc = IssueProc.objects.filter(issue=issue).first()
+            return issue_proc.pid
+        except AttributeError:
+            issn_id = issue_proc.journal_proc.pid
+            year = issue.publication_year
+            issue_order = str(issue.order).zfill(4)
+            return f"{issn_id}{year}{issue_order}"
 
 
 class ArticleEventCreateError(Exception):
