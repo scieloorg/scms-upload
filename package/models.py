@@ -173,7 +173,7 @@ class SPSPkgComponent(FileLocation, Orderable):
     # herdados de FileLocation
     # - basename = models.TextField(_("Basename"), null=True, blank=True)
     # - uri = models.URLField(_("URI"), null=True, blank=True)
-    sps_pkg = ParentalKey("SPSPkg", related_name="component")
+    sps_pkg = ParentalKey("SPSPkg", related_name="components")
     component_type = models.CharField(
         _("Package component type"),
         max_length=32,
@@ -186,7 +186,7 @@ class SPSPkgComponent(FileLocation, Orderable):
         null=True,
         blank=True,
     )
-    legacy_uri = models.TextField(null=True, blank=True)
+    legacy_uri = models.CharField(max_length=120, null=True, blank=True)
 
     def autocomplete_label(self):
         return f"{self.sps_pkg} {self.basename}"
@@ -332,9 +332,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
     # zip
     file = models.FileField(upload_to=pkg_directory_path, null=True, blank=True)
 
-    # compontents do pacote
-    components = models.ManyToManyField(SPSPkgComponent)
-
     # XML URI
     xml_uri = models.URLField(null=True, blank=True)
 
@@ -344,11 +341,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         null=True,
         blank=True,
         choices=choices.PKG_ORIGIN,
-        default=choices.PKG_ORIGIN_INGRESS_WITHOUT_VALIDATION,
     )
-    # publicar somente a partir da data informada
-    scheduled = models.DateTimeField(null=True, blank=True)
-
     # o pacote pode ter pid_v3, sem estar registrado no pid provider core
     registered_in_core = models.BooleanField(null=True, blank=True)
 
@@ -417,13 +410,29 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
     @property
     def pdfs(self):
-        return self.components.filter(component_type="rendition").iterator()
+        for item in self.components.filter(component_type="rendition"):
+            yield {
+                "lang": item.lang and item.lang.code2,
+                "url": item.uri,
+                "basename": item.basename,
+                "legacy_uri": item.legacy_uri,
+            }
 
     @property
-    def supplementary_material(self):
-        return self.components.filter(
-            component_type='"supplementary-material"'
-        ).iterator()
+    def htmls(self):
+        for item in self.components.filter(component_type="html"):
+            yield {"lang": item.lang and item.lang.code2, "url": item.uri}
+
+    @property
+    def supplementary_materials(self):
+        for item in self.components.filter(component_type="supplementary-material"):
+            yield {
+                "lang": item.lang and item.lang.code2,
+                "url": item.uri,
+                "basename": item.basename,
+                "legacy_uri": item.legacy_uri,
+                "xml_elem_id": item.xml_elem_id,
+            }
 
     @classmethod
     def get(cls, pid_v3):
@@ -477,9 +486,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
             obj.save_pkg_zip_file(user, sps_pkg_zip_path)
 
-            obj.save_package_in_cloud(user, original_pkg_components, article_proc)
-
-            obj.generate_article_html_page(user)
+            obj.upload_package_to_the_cloud(user, original_pkg_components, article_proc)
 
             obj.validate(True)
 
@@ -489,6 +496,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             return obj
 
         except Exception as e:
+            logging.exception(e)
             exc_type, exc_value, exc_traceback = sys.exc_info()
             operation.finish(
                 user,
@@ -628,23 +636,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
         except Exception as e:
             raise Exception(f"Unable to save {name}. Exception: {e}")
 
-    def generate_article_html_page(self, user):
-        try:
-            generator = HTMLGenerator.parse(
-                file=self.xml_uri,
-                valid_only=False,
-                xslt="3.0",
-            )
-            for lang in generator.languages:
-                PreviewArticlePage.create_or_update(
-                    user,
-                    self,
-                    lang=Language.get_or_create(creator=user, code2=lang),
-                    content=str(generator.generate(lang)),
-                )
-        except Exception as e:
-            logging.exception(f"PreviewArticlePage {self.sps_pkg_name} {e}")
-
     @property
     def subdir(self):
         if not hasattr(self, "_subdir") or not self._subdir:
@@ -654,80 +645,121 @@ class SPSPkg(CommonControlField, ClusterableModel):
             self._subdir = os.path.join(subdir, "/".join(suffix.split("-")))
         return self._subdir
 
-    def save_package_in_cloud(self, user, original_pkg_components, article_proc):
+    def upload_package_to_the_cloud(self, user, original_pkg_components, article_proc):
         self.save()
-        xml_with_pre = self._save_components_in_cloud(
-            user,
-            original_pkg_components,
-            article_proc,
-        )
-        self._local_to_remote(xml_with_pre)
-        self._save_xml_in_cloud(user, xml_with_pre, article_proc)
-        self.valid_components = self.components.filter(uri__isnull=True).count() == 0
-        self.save()
-
-    def _save_components_in_cloud(self, user, original_pkg_components, article_proc):
-        op = article_proc.start(user, "_save_components_in_cloud")
-        xml_with_pre = None
-        mimetypes.init()
         self.components.all().delete()
 
-        failures = []
+        xml_with_pre = self.upload_items_to_the_cloud(
+            user,
+            article_proc,
+            "upload_assets_to_the_cloud",
+            self.upload_assets_to_the_cloud,
+            **{"original_pkg_components": original_pkg_components},
+        )
+        self.upload_items_to_the_cloud(
+            user,
+            article_proc,
+            "upload_xml_to_the_cloud",
+            self.upload_xml_to_the_cloud,
+            **{"xml_with_pre": xml_with_pre},
+        )
+        self.upload_items_to_the_cloud(
+            user,
+            article_proc,
+            "upload_article_page_to_the_cloud",
+            self.upload_article_page_to_the_cloud,
+        )
+        self.valid_components = not self.components.filter(uri__isnull=True).exists()
+        self.save()
+
+    def upload_items_to_the_cloud(
+        self, user, article_proc, operation_title, callable_get_items, **params
+    ):
+        op = article_proc.start(user, operation_title)
+        response = callable_get_items(user, **params)
+        detail = dict(response)
+        try:
+            xml_with_pre = detail.pop("xml_with_pre")
+        except KeyError:
+            xml_with_pre = None
+
+        completed = True
+        for item in response["items"]:
+            try:
+                k = item["uri"]
+            except KeyError:
+                completed = False
+                break
+        op.finish(user, completed=completed, detail=detail)
+        return xml_with_pre
+
+    def upload_to_the_cloud(
+        self,
+        user,
+        filename,
+        ext,
+        content,
+        component_type,
+        lang=None,
+        legacy_uri=None,
+    ):
+        try:
+            response = {}
+            response = minio_push_file_content(
+                content=content,
+                mimetype=mimetypes.types_map[ext],
+                object_name=f"{self.subdir}/{filename}",
+            )
+            uri = response["uri"]
+        except Exception as e:
+            uri = None
+            response.update(
+                dict(
+                    basename=filename,
+                    error=str(e),
+                    error_type=str(type(e)),
+                )
+            )
+        SPSPkgComponent.create_or_update(
+            user=user,
+            sps_pkg=self,
+            uri=uri,
+            basename=filename,
+            component_type=component_type,
+            lang=lang,
+            legacy_uri=legacy_uri,
+        )
+        response["filename"] = filename
+        return response
+
+    def upload_assets_to_the_cloud(self, user, original_pkg_components):
+        xml_with_pre = None
+        items = []
         with ZipFile(self.file.path) as optimised_fp:
             for item in optimised_fp.namelist():
                 name, ext = os.path.splitext(item)
 
+                component = original_pkg_components.get(item) or {}
                 with optimised_fp.open(item, "r") as optimised_item_fp:
                     content = optimised_item_fp.read()
 
                 if ext == ".xml":
                     xml_with_pre = get_xml_with_pre(content.decode("utf-8"))
 
-                component_data = original_pkg_components.get(item) or {}
-                self._save_component_in_cloud(
-                    user,
-                    item,
-                    content,
-                    ext,
-                    component_data,
-                    failures,
-                )
-        items = [dict(basename=c.basename, uri=c.uri) for c in self.components.all()]
-        detail = {"items": items, "failures": failures}
-        op.finish(user, completed=not failures, detail=detail)
-        return xml_with_pre
+                else:
+                    result = self.upload_to_the_cloud(
+                        user,
+                        item,
+                        ext,
+                        content,
+                        component.get("component_type") or "asset",
+                        component.get("lang"),
+                        component.get("legacy_uri"),
+                    )
+                    items.append(result)
+        return {"xml_with_pre": xml_with_pre, "items": items}
 
-    def _save_component_in_cloud(
-        self, user, item, content, ext, component_data, failures
-    ):
-        try:
-            response = minio_push_file_content(
-                content=content,
-                mimetype=mimetypes.types_map[ext],
-                object_name=f"{self.subdir}/{item}",
-            )
-            uri = response["uri"]
-        except Exception as e:
-            uri = None
-            failures.append(
-                dict(
-                    basename=item,
-                    error=str(e),
-                )
-            )
-        self.components.add(
-            SPSPkgComponent.create_or_update(
-                user=user,
-                sps_pkg=self,
-                uri=uri,
-                basename=item,
-                component_type=component_data.get("component_type"),
-                lang=component_data.get("lang"),
-                legacy_uri=component_data.get("legacy_uri"),
-            )
-        )
-
-    def _local_to_remote(self, xml_with_pre):
+    def upload_xml_to_the_cloud(self, user, xml_with_pre):
         replacements = {
             item.basename: item.uri
             for item in self.components.filter(uri__isnull=False).iterator()
@@ -736,53 +768,79 @@ class SPSPkg(CommonControlField, ClusterableModel):
             xml_assets = ArticleAssets(xml_with_pre.xmltree)
             xml_assets.replace_names(replacements)
 
-    def _save_xml_in_cloud(self, user, xml_with_pre, article_proc):
-        op = article_proc.start(user, "_save_xml_in_cloud")
+        content = xml_with_pre.tostring(pretty_print=True).encode("utf-8")
+
         filename = self.sps_pkg_name + ".xml"
-        try:
-            response = minio_push_file_content(
-                content=xml_with_pre.tostring(pretty_print=True).encode("utf-8"),
-                mimetype=mimetypes.types_map[".xml"],
-                object_name=f"{self.subdir}/{filename}",
-            )
-            uri = response["uri"]
-        except Exception as e:
-            uri = None
-        self.xml_uri = uri
-        self.save()
-        self.components.add(
-            SPSPkgComponent.create_or_update(
-                user=user,
-                sps_pkg=self,
-                uri=uri,
-                basename=filename,
-                component_type="xml",
-                lang=None,
-                legacy_uri=None,
-            )
+
+        result = self.upload_to_the_cloud(
+            user, filename, ".xml", content, "xml", lang=None, legacy_uri=None
         )
-        op.finish(user, completed=bool(uri), detail=response)
+        self.xml_uri = result.get("uri")
+        self.save()
+        return {"items": [result]}
+
+    def generate_article_html_pages(self):
+        try:
+            generator = HTMLGenerator.parse(
+                file=self.xml_uri,
+                valid_only=False,
+                xslt="3.0",
+            )
+            for lang in generator.languages:
+                suffix = f"-{lang}"
+                yield {
+                    "filename": f"{self.sps_pkg_name}{suffix}.html",
+                    "content": str(generator.generate(lang)),
+                    "lang": lang,
+                    "ext": ".html",
+                    "component_type": "html",
+                }
+        except Exception as exc:
+            logging.exception(f"{self.xml_uri} {exc}")
+
+    def upload_article_page_to_the_cloud(self, user):
+        items = []
+        for item in self.generate_article_html_pages():
+            lang = item["lang"]
+            content = item["content"].encode("utf-8")
+            PreviewArticlePage.create_or_update(
+                user,
+                self,
+                lang=Language.get_or_create(creator=user, code2=lang),
+                content=content,
+            )
+            response = self.upload_to_the_cloud(
+                user,
+                item["filename"],
+                item["ext"],
+                content,
+                item["component_type"],
+                lang,
+            )
+            items.append(response)
+        return {"items": items}
 
     def synchronize(self, user, article_proc):
-        zip_xml_file_path = self.file.path
+        pass
+        # zip_xml_file_path = self.file.path
 
-        logging.info(f"Synchronize {zip_xml_file_path}")
-        for response in pid_provider_app.request_pid_for_xml_zip(
-            zip_xml_file_path, user, is_published=self.is_public
-        ):
-            if not response["synchronized"]:
-                continue
+        # logging.info(f"Synchronize {zip_xml_file_path}")
+        # for response in pid_provider_app.request_pid_for_xml_zip(
+        #     zip_xml_file_path, user, is_published=self.is_public
+        # ):
+        #     if not response["synchronized"]:
+        #         continue
 
-            if response.get("v3") and self.pid_v3 != response.get("v3"):
-                # atualiza conteúdo de zip
-                with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
-                    zf.writestr(
-                        response["filename"],
-                        response["xml_with_pre"].tostring(pretty_print=True),
-                    )
+        #     if response.get("v3") and self.pid_v3 != response.get("v3"):
+        #         # atualiza conteúdo de zip
+        #         with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
+        #             zf.writestr(
+        #                 response["filename"],
+        #                 response["xml_with_pre"].tostring(pretty_print=True),
+        #             )
 
-                self._save_xml_in_cloud(user, response["xml_with_pre"], article_proc)
-                self.generate_article_html_page(user)
+        #         self.upload_xml_to_the_cloud(user, response["xml_with_pre"], article_proc)
+        #         self.upload_article_page_to_the_cloud(user, article_proc)
 
-            self.registered_in_core = response["synchronized"]
-            self.save()
+        #     self.registered_in_core = response["synchronized"]
+        #     self.save()
