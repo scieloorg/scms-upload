@@ -2,16 +2,28 @@ import logging
 
 from django.utils.translation import gettext_lazy as _
 
+from journal.models import JournalHistory
 from publication.api.publication import PublicationAPI
 from publication.utils.journal import build_journal
 
 
 def publish_journal(journal_proc, api_data):
     logging.info(f"publish_journal {journal_proc}")
+
+    journal = journal_proc.journal
+    journal_pid = journal_proc.pid
+    journal_acron = journal_proc.acron
+    journal_history = JournalHistory.objects.filter(
+        journal_collection__collection=journal_proc.collection,
+        journal_collection__journal=journal_proc.journal,
+    )
+
     payload = {}
 
     journal_payload_builder = JournalPayload(payload)
-    build_journal(journal_proc, journal_payload_builder)
+    build_journal(
+        journal_payload_builder, journal, journal_pid, journal_acron, journal_history
+    )
 
     api = PublicationAPI(**api_data)
     return api.post_data(payload)
@@ -146,7 +158,7 @@ class JournalPayload:
         self.data["short_title"] = short_title
 
     def add_journal_issns(self, scielo_issn, eletronic_issn, print_issn=None):
-        # self.data["scielo_issn"] = scielo_issn
+        self.data["scielo_issn"] = scielo_issn
         self.data["print_issn"] = print_issn
         self.data["eletronic_issn"] = eletronic_issn
 
@@ -207,7 +219,7 @@ class JournalPayload:
                     "reason": reason or "",
                 }
             )
-            # self.data["current_status"] = self.data["status_history"][-1].status
+            self.data["current_status"] = self.data["status_history"][-1]["status"]
 
     def add_mission(self, language, description):
         """
