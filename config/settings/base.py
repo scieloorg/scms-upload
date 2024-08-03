@@ -130,6 +130,7 @@ LOCAL_APPS = [
     "researcher",
     "upload",
     "pid_provider",
+    "team",
     "tracker",
 ]
 
