@@ -5,14 +5,20 @@ from wagtail.contrib.modeladmin.options import (
     ModelAdminGroup,
     modeladmin_register,
 )
-from wagtail.contrib.modeladmin.views import CreateView
+from wagtail.contrib.modeladmin.views import CreateView, EditView
 
 from config.menu import get_menu_order
 
-from .models import Issue
+from .models import TOC, Issue
 
 
 class IssueCreateView(CreateView):
+    def form_valid(self, form):
+        self.object = form.save_all(self.request.user)
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class TOCEditView(EditView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())
@@ -31,6 +37,7 @@ class IssueAdmin(ModelAdmin):
     list_display = (
         "journal",
         "publication_year",
+        "order",
         "volume",
         "number",
         "supplement",
@@ -52,16 +59,42 @@ class IssueAdmin(ModelAdmin):
     #     return qs.order_by("-updated")
 
 
-class IssueModelAdminGroup(ModelAdminGroup):
+class TOCAdmin(ModelAdmin):
+    model = TOC
+    inspect_view_enabled = True
+    menu_label = _("Table of contents sections")
+    edit_view_class = TOCEditView
     menu_icon = "folder"
-    menu_label = _("Issues")
-    # menu_order = get_menu_order("journal")
-    menu_order = 200
-    items = (
-        IssueAdmin,
-        # IssueProcAdmin,
+    menu_order = get_menu_order("issue")
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+
+    list_display = (
+        "issue",
+        "creator",
+        "created",
+        "updated_by",
+        "updated",
+    )
+    list_filter = ("ordered",)
+    search_fields = (
+        "issue__journal__title",
+        "issue__journal__official_journal__title",
+        "issue__volume",
+        "issue__number",
+        "issue__supplement",
+        "issue__publication_year",
     )
 
 
-# modeladmin_register(IssueModelAdminGroup)
-modeladmin_register(IssueAdmin)
+class IssueModelAdminGroup(ModelAdminGroup):
+    menu_icon = "folder"
+    menu_label = _("Issues")
+    menu_order = get_menu_order("issue")
+    items = (
+        IssueAdmin,
+        TOCAdmin,
+    )
+
+
+modeladmin_register(IssueModelAdminGroup)
