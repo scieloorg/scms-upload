@@ -11,7 +11,7 @@ SECRET_KEY = env(
     default="FMiraeekXCSl3zHfg7D4oHx7ufT46HRnwnsawKgTCC53BYajVkVzb8HhOvBOHakR",
 )
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
-ALLOWED_HOSTS = ["localhost", "0.0.0.0", "127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "0.0.0.0", "127.0.0.1", "192.168.1.98"]
 
 # CACHES
 # ------------------------------------------------------------------------------
@@ -66,3 +66,6 @@ INSTALLED_APPS += ["django_extensions"]  # noqa F405
 CELERY_TASK_EAGER_PROPAGATES = True
 # Your stuff...
 # ------------------------------------------------------------------------------
+
+JOURNAL_API_URL = f"http://{ALLOWED_HOSTS[-1]}:8009/api/v1/journal"
+ISSUE_API_URL = f"http://{ALLOWED_HOSTS[-1]}:8009/api/v1/issue"
