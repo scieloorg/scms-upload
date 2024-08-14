@@ -22,6 +22,7 @@ from journal.exceptions import (
     SubjectCreationOrUpdateError,
 )
 from journal.forms import OfficialJournalForm
+from location.models import Location
 
 
 class JournalSection(TextModel, CommonControlField):
@@ -265,6 +266,11 @@ class Journal(CommonControlField, ClusterableModel):
     nlm_title = models.CharField(max_length=265, null=True, blank=True)
     doi_prefix = models.CharField(max_length=16, null=True, blank=True)
     logo_url = models.URLField(null=True, blank=True)
+    contact_name = models.TextField(null=True, blank=True)
+    contact_address = models.TextField(_("Address"), null=True, blank=True)
+    contact_location = models.ForeignKey(
+        Location, on_delete=models.SET_NULL, null=True, blank=True
+    )
 
     def __unicode__(self):
         return self.title or self.short_title or str(self.official_journal)
@@ -424,14 +430,175 @@ class Journal(CommonControlField, ClusterableModel):
                 names.append(item.institution.name)
         return names
 
+    def add_email(self, email):
+        if email:
+            return JournalEmail.create_or_update(self, email)
 
-class Owner(Orderable, InstitutionHistory):
+    @property
+    def contact_email(self):
+        email = []
+        for item in self.journal_email.all():
+            email.append(item.email)
+        return ", ".join(email)
+
+    @property
+    def contact(self):
+        contact = dict(
+            name=self.contact_name,
+            address=self.contact_address,
+            city=None,
+            state=None,
+            country=None,
+            email=self.contact_email,
+        )
+        if self.contact_location:
+            cl = self.contact_location
+            contact.update(
+                dict(
+                    city=cl.city and cl.city.name,
+                    state=cl.state and cl.state.name,
+                    country=cl.country and cl.country.name,
+                )
+            )
+        return contact
+
+    @property
+    def subject_areas(self):
+        return [item.value for item in self.subject.all()]
+
+
+class JournalEmail(Orderable):
+    journal = ParentalKey(
+        Journal, on_delete=models.SET_NULL, related_name="journal_email", null=True
+    )
+    email = models.EmailField()
+
+    class Meta:
+        unique_together = [("journal", "email")]
+
+    @classmethod
+    def create(
+        cls,
+        journal=None,
+        email=None,
+    ):
+        try:
+            obj = cls()
+            obj.journal = journal
+            obj.email = email
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(journal, email)
+
+    @classmethod
+    def get(cls, journal, email):
+        if journal and email:
+            return cls.objects.get(journal=journal, email=email)
+        raise ValueError(f"Journal.get requires email and journal ({dict(journal=journal, email=email)})")
+
+    @classmethod
+    def create_or_update(
+        cls,
+        journal=None,
+        email=None,
+    ):
+        logging.info(f"Journal.create_or_update({journal})")
+        try:
+            obj = cls.get(journal, email)
+            obj.journal = journal
+            obj.email = email
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(journal, email)
+
+
+class BaseInstitutionHistory(InstitutionHistory):
+    class Meta:
+        abstract = True
+        unique_together = [("journal", "institution", "initial_date", "final_date")]
+
+    @classmethod
+    def get(cls, journal, institution, initial_date=None, final_date=None):
+        return cls.objects.get(
+            journal=journal,
+            institution=institution,
+            initial_date=initial_date,
+            final_date=final_date,
+        )
+
+    @classmethod
+    def create(
+        cls,
+        user,
+        journal,
+        institution,
+        initial_date=None,
+        final_date=None,
+    ):
+        # Institution
+        # check if exists the institution
+        try:
+            obj = cls()
+            obj.journal = journal
+            obj.institution = institution
+            obj.initial_date = initial_date
+            obj.final_date = final_date
+            obj.creator = user
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(
+                journal, institution, initial_date, final_date
+            )
+
+    @classmethod
+    def create_or_update(
+        cls,
+        user,
+        journal,
+        institution,
+        initial_date=None,
+        final_date=None,
+    ):
+        # Institution
+        # check if exists the institution
+        try:
+            return cls.get(
+                journal, institution, initial_date, final_date
+            )
+        except cls.MultipleObjectsReturned:
+            cls.objects.filter(
+                journal=journal,
+                institution=institution,
+                initial_date=initial_date,
+                final_date=final_date
+            ).delete()
+            return cls.create(
+                user,
+                journal,
+                institution,
+                initial_date,
+                final_date,
+            )
+        except cls.DoesNotExist:
+            return cls.create(
+                user,
+                journal,
+                institution,
+                initial_date,
+                final_date,
+            )
+
+
+class Owner(Orderable, BaseInstitutionHistory):
     journal = ParentalKey(
         Journal, related_name="owner", null=True, blank=True, on_delete=models.SET_NULL
     )
 
 
-class Publisher(Orderable, InstitutionHistory):
+class Publisher(Orderable, BaseInstitutionHistory):
     journal = ParentalKey(
         Journal,
         related_name="publisher",
@@ -441,7 +608,7 @@ class Publisher(Orderable, InstitutionHistory):
     )
 
 
-class Sponsor(Orderable, InstitutionHistory):
+class Sponsor(Orderable, BaseInstitutionHistory):
     journal = ParentalKey(
         Journal,
         related_name="sponsor",
@@ -457,6 +624,7 @@ class Mission(CommonControlField, HTMLTextModel):
     )
 
     class Meta:
+        unique_together = [("journal", "language")]
         indexes = [
             models.Index(
                 fields=[
@@ -465,15 +633,6 @@ class Mission(CommonControlField, HTMLTextModel):
             ),
         ]
 
-    @property
-    def data(self):
-        d = {}
-
-        if self.journal:
-            d.update(self.journal.data)
-
-        return d
-
     @classmethod
     def get(
         cls,
@@ -481,8 +640,31 @@ class Mission(CommonControlField, HTMLTextModel):
         language,
     ):
         if journal and language:
-            return cls.objects.filter(journal=journal, language=language)
+            return cls.objects.get(journal=journal, language=language)
         raise MissionGetError("Mission.get requires journal and language parameters")
+
+    @classmethod
+    def create(
+        cls,
+        user,
+        journal,
+        language,
+        mission_text,
+    ):
+        if user and journal and language and mission_text:
+            try:
+                obj = cls()
+                obj.creator = user
+                obj.text = mission_text or obj.text
+                obj.language = language or obj.language
+                obj.journal = journal or obj.journal
+                obj.save()
+                return obj
+            except IntegrityError:
+                return cls.get(journal, language)
+        raise MissionCreateOrUpdateError(
+            f"Mission.create requires parameters {dict(user=user, journal=journal, language=language, mission_text=mission_text)}"
+        )
 
     @classmethod
     def create_or_update(
@@ -492,25 +674,19 @@ class Mission(CommonControlField, HTMLTextModel):
         language,
         mission_text,
     ):
-        if not mission_text:
-            raise MissionCreateOrUpdateError(
-                "Mission.create_or_update requires mission_rich_text parameter"
-            )
         try:
             obj = cls.get(journal, language)
             obj.updated_by = user
-        except IndexError:
-            obj = cls()
-            obj.creator = user
-        except (MissionGetError, cls.MultipleObjectsReturned) as e:
-            raise MissionCreateOrUpdateError(
-                _("Unable to create or update journal {}").format(e)
-            )
-        obj.text = mission_text or obj.text
-        obj.language = language or obj.language
-        obj.journal = journal or obj.journal
-        obj.save()
-        return obj
+            obj.text = mission_text or obj.text
+            obj.language = language or obj.language
+            obj.journal = journal or obj.journal
+            obj.save()
+            return obj
+        except cls.MultipleObjectsReturned:
+            cls.objects.filter(journal=journal, language=language).delete()
+            return cls.create(user, journal, language, mission_text)
+        except cls.DoesNotExist:
+            return cls.create(user, journal, language, mission_text)
 
 
 class JournalCollection(CommonControlField, ClusterableModel):
@@ -752,8 +928,8 @@ class Subject(CommonControlField):
     @classmethod
     def create_or_update(
         cls,
-        code,
         user,
+        code,
     ):
         try:
             obj = cls.get(code=code)
