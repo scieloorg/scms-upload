@@ -4,17 +4,11 @@ def build_journal(builder, journal, journal_id, journal_acron, journal_history):
     builder.add_ids(journal_id)
     builder.add_dates(journal.created, journal.updated)
     builder.add_acron(journal_acron)
-    for publisher in journal.publisher.all():
-        builder.add_contact(
-            name=publisher.institution.name,
-            address=publisher.institution.location,
-            city=publisher.institution.location.city.name,
-            state=publisher.institution.location.state.name,
-            country=publisher.institution.location.country.name,
-        )
+
+    builder.add_contact(**journal.contact)
 
     for mission in journal.mission.all():
-        builder.add_mission(mission.language, mission.text)
+        builder.add_mission(mission.language.code2, mission.text)
 
     for journal_history in journal_history.all():
         if journal_history.event_type == "ADMITTED":
@@ -56,10 +50,22 @@ def build_journal(builder, journal, journal_id, journal_acron, journal_history):
     # builder.add_related_journals(previous_journal, next_journal_title)
     for sponsor in journal.sponsor.all():
         builder.add_sponsor(sponsor.institution.name)
-    for subject_area in journal.subject.all():
-        builder.add_thematic_scopes(
-            subject_categories=None,
-            subject_areas=subject_area.value,
-        )
+
+    names = []
+    for item in journal.owner.all():
+        name = item.institution.name
+        if name not in names:
+            names.append(name)
+            builder.add_publisher(name)
+    for item in journal.publisher.all():
+        name = item.institution.name
+        if name not in names:
+            names.append(name)
+            builder.add_publisher(name)
+
+    builder.add_thematic_scopes(
+        subject_categories=None,
+        subject_areas=journal.subject_areas,
+    )
 
     # builder.add_is_public()
