@@ -27,7 +27,9 @@ from journal.models import (
     Owner,
     Publisher,
     Subject,
+    Mission,
 )
+from location.models import Location
 from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
@@ -71,10 +73,24 @@ def create_or_update_journal(
     journal.license_code = classic_website_journal.permissions
     journal.nlm_title = classic_website_journal.title_nlm
     journal.doi_prefix = None
+    journal.contact_name = "; ".join(classic_website_journal.raw_publisher_names)
+    journal.contact_location = Location.create_or_update(
+        user=user,
+        city_name=classic_website_journal.publisher_city,
+        state_acronym=classic_website_journal.publisher_state,
+        country_acronym=classic_website_journal.publisher_country,
+    )
+    journal.contact_address = ", ".join(classic_website_journal.publisher_address)
+    journal.add_email(classic_website_journal.publisher_email)
     journal.save()
 
+    for item in classic_website_journal.mission:
+        language = Language.get_or_create(name=None, code2=item["language"], creator=user)
+        journal.mission.add(
+            Mission.create_or_update(user, journal, language, item["text"]))
+
     for code in classic_website_journal.subject_areas:
-        journal.subjects.add(Subject.create_or_update(user, code))
+        journal.subject.add(Subject.create_or_update(user, code))
 
     for publisher_name in classic_website_journal.raw_publisher_names:
         institution = Institution.get_or_create(
@@ -86,10 +102,8 @@ def create_or_update_journal(
             location=None,
             user=user,
         )
-        p = Publisher(journal=journal, institution=institution, creator=user)
-        p.save()
-        p = Owner(journal=journal, institution=institution, creator=user)
-        p.save()
+        journal.owner.add(Owner.create_or_update(user, journal, institution))
+        journal.publisher.add(Publisher.create_or_update(user, journal, institution))
 
     journal_proc.update(
         user=user,

@@ -15,11 +15,11 @@ from journal.models import (
     Owner,
     JournalCollection,
     JournalHistory
-)    
+)
 from migration import controller
 from proc.models import IssueProc, JournalProc
 from publication.api.issue import publish_issue
-from publication.api.journal import publish_journal 
+from publication.api.journal import publish_journal
 from publication.api.publication import get_api_data
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
@@ -151,7 +151,7 @@ def migrate_and_publish_issues(
 
 
 def create_or_update_journal(
-    journal_title, issn_electronic, issn_print, user, force_update
+    journal_title, issn_electronic, issn_print, user, force_update=None
 ):
     if force_update:
         return fetch_and_create_journal(
@@ -221,8 +221,7 @@ def fetch_and_create_journal(
             location=None,
             user=user,
         )
-        p = Publisher(journal=journal, institution=institution, creator=user)
-        p.save()
+        journal.publisher.add(Publisher.create_or_update(user, journal, institution))
 
     for item in result.get("owner") or []:
         institution = Institution.get_or_create(
@@ -234,8 +233,7 @@ def fetch_and_create_journal(
             location=None,
             user=user,
         )
-        p = Owner(journal=journal, institution=institution, creator=user)
-        p.save()
+        journal.owner.add(Owner.create_or_update(user, journal, institution))
 
     for item in result.get("scielo_journal") or []:
         try:
