@@ -26,6 +26,7 @@ def publish_journal(journal_proc, api_data):
     )
 
     api = PublicationAPI(**api_data)
+    logging.info(payload)
     return api.post_data(payload)
 
 
@@ -260,3 +261,7 @@ class JournalPayload:
 
     # def add_is_public(self):
     #     self.data["is_public"] = True
+
+    def add_publisher(self, name):
+        self.data.setdefault("institution_responsible_for", [])
+        self.data["institution_responsible_for"].append({"name": name})
