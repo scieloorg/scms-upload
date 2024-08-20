@@ -740,7 +740,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         filename = self.sps_pkg_name + ".xml"
         try:
             response = minio_push_file_content(
-                content=xml_with_pre.tostring(pretty_print=True).encode("utf-8"),
+                content=xml_with_pre.tostring(pretty_print=True).encode("utf-8").strip(),
                 mimetype=mimetypes.types_map[".xml"],
                 object_name=f"{self.subdir}/{filename}",
             )
