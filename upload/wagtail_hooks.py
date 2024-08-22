@@ -90,24 +90,34 @@ class PackageAdmin(ModelAdmin):
     )
 
     def get_queryset(self, request):
-        qs = (
-            super()
-            .get_queryset(request)
-            .filter(
-                status__in=[
-                    choices.PS_ENQUEUED_FOR_VALIDATION,
-                    choices.PS_VALIDATED_WITH_ERRORS,
-                    choices.PS_PENDING_CORRECTION,
-                    choices.PS_REJECTED,
-                ]
-            )
-        )
+        """
+        Para produtor de XML
+        PS_ENQUEUED_FOR_VALIDATION: aguardar término de validação
+        PS_VALIDATED_WITH_ERRORS: revisar os erros, finalizar o depósito
+        PS_PENDING_CORRECTION: corrigir os erros assumidos
+        PS_UNEXPECTED: pacote inesperado (artigo não requer correção ou errata, nem é artigo novo)
 
-        if self.permission_helper.user_can_analyse_error_validation_resolution(
+        Para Analista de Qualidade
+        apenas consulta
+        """
+        status = [
+            choices.PS_ENQUEUED_FOR_VALIDATION,
+            choices.PS_VALIDATED_WITH_ERRORS,
+            choices.PS_PENDING_CORRECTION,
+            choices.PS_UNEXPECTED,
+            # TODO choices.PS_REQUIRED_ERRATUM,
+            # TODO choices.PS_REQUIRED_UPDATE,
+        ]
+
+        params = {}
+        if self.permission_helper.user_can_finish_deposit(
             request.user, None
         ):
-            return qs
-        return qs.filter(creator=request.user)
+            params = {
+                "creator": request.user
+            }
+
+        return super().get_queryset(request).filter(status__in=status, **params)
 
 
 class QualityAnalysisPackageAdmin(ModelAdmin):
@@ -153,21 +163,30 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
     )
 
     def get_queryset(self, request):
-        qs = (
-            super()
-            .get_queryset(request)
-            .filter(
-                status__in=[
-                    choices.PS_PENDING_QA_DECISION,
-                    choices.PS_VALIDATED_WITH_ERRORS,
-                ]
-            )
-        )
+        """
+        Para Analista de Qualidade
+        PS_VALIDATED_WITH_ERRORS:
+            sem esperar o produtor de XML terminar o depósito,
+            revisar os erros, aceitar ou rejeitar pacote
+        PS_PENDING_QA_DECISION:
+            a pedido do produtor de XML,
+            revisar os erros, aceitar ou rejeitar pacote
 
-        if self.permission_helper.user_can_access_all_packages(request.user, None):
-            return qs
+        Para o produtor de XML, apenas consulta
+        """
+        status = [
+            choices.PS_VALIDATED_WITH_ERRORS,
+            choices.PS_PENDING_QA_DECISION,
+        ]
+        params = {}
+        if self.permission_helper.user_can_finish_deposit(
+            request.user, None
+        ):
+            params = {
+                "creator": request.user
+            }
 
-        return qs.filter(creator=request.user)
+        return super().get_queryset(request).filter(status__in=status, **params)
 
 
 class ApprovedPackageAdmin(ModelAdmin):
@@ -175,7 +194,7 @@ class ApprovedPackageAdmin(ModelAdmin):
 
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
-    menu_label = _("Approved package")
+    menu_label = _("Publication")
     menu_icon = "folder"
     menu_order = 200
     edit_view_class = ApprovedPackageEditView
@@ -192,7 +211,7 @@ class ApprovedPackageAdmin(ModelAdmin):
         "analyst",
         "toc_sections",
         "order",
-        "website_pub_date",
+        "scheduled_publication_date",
         "category",
         "status",
         "updated",
@@ -212,27 +231,33 @@ class ApprovedPackageAdmin(ModelAdmin):
     )
 
     def get_queryset(self, request):
-        qs = (
-            super()
-            .get_queryset(request)
-            .filter(
-                status__in=[
-                    choices.PS_APPROVED,
-                    choices.PS_APPROVED_WITH_ERRORS,
-                    choices.PS_PREPARE_SPSPKG,
-                    choices.PS_PREPARE_PUBLICATION,
-                    choices.PS_READY_TO_QA_WEBSITE,
-                    choices.PS_READY_TO_PUBLISH,
-                    choices.PS_SCHEDULED_PUBLICATION,
-                    choices.PS_PUBLISHED,
-                ]
-            )
-        )
+        """
+        Para Analista de Qualidade
+        PS_APPROVED:
+            publicar (opcionalmente editar data de publicação e a ordem do artigo no sumário)
+        PS_APPROVED_WITH_ERRORS:
+            publicar (opcionalmente editar data de publicação e a ordem do artigo no sumário)
+        PS_SCHEDULED_PUBLICATION:
+            - publicar (opcionalmente editar data de publicação e a ordem do artigo no sumário)
+            - despublicar (mudar status para rejeitado e mudar o status do artigo no site)
+        Para o produtor de XML, apenas consulta
+        """
+        status = [
+            choices.PS_READY_TO_PREVIEW,
+            choices.PS_PREVIEW,
+            choices.PS_PREPARE_SPSPKG,
+            choices.PS_PREPARE_PUBLICATION,
+            choices.PS_SCHEDULED_PUBLICATION,
+        ]
+        params = {}
+        if self.permission_helper.user_can_finish_deposit(
+            request.user, None
+        ):
+            params = {
+                "creator": request.user
+            }
 
-        if self.permission_helper.user_can_access_all_packages(request.user, None):
-            return qs
-
-        return qs.filter(creator=request.user)
+        return super().get_queryset(request).filter(status__in=status, **params)
 
 
 class XMLErrorReportAdmin(ModelAdmin):

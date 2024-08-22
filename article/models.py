@@ -332,7 +332,7 @@ class Article(ClusterableModel, CommonControlField):
             return
 
         if self.position:
-            return self.position
+            return
 
         position = TocSection.get_section_position(self.issue, self.sections) or 0
 
@@ -368,6 +368,9 @@ class Article(ClusterableModel, CommonControlField):
         # AS_PUBLISHED = "published"
         self.status = new_status or choices.AS_PUBLISHED
         self.save()
+
+    def get_zip_filename_and_content(self):
+        return self.sps_pkg.get_zip_filename_and_content()
 
 
 class ArticleDOIWithLang(Orderable, DOIWithLang):
@@ -418,7 +421,6 @@ class RelatedItem(CommonControlField):
 
 
 class RequestArticleChange(CommonControlField):
-    deadline = models.DateField(_("Deadline"), blank=False, null=False)
 
     change_type = models.CharField(
         _("Change type"),
@@ -427,25 +429,18 @@ class RequestArticleChange(CommonControlField):
         blank=False,
         null=False,
     )
-    comment = RichTextField(_("Comment"), max_length=512, blank=True, null=True)
-
+    comment = models.TextField(_("Comment"), blank=True, null=True)
     article = models.ForeignKey(
         Article, on_delete=models.CASCADE, blank=True, null=True
     )
-    pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True)
-    demanded_user = models.ForeignKey(
-        User, on_delete=models.CASCADE, blank=False, null=False
-    )
 
     panels = [
-        FieldPanel("pid_v3", classname="collapsible"),
-        FieldPanel("deadline", classname="collapsible"),
+        AutocompletePanel("article"),
         FieldPanel("change_type", classname="collapsible"),
-        AutocompletePanel("demanded_user", classname="collapsible"),
         FieldPanel("comment", classname="collapsible"),
     ]
 
     def __str__(self) -> str:
-        return f"{self.article or self.pid_v3} - {self.deadline}"
+        return f"{self.article}"
 
     base_form_class = RequestArticleChangeForm

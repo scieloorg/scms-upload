@@ -20,6 +20,7 @@ class QAPackageForm(CoreAdminModelForm):
         if cleaned_data:
             analyst = cleaned_data.get("analyst")
             qa_decision = cleaned_data.get("qa_decision")
+
             if not analyst and not qa_decision:
                 self.add_error(
                     "qa_decision",
@@ -29,19 +30,12 @@ class QAPackageForm(CoreAdminModelForm):
                 )
 
     def save_all(self, user):
-        qa_package = super().save(commit=False)
-        if qa_package.qa_decision:
-            qa_package.status = qa_package.qa_decision
-            if qa_package.is_approved:
-                if not qa_package.approved_date:
-                    qa_package.approved_date = datetime.utcnow()
+        qa_package = super().save_all(user)
 
         if not qa_package.analyst:
             qa_package.analyst = CollectionTeamMember.objects.get(user=user)
         if qa_package.analyst:
             qa_package.assignee = qa_package.analyst.user
-
-        qa_package.approved_date = qa_package.approved_date or datetime.utcnow()
 
         self.save()
 
@@ -49,7 +43,31 @@ class QAPackageForm(CoreAdminModelForm):
 
 
 class ApprovedPackageForm(CoreAdminModelForm):
-    pass
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data:
+            qa_decision = cleaned_data.get("qa_decision")
+            qa_comment = cleaned_data.get("qa_comment")
+            if qa_decision == choices.PS_PENDING_CORRECTION and not qa_comment.strip():
+                self.add_error(
+                    "qa_comment",
+                    _(
+                        "Justify your decision about the package"
+                    ),
+                )
+            # manter simples, versão sem possibilidade de agendamento
+            # scheduled_release_date = cleaned_data.get("scheduled_release_date")
+            # if qa_decision == choices.PS_SCHEDULED_PUBLICATION and not scheduled_release_date:
+            #     self.add_error(
+            #         "scheduled_release_date",
+            #         _(
+            #             "Inform the date to make article public"
+            #         ),
+            #     )
+
+    def save_all(self, user):
+        qa_package = super().save_all(user)
+        return qa_package
 
 
 class ValidationResultForm(CoreAdminModelForm):
@@ -60,14 +78,14 @@ class XMLErrorReportForm(CoreAdminModelForm):
     def clean(self):
         cleaned_data = super().clean()
         if cleaned_data:
-            if not cleaned_data.get("xml_producer_ack"):
+            if cleaned_data.get("xml_producer_ack") not in (False, True):
                 self.add_error(
                     "xml_producer_ack",
                     _("Inform if you finish or not the errors review"),
                 )
 
     def save_all(self, user):
-        obj = super().save(commit=False)
+        obj = super().save_all(user)
         if obj.package.creator == obj.updated_by:
             obj.package.save()
 

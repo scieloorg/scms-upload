@@ -8,7 +8,6 @@ from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from core.models import PressRelease
-from proc import controller as proc_controller
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
@@ -339,12 +338,13 @@ def task_publish_article(
 ):
     try:
         user = _get_user(user_id, username)
+        manager = None
         if upload_package_id:
-            proc = Package.objects.get(pk=upload_package_id)
+            manager = Package.objects.get(pk=upload_package_id)
         elif article_proc_id:
-            proc = ArticleProc.objects.get(pk=article_proc_id)
+            manager = ArticleProc.objects.get(pk=article_proc_id)
 
-        article = proc.article
+        article = manager.article
 
         for journal_proc in JournalProc.objects.filter(
             journal=article.journal
@@ -358,7 +358,7 @@ def task_publish_article(
                 continue
 
             api = PublicationAPI(
-                post_data_url=website.api_url_journal,
+                post_data_url=website.api_url_article,
                 get_token_url=website.api_get_token_url,
                 username=website.api_username,
                 password=website.api_password,
@@ -366,7 +366,13 @@ def task_publish_article(
             )
             api.get_token()
             api_data = api.data
-            logging.info(f"api_data: {api_data}")
+
+            response = publish_article(manager, api_data, journal_proc.pid)
+            if response.get("result") == "OK":
+                manager.update_status()
+                continue
+
+            api_data["post_data_url"] = website.api_url_journal
             journal_proc.publish(
                 user,
                 publish_journal,
@@ -387,19 +393,9 @@ def task_publish_article(
             )
 
             api_data["post_data_url"] = website.api_url_article
-            publish_article(proc, api_data, journal_proc.pid)
-            proc.update_status()
-
-            if website_kind == QA:
-                try:
-                    website = WebSiteConfiguration.get(
-                        purpose=PUBLIC,
-                        collection=journal_proc.collection,
-                    )
-                except WebSiteConfiguration.DoesNotExist:
-                    # se não existe a instância pública, só existe QA
-                    # muda status para PS_PUBLISHED / AS_PUBLISHED
-                    proc.update_status()
+            publish_article(manager, api_data, journal_proc.pid)
+            if response.get("result") == "OK":
+                manager.update_status()
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -408,7 +404,9 @@ def task_publish_article(
             exc_traceback=exc_traceback,
             detail=dict(
                 task="task_publish_article",
-                article=str(article),
+                item=str(manager),
+                article_proc_id=article_proc_id,
+                upload_package_id=article_proc_id,
                 website_kind=website_kind,
             ),
         )

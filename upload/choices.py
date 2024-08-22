@@ -8,45 +8,43 @@ from django.utils.translation import gettext as _
 
 # SYSTEM
 2.1. PS_ENQUEUED_FOR_VALIDATION --> 3
-2.2. PS_REJECTED --> 10
+2.2. PS_UNEXPECTED --> 10
 
 # SYSTEM
-3.1. PS_APPROVED --> 9
-3.2. PS_REJECTED --> 10
+3.1. PS_READY_TO_PREVIEW --> 13
+3.2. PS_PENDING_CORRECTION --> 10
 3.3. PS_VALIDATED_WITH_ERRORS --> 7
 
 # QA USER
-4.1. PS_PUBLISHED --> FIM
-4.2. PS_SCHEDULED_FOR_PUBLICATION --> 4.1
-
-# XML PRODUCTOR USER
-5.1. PS_PENDING_CORRECTION --> 10
-5.2. PS_PENDING_QA_DECISION --> 6
+4.1. PS_PUBLISHED --> 8
 
 # QA USER
 6.1. PS_PENDING_CORRECTION --> 10
-6.2. PS_APPROVED_WITH_ERRORS --> 9
+6.2. PS_READY_TO_PREVIEW --> 13
 
+# XML PRODUCTOR USER
 # SYSTEM / CONFIGURAÇÃO DO FLUXO
-7.1. PS_PENDING_DEPOSIT --> 5 (MENOR TOLERÂNCIA) - GARGALO NOS PRODUTORES
+7.1. PS_PENDING_CORRECTION --> 10
 7.2. PS_PENDING_QA_DECISION --> 6 (MAIS TOLERANTE - GARGALO NA UNIDADE SCIELO)
 
-# ANY USER
+# QA USER ON BEHALF ANY USER
 8.1. PS_REQUIRED_ERRATUM --> 11
 8.2. PS_REQUIRED_UPDATE --> 11
-
-# SYSTEM / CONFIGURAÇÃO DO FLUXO
-9.1 PS_READY_TO_QA_WEBSITE --> 12
-9.2 PS_APPROVED_WITH_ERRORS --> 9
-9.3 PS_APPROVED --> 9
 
 10. produtor de XML terá que corrigir e re-submeter
 
 # EDITOR | ?
 11.1. ASSIGN XML PRODUCTOR --> 10
 
-# EDITOR | ?
-12.1. ASSIGN XML PRODUCTOR --> 10
+# SYSTEM / QA USER
+13.1. PS_PREVIEW --> 14
+
+# QA USER
+14.1. PS_PENDING_CORRECTION --> 10
+14.2. PS_READY_TO_PUBLISH --> 4
+
+
+
 
 """
 PS_SUBMITTED = "submitted"
@@ -56,11 +54,12 @@ PS_APPROVED_WITH_ERRORS = "approved-with-errors"
 PS_PENDING_CORRECTION = "pending-correction"
 PS_PENDING_DEPOSIT = "pending-deposit"
 PS_PENDING_QA_DECISION = "pending-qa-decision"
-PS_REJECTED = "rejected"
+PS_UNEXPECTED = "unexpected"
 PS_APPROVED = "approved"
 PS_PREPARE_SPSPKG = "prepare-sps-pkg"
 PS_PREPARE_PUBLICATION = "prepare-publication"
-PS_READY_TO_QA_WEBSITE = "ready-to-qa"
+PS_READY_TO_PREVIEW = "ready-to-preview"
+PS_PREVIEW = "preview"
 PS_READY_TO_PUBLISH = "ready-to-publish"
 PS_SCHEDULED_PUBLICATION = "scheduled-publication"
 PS_PUBLISHED = "published"
@@ -69,34 +68,36 @@ PS_REQUIRED_ERRATUM = "required-erratum"
 PS_REQUIRED_UPDATE = "required-update"
 
 PACKAGE_STATUS = (
+    (PS_REQUIRED_ERRATUM, _("Required erratum")),
+    (PS_REQUIRED_UPDATE, _("Required update")),
     (PS_SUBMITTED, _("Submitted")),
     (PS_ENQUEUED_FOR_VALIDATION, _("Enqueued for validation")),
     (PS_VALIDATED_WITH_ERRORS, _("Validated with errors")),
-    (PS_APPROVED_WITH_ERRORS, _("Approved with errors")),
-    (PS_PENDING_CORRECTION, _("Pending for correction")),
-    (PS_PENDING_DEPOSIT, _("Pending deposit")),
+    # (PS_APPROVED_WITH_ERRORS, _("Approved with errors")),
+    # (PS_PENDING_DEPOSIT, _("Pending deposit")),
     (PS_PENDING_QA_DECISION, _("Pending quality analysis decision")),
     (PS_PENDING_CORRECTION, _("Pending for correction")),
-    (PS_REJECTED, _("Rejected")),
-    (PS_APPROVED, _("Approved")),
-    (PS_PREPARE_SPSPKG, _("Preparing SPS package")),
-    (PS_PREPARE_PUBLICATION, _("Prepare publication")),
-    (PS_READY_TO_QA_WEBSITE, _("Ready to QA website")),
-    (PS_READY_TO_PUBLISH, _("Ready to publish")),
+    (PS_UNEXPECTED, _("Unexpected")),
+    # (PS_APPROVED, _("Approved")),
+    # (PS_PREPARE_SPSPKG, _("Preparing SPS package")),
+    # (PS_PREPARE_PUBLICATION, _("Prepare publication")),
+    (PS_READY_TO_PREVIEW, _("Ready to preview")),
+    (PS_PREVIEW, _("Preview")),
     (PS_SCHEDULED_PUBLICATION, _("Scheduled publication")),
+    (PS_READY_TO_PUBLISH, _("Ready to publish")),
     (PS_PUBLISHED, _("Published")),
 )
 
 CRITICAL_ERROR_DECISION = (
-    (PS_REJECTED, _("Rejected")),
-    (PS_APPROVED_WITH_ERRORS, _("Approved with errors")),
+    (PS_PENDING_CORRECTION, _("Pending for correction")),
+    (PS_VALIDATED_WITH_ERRORS, _("Validated with errors")),
 )
 
 QA_DECISION = (
     (PS_PENDING_CORRECTION, _("Pending for correction")),
-    (PS_REJECTED, _("Rejected")),
-    (PS_APPROVED, _("Approved")),
-    (PS_APPROVED_WITH_ERRORS, _("Approved with errors")),
+    (PS_READY_TO_PREVIEW, _("Ready to preview")),
+    # (PS_SCHEDULED_PUBLICATION, _("Scheduled publication")),
+    (PS_READY_TO_PUBLISH, _("Ready to publish")),
 )
 
 # Model Package, Field category
@@ -110,7 +111,6 @@ PACKAGE_CATEGORY = (
     (PC_ERRATUM, _("Erratum")),
     (PC_NEW_DOCUMENT, _("New document")),
 )
-
 
 # Model ValidationResult, campo que agrupo tipos de erro de validação, VR = Validation Report
 VR_XML_OR_DTD = "xml_or_dtd"

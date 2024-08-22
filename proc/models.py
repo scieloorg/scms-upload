@@ -626,6 +626,10 @@ class BaseProc(CommonControlField):
             logging.info(f"Skip publish on {website_kind} {self.pid}")
             return
 
+        operation = self.start(
+            user, f"publish {self.migrated_data.content_type} {self} on {website_kind}"
+        )
+
         if website_kind == collection_choices.QA:
             self.qa_ws_status = tracker_choices.PROGRESS_STATUS_DOING
         else:
@@ -635,10 +639,10 @@ class BaseProc(CommonControlField):
         api_data = api_data or get_api_data(
             self.collection, self.migrated_data.content_type, website_kind
         )
-        operation = self.start(
-            user, f"publish {self.migrated_data.content_type} {self} on {website_kind}"
-        )
-        response = callable_publish(self, api_data)
+        if api_data.get("error"):
+            response = api_data
+        else:
+            response = callable_publish(self, api_data)
         completed = bool(response.get("result") == "OK")
         if completed:
             self.update_publication_stage()

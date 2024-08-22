@@ -4,6 +4,7 @@ import sys
 from django.conf import settings
 
 from collection.models import Collection
+from collection.choices import PUBLIC, QA
 from core.utils.requester import fetch_data
 from issue.models import Issue
 from journal.models import (
@@ -73,6 +74,13 @@ def migrate_and_publish_journals(
                 api_data=api_data,
                 force_update=force_update,
             )
+            journal_proc.publish(
+                user,
+                publish_journal,
+                website_kind=PUBLIC,
+                api_data=api_data,
+                force_update=force_update,
+            )
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -126,6 +134,13 @@ def migrate_and_publish_issues(
             issue_proc.publish(
                 user,
                 publish_issue,
+                api_data=api_data,
+                force_update=force_update,
+            )
+            issue_proc.publish(
+                user,
+                publish_issue,
+                website_kind=PUBLIC,
                 api_data=api_data,
                 force_update=force_update,
             )

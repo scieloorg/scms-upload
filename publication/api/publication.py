@@ -16,10 +16,15 @@ from publication.api import exceptions
 
 def get_api_data(collection, content_type, website_kind=None):
     website_kind = website_kind or collection_choices.QA
-    website = WebSiteConfiguration.get(
-        collection=collection,
-        purpose=website_kind,
-    )
+
+    try:
+        website = WebSiteConfiguration.get(
+            collection=collection,
+            purpose=website_kind,
+        )
+    except WebSiteConfiguration.DoesNotExist:
+        return {"error": f"Website does not exist: {collection} {website_kind}"}
+
     API_URLS = {
         "journal": website.api_url_journal,
         "issue": website.api_url_issue,

@@ -69,7 +69,7 @@ class UploadButtonHelper(ButtonHelper):
             classnames.extend(UploadButtonHelper.index_button_classnames)
 
         if (
-            obj.status in (choices.PS_PENDING_DEPOSIT, choices.PS_VALIDATED_WITH_ERRORS)
+            obj.status == choices.PS_VALIDATED_WITH_ERRORS
             and ph.user_can_finish_deposit(usr, obj)
             and url_name == "upload_package_modeladmin_inspect"
         ):

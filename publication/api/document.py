@@ -1,4 +1,5 @@
 import logging
+import json
 from datetime import datetime
 
 from django.utils.translation import gettext_lazy as _
@@ -8,18 +9,23 @@ from publication.utils.document import build_article
 
 
 def publish_article(article_proc, api_data, journal_pid=None):
+    """
+    {"failed": False, "id": article.id}
+    {"failed": True, "error": str(ex)}
+    """
     data = {}
     builder = ArticlePayload(data)
 
     try:
-        # ArticleProc
+        # somente se article_proc é instancia de ArticleProc
         journal_pid = article_proc.issue_proc.journal_proc.pid
-        order = article_proc.article.order
-        pub_date = article_proc.article.first_publication_date
     except AttributeError:
-        # Package
-        order = article_proc.order
-        pub_date = article_proc.website_pub_date
+        if not journal_pid:
+            raise ValueError(
+                "publication.api.document.publish_article requires journal_pid")
+
+    order = article_proc.article.order
+    pub_date = article_proc.article.first_publication_date or datetime.utcnow()
 
     build_article(builder, article_proc.article, journal_pid, order, pub_date)
 
@@ -30,7 +36,9 @@ def publish_article(article_proc, api_data, journal_pid=None):
         order=order,
         article_url=data.get("xml"),
     )
-    return api.post_data(data, kwargs)
+    ret = api.post_data(data, kwargs)
+    logging.info(ret)
+    return ret
 
 
 class ArticlePayload:

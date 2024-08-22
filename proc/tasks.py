@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from collection.choices import QA
+from collection.choices import QA, PUBLIC
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from migration import controller
@@ -287,6 +287,13 @@ def task_migrate_and_publish_article(
             article_proc.publish(
                 user,
                 publish_article,
+                api_data=article_api_data,
+                force_update=force_update,
+            )
+            article_proc.publish(
+                user,
+                publish_article,
+                website_kind=PUBLIC,
                 api_data=article_api_data,
                 force_update=force_update,
             )

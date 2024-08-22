@@ -11,9 +11,9 @@ services:
       - redis
       - postgres
       - mailhog
-      - pgbouncer
-    links:
-      - pgbouncer
+      # - pgbouncer
+    # links:
+    #   - pgbouncer
     volumes:
       - .:/app:z
     env_file:
@@ -23,19 +23,19 @@ services:
       - "8007:8000"
     command: /start
 
-  pgbouncer:
-    image: edoburu/pgbouncer:1.14.0
-    restart: always
-    container_name: upload_local_pgbouncer
-    environment:
-      - DATABASE_URL=postgres://GVRFlLmcCNfGLhsFvSnCioYOPJPYpyfj:BQ4hSUL4rdj5WZLdR8ilDLRQMvCtzo0caMaXDO0olGsmycQjlcZlTVK9DepZR8kk@postgres/uploaddb
-      - MAX_CLIENT_CONN=100
-    ports:
-      - 6437:5432
-    depends_on:
-      - postgres
-    links:
-      - postgres
+  # pgbouncer:
+  #   image: edoburu/pgbouncer:1.14.0
+  #   restart: always
+  #   container_name: upload_local_pgbouncer
+  #   environment:
+  #     - DATABASE_URL=postgres://GVRFlLmcCNfGLhsFvSnCioYOPJPYpyfj:BQ4hSUL4rdj5WZLdR8ilDLRQMvCtzo0caMaXDO0olGsmycQjlcZlTVK9DepZR8kk@postgres/uploaddb
+  #     - MAX_CLIENT_CONN=100
+  #   ports:
+  #     - 6437:5432
+  #   depends_on:
+  #     - postgres
+  #   links:
+  #     - postgres
 
   postgres:
     build:
@@ -62,11 +62,11 @@ services:
   #   ports:
   #       - "27017:27017"
 
-  adminer:
-    image: adminer
-    container_name: upload_local_adminer
-    ports:
-        - "8087:8080"
+  # adminer:
+  #   image: adminer
+  #   container_name: upload_local_adminer
+  #   ports:
+  #       - "8087:8080"
 
   # docs:
   #   image: upload_local_docs

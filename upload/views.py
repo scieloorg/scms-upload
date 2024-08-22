@@ -8,14 +8,14 @@ from wagtail.contrib.modeladmin.views import CreateView, EditView, InspectView
 
 from article.models import Article
 from issue.models import Issue
-from upload.tasks import task_process_approved_package, task_validate_original_zip_file
+from publication.tasks import task_publish_article
+from upload.controller import receive_package
+from upload.models import Package, choices
+from upload.tasks import task_validate_original_zip_file
 from upload.utils import file_utils
+from upload.utils import package_utils
+from upload.utils.package_utils import coerce_package_and_errors, render_html
 from upload.utils.xml_utils import XMLFormatError
-
-from .controller import receive_package
-from .models import Package, choices
-from .utils import package_utils
-from .utils.package_utils import coerce_package_and_errors, render_html
 
 
 class PackageCreateView(CreateView):
@@ -152,7 +152,7 @@ class QAPackageEditView(EditView):
     def form_valid(self, form):
         package = form.save_all(self.request.user)
 
-        process_approved_package(package, self.request)
+        process_qa_decision(package, self.request)
 
         return HttpResponseRedirect(self.get_success_url())
 
@@ -161,7 +161,7 @@ class ApprovedPackageEditView(EditView):
     def form_valid(self, form):
         package = form.save_all(self.request.user)
 
-        process_approved_package(package, self.request)
+        process_qa_decision(package, self.request)
 
         return HttpResponseRedirect(self.get_success_url())
 
@@ -184,7 +184,7 @@ def finish_deposit(request):
         if package.finish_deposit():
             # muda o status para a próxima etapa
             messages.success(request, _("Package has been deposited"))
-            process_approved_package(package, request)
+            process_qa_decision(package, request)
             return redirect("/admin/upload/package/")
 
         if not package.is_error_review_finished:
@@ -206,14 +206,8 @@ def finish_deposit(request):
         return redirect(f"/admin/upload/package/inspect/{package_id}")
 
 
-def process_approved_package(package, request):
-    if package.is_approved or package.is_allowed_to_change_publication_parameters:
-        task_process_approved_package.apply_async(
-            kwargs=dict(
-                user_id=request.user.id,
-                package_id=package.id,
-            )
-        )
+def process_qa_decision(package, request):
+    package.process_qa_decision(task_publish_article)
 
 
 def download_errors(request):

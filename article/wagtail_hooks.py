@@ -128,11 +128,8 @@ class RequestArticleChangeModelAdmin(ModelAdmin):
     list_display = (
         "creator",
         "created",
-        "deadline",
         "article",
-        "pid_v3",
         "change_type",
-        "demanded_user",
     )
     list_filter = ("change_type",)
     search_fields = (
@@ -145,7 +142,7 @@ class RequestArticleChangeModelAdmin(ModelAdmin):
         qs = super().get_queryset(request)
 
         if self.permission_helper.user_can_make_article_change(request.user, None):
-            return qs.filter(demanded_user=request.user)
+            return qs
 
         return qs
 
@@ -157,12 +154,12 @@ class ArticleModelAdminGroup(ModelAdminGroup):
     items = (
         ArticleModelAdmin,
         # RelatedItemModelAdmin,
-        # RequestArticleChangeModelAdmin,
+        RequestArticleChangeModelAdmin,
         # ApprovedArticleModelAdmin,
     )
 
 
-modeladmin_register(ArticleModelAdmin)
+modeladmin_register(ArticleModelAdminGroup)
 
 
 @hooks.register("register_admin_urls")

@@ -624,7 +624,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
             # saved original
             with open(zip_file_path, "rb") as fp:
                 self.save_file(filename, fp.read())
-        self.save()
 
     def save_file(self, name, content):
         try:
@@ -844,3 +843,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
         #     self.registered_in_core = response["synchronized"]
         #     self.save()
+
+    def get_zip_filename_and_content(self):
+        d = {}
+        with open(self.file.path, "rb") as fp:
+            d["content"] = fp.read()
+        d["filename"] = self.sps_pkg_name + ".zip"
+        return d

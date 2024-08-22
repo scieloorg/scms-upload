@@ -6,14 +6,7 @@ import sys
 from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
-from packtools.sps import exceptions as sps_exceptions
-from packtools.sps.models import package as sps_package
-from packtools.sps.models.article_assets import ArticleAssets
-from packtools.sps.models.article_renditions import ArticleRenditions
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
-from packtools.sps.utils import file_utils as sps_file_utils
-from packtools.sps.validation import article as sps_validation_article
-from packtools.sps.validation import journal as sps_validation_journal
 from packtools.sps.validation.xml_structure import StructureValidator
 
 from article import choices as article_choices
@@ -22,7 +15,6 @@ from collection import choices as collection_choices
 from config import celery_app
 from issue.models import Issue
 from journal.models import Journal
-from libs.dsm.publication.documents import get_document, get_similar_documents
 from publication.tasks import task_publish_article
 from tracker.models import UnexpectedEvent
 from upload import choices
@@ -160,11 +152,11 @@ def task_validate_assets(package_id, xml_path, package_files, xml_assets):
     # devido às tarefas serem executadas concorrentemente,
     # necessário verificar se todas tarefas finalizaram e
     # então finalizar o pacote
-    package.finish_validations()
-    if package.is_approved:
-        task_process_approved_package.apply_async(
-            kwargs=dict(package_id=package.id, package_status=package.status)
-        )
+    package.finish_validations(task_publish_article)
+    # if package.is_approved:
+    #     task_process_approved_package.apply_async(
+    #         kwargs=dict(package_id=package.id, package_status=package.status)
+    #     )
 
 
 @celery_app.task(priority=0)
@@ -201,14 +193,14 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
         )
 
     report.finish_validations()
-    package.finish_validations()
+    package.finish_validations(task_publish_article)
     # devido às tarefas serem executadas concorrentemente,
     # necessário verificar se todas tarefas finalizaram e
     # então finalizar o pacote
-    if package.is_approved:
-        task_process_approved_package.apply_async(
-            kwargs=dict(package_id=package.id, package_status=package.status)
-        )
+    # if package.is_approved:
+    #     task_process_approved_package.apply_async(
+    #         kwargs=dict(package_id=package.id, package_status=package.status)
+    #     )
 
 
 @celery_app.task(bind=True, priority=0)
@@ -338,11 +330,11 @@ def task_validate_xml_structure(
         # devido às tarefas serem executadas concorrentemente,
         # necessário verificar se todas tarefas finalizaram e
         # então finalizar o pacote
-        package.finish_validations()
-        if package.is_approved:
-            task_process_approved_package.apply_async(
-                kwargs=dict(package_id=package.id)
-            )
+        package.finish_validations(task_publish_article)
+        # if package.is_approved:
+        #     task_process_approved_package.apply_async(
+        #         kwargs=dict(package_id=package.id)
+        #     )
 
 
 @celery_app.task(bind=True, priority=0)
@@ -375,20 +367,20 @@ def task_validate_xml_content(
         )
 
 
-@celery_app.task(bind=True, priority=0)
-def task_process_approved_package(
-    self,
-    package_id,
-    user_id=None,
-):
-    package = Package.objects.get(pk=package_id)
-    package.process_approved_package(user=User.objects.get(pk=user_id))
-    task_publish_article.apply_async(
-        kwargs=dict(
-            user_id=user_id,
-            username=None,
-            api_data=None,
-            website_kind=collection_choices.QA,
-            upload_package_id=package.id,
-        )
-    )
+# @celery_app.task(bind=True, priority=0)
+# def task_process_approved_package(
+#     self,
+#     package_id,
+#     user_id=None,
+# ):
+#     package = Package.objects.get(pk=package_id)
+#     package.process_approved_package(user=User.objects.get(pk=user_id))
+#     task_publish_article.apply_async(
+#         kwargs=dict(
+#             user_id=user_id,
+#             username=None,
+#             api_data=None,
+#             website_kind=collection_choices.QA,
+#             upload_package_id=package.id,
+#         )
+#     )

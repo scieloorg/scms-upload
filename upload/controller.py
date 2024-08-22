@@ -35,7 +35,11 @@ from upload.utils import file_utils, package_utils, xml_utils
 pp = PidRequester()
 
 
-class PackageError(Exception):
+class UnexpectedPackageError(Exception):
+    ...
+
+
+class PackageDataError(Exception):
     ...
 
 
@@ -56,6 +60,9 @@ def receive_package(request, package):
         user = request.user
         response = {}
         for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
+            package.xml_name = xml_with_pre.filename
+            package.save()
+
             response = _check_article_and_journal(xml_with_pre, user=user)
             logging.info(response)
             if response.get("xml_changed"):
@@ -163,7 +170,7 @@ def _check_article_and_journal(xml_with_pre, user):
         response = pp.is_registered_xml_with_pre(xml_with_pre, xml_with_pre.filename)
         logging.info(f"is_registered_xml_with_pre: {response}")
         # verifica se o XML é esperado (novo, requer correção, requer atualização)
-        _check_package_is_expected(response)
+        _check_package_is_expected(response, xml_with_pre.sps_pkg_name)
         logging.info(f"_check_package_is_expected: {response}")
 
         # verifica se journal e issue estão registrados
@@ -181,40 +188,51 @@ def _check_article_and_journal(xml_with_pre, user):
 
         response["package_status"] = choices.PS_ENQUEUED_FOR_VALIDATION
         return response
-    except PackageError as e:
-        response["package_status"] = choices.PS_REJECTED
+    except UnexpectedPackageError as e:
+        response["package_status"] = choices.PS_UNEXPECTED
+        response["blocking_error"] = str(e)
+        return response
+    except PackageDataError as e:
+        response["package_status"] = choices.PS_PENDING_CORRECTION
         response["blocking_error"] = str(e)
         return response
 
 
-def _check_package_is_expected(response):
+def _check_package_is_expected(response, sps_pkg_name):
 
     try:
         article = Article.objects.get(pid_v3=response["v3"])
     except (Article.DoesNotExist, KeyError):
-        response["article"] = None
-        response["package_category"] = choices.PC_NEW_DOCUMENT
+        # artigo novo, inédito no sistema
+        # buscar se o último pacote está pendente de correção, então é aceitável
+        previous_package = (
+            Package.objects.filter(name=sps_pkg_name).order_by("-created").first()
+        )
+        if not previous_package or previous_package.status == choices.PS_PENDING_CORRECTION:
+            response["article"] = None
+            response["package_category"] = choices.PC_NEW_DOCUMENT
+            return
+        raise UnexpectedPackageError(
+            f"{sps_pkg_name} status={previous_package.status}. Unexpected updates."
+        )
     else:
-        try:
-            previous_package = (
-                Package.objects.filter(article=article).order_by("-created").first()
-            )
-            if previous_package.status in (
-                choices.PS_REJECTED,
-                choices.PS_PENDING_CORRECTION,
-            ):
+        previous_package = (
+            Package.objects.filter(article=article).order_by("-created").first()
+        )
+        if previous_package:
+            if previous_package.status == choices.PS_PENDING_CORRECTION:
                 response["previous_package"] = previous_package.expiration_date
                 if previous_package.expiration_date < datetime.utcnow():
-                    raise PackageError(
+                    raise UnexpectedPackageError(
                         f"The package is late. It was expected until {previous_package.expiration_date}"
                     )
-            else:
-                raise PackageError(
+            elif previous_package.status not in (
+                choices.PS_REQUIRED_ERRATUM,
+                choices.PS_REQUIRED_UPDATE,
+            ):
+                raise UnexpectedPackageError(
                     f"There is a previous package in progress ({previous_package.status}) for {article}"
                 )
-        except (AttributeError, Package.DoesNotExist):
-            # article was entered through migration, not through upload
-            pass
 
         response["article"] = article
         if article.status == article_choices.AS_REQUIRE_UPDATE:
@@ -227,7 +245,7 @@ def _check_package_is_expected(response):
             article.save()
         else:
             response["package_category"] = choices.PC_UPDATE
-            raise PackageError(
+            raise UnexpectedPackageError(
                 f"Package is rejected because the article status is: {article.status}"
             )
 
@@ -244,7 +262,7 @@ def _check_journal(response, xmltree, user):
         journal_title, issn_electronic, issn_print, user
     )
     if not response["journal"]:
-        raise PackageError(
+        raise PackageDataError(
             f"Not registered journal: {journal_title} {issn_electronic} {issn_print}"
         )
 
@@ -255,7 +273,7 @@ def _check_issue(response, xmltree, user):
         response["journal"], xml.volume, xml.suppl, xml.number, user
     )
     if not response["issue"]:
-        raise PackageError(
+        raise PackageDataError(
             f"Not registered issue: {response['journal']} {xml.volume} {xml.number} {xml.suppl}"
         )
 
@@ -266,13 +284,13 @@ def _check_xml_and_registered_data_compability(response):
     if article:
         journal = response["journal"]
         if journal is not article.journal:
-            raise PackageError(
+            raise PackageDataError(
                 f"{article.journal} (registered) differs from {journal} (XML)"
             )
 
         issue = response["issue"]
         if issue is not article.issue:
-            raise PackageError(
+            raise PackageDataError(
                 f"{article.issue} (registered) differs from {issue} (XML)"
             )
 

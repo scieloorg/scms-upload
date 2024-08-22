@@ -29,6 +29,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article import choices as article_choices
 from article.models import Article
+
 from collection.models import Collection
 from core.models import CommonControlField
 from issue.models import Issue
@@ -106,6 +107,11 @@ class Package(CommonControlField, ClusterableModel):
         null=True,
         blank=True,
     )
+    qa_comment = models.TextField(
+        _("Quality analysis comment"),
+        null=True,
+        blank=True,
+    )
     analyst = models.ForeignKey(
         CollectionTeamMember, blank=True, null=True, on_delete=models.SET_NULL
     )
@@ -152,9 +158,6 @@ class Package(CommonControlField, ClusterableModel):
     )
 
     order = models.PositiveSmallIntegerField(default=0)
-    approved_date = models.DateField(null=True, blank=True)
-    website_pub_date = models.DateField(null=True, blank=True)
-    xml_pub_date = models.DateField(null=True, blank=True)
     pid_v2 = models.CharField(max_length=23, null=True, blank=True)
 
     panels = [
@@ -223,16 +226,10 @@ class Package(CommonControlField, ClusterableModel):
     def save(self, *args, **kwargs):
         if not self.expiration_date:
             self.expiration_date = date.today() + timedelta(days=30)
-        if self.status in (choices.PS_REJECTED, choices.PS_PENDING_CORRECTION):
-            if self.article:
-                self.article.update_status()
-        if not self.qa_decision and self.status in (
-            choices.PS_REJECTED,
-            choices.PS_PENDING_CORRECTION,
-            choices.PS_APPROVED,
-            choices.PS_APPROVED_WITH_ERRORS,
-        ):
-            self.qa_decision = self.status
+
+        if self.status == choices.PS_PENDING_CORRECTION and self.article:
+            # volta article.status para o status antes da submissão do pacote
+            self.article.update_status()
 
         super(Package, self).save(*args, **kwargs)
 
@@ -265,34 +262,6 @@ class Package(CommonControlField, ClusterableModel):
             return cls.objects.get(pk=pkg_id)
         if article:
             return cls.objects.get(article=article)
-
-    @classmethod
-    def create(cls, user_id, file, article_id=None, category=None, status=None):
-        obj = cls()
-        obj.article_id = article_id
-        obj.creator_id = user_id
-        obj.created = datetime.utcnow()
-        obj.file = file
-        obj.category = category
-        obj.status = status
-        obj.qa_decision = None
-        obj.save()
-        return obj
-
-    @classmethod
-    def create_or_update(cls, user_id, file, article=None, category=None, status=None):
-        try:
-            obj = cls.get(article=article)
-            obj.article = article
-            obj.file = file
-            obj.category = category
-            obj.status = status
-            obj.save()
-            return obj
-        except cls.DoesNotExist:
-            return cls.create(
-                user_id, file, article_id=article.id, category=category, status=status
-            )
 
     @property
     def data(self):
@@ -334,7 +303,7 @@ class Package(CommonControlField, ClusterableModel):
             return False
         return True
 
-    def finish_validations(self):
+    def finish_validations(self, task_publish_article=None):
         """
         Finaliza as validações do pacote.
 
@@ -346,8 +315,8 @@ class Package(CommonControlField, ClusterableModel):
             None
 
         O status do pacote é atualizado com base nas seguintes regras:
-        - Se houver erros bloqueadores, o status será definido como 'PS_REJECTED'.
-        - Se não houver nenhum problema, o status será definido como 'PS_APPROVED'.
+        - Se houver erros críticos, o status será definido como 'PS_PENDING_CORRECTION'.
+        - Se não houver nenhum problema, o status será definido como 'PS_READY_TO_PREVIEW'.
         - Se houver problemas não bloqueadores, o status será definido como 'PS_VALIDATED_WITH_ERRORS'.
         """
         if not self.is_validation_finished:
@@ -366,8 +335,17 @@ class Package(CommonControlField, ClusterableModel):
         if self.blocking_errors:
             # pacote tem erros indiscutíveis
             self.status = UploadValidator.get_decision_for_blocking_errors()
-        elif metrics["total_validations"] == 0:
-            self.status = choices.PS_APPROVED
+        elif (
+            metrics["total_validations"] > 0
+            and (metrics["total_xml_issues"] + metrics["total_pkg_issues"]) == 0
+        ):
+            # pacote sem erros identificados no XML
+            self.status = choices.PS_READY_TO_PREVIEW
+            if task_publish_article:
+                self.qa_decision = choices.PS_READY_TO_PREVIEW
+                self.save()
+                self.prepare_preview(None, task_publish_article)
+                return
         else:
             # pacote tem problemas que podem ser ou não erros
             # depende de uma decisão manual do produtor do XML e do analista
@@ -461,39 +439,35 @@ class Package(CommonControlField, ClusterableModel):
         if self.status == choices.PS_VALIDATED_WITH_ERRORS:
             return _("The XML producer is reviewing the errors")
 
-        if (
-            self.status == choices.PS_PENDING_CORRECTION
-            or self.status == choices.PS_REJECTED
-        ):
+        if self.status == choices.PS_PENDING_CORRECTION:
             return _("The XML producer must correct the package and submit again")
 
         metrics = self.metrics
-        if self.status == choices.PS_PENDING_DEPOSIT:
-            if self.is_error_review_finished:
-                msgs = []
-                if metrics["total_contested_xml_errors"]:
-                    msgs.append(
-                        _("The XML producer concluded that {} are not errors").format(
-                            metrics["total_contested_xml_errors"]
-                        )
+        if self.is_error_review_finished:
+            msgs = []
+            if metrics["total_contested_xml_errors"]:
+                msgs.append(
+                    _("The XML producer concluded that {} are not errors").format(
+                        metrics["total_contested_xml_errors"]
                     )
-                if metrics["total_declared_impossible_to_fix"]:
-                    msgs.append(
-                        _(
-                            "The XML producer concluded that {} are impossible to fix"
-                        ).format(metrics["total_declared_impossible_to_fix"])
-                    )
-                if not self.is_acceptable_package:
-                    # <!-- User must finish the error review -->
-                    msgs.append(
-                        _("The XML producer must correct the package and submit again")
-                    )
+                )
+            if metrics["total_declared_impossible_to_fix"]:
+                msgs.append(
+                    _(
+                        "The XML producer concluded that {} are impossible to fix"
+                    ).format(metrics["total_declared_impossible_to_fix"])
+                )
+            if not self.is_acceptable_package:
+                # <!-- User must finish the error review -->
+                msgs.append(
+                    _("The XML producer must correct the package and submit again")
+                )
 
-                else:
-                    msgs.append(_("Finish the deposit"))
-                return ". ".join(msgs)
             else:
-                return _("Review and comment the errors")
+                msgs.append(_("Finish the deposit"))
+            return ". ".join(msgs)
+        else:
+            return _("Review and comment the errors")
 
     @property
     def is_error_review_finished(self):
@@ -513,11 +487,9 @@ class Package(CommonControlField, ClusterableModel):
 
     def finish_deposit(self):
         """
-        Finaliza o depósito do pacote.
-
-        Avalia se o depósito do pacote pode ser finalizado com base em
-        critérios específicos, como a existência de erros no XML,
-        a conclusão da revisão de erros e a aceitabilidade do pacote.
+        Para finalizar o depósito, o usuário terá que finalizar a revisão
+        dos erros e anotar uma resposta para cada um, ou se apenas 1 resposta
+        indicar concordância com o erro.
 
         Retorna:
             bool: True se o depósito for finalizado com sucesso, False caso contrário.
@@ -532,10 +504,6 @@ class Package(CommonControlField, ClusterableModel):
         if not self.status == choices.PS_VALIDATED_WITH_ERRORS:
             return False
 
-        if not self.is_error_review_finished:
-            # não pode finalizar, se não terminar a revisão ou ...
-            return False
-
         metrics = self.metrics
         if metrics.get("reaction_to_fix"):
             # pode finalizar, se aceitar pelo menos 1 erro no XML ou ...
@@ -543,6 +511,12 @@ class Package(CommonControlField, ClusterableModel):
             self.save()
             return True
 
+        # nenhum erro foi aceito ou revisão dos erros não iniciou
+        if not self.is_error_review_finished:
+            # não pode finalizar, se não terminar a revisão ou ...
+            return False
+
+        # revisão de erros finalizou
         if self.is_acceptable_package:
             # pode finalizar, se a quantidade de erros é tolerável
             # para passar para uma avaliação manual
@@ -550,10 +524,10 @@ class Package(CommonControlField, ClusterableModel):
             self.save()
             return True
 
-        # não pode finalizar, devido às correções pendentes
+        # pode finalizar, se a quantidade de erros não é tolerável
         self.status = choices.PS_PENDING_CORRECTION
         self.save()
-        return False
+        return True
 
     @property
     def is_acceptable_package(self):
@@ -572,26 +546,21 @@ class Package(CommonControlField, ClusterableModel):
         if not self.is_validation_finished:
             return False
 
-        if self.blocking_errors:
-            return False
-
         metrics = self.metrics
 
-        if UploadValidator.check_max_xml_errors_percentage(
-            self.xml_errors_percentage
-        ) and UploadValidator.check_max_xml_warnings_percentage(
-            self.xml_warnings_percentage
-        ):
-            # avalia os números sem a resposta da revisão de erros
-            return True
-
         if self.is_error_review_finished:
-            # avalia os números da resposta da revisão de erros
+            # avalia os números de erros, deduzindo os falsos positivos
             return UploadValidator.check_max_xml_errors_percentage(
                 self.contested_xml_errors_percentage
             ) and UploadValidator.check_max_impossible_to_fix_percentage(
                 self.declared_impossible_to_fix_percentage
             )
+        # avalia os números de erros, sem deduzir os falsos positivos
+        return UploadValidator.check_max_xml_errors_percentage(
+            self.xml_errors_percentage
+        ) and UploadValidator.check_max_xml_warnings_percentage(
+            self.xml_warnings_percentage
+        )
 
     def get_errors_report_content(self):
         filename = self.name + f"-{report_datetime()}-errors.csv"
@@ -638,40 +607,75 @@ class Package(CommonControlField, ClusterableModel):
 
         return {"content": content, "filename": filename, "columns": fieldnames}
 
-    def process_approved_package(self, user):
-        logging.info(f"process_approved_package - status: {self.status}")
-
-        save = False
-
-        if self.is_allowed_to_change_publication_parameters:
-            self.updated_by = user
-            self.status = choices.PS_PREPARE_SPSPKG
-
-            if not self.approved_date:
-                self.approved_date = datetime.utcnow()
-
-            if not self.order and self.article:
-                # se package.order is None, regasta de article.order
-                self.order = self.article.order
-
-            if not self.website_pub_date:
-                if self.article:
-                    # se not package.website_pub_date, regasta de article.first_publication_date
-                    self.website_pub_date = self.article.first_publication_date
-
+    def process_qa_decision(self, user, task):
+        if self.qa_decision == choices.PS_PENDING_CORRECTION:
+            self.status = self.qa_decision
             self.save()
+            return
+
+        if self.qa_decision == choices.PS_READY_TO_PREVIEW:
+            self.status = self.qa_decision
+            self.save()
+            self.prepare_preview(user, task)
+            return
+
+        if self.qa_decision == choices.AS_READY_TO_PUBLISH:
+            self.status = self.qa_decision
+            self.save()
+            self.prepare_publication(user, task)
+
+    def prepare_preview(self, user, task_publish_article):
+        logging.info(f"prepare_preview - status: {self.status}")
+
+        if self.qa_decision != choices.PS_READY_TO_PREVIEW:
+            return
+
+        user = user or self.updated_by or self.creator
 
         self.prepare_sps_package(user)
-        self.prepare_article_publication(user)
+        self.set_article_order(user)
 
-    def update_xml_file(self, xml_with_pre):
-        changed = False
+        if task_publish_article:
+            task_publish_article.apply_async(
+                kwargs=dict(
+                    user_id=user.id,
+                    username=user.username,
+                    api_data=None,
+                    website_kind="QA",
+                    article_proc_id=None,
+                    upload_package_id=self.id,
+                )
+            )
 
-        if not self.order:
-            try:
-                self.order = int(xml_with_pre.order or xml_with_pre.fpage)
-            except (TypeError, ValueError):
-                pass
+    def prepare_publication(self, user, task_publish_article):
+        logging.info(f"prepare_preview - status: {self.status}")
+
+        if self.qa_decision != choices.PS_READY_TO_PUBLISH:
+            return
+
+        user = user or self.updated_by or self.creator
+
+        self.prepare_sps_package(user)
+        self.set_article_order(user)
+
+        if task_publish_article:
+            task_publish_article.apply_async(
+                kwargs=dict(
+                    user_id=user.id,
+                    username=user.username,
+                    api_data=None,
+                    website_kind="PUBLIC",
+                    article_proc_id=None,
+                    upload_package_id=self.id,
+                )
+            )
+
+    def update_xml_file(self, xml_with_pre, first_release_date):
+        """
+        Se aplicável, atualiza o XML com a data de publicação do artigo
+        """
+
+        release_date = first_release_date or datetime.utcnow()
 
         try:
             article_publication_date = xml_with_pre.article_publication_date
@@ -679,27 +683,16 @@ class Package(CommonControlField, ClusterableModel):
         except Exception as e:
             article_publication_date = None
 
-        if not self.website_pub_date:
-            try:
-                self.website_pub_date = article_publication_date
-            except XMLWithPreArticlePublicationDateError as e:
-                self.website_pub_date = UploadValidator.calculate_publication_date(
-                    datetime.utcnow()
-                )
-
-        if self.website_pub_date != article_publication_date:
+        if article_publication_date != release_date:
             # atualiza a data de publicação do artigo no site público
             xml_with_pre.article_publication_date = {
-                "year": self.website_pub_date.year,
-                "month": self.website_pub_date.month,
-                "day": self.website_pub_date.day,
+                "year": release_date.year,
+                "month": release_date.month,
+                "day": release_date.day,
             }
-            changed = True
 
-        if changed:
             xml_with_pre.update_xml_in_zip_file()
-
-        return changed
+            return True
 
     def get_or_generate_pid_v2(self):
         issue_pid = IssueProc.get_or_generate_issue_pid(self.issue)
@@ -712,7 +705,7 @@ class Package(CommonControlField, ClusterableModel):
         # TODO components, texts
         for xml_with_pre in XMLWithPre.create(path=self.file.path):
             if (
-                self.update_xml_file(xml_with_pre)
+                self.update_xml_file(xml_with_pre, self.article and self.article.first_publication_date)
                 or not self.sps_pkg
                 or not self.sps_pkg.valid_components
             ):
@@ -733,6 +726,9 @@ class Package(CommonControlField, ClusterableModel):
                     texts=texts,
                     article_proc=self,
                 )
+                save = True
+
+            if save:
                 self.save()
 
     def start(self, user, name):
@@ -742,42 +738,31 @@ class Package(CommonControlField, ClusterableModel):
         # return operation
         return UploadProcResult.start(user, self, name)
 
-    @property
-    def is_approved(self):
-        return self.status in (choices.PS_APPROVED, choices.PS_APPROVED_WITH_ERRORS)
-
     def update_sps_pkg_status(self):
-        # conseguiu registrar no minio
+        # completou sps package
         # TODO melhora a atribuição do status
-        self.status = choices.PS_PREPARE_PUBLICATION
-        self.save()
+        pass
 
-    def prepare_article_publication(self, user):
-        logging.info(f"prepare_article_publication - status: {self.status}")
+    def set_article_order(self, user):
+        logging.info(f"set_article_order - status: {self.status}")
         self.article = Article.create_or_update(
             user, self.sps_pkg, self.issue, self.journal or self.issue.journal
         )
+        # atualizar article.position com o valor de order fornecido via formulario
         self.article.set_position(self.order)
+
+        # atualizar package.order com article.order, cujo valor position or fpage
         self.order = self.article.order
         self.save()
 
-    def update_status(self, new_status=None):
-        self.status = new_status or choices.PS_PUBLISHED
-        self.save()
-        self.article.update_status()
-
-    @property
-    def is_allowed_to_change_publication_parameters(self):
-        return self.status in (
-            choices.PS_APPROVED,
-            choices.PS_APPROVED_WITH_ERRORS,
-            choices.PS_PREPARE_SPSPKG,
-            choices.PS_PREPARE_PUBLICATION,
-            choices.PS_READY_TO_QA_WEBSITE,
-            choices.PS_READY_TO_PUBLISH,
-            choices.PS_SCHEDULED_PUBLICATION,
-            choices.PS_PUBLISHED,
-        )
+    def update_status(self):
+        if self.qa_decision == choices.PS_READY_TO_PREVIEW:
+            self.status = choices.PS_PREVIEW
+            self.save()
+        elif self.qa_decision == choices.PS_READY_TO_PUBLISH:
+            self.status = choices.PS_PUBLISHED
+            self.save()
+            self.article.update_status()
 
     @property
     def toc_sections(self):
@@ -803,6 +788,7 @@ class QAPackage(Package):
         FieldPanel("status", read_only=True),
         AutocompletePanel("analyst"),
         FieldPanel("qa_decision"),
+        FieldPanel("qa_comment"),
     ]
 
     base_form_class = QAPackageForm
@@ -812,15 +798,15 @@ class QAPackage(Package):
 
 
 class ApprovedPackage(Package):
+    # Nome mais adequado é pronto para previsualizar
 
     panels = [
         FieldPanel("status", read_only=True),
         AutocompletePanel("analyst", read_only=True),
-        FieldPanel("qa_decision", read_only=True),
-        FieldPanel("approved_date", read_only=True),
+        FieldPanel("qa_decision"),
+        FieldPanel("qa_comment"),
         FieldPanel("order"),
-        FieldPanel("website_pub_date"),
-        FieldPanel("pid_v2"),
+        # FieldPanel("scheduled_release_date"),
     ]
 
     base_form_class = ApprovedPackageForm
