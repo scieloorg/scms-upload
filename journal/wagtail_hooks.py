@@ -63,7 +63,11 @@ class JournalAdmin(ModelAdmin):
     exclude_from_explorer = False
 
     list_display = ("title", "short_title")
-    search_fields = ("official_journal__issn_electronic", "official_journal__issn_print", "short_title")
+    search_fields = (
+        "official_journal__issn_electronic",
+        "official_journal__issn_print",
+        "short_title",
+    )
 
 
 class JournalModelAdminGroup(ModelAdminGroup):

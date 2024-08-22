@@ -7,7 +7,6 @@ from pid_provider.provider import PidProvider
 from pid_provider.requester import PidRequester
 from proc.models import ArticleProc
 
-
 User = get_user_model()
 
 

@@ -60,7 +60,7 @@ CACHES = {
 # https://docs.djangoproject.com/en/dev/ref/middleware/#x-content-type-options-nosniff
 # SECURE_CONTENT_TYPE_NOSNIFF = env.bool(
 #    "DJANGO_SECURE_CONTENT_TYPE_NOSNIFF", default=True
-#)
+# )
 
 # STATIC
 # ------------------------
