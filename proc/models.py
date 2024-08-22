@@ -665,7 +665,8 @@ class BaseProc(CommonControlField):
         self.save()
 
         api_data = api_data or get_api_data(
-            self.collection, self.migrated_data.content_type, website_kind)
+            self.collection, self.migrated_data.content_type, website_kind
+        )
         operation = self.start(
             user, f"publish {self.migrated_data.content_type} {self} on {website_kind}"
         )

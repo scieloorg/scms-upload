@@ -6,6 +6,7 @@ from wagtail.contrib.modeladmin.views import CreateView
 from .models import Researcher
 from config.menu import get_menu_order
 
+
 class ResearcherCreateView(CreateView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)

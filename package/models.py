@@ -392,7 +392,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
     )
 
     class Meta:
-        ordering = ['-updated']
+        ordering = ["-updated"]
 
         indexes = [
             models.Index(fields=["pid_v3"]),
@@ -555,7 +555,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
             operation = None
 
             for response in pid_provider_app.request_pid_for_xml_zip(
-                zip_xml_file_path, user, is_published=is_public, article_proc=article_proc,
+                zip_xml_file_path,
+                user,
+                is_published=is_public,
+                article_proc=article_proc,
             ):
                 logging.info(f"package response: {response}")
                 operation = article_proc.start(user, "request_pid_for_xml_zip")
@@ -571,7 +574,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
                 if response.get("xml_changed"):
                     # atualiza conteúdo de zip
-                    with ZipFile(zip_xml_file_path, "a", compression=ZIP_DEFLATED) as zf:
+                    with ZipFile(
+                        zip_xml_file_path, "a", compression=ZIP_DEFLATED
+                    ) as zf:
                         zf.writestr(
                             response["filename"],
                             xml_with_pre.tostring(pretty_print=True),
@@ -688,10 +693,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     component_data,
                     failures,
                 )
-        items = [
-            dict(basename=c.basename, uri=c.uri)
-            for c in self.components.all()
-        ]
+        items = [dict(basename=c.basename, uri=c.uri) for c in self.components.all()]
         detail = {"items": items, "failures": failures}
         op.finish(user, completed=not failures, detail=detail)
         return xml_with_pre

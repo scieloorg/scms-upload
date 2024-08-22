@@ -124,12 +124,11 @@ class Journal(CommonControlField, ClusterableModel):
     """
     Journal para site novo
     """
+
     short_title = models.CharField(
         _("Short Title"), max_length=100, null=True, blank=True
     )
-    title = models.CharField(
-        _("Title"), max_length=265, null=True, blank=True
-    )
+    title = models.CharField(_("Title"), max_length=265, null=True, blank=True)
     journal_acron = models.TextField(_("Journal Acronym"), null=True, blank=True)
     official_journal = models.ForeignKey(
         "OfficialJournal",
@@ -223,8 +222,16 @@ class Journal(CommonControlField, ClusterableModel):
 
 
 class Owner(Orderable, InstitutionHistory):
-    journal = ParentalKey(Journal, related_name="owner", null=True, blank=True, on_delete=models.SET_NULL)
+    journal = ParentalKey(
+        Journal, related_name="owner", null=True, blank=True, on_delete=models.SET_NULL
+    )
 
 
 class Publisher(Orderable, InstitutionHistory):
-    journal = ParentalKey(Journal, related_name="publisher", null=True, blank=True, on_delete=models.SET_NULL)
+    journal = ParentalKey(
+        Journal,
+        related_name="publisher",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )

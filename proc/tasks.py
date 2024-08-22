@@ -286,7 +286,12 @@ def task_migrate_and_publish_article(
         article_proc = ArticleProc.objects.get(pk=article_proc_id)
         article = article_proc.migrate_article(user, force_update)
         if article:
-            article_proc.publish(user, publish_article, api_data=article_api_data, force_update=force_update)
+            article_proc.publish(
+                user,
+                publish_article,
+                api_data=article_api_data,
+                force_update=force_update,
+            )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -400,7 +405,9 @@ def task_migrate_and_publish_articles(
         article_api_data = None
         for journal_proc in JournalProc.objects.filter(**params):
 
-            article_api_data = article_api_data or get_api_data(journal_proc.collection, "article")
+            article_api_data = article_api_data or get_api_data(
+                journal_proc.collection, "article"
+            )
             # como é custoso obter os registros de acron,
             # somente se force_import é True, reexecuta a leitura de acron.id
             controller.register_acron_id_file_content(
