@@ -22,7 +22,9 @@ def setup(user, file_path=None, config=None):
         except FileNotFoundError:
             raise FileNotFoundError(file_path)
 
-    collection = Collection.get_or_create(acron=data["collection_acron"], user=user)
+    collection = Collection.get_or_create(
+        acron=data["collection_acron"], name=data["collection_name"], user=user
+    )
 
     config = data["classic_ws_config"]
     classic_website = ClassicWebsiteConfiguration.get_or_create(
