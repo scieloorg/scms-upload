@@ -79,7 +79,10 @@ class State(CommonControlField):
     @classmethod
     def get(cls, name=None, acronym=None):
         if name or acronym:
-            return cls.objects.get(name__iexact=name, acronym=acronym)
+            try:
+                return cls.objects.get(name__iexact=name, acronym=acronym)
+            except cls.MultipleObjectsReturned:
+                return cls.objects.filter(name__iexact=name, acronym=acronym).first()
         raise ValueError(f"State.get missing params {dict(name__iexact=name, acronym=acronym)}")
 
     @classmethod
@@ -141,7 +144,10 @@ class Country(CommonControlField):
     @classmethod
     def get(cls, name=None, acronym=None):
         if name or acronym:
-            return cls.objects.get(name__iexact=name, acronym=acronym)
+            try:
+                return cls.objects.get(name__iexact=name, acronym=acronym)
+            except cls.MultipleObjectsReturned:
+                return cls.objects.filter(name__iexact=name, acronym=acronym).first()
         raise ValueError(f"Country.get missing params {dict(name__iexact=name, acronym=acronym)}")
 
     @classmethod
