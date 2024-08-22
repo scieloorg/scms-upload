@@ -1,4 +1,5 @@
-from django.db import models
+from django.db import IntegrityError, models
+from django.db.models import Q
 from django.utils.translation import gettext as _
 
 from core.models import CommonControlField
@@ -61,12 +62,13 @@ class State(CommonControlField):
 
     name = models.TextField(_("State Name"), blank=True, null=True)
     acronym = models.CharField(
-        _("State Acronym"), blank=True, null=True, max_length=255
+        _("State Acronym"), blank=True, null=True, max_length=8
     )
 
     class Meta:
         verbose_name = _("State")
         verbose_name_plural = _("States")
+        unique_together = [("name", "acronym")]
 
     def __unicode__(self):
         return "%s %s" % (self.name, self.acronym)
@@ -76,24 +78,30 @@ class State(CommonControlField):
 
     @classmethod
     def get(cls, name=None, acronym=None):
-        if acronym:
-            return cls.objects.get(acronym=acronym)
-        if name:
-            return cls.objects.get(name__iexact=name)
+        if name or acronym:
+            return cls.objects.get(name__iexact=name, acronym=acronym)
+        raise ValueError(f"State.get missing params {dict(name__iexact=name, acronym=acronym)}")
+
+    @classmethod
+    def create(cls, user, name=None, acronym=None):
+        if name or acronym:
+            try:
+                obj = cls()
+                obj.name = name
+                obj.acronym = acronym
+                obj.creator = user
+                obj.save()
+                return obj
+            except IntegrityError:
+                return cls.get(name, acronym)
+        raise ValueError(f"State.create missing params {dict(name__iexact=name, acronym=acronym)}")
 
     @classmethod
     def get_or_create(cls, user, name=None, acronym=None):
         try:
             return cls.get(name, acronym)
         except cls.DoesNotExist:
-            if not name and not acronym:
-                raise ValueError("State.get_or_create requires name or acronym")
-            state = State()
-            state.name = name
-            state.acronym = acronym
-            state.creator = user
-            state.save()
-            return state
+            return cls.create(user, name, acronym)
 
     @property
     def data(self):
@@ -116,12 +124,13 @@ class Country(CommonControlField):
 
     name = models.TextField(_("Country Name"), blank=True, null=True)
     acronym = models.CharField(
-        _("Country Acronym"), blank=True, null=True, max_length=255
+        _("Country Acronym"), blank=True, null=True, max_length=8
     )
 
     class Meta:
         verbose_name = _("Country")
         verbose_name_plural = _("Countries")
+        unique_together = [("name", "acronym")]
 
     def __unicode__(self):
         return "%s %s" % (self.name, self.acronym)
@@ -131,24 +140,30 @@ class Country(CommonControlField):
 
     @classmethod
     def get(cls, name=None, acronym=None):
-        if acronym:
-            return cls.objects.get(acronym=acronym)
-        if name:
-            return cls.objects.get(name__iexact=name)
+        if name or acronym:
+            return cls.objects.get(name__iexact=name, acronym=acronym)
+        raise ValueError(f"Country.get missing params {dict(name__iexact=name, acronym=acronym)}")
+
+    @classmethod
+    def create(cls, user, name=None, acronym=None):
+        if name or acronym:
+            try:
+                obj = cls()
+                obj.name = name
+                obj.acronym = acronym
+                obj.creator = user
+                obj.save()
+                return obj
+            except IntegrityError:
+                return cls.get(name, acronym)
+        raise ValueError(f"Country.create missing params {dict(name__iexact=name, acronym=acronym)}")
 
     @classmethod
     def get_or_create(cls, user, name=None, acronym=None):
         try:
             return cls.get(name, acronym)
         except cls.DoesNotExist:
-            if not name and not acronym:
-                raise ValueError("Country.get_or_create requires name or acronym")
-            country = Country()
-            country.name = name
-            country.acronym = acronym
-            country.creator = user
-            country.save()
-            return country
+            return cls.create(user, name, acronym)
 
     @property
     def data(self):
@@ -196,6 +211,41 @@ class Location(CommonControlField):
     @classmethod
     def get(cls, country, state, city):
         return cls.objects.get(country=country, state=state, city=city)
+
+    @classmethod
+    def create(cls, user, country, state, city):
+        try:
+            location = Location()
+            location.country = country
+            location.state = state
+            location.city = city
+            location.creator = user
+            location.save()
+            return location
+        except IntegrityError:
+            return cls.get(country=country, state=state, city=city)
+
+    @classmethod
+    def create_or_update(cls, user, country=None, country_name=None, country_acronym=None, state=None, state_name=None, state_acronym=None, city=None, city_name=None):
+
+        if not country:
+            try:
+                country = Country.get_or_create(user=user, name=country_name, acronym=country_acronym)
+            except ValueError:
+                country = None
+
+        if not state:
+            try:
+                state = State.get_or_create(user=user, name=state_name, acronym=state_acronym)
+            except ValueError:
+                state = None
+
+        if not city:
+            try:
+                city = City.get_or_create(user=user, name=city_name)
+            except ValueError:
+                city = None
+        return cls.get_or_create(user, country, state, city)
 
     @classmethod
     def get_or_create(cls, user, country, state, city):
