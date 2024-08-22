@@ -4,12 +4,14 @@ import os
 import sys
 from datetime import datetime
 from tempfile import TemporaryDirectory
-from zipfile import ZipFile, ZIP_DEFLATED
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.core.files.base import ContentFile
-from django.db.models import Q
 from django.db import models
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
 from packtools import HTMLGenerator
 from packtools.sps.models.v2.article_assets import ArticleAssets
 from packtools.sps.pid_provider.xml_sps_lib import (
@@ -18,11 +20,9 @@ from packtools.sps.pid_provider.xml_sps_lib import (
     get_xml_with_pre_from_uri,
 )
 from packtools.utils import SPPackage
-from modelcluster.fields import ParentalKey
-from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
-from wagtailautocomplete.edit_handlers import AutocompletePanel
 from wagtail.models import Orderable
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from collection import choices as collection_choices
 from collection.models import Language
@@ -31,7 +31,6 @@ from files_storage.models import FileLocation, MinioConfiguration
 from package import choices
 from pid_provider.requester import PidRequester
 from tracker.models import UnexpectedEvent
-
 
 pid_provider_app = PidRequester()
 

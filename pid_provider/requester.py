@@ -6,7 +6,7 @@ from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from pid_provider.base_pid_provider import BasePidProvider
 from pid_provider.client import PidProviderAPIClient
-from pid_provider.models import PidProviderXML, FixPidV2
+from pid_provider.models import FixPidV2, PidProviderXML
 from tracker.models import UnexpectedEvent
 
 
