@@ -1,4 +1,5 @@
-from django.db import models
+from django.db import IntegrityError, models
+from django.db.models import Q
 from django.utils.translation import gettext as _
 from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel
@@ -82,22 +83,36 @@ class Institution(CommonControlField, ClusterableModel):
 
     @classmethod
     def get(cls, inst_name=None, inst_acronym=None, location=None):
-        parms = {}
-        if inst_name:
-            parms["name__iexact"] = inst_name
-        if inst_acronym:
-            parms["acronym"] = inst_acronym
+        return cls.objects.get(name__iexact=inst_name, acronym=inst_acronym, location=location)
+
+    @classmethod
+    def create(
+        cls,
+        user,
+        inst_name=None,
+        inst_acronym=None,
+        level_1=None,
+        level_2=None,
+        level_3=None,
+        location=None,
+    ):
+        # Institution
+        # check if exists the institution
         try:
-            return cls.objects.get(**parms)
-        except cls.MultipleObjectsReturned:
-            selected = None
-            for item in cls.objects.filter(**parms).iterator():
-                if not selected:
-                    selected = item
-                    continue
-                if item.data.values().count(None) < selected.data.values().count(None):
-                    selected = item
-            return selected
+            institution = cls()
+            institution.name = inst_name
+            institution.acronym = inst_acronym
+            institution.level_1 = level_1
+            institution.level_2 = level_2
+            institution.level_3 = level_3
+            institution.location = location
+            institution.creator = user
+            institution.save()
+            return institution
+        except IntegrityError:
+            return cls.get(
+                inst_name, inst_acronym, location
+            )
 
     @classmethod
     def get_or_create(
@@ -116,17 +131,29 @@ class Institution(CommonControlField, ClusterableModel):
             return cls.get(
                 inst_name=inst_name, inst_acronym=inst_acronym, location=location
             )
+        except cls.MultipleObjectsReturned:
+            cls.objects.filter(
+                inst_name__iexact=inst_name, inst_acronym=inst_acronym, location=location
+            ).delete()
+            return cls.create(
+                user,
+                inst_name,
+                inst_acronym,
+                level_1,
+                level_2,
+                level_3,
+                location,
+            )
         except cls.DoesNotExist:
-            institution = cls()
-            institution.name = inst_name
-            institution.acronym = inst_acronym
-            institution.level_1 = level_1
-            institution.level_2 = level_2
-            institution.level_3 = level_3
-            institution.location = location
-            institution.creator = user
-            institution.save()
-            return institution
+            return cls.create(
+                user,
+                inst_name,
+                inst_acronym,
+                level_1,
+                level_2,
+                level_3,
+                location,
+            )
 
     base_form_class = InstitutionForm
 
