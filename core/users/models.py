@@ -28,14 +28,21 @@ class User(AbstractUser):
     autocomplete_search_field = "username"
 
     def autocomplete_label(self):
-        label = self.username
-        user_groups = sorted([g.name for g in self.groups.all()])
+        labels = []
 
-        full_name = f"{self.first_name} {self.last_name}"
-        if full_name != " ":
-            label += f" ({full_name})"
+        if self.username:
+            labels.append(self.username)
+        if self.fullname:
+            labels.append(self.fullname)
+        if self.group_names:
+            labels.append(", ".join(self.group_names))
 
-        if len(user_groups) > 0:
-            label += f" - {', '.join(user_groups)}"
+        return " | ".join(labels)
 
-        return label
+    @property
+    def fullname(self):
+        return " ".join([name.strip() for name in [self.first_name, self.last_name] if name.strip()])
+
+    @property
+    def group_names(self):
+        return sorted([g.name for g in self.groups.all()])
