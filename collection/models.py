@@ -242,6 +242,10 @@ class Language(CommonControlField):
                 )
             return obj
 
+    @property
+    def data(self):
+        return {"value": self.name, "code": self.code2}
+
     base_form_class = CoreAdminModelForm
 
 
