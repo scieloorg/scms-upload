@@ -15,7 +15,9 @@ from publication.api.journal import publish_journal
 from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
 from tracker.models import UnexpectedEvent
-from upload.models import Package
+
+# FIXME
+# from upload.models import Package
 
 User = get_user_model()
 
@@ -342,10 +344,16 @@ def task_publish_article(
     try:
         user = _get_user(user_id, username)
         manager = None
-        if upload_package_id:
-            manager = Package.objects.get(pk=upload_package_id)
-        elif article_proc_id:
-            manager = ArticleProc.objects.get(pk=article_proc_id)
+
+        try:
+            if upload_package_id:
+                manager = Package.objects.get(pk=upload_package_id)
+            elif article_proc_id:
+                manager = ArticleProc.objects.get(pk=article_proc_id)
+
+        except Exception as e:
+            logging.exception(e)
+            return
 
         article = manager.article
 
