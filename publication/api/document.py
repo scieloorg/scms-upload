@@ -1,4 +1,5 @@
 import logging
+import json
 from datetime import datetime
 
 from django.utils.translation import gettext_lazy as _
@@ -7,19 +8,37 @@ from publication.api.publication import PublicationAPI
 from publication.utils.document import build_article
 
 
-def publish_article(article_proc, api_data):
+def publish_article(article_proc, api_data, journal_pid=None):
+    """
+    {"failed": False, "id": article.id}
+    {"failed": True, "error": str(ex)}
+    """
     data = {}
     builder = ArticlePayload(data)
-    build_article(article_proc.article, article_proc.journal_proc, builder)
+
+    try:
+        # somente se article_proc é instancia de ArticleProc
+        journal_pid = article_proc.issue_proc.journal_proc.pid
+    except AttributeError:
+        if not journal_pid:
+            raise ValueError(
+                "publication.api.document.publish_article requires journal_pid")
+
+    order = article_proc.article.order
+    pub_date = article_proc.article.first_publication_date or datetime.utcnow()
+
+    build_article(builder, article_proc.article, journal_pid, order, pub_date)
 
     api = PublicationAPI(**api_data)
     kwargs = dict(
         article_id=data.get("_id"),
         issue_id=data.get("issue_id"),
-        order=data.get("order"),
+        order=order,
         article_url=data.get("xml"),
     )
-    return api.post_data(data, kwargs)
+    ret = api.post_data(data, kwargs)
+    logging.info(ret)
+    return ret
 
 
 class ArticlePayload:
@@ -129,7 +148,7 @@ class ArticlePayload:
         _translated_title["language"] = language
         self.data["translated_titles"].append(_translated_title)
 
-    def add_section(self, language, text):
+    def add_section(self, language, text, code):
         # sections"] = EmbeddedDocumentListField(TranslatedSection))
         if self.data["translated_sections"] is None:
             self.data["translated_sections"] = []
@@ -204,7 +223,7 @@ class ArticlePayload:
                 lang=lang,
                 url=url,
                 filename=filename,
-                type=type,
+                type="pdf",
                 classic_uri=classic_uri,
             )
         )
@@ -219,7 +238,7 @@ class ArticlePayload:
         _mat_suppl_item["ref_id"] = ref_id
         _mat_suppl_item["filename"] = filename
         # TODO
-        # _mat_suppl_item.classic_uri"] = classic_uri
+        _mat_suppl_item["classic_uri"] = classic_uri
         self.data["mat_suppl_items"].append(_mat_suppl_item)
 
     def add_status(self):
