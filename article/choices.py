@@ -109,6 +109,9 @@ ARTICLE_TYPE = (
 
 
 # Model Article, Field status
+# TODO delete
+AS_CHANGE_SUBMITTED = "change-submitted"
+
 AS_UPDATE_SUBMITTED = "update-submitted"
 AS_ERRATUM_SUBMITTED = "erratum-submitted"
 AS_REQUIRE_UPDATE = "required-update"
