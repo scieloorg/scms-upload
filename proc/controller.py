@@ -266,7 +266,7 @@ def fetch_and_create_journal(
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
             force_update=force_update,
         )
-        journal.acron = item.get("journal_acron")
+        journal.journal_acron = item.get("journal_acron")
         journal_collection = JournalCollection.create_or_update(
             user, collection, journal
         )
