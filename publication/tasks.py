@@ -4,7 +4,7 @@ import sys
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
-from collection.choices import QA
+from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from core.models import PressRelease
@@ -15,6 +15,7 @@ from publication.api.journal import publish_journal
 from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
 from tracker.models import UnexpectedEvent
+from upload.models import Package
 
 User = get_user_model()
 
@@ -68,26 +69,6 @@ def _get_collections(collection_acron):
                 "collection_acron": collection_acron,
             },
         )
-
-
-def _get_api_data(collection, website_kind, item_name):
-    website = WebSiteConfiguration.get(
-        collection=collection,
-        purpose=website_kind,
-    )
-    API_URLS = {
-        "journal": website.api_url_journal,
-        "issue": website.api_url_issue,
-        "article": website.api_url_article,
-    }
-    api = PublicationAPI(
-        post_data_url=API_URLS.get(item_name),
-        get_token_url=website.api_get_token_url,
-        username=website.api_username,
-        password=website.api_password,
-    )
-    api.get_token()
-    return api.data
 
 
 # @celery_app.task(bind=True)
@@ -341,5 +322,94 @@ def task_publish_item_inline(
             detail=dict(
                 item_id=item_id,
                 model_name=model_name,
+            ),
+        )
+
+
+@celery_app.task(bind=True)
+def task_publish_article(
+    self,
+    user_id,
+    username,
+    api_data,
+    website_kind,
+    article_proc_id=None,
+    upload_package_id=None,
+):
+    """
+    Tarefa que publica artigos ingressados pelo Upload
+    """
+    try:
+        user = _get_user(user_id, username)
+        manager = None
+        if upload_package_id:
+            manager = Package.objects.get(pk=upload_package_id)
+        elif article_proc_id:
+            manager = ArticleProc.objects.get(pk=article_proc_id)
+
+        article = manager.article
+
+        for journal_proc in JournalProc.objects.filter(
+            journal=article.journal
+        ).iterator():
+            try:
+                website = WebSiteConfiguration.get(
+                    collection=journal_proc.collection,
+                    purpose=website_kind,
+                )
+            except WebSiteConfiguration.DoesNotExist:
+                continue
+
+            api = PublicationAPI(
+                post_data_url=website.api_url_article,
+                get_token_url=website.api_get_token_url,
+                username=website.api_username,
+                password=website.api_password,
+                timeout=1,
+            )
+            api.get_token()
+            api_data = api.data
+
+            response = publish_article(manager, api_data, journal_proc.pid)
+            if response.get("result") == "OK":
+                manager.update_status()
+                continue
+
+            api_data["post_data_url"] = website.api_url_journal
+            journal_proc.publish(
+                user,
+                publish_journal,
+                website_kind=website_kind,
+                api_data=api_data,
+                force_update=True,
+            )
+
+            api_data["post_data_url"] = website.api_url_issue
+            IssueProc.objects.get(
+                journal_proc=journal_proc, issue=article.issue
+            ).publish(
+                user,
+                publish_issue,
+                website_kind=website_kind,
+                api_data=api_data,
+                force_update=True,
+            )
+
+            api_data["post_data_url"] = website.api_url_article
+            publish_article(manager, api_data, journal_proc.pid)
+            if response.get("result") == "OK":
+                manager.update_status()
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail=dict(
+                task="task_publish_article",
+                item=str(manager),
+                article_proc_id=article_proc_id,
+                upload_package_id=article_proc_id,
+                website_kind=website_kind,
             ),
         )
