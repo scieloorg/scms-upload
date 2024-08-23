@@ -7,11 +7,15 @@ from publication.utils.issue import build_issue
 
 
 def publish_issue(issue_proc, api_data):
+    issue = issue_proc.issue
+    issue_id = issue_proc.pid
+    journal_id = issue_proc.journal_proc.pid
+
     data = {}
     builder = IssuePayload(data)
-    build_issue(issue_proc, issue_proc.journal_proc.pid, builder)
+    build_issue(builder, journal_id, issue, issue_id)
     api = PublicationAPI(**api_data)
-    return api.post_data(data, {"journal_id": issue_proc.journal_proc.pid})
+    return api.post_data(data, {"journal_id": journal_id})
 
 
 class IssuePayload:
@@ -43,6 +47,7 @@ class IssuePayload:
             self.data["updated"] = updated.isoformat()
 
     def add_ids(self, issue_id):
+        # "1678-4464-1998-v29-n3"
         self.data["id"] = issue_id
         # self.data["iid"] = issue_id
 
@@ -50,6 +55,7 @@ class IssuePayload:
         self.data["order"] = order
 
     def add_pid(self, pid):
+        # "1678-446419980003"
         self.data["pid"] = pid
 
     def add_publication_date(self, year, start_month, end_month):
