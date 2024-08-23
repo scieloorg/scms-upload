@@ -16,7 +16,6 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 from collection.models import Collection
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
-from journal.models import Journal
 from tracker import choices as tracker_choices
 
 from . import exceptions
@@ -35,10 +34,6 @@ class MigratedDocumentHTMLForbiddenError(Exception):
 
 
 class MigrationError(Exception):
-    ...
-
-
-class HTMLXMLCreateOrUpdateError(Exception):
     ...
 
 
@@ -557,8 +552,9 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
     journal = models.ForeignKey(
-        Journal, on_delete=models.SET_NULL, null=True, blank=True
+        "journal.Journal", on_delete=models.SET_NULL, null=True, blank=True
     )
+    journal_acron = models.CharField(max_length=16, null=True, blank=True)
     file = models.FileField(
         upload_to=migrated_files_directory_path, null=True, blank=True
     )
@@ -576,7 +572,10 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         return f"{self.source_path}"
 
     class Meta:
-        unique_together = [("collection", "journal", "source_path")]
+        unique_together = [
+            ("collection", "journal", "source_path"),
+            ("collection", "journal_acron", "source_path"),
+        ]
         indexes = [
             models.Index(fields=["source_path"]),
         ]
@@ -585,16 +584,13 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
     def get(
         cls,
         collection,
-        journal,
         source_path,
     ):
-        if collection and journal and source_path:
-            return cls.objects.get(
-                collection=collection, journal=journal, source_path=source_path
-            )
+        if collection and source_path:
+            return cls.objects.get(collection=collection, source_path=source_path)
+
         d = dict(
             collection=collection,
-            journal=journal,
             source_path=source_path,
         )
         raise ValueError(f"JournalAcronIdFile.create requires all parameters. Got {d}")
@@ -604,14 +600,14 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         cls,
         user,
         collection,
-        journal,
+        journal_acron,
         source_path,
     ):
-        if not user and not journal and not collection and not source_path:
+        if not user and not journal_acron and not collection and not source_path:
             d = dict(
                 user=user,
                 collection=collection,
-                journal=journal,
+                journal_acron=journal_acron,
                 source_path=source_path,
             )
             raise ValueError(
@@ -621,7 +617,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         try:
             obj = cls()
             obj.collection = collection
-            obj.journal = journal
+            obj.journal_acron = journal_acron
             obj.source_path = source_path
             obj.creator = user
             obj.file_size = JournalAcronIdFile.get_file_size(source_path)
@@ -634,7 +630,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
 
             return obj
         except IntegrityError:
-            return cls.get(collection, journal, source_path)
+            return cls.get(collection, source_path)
 
     def save_file(self, name, content, delete=False):
         try:
@@ -648,12 +644,15 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         cls,
         user,
         collection,
-        journal,
+        journal_acron,
         source_path,
         force_update=None,
     ):
         try:
-            obj = cls.get(collection, journal, source_path)
+            obj = cls.get(collection, source_path)
+            if journal_acron and obj.journal_acron is None:
+                obj.journal_acron = journal_acron
+                obj.save()
             file_size = JournalAcronIdFile.get_file_size(source_path)
 
             doit = any((force_update, not obj.is_up_to_date(file_size)))
@@ -674,7 +673,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             obj.id_file_records.all().update(deleted=True)
             return obj
         except cls.DoesNotExist:
-            return cls.create(user, collection, journal, source_path)
+            return cls.create(user, collection, journal_acron, source_path)
 
     @staticmethod
     def get_file_size(source_path):
@@ -685,12 +684,12 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         return bool(self.file_size and self.file_size == file_size)
 
     @classmethod
-    def modified_articles(cls, collection=None, journal=None, issue_folder=None):
+    def modified_articles(cls, collection=None, journal_acron=None, issue_folder=None):
         params = {}
         if collection:
             params["collection"] = collection
-        if journal:
-            params["journal"] = journal
+        if journal_acron:
+            params["journal_acron"] = journal_acron
 
         for journal_acron_id_file in cls.objects.filter(**params):
             from_datetime = (
@@ -698,7 +697,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             )
             items = IdFileRecord.modified_records(
                 collection=journal_acron_id_file.collection,
-                journal=journal_acron_id_file.journal,
+                journal_acron=journal_acron_id_file.journal_acron,
                 issue_folder=issue_folder,
                 from_datetime=from_datetime,
             )
@@ -706,12 +705,12 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
                 yield from items
 
     @classmethod
-    def issues_with_modified_articles(cls, collection=None, journal=None):
+    def issues_with_modified_articles(cls, collection=None, journal_acron=None):
         params = {}
         if collection:
             params["collection"] = collection
-        if journal:
-            params["journal"] = journal
+        if journal_acron:
+            params["journal_acron"] = journal_acron
 
         for journal_acron_id_file in cls.objects.filter(**params):
             from_datetime = (
@@ -719,21 +718,21 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             )
             items = IdFileRecord.modified_records(
                 collection=journal_acron_id_file.collection,
-                journal=journal_acron_id_file.journal,
+                journal_acron=journal_acron_id_file.journal_acron,
                 from_datetime=from_datetime,
             )
             if items.exists():
                 yield from items.values(
-                    "parent__journal__id", "parent__collection__id", "issue_folder"
+                    "parent__journal_acron", "parent__collection__id", "issue_folder"
                 ).distinct()
 
     @classmethod
-    def journals_with_modified_articles(cls, collection=None, journal=None):
+    def journals_with_modified_articles(cls, collection=None, journal_acron=None):
         params = {}
         if collection:
             params["collection"] = collection
-        if journal:
-            params["journal"] = journal
+        if journal_acron:
+            params["journal_acron"] = journal_acron
 
         for journal_acron_id_file in cls.objects.filter(**params):
             from_datetime = (
@@ -741,7 +740,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             )
             items = IdFileRecord.modified_records(
                 collection=journal_acron_id_file.collection,
-                journal=journal_acron_id_file.journal,
+                journal_acron=journal_acron_id_file.journal_acron,
                 from_datetime=from_datetime,
             )
             if items.exists():
@@ -802,7 +801,7 @@ class IdFileRecord(CommonControlField, Orderable):
             item_type=item_type,
             item_pid=item_pid,
         )
-        raise ValueError(f"JournalAcronIdFile.get requires all parameters. Got {d}")
+        raise ValueError(f"IdFileRecord.get requires all parameters. Got {d}")
 
     @classmethod
     def create(
@@ -824,9 +823,7 @@ class IdFileRecord(CommonControlField, Orderable):
                 item_type=item_type,
                 item_pid=item_pid,
             )
-            raise ValueError(
-                f"JournalAcronIdFile.create requires all parameters. Got {d}"
-            )
+            raise ValueError(f"IdFileRecord.create requires all parameters. Got {d}")
 
         try:
             obj = cls(
@@ -865,9 +862,7 @@ class IdFileRecord(CommonControlField, Orderable):
                 item_type=item_type,
                 item_pid=item_pid,
             )
-            raise ValueError(
-                f"JournalAcronIdFile.create requires all parameters. Got {d}"
-            )
+            raise ValueError(f"IdFileRecord.create requires all parameters. Got {d}")
 
         try:
             obj = cls.get(parent, item_type, item_pid)
@@ -932,13 +927,13 @@ class IdFileRecord(CommonControlField, Orderable):
 
     @classmethod
     def modified_records(
-        cls, collection=None, journal=None, issue_folder=None, from_datetime=None
+        cls, collection=None, journal_acron=None, issue_folder=None, from_datetime=None
     ):
         params = {}
         if collection:
             params["parent__collection"] = collection
-        if journal:
-            params["parent__journal"] = journal
+        if journal_acron:
+            params["parent__journal_acron"] = journal_acron
         if issue_folder:
             params["issue_folder"] = issue_folder
         if from_datetime:

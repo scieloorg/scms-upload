@@ -12,11 +12,24 @@ from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from scielo_classic_website import classic_ws
 from scielo_classic_website.controller import pids_and_their_records
 
-from article.controller import create_article
+from article.models import Article
+from collection.models import Language
 from core.controller import parse_yyyymmdd
 from htmlxml.models import HTMLXML
-from issue.models import Issue
-from journal.models import Journal, OfficialJournal
+from institution.models import Institution
+from issue.models import TOC, Issue, TocSection
+from journal.models import (
+    Journal,
+    JournalCollection,
+    JournalHistory,
+    JournalSection,
+    OfficialJournal,
+    Owner,
+    Publisher,
+    Subject,
+    Mission,
+)
+from location.models import Location
 from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
@@ -28,6 +41,7 @@ def create_or_update_journal(
     user,
     journal_proc,
     force_update,
+    **kwargs,
 ):
     """
     Create/update OfficialJournal, JournalProc e Journal
@@ -52,10 +66,44 @@ def create_or_update_journal(
     journal = Journal.create_or_update(
         user=user,
         official_journal=official_journal,
+        short_title=classic_website_journal.abbreviated_title,
+        title=classic_website_journal.title,
+        journal_acron=classic_website_journal.acronym,
     )
-    # TODO
-    # for publisher_name in classic_website_journal.raw_publisher_names:
-    #     journal.add_publisher(user, publisher_name)
+    journal.license_code = classic_website_journal.permissions
+    journal.nlm_title = classic_website_journal.title_nlm
+    journal.doi_prefix = None
+    journal.contact_name = "; ".join(classic_website_journal.raw_publisher_names)
+    journal.contact_location = Location.create_or_update(
+        user=user,
+        city_name=classic_website_journal.publisher_city,
+        state_acronym=classic_website_journal.publisher_state,
+        country_acronym=classic_website_journal.publisher_country,
+    )
+    journal.contact_address = ", ".join(classic_website_journal.publisher_address)
+    journal.add_email(classic_website_journal.publisher_email)
+    journal.save()
+
+    for item in classic_website_journal.mission:
+        language = Language.get_or_create(name=None, code2=item["language"], creator=user)
+        journal.mission.add(
+            Mission.create_or_update(user, journal, language, item["text"]))
+
+    for code in classic_website_journal.subject_areas:
+        journal.subject.add(Subject.create_or_update(user, code))
+
+    for publisher_name in classic_website_journal.raw_publisher_names:
+        institution = Institution.get_or_create(
+            inst_name=publisher_name,
+            inst_acronym=None,
+            level_1=None,
+            level_2=None,
+            level_3=None,
+            location=None,
+            user=user,
+        )
+        journal.owner.add(Owner.create_or_update(user, journal, institution))
+        journal.publisher.add(Publisher.create_or_update(user, journal, institution))
 
     journal_proc.update(
         user=user,
@@ -67,7 +115,38 @@ def create_or_update_journal(
         force_update=force_update,
     )
 
+    jc = JournalCollection.create_or_update(user, collection, journal)
+
+    create_journal_history(user, jc, classic_website_journal)
     return journal
+
+
+def create_journal_history(user, jc, classic_website_journal):
+    status_items = {
+        "D": "INTERRUPTED",
+        "S": "INTERRUPTED",
+        "C": "ADMITTED",
+    }
+    for event in classic_website_journal.status_history:
+        # obtém year, month, day
+        _date = event["date"]
+        year, month, day = parse_yyyymmdd(_date)
+
+        # obtém event_type
+        _status = event["status"]
+        event_type = status_items.get(_status)
+
+        # obtém interruption_reason
+        _reason = event.get("reason")
+        interruption_reason = None
+        if _status == "D":
+            interruption_reason = "ceased"
+        else:
+            interruption_reason = _reason
+
+        JournalHistory.create_or_update(
+            user, jc, event_type, year, month, day, interruption_reason
+        )
 
 
 def create_or_update_issue(
@@ -106,6 +185,8 @@ def create_or_update_issue(
             not classic_website_issue.number and not classic_website_issue.supplement
         ),
         total_documents=classic_website_issue.total_documents,
+        order=int(classic_website_issue.order[-4:]),
+        issue_pid_suffix=classic_website_issue.order[-4:],
     )
     issue_proc.update(
         user=user,
@@ -115,6 +196,33 @@ def create_or_update_issue(
         migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         force_update=force_update,
     )
+
+    toc = TOC.create_or_update(
+        user,
+        issue,
+        ordered=True,
+    )
+    languages = {}
+    for code, sections in classic_website_issue.sections_by_code.items():
+        issue_section = None
+        for section in sections:
+            lang_code = section.get("language")
+
+            # reduz consulta em banco de dados
+            try:
+                language = languages[lang_code]
+            except KeyError:
+                languages[lang_code] = Language.get_or_create(
+                    creator=user, code2=lang_code
+                )
+            sec = JournalSection.create_or_update(
+                user,
+                issue_proc.journal_proc.journal,
+                language=languages[lang_code],
+                code=section.get("code"),
+                text=section.get("text"),
+            )
+            TocSection.create_or_update(user, toc, section.get("code"), sec)
     return issue
 
 
@@ -122,6 +230,7 @@ def create_or_update_article(
     user,
     article_proc,
     force_update,
+    **kwargs,
 ):
     """
     Create/update Issue
@@ -130,11 +239,17 @@ def create_or_update_article(
         logging.info(f"article_proc.migration_status={article_proc.migration_status}")
         return article_proc.article
 
-    article = create_article(article_proc.sps_pkg, user, force_update)
+    article = Article.create_or_update(
+        user,
+        article_proc.sps_pkg,
+        issue=article_proc.issue_proc.issue,
+        journal=article_proc.issue_proc.journal_proc.journal,
+    )
+    article_proc.migrated_data.migration_status = tracker_choices.PROGRESS_STATUS_DONE
     article_proc.migration_status = tracker_choices.PROGRESS_STATUS_DONE
     article_proc.updated_by = user
     article_proc.save()
-    return article["article"]
+    return article
 
 
 class XMLVersionXmlWithPreError(Exception):
@@ -668,7 +783,7 @@ def register_acron_id_file_content(
             journal_id_file = JournalAcronIdFile.create_or_update(
                 user=user,
                 collection=collection,
-                journal=journal,
+                journal_acron=journal_acron,
                 source_path=source_path,
                 force_update=force_update,
             )

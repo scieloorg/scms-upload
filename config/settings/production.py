@@ -217,3 +217,6 @@ LOGGING = {
 
 # Your stuff...
 # ------------------------------------------------------------------------------
+
+JOURNAL_API_URL = "http://core.scielo.org/api/v1/journal"
+ISSUE_API_URL = "http://core.scielo.org/api/v1/issue"
