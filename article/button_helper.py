@@ -1,7 +1,8 @@
 from django.utils.translation import gettext as _
 from wagtail.contrib.modeladmin.helpers import ButtonHelper
 
-from upload.choices import PC_ERRATUM, PC_UPDATE
+# FIXME
+# from upload.choices import PC_ERRATUM, PC_UPDATE
 
 from .choices import AS_REQUIRE_ERRATUM, AS_REQUIRE_UPDATE
 
@@ -22,10 +23,12 @@ class RequestArticleChangeButtonHelper(ButtonHelper):
     def submit_change(self, obj, classnames):
         text = _("Submit change")
 
-        if obj.article.status == AS_REQUIRE_UPDATE:
-            package_category = PC_UPDATE
-        elif obj.article.status == AS_REQUIRE_ERRATUM:
-            package_category = PC_ERRATUM
+        package_category = ""
+        # FIXME
+        # if obj.article.status == AS_REQUIRE_UPDATE:
+        #     package_category = PC_UPDATE
+        # elif obj.article.status == AS_REQUIRE_ERRATUM:
+        #     package_category = PC_ERRATUM
 
         return {
             "url": "/admin/upload/package/create/?article_id=%s&package_category=%s"
@@ -83,10 +86,12 @@ class ArticleButtonHelper(ButtonHelper):
     def submit_change(self, obj, classnames):
         text = _("Submit change")
 
-        if obj.status == AS_REQUIRE_UPDATE:
-            package_category = PC_UPDATE
-        elif obj.status == AS_REQUIRE_ERRATUM:
-            package_category = PC_ERRATUM
+        package_category = ""
+        # FIXME
+        # if obj.article.status == AS_REQUIRE_UPDATE:
+        #     package_category = PC_UPDATE
+        # elif obj.article.status == AS_REQUIRE_ERRATUM:
+        #     package_category = PC_ERRATUM
 
         return {
             "url": "/admin/upload/package/create/?article_id=%s&package_category=%s"
