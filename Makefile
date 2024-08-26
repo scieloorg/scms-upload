@@ -1,9 +1,5 @@
 default: build
 
-COMPOSE_FILE_DEV = local.yml
-
-compose = ${COMPOSE_FILE_DEV}
-
 export SCMS_BUILD_DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 export SCMS_VCS_REF=$(strip $(shell git rev-parse --short HEAD))
 export SCMS_WEBAPP_VERSION=$(strip $(shell cat VERSION))
@@ -136,4 +132,4 @@ exclude_upload_production_django:  ## Exclude all productions containers
 		echo "No images found for 'upload_production*'"; \
 	fi
 
-update: stop rm exclude_upload_production_django up
+update: stop rm exclude_upload_production_django build up
