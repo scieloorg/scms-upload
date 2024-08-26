@@ -200,7 +200,7 @@ def task_migrate_journal_articles(
 
         if params:
             logging.info(f"task_migrate_journal_articles - issues 2 : {journal_proc}")
-            for issue_proc in IssueProc.filter(**params):
+            for issue_proc in IssueProc.objects.filter(**params):
                 logging.info(f"task_migrate_journal_articles - issues 2 : {issue_proc}")
 
                 issue_proc.get_files_from_classic_website(
