@@ -14,28 +14,31 @@ from core.utils.requester import post_data
 from publication.api import exceptions
 
 
-def get_api_data(collection, content_type, website_kind=None):
-    website_kind = website_kind or collection_choices.QA
-
-    try:
-        website = WebSiteConfiguration.get(
-            collection=collection,
-            purpose=website_kind,
-        )
-    except WebSiteConfiguration.DoesNotExist:
-        return {"error": f"Website does not exist: {collection} {website_kind}"}
+def get_api(collection, content_type, website_kind=None):
+    website = WebSiteConfiguration.get(
+        collection=collection,
+        purpose=website_kind,
+    )
 
     API_URLS = {
         "journal": website.api_url_journal,
         "issue": website.api_url_issue,
         "article": website.api_url_article,
     }
-    api = PublicationAPI(
+    return PublicationAPI(
         post_data_url=API_URLS.get(content_type),
         get_token_url=website.api_get_token_url,
         username=website.api_username,
         password=website.api_password,
     )
+
+
+def get_api_data(collection, content_type, website_kind=None):
+    try:
+        api = get_api(collection, content_type, website_kind)
+    except WebSiteConfiguration.DoesNotExist:
+        return {"error": f"Website does not exist: {collection} {website_kind}"}
+
     api.get_token()
     return api.data
 
