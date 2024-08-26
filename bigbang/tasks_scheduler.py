@@ -89,7 +89,9 @@ def schedule_migration_subtasks(username):
 
 
 def schedule_publication_subtasks(username):
-    pass
+    _schedule_publish_articles(username)
+    _schedule_publish_issues(username)
+    _schedule_publish_journals(username)
 
 
 def _schedule_migration_and_publication(username, enabled):
@@ -203,3 +205,73 @@ def _schedule_migrate_and_publish_articles(username, enabled):
 #         hour="*",
 #         minute=SINCHRONIZE_TO_PID_PROVIDER_MINUTES,
 #     )
+
+
+def _schedule_publish_journals(username, enabled=False):
+    """
+    Agenda a tarefa de migrar os registros da base de dados TITLE
+    Deixa a tarefa desabilitada
+    """
+    schedule_task(
+        task="proc.tasks.task_publish_journals",
+        name="publish_journals",
+        kwargs=dict(
+            username=None,
+            collection_acron=None,
+            journal_acron=None,
+            force_update=False,
+        ),
+        description=_("Publica periódicos"),
+        priority=TITLE_DB_MIGRATION_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=TITLE_DB_MIGRATION_MINUTES,
+    )
+
+
+def _schedule_publish_issues(username, enabled=False):
+    """
+    Agenda a tarefa de migrar os registros da base de dados ISSUE
+    Deixa a tarefa abilitada
+    """
+    schedule_task(
+        task="proc.tasks.task_publish_issues",
+        name="publish_issues",
+        kwargs=dict(
+            username=None,
+            collection_acron=None,
+            journal_acron=None,
+            publication_year=None,
+            force_update=False,
+        ),
+        description=_("Publica fascículos"),
+        priority=ISSUE_DB_MIGRATION_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=ISSUE_DB_MIGRATION_MINUTES,
+    )
+
+
+def _schedule_publish_articles(username, enabled=False):
+    schedule_task(
+        task="proc.tasks.task_publish_articles",
+        name="publish_articles",
+        kwargs=dict(
+            username=None,
+            collection_acron=None,
+            journal_acron=None,
+            publication_year=None,
+            force_update=False,
+        ),
+        description=_("Publica artigos"),
+        priority=ARTICLE_DB_MIGRATION_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=ARTICLE_DB_MIGRATION_MINUTES,
+    )
