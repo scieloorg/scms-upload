@@ -71,6 +71,7 @@ def migrate_and_publish_journals(
             journal_proc.publish(
                 user,
                 publish_journal,
+                website_kind=QA,
                 api_data=api_data,
                 force_update=force_update,
             )
@@ -134,6 +135,7 @@ def migrate_and_publish_issues(
             issue_proc.publish(
                 user,
                 publish_issue,
+                website_kind=QA,
                 api_data=api_data,
                 force_update=force_update,
             )
