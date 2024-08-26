@@ -42,7 +42,7 @@ def build_journal(builder, journal, journal_id, journal_acron, journal_history):
     )
     try:
         # FIXME
-        builder.add_logo_url(journal.logo_url)
+        builder.add_logo_url(journal.logo_url or "https://www.scielo.org/journal_logo_missing.gif")
     except AttributeError:
         builder.add_logo_url("https://www.scielo.org/journal_logo_missing.gif")
     builder.add_online_submission_url(journal.submission_online_url)  # Adicionar
