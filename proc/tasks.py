@@ -70,6 +70,7 @@ def task_migrate_and_publish(
     force_update=False,
 ):
     try:
+        user = _get_user(user_id, username)
         from_datetime = datetime.utcnow()
         for collection in _get_collections(collection_acron):
             # obtém os dados do site clássico
