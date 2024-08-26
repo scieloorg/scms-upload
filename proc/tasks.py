@@ -70,6 +70,7 @@ def task_migrate_and_publish(
     force_update=False,
 ):
     try:
+        user = _get_user(user_id, username)
         from_datetime = datetime.utcnow()
         for collection in _get_collections(collection_acron):
             # obtém os dados do site clássico
@@ -199,7 +200,7 @@ def task_migrate_journal_articles(
 
         if params:
             logging.info(f"task_migrate_journal_articles - issues 2 : {journal_proc}")
-            for issue_proc in IssueProc.filter(**params):
+            for issue_proc in IssueProc.objects.filter(**params):
                 logging.info(f"task_migrate_journal_articles - issues 2 : {issue_proc}")
 
                 issue_proc.get_files_from_classic_website(
@@ -712,7 +713,7 @@ def task_publish_articles(
                             tracker_choices.PROGRESS_STATUS_REPROC,
                         ]
 
-                items = articleProc.objects.filter(**params)
+                items = ArticleProc.objects.filter(**params)
 
                 for article_proc in items:
                     task_publish_article.apply_async(
@@ -755,7 +756,7 @@ def task_publish_article(
 ):
     try:
         user = _get_user(user_id, username)
-        article_proc = articleProc.objects.get(pk=article_proc_id)
+        article_proc = ArticleProc.objects.get(pk=article_proc_id)
         article_proc.publish(
             user,
             publish_article,
