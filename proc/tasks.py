@@ -713,7 +713,7 @@ def task_publish_articles(
                             tracker_choices.PROGRESS_STATUS_REPROC,
                         ]
 
-                items = articleProc.objects.filter(**params)
+                items = ArticleProc.objects.filter(**params)
 
                 for article_proc in items:
                     task_publish_article.apply_async(
@@ -756,7 +756,7 @@ def task_publish_article(
 ):
     try:
         user = _get_user(user_id, username)
-        article_proc = articleProc.objects.get(pk=article_proc_id)
+        article_proc = ArticleProc.objects.get(pk=article_proc_id)
         article_proc.publish(
             user,
             publish_article,
