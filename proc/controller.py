@@ -344,6 +344,14 @@ def fetch_and_create_issue(journal, volume, suppl, number, user):
                         journal_proc.collection,
                         pid=f"{journal_proc.pid}{issue.publication_year}{issue_pid_suffix}",
                     )
-                    issue_proc.journal_proc = journal_proc
+
+                    issue_proc.update(
+                        user=user,
+                        journal_proc=journal_proc,
+                        issue_folder=issue.issue_folder,
+                        issue=issue,
+                        migration_status=tracker_choices.PROGRESS_STATUS_DONE,
+                        force_update=True,
+                    )
                     issue_proc.save()
         return issue
