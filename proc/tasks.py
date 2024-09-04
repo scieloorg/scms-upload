@@ -160,20 +160,7 @@ def task_migrate_journal_articles(
 
         # obtém os issues que tiveram atualizações ou
         # obtém todos os issues se force_update=True
-        params = {}
-        if issue_folder or publication_year:
-            if issue_folder:
-                params["issue_folder"] = issue_folder
-            if publication_year:
-                params["issue__publication_year"] = publication_year
-
-        if params:
-            issue_procs = IssueProc.objects.filter(
-                journal_proc=journal_proc,
-                **params,
-            )
-        else:
-            issue_procs = journal_proc.issues_with_modified_articles()
+        issue_procs = journal_proc.issues_with_modified_articles()
 
         logging.info(f"task_migrate_journal_articles - issues 1 : {journal_proc}")
         for issue_proc in issue_procs:
@@ -202,6 +189,11 @@ def task_migrate_journal_articles(
                 )
             )
 
+        params = {}
+        if issue_folder:
+            params["issue_folder"] = issue_folder
+        if publication_year:
+            params["issue__publication_year"] = publication_year
         if params:
             logging.info(f"task_migrate_journal_articles - issues 2 : {journal_proc}")
             for issue_proc in IssueProc.objects.filter(**params):
