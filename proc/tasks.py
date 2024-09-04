@@ -154,22 +154,26 @@ def task_migrate_journal_articles(
         atualiza mesmo se já existe
     """
     try:
-        params = {}
         user = _get_user(user_id, username)
         journal_proc = JournalProc.objects.get(pk=journal_proc_id)
         logging.info(f"task_migrate_journal_articles: {journal_proc}")
 
         # obtém os issues que tiveram atualizações ou
         # obtém todos os issues se force_update=True
-        issue_procs = journal_proc.issues_with_modified_articles()
-
+        params = {}
         if issue_folder or publication_year:
             if issue_folder:
                 params["issue_folder"] = issue_folder
             if publication_year:
-                params["publication_year"] = publication_year
-            if issue_procs.filter(**params).exist():
-                params = None
+                params["issue__publication_year"] = publication_year
+
+        if params:
+            issue_procs = IssueProc.objects.filter(
+                journal_proc=journal_proc,
+                **params,
+            )
+        else:
+            issue_procs = journal_proc.issues_with_modified_articles()
 
         logging.info(f"task_migrate_journal_articles - issues 1 : {journal_proc}")
         for issue_proc in issue_procs:
@@ -653,7 +657,7 @@ def task_migrate_and_publish_articles(
                     issue_folder=issue_folder,
                     force_update=force_update or force_import,
                     qa_article_api_data=qa_article_api_data,
-                    public_article_api_data=public_article_api_data,                    
+                    public_article_api_data=public_article_api_data,
                     # from_datetime=from_datetime,
                 )
             )
