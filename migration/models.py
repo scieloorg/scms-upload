@@ -459,16 +459,19 @@ class MigratedFile(CommonControlField):
 
     @property
     def text(self):
-        if self.component_type == "html":
-            try:
-                with open(self.file.path, mode="r", encoding="iso-8859-1") as fp:
-                    return fp.read()
-            except:
+        try:
+            if self.component_type == "html":
+                try:
+                    with open(self.file.path, mode="r", encoding="iso-8859-1") as fp:
+                        return fp.read()
+                except:
+                    with open(self.file.path, mode="r", encoding="utf-8") as fp:
+                        return fp.read()
+            if self.component_type == "xml":
                 with open(self.file.path, mode="r", encoding="utf-8") as fp:
                     return fp.read()
-        if self.component_type == "xml":
-            with open(self.file.path, mode="r", encoding="utf-8") as fp:
-                return fp.read()
+        except Exception as e:
+            return None
 
 
 class MigratedJournal(MigratedData):
@@ -680,8 +683,11 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         return os.stat(source_path).st_size
 
     def is_up_to_date(self, file_size):
-        logging.info(f"{self.file.path} {file_size} {self.file_size}")
-        return bool(self.file_size and self.file_size == file_size)
+        try:
+            logging.info(f"{self.file.path} {file_size} {self.file_size}")
+            return bool(self.file_size and self.file_size == file_size)
+        except Exception as e:
+            return False
 
     @classmethod
     def modified_articles(cls, collection=None, journal_acron=None, issue_folder=None):
