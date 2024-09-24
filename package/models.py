@@ -763,13 +763,13 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 else:
                     component = original_pkg_components.get(item) or {}
                     result = self.upload_to_the_cloud(
-                        user,
-                        item,
-                        ext,
-                        content,
-                        component.get("component_type") or "asset",
-                        component.get("lang"),
-                        component.get("legacy_uri"),
+                        user=user,
+                        filename=item,
+                        ext=ext,
+                        content=content,
+                        component_type=component.get("component_type") or "asset",
+                        lang=component.get("lang"),
+                        legacy_uri=component.get("legacy_uri"),
                     )
                     items.append(result)
         return {"xml_with_pre": xml_with_pre, "items": items}
@@ -843,8 +843,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 content,
                 item["component_type"],
                 lang,
-                item.get("error"),
-                item.get("error_type"),
+                legacy_uri=None,
+                error=item.get("error"),
+                error_type=item.get("error_type"),
             )
             items.append(response)
         return {"items": items}
