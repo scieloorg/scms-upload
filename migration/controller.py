@@ -236,7 +236,6 @@ def create_or_update_article(
     Create/update Issue
     """
     if not tracker_choices.allowed_to_run(article_proc.migration_status, force_update):
-        logging.info(f"article_proc.migration_status={article_proc.migration_status}")
         return article_proc.article
 
     article = Article.create_or_update(

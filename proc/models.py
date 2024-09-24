@@ -623,7 +623,7 @@ class BaseProc(CommonControlField):
             doit = tracker_choices.allowed_to_run(self.public_ws_status, force_update)
 
         if not doit:
-            logging.info(f"Skip publish on {website_kind} {self.pid}")
+            # logging.info(f"Skip publish on {website_kind} {self.pid}")
             return
 
         operation = self.start(
@@ -632,6 +632,7 @@ class BaseProc(CommonControlField):
 
         if website_kind == collection_choices.QA:
             self.qa_ws_status = tracker_choices.PROGRESS_STATUS_DOING
+            self.public_ws_status = tracker_choices.PROGRESS_STATUS_TODO
         else:
             self.public_ws_status = tracker_choices.PROGRESS_STATUS_DOING
         self.save()
@@ -644,21 +645,23 @@ class BaseProc(CommonControlField):
         else:
             response = callable_publish(self, api_data)
         completed = bool(response.get("result") == "OK")
-        if completed:
-            self.update_publication_stage()
+        self.update_publication_stage(website_kind, completed)
         operation.finish(user, completed=completed, detail=response)
 
-    def update_publication_stage(self):
+    def update_publication_stage(self, website_kind, completed):
         """
         Estabele o próxim estágio, após ser publicado no QA ou no Público
         """
-        if self.qa_ws_status == tracker_choices.PROGRESS_STATUS_DOING:
-            self.qa_ws_status = tracker_choices.PROGRESS_STATUS_DONE
-            if self.migrated_data:
-                self.public_ws_status = tracker_choices.PROGRESS_STATUS_TODO
+        if completed:
+            status = tracker_choices.PROGRESS_STATUS_DONE
+        else:
+            status = tracker_choices.PROGRESS_STATUS_PENDING
+
+        if website_kind == collection_choices.QA:
+            self.qa_ws_status = status
             self.save()
-        elif self.public_ws_status == tracker_choices.PROGRESS_STATUS_TODO:
-            self.public_ws_status = tracker_choices.PROGRESS_STATUS_DONE
+        else:
+            self.public_ws_status = status
             self.save()
 
     @classmethod
@@ -1011,7 +1014,7 @@ class IssueProc(BaseProc, ClusterableModel):
         try:
             doit = tracker_choices.allowed_to_run(self.files_status, force_update)
             if not doit:
-                logging.info(f"Skip get_files_from_classic_website {self.pid}")
+                # logging.info(f"Skip get_files_from_classic_website {self.pid}")
                 return
 
             operation = self.start(user, "get_files_from_classic_website")
@@ -1098,7 +1101,7 @@ class IssueProc(BaseProc, ClusterableModel):
 
         doit = tracker_choices.allowed_to_run(self.docs_status, force_update)
         if not doit:
-            logging.info(f"Skip migrate_document_records {self.pid}")
+            # logging.info(f"Skip migrate_document_records {self.pid}")
             return
 
         operation = self.start(user, "migrate_document_records")
@@ -1169,15 +1172,15 @@ class IssueProc(BaseProc, ClusterableModel):
                 migrated_article.file_type = document.file_type
                 migrated_article.save()
 
-            d = dict(
-                issue_proc=self,
-                pkg_name=document.filename_without_extension,
-                migration_status=tracker_choices.PROGRESS_STATUS_TODO,
-                user=user,
-                main_lang=document.original_language,
-                force_update=force_update,
-            )
-            logging.info(f"article_proc.... {d}")
+            # d = dict(
+            #     issue_proc=self,
+            #     pkg_name=document.filename_without_extension,
+            #     migration_status=tracker_choices.PROGRESS_STATUS_TODO,
+            #     user=user,
+            #     main_lang=document.original_language,
+            #     force_update=force_update,
+            # )
+            # logging.info(f"article_proc.... {d}")
             article_proc.update(
                 issue_proc=self,
                 pkg_name=document.filename_without_extension,
@@ -1343,7 +1346,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             doit = tracker_choices.allowed_to_run(self.xml_status, body_and_back_xml)
             if not doit:
-                logging.info(f"Skip get_xml {self.pid}")
+                # logging.info(f"Skip get_xml {self.pid}")
                 return self.xml_status == tracker_choices.PROGRESS_STATUS_DONE
 
             operation = self.start(user, "get xml")
@@ -1526,7 +1529,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             force_update = force_update or body_and_back_xml or html_to_xml
             doit = tracker_choices.allowed_to_run(self.sps_pkg_status, force_update)
             if not doit:
-                logging.info(f"Skip generate_sps_package {self.pid}")
+                # logging.info(f"Skip generate_sps_package {self.pid}")
                 return self.sps_pkg_status == tracker_choices.PROGRESS_STATUS_DONE
 
             operation = self.start(user, "generate_sps_package")

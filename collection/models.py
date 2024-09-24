@@ -115,7 +115,6 @@ class WebSiteConfiguration(CommonControlField, ClusterableModel):
     @classmethod
     def get(cls, url=None, collection=None, purpose=None):
         params = dict(url=url, collection=collection, purpose=purpose)
-        logging.info(f"Collection.get({params})")
         if url:
             return cls.objects.get(url=url)
         if collection and purpose:

@@ -2,6 +2,7 @@ import logging
 import mimetypes
 import os
 import sys
+from shutil import copyfile
 from datetime import datetime
 from tempfile import TemporaryDirectory
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -87,6 +88,26 @@ class BasicXMLFileSaveError(Exception):
 
 class PreviewArticlePageFileSaveError(Exception):
     ...
+
+
+def update_zip_file(zip_xml_file_path, response, xml_with_pre):
+    try:
+        if not response.pop("xml_changed"):
+            return
+    except KeyError:
+        return
+
+    new_xml = xml_with_pre.tostring(pretty_print=True)
+    with TemporaryDirectory() as targetdir:
+        new_zip_path = os.path.join(targetdir, os.path.basename(zip_xml_file_path))
+        with ZipFile(new_zip_path, "a", compression=ZIP_DEFLATED) as new_zfp:
+            with ZipFile(zip_xml_file_path) as zfp:
+                for item in zfp.namelist():
+                    if item == response["filename"]:
+                        new_zfp.writestr(item, new_xml)
+                    else:
+                        new_zfp.writestr(item, zfp.read(item))
+        copyfile(new_zip_path, zip_xml_file_path)
 
 
 def basic_xml_directory_path(instance, filename):
@@ -364,7 +385,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         FieldPanel("xml_uri"),
         FieldPanel("file"),
         InlinePanel("article_page", label=_("Article Page")),
-        InlinePanel("component", label=_("Package component")),
+        InlinePanel("components", label=_("Package component")),
     ]
 
     panel_status = [
@@ -487,7 +508,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
             obj.save_pkg_zip_file(user, sps_pkg_zip_path)
 
             obj.upload_package_to_the_cloud(user, original_pkg_components, article_proc)
-
             obj.validate(True)
 
             article_proc.update_sps_pkg_status()
@@ -511,7 +531,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
         elif texts.get("html_langs"):
             self.valid_texts = (
                 set(texts.get("xml_langs"))
-                == set(texts.get("pdf_langs"))
                 == set(texts.get("html_langs"))
             )
         else:
@@ -579,15 +598,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     registered_in_core=response.get("synchronized"),
                 )
 
-                if response.get("xml_changed"):
-                    # atualiza conteúdo de zip
-                    with ZipFile(
-                        zip_xml_file_path, "a", compression=ZIP_DEFLATED
-                    ) as zf:
-                        zf.writestr(
-                            response["filename"],
-                            xml_with_pre.tostring(pretty_print=True),
-                        )
+                update_zip_file(zip_xml_file_path, response, xml_with_pre)
 
                 operation.finish(
                     user,
@@ -701,22 +712,30 @@ class SPSPkg(CommonControlField, ClusterableModel):
         component_type,
         lang=None,
         legacy_uri=None,
+        error=None,
+        error_type=None,
     ):
         try:
-            response = {}
-            response = minio_push_file_content(
-                content=content,
-                mimetype=mimetypes.types_map[ext],
-                object_name=f"{self.subdir}/{filename}",
-            )
-            uri = response["uri"]
-        except Exception as e:
             uri = None
+            response = {}
+
+            if content:
+                response = minio_push_file_content(
+                    content=content,
+                    mimetype=mimetypes.types_map[ext],
+                    object_name=f"{self.subdir}/{filename}",
+                )
+                uri = response["uri"]
+        except Exception as e:
+            error = str(e)
+            error_type = str(type(e))
+
+        if error:
             response.update(
                 dict(
                     basename=filename,
-                    error=str(e),
-                    error_type=str(type(e)),
+                    error=error,
+                    error_type=error_type,
                 )
             )
         SPSPkgComponent.create_or_update(
@@ -735,17 +754,14 @@ class SPSPkg(CommonControlField, ClusterableModel):
         xml_with_pre = None
         items = []
         with ZipFile(self.file.path) as optimised_fp:
-            for item in optimised_fp.namelist():
+            for item in set(optimised_fp.namelist()):
                 name, ext = os.path.splitext(item)
-
-                component = original_pkg_components.get(item) or {}
-                with optimised_fp.open(item, "r") as optimised_item_fp:
-                    content = optimised_item_fp.read()
-
+                content = optimised_fp.read(item)
                 if ext == ".xml":
                     xml_with_pre = get_xml_with_pre(content.decode("utf-8"))
 
                 else:
+                    component = original_pkg_components.get(item) or {}
                     result = self.upload_to_the_cloud(
                         user,
                         item,
@@ -795,19 +811,31 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     "component_type": "html",
                 }
         except Exception as exc:
-            logging.exception(f"{self.xml_uri} {exc}")
+            for lang in self.texts["xml_langs"]:
+                suffix = f"-{lang}"
+                yield {
+                    "filename": f"{self.sps_pkg_name}{suffix}.html",
+                    "error": str(exc),
+                    "error_type": str(type(exc)),
+                    "lang": lang,
+                    "ext": ".html",
+                    "component_type": "html",
+                }
 
     def upload_article_page_to_the_cloud(self, user):
         items = []
         for item in self.generate_article_html_pages():
             lang = item["lang"]
-            content = item["content"].encode("utf-8")
-            PreviewArticlePage.create_or_update(
-                user,
-                self,
-                lang=Language.get_or_create(creator=user, code2=lang),
-                content=content,
-            )
+            try:
+                content = item["content"].encode("utf-8")
+            except KeyError:
+                content = None
+            # PreviewArticlePage.create_or_update(
+            #     user,
+            #     self,
+            #     lang=Language.get_or_create(creator=user, code2=lang),
+            #     content=content,
+            # )
             response = self.upload_to_the_cloud(
                 user,
                 item["filename"],
@@ -815,6 +843,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 content,
                 item["component_type"],
                 lang,
+                item.get("error"),
+                item.get("error_type"),
             )
             items.append(response)
         return {"items": items}

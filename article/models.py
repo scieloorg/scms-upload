@@ -281,8 +281,6 @@ class Article(ClusterableModel, CommonControlField):
         items = xml_sections.article_section
         items.extend(xml_sections.sub_article_section)
 
-        logging.info(list(items))
-
         try:
             toc = TOC.objects.get(issue=self.issue)
         except TOC.DoesNotExist:
@@ -290,7 +288,6 @@ class Article(ClusterableModel, CommonControlField):
 
         group = None
         for item in items:
-            logging.info(f"section: {item}")
             if not item.get("text"):
                 continue
             try:
@@ -301,7 +298,6 @@ class Article(ClusterableModel, CommonControlField):
                     text=item.get("text"),
                 )
             except JournalSection.MultipleObjectsReturned as e:
-                logging.info(f"duplicated {item}")
                 section = JournalSection.objects.filter(
                     parent=self.journal,
                     language=language,

@@ -621,7 +621,7 @@ def task_migrate_and_publish_articles(
         if collection_acron:
             params["collection__acron"] = collection_acron
         if journal_acron:
-            params["journal__acron"] = journal_acron
+            params["acron"] = journal_acron
 
         logging.info(params)
         article_api_data = None
