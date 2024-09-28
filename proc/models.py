@@ -877,6 +877,7 @@ class IssueProc(BaseProc, ClusterableModel):
         choices=tracker_choices.PROGRESS_STATUS,
         default=tracker_choices.PROGRESS_STATUS_TODO,
     )
+    resumption_date = models.DateTimeField(null=True, blank=True)
 
     MigratedDataClass = MigratedIssue
     base_form_class = ProcAdminModelForm
@@ -1108,12 +1109,15 @@ class IssueProc(BaseProc, ClusterableModel):
         done = 0
         journal_data = self.journal_proc.migrated_data.data
 
+        resumption = None if force_update else self.resumption_date
+        logging.info(f"Migrate documents from {resumption}")
         # registros novos ou atualizados
         id_file_records = list(
-            JournalAcronIdFile.modified_articles(
+            IdFileRecord.document_records_to_migrate(
                 collection=self.journal_proc.collection,
                 journal_acron=self.journal_proc.acron,
                 issue_folder=self.issue_folder,
+                resumption=resumption,
             )
         )
 
@@ -1124,6 +1128,8 @@ class IssueProc(BaseProc, ClusterableModel):
                 article_proc = self.create_or_update_article_proc(
                     user, record.item_pid, data["data"], force_update
                 )
+                self.resumption_date = record.updated
+                self.save()
                 done += 1
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1131,11 +1137,11 @@ class IssueProc(BaseProc, ClusterableModel):
                     e=e,
                     exc_traceback=exc_traceback,
                     detail={
-                        "task": "proc.controller.migrate_document_records",
+                        "task": "IssueProc.migrate_document_records",
                         "user_id": user.id,
                         "username": user.username,
-                        "collection": self.journal_proc.collection.acron,
-                        "journal": str(self.journal_proc.journal),
+                        "collection": self.collection.acron,
+                        "item": record.item_pid,
                         "force_update": force_update,
                     },
                 )
