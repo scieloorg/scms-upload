@@ -5,6 +5,7 @@ from copy import deepcopy
 from datetime import datetime
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
@@ -85,9 +86,12 @@ def create_or_update_journal(
     journal.save()
 
     for item in classic_website_journal.mission:
-        language = Language.get_or_create(name=None, code2=item["language"], creator=user)
+        language = Language.get_or_create(
+            name=None, code2=item["language"], creator=user
+        )
         journal.mission.add(
-            Mission.create_or_update(user, journal, language, item["text"]))
+            Mission.create_or_update(user, journal, language, item["text"])
+        )
 
     for code in classic_website_journal.subject_areas:
         journal.subject.add(Subject.create_or_update(user, code))
@@ -592,7 +596,6 @@ class PkgZipBuilder:
 
         pdf_langs = []
 
-        logging.info(renditions)
         for rendition in renditions:
             try:
                 if rendition.lang:
@@ -763,10 +766,13 @@ def register_acron_id_file_content(
     journal_proc,
     force_update,
 ):
-
+    """
+    Para um dado JournalAcronIdFile, criar itens em IdFileRecord
+    """
     try:
         # Importa os registros de documentos
         operation = journal_proc.start(user, "register_acron_id_file_content")
+        detail = {}
         journal = journal_proc.journal
         collection = journal_proc.collection
         journal_acron = journal_proc.acron
@@ -779,6 +785,7 @@ def register_acron_id_file_content(
         )
         if os.path.isfile(source_path):
 
+            start = datetime.utcnow().isoformat()
             journal_id_file = JournalAcronIdFile.create_or_update(
                 user=user,
                 collection=collection,
@@ -786,20 +793,45 @@ def register_acron_id_file_content(
                 source_path=source_path,
                 force_update=force_update,
             )
-            has_items = journal_id_file.id_file_records.filter(deleted=False).exists()
-            if not has_items:
-                # todos estão como delete = True
+
+            completed = True
+            if force_update or start < journal_id_file.updated.isoformat():
+                completed = False
+                total = 0
+                changed = 0
+
+                logging.info(f"Reading {source_path}")
                 for item in read_bases_work_acron_id_file(
                     user,
                     source_path,
                     classic_website,
                     journal_proc,
                 ):
-                    journal_id_file.id_file_records.add(
-                        IdFileRecord.create_or_update(user, journal_id_file, **item)
+                    item["force_update"] = force_update
+                    rec = IdFileRecord.create_or_update(
+                        user,
+                        journal_id_file,
+                        **item,
                     )
+                    if force_update or start < rec.updated.isoformat():
+                        changed += 1
+                    total += 1
+                completed = (
+                    journal_id_file.id_file_records.filter().count() == total
+                )
+
+                detail.update({
+                    "force_update": force_update,
+                    "total": total,
+                    "changed": changed,
+                    "updated": journal_id_file.updated.isoformat(),
+                })
+                logging.info(f"detail: {detail}")
+
             operation.finish(
-                user, completed=bool(journal_id_file.id_file_records.count())
+                user,
+                completed=completed,
+                detail=detail,
             )
         else:
             operation.finish(
@@ -824,38 +856,40 @@ def read_bases_work_acron_id_file(user, source_path, classic_website, journal_pr
     data = {}
     classic_ws_issue = None
     classic_ws_doc = None
+
     for item_pid, item_records in pids_and_their_records(source_path, "article"):
-        info = {"item_pid": item_pid}
-        operation = journal_proc.start(
-            user, f"get data from {os.path.basename(source_path)} for {item_pid}"
-        )
+        # info = {"item_pid": item_pid}
+        # operation = journal_proc.start(
+        #     user, f"get data from {os.path.basename(source_path)} for {item_pid}"
+        # )
         if len(item_records) == 1:
             data["issue"] = item_records[0]
             classic_ws_issue = classic_ws.Issue(data["issue"])
-            info["classic_ws_issue_pid"] = classic_ws_issue.pid
-            d = dict(
+            # info["classic_ws_issue_pid"] = classic_ws_issue.pid
+
+            yield dict(
                 item_type="issue",
                 item_pid=item_pid,
                 data=data["issue"],
                 issue_folder=classic_ws_issue.issue_label,
                 article_filename=None,
+                processing_date=classic_ws_issue.isis_updated_date,
             )
-            yield d
-            operation.finish(
-                user,
-                completed=True,
-                detail={"item_type": "issue", "issue_folder": d["issue_folder"]},
-            )
+            # operation.finish(
+            #     user,
+            #     completed=True,
+            #     detail={"item_type": "issue", "issue_folder": d["issue_folder"]},
+            # )
             continue
 
         if not classic_ws_issue:
             # raise ValueError(f"{source_path} must have 'i' record for {item_pid}")
 
-            operation.finish(
-                user,
-                completed=False,
-                detail={"classic_ws_issue": None},
-            )
+            # operation.finish(
+            #     user,
+            #     completed=False,
+            #     detail={"classic_ws_issue": None},
+            # )
             continue
 
         # item = documento
@@ -866,28 +900,27 @@ def read_bases_work_acron_id_file(user, source_path, classic_website, journal_pr
         try:
             scielo_pid_v2 = classic_ws_doc.scielo_pid_v2
         except AttributeError:
-            logging.info(f"Missing scielo_pid_v2 for {item_pid}")
-            logging.exception(data)
+            logging.info(f"Missing scielo_pid_v2 for {item_pid} {data}")
 
-        info.update(
-            dict(
-                item_type="article",
-                classic_ws_doc_pid=scielo_pid_v2,
-                issue_folder=classic_ws_doc.issue.issue_label,
-                article_filename=classic_ws_doc.filename_without_extension,
-                article_filetype=classic_ws_doc.file_type,
-                processing_date=classic_ws_doc.processing_date,
-            )
-        )
+        # info.update(
+        #     dict(
+        #         item_type="article",
+        #         classic_ws_doc_pid=scielo_pid_v2,
+        #         issue_folder=classic_ws_doc.issue.issue_label,
+        #         article_filename=classic_ws_doc.filename_without_extension,
+        #         article_filetype=classic_ws_doc.file_type,
+        #         processing_date=classic_ws_doc.processing_date,
+        #     )
+        # )
 
         if (
             classic_ws_issue.pid not in item_pid
             or item_pid != classic_ws_doc.scielo_pid_v2
         ):
             # raise ValueError(f"{classic_ws_issue.pid} and {item_pid} do not match")
-            detail = {"error": "unmatched issue_pid and item_pid"}
-            detail.update(info)
-            operation.finish(user, completed=False, detail=detail)
+            # detail = {"error": "unmatched issue_pid and item_pid"}
+            # detail.update(info)
+            # operation.finish(user, completed=False, detail=detail)
             continue
 
         # se houver bases-work/p/<pid>, obtém os registros de parágrafo
@@ -895,12 +928,13 @@ def read_bases_work_acron_id_file(user, source_path, classic_website, journal_pr
         p_records = list(p_records)
         if p_records:
             # adiciona registros p aos registros do artigo
-            info["external_p_records_count"] = len(p_records)
+            # info["external_p_records_count"] = len(p_records)
             yield dict(
                 item_type="paragraph",
                 item_pid=item_pid,
                 data=p_records,
                 issue_folder=classic_ws_issue.issue_label,
+                processing_date=classic_ws_doc.processing_date,
             )
 
         yield dict(
@@ -910,5 +944,6 @@ def read_bases_work_acron_id_file(user, source_path, classic_website, journal_pr
             issue_folder=classic_ws_doc.issue.issue_label,
             article_filename=classic_ws_doc.filename_without_extension,
             article_filetype=classic_ws_doc.file_type,
+            processing_date=classic_ws_doc.processing_date,
         )
-        operation.finish(user, completed=True, detail=info)
+        # operation.finish(user, completed=True, detail=info)
