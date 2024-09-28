@@ -176,8 +176,6 @@ class PidProviderAPIClient:
             name, ext = os.path.splitext(name)
             zip_xml_file_path = os.path.join(tmpdirname, name + ".zip")
 
-            logging.info(f"Posting xml with {xml_with_pre.data}")
-
             create_xml_zip_file(
                 zip_xml_file_path, xml_with_pre.tostring(pretty_print=True)
             )
@@ -235,10 +233,12 @@ class PidProviderAPIClient:
             )
 
     def _process_post_xml_response(self, response, xml_with_pre, created=None):
+        logging.info(f"Pid Provider Post: {xml_with_pre.data}")
         if not response:
+            logging.info(f"Pid Provider Response: none")
             return
         for item in response:
-            logging.info(f"_process_post_xml_response ({xml_with_pre.data}): {item}")
+            logging.info(f"Pid Provider Response: {item}")
 
             if not item.get("xml_changed"):
                 # pids do xml_with_pre não mudaram
