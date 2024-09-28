@@ -31,13 +31,19 @@ PROGRESS_STATUS = (
     (PROGRESS_STATUS_IGNORED, _("ignored")),
 )
 
+PROGRESS_STATUS_FORCE_UPDATE = [
+    PROGRESS_STATUS_REPROC,
+    PROGRESS_STATUS_TODO,
+    PROGRESS_STATUS_DONE,
+    PROGRESS_STATUS_PENDING,
+    PROGRESS_STATUS_BLOCKED,
+]
+
+PROGRESS_STATUS_REGULAR_TODO = [
+    PROGRESS_STATUS_REPROC,
+    PROGRESS_STATUS_TODO,
+]
+
 
 def allowed_to_run(status, force_update):
-    if force_update:
-        return True
-    return status in (
-        PROGRESS_STATUS_TODO,
-        PROGRESS_STATUS_REPROC,
-        PROGRESS_STATUS_PENDING,
-        PROGRESS_STATUS_BLOCKED,
-    )
+    return force_update and status in PROGRESS_STATUS_FORCE_UPDATE or status in PROGRESS_STATUS_TODO
