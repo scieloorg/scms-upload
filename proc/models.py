@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -38,6 +38,7 @@ from migration.controller import (
 )
 from migration.models import (
     JournalAcronIdFile,
+    IdFileRecord,
     MigratedArticle,
     MigratedData,
     MigratedFile,
@@ -500,6 +501,41 @@ class BaseProc(CommonControlField):
                 )
 
     @classmethod
+    def get_queryset_to_process(cls, STATUS):
+        return (
+            Q(migration_status__in=STATUS)
+            | Q(qa_ws_status__in=STATUS)
+            | Q(public_ws_status__in=STATUS)
+        )
+
+    @classmethod
+    def items_to_process_info(cls, items):
+        return items.values(
+            "migration_status", "qa_ws_status", "public_ws_status"
+        ).annotate(total=Count("id"))
+
+    @classmethod
+    def items_to_process(cls, collection, content_type, params, force_update):
+        """
+        BaseProc.items_to_process
+        """
+        STATUS = tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+        if force_update:
+            STATUS = tracker_choices.PROGRESS_STATUS_FORCE_UPDATE
+
+        params = params or {}
+        if content_type == "article":
+            params["sps_pkg__pid_v3__isnull"] = False
+
+        q = cls.get_queryset_to_process(STATUS)
+
+        return cls.objects.filter(
+            q,
+            collection=collection,
+            **params,
+        )
+
+    @classmethod
     def items_to_register(cls, collection, content_type, force_update):
         """
         Muda o migration_status de REPROC para TODO
@@ -587,9 +623,9 @@ class BaseProc(CommonControlField):
         q = Q(qa_ws_status=tracker_choices.PROGRESS_STATUS_REPROC)
         if force_update:
             q = (
-                Q(qa_ws_status__isnull=tracker_choices.PROGRESS_STATUS_DONE)
-                | Q(qa_ws_status__isnull=tracker_choices.PROGRESS_STATUS_PENDING)
-                | Q(qa_ws_status__isnull=tracker_choices.PROGRESS_STATUS_BLOCKED)
+                Q(qa_ws_status=tracker_choices.PROGRESS_STATUS_DONE)
+                | Q(qa_ws_status=tracker_choices.PROGRESS_STATUS_PENDING)
+                | Q(qa_ws_status=tracker_choices.PROGRESS_STATUS_BLOCKED)
             )
 
         cls.objects.filter(q, **params).update(
@@ -647,6 +683,7 @@ class BaseProc(CommonControlField):
         completed = bool(response.get("result") == "OK")
         self.update_publication_stage(website_kind, completed)
         operation.finish(user, completed=completed, detail=response)
+        return completed
 
     def update_publication_stage(self, website_kind, completed):
         """
@@ -975,6 +1012,26 @@ class IssueProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
+    def get_queryset_to_process(cls, STATUS):
+        return (
+            Q(migration_status__in=STATUS)
+            | Q(qa_ws_status__in=STATUS)
+            | Q(public_ws_status__in=STATUS)
+            | Q(docs_status__in=STATUS)
+            | Q(files_status__in=STATUS)
+        )
+
+    @classmethod
+    def items_to_process_info(cls, items):
+        return items.values(
+            "migration_status",
+            "docs_status",
+            "files_status",
+            "qa_ws_status",
+            "public_ws_status",
+        ).annotate(total=Count("id"))
+
+    @classmethod
     def files_to_migrate(
         cls, collection, journal_acron, publication_year=None, force_update=None
     ):
@@ -1159,6 +1216,7 @@ class IssueProc(BaseProc, ClusterableModel):
             self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
         else:
             self.docs_status = tracker_choices.PROGRESS_STATUS_PENDING
+        self.files_status = tracker_choices.PROGRESS_STATUS_TODO
         self.save()
 
     def create_or_update_article_proc(self, user, pid, data, force_update):
@@ -1396,6 +1454,26 @@ class ArticleProc(BaseProc, ClusterableModel):
                 exception=e,
             )
             return self.xml_status == tracker_choices.PROGRESS_STATUS_TODO
+
+    @classmethod
+    def get_queryset_to_process(cls, STATUS):
+        return (
+            Q(migration_status__in=STATUS)
+            | Q(qa_ws_status__in=STATUS)
+            | Q(public_ws_status__in=STATUS)
+            | Q(xml_status__in=STATUS)
+            | Q(sps_pkg_status__in=STATUS)
+        )
+
+    @classmethod
+    def items_to_process_info(cls, items):
+        return items.values(
+            "xml_status",
+            "sps_pkg_status",
+            "migration_status",
+            "qa_ws_status",
+            "public_ws_status",
+        ).annotate(total=Count("id"))
 
     @classmethod
     def items_to_get_xml(
