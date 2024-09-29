@@ -2,6 +2,7 @@ import logging
 import mimetypes
 import os
 import sys
+from io import BytesIO
 from shutil import copyfile
 from datetime import datetime
 from tempfile import TemporaryDirectory
@@ -13,6 +14,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
+from lxml import etree
 from packtools import HTMLGenerator
 from packtools.sps.models.v2.article_assets import ArticleAssets
 from packtools.sps.pid_provider.xml_sps_lib import (
@@ -28,6 +30,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 from collection import choices as collection_choices
 from collection.models import Language
 from core.models import CommonControlField
+from core.utils.requester import fetch_data
 from files_storage.models import FileLocation, MinioConfiguration
 from package import choices
 from pid_provider.requester import PidRequester
@@ -797,7 +800,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
     def generate_article_html_pages(self):
         try:
             generator = HTMLGenerator.parse(
-                file=self.xml_uri,
+                etree.parse(BytesIO(fetch_data(self.xml_uri))),
                 valid_only=False,
                 xslt="3.0",
             )
@@ -814,6 +817,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             for lang in self.texts["xml_langs"]:
                 suffix = f"-{lang}"
                 yield {
+                    "uri": self.xml_uri,
                     "filename": f"{self.sps_pkg_name}{suffix}.html",
                     "error": str(exc),
                     "error_type": str(type(exc)),

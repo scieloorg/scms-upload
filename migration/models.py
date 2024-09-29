@@ -394,8 +394,6 @@ class MigratedFile(CommonControlField):
             obj = cls.get(collection, original_path)
 
             if not force_update and obj.is_up_to_date(file_date):
-                # is already done
-                logging.info("it is already up-to-date")
                 return obj
 
             obj.updated_by = user
@@ -660,20 +658,16 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
 
             doit = any((force_update, not obj.is_up_to_date(file_size)))
             if not doit:
-                logging.info(f"skip update {source_path}")
                 return obj
 
             obj.updated_by = user
             obj.updated = datetime.utcnow()
             obj.file_size = file_size
-            obj.save()
 
             with open(source_path, "rb") as fp:
                 basename = os.path.basename(source_path)
                 obj.save_file(basename, fp.read(), True)
-                obj.save()
-
-            obj.id_file_records.all().update(deleted=True)
+            obj.save()
             return obj
         except cls.DoesNotExist:
             return cls.create(user, collection, journal_acron, source_path)
@@ -688,69 +682,6 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             return bool(self.file_size and self.file_size == file_size)
         except Exception as e:
             return False
-
-    @classmethod
-    def modified_articles(cls, collection=None, journal_acron=None, issue_folder=None):
-        params = {}
-        if collection:
-            params["collection"] = collection
-        if journal_acron:
-            params["journal_acron"] = journal_acron
-
-        for journal_acron_id_file in cls.objects.filter(**params):
-            from_datetime = (
-                journal_acron_id_file.updated or journal_acron_id_file.created
-            )
-            items = IdFileRecord.modified_records(
-                collection=journal_acron_id_file.collection,
-                journal_acron=journal_acron_id_file.journal_acron,
-                issue_folder=issue_folder,
-                from_datetime=from_datetime,
-            )
-            if items.exists():
-                yield from items
-
-    @classmethod
-    def issues_with_modified_articles(cls, collection=None, journal_acron=None):
-        params = {}
-        if collection:
-            params["collection"] = collection
-        if journal_acron:
-            params["journal_acron"] = journal_acron
-
-        for journal_acron_id_file in cls.objects.filter(**params):
-            from_datetime = (
-                journal_acron_id_file.updated or journal_acron_id_file.created
-            )
-            items = IdFileRecord.modified_records(
-                collection=journal_acron_id_file.collection,
-                journal_acron=journal_acron_id_file.journal_acron,
-                from_datetime=from_datetime,
-            )
-            if items.exists():
-                yield from items.values(
-                    "parent__journal_acron", "parent__collection__id", "issue_folder"
-                ).distinct()
-
-    @classmethod
-    def journals_with_modified_articles(cls, collection=None, journal_acron=None):
-        params = {}
-        if collection:
-            params["collection"] = collection
-        if journal_acron:
-            params["journal_acron"] = journal_acron
-
-        for journal_acron_id_file in cls.objects.filter(**params):
-            from_datetime = (
-                journal_acron_id_file.updated or journal_acron_id_file.created
-            )
-            items = IdFileRecord.modified_records(
-                collection=journal_acron_id_file.collection,
-                journal_acron=journal_acron_id_file.journal_acron,
-                from_datetime=from_datetime,
-            )
-            if items.exists():
-                yield journal_acron_id_file
 
 
 class IdFileRecord(CommonControlField, Orderable):
@@ -857,6 +788,7 @@ class IdFileRecord(CommonControlField, Orderable):
         item_pid,
         data,
         issue_folder,
+        force_update=None,
         article_filename=None,
         article_filetype=None,
         processing_date=None,
@@ -872,10 +804,10 @@ class IdFileRecord(CommonControlField, Orderable):
 
         try:
             obj = cls.get(parent, item_type, item_pid)
-            if processing_date and obj.processing_date == processing_date:
-                obj.deleted = False
-                obj.save()
-                return obj
+            if not force_update:
+                if data == obj.data:
+                    return obj
+
             obj.updated_by = user
             obj.updated = datetime.utcnow()
             obj.data = data
@@ -883,7 +815,6 @@ class IdFileRecord(CommonControlField, Orderable):
             obj.article_filename = article_filename
             obj.article_filetype = article_filetype
             obj.processing_date = processing_date
-            obj.deleted = False
             obj.save()
             return obj
         except cls.DoesNotExist:
@@ -932,9 +863,7 @@ class IdFileRecord(CommonControlField, Orderable):
         }
 
     @classmethod
-    def modified_records(
-        cls, collection=None, journal_acron=None, issue_folder=None, from_datetime=None
-    ):
+    def document_records_to_migrate(cls, collection=None, journal_acron=None, issue_folder=None, pid_prefix=None, resumption=None):
         params = {}
         if collection:
             params["parent__collection"] = collection
@@ -942,11 +871,10 @@ class IdFileRecord(CommonControlField, Orderable):
             params["parent__journal_acron"] = journal_acron
         if issue_folder:
             params["issue_folder"] = issue_folder
-        if from_datetime:
-            return cls.objects.filter(
-                Q(created__gte=from_datetime) | Q(updated__gte=from_datetime),
-                item_type="article",
-                **params,
-            )
-        else:
-            return cls.objects.filter(item_type="article", **params)
+        if pid_prefix:
+            params["item_pid__startswith"] = pid_prefix
+        if resumption:
+            params["updated__gt"] = resumption
+
+        logging.info(f"IdFileRecord.document_records_to_migrate {params}")
+        return cls.objects.filter(item_type="article", **params)
