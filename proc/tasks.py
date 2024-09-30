@@ -183,7 +183,6 @@ def task_migrate_and_publish_journals(
                 collection,
                 classic_website,
                 force_update,
-                force_import
             )
 
             qa_api_data = get_api_data(collection, "journal", "QA")
@@ -401,7 +400,6 @@ def task_migrate_and_publish_issues(
                 collection,
                 classic_website,
                 force_update,
-                force_import,
             )
 
             qa_api_data = get_api_data(collection, "issue", "QA")
