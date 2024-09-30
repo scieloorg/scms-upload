@@ -390,7 +390,7 @@ def task_migrate_and_publish_issues(
         if publication_year:
             params["issue__publication_year"] = publication_year
 
-        logging.info()
+        logging.info(params)
         for collection in _get_collections(collection_acron):
             # obtém os dados do site clássico
             classic_website = controller.get_classic_website(collection.acron)
@@ -409,7 +409,6 @@ def task_migrate_and_publish_issues(
                 collection=collection, **params
             ):
                 try:
-                    # cria ou atualiza Journal e atualiza issue_proc
                     migrate_issue(
                         user,
                         issue_proc,
