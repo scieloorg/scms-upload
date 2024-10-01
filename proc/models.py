@@ -523,9 +523,8 @@ class BaseProc(CommonControlField):
         if force_update:
             STATUS = tracker_choices.PROGRESS_STATUS_FORCE_UPDATE
 
-        params = params or {}
-        if content_type == "article":
-            params["sps_pkg__pid_v3__isnull"] = False
+        if params is None:
+            params = {}
 
         q = cls.get_queryset_to_process(STATUS)
 
