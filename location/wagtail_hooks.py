@@ -45,4 +45,4 @@ class LocationAdmin(ModelAdmin):
     export_filename = "locations"
 
 
-modeladmin_register(LocationAdmin)
+# modeladmin_register(LocationAdmin)
