@@ -40,6 +40,7 @@ class ArticleModelAdmin(ModelAdmin):
 
     list_display = (
         "__str__",
+        "pid_v3",
         "status",
         "display_sections",
         "order",
