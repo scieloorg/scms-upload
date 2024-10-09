@@ -118,7 +118,7 @@ def fetch_data(url, params=None, headers=None, json=False, timeout=2, verify=Tru
     """
 
     try:
-        logger.info("Fetching the URL: %s" % url)
+        logger.info("Fetching the URL: %s %s" % (url, params))
         response = requests.get(
             url, params=params, headers=headers, timeout=timeout, verify=verify
         )
