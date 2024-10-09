@@ -54,4 +54,4 @@ class InstitutionAdmin(ModelAdmin):
     export_filename = "institutions"
 
 
-modeladmin_register(InstitutionAdmin)
+# modeladmin_register(InstitutionAdmin)

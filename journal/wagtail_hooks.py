@@ -75,7 +75,7 @@ class JournalModelAdminGroup(ModelAdminGroup):
     menu_label = _("Journals")
     menu_order = get_menu_order("journal")
     items = (
-        OfficialJournalAdmin,
+        # OfficialJournalAdmin,
         JournalAdmin,
         # JournalProcAdmin,
     )
