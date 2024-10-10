@@ -24,7 +24,7 @@ def publish_article(article_proc, api_data, journal_pid=None):
             raise ValueError(
                 "publication.api.document.publish_article requires journal_pid")
 
-    order = article_proc.article.order
+    order = article_proc.article.position
     pub_date = article_proc.article.first_publication_date or datetime.utcnow()
 
     build_article(builder, article_proc.article, journal_pid, order, pub_date)

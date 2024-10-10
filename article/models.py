@@ -17,7 +17,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article.forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from collection import choices as collection_choices
-from collection.models import Collection, Language
+from collection.models import Collection, Language, WebSiteConfiguration
 from core.models import CommonControlField, HTMLTextModel
 from doi.models import DOIWithLang
 from issue.models import TOC, Issue, TocSection
@@ -151,15 +151,6 @@ class Article(ClusterableModel, CommonControlField):
         return self.sps_pkg.xml_uri
 
     @property
-    def order(self):
-        if self.position:
-            return self.position
-        try:
-            return int(self.fpage)
-        except (TypeError, ValueError):
-            return self.position
-
-    @property
     def is_public(self):
         return bool(
             self.first_publication_date
@@ -186,7 +177,7 @@ class Article(ClusterableModel, CommonControlField):
         raise ValueError("Article.get requires pid_v3")
 
     @classmethod
-    def create_or_update(cls, user, sps_pkg, issue=None, journal=None):
+    def create_or_update(cls, user, sps_pkg, issue=None, journal=None, position=None):
         if not sps_pkg or sps_pkg.pid_v3 is None:
             raise ValueError("create_article requires sps_pkg with pid_v3")
 
@@ -199,8 +190,10 @@ class Article(ClusterableModel, CommonControlField):
             obj.creator = user
 
         obj.sps_pkg = sps_pkg
-        obj.pid_v2 = sps_pkg.xml_with_pre.v2
-        obj.article_type = sps_pkg.xml_with_pre.xmltree.find(".").get("article_type")
+
+        xml_with_pre = sps_pkg.xml_with_pre
+        obj.pid_v2 = xml_with_pre.v2
+        obj.article_type = xml_with_pre.xmltree.find(".").get("article-type")
 
         if journal:
             obj.journal = journal
@@ -213,10 +206,11 @@ class Article(ClusterableModel, CommonControlField):
 
         obj.status = obj.status or choices.AS_READY_TO_PUBLISH
         obj.add_pages()
-        obj.add_sections(user)
+        obj.add_position(position, xml_with_pre.fpage)
         obj.add_article_publication_date()
         obj.save()
 
+        obj.add_sections(user)
         obj.add_article_titles(user)
         return obj
 
@@ -236,7 +230,6 @@ class Article(ClusterableModel, CommonControlField):
         self.fpage_seq = xml_with_pre.fpage_seq
         self.lpage = xml_with_pre.lpage
         self.elocation_id = xml_with_pre.elocation_id
-        self.position = xml_with_pre.order
 
     def add_issue(self, user):
         xml_with_pre = self.sps_pkg.xml_with_pre
@@ -262,16 +255,18 @@ class Article(ClusterableModel, CommonControlField):
         ).article_title_list
         self.title_with_lang.all().delete()
         for title in titles:
-            obj = ArticleTitle.create_or_update(
-                user,
-                parent=self,
-                text=title.get("html_text"),
-                language=Language.get(code2=title.get("language") or title.get("lang")),
-            )
-            self.title_with_lang.add(obj)
+            try:
+                obj = ArticleTitle.create_or_update(
+                    user,
+                    parent=self,
+                    text=title.get("html_text"),
+                    language=Language.get(code2=title.get("language") or title.get("lang")),
+                )
+                self.title_with_lang.add(obj)
+            except Exception as e:
+                logging.exception(e)
 
     def add_sections(self, user):
-        self.save()
         self.sections.all().delete()
 
         xml_sections = ArticleTocSections(
@@ -281,6 +276,8 @@ class Article(ClusterableModel, CommonControlField):
         items = xml_sections.article_section
         items.extend(xml_sections.sub_article_section)
 
+        logging.info(list(items))
+
         try:
             toc = TOC.objects.get(issue=self.issue)
         except TOC.DoesNotExist:
@@ -288,6 +285,7 @@ class Article(ClusterableModel, CommonControlField):
 
         group = None
         for item in items:
+            logging.info(f"section: {item}")
             if not item.get("text"):
                 continue
             try:
@@ -298,6 +296,7 @@ class Article(ClusterableModel, CommonControlField):
                     text=item.get("text"),
                 )
             except JournalSection.MultipleObjectsReturned as e:
+                logging.info(f"duplicated {item}")
                 section = JournalSection.objects.filter(
                     parent=self.journal,
                     language=language,
@@ -321,15 +320,16 @@ class Article(ClusterableModel, CommonControlField):
                 self.sps_pkg.xml_with_pre.article_publication_date, "%Y-%m-%d"
             )
 
-    def set_position(self, position=None):
-        if position:
-            self.position = position
+    def add_position(self, position=None, fpage=None):
+        try:
+            self.position = int(position or fpage)
+            return
+        except (ValueError, TypeError):
+            pass
+
+        # gera position
+        if not self.created:
             self.save()
-            return
-
-        if self.position:
-            return
-
         position = TocSection.get_section_position(self.issue, self.sections) or 0
 
         sections = [item.text for item in self.sections.all()]
@@ -337,7 +337,6 @@ class Article(ClusterableModel, CommonControlField):
             position * 10000
             + Article.objects.filter(sections__text__in=sections).count()
         )
-        self.save()
 
     @property
     def multilingual_sections(self):
@@ -348,6 +347,7 @@ class Article(ClusterableModel, CommonControlField):
         return str(self.multilingual_sections)
 
     def update_status(self, new_status=None):
+        # TODO create PublicationEvent
         if self.status == choices.AS_UPDATE_SUBMITTED:
             self.status = choices.AS_REQUIRE_UPDATE
             self.save()
@@ -440,3 +440,54 @@ class RequestArticleChange(CommonControlField):
         return f"{self.article}"
 
     base_form_class = RequestArticleChangeForm
+
+
+class PublicationEvent:
+    article = ParentalKey(
+        Article,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="publication_events",
+    )
+    website = models.ForeignKey(WebSiteConfiguration, null=True, blank=True, on_delete=models.SET_NULL)
+    creator = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    created = models.DateTimeField(verbose_name=_("Creation date"), auto_now_add=True)
+    is_public = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = _("Publication")
+        verbose_name_plural = _("Publications")
+
+        unique_together = [("website", "created")]
+        indexes = [
+            models.Index(fields=["website"]),
+            models.Index(fields=["created"]),
+        ]
+        ordering = ["article", "website", "-created"]
+
+    def __str__(self):
+        return f"{self.website} {self.is_public} {self.created}"
+
+    @property
+    def data(self):
+        return {"website": self.website, "is_public": self.is_public, "created": self.created.isoformat()}
+
+    @classmethod
+    def create(cls, article, website, is_public, user=None):
+        if article or website:
+            try:
+                obj = cls()
+                obj.article = article
+                obj.website = website
+                obj.is_public = is_public
+                obj.creator = user
+                obj.save()
+                return obj
+            except IntegrityError:
+                return cls.objects.get(article=article, website=website, created=obj.created)
+        raise ValueError(f"PublicationEvent.create missing params {dict(article=article, website=website)}")
+
+    @staticmethod
+    def get_current(article, website):
+        return PublicationEvent.objects.filter(article=article, website=website).order_by("-created").first()
