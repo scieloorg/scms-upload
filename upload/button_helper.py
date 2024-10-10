@@ -13,7 +13,7 @@ class UploadButtonHelper(ButtonHelper):
     ]
 
     def assign(self, obj, classnames, label=None):
-        text = label or _("Assign")
+        text = label or _("Accept / Reject the package or delegate it")
         return {
             "url": reverse("upload:assign") + "?package_id=%s" % str(obj.id),
             "label": text,
@@ -47,13 +47,20 @@ class UploadButtonHelper(ButtonHelper):
         This function is used to gather all available buttons.
         We append our custom button to the btns list.
         """
+        ph = self.permission_helper
+        usr = self.request.user
+        url_name = self.request.resolver_match.url_name
+
+        if not ph.user_can_analyse_error_validation_resolution(usr, obj):
+            # usuário sem poder de análise
+            exclude = ["edit", "delete"]
+
         btns = super().get_buttons_for_obj(
             obj, exclude, classnames_add, classnames_exclude
         )
 
-        ph = self.permission_helper
-        usr = self.request.user
-        url_name = self.request.resolver_match.url_name
+        if not obj.is_validation_finished:
+            return btns
 
         classnames = []
         if url_name.endswith("_modeladmin_inspect"):
@@ -62,19 +69,20 @@ class UploadButtonHelper(ButtonHelper):
             classnames.extend(UploadButtonHelper.index_button_classnames)
 
         if (
-            obj.status == choices.PS_READY_TO_BE_FINISHED
+            obj.status == choices.PS_VALIDATED_WITH_ERRORS
             and ph.user_can_finish_deposit(usr, obj)
             and url_name == "upload_package_modeladmin_inspect"
         ):
             btns.append(self.finish_deposit_button(obj, classnames))
 
-        if obj.status == choices.PS_PUBLISHED:
-            btns.append(self.view_published_document(obj, classnames))
-
-        if obj.assignee is None:
-            if obj.status == choices.PS_QA and ph.user_can_assign_package(usr, obj):
-                btns.append(self.assign(obj, classnames))
-        elif obj.assignee != usr:
-            btns.append(self.assign(obj, classnames, _("Reassign")))
+        if (
+            obj.status
+            in (
+                choices.PS_PENDING_QA_DECISION,
+                choices.PS_VALIDATED_WITH_ERRORS,
+            )
+            and ph.user_can_assign_package(usr, obj)
+        ):
+            btns.append(self.assign(obj, classnames))
 
         return btns
