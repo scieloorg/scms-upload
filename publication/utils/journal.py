@@ -1,3 +1,7 @@
+import logging
+from datetime import datetime
+
+
 def build_journal(builder, journal, journal_id, journal_acron, journal_history):
     official_journal = journal.official_journal
 
@@ -11,6 +15,7 @@ def build_journal(builder, journal, journal_id, journal_acron, journal_history):
         builder.add_mission(mission.language.code2, mission.text)
 
     for journal_history in journal_history.all():
+        logging.info(f"journal_history.event_type: {journal_history.event_type}")
         if journal_history.event_type == "ADMITTED":
             event_type = "current"
         elif journal_history.interruption_reason == "ceased":
@@ -30,6 +35,11 @@ def build_journal(builder, journal, journal_id, journal_acron, journal_history):
             journal_history.date,
             journal_history.interruption_reason,
         )
+    if not builder.data.get("status_history"):
+        builder.data["status_history"] = [{"status": "current", "date": datetime.utcnow().isoformat()}]
+
+    builder.data["current_status"] = builder.data["status_history"][-1]["status"]
+
     builder.add_journal_issns(
         scielo_issn=journal_id,
         eletronic_issn=official_journal.issn_electronic,

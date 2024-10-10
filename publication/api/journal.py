@@ -222,7 +222,6 @@ class JournalPayload:
                     "reason": reason or "",
                 }
             )
-            self.data["current_status"] = self.data["status_history"][-1]["status"]
 
     def add_mission(self, language, description):
         """
