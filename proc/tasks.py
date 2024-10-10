@@ -275,7 +275,7 @@ def task_publish_journals(
             for website_kind in (QA, PUBLIC):
 
                 try:
-                    api = get_api(collection, "issue", website_kind)
+                    api = get_api(collection, "journal", website_kind)
                 except WebSiteConfiguration.DoesNotExist:
                     continue
                 api.get_token()
