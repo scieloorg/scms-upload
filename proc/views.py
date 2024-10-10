@@ -1,17 +1,23 @@
+import logging
+
 from django.http import HttpResponseRedirect
-from django.utils.translation import gettext as _
-from django.shortcuts import render
 from wagtail.contrib.modeladmin.views import CreateView, EditView
 
 
-# Create your views here.
-class JournalTOCCreateView(CreateView):
+class ProcCreateView(CreateView):
+    def form_valid(self, form):
+        logging.info(f"ProcCreateView.user {self.request.user}")
+        self.object = form.save_all(self.request.user)
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class ProcEditView(EditView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())
 
 
-class JournalTOCEditView(EditView):
+class CoreCreateView(CreateView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())

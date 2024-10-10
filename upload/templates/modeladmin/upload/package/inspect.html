@@ -1,6 +1,31 @@
 {% extends "modeladmin/inspect.html" %}
 {% load i18n modeladmin_tags wagtailadmin_tags wagtailcore_tags %}
 
+{% block header %}
+    {% include "modeladmin/includes/header_with_history.html" with title=view.get_page_title subtitle=view.get_page_subtitle icon=view.header_icon merged=1 latest_log_entry=latest_log_entry history_url=history_url %}
+
+    {% if linked %}
+    <div class="nice-padding">
+        <p class="back">
+            <a href="{{ view.index_url }}?q={{ pkg_zip_name }}">
+                {% icon name="arrow-left" classname="default" %}
+                {% blocktrans trimmed with view.verbose_name as model_name %}Back to {{ pkg_zip_name }} list{% endblocktrans %}
+            </a>
+        </p>
+        {% for lk in linked %}
+            <p class="back">
+                <a href="/admin/upload/package/inspect/{{ lk.id }}/">
+                    {% icon name="arrow-left" classname="default" %}
+                    {% blocktrans trimmed with lk.status as st %}Go to {{ lk }} validation reports ({{ st }}) {% endblocktrans %}
+
+                    
+                </a>
+            </p>
+        {% endfor %}
+    </div>
+    {% endif %}
+{% endblock %}
+
 {% block fields_output %}
     {% if fields %}
         <h3>{% trans "Details" %}</h3>
@@ -27,148 +52,186 @@
     {{ block.super }}
 
     {% if category != 'generated-by-the-system' %}
+
     <div class="nice-padding">
-        <h3>{% trans "Reports" %}</h3>
+        <h3>{% trans "XML" %}</h3>
+        <div>
+        <textarea rows="10" readonly="true">{{ xml }}</textarea>
+        </div>
+    </div>
+
+    <div class="nice-padding">
+        <h3>{% trans "Package validations" %}</h3>
         <table class="listing">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Result</th>
-                    <th>Link</th>
+                    <th>{% trans 'Name' %}</th>
+                    <th>{% trans 'Date' %}</th>
+                    <th>{% trans 'Blocking issues' %}</th>
+                    <th>{% trans 'Critical issues' %}</th>
+                    <th>{% trans 'Errors' %}</th>
+                    <th>{% trans 'Warnings' %}</th>
+                    <th>{% trans 'Link' %}</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td class='title'><h2>{% trans "XML and/or DTD formation" %}</h2></td>
-                    {% if not validation_results.xml_or_dtd %}
-                        <td><span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span></td>
-                        <td></td>
-                    {% else %}
+                {% for report in reports %}
+                    <tr>
+                        <td class='title'>{{ report.title }}</td>
+                        <td>{{ report.updated }}</td>
+                        <td>{{ report.total_blocking }}</td>
+                        <td>{{ report.total_critical }}</td>
+                        <td>{{ report.total_errors }}</td>
+                        <td>{{ report.total_warnings }}</td>
                         <td>
-                            {% if validation_results.xml_or_dtd.status == 'disapproved' %}
-                                <span class='help-block help-critical'>{% trans "XML file has errors." %}</a></span>
+                            <a name="vr{{ report.id }}"/>
+                            {% if report.creation == 'doing' %}
+                                <a class="button" href Reload page="">{% trans 'Processing...' %}</a>
                             {% else %}
-                                <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
+                                <a class="button" href="/admin/upload/validationreport/edit/{{ report.id }}">
+                                    {% if perms.upload.send_validation_error_resolution and report.errors %}
+                                        {% trans 'Resolve errors' %}
+                                    {% else %}
+                                        {% trans 'View report' %}
+                                    {% endif %}
+                                </a>  
+                            {% endif %}                      
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <h3>{% trans "XML Validations" %}</h3>
+        <div>
+            <div class="help-block help-warning" name="help-to-fix">
+                <svg class="icon icon-warning icon" aria-hidden="true"><use href="#icon-warning"></use></svg><a href="#xref-help-to-fix"><sup>*</sup></a></sup>
+                {% trans 'By default the system sets all the XML errors were accepted by the XML producer and will be corrected. In case of disagreement, review the errors and set a different opinion' %}
+            </div>
+        </div>
+        <table class="listing">
+            <thead>
+                <tr>
+                    <th>{% trans 'Name' %}</th>
+                    <th>{% trans 'Date' %}</th>
+                    <th>{% trans 'Critical issues' %}</th>
+                    <th>{% trans 'Errors' %}</th>
+                    <th>{% trans 'Warnings' %}</th>
+                    <th>{% trans 'Accepted to fix' %}<sup><a name="xref-help-to-fix" href="#help-to-fix">*</a></sup></th>
+                    <th>{% trans 'Contested issues' %}</th>
+                    <th>{% trans 'Declared impossible to fix' %}</th>
+                    <th>{% trans 'Link' %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in xml_error_reports %}
+                    <tr>
+                        <td class="title">{{ report.title }}</td>
+                        <td>{{ report.updated }}</td>
+                        <td>{{ report.total_critical }}</td>
+                        <td>{{ report.total_error }}</td>
+                        <td>{{ report.total_warning }}</td>
+                        <td>{{ report.reaction_to_fix }}</td>
+                        <td>{{ report.reaction_not_to_fix }}</td>
+                        <td>{{ report.reaction_impossible_to_fix }}</td>
+                        <td>
+                            <a name="xer{{ report.id }}"/>
+                            {% if report.creation == 'doing' %}
+                                <a class="button" href="">{% trans 'Processing... Reload page' %}</a>
+                            {% else %}
+                                <a class="button" href="/admin/upload/xmlerrorreport/edit/{{ report.id }}">
+                                    {% if report.xml_producer_ack %}
+                                        {% trans 'Error review completed' %}
+                                    {% else %}
+                                        {% if perms.upload.send_validation_error_resolution %}
+                                            {% trans 'Review the XML errors' %}
+                                        {% else %}
+                                            {% trans 'View the XML errors' %}
+                                        {% endif %}
+                                        
+                                    {% endif %}
+                                </a>
+                                ({% trans 'Pending conclusion' %})<br/>
                             {% endif %}
                         </td>
-                        <td>
-                            {% trans 'See the XML and/or DTD Formation Report: ' %}
-                            {% for x in validation_results.xml_or_dtd.xmls %}
-                                <a href="{{ x.inspect_uri }}">XML {{ forloop.counter }}</a>
-                                {% if not forloop.last %} | {% endif %}
-                            {% endfor %}
-                        </td>
-                    {% endif %}
-                </tr>
-
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <table class="listing">
+            <thead>
                 <tr>
-                    <td class='title'><h2>{% trans "Digital assets and renditions" %}</h2></td>
-                    {% if not validation_results.asset_and_rendition %}
-                        <td><span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span></td>
-                        <td></td>
-                    {% else %}
-                        <td>
-                            {% if validation_results.asset_and_rendition.status == 'disapproved' %}
-                                <span class='help-block help-critical'>{% trans "Digital assets and/or renditions validation failed." %}</span>
-                            {% else %}
-                                <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
-                            {% endif %}
-                        </td>
-                        <td><a href="{% url 'upload:validation_report' %}?package_id={{ package_id }}&report=asset_and_rendition">{% trans 'See the Digital Assets and Renditions Report.' %}</a><td>
-                    {% endif %}
+                    <th>{% trans 'Name' %}</th>
+                    <th>{% trans 'Date' %}</th>
+                    <th>{% trans 'Validations' %}</th>
+                    <th>{% trans 'Link' %}</th>
                 </tr>
-
-                <tr>
-                    <td class='title'><h2>{% trans "Stylesheet" %}</h2></td>
-                    {% if not validation_results.stylesheet %}
-                        <td><span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span></td>
-                        <td></td>
-                    {% else %}
+            </thead>
+            <tbody>
+                {% for report in xml_info_reports %}
+                    <tr>
+                        <td class='title'>{{ report.title }}</td>
+                        <td>{{ report.updated }}</td>
+                        <td>{{ report.total }}</td>    
                         <td>
-                            {% if validation_results.stylesheet.status == 'disapproved' %}
-                                <span class='help-block help-critical'>{% trans "Stylesheet validation failed." %}</span>
-                            {% else %}
-                                <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
-                            {% endif %}
+                            <a name="xi"/>
+                            <a class="button" href="/admin/upload/xmlinforeport/edit/{{ report.id }}">{% trans 'View report' %}</a>
                         </td>
-                        <td></td>
-                    {% endif %}
-                </tr>
-
-                <tr>
-                    <td class='title'><h2>{% trans "Individual content validation" %}</h2></td>
-                    {% if not validation_results.individual_content %}
-                        <td><span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span></td>
-                        <td></td>
-                    {% else %}
-                        <td>
-                            {% if validation_results.individual_content.status == 'disapproved' %}
-                                <span class='help-block help-critical'>{% trans "Individual content validation failed." %}</span>
-                            {% else %}
-                                <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
-                            {% endif %}
-                        </td>
-                        <td><a href="{% url 'upload:validation_report' %}?package_id={{ package_id }}&report=individual_content">{% trans 'See the Individual Content Report.' %}</a></td>
-                    {% endif %}
-                </tr>
-                
-                <tr>
-                    <td class='title'><h2>{% trans "Grouped content validation" %}</h2></td>
-                    {% if not validation_results.grouped_content %}
-                        <td><span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span></td>
-                        <td></td>
-                    {% else %}
-                        <td>
-                            {% if validation_results.grouped_content.status == 'disapproved' %}
-                                <span class='help-block help-critical'>{% trans "Individual content validation failed." %}</span>
-                            {% else %}
-                                <span class='help-block help-info'>{% trans 'There are no errors.' %}</span>
-                            {% endif %}
-                        </td>
-                        <td></td>
-                    {% endif %}
-                </tr>
-                
-                <tr>
-                    <td class='title'><h2>{% trans "Quality analysis opinion" %}</h2></td>
-                    {% if not validation_results.qa %}
-                        <td><span class='help-block help-warning'>{% trans 'This report is not available yet.' %}</span></td>
-                        <td></td>
-                    {% else %}
-                        <td>
-                            {% if status == 'pending-correction' %}
-                                <span class='help-block help-critical'>{% trans "There are pending corrections." %}</span>
-                            {% else %}
-                                <span class='help-block help-info'>{% trans 'Package has been accepted.' %}</span>
-                            {% endif %}
-                        </td>
-                        <td><a href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}&scope=report">{% trans 'See Quality Analysis Report.' %}</a></td>
-                    {% endif %}
-                </tr>
+                    </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>
     {% endif %}
-    
-    {% if validation_results.xml_or_dtd.status == 'approved' %}
-        {% include 'modeladmin/upload/package/inspect_buttons.html' %}
-    {% endif %}
 
-    {% include 'modeladmin/upload/package/inspect_buttons_download.html' %}
-
-    {% if status == 'validated-with-errors' or status == 'quality-analysis' %}
+    {% if not summary.is_validation_finished %}
         <div class="nice-padding row">
-            <h3>{% trans "Actions" %}</h3>
-            <div class="col2">
-                {% if status == 'validated-with-errors' and perms.upload.send_validation_error_resolution %}
-                    <a class="button is-small" href="{% url 'upload:error_resolution' %}?package_id={{ package_id }}">{% trans 'Start Error Resolution' %}</a>
-                {% else %}
-                    {% if status == 'quality-analysis' and perms.upload.analyse_validation_error_resolution %}
-                        <a class="button is-small" href="{% url 'upload:error_resolution' %}?scope=analyse&package_id={{ package_id }}">{% trans 'Analyse Error Resolution' %}</a>
+            <a class="button" href="">
+                {% trans 'Processing validations... Reload page. ' %}
+            </a>
+        </div>
+    {% else %}
+        <div class="nice-padding row">
+            <p>{% trans 'Validations finished!' %}</p>
+        </div>
+        <div class="nice-padding row">
+            <h3>{% trans "Summary" %}</h3>
+
+           <div class="row">
+                <div class="12">
+                    <ul>
+                        <li>{% trans "XML warnings" %}: {{ summary.total_xml_warnings }} / {{ summary.total_validations }}</li>
+                        <li>{% trans "XML errors" %}: {{ summary.total_xml_errors }} / {{ summary.total_validations }}</li>
+                        <li>{% trans "Critical issues" %}: {{ summary.critical_errors }}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="nice-padding row">
+            <div class="row">
+                <div class="12">
+                    {% if summary.conclusion %}
+                        <div class="help-block help-info">
+                            <svg class="icon icon-help icon" aria-hidden="true"><use href="#icon-help"></use></svg>
+                            <p>{{ summary.conclusion }}</p>
+                        </div>
                     {% endif %}
-                {% endif %}
+                    {% if summary.total_xml_errors or summary.total_xml_warnings or summary.critical_errors %}
+                        <div>
+                            <a class="button" href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
+                                <!-- User must finish the error review -->
+                                {% trans 'Download XML errors report' %}
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
     {% endif %}
+
+    </div>
+    <div class="nice-padding row">
+        <div>...........</div>
+    </div>
 
 {% endblock %}

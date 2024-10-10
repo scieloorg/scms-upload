@@ -1,33 +1,88 @@
 from django.utils.translation import gettext as _
 
 # Model Package, Field status
+
+"""
+# SYSTEM
+1. PS_SUBMITTED --> primeira avaliação --> 2
+
+# SYSTEM
+2.1. PS_ENQUEUED_FOR_VALIDATION --> 3
+2.2. PS_UNEXPECTED --> 10
+
+# SYSTEM
+3.1. PS_READY_TO_PREVIEW --> 13
+3.2. PS_PENDING_CORRECTION --> 10
+3.3. PS_VALIDATED_WITH_ERRORS --> 7
+
+# QA USER
+4.1. PS_PUBLISHED --> 8
+
+# QA USER
+6.1. PS_PENDING_CORRECTION --> 10
+6.2. PS_READY_TO_PREVIEW --> 13
+
+# XML PRODUCTOR USER
+# SYSTEM / CONFIGURAÇÃO DO FLUXO
+7.1. PS_PENDING_CORRECTION --> 10
+7.2. PS_PENDING_QA_DECISION --> 6 (MAIS TOLERANTE - GARGALO NA UNIDADE SCIELO)
+
+# QA USER ON BEHALF ANY USER
+8.1. PS_REQUIRED_ERRATUM --> 11
+8.2. PS_REQUIRED_UPDATE --> 11
+
+10. produtor de XML terá que corrigir e re-submeter
+
+# EDITOR | ?
+11.1. ASSIGN XML PRODUCTOR --> 10
+
+# SYSTEM / QA USER
+13.1. PS_PREVIEW --> 14
+
+# QA USER
+14.1. PS_PENDING_CORRECTION --> 10
+14.2. PS_READY_TO_PUBLISH --> 4
+"""
 PS_SUBMITTED = "submitted"
 PS_ENQUEUED_FOR_VALIDATION = "enqueued-for-validation"
 PS_VALIDATED_WITH_ERRORS = "validated-with-errors"
-PS_VALIDATED_WITHOUT_ERRORS = "validated-without-errors"
 PS_PENDING_CORRECTION = "pending-correction"
-PS_READY_TO_BE_FINISHED = "ready-to-be-finished"
-PS_QA = "quality-analysis"
-PS_REJECTED = "rejected"
-PS_ACCEPTED = "accepted"
-PS_SCHEDULED_FOR_PUBLICATION = "scheduled-for-publication"
+PS_PENDING_QA_DECISION = "pending-qa-decision"
+PS_UNEXPECTED = "unexpected"
+PS_READY_TO_PREVIEW = "ready-to-preview"
+PS_PREVIEW = "preview"
+PS_READY_TO_PUBLISH = "ready-to-publish"
 PS_PUBLISHED = "published"
-
 PS_REQUIRED_ERRATUM = "required-erratum"
 PS_REQUIRED_UPDATE = "required-update"
+PS_DEPUBLISHED = "depublished"
 
 PACKAGE_STATUS = (
+    (PS_REQUIRED_ERRATUM, _("Required erratum")),
+    (PS_REQUIRED_UPDATE, _("Required update")),
     (PS_SUBMITTED, _("Submitted")),
     (PS_ENQUEUED_FOR_VALIDATION, _("Enqueued for validation")),
     (PS_VALIDATED_WITH_ERRORS, _("Validated with errors")),
-    (PS_VALIDATED_WITHOUT_ERRORS, _("Validated without errors")),
+    (PS_PENDING_QA_DECISION, _("Pending quality analysis decision")),
     (PS_PENDING_CORRECTION, _("Pending for correction")),
-    (PS_READY_TO_BE_FINISHED, _("Ready to be finished")),
-    (PS_QA, _("Waiting for quality analysis")),
-    (PS_REJECTED, _("Rejected")),
-    (PS_ACCEPTED, _("Accepted")),
-    (PS_SCHEDULED_FOR_PUBLICATION, _("Scheduled for publication")),
+    (PS_UNEXPECTED, _("Unexpected")),
+    (PS_READY_TO_PREVIEW, _("Ready to preview on QA website")),
+    (PS_PREVIEW, _("Preview")),
+    (PS_READY_TO_PUBLISH, _("Ready to publish on public website")),
     (PS_PUBLISHED, _("Published")),
+)
+
+CRITICAL_ERROR_DECISION = (
+    (PS_PENDING_CORRECTION, _("Pending for correction")),
+    (PS_VALIDATED_WITH_ERRORS, _("Validated with errors")),
+)
+
+QA_DECISION = (
+    (PS_DEPUBLISHED, _("Depublish")),
+    (PS_PENDING_CORRECTION, _("Pending for correction")),
+    (PS_PENDING_QA_DECISION, _("Pending quality analysis decision")),
+    (PS_READY_TO_PREVIEW, _("Ready to preview on QA website")),
+    (PS_READY_TO_PUBLISH, _("Ready to publish on public website")),
 )
 
 # Model Package, Field category
@@ -42,112 +97,122 @@ PACKAGE_CATEGORY = (
     (PC_NEW_DOCUMENT, _("New document")),
 )
 
-
-# Model ValidationResult, Field category, VE = Validation Error
-VE_PACKAGE_FILE_ERROR = "package-file-error"
-VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR = "article-journal-incompatibility-error"
-VE_ARTICLE_IS_NOT_NEW_ERROR = "article-is-not-new-error"
-VE_XML_FORMAT_ERROR = "xml-format-error"
-VE_BIBLIOMETRICS_DATA_ERROR = "bibliometrics-data-error"
-VE_SERVICES_DATA_ERROR = "services-data-error"
-VE_DATA_CONSISTENCY_ERROR = "data-consistency-error"
-VE_CRITERIA_ISSUES_ERROR = "criteria-issues-error"
-VE_ASSET_ERROR = "asset-error"
-VE_RENDITION_ERROR = "rendition-error"
-
-VALIDATION_ERROR_CATEGORY = (
-    (VE_PACKAGE_FILE_ERROR, "PACKAGE_FILE_ERROR"),
-    (VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR, "ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR"),
-    (VE_ARTICLE_IS_NOT_NEW_ERROR, "ARTICLE_IS_NOT_NEW_ERROR"),
-    (VE_XML_FORMAT_ERROR, "XML_FORMAT_ERROR"),
-    (VE_BIBLIOMETRICS_DATA_ERROR, "BIBLIOMETRICS_DATA_ERROR"),
-    (VE_SERVICES_DATA_ERROR, "SERVICES_DATA_ERROR"),
-    (VE_DATA_CONSISTENCY_ERROR, "DATA_CONSISTENCY_ERROR"),
-    (VE_CRITERIA_ISSUES_ERROR, "CRITERIA_ISSUES"),
-    (VE_ASSET_ERROR, "ASSET_ERROR"),
-    (VE_RENDITION_ERROR, "RENDITION_ERROR"),
-)
-
 # Model ValidationResult, campo que agrupo tipos de erro de validação, VR = Validation Report
 VR_XML_OR_DTD = "xml_or_dtd"
 VR_ASSET_AND_RENDITION = "asset_and_rendition"
 VR_INDIVIDUAL_CONTENT = "individual_content"
-VR_GROUPED_CONTENT = "grouped_content"
+VR_GROUP_CONTENT = "group_content"
 VR_STYLESHEET = "stylesheet"
 VR_PACKAGE_FILE = "package_file"
 
-VALIDATION_REPORT_ITEMS = {
-    VR_XML_OR_DTD: set(
-        [
-            VE_XML_FORMAT_ERROR,
-        ]
-    ),
-    VR_ASSET_AND_RENDITION: set(
-        [
-            VE_ASSET_ERROR,
-            VE_RENDITION_ERROR,
-        ]
-    ),
-    VR_INDIVIDUAL_CONTENT: set(
-        [
-            VE_ARTICLE_IS_NOT_NEW_ERROR,
-            VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR,
-            VE_BIBLIOMETRICS_DATA_ERROR,
-            VE_DATA_CONSISTENCY_ERROR,
-        ]
-    ),
-    VR_GROUPED_CONTENT: set(
-        [
-            VE_CRITERIA_ISSUES_ERROR,
-            VE_SERVICES_DATA_ERROR,
-        ]
-    ),
-    VR_PACKAGE_FILE: set(
-        [
-            VE_PACKAGE_FILE_ERROR,
-        ]
-    ),
-}
+VAL_CAT_PACKAGE_FILE = "package-file"
+VAL_CAT_UNEXPECTED = "unexpected"
+VAL_CAT_FORBIDDEN_UPDATE = "forbidden-update"
+VAL_CAT_ARTICLE_JOURNAL_COMPATIBILITY = "journal-incompatibility"
+VAL_CAT_ARTICLE_IS_NOT_NEW = "article-is-not-new"
+VAL_CAT_XML_FORMAT = "xml-format"
+VAL_CAT_STYLE = "xml-style"
+VAL_CAT_XML_CONTENT = "xml-content"
+VAL_CAT_BIBLIOMETRICS_DATA = "bibliometrics-data"
+VAL_CAT_SERVICES_DATA = "services-data"
+VAL_CAT_DATA_CONSISTENCY = "data-consistency"
+VAL_CAT_CRITERIA_ISSUES = "criteria-issues"
+VAL_CAT_ASSET = "asset"
+VAL_CAT_RENDITION = "rendition"
+VAL_CAT_RENDITION_CONTENT = "rendition-content"
+VAL_CAT_WEB_PAGE_CONTENT = "web-page-content"
+VAL_CAT_GROUP_DATA = "group"
 
-VALIDATION_DICT_ERROR_CATEGORY_TO_REPORT = {
-    VE_XML_FORMAT_ERROR: VR_XML_OR_DTD,
-    VE_ASSET_ERROR: VR_ASSET_AND_RENDITION,
-    VE_RENDITION_ERROR: VR_ASSET_AND_RENDITION,
-    VE_ARTICLE_IS_NOT_NEW_ERROR: VR_INDIVIDUAL_CONTENT,
-    VE_ARTICLE_JOURNAL_INCOMPATIBILITY_ERROR: VR_INDIVIDUAL_CONTENT,
-    VE_BIBLIOMETRICS_DATA_ERROR: VR_INDIVIDUAL_CONTENT,
-    VE_DATA_CONSISTENCY_ERROR: VR_INDIVIDUAL_CONTENT,
-    VE_CRITERIA_ISSUES_ERROR: VR_GROUPED_CONTENT,
-    VE_SERVICES_DATA_ERROR: VR_GROUPED_CONTENT,
-    VE_PACKAGE_FILE_ERROR: VR_PACKAGE_FILE,
-}
+VALIDATION_CATEGORY = (
+    (VAL_CAT_ARTICLE_JOURNAL_COMPATIBILITY, "ARTICLE_JOURNAL_COMPATIBILITY"),
+    (VAL_CAT_ARTICLE_IS_NOT_NEW, "ARTICLE_IS_NOT_NEW"),
+    (VAL_CAT_XML_FORMAT, "XML_FORMAT"),
+    (VAL_CAT_STYLE, "XML_STYLE"),
+    (VAL_CAT_XML_CONTENT, "VAL_CAT_XML_CONTENT"),
+    (VAL_CAT_GROUP_DATA, "VAL_CAT_GROUP_DATA"),
+    (VAL_CAT_BIBLIOMETRICS_DATA, "BIBLIOMETRICS_DATA"),
+    (VAL_CAT_SERVICES_DATA, "SERVICES_DATA"),
+    (VAL_CAT_DATA_CONSISTENCY, "DATA_CONSISTENCY"),
+    (VAL_CAT_CRITERIA_ISSUES, "CRITERIA_ISSUES"),
+    (VAL_CAT_ASSET, "ASSET"),
+    (VAL_CAT_RENDITION, "RENDITION"),
+    (VAL_CAT_PACKAGE_FILE, "PACKAGE_FILE"),
+)
 
 # Model ValidationResult, Field status
-VS_CREATED = "created"
-VS_DISAPPROVED = "disapproved"
-VS_APPROVED = "approved"
+REPORT_CREATION_NONE = ""
+REPORT_CREATION_WIP = "doing"
+REPORT_CREATION_DONE = "done"
 
-VALIDATION_STATUS = (
-    (VS_CREATED, "created"),
-    (VS_DISAPPROVED, "disapproved"),
-    (VS_APPROVED, "approved"),
+REPORT_CREATION = (
+    (REPORT_CREATION_DONE, "done"),
+    (REPORT_CREATION_WIP, "doing"),
+    (REPORT_CREATION_NONE, ""),
+)
+
+# Model ValidationResult, Field status
+VALIDATION_RESULT_SUCCESS = "OK"
+VALIDATION_RESULT_FAILURE = "ERROR"
+VALIDATION_RESULT_CRITICAL = "CRITICAL"
+VALIDATION_RESULT_BLOCKING = "BLOCKING"
+VALIDATION_RESULT_UNKNOWN = "UKN"
+VALIDATION_RESULT_WARNING = "WARNING"
+
+VALIDATION_RESULT = (
+    (VALIDATION_RESULT_BLOCKING, _("blocking")),
+    (VALIDATION_RESULT_CRITICAL, _("critical")),
+    (VALIDATION_RESULT_FAILURE, _("error")),
+    (VALIDATION_RESULT_UNKNOWN, _("unknown")),
+    (VALIDATION_RESULT_WARNING, _("warning")),
+    (VALIDATION_RESULT_SUCCESS, _("ok")),
 )
 
 # Model ErrorResolution, Field action
-ER_ACTION_TO_FIX = "to-fix"
-ER_ACTION_DISAGREE = "disagree"
+ER_REACTION_FIX = "to-fix"
+ER_REACTION_NOT_TO_FIX = "not-to-fix"
+ER_REACTION_IMPOSSIBLE_TO_FIX = "unable-to-fix"
 
-ERROR_RESOLUTION_ACTION = (
-    (ER_ACTION_TO_FIX, _("I will fix this error")),
-    (ER_ACTION_DISAGREE, _("This is not an error")),
+ERROR_REACTION = (
+    (ER_REACTION_FIX, _("XML producer will fix this error")),
+    (
+        ER_REACTION_IMPOSSIBLE_TO_FIX,
+        _("XML producer declares that correction is impossible"),
+    ),
+    (ER_REACTION_NOT_TO_FIX, _("XML producer disagrees that there is an error")),
 )
 
 
 # Model ErrorResolution, Field opinion
-ER_OPINION_FIXED = "fixed"
-ER_OPINION_FIX_DEMANDED = "fix-demanded"
+ER_DECISION_NO_CORRECTION_NEEDED = "accepted"
+ER_DECISION_ACCEPTED_WITH_ERRORS = "accepted-with-error"
+ER_DECISION_CORRECTION_REQUIRED = "to-fix"
 
-ERROR_RESOLUTION_OPINION = (
-    (ER_OPINION_FIXED, _("Fixed")),
-    (ER_OPINION_FIX_DEMANDED, _("Error has to be fixed")),
+ERROR_DECISION = (
+    (ER_DECISION_ACCEPTED_WITH_ERRORS, _("Accepted with errors")),
+    (ER_DECISION_NO_CORRECTION_NEEDED, _("Accepted")),
+    (ER_DECISION_CORRECTION_REQUIRED, _("Correction required")),
+)
+
+
+STRICT_AUTO_PUBLICATION = "strict"
+FLEXIBLE_AUTO_PUBLICATION = "flexible"
+MANUAL_PUBLICATION = "manual"
+
+PUBLICATION_RULE = (
+    (FLEXIBLE_AUTO_PUBLICATION, _("Flexible auto publication")),
+    (STRICT_AUTO_PUBLICATION, _("Strict auto publication")),
+    (MANUAL_PUBLICATION, _("Manual publication")),
+)
+
+# nunca publicado antes
+UNRELEASED = "unreleased"
+# publicado
+PUBLISHED = "published"
+# despubicado
+DEPUBLISHED = "depublished"
+
+WEBSITE_STATUS = (
+    (UNRELEASED, _("unreleased")),
+    (PUBLISHED, _("published")),
+    (DEPUBLISHED, _("depublished")),
 )

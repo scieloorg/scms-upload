@@ -1,4 +1,5 @@
 from wagtail.admin.forms import WagtailAdminModelForm
+from core.forms import CoreAdminModelForm
 
 
 class OfficialJournalForm(WagtailAdminModelForm):
@@ -11,3 +12,10 @@ class OfficialJournalForm(WagtailAdminModelForm):
         self.save()
 
         return journal
+
+
+class JournalTOCForm(CoreAdminModelForm):
+    def save_all(self, user):
+        obj = super().save_all(user)
+        self.save()
+        return obj
