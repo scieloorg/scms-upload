@@ -17,6 +17,20 @@ from team.forms import CollectionTeamMemberModelForm
 User = get_user_model()
 
 
+ALLOWED_COLLECTIONS = ["dom", "spa", "scl"]
+
+
+def has_permission(user=None):
+    try:
+        if not user:
+            logging.info(f"has_permission: collection")
+            return Collection.objects.filter(acron__in=ALLOWED_COLLECTIONS).exists()
+        logging.info(f"has_permission: user")
+        return CollectionTeamMember.has_upload_permission(user)
+    except Exception as e:
+        return False
+
+
 class TeamMember(CommonControlField):
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
     is_active_member = models.BooleanField(null=True, blank=True, default=True)
@@ -99,3 +113,7 @@ class CollectionTeamMember(TeamMember):
     def members(user, is_active_member=None):
         for collection in CollectionTeamMember.collections(user, is_active_member):
             return CollectionTeamMember.objects.filter(collection=collection)
+
+    @classmethod
+    def has_upload_permission(cls, user):
+        return cls.objects.filter(user=user, collection__acron__in=ALLOWED_COLLECTIONS).exists()
