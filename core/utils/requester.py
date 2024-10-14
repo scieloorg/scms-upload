@@ -83,6 +83,10 @@ def post_data(
     try:
         response.raise_for_status()
     except requests.HTTPError as exc:
+        try:
+            return response.json()
+        except Exception as json_error:
+            pass
         if 400 <= exc.response.status_code < 500:
             raise NonRetryableError(exc) from exc
         elif 500 <= exc.response.status_code < 600:
