@@ -148,6 +148,8 @@ class OfficialJournal(CommonControlField):
         _("ISSN Eletronic"), max_length=9, null=True, blank=True
     )
     issnl = models.CharField(_("ISSNL"), max_length=9, null=True, blank=True)
+    previous_journal_title = models.CharField(max_length=128, null=True, blank=True)
+    next_journal_title = models.CharField(max_length=128, null=True, blank=True)
 
     base_form_class = OfficialJournalForm
 
@@ -195,14 +197,14 @@ class OfficialJournal(CommonControlField):
         return d
 
     @classmethod
-    def get(cls, issn_print=None, issn_electronic=None, issnl=None):
-        logging.info(f"OfficialJournal.get({issn_print}, {issn_electronic}, {issnl})")
+    def get(cls, issn_print=None, issn_electronic=None, issnl=None, title=None):
         if issn_electronic:
             return cls.objects.get(issn_electronic=issn_electronic)
         if issn_print:
             return cls.objects.get(issn_print=issn_print)
         if issnl:
             return cls.objects.get(issnl=issnl)
+        raise ValueError(f"{title} - OfficialJournal.get requires issn_print, issn_electronic")
 
     @classmethod
     def create_or_update(
@@ -215,9 +217,6 @@ class OfficialJournal(CommonControlField):
         title_iso=None,
         foundation_year=None,
     ):
-        logging.info(
-            f"OfficialJournal.create_or_update({issn_print}, {issn_electronic}, {issnl})"
-        )
         try:
             obj = cls.get(issn_print, issn_electronic, issnl)
             obj.updated_by = user
@@ -233,8 +232,12 @@ class OfficialJournal(CommonControlField):
         obj.issn_electronic = issn_electronic or obj.issn_electronic
         obj.foundation_year = foundation_year or obj.foundation_year
         obj.save()
-        logging.info(f"return {obj}")
         return obj
+
+    def add_related_journal(self, previous_journal_title, next_journal_title):
+        self.previous_journal_title = previous_journal_title
+        self.next_journal_title = next_journal_title
+        self.save()
 
 
 class Journal(CommonControlField, ClusterableModel):
@@ -246,7 +249,7 @@ class Journal(CommonControlField, ClusterableModel):
         _("Short Title"), max_length=100, null=True, blank=True
     )
     title = models.CharField(_("Title"), max_length=265, null=True, blank=True)
-    journal_acron = models.CharField(_("Journal Acronym"), max_length=8, null=True, blank=True)
+    journal_acron = models.CharField(_("Journal Acronym"), max_length=16, null=True, blank=True)
     official_journal = models.ForeignKey(
         "OfficialJournal",
         null=True,
@@ -283,7 +286,7 @@ class Journal(CommonControlField, ClusterableModel):
     panels_identification = [
         AutocompletePanel("official_journal"),
         FieldPanel("short_title"),
-        FieldPanel("journal_acron")
+        FieldPanel("journal_acron"),
     ]
 
     panels_owner = [
@@ -306,6 +309,14 @@ class Journal(CommonControlField, ClusterableModel):
             ObjectList(panels_mission, heading=_("Mission")),
         ]
     )
+
+    @property
+    def issn_print(self):
+        return self.official_journal.issn_print
+
+    @property
+    def issn_electronic(self):
+        return self.official_journal.issn_electronic
 
     @property
     def first_letters(self):
@@ -382,10 +393,8 @@ class Journal(CommonControlField, ClusterableModel):
         short_title=None,
         journal_acron=None,
     ):
-        logging.info(f"Journal.create_or_update({official_journal}")
         try:
             obj = cls.get(official_journal=official_journal)
-            logging.info("update {}".format(obj))
             obj.updated_by = user
             obj.updated = datetime.utcnow()
             obj.official_journal = official_journal or obj.official_journal
@@ -503,7 +512,6 @@ class JournalEmail(Orderable):
         journal=None,
         email=None,
     ):
-        logging.info(f"Journal.create_or_update({journal})")
         try:
             obj = cls.get(journal, email)
             obj.journal = journal
@@ -882,13 +890,14 @@ class JournalHistory(CommonControlField):
             "year": self.year,
             "month": self.month,
             "day": self.day,
+            "date": self.date,
         }
 
         return d
 
     @property
     def date(self):
-        return f"{self.year}-{str(self.month).zfill(2)}-{str(self.day).zfill(2)}"
+        return "-".join((str(i).zfill(2) for i in [self.year, self.month, self.day] if i))
 
     @property
     def opac_event_type(self):
