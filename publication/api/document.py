@@ -37,7 +37,7 @@ def publish_article(article_proc, api_data, journal_pid=None):
         article_url=data.get("xml"),
     )
     ret = api.post_data(data, kwargs)
-    logging.info(ret)
+    ret["payload"] = data
     return ret
 
 

@@ -22,13 +22,13 @@ def publish_journal(journal_proc, api_data):
 
     journal_payload_builder = JournalPayload(payload)
     build_journal(
-        journal_payload_builder, journal, journal_pid, journal_acron, journal_history
+        journal_payload_builder, journal, journal_pid, journal_acron, journal_history,
+        journal_proc.availability_status
     )
 
     api = PublicationAPI(**api_data)
     response = api.post_data(payload)
-    logging.info(payload)
-    logging.info(response)
+    response["payload"] = payload
     return response
 
 
@@ -199,9 +199,9 @@ class JournalPayload:
     def add_online_submission_url(self, online_submission_url):
         self.data["online_submission_url"] = online_submission_url
 
-    # def add_related_journals(self, previous_journal, next_journal_title):
-    #     self.data["next_title"] = next_journal_title
-    #     self.data["previous_journal_ref"] = previous_journal
+    def add_related_journals(self, previous_journal, next_journal_title):
+        self.data["next_journal"] = {"name": next_journal_title}
+        self.data["previous_journal"] = {"name": previous_journal}
 
     def add_event_to_timeline(self, status, since, reason):
         """
@@ -222,7 +222,6 @@ class JournalPayload:
                     "reason": reason or "",
                 }
             )
-            self.data["current_status"] = self.data["status_history"][-1]["status"]
 
     def add_mission(self, language, description):
         """
@@ -261,8 +260,8 @@ class JournalPayload:
     #             "h5_metric_year": h5_metric_year or None,
     #         }
 
-    # def add_is_public(self):
-    #     self.data["is_public"] = True
+    def add_is_public(self, availability_status):
+        self.data["is_public"] = availability_status == "C"
 
     def add_publisher(self, name):
         self.data.setdefault("institution_responsible_for", [])
