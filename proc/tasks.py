@@ -76,7 +76,8 @@ def task_migrate_and_publish(
     publication_year=None,
     issue_folder=None,
     force_update=False,
-    force_import=None,
+    force_import_acron_id_file=False,
+    force_migrate_document_records=False,
 ):
     try:
         user = _get_user(user_id, username)
@@ -91,6 +92,9 @@ def task_migrate_and_publish(
             issue_filter["issue_folder"] = issue_folder
         if publication_year:
             issue_filter["issue__publication_year"] = publication_year
+
+        logging.info(f"journal_filter: {journal_filter}")
+        logging.info(f"issue_filter: {issue_filter}")
 
         for collection in _get_collections(collection_acron):
             # obtém os dados do site clássico
@@ -110,21 +114,47 @@ def task_migrate_and_publish(
                 classic_website,
                 force_update,
             )
+
             items = JournalProc.items_to_process(collection, "journal", journal_filter, force_update)
             logging.info(f"journals to process: {items.count()}")
-            logging.info(f"journal_filter: {journal_filter}")
-            logging.info(f"issue_filter: {issue_filter}")
-            logging.info(list(JournalProc.items_to_process_info(items)))
             for journal_proc in items:
                 migrate_journal(
                     user,
                     journal_proc,
                     issue_filter,
                     force_update,
-                    force_import,
-                    migrate_issues=True,
-                    migrate_articles=True,
+                    force_import_acron_id_file=force_import_acron_id_file,
+                    force_migrate_document_records=force_migrate_document_records,
+                    migrate_issues=False,
+                    migrate_articles=False,
                 )
+
+            items = IssueProc.items_to_process(
+                collection,
+                "issue",
+                issue_filter,
+                force_update,
+            )
+            logging.info(f"issues to process: {items.count()}")
+            for issue_proc in items:
+                migrate_issue(
+                    user,
+                    issue_proc,
+                    force_update,
+                    force_migrate_document_records=force_migrate_document_records,
+                    migrate_articles=False,
+                )
+
+            article_filter = {}
+            if issue_filter:
+                article_filter = {f"issue_proc__{k}": v for k, v in issue_filter.items()}
+
+            logging.info(f"article_filter: {article_filter}")
+            items = ArticleProc.items_to_process(collection, "article", article_filter, force_update)
+            logging.info(f"articles to process: {items.count()}")
+            for article_proc in items:
+                article_proc.migrate_article(user, force_update)
+
             for website_kind in (QA, PUBLIC):
                 publish_journals(
                     user,
@@ -133,10 +163,49 @@ def task_migrate_and_publish(
                     journal_filter,
                     issue_filter,
                     force_update,
-                    run_publish_issues=True,
-                    run_publish_articles=True,
+                    run_publish_issues=False,
+                    run_publish_articles=False,
                     task_publish_article=task_publish_article,
                 )
+
+                items = IssueProc.items_to_publish(
+                    website_kind=website_kind,
+                    content_type="issue",
+                    collection=collection,
+                    force_update=force_update,
+                    params=issue_filter,
+                )
+                logging.info(f"publish_issues: {issue_filter} {items.count()}")
+                api_data = get_api_data(collection, "issue", website_kind)
+                for issue_proc in items:
+                    published = issue_proc.publish(
+                        user,
+                        publish_issue,
+                        website_kind=website_kind,
+                        api_data=api_data,
+                        force_update=force_update,
+                    )
+
+                items = ArticleProc.items_to_publish(
+                    website_kind=website_kind,
+                    content_type="article",
+                    collection=collection,
+                    force_update=force_update,
+                    params=issue_filter,
+                )
+                api_data = get_api_data(collection, "article", website_kind)
+                logging.info(f"publish_articles: {issue_filter} {items.count()}")
+                for article_proc in items:
+                    task_publish_article.apply_async(
+                        kwargs=dict(
+                            user_id=user.id,
+                            username=user.username,
+                            website_kind=website_kind,
+                            article_proc_id=article_proc.id,
+                            api_data=api_data,
+                            force_update=force_update,
+                        )
+                    )
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -152,7 +221,8 @@ def task_migrate_and_publish(
                 "publication_year": publication_year,
                 "issue_folder": issue_folder,
                 "force_update": force_update,
-                "force_import": force_import,
+                "force_import_acron_id_file": force_import_acron_id_file,
+                "force_migrate_document_records": force_migrate_document_records,
             },
         )
 
@@ -166,7 +236,8 @@ def task_migrate_and_publish_journals(
     collection_acron=None,
     journal_acron=None,
     force_update=False,
-    force_import=None,
+    force_import_acron_id_file=False,
+    force_migrate_document_records=False,
 ):
     try:
         user = _get_user(user_id, username)
@@ -198,7 +269,8 @@ def task_migrate_and_publish_journals(
                         journal_proc,
                         issue_filter=None,
                         force_update=force_update,
-                        force_import=force_import,
+                        force_import_acron_id_file=force_import_acron_id_file,
+                        force_migrate_document_records=force_migrate_document_records,
                         migrate_issues=False,
                         migrate_articles=False,
                     )
@@ -270,6 +342,7 @@ def task_publish_journals(
         if journal_acron:
             params["acron"] = journal_acron
 
+        logging.info(f"task_publish_journals {params}")
         for collection in _get_collections(collection_acron):
 
             for website_kind in (QA, PUBLIC):
@@ -281,13 +354,16 @@ def task_publish_journals(
                 api.get_token()
                 api_data = api.data
 
-                for journal_proc in JournalProc.items_to_publish(
+                items = JournalProc.items_to_publish(
                     website_kind=website_kind,
                     content_type="journal",
                     collection=collection,
                     force_update=force_update,
                     params=params,
-                ):
+                )
+                logging.info(f"publish_journals {items.count()}")
+                for journal_proc in items:
+                    logging.info(f"{website_kind} {journal_proc}")
                     try:
                         task_publish_journal.apply_async(
                             kwargs=dict(
@@ -378,7 +454,7 @@ def task_migrate_and_publish_issues(
     publication_year=None,
     issue_folder=None,
     force_update=False,
-    force_import=None
+    force_migrate_document_records=False
 ):
     try:
         user = _get_user(user_id, username)
@@ -404,16 +480,15 @@ def task_migrate_and_publish_issues(
 
             qa_api_data = get_api_data(collection, "issue", "QA")
             public_api_data = get_api_data(collection, "issue", "PUBLIC")
-
-            for issue_proc in IssueProc.objects.filter(
-                collection=collection, **params
-            ):
+            items = IssueProc.items_to_process(collection, "issue", params, force_update)
+            logging.info(items.count())
+            for issue_proc in items:
                 try:
                     migrate_issue(
                         user,
                         issue_proc,
                         force_update,
-                        force_import,
+                        force_migrate_document_records=force_migrate_document_records,
                         migrate_articles=False,
                     )
 
