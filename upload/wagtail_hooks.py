@@ -607,8 +607,7 @@ class UploadModelAdminGroup(ModelAdminGroup):
     menu_order = get_menu_order("upload")
 
 
-if has_permission():
-    modeladmin_register(UploadModelAdminGroup)
+modeladmin_register(UploadModelAdminGroup)
 
 
 class UploadReportsModelAdminGroup(ModelAdminGroup):
@@ -626,8 +625,7 @@ class UploadReportsModelAdminGroup(ModelAdminGroup):
     )
     menu_order = get_menu_order("upload-error")
 
-if has_permission():
-    modeladmin_register(UploadReportsModelAdminGroup)
+modeladmin_register(UploadReportsModelAdminGroup)
 
 
 @hooks.register("register_admin_urls")
