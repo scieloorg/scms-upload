@@ -391,7 +391,7 @@ class BaseProc(CommonControlField):
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
+            ObjectList(panel_proc_result, heading=_("Events")),
         ]
     )
 
@@ -425,7 +425,7 @@ class BaseProc(CommonControlField):
             obj.creator = user
             obj.collection = collection
             obj.pid = pid
-            obj.public_ws_status = tracker_choices.PROGRESS_STATUS_PENDING
+            obj.public_ws_status = tracker_choices.PROGRESS_STATUS_TODO
             obj.save()
         return obj
 
@@ -560,10 +560,6 @@ class BaseProc(CommonControlField):
         ).update(migration_status=tracker_choices.PROGRESS_STATUS_TODO)
 
         # seleciona os registros MigratedData
-        count = cls.objects.filter(
-            migration_status=tracker_choices.PROGRESS_STATUS_TODO,
-            **params,
-        ).count()
         return cls.objects.filter(
             migration_status=tracker_choices.PROGRESS_STATUS_TODO,
             **params,
@@ -634,7 +630,7 @@ class BaseProc(CommonControlField):
         count = cls.objects.filter(
             qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO, **params
         ).count()
-        logging.info(f"It will publish: {count}")
+        logging.info(f"It will publish: {count} {params}")
         items = cls.objects.filter(
             qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO, **params
         )
@@ -664,7 +660,7 @@ class BaseProc(CommonControlField):
         operation = self.start(
             user, f"publish {self.migrated_data.content_type} {self} on {website_kind}"
         )
-
+        logging.info(f"publish {self} on {website_kind}")
         if website_kind == collection_choices.QA:
             self.qa_ws_status = tracker_choices.PROGRESS_STATUS_DOING
             self.public_ws_status = tracker_choices.PROGRESS_STATUS_TODO
@@ -691,7 +687,7 @@ class BaseProc(CommonControlField):
         if completed:
             status = tracker_choices.PROGRESS_STATUS_DONE
         else:
-            status = tracker_choices.PROGRESS_STATUS_PENDING
+            status = tracker_choices.PROGRESS_STATUS_REPROC
 
         if website_kind == collection_choices.QA:
             self.qa_ws_status = status
@@ -769,14 +765,14 @@ class JournalProc(BaseProc, ClusterableModel):
     base_form_class = ProcAdminModelForm
 
     panel_proc_result = [
-        InlinePanel("journal_proc_result", label=_("Event")),
+        InlinePanel("journal_proc_result", label=_("Event newest to oldest")),
     ]
     MigratedDataClass = MigratedJournal
 
     edit_handler = TabbedInterface(
         [
             ObjectList(BaseProc.panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
+            ObjectList(panel_proc_result, heading=_("Events")),
         ]
     )
 
@@ -930,12 +926,12 @@ class IssueProc(BaseProc, ClusterableModel):
         AutocompletePanel("issue_files"),
     ]
     panel_proc_result = [
-        InlinePanel("issue_proc_result", label=_("Event")),
+        InlinePanel("issue_proc_result", label=_("Event newest to oldest")),
     ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
-            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
+            ObjectList(panel_proc_result, heading=_("Events")),
         ]
     )
 
@@ -1168,15 +1164,16 @@ class IssueProc(BaseProc, ClusterableModel):
         resumption = None if force_update else self.resumption_date
         logging.info(f"Migrate documents from {resumption}")
         # registros novos ou atualizados
-        id_file_records = list(
-            IdFileRecord.document_records_to_migrate(
-                collection=self.journal_proc.collection,
-                journal_acron=self.journal_proc.acron,
-                issue_folder=self.issue_folder,
-                resumption=resumption,
-            )
-        )
 
+        params = dict(
+            collection=self.journal_proc.collection,
+            journal_acron=self.journal_proc.acron,
+            issue_folder=self.issue_folder,
+            resumption=resumption,
+        )
+        id_file_records = IdFileRecord.document_records_to_migrate(**params)
+
+        errors = []
         for record in id_file_records:
             try:
                 logging.info(f"migrate_document_records: {record.item_pid}")
@@ -1189,6 +1186,7 @@ class IssueProc(BaseProc, ClusterableModel):
                 done += 1
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
+                errors.append({"pid": record.item_pid, "error_type": str(exc_type), "error_message": str(exc_value)})
                 UnexpectedEvent.create(
                     e=e,
                     exc_traceback=exc_traceback,
@@ -1201,20 +1199,24 @@ class IssueProc(BaseProc, ClusterableModel):
                         "force_update": force_update,
                     },
                 )
-        got = len(id_file_records)
-        total_docs = self.issue.total_documents or got
+        got = id_file_records.count()
+        detail = params
+        detail.update({
+            "total issue documents": self.issue.total_documents,
+            "total records": got,
+            "total done": done,
+            "errors": errors,
+        })
+        completed = got == done
         operation.finish(
             user,
-            completed=total_docs == done,
-            detail={
-                "total_documents": got,
-                "total_documents_expected": self.issue.total_documents,
-            },
+            completed=completed,
+            detail=detail,
         )
-        if total_docs == done:
+        if completed:
             self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
         else:
-            self.docs_status = tracker_choices.PROGRESS_STATUS_PENDING
+            self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
         self.files_status = tracker_choices.PROGRESS_STATUS_TODO
         self.save()
 
@@ -1333,13 +1335,13 @@ class ArticleProc(BaseProc, ClusterableModel):
     #     AutocompletePanel("events"),
     # ]
     panel_proc_result = [
-        InlinePanel("article_proc_result", label=_("Event")),
+        InlinePanel("article_proc_result", label=_("Event newest to oldest")),
     ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_status, heading=_("Status")),
             ObjectList(panel_files, heading=_("Files")),
-            ObjectList(panel_proc_result, heading=_("Events newest to oldest")),
+            ObjectList(panel_proc_result, heading=_("Events")),
         ]
     )
 
@@ -1437,7 +1439,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             if xml:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
             else:
-                self.xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+                self.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
             self.save()
 
             completed = self.xml_status == tracker_choices.PROGRESS_STATUS_DONE
