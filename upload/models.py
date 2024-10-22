@@ -392,7 +392,7 @@ class Package(CommonControlField, ClusterableModel):
         return f"{self.package_name} {self.status}"
 
     def __str__(self):
-        if self.pkg_zip.packages.all().count() > 1:
+        if self.pkg_zip and self.pkg_zip.packages.all().count() > 1:
             return f"{self.package_name} ({self.pkg_zip.name})"
         return self.package_name
 
@@ -932,11 +932,14 @@ class Package(CommonControlField, ClusterableModel):
         self.status = choices.PS_READY_TO_PUBLISH
 
         # no entanto, só conclui a publicação se todos os pacotes vinculados estão com o mesmo status
-        if not self.pkg_zip.packages.filter(
-            ~Q(status=choices.PS_READY_TO_PUBLISH)
-        ).exists():
-            # todos os pacotes vinculados estão com o mesmo status
-            # (choices.PS_READY_TO_PUBLISH), então pode publicar em PUBLIC
+        if self.linked:
+            if not self.linked.filter(
+                ~Q(status=choices.PS_READY_TO_PUBLISH)
+            ).exists():
+                # todos os pacotes vinculados estão com o mesmo status
+                # (choices.PS_READY_TO_PUBLISH), então pode publicar em PUBLIC
+                websites.append("PUBLIC")
+        else:
             websites.append("PUBLIC")
 
         self.finish_qa_decision(user, operation, websites, result, rule)
