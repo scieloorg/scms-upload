@@ -72,8 +72,9 @@ class PackageZipAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        params = {}
-        if self.permission_helper.user_can_finish_deposit(request.user, None):
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
+            params = {}
+        elif self.permission_helper.user_can_finish_deposit(request.user, None):
             params = {"creator": request.user}
 
         return super().get_queryset(request).filter(**params)
@@ -140,27 +141,8 @@ class PackageAdmin(ModelAdmin):
         except KeyError:
             logging.info(request.GET)
 
-        if self.permission_helper.user_can_finish_deposit(request.user, None):
-            params["creator"] = request.user
-            action_required = [
-                choices.PS_VALIDATED_WITH_ERRORS,
-                choices.PS_PENDING_CORRECTION,
-                choices.PS_UNEXPECTED,
-                choices.PS_REQUIRED_ERRATUM,
-                choices.PS_REQUIRED_UPDATE,
-            ]
-            waiting_status = [
-                choices.PS_ENQUEUED_FOR_VALIDATION,
-                choices.PS_PENDING_QA_DECISION,
-                choices.PS_READY_TO_PREVIEW,
-                choices.PS_PREVIEW,
-                choices.PS_READY_TO_PUBLISH,
-                choices.PS_PUBLISHED,
-            ]
-
-            status = action_required + waiting_status
-
-        else:
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
+            params = {}
             waiting_status = [
                 choices.PS_ENQUEUED_FOR_VALIDATION,
                 choices.PS_PENDING_CORRECTION,
@@ -191,6 +173,25 @@ class PackageAdmin(ModelAdmin):
                 + action_required_qa_menu
                 + action_required_publication_menu
             )
+        elif self.permission_helper.user_can_finish_deposit(request.user, None):
+            params["creator"] = request.user
+            action_required = [
+                choices.PS_VALIDATED_WITH_ERRORS,
+                choices.PS_PENDING_CORRECTION,
+                choices.PS_UNEXPECTED,
+                choices.PS_REQUIRED_ERRATUM,
+                choices.PS_REQUIRED_UPDATE,
+            ]
+            waiting_status = [
+                choices.PS_ENQUEUED_FOR_VALIDATION,
+                choices.PS_PENDING_QA_DECISION,
+                choices.PS_READY_TO_PREVIEW,
+                choices.PS_PREVIEW,
+                choices.PS_READY_TO_PUBLISH,
+                choices.PS_PUBLISHED,
+            ]
+
+            status = action_required + waiting_status
 
         return super().get_queryset(request).filter(status__in=status, **params)
 
@@ -211,16 +212,11 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
     list_per_page = 20
 
     list_display = (
-        "__str__",
+        "name",
         "assignee",
-        "analyst",
         "xml_errors_percentage",
-        "contested_xml_errors_percentage",
-        "declared_impossible_to_fix_percentage",
-        "category",
         "status",
         "updated",
-        "expiration_date",
     )
     list_filter = (
         "creator",
@@ -262,8 +258,9 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
             choices.PS_PENDING_CORRECTION,
             choices.PS_PENDING_QA_DECISION,
         ]
-        params = {}
-        if self.permission_helper.user_can_finish_deposit(request.user, None):
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
+            params = {}
+        elif self.permission_helper.user_can_finish_deposit(request.user, None):
             params = {"creator": request.user}
 
         return super().get_queryset(request).filter(status__in=status, **params)
@@ -322,8 +319,9 @@ class ReadyToPublishPackageAdmin(ModelAdmin):
             choices.PS_READY_TO_PUBLISH,
             # choices.PS_SCHEDULED_PUBLICATION,
         ]
-        params = {}
-        if self.permission_helper.user_can_finish_deposit(request.user, None):
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
+            params = {}
+        elif self.permission_helper.user_can_finish_deposit(request.user, None):
             params = {"creator": request.user}
 
         return super().get_queryset(request).filter(status__in=status, **params)
