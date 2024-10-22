@@ -320,7 +320,14 @@ class Package(CommonControlField, ClusterableModel):
     panels = [
         # FieldPanel("file"),
     ]
-
+    panel_event = [
+        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
+    ]
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(panel_event, heading=_("Events")),
+        ]
+    )
     base_form_class = UploadPackageForm
 
     class Meta:
@@ -1156,13 +1163,13 @@ class ReadyToPublishPackage(Package):
     ]
 
     panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event")),
+        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
     ]
 
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_data, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events newest to oldest")),
+            ObjectList(panel_event, heading=_("Events")),
         ]
     )
     base_form_class = ReadyToPublishPackageForm
