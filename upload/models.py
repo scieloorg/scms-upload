@@ -319,12 +319,17 @@ class Package(CommonControlField, ClusterableModel):
 
     panels = [
         # FieldPanel("file"),
+        FieldPanel("status", read_only=True),
+        FieldPanel("numbers", read_only=True),
+        FieldPanel("qa_ws_status", read_only=True),
+        FieldPanel("public_ws_status", read_only=True),
     ]
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
     ]
     edit_handler = TabbedInterface(
         [
+            ObjectList(panels, heading=_("Status")),
             ObjectList(panel_event, heading=_("Events")),
         ]
     )
@@ -1137,7 +1142,15 @@ class QAPackage(Package):
         FieldPanel("qa_decision"),
         FieldPanel("qa_comment"),
     ]
-
+    panel_event = [
+        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
+    ]
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(panels, heading=_("Decision")),
+            ObjectList(panel_event, heading=_("Events")),
+        ]
+    )
     base_form_class = QAPackageForm
 
     class Meta:
