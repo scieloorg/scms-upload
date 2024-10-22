@@ -514,7 +514,17 @@ def task_process_qa_decision(
             )
         )
     if websites and "PUBLIC" in websites:
-        for item in package.pkg_zip.packages.all():
+        task_publish_article.apply_async(
+            kwargs=dict(
+                user_id=user.id,
+                username=user.username,
+                api_data=None,
+                website_kind="PUBLIC",
+                article_proc_id=None,
+                upload_package_id=package.id,
+            )
+        )
+        for item in package.linked.all():
             task_publish_article.apply_async(
                 kwargs=dict(
                     user_id=user.id,
