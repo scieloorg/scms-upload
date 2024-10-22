@@ -59,8 +59,9 @@ class PackageZipAdmin(ModelAdmin):
         "creator",
         "updated",
     )
-    # list_filter = (
-    # )
+    list_filter = (
+        "creator",
+    )
     search_fields = (
         "name",
         "file",
@@ -104,6 +105,7 @@ class PackageAdmin(ModelAdmin):
         "expiration_date",
     )
     list_filter = (
+        "creator",
         "category",
         "status",
     )
@@ -220,7 +222,11 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         "updated",
         "expiration_date",
     )
-    list_filter = ("status", "category")
+    list_filter = (
+        "creator",
+        "status",
+        "category",
+    )
     search_fields = (
         "name",
         "file",
@@ -289,7 +295,11 @@ class ReadyToPublishPackageAdmin(ModelAdmin):
         "status",
         "updated",
     )
-    list_filter = ("status", "category")
+    list_filter = (
+        "creator",
+        "status",
+        "category",
+    )
     search_fields = (
         "name",
         "file",
