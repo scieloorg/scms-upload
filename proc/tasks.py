@@ -484,6 +484,7 @@ def task_publish_issues(
     force_update=False,
 ):
     try:
+        user = _get_user(user_id, username)
         params = {}
         if journal_acron:
             params["journal_proc__acron"] = journal_acron
