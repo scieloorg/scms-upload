@@ -1,6 +1,12 @@
-from tempfile import mkdtemp
+import csv
+import logging
+import os
+from datetime import date, datetime, timedelta
+from random import randint
+from shutil import copyfile
+from tempfile import TemporaryDirectory, mkdtemp
 from time import sleep
-from zipfile import BadZipFile
+from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 from django.utils.translation import gettext as _
 from lxml import etree
@@ -321,3 +327,17 @@ def get_article_data_for_comparison(xmltree):
         article_data["authors"].append(f'{c.get("surname")}, {c.get("given_names")}')
 
     return article_data
+
+
+def update_zip_file(zip_xml_file_path, xml_with_pre):
+    new_xml = xml_with_pre.tostring(pretty_print=True)
+    with TemporaryDirectory() as targetdir:
+        new_zip_path = os.path.join(targetdir, os.path.basename(zip_xml_file_path))
+        with ZipFile(new_zip_path, "a", compression=ZIP_DEFLATED) as new_zfp:
+            with ZipFile(zip_xml_file_path) as zfp:
+                for item in zfp.namelist():
+                    if item == xml_with_pre.filename:
+                        new_zfp.writestr(item, new_xml)
+                    else:
+                        new_zfp.writestr(item, zfp.read(item))
+        copyfile(new_zip_path, zip_xml_file_path)
