@@ -388,7 +388,7 @@ def validate_xml_content(package, journal):
     }
     try:
         for xml_with_pre in XMLWithPre.create(path=package.file.path):
-            _validate_xml_content(xml_with_pre, package, params)
+            return _validate_xml_content(xml_with_pre, package, params)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -443,7 +443,7 @@ def _validate_xml_content(xml_with_pre, package, params):
         # devido às tarefas serem executadas concorrentemente,
         # necessário verificar se todas tarefas finalizaram e
         # então finalizar o pacote
-        package.finish_validations()
+        return True
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
