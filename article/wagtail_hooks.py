@@ -43,7 +43,6 @@ class ArticleModelAdmin(ModelAdmin):
         "pid_v3",
         "status",
         "display_sections",
-        "order",
         "fpage",
         "position",
         "first_publication_date",
