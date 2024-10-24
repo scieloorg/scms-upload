@@ -52,6 +52,11 @@ from upload.forms import (
 )
 from upload.permission_helper import ACCESS_ALL_PACKAGES, ASSIGN_PACKAGE, FINISH_DEPOSIT
 from upload.utils import file_utils
+from upload.utils.package_utils import update_zip_file
+
+
+class QADecisionException(Exception):
+    pass
 
 
 class NotFinishedValitionsError(Exception):
@@ -100,16 +105,22 @@ class PackageZip(CommonControlField):
         null=False,
         blank=False,
     )
-
+    show_package_validations = models.BooleanField(
+        _("Show package validations"), default=False,
+        help_text=_("Unchecked to be redirect to package upload. Checked to be redirect to package validation"),
+    )
     name = models.CharField(max_length=40, null=True, blank=True)
 
     panels = [
         FieldPanel("file"),
+        FieldPanel("show_package_validations"),
     ]
 
     base_form_class = PackageZipForm
 
     class Meta:
+        verbose_name = _("Zip file")
+        verbose_name_plural = _("Zip files")
         indexes = [
             models.Index(
                 fields=[
@@ -235,14 +246,17 @@ class Package(CommonControlField, ClusterableModel):
         choices=choices.QA_DECISION,
         null=True,
         blank=True,
+        help_text=_("Make a decision about the package or choose the analyst who will decide it"),
     )
     qa_comment = models.TextField(
         _("Quality analysis comment"),
         null=True,
         blank=True,
+        help_text=_("Comment the decision about the package or choose the analyst who will comment it"),
     )
     analyst = models.ForeignKey(
-        CollectionTeamMember, blank=True, null=True, on_delete=models.SET_NULL
+        CollectionTeamMember, blank=True, null=True, on_delete=models.SET_NULL,
+        help_text=_("Choose the analyst who will decide about the package or add your decision")
     )
     sps_pkg = models.ForeignKey(
         SPSPkg,
@@ -336,6 +350,8 @@ class Package(CommonControlField, ClusterableModel):
     base_form_class = UploadPackageForm
 
     class Meta:
+        verbose_name = _("Package")
+        verbose_name_plural = _("Packages")
         permissions = (
             (FINISH_DEPOSIT, _("Can finish deposit")),
             (ACCESS_ALL_PACKAGES, _("Can access all packages from all users")),
@@ -543,7 +559,7 @@ class Package(CommonControlField, ClusterableModel):
             return False
         return True
 
-    def finish_validations(self, task_publish_article=None):
+    def finish_validations(self, task_process_qa_decision=None):
         """
         1. Verifica se as validações que executaram em paralelo, finalizaram
         2. Calcula os números de problemas do pacote
@@ -606,11 +622,15 @@ class Package(CommonControlField, ClusterableModel):
         logging.info(f"Package.finish_validations - status: {self.status}")
 
         if self.status == choices.PS_READY_TO_PREVIEW:
-            # if task_publish_article:
             self.qa_decision = choices.PS_READY_TO_PREVIEW
-            self.process_qa_decision(self.creator)
             self.save()
-            return
+            if task_process_qa_decision:
+                task_process_qa_decision.apply_async(
+                    kwargs=dict(
+                        user_id=self.creator.id,
+                        package_id=self.id,
+                    )
+                )
 
         self.save()
 
@@ -672,20 +692,20 @@ class Package(CommonControlField, ClusterableModel):
         # TODO abater as validações com status=WARNING e reação IMPOSSIBLE_TO_FIX
         xml_numbers = XMLError.get_numbers(package=self)
 
-        total_contested_xml_errors = numbers.get("reaction_not_to_fix") or 0
+        total_contested_xml_errors = xml_numbers.get("reaction_not_to_fix") or 0
         self.contested_xml_errors_percentage = round(
             total_contested_xml_errors * 100 / xml_numbers["total"], 2
         )
 
         total_declared_impossible_to_fix = (
-            numbers.get("reaction_impossible_to_fix") or 0
+            xml_numbers.get("reaction_impossible_to_fix") or 0
         )
         self.declared_impossible_to_fix_percentage = round(
             total_declared_impossible_to_fix * 100 / xml_numbers["total"], 2
         )
 
         data = {
-            "total_accepted_to_fix": numbers.get("reaction_to_fix") or 0,
+            "total_accepted_to_fix": xml_numbers.get("reaction_to_fix") or 0,
             "total_contested_xml_errors": total_contested_xml_errors,
             "total_declared_impossible_to_fix": total_declared_impossible_to_fix,
         }
@@ -870,9 +890,10 @@ class Package(CommonControlField, ClusterableModel):
 
     def process_qa_decision(self, user):
         operation = self.start(user, "process_qa_decision")
+
         if self.qa_decision == choices.PS_PENDING_CORRECTION:
             self.finish_qa_decision(user, operation, websites=None, result=None, rule=None)
-            return
+            return []
 
         if self.qa_decision == choices.PS_DEPUBLISHED:
             # TODO
@@ -881,7 +902,7 @@ class Package(CommonControlField, ClusterableModel):
                 completed=True,
                 detail={"decision": self.qa_decision, "error": "not implemented"},
             )
-            return
+            return []
 
         if self.qa_decision not in (
             choices.PS_READY_TO_PREVIEW,
@@ -892,7 +913,7 @@ class Package(CommonControlField, ClusterableModel):
                 completed=True,
                 detail={"decision": self.qa_decision, "error": "unexpected decision"},
             )
-            return
+            return []
 
         save = False
         user = user or self.updated_by or self.creator
@@ -900,74 +921,91 @@ class Package(CommonControlField, ClusterableModel):
         websites = []
 
         # gera pacote sps e o valida quanto a compontentes disponíveis no minio
-        result = self.prepare_sps_package(user)
+        result = self.prepare_sps_package(user) or {}
 
         # verifica pela regra de publicação e pela situação do pacote
         # se pode ser publicado em PUBLIC
         rule = UploadValidator.get_publication_rule()
 
-        if result.get("blocking_errors"):
-            # não foi possível criar sps package
-            # o que impede de publicar em qq site
-            self.qa_decision = choices.PS_PENDING_CORRECTION
+        try:
+            self.analyze_result(user, result, websites, rule)
+        except QADecisionException as exc:
+            logging.exception(exc)
+            result["exception"] = exc
             self.finish_qa_decision(user, operation, websites, result, rule)
             return websites
-
-        if self.qa_decision == choices.PS_READY_TO_PREVIEW:
-            # publica em QA não importa a gravidade dos erros
-            websites.append("QA")
-            self.create_or_update_article(user, save=False)
-
-        if result.get("critical_errors"):
-            # com erros críticos somente publica em QA
-            self.qa_decision = choices.PS_PENDING_CORRECTION
-            self.finish_qa_decision(user, operation, websites, result, rule)
-            return websites
-
-        if result.get("error") or self.has_errors:
-            if rule == choices.STRICT_AUTO_PUBLICATION:
-                # Há erros e é modo rígido, somente publica em QA
-                self.qa_decision = choices.PS_PENDING_CORRECTION
-                self.finish_qa_decision(user, operation, websites, result, rule)
-                return websites
-
-        if rule == choices.MANUAL_PUBLICATION:
-            # No modo de publicação manual no website PUBLIC,
-            # com ou sem erros, é decisão do analista
-            if self.qa_decision == choices.PS_READY_TO_PREVIEW:
-                # publica somente em QA
-                self.finish_qa_decision(user, operation, websites, result, rule)
-                return websites
 
         # nenhum erro ou regra flexível, permissão de publicar no site público
         self.qa_decision = choices.PS_READY_TO_PUBLISH
         self.status = choices.PS_READY_TO_PUBLISH
-
-        # no entanto, só conclui a publicação se todos os pacotes vinculados estão com o mesmo status
-        if self.linked:
-            if not self.linked.filter(
-                ~Q(status=choices.PS_READY_TO_PUBLISH)
-            ).exists():
-                # todos os pacotes vinculados estão com o mesmo status
-                # (choices.PS_READY_TO_PUBLISH), então pode publicar em PUBLIC
-                websites.append("PUBLIC")
-        else:
+        if not self.linked or not self.linked.filter(
+            ~Q(status=choices.PS_READY_TO_PUBLISH)
+        ).exists():
+            # nenhum pacote vinculado como outros ou
+            # todos os pacotes vinculados estão com o mesmo status
+            # (choices.PS_READY_TO_PUBLISH), então pode publicar em PUBLIC
             websites.append("PUBLIC")
 
         self.finish_qa_decision(user, operation, websites, result, rule)
         return websites
 
-    def finish_qa_decision(self, user, operation, websites, result, rule=None):
+    def analyze_result(self, user, result, websites, rule):
+        if result.get("blocking_errors"):
+            # não foi possível criar sps package
+            result["request_correction"] = True
+            raise QADecisionException("Found blocking errors")
+
+        if self.qa_decision == choices.PS_READY_TO_PREVIEW:
+            try:
+                # cria ou atualiza Article
+                self.create_or_update_article(user, save=False)
+            except Exception as e:
+                result["request_correction"] = True
+                result.update({"exception_message": str(e), "exception_type": str(type(e))})
+                raise QADecisionException(e)
+            # publica em QA não importa a gravidade dos erros
+            websites.append("QA")
+
+        if result.get("critical_errors"):
+            # com erros críticos somente publica em QA
+            result["request_correction"] = True
+            raise QADecisionException("Found critical errors")
+
+        if rule == choices.STRICT_AUTO_PUBLICATION:
+            if result.get("error") or self.has_errors:
+                # Há erros e é modo rígido, somente publica em QA
+                result["request_correction"] = True
+                raise QADecisionException("Found errors")
+
+        elif rule == choices.MANUAL_PUBLICATION:
+            # No modo de publicação manual no website PUBLIC,
+            # com ou sem erros, é decisão do analista
+            if self.qa_decision == choices.PS_READY_TO_PREVIEW:
+                # publica somente em QA
+                result["request_correction"] = False
+                raise QADecisionException("Publish only on QA website")
+
+    def finish_qa_decision(self, user, operation, websites, result, rule):
+        try:
+            exception = result.pop("exception")
+        except (KeyError, AttributeError, TypeError, ValueError):
+            exception = None
+
+        if result and result.get("request_correction"):
+            self.qa_decision = choices.PS_PENDING_CORRECTION
+            self.assignee = self.creator
+
         self.status = self.qa_decision
         self.save()
         detail = {"decision": self.qa_decision, "websites": websites, "rule": rule}
-        detail.update(result)
-        operation.finish(user, completed=True, detail=detail)
+        detail.update(result or {})
+        operation.finish(user, completed=True, detail=detail, exception=exception)
 
     def xml_file_changed(self, xml_with_pre, first_release_date):
         """
         Se aplicável, atualiza o XML com a data de publicação do artigo
         """
+        changed = False
         try:
             article_publication_date = xml_with_pre.article_publication_date
             article_publication_date = datetime.fromisoformat(article_publication_date)
@@ -981,7 +1019,6 @@ class Package(CommonControlField, ClusterableModel):
 
         release_date = first_release_date or datetime.utcnow()
         r_date = (release_date.year, release_date.month, release_date.day)
-
         if a_date != r_date:
             # atualiza a data de publicação do artigo no site público
             xml_with_pre.article_publication_date = {
@@ -989,8 +1026,15 @@ class Package(CommonControlField, ClusterableModel):
                 "month": release_date.month,
                 "day": release_date.day,
             }
+            changed = True
 
-            xml_with_pre.update_xml_in_zip_file()
+        if not xml_with_pre.v2:
+            xml_with_pre.v2 = self.get_or_generate_pid_v2()
+            changed = True
+
+        if changed:
+            # xml_with_pre.update_xml_in_zip_file()
+            update_zip_file(self.file.path, xml_with_pre)
             return True
 
     def get_or_generate_pid_v2(self):
@@ -1078,8 +1122,13 @@ class Package(CommonControlField, ClusterableModel):
 
     def create_or_update_article(self, user, save):
         logging.info(f"create_or_update_article - status: {self.status}")
+        if not self.issue:
+            ValueError("Unable to create or update article: missing issue")
+        if not self.journal:
+            ValueError("Unable to create or update article: missing journal")
+
         self.article = Article.create_or_update(
-            user, self.sps_pkg, self.issue, self.journal or self.issue.journal, self.order
+            user, self.sps_pkg, self.issue, self.journal, self.order
         )
 
         # atualizar package.order com article.order, cujo valor position or fpage
@@ -1105,10 +1154,12 @@ class Package(CommonControlField, ClusterableModel):
             if website_kind == collection_choices.QA:
                 self.qa_ws_status = status
                 self.qa_ws_pubdate = datetime.utcnow()
+                self.status = choices.PS_PREVIEW
                 self.save()
             elif website_kind == collection_choices.PUBLIC:
                 self.public_ws_status = status
                 self.public_ws_pubdate = datetime.utcnow()
+                self.status = choices.PS_PUBLISHED
                 self.save()
 
     @property
@@ -1136,18 +1187,20 @@ class QAPackage(Package):
 
     """
 
-    panels = [
+    panel_decision = [
         FieldPanel("status", read_only=True),
-        AutocompletePanel("analyst"),
         FieldPanel("qa_decision"),
         FieldPanel("qa_comment"),
+        AutocompletePanel("analyst"),
+        FieldPanel("order"),
+        AutocompletePanel("linked"),
     ]
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
     ]
     edit_handler = TabbedInterface(
         [
-            ObjectList(panels, heading=_("Decision")),
+            ObjectList(panel_decision, heading=_("Decision")),
             ObjectList(panel_event, heading=_("Events")),
         ]
     )
@@ -1155,6 +1208,8 @@ class QAPackage(Package):
 
     class Meta:
         proxy = True
+        verbose_name = _("Pending decision package")
+        verbose_name_plural = _("Pending decision packages")
 
 
 class ReadyToPublishPackage(Package):
@@ -1189,6 +1244,8 @@ class ReadyToPublishPackage(Package):
 
     class Meta:
         proxy = True
+        verbose_name = _("Package ready to publish")
+        verbose_name_plural = _("Packages ready to publish")
 
 
 class BaseValidationResult(CommonControlField):
