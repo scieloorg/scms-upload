@@ -30,41 +30,35 @@ class QAPackageForm(CoreAdminModelForm):
     def clean(self):
         cleaned_data = super().clean()
         if cleaned_data:
-            status = cleaned_data.get("status")
             analyst = cleaned_data.get("analyst")
             qa_decision = cleaned_data.get("qa_decision")
-
-            if not analyst:
+            if qa_decision == choices.PS_PENDING_QA_DECISION and not analyst:
                 self.add_error(
                     "analyst",
                     _(
-                        "Select an analyst that made or will make the decision about the package"
+                        "Choose the analyst who will decide about the package"
                     ),
                 )
+
             if not qa_decision:
                 self.add_error(
                     "qa_decision",
                     _(
-                        "Inform the decision and the analyst that made the decision about the package"
+                        "Make a decision about the package or choose the analyst who will decide about the package"
                     ),
                 )
-            if qa_decision == choices.PS_READY_TO_PUBLISH:
-                if status not in (choices.PS_PREVIEW, ):
-                    self.add_error(
-                        "qa_decision",
-                        _(
-                            "Invalid decision. Preview the article at QA website before publishing it"
-                        )
-                    )
 
     def save_all(self, user):
         qa_package = super().save_all(user)
+
+        if qa_package.qa_decision != choices.PS_PENDING_QA_DECISION:
+            if not qa_package.analyst or qa_package.analyst and qa_package.analyst.user != user:
+                qa_package.analyst = CollectionTeamMember.objects.filter(user=user).first()
 
         if qa_package.analyst:
             qa_package.assignee = qa_package.analyst.user
 
         self.save()
-
         return qa_package
 
 
