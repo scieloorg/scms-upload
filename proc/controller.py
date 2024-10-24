@@ -2,6 +2,7 @@ import logging
 import sys
 
 from django.conf import settings
+from django.db.models import Q
 from requests.exceptions import HTTPError 
 
 from collection.models import Collection
@@ -14,7 +15,6 @@ from journal.models import (
     Subject,
     Institution,
     Publisher,
-    Institution,
     Owner,
     JournalCollection,
     JournalHistory,
@@ -41,10 +41,19 @@ class UnableToCreateIssueProcsError(Exception):
     pass
 
 
+class FetchJournalDataException(Exception):
+    pass
+
+
+class FetchIssueDataException(Exception):
+    pass
+
+
 try:
-    core_timeout = PidProviderConfig.objects.filter(timeout__isnull=False).first().timeout
+    DEFAULT_CORE_TIMEOUT = 15
+    CORE_TIMEOUT = int(PidProviderConfig.objects.filter(timeout__isnull=False).first().timeout or DEFAULT_CORE_TIMEOUT)
 except Exception as e:
-    core_timeout = 5
+    CORE_TIMEOUT = DEFAULT_CORE_TIMEOUT
 
 
 def create_or_update_journal(
@@ -52,6 +61,11 @@ def create_or_update_journal(
 ):
     # esta função por enquanto é chamada somente no fluxo de ingresso de conteúdo novo
     # no fluxo de migração, existe migration.controller.create_or_update_journal
+    force_update = force_update or not JournalProc.objects.filter(
+        Q(journal__official_journal__issn_electronic=issn_electronic) |
+        Q(journal__official_journal__issn_print=issn_print)
+    ).exists()
+
     if not force_update:
         try:
             return Journal.get_registered(journal_title, issn_electronic, issn_print)
@@ -64,7 +78,7 @@ def create_or_update_journal(
         )
     except FetchMultipleJournalsError as exc:
         raise exc
-    except Exception as exc:
+    except FetchJournalDataException as exc:
         pass
 
     try:
@@ -90,17 +104,17 @@ def fetch_and_create_journal(
             url=settings.JOURNAL_API_URL,
             params=params,
             json=True,
-            timeout=core_timeout or 5,
+            timeout=CORE_TIMEOUT,
         )
-        logging.info(response)
     except Exception as e:
-        logging.exception(e)
-        return
+        raise FetchJournalDataException(f"fetch_and_create_journal: {settings.JOURNAL_API_URL} {params} {e}")
 
     if response["count"] > 1:
         raise FetchMultipleJournalsError(f"{settings.JOURNAL_API_URL} with {params} returned {response['count']} journals. Ask for support to solve this issue")
 
     for result in response.get("results") or []:
+        logging.info(f"fetch_and_create_journal {params}: {result}")
+
         official = result["official"]
         official_journal = OfficialJournal.create_or_update(
             title=official["title"],
@@ -128,7 +142,7 @@ def fetch_and_create_journal(
         for item in result.get("publisher") or []:
             institution = Institution.get_or_create(
                 inst_name=item["name"],
-                acronym=None,
+                inst_acronym=None,
                 level_1=None,
                 level_2=None,
                 level_3=None,
@@ -140,7 +154,7 @@ def fetch_and_create_journal(
         for item in result.get("owner") or []:
             institution = Institution.get_or_create(
                 inst_name=item["name"],
-                acronym=None,
+                inst_acronym=None,
                 level_1=None,
                 level_2=None,
                 level_3=None,
@@ -150,6 +164,7 @@ def fetch_and_create_journal(
             journal.owner.add(Owner.create_or_update(user, journal, institution))
 
         for item in result.get("scielo_journal") or []:
+            logging.info(f"fetch_and_create_journal {params}: scielo_journal {item}")
             try:
                 collection = Collection.objects.get(acron=item["collection_acron"])
             except Collection.DoesNotExist:
@@ -161,7 +176,7 @@ def fetch_and_create_journal(
                 journal=journal,
                 acron=item["journal_acron"],
                 title=journal.title,
-                availability_status="C",
+                availability_status=item.get("availability_status") or "C",
                 migration_status=tracker_choices.PROGRESS_STATUS_DONE,
                 force_update=force_update,
             )
@@ -184,6 +199,14 @@ def fetch_and_create_journal(
 def create_or_update_issue(journal, pub_year, volume, suppl, number, user, force_update=None):
     # esta função por enquanto é chamada somente no fluxo de ingresso de conteúdo novo
     # no fluxo de migração, existe migration.controller.create_or_update_issue
+    force_update = force_update or not IssueProc.objects.filter(
+        journal_proc__journal=journal,
+        issue__publication_year=pub_year,
+        issue__volume=volume,
+        issue__number=number,
+        issue__supplement=suppl,
+    ).exists()
+
     if not force_update:
         try:
             return Issue.get(
@@ -198,7 +221,7 @@ def create_or_update_issue(journal, pub_year, volume, suppl, number, user, force
     try:
         fetch_and_create_issues(
             journal, pub_year, volume, suppl, number, user)
-    except Exception as exc:
+    except FetchIssueDataException as exc:
         pass
 
     try:
@@ -224,22 +247,19 @@ def fetch_and_create_issues(journal, pub_year, volume, suppl, number, user):
                 "volume": volume,
             }
             params = {k: v for k, v in params.items() if v}
-            logging.info(params)
             response = fetch_data(
                 url=settings.ISSUE_API_URL,
                 params=params,
                 json=True,
-                timeout=5,
+                timeout=CORE_TIMEOUT,
             )
 
         except Exception as e:
-            logging.exception(e)
-            return
+            raise FetchIssueDataException(f"fetch_and_create_issue: {settings.ISSUE_API_URL} {params} {e}")
 
-        logging.info(f"REsponse {response}")
         issue = None
-        for result in response.get("results"):
-            logging.info(f"result: {result}")
+        for result in response.get("results") or []:
+            logging.info(f"fetch_and_create_issues {params}: {result}")
             issue = Issue.get_or_create(
                 journal=journal,
                 volume=result["volume"],
@@ -261,6 +281,7 @@ def fetch_and_create_issues(journal, pub_year, volume, suppl, number, user):
                         journal_proc.collection,
                         pid=f"{journal_proc.pid}{issue.publication_year}{issue_pid_suffix}",
                     )
+                    issue_proc.issue = issue
                     issue_proc.journal_proc = journal_proc
                     issue_proc.save()
 
@@ -374,7 +395,7 @@ def migrate_journal(
                 "task": "proc.controller.migrate_journal",
                 "user_id": user.id,
                 "username": user.username,
-                "collection": collection.acron,
+                "collection": journal_proc.collection.acron,
                 "pid": journal_proc.pid,
                 "issue_filter": issue_filter,
                 "force_update": force_update,
@@ -420,7 +441,7 @@ def migrate_issue(user, issue_proc, force_update, force_import, migrate_articles
                 "task": "proc.controller.migrate_issue",
                 "user_id": user.id,
                 "username": user.username,
-                "collection": collection.acron,
+                "collection": issue_proc.collection.acron,
                 "pid": issue_proc.pid,
                 "force_update": force_update,
                 "force_import": force_import,
