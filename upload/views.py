@@ -28,28 +28,16 @@ class PackageZipCreateView(CreateView):
             return HttpResponseRedirect(self.get_success_url())
 
         pkg_zip = form.save_all(self.request.user)
-        logging.info(pkg_zip)
-
-        try:
-            messages.info(
-                self.request,
-                _("{} is being validated").format(pkg_zip.name),
+        task_receive_packages.apply_async(
+            kwargs=dict(
+                user_id=self.request.user.id,
+                pkg_zip_id=pkg_zip.id,
             )
-
-        except Exception as exc:
-            messages.error(
-                self.request,
-                f"{pkg_zip}: {exc}",
-            )
-        else:
-            task_receive_packages.apply_async(
-                kwargs=dict(
-                    user_id=self.request.user.id,
-                    pkg_zip_id=pkg_zip.id,
-                )
-            )
+        )
+        if pkg_zip.show_package_validations:
             return redirect(f"/admin/upload/package?q={pkg_zip.name}")
-            # return HttpResponseRedirect(self.get_success_url())
+        else:
+            return HttpResponseRedirect(self.get_success_url())
 
 
 class PackageAdminInspectView(InspectView):
