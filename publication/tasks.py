@@ -11,6 +11,7 @@ from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from core.models import PressRelease
 from proc.models import ArticleProc, IssueProc, JournalProc
+from proc.controller import create_or_update_journal, create_or_update_issue
 from upload.models import Package
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
@@ -357,27 +358,40 @@ def task_publish_article(
         manager = None
         op_main = None
 
-        try:
-            if upload_package_id:
-                manager = Package.objects.get(pk=upload_package_id)
-                issue = manager.article.issue
-            elif article_proc_id:
-                manager = ArticleProc.objects.get(pk=article_proc_id)
-                issue = manager.issue_proc.issue
-
-        except Exception as e:
-            logging.exception(e)
-            return
+        if upload_package_id:
+            manager = Package.objects.get(pk=upload_package_id)
+            issue = manager.article.issue
+        elif article_proc_id:
+            manager = ArticleProc.objects.get(pk=article_proc_id)
+            issue = manager.issue_proc.issue
 
         article = manager.article
-
-        logging.info(article.journal)
+        journal = article.journal
+        issue = article.issue
 
         op_main = manager.start(user, f"publish on {website_kind}")
 
-        for journal_proc in JournalProc.objects.filter(
-            journal=article.journal
-        ).iterator():
+        if not JournalProc.objects.filter(journal=journal).exists():
+            create_or_update_journal(
+                journal_title=journal.title,
+                issn_electronic=journal.official_journal.issn_electronic,
+                issn_print=journal.official_journal.issn_print,
+                user=user,
+                force_update=True,
+            )
+
+        if not IssueProc.objects.filter(issue=issue).exists():
+            create_or_update_issue(
+                journal=journal,
+                pub_year=issue.publication_year,
+                volume=issue.volume,
+                suppl=issue.supplement,
+                number=issue.number,
+                user=user,
+                force_update=True,
+            )
+
+        for journal_proc in JournalProc.objects.filter(journal=journal):
 
             webiste_id = f"{website_kind} {journal_proc.collection}"
             op_collection = manager.start(
@@ -388,12 +402,12 @@ def task_publish_article(
                     collection=journal_proc.collection,
                     purpose=website_kind,
                 )
-            except WebSiteConfiguration.DoesNotExist:
+            except WebSiteConfiguration.DoesNotExist as exc:
                 op_collection.finish(
                     user,
                     completed=False,
                     message=f"{webiste_id} does not exist",
-                    message_type=str(exc),
+                    exception=exc,
                     detail=None,
                 )
                 continue
@@ -441,16 +455,17 @@ def task_publish_article(
 
             api_data["post_data_url"] = website.api_url_article
             response = publish_article(manager, api_data, journal_proc.pid)
-            if response.get("result") == "OK":
-                manager.update_publication_stage(website_kind, completed=True)
-                op_collection.finish(
-                    user,
-                    completed=True,
-                    message=f"published or depublished",
-                    detail=response,
-                )
-        else:
-            raise JournalProc.DoesNotExist(f"No journal_proc for {article} {article.journal}")
+            completed = response.get("result") == "OK"
+            manager.update_publication_stage(website_kind, completed=completed)
+            op_collection.finish(
+                user,
+                completed=completed,
+                detail=response,
+            )
+        if not JournalProc.objects.filter(journal=journal).exists():
+            raise JournalProc.DoesNotExist(f"No journal_proc for {article} {journal}")
+        if not IssueProc.objects.filter(issue=issue).exists():
+            raise IssueProc.DoesNotExist(f"No issue_proc for {article} {issue}")
 
         op_main.finish(
             user,
