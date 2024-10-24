@@ -63,7 +63,6 @@ class Operation(CommonControlField):
         blank=True,
     )
     completed = models.BooleanField(null=True, blank=True, default=False)
-    event = models.ForeignKey(Event, on_delete=models.SET_NULL, null=True, blank=True)
     detail = models.JSONField(null=True, blank=True)
 
     base_form_class = ProcAdminModelForm
@@ -91,7 +90,6 @@ class Operation(CommonControlField):
         return dict(
             name=self.name,
             completed=self.completed,
-            event=self.event and self.event.data,
             detail=self.detail,
             created=self.created.isoformat(),
         )
@@ -153,32 +151,21 @@ class Operation(CommonControlField):
         exc_traceback=None,
         detail=None,
     ):
-        if not message_type:
-            if not completed:
-                message_type = "ERROR"
+        detail = detail or {}
+        if exception:
+            detail["exception_message"] = str(exception)
+            detail["exception_type"] = str(type(exception))
+        if exc_traceback:
+            detail["traceback"] = str(format_traceback(exc_traceback))
+        if message_type:
+            detail["message_type"] = message_type
+        if message:
+            detail["message"] = message
 
-        if detail:
-            try:
-                json.dumps(detail)
-            except Exception as exc_detail:
-                detail = str(detail)
-
-        if message_type or exception or exc_traceback:
-            event = Event.create(
-                user=user,
-                message_type=message_type,
-                message=message,
-                e=exception,
-                exc_traceback=exc_traceback,
-                detail=detail,
-            )
-            detail = event.data
-
-        if detail:
-            try:
-                json.dumps(detail)
-            except Exception as exc_detail:
-                detail = str(detail)
+        try:
+            json.dumps(detail)
+        except Exception as exc_detail:
+            detail = str(detail)
 
         self.detail = detail
         self.completed = completed

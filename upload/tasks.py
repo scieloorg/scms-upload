@@ -157,7 +157,7 @@ def task_validate_assets(package_id, xml_path, package_files, xml_assets):
     # devido às tarefas serem executadas concorrentemente,
     # necessário verificar se todas tarefas finalizaram e
     # então finalizar o pacote
-    package.finish_validations(task_publish_article)
+    package.finish_validations(task_process_qa_decision)
     # if package.is_approved:
     #     task_process_approved_package.apply_async(
     #         kwargs=dict(package_id=package.id, package_status=package.status)
@@ -198,7 +198,7 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
         )
 
     report.finish_validations()
-    package.finish_validations(task_publish_article)
+    package.finish_validations(task_process_qa_decision)
     # devido às tarefas serem executadas concorrentemente,
     # necessário verificar se todas tarefas finalizaram e
     # então finalizar o pacote
@@ -223,7 +223,7 @@ def task_validate_renditions_content(package_id, xml_path):
     try:
 
         for rendition in package.renditions:
-            for result in validate_rendition(rendition, xml_with_pre):
+            for result in validate_rendition(rendition, package.xml_with_pre):
                 validation_result = report.add_validation_result(
                     status=choices.VALIDATION_RESULT_FAILURE,
                     message=result["message"],
@@ -244,7 +244,7 @@ def task_validate_renditions_content(package_id, xml_path):
             },
         )
     report.finish_validations()
-    package.finish_validations(task_publish_article)
+    package.finish_validations(task_process_qa_decision)
 
 
 @celery_app.task(bind=True, priority=0)
@@ -453,7 +453,7 @@ def task_validate_xml_structure(
         # devido às tarefas serem executadas concorrentemente,
         # necessário verificar se todas tarefas finalizaram e
         # então finalizar o pacote
-        package.finish_validations(task_publish_article)
+        package.finish_validations(task_process_qa_decision)
         # if package.is_approved:
         #     task_process_approved_package.apply_async(
         #         kwargs=dict(package_id=package.id)
@@ -476,7 +476,8 @@ def task_validate_xml_content(
         else:
             issue = None
 
-        controller.validate_xml_content(package, journal)
+        if controller.validate_xml_content(package, journal):
+            package.finish_validations(task_process_qa_decision)
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -514,7 +515,17 @@ def task_process_qa_decision(
             )
         )
     if websites and "PUBLIC" in websites:
-        for item in package.pkg_zip.packages.all():
+        task_publish_article.apply_async(
+            kwargs=dict(
+                user_id=user.id,
+                username=user.username,
+                api_data=None,
+                website_kind="PUBLIC",
+                article_proc_id=None,
+                upload_package_id=package.id,
+            )
+        )
+        for item in package.linked.all():
             task_publish_article.apply_async(
                 kwargs=dict(
                     user_id=user.id,
@@ -553,7 +564,7 @@ def task_validate_webpages_content(package_id):
     try:
 
         for webpage in package.htmls:
-            for result in validate_webpage(webpage, xml_with_pre):
+            for result in validate_webpage(webpage, package.xml_with_pre):
                 validation_result = report.add_validation_result(
                     status=choices.VALIDATION_RESULT_FAILURE,
                     message=result["message"],
@@ -570,8 +581,8 @@ def task_validate_webpages_content(package_id):
             exc_traceback=exc_traceback,
             detail={
                 "operation": "upload.tasks.task_validate_webpages_content",
-                "detail": dict(xml_path=xml_path),
+                "detail": dict(package=str(package)),
             },
         )
     report.finish_validations()
-    package.finish_validations(task_publish_article)
+    package.finish_validations(task_process_qa_decision)

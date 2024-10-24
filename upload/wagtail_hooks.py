@@ -2,6 +2,7 @@ import logging
 
 from django.urls import include, path
 from django.utils.translation import gettext as _
+from django.db.models import Q
 from wagtail import hooks
 from wagtail.contrib.modeladmin.options import (
     ModelAdmin,
@@ -46,7 +47,7 @@ class PackageZipAdmin(ModelAdmin):
     create_view_enabled = True
     create_view_class = PackageZipCreateView
     inspect_view_enabled = False
-    menu_label = _("Upload")
+    menu_label = _("Package upload")
     menu_icon = "folder"
     menu_order = 200
     add_to_settings_menu = False
@@ -59,8 +60,9 @@ class PackageZipAdmin(ModelAdmin):
         "creator",
         "updated",
     )
-    # list_filter = (
-    # )
+    list_filter = (
+        "creator",
+    )
     search_fields = (
         "name",
         "file",
@@ -71,8 +73,9 @@ class PackageZipAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        params = {}
-        if self.permission_helper.user_can_finish_deposit(request.user, None):
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
+            params = {}
+        elif self.permission_helper.user_can_finish_deposit(request.user, None):
             params = {"creator": request.user}
 
         return super().get_queryset(request).filter(**params)
@@ -86,7 +89,7 @@ class PackageAdmin(ModelAdmin):
     # create_view_class = PackageCreateView
     inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
-    menu_label = _("Validation")
+    menu_label = _("Package Validation")
     menu_icon = "folder"
     menu_order = 200
     add_to_settings_menu = False
@@ -104,6 +107,7 @@ class PackageAdmin(ModelAdmin):
         "expiration_date",
     )
     list_filter = (
+        "creator",
         "category",
         "status",
     )
@@ -138,27 +142,8 @@ class PackageAdmin(ModelAdmin):
         except KeyError:
             logging.info(request.GET)
 
-        if self.permission_helper.user_can_finish_deposit(request.user, None):
-            params["creator"] = request.user
-            action_required = [
-                choices.PS_VALIDATED_WITH_ERRORS,
-                choices.PS_PENDING_CORRECTION,
-                choices.PS_UNEXPECTED,
-                choices.PS_REQUIRED_ERRATUM,
-                choices.PS_REQUIRED_UPDATE,
-            ]
-            waiting_status = [
-                choices.PS_ENQUEUED_FOR_VALIDATION,
-                choices.PS_PENDING_QA_DECISION,
-                choices.PS_READY_TO_PREVIEW,
-                choices.PS_PREVIEW,
-                choices.PS_READY_TO_PUBLISH,
-                choices.PS_PUBLISHED,
-            ]
-
-            status = action_required + waiting_status
-
-        else:
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
+            params = {}
             waiting_status = [
                 choices.PS_ENQUEUED_FOR_VALIDATION,
                 choices.PS_PENDING_CORRECTION,
@@ -189,6 +174,25 @@ class PackageAdmin(ModelAdmin):
                 + action_required_qa_menu
                 + action_required_publication_menu
             )
+        elif self.permission_helper.user_can_finish_deposit(request.user, None):
+            params["creator"] = request.user
+            action_required = [
+                choices.PS_VALIDATED_WITH_ERRORS,
+                choices.PS_PENDING_CORRECTION,
+                choices.PS_UNEXPECTED,
+                choices.PS_REQUIRED_ERRATUM,
+                choices.PS_REQUIRED_UPDATE,
+            ]
+            waiting_status = [
+                choices.PS_ENQUEUED_FOR_VALIDATION,
+                choices.PS_PENDING_QA_DECISION,
+                choices.PS_READY_TO_PREVIEW,
+                choices.PS_PREVIEW,
+                choices.PS_READY_TO_PUBLISH,
+                choices.PS_PUBLISHED,
+            ]
+
+            status = action_required + waiting_status
 
         return super().get_queryset(request).filter(status__in=status, **params)
 
@@ -197,7 +201,7 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
     model = QAPackage
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
-    menu_label = _("Pending decision")
+    menu_label = _("Pending decision packages")
     menu_icon = "folder"
     menu_order = 200
     edit_view_class = QAPackageEditView
@@ -209,18 +213,18 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
     list_per_page = 20
 
     list_display = (
-        "__str__",
+        "name",
+        "creator",
         "assignee",
-        "analyst",
         "xml_errors_percentage",
-        "contested_xml_errors_percentage",
-        "declared_impossible_to_fix_percentage",
-        "category",
         "status",
         "updated",
-        "expiration_date",
     )
-    list_filter = ("status", "category")
+    list_filter = (
+        "creator",
+        "status",
+        "category",
+    )
     search_fields = (
         "name",
         "file",
@@ -256,8 +260,12 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
             choices.PS_PENDING_CORRECTION,
             choices.PS_PENDING_QA_DECISION,
         ]
-        params = {}
-        if self.permission_helper.user_can_finish_deposit(request.user, None):
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
+            params = {}
+            return super().get_queryset(request).filter(
+                Q(assignee__isnull=True) | Q(assignee=request.user),
+                status__in=status, **params)
+        elif self.permission_helper.user_can_finish_deposit(request.user, None):
             params = {"creator": request.user}
 
         return super().get_queryset(request).filter(status__in=status, **params)
@@ -268,7 +276,7 @@ class ReadyToPublishPackageAdmin(ModelAdmin):
 
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
-    menu_label = _("Publication")
+    menu_label = _("Package publication")
     menu_icon = "folder"
     menu_order = 200
     edit_view_class = ReadyToPublishPackageEditView
@@ -289,7 +297,11 @@ class ReadyToPublishPackageAdmin(ModelAdmin):
         "status",
         "updated",
     )
-    list_filter = ("status", "category")
+    list_filter = (
+        "creator",
+        "status",
+        "category",
+    )
     search_fields = (
         "name",
         "file",
@@ -312,8 +324,11 @@ class ReadyToPublishPackageAdmin(ModelAdmin):
             choices.PS_READY_TO_PUBLISH,
             # choices.PS_SCHEDULED_PUBLICATION,
         ]
-        params = {}
-        if self.permission_helper.user_can_finish_deposit(request.user, None):
+        if self.permission_helper.user_can_access_all_packages(request.user, None):
+            params = {}
+            return super().get_queryset(request).filter(
+                status__in=status, **params)
+        elif self.permission_helper.user_can_finish_deposit(request.user, None):
             params = {"creator": request.user}
 
         return super().get_queryset(request).filter(status__in=status, **params)

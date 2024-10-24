@@ -550,7 +550,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
     @property
     def data(self):
         return dict(
+            is_complete=self.is_complete,
             registered_in_core=self.registered_in_core,
+            valid_texts=self.valid_texts,
+            valid_components=self.valid_components,
             texts=self.texts,
             components=[item.data for item in self.components.all()],
         )
