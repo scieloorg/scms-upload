@@ -125,6 +125,10 @@ def fetch_and_create_journal(
             foundation_year=official.get("foundation_year"),
             user=user,
         )
+        official_journal.add_related_journal(
+            result.get("previous_journal_title"),
+            result.get("next_journal_title"),
+        )
         journal = Journal.create_or_update(
             user=user,
             official_journal=official_journal,
@@ -363,7 +367,7 @@ def create_or_update_migrated_issue(
 
 
 def migrate_journal(
-    user, journal_proc, issue_filter, force_update, force_import, migrate_issues, migrate_articles
+    user, journal_proc, issue_filter, force_update, force_import_acron_id_file, force_migrate_document_records, migrate_issues, migrate_articles
 ):
     try:
         # cria ou atualiza Journal e atualiza journal_proc
@@ -374,17 +378,8 @@ def migrate_journal(
         controller.register_acron_id_file_content(
             user,
             journal_proc,
-            force_update=force_import,
+            force_update=force_import_acron_id_file,
         )
-
-        if migrate_issues:
-            items = IssueProc.items_to_process(journal_proc.collection, "issue", issue_filter, force_update)
-            logging.info(f"issues to process: {items.count()}")
-            logging.info(f"issue_filter: {issue_filter}")
-            logging.info(list(IssueProc.items_to_process_info(items)))
-
-            for issue_proc in items:
-                migrate_issue(user, issue_proc, force_update, force_import, migrate_articles)
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -399,15 +394,17 @@ def migrate_journal(
                 "pid": journal_proc.pid,
                 "issue_filter": issue_filter,
                 "force_update": force_update,
-                "force_import": force_import,
+                "force_import_acron_id_file": force_import_acron_id_file,
+                "force_migrate_document_records": force_migrate_document_records,
                 "migrate_issues": migrate_issues,
                 "migrate_articles": migrate_articles,
             },
         )
 
 
-def migrate_issue(user, issue_proc, force_update, force_import, migrate_articles):
+def migrate_issue(user, issue_proc, force_update, force_migrate_document_records, migrate_articles):
     try:
+        collection = issue_proc.collection
         issue_proc.create_or_update_item(
             user,
             force_update,
@@ -417,19 +414,18 @@ def migrate_issue(user, issue_proc, force_update, force_import, migrate_articles
 
         issue_proc.migrate_document_records(
             user,
-            force_update=force_import,
+            force_update=force_migrate_document_records,
         )
 
         issue_proc.get_files_from_classic_website(
             user, force_update, controller.import_one_issue_files
         )
 
-        article_filter = {"issue_proc": issue_proc}
         if migrate_articles:
+            article_filter = {"issue_proc": issue_proc}
             items = ArticleProc.items_to_process(issue_proc.collection, "article", article_filter, force_update)
             logging.info(f"articles to process: {items.count()}")
             logging.info(f"article_filter: {article_filter}")
-            logging.info(list(ArticleProc.items_to_process_info(items)))
             for article_proc in items:
                 article_proc.migrate_article(user, force_update)
     except Exception as e:
@@ -444,7 +440,7 @@ def migrate_issue(user, issue_proc, force_update, force_import, migrate_articles
                 "collection": issue_proc.collection.acron,
                 "pid": issue_proc.pid,
                 "force_update": force_update,
-                "force_import": force_import,
+                "force_migrate_document_records": force_migrate_document_records,
                 "migrate_articles": migrate_articles,
             },
         )
@@ -530,6 +526,7 @@ def publish_issues(
     if api_data.get("error"):
         logging.error(api_data)
     else:
+        issue_filter["journal_proc"] = journal_proc
         items = IssueProc.items_to_publish(
             website_kind=website_kind,
             content_type="issue",
