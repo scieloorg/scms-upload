@@ -46,6 +46,7 @@ class JournalProcModelAdmin(ModelAdmin):
     list_display = (
         "journal",
         "acron",
+        "availability_status",
         "migration_status",
         "qa_ws_status",
         "public_ws_status",
@@ -60,9 +61,10 @@ class JournalProcModelAdmin(ModelAdmin):
     )
     search_fields = (
         "acron",
-        "availability_status",
-        "scielo_issn",
-        "title",
+        "pid",
+        "journal__title",
+        "journal__official_journal__issn_print",
+        "journal__official_journal__issn_electronic",
     )
 
 
@@ -97,6 +99,7 @@ class IssueProcModelAdmin(ModelAdmin):
     )
     search_fields = (
         "journal_proc__acron",
+        "journal_proc__journal__title",
         "issue_folder",
         "issue__publication_year",
         "issue__volume",

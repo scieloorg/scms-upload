@@ -56,14 +56,37 @@ def create_or_update_journal(
     classic_website_journal = classic_ws.Journal(journal_data)
 
     year, month, day = parse_yyyymmdd(classic_website_journal.first_year)
-    official_journal = OfficialJournal.create_or_update(
-        user=user,
-        issn_electronic=classic_website_journal.electronic_issn,
-        issn_print=classic_website_journal.print_issn,
-        title=classic_website_journal.title,
-        title_iso=classic_website_journal.title_iso,
-        foundation_year=year,
-    )
+    try:
+        eissn = classic_website_journal.electronic_issn
+        pissn = classic_website_journal.print_issn
+        if not eissn and not pissn:
+            issn = classic_website_journal.get_field_content(
+                "v935", subfields={"_": "issn"}, single=True, simple=True)
+            issn_type = classic_website_journal.get_field_content(
+                "v035", subfields={"_": "issn_type"}, single=True, simple=True)
+            if issn and issn_type:
+                if issn_type["issn_type"] == "PRINT":
+                    pissn = issn["issn"]
+                elif issn_type["issn_type"] == "ONLIN":
+                    eissn = issn["issn"]
+
+        if not eissn and not pissn:
+            raise ValueError(f"Missing ISSN for {journal_data}")
+        official_journal = OfficialJournal.create_or_update(
+            user=user,
+            issn_electronic=eissn,
+            issn_print=pissn,
+            title=classic_website_journal.title,
+            title_iso=classic_website_journal.title_iso,
+            foundation_year=year,
+        )
+        official_journal.add_related_journal(
+            classic_website_journal.previous_title,
+            classic_website_journal.next_title,
+        )
+    except ValueError as e:
+        logging.exception(f"{journal_proc} {journal_data} {e}")
+        raise e
     journal = Journal.create_or_update(
         user=user,
         official_journal=official_journal,
@@ -85,12 +108,42 @@ def create_or_update_journal(
     journal.add_email(classic_website_journal.publisher_email)
     journal.save()
 
+    journal_proc.update(
+        user=user,
+        journal=journal,
+        acron=classic_website_journal.acronym,
+        title=classic_website_journal.title,
+        availability_status=classic_website_journal.current_status,
+        migration_status=tracker_choices.PROGRESS_STATUS_DONE,
+        force_update=force_update,
+    )
+
+    missions = {}
     for item in classic_website_journal.mission:
+        try:
+            text = item["text"]
+        except KeyError as exc:
+            text = ''
+            logging.exception(f"{journal} - Missing mission data {item}")
+            continue
+        try:
+            lang = item["language"]
+        except KeyError as exc:
+            lang = None
+            logging.info(f"Mission no lang (1). {journal_proc} {item}")
+
+        if not lang or not text:
+            logging.info(f"Mission no lang or no text (2). {journal_proc} {item}")
+            continue
+        missions.setdefault(lang, [])
+        missions[lang].append(text)
+
+    for lang, text in missions.items():
         language = Language.get_or_create(
-            name=None, code2=item["language"], creator=user
+            name=None, code2=lang, creator=user
         )
         journal.mission.add(
-            Mission.create_or_update(user, journal, language, item["text"])
+            Mission.create_or_update(user, journal, language, "\n".join(text))
         )
 
     for code in classic_website_journal.subject_areas:
@@ -108,16 +161,6 @@ def create_or_update_journal(
         )
         journal.owner.add(Owner.create_or_update(user, journal, institution))
         journal.publisher.add(Publisher.create_or_update(user, journal, institution))
-
-    journal_proc.update(
-        user=user,
-        journal=journal,
-        acron=classic_website_journal.acronym,
-        title=classic_website_journal.title,
-        availability_status=classic_website_journal.current_status,
-        migration_status=tracker_choices.PROGRESS_STATUS_DONE,
-        force_update=force_update,
-    )
 
     jc = JournalCollection.create_or_update(user, collection, journal)
 
@@ -795,9 +838,11 @@ def register_acron_id_file_content(
             )
 
             completed = True
+            total = journal_id_file.id_file_records.filter().count()
+            detail = {"total": total}
             if force_update or start < journal_id_file.updated.isoformat():
                 completed = False
-                total = 0
+                done = 0
                 changed = 0
 
                 logging.info(f"Reading {source_path}")
@@ -815,19 +860,15 @@ def register_acron_id_file_content(
                     )
                     if force_update or start < rec.updated.isoformat():
                         changed += 1
-                    total += 1
-                completed = (
-                    journal_id_file.id_file_records.filter().count() == total
-                )
+                    done += 1
+                completed = total == done
 
                 detail.update({
                     "force_update": force_update,
-                    "total": total,
+                    "done": done,
                     "changed": changed,
                     "updated": journal_id_file.updated.isoformat(),
                 })
-                logging.info(f"detail: {detail}")
-
             operation.finish(
                 user,
                 completed=completed,
