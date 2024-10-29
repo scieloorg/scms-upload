@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 
 from django.core.files.base import ContentFile
 from django.db import models
@@ -504,6 +505,17 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         ]
 
     @property
+    def data(self):
+        return {
+            "html2xml_status": self.html2xml_status,
+            "n_paragraphs": self.n_paragraphs,
+            "n_references": self.n_references,
+            "record_types": self.record_types,
+            "html_translation_langs": self.html_translation_langs,
+            "pdf_langs": self.pdf_langs,
+        }
+
+    @property
     def directory_path(self):
         return f"classic_website/{self.migrated_article.collection.acron}/html2xml/{self.migrated_article.path}"
 
@@ -566,6 +578,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         body_and_back_xml,
     ):
         try:
+            op = article_proc.start(user, "html_to_xml")
             self.html2xml_status = tracker_choices.PROGRESS_STATUS_DOING
             self.html_translation_langs = "-".join(
                 sorted(article_proc.translations.keys())
@@ -580,6 +593,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             )
             self.save()
 
+            detail = {}
             document = Document(article_proc.migrated_data.data)
             document._translated_html_by_lang = article_proc.translations
 
@@ -588,18 +602,37 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             )
             xml_content = self._generate_xml_from_html(user, article_proc, document)
 
-            if xml_content and body_and_back:
+            detail = {"xml_content": bool(xml_content), "body_and_back": bool(body_and_back)}
+            completed = bool(xml_content and body_and_back)
+            if completed:
                 self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
-            elif xml_content:
-                self.html2xml_status = tracker_choices.PROGRESS_STATUS_PENDING
             else:
-                self.html2xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+                self.html2xml_status = tracker_choices.PROGRESS_STATUS_PENDING
             self.save()
+
+            op.finish(
+                user,
+                completed=completed,
+                exception=None,
+                message_type=None,
+                message=None,
+                exc_traceback=None,
+                detail=detail,
+            )
         except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+
             self.html2xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
-            raise e
-        self.generate_report(user, article_proc)
+            op.finish(
+                user,
+                completed=False,
+                exception=e,
+                message_type=None,
+                message=None,
+                exc_traceback=exc_traceback,
+                detail=detail,
+            )
         return xml_content
 
     @property
@@ -617,8 +650,9 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             return ""
 
     def generate_report(self, user, article_proc):
-        op = article_proc.start(user, "generate html xml report")
+        op = article_proc.start(user, "html_to_xml: generate report")
         try:
+            detail = {}
             html = _fromstring(self.first_bb_file)
 
             for xml_with_pre in XMLWithPre.create(path=self.file.path):
@@ -641,28 +675,36 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 },
             )
         except Exception as e:
-            op.finish(user, completed=False, detail={"error": str(e)})
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            op.finish(
+                user,
+                completed=False,
+                exception=e,
+                message_type=None,
+                message=None,
+                exc_traceback=exc_traceback,
+                detail=detail,
+            )
 
     def _generate_xml_body_and_back(self, user, article_proc, document):
         """
         Generate XML body and back from html_translation_langs and p records
         """
         done = False
-        operation = article_proc.start(user, "generate xml body and back")
+        operation = article_proc.start(user, "html_to_xml: generate xml body + back")
 
         languages = document._translated_html_by_lang
         detail = {}
         detail.update(languages)
+
         try:
             document.generate_body_and_back_from_html(languages)
             done = True
+            # guarda cada versão de body/back
         except GenerateBodyAndBackFromHTMLError as e:
-            # cria xml_body_and_back padrão
-            document.xml_body_and_back = ["<article/>"]
-            detail = {"warning": str(e)}
+            document.xml_body_and_back = ["<article><body/><back/></article>"]
             done = False
 
-        # guarda cada versão de body/back
         if document.xml_body_and_back:
             for i, xml_body_and_back in enumerate(document.xml_body_and_back, start=1):
                 BodyAndBackFile.create_or_update(
@@ -677,7 +719,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         return done
 
     def _generate_xml_from_html(self, user, article_proc, document):
-        operation = article_proc.start(user, "_generate_xml_from_html")
+        operation = article_proc.start(user, "html_to_xml: merge front + body + back")
         xml_content = None
         detail = {}
         try:
@@ -685,10 +727,19 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             xml_file = article_proc.pkg_name + ".xml"
             self.save_file(xml_file, xml_content)
             detail["xml"] = xml_file
+            operation.finish(user, bool(xml_content), detail=detail)
+            return xml_content
         except Exception as e:
-            detail = {"error": str(e)}
-        operation.finish(user, bool(xml_content), detail=detail)
-        return xml_content
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            operation.finish(
+                user,
+                completed=False,
+                exception=e,
+                message_type=None,
+                message=None,
+                exc_traceback=exc_traceback,
+                detail=detail,
+            )
 
     def save_report(self, content):
         # content = json.dumps(data)

@@ -46,4 +46,4 @@ PROGRESS_STATUS_REGULAR_TODO = [
 
 
 def allowed_to_run(status, force_update):
-    return force_update and status in PROGRESS_STATUS_FORCE_UPDATE or status in PROGRESS_STATUS_TODO
+    return force_update and status in PROGRESS_STATUS_FORCE_UPDATE or status in PROGRESS_STATUS_REGULAR_TODO
