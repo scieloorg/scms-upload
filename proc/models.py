@@ -1429,6 +1429,9 @@ class ArticleProc(BaseProc, ClusterableModel):
                 self.migrated_data.file_type = self.migrated_data.document.file_type
                 self.migrated_data.save()
 
+            detail = {}
+            detail["file_type"] = self.migrated_data.file_type
+
             if self.migrated_data.file_type == "html":
                 migrated_data = self.migrated_data
                 classic_ws_doc = migrated_data.document
@@ -1439,17 +1442,19 @@ class ArticleProc(BaseProc, ClusterableModel):
                     record_types="|".join(classic_ws_doc.record_types or []),
                 )
                 htmlxml.html_to_xml(user, self, body_and_back_xml)
+                htmlxml.generate_report(user, self)
+                detail.update(htmlxml.data)
 
             xml = get_migrated_xml_with_pre(self)
-
             if xml:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
+                detail.update(xml.data)
             else:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
             self.save()
 
             completed = self.xml_status == tracker_choices.PROGRESS_STATUS_DONE
-            operation.finish(user, completed=completed, detail=xml and xml.data)
+            operation.finish(user, completed=completed, detail=detail)
             return completed
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
