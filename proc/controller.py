@@ -329,7 +329,7 @@ def migrate_journal(
                 "task": "proc.controller.migrate_journal",
                 "user_id": user.id,
                 "username": user.username,
-                "collection": collection.acron,
+                "collection": journal_proc.collection.acron,
                 "pid": journal_proc.pid,
                 "issue_filter": issue_filter,
                 "force_update": force_update,
