@@ -508,7 +508,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             obj.texts = texts
             obj.save()
 
-            obj.save_pkg_zip_file(user, sps_pkg_zip_path)
+            obj.save_pkg_zip_file(user, sps_pkg_zip_path, article_proc)
 
             obj.upload_package_to_the_cloud(user, original_pkg_components, article_proc)
             obj.validate(True)
@@ -550,7 +550,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
     @property
     def data(self):
         return dict(
+            is_complete=self.is_complete,
             registered_in_core=self.registered_in_core,
+            valid_texts=self.valid_texts,
+            valid_components=self.valid_components,
             texts=self.texts,
             components=[item.data for item in self.components.all()],
         )
@@ -622,7 +625,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 f"Unable to add pid v3 to {zip_xml_file_path}, got {response}. Exception {type(e)} {e}"
             )
 
-    def save_pkg_zip_file(self, user, zip_file_path):
+    def save_pkg_zip_file(self, user, zip_file_path, article_proc):
+        operation = article_proc.start(user, "save_pkg_zip_file")
         filename = self.sps_pkg_name + ".zip"
         try:
             with TemporaryDirectory() as targetdir:
@@ -634,10 +638,29 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 # saved optimised
                 with open(target, "rb") as fp:
                     self.save_file(filename, fp.read())
+                operation.finish(
+                    user,
+                    completed=True,
+                    detail={"source": target, "optimized": True},
+                )
         except Exception as e:
             # saved original
-            with open(zip_file_path, "rb") as fp:
-                self.save_file(filename, fp.read())
+            try:
+                with open(zip_file_path, "rb") as fp:
+                    self.save_file(filename, fp.read())
+                operation.finish(
+                    user,
+                    completed=True,
+                    detail={"source": zip_file_path, "optimized": False, "message": str(e)},
+                )
+            except Exception as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                operation.finish(
+                    user,
+                    exc_traceback=exc_traceback,
+                    exception=e,
+                    detail={"source": zip_file_path, "optimized": False},
+                )
 
     def save_file(self, name, content):
         try:
