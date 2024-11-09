@@ -191,10 +191,10 @@ def task_migrate_and_publish(
                     content_type="article",
                     collection=collection,
                     force_update=force_update,
-                    params=issue_filter,
+                    params=article_filter,
                 )
                 api_data = get_api_data(collection, "article", website_kind)
-                logging.info(f"publish_articles: {issue_filter} {items.count()}")
+                logging.info(f"publish_articles: {article_filter} {items.count()}")
                 for article_proc in items:
                     task_publish_article.apply_async(
                         kwargs=dict(
@@ -525,6 +525,7 @@ def task_migrate_and_publish_issues(
                             "collection": collection.acron,
                             "pid": issue_proc.pid,
                             "force_update": force_update,
+                            "force_migrate_document_records": force_migrate_document_records,
                         },
                     )
 
@@ -542,7 +543,7 @@ def task_migrate_and_publish_issues(
                 "publication_year": publication_year,
                 "issue_folder": issue_folder,
                 "force_update": force_update,
-                "force_import": force_import,
+                "force_migrate_document_records": force_migrate_document_records,
             },
         )
 
@@ -602,8 +603,8 @@ def task_publish_issues(
                             exc_traceback=exc_traceback,
                             detail={
                                 "task": "proc.tasks.publish_issues",
-                                "user_id": user.id,
-                                "username": user.username,
+                                "user_id": user_id,
+                                "username": username,
                                 "collection": collection.acron,
                                 "pid": issue_proc.pid,
                                 "force_update": force_update,
@@ -698,7 +699,9 @@ def task_migrate_and_publish_articles(
             logging.info(list(ArticleProc.items_to_process_info(items)))
 
             for article_proc in items:
-                article_proc.migrate_article(user, force_update)
+                article = article_proc.migrate_article(user, force_update)
+                if not article:
+                    continue
 
                 task_publish_article.apply_async(
                         kwargs=dict(

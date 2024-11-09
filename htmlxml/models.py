@@ -578,6 +578,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         body_and_back_xml,
     ):
         try:
+            detail = {}
             op = article_proc.start(user, "html_to_xml")
             self.html2xml_status = tracker_choices.PROGRESS_STATUS_DOING
             self.html_translation_langs = "-".join(
@@ -619,6 +620,8 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 exc_traceback=None,
                 detail=detail,
             )
+            return xml_content
+            
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
 
@@ -633,7 +636,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 exc_traceback=exc_traceback,
                 detail=detail,
             )
-        return xml_content
+        
 
     @property
     def first_bb_file(self):
