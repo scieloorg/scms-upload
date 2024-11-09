@@ -196,6 +196,7 @@ class ArticleProcModelAdmin(ModelAdmin):
     edit_view_class = ProcEditView
     list_per_page = 10
     list_display = (
+        "__str__",
         "pkg_name",
         "issue_proc",
         "xml_status",
