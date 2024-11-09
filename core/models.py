@@ -105,7 +105,7 @@ class BaseTextModel(models.Model):
 
 
 class TextModel(BaseTextModel):
-    text = models.CharField(max_length=100, null=False, blank=False)
+    text = models.CharField(max_length=200, null=False, blank=False)
 
     panels = [FieldPanel("text"), FieldPanel("language")]
 
