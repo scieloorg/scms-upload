@@ -85,8 +85,26 @@ class State(CommonControlField):
                 return cls.objects.filter(name__iexact=name, acronym=acronym).first()
         raise ValueError(f"State.get missing params {dict(name__iexact=name, acronym=acronym)}")
 
+    @staticmethod
+    def add(data, value):
+        if value:
+            if len(value) == 2 and value.upper() == value:
+                data["acronym"] = value
+            else:
+                data["name"] = value
+
+    @staticmethod
+    def fix_values(name, acronym):
+        params = {}
+        State.add(params, name)
+        State.add(params, acronym)
+        return params
+
     @classmethod
     def create(cls, user, name=None, acronym=None):
+        fixed = State.fix_values(name, acronym)
+        name = fixed.get("name")
+        acronym = fixed.get("acronym")
         if name or acronym:
             try:
                 obj = cls()
@@ -101,6 +119,9 @@ class State(CommonControlField):
 
     @classmethod
     def get_or_create(cls, user, name=None, acronym=None):
+        fixed = State.fix_values(name, acronym)
+        name = fixed.get("name")
+        acronym = fixed.get("acronym")
         try:
             return cls.get(name, acronym)
         except cls.DoesNotExist:
