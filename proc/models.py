@@ -646,19 +646,37 @@ class BaseProc(CommonControlField):
             except AttributeError:
                 raise Exception("*Proc.publish requires content_type parameter")
 
+        detail = {
+            "website_kind": website_kind,
+            "force_update": force_update,
+        }
         doit = False
         if website_kind == collection_choices.QA:
+            detail["qa_ws_status"] = self.qa_ws_status
             doit = tracker_choices.allowed_to_run(self.qa_ws_status, force_update)
         else:
-            doit = tracker_choices.allowed_to_run(self.public_ws_status, force_update)
+            detail["public_ws_status"] = self.public_ws_status
+            if (
+                self.migrated_data.content_type == "article" and 
+                (not self.sps_pkg or not self.sps_pkg.registered_in_core)
+            ):
+                detail["registered_in_core"] = self.self.sps_pkg.registered_in_core
+                doit = False
+            else:
+                doit = tracker_choices.allowed_to_run(
+                    self.public_ws_status, force_update
+                )
 
-        if not doit:
-            # logging.info(f"Skip publish on {website_kind} {self.pid}")
-            return
-
+        detail["doit"] = doit
         operation = self.start(
             user, f"publish {content_type} {self} on {website_kind}"
         )
+
+        if not doit:
+            # logging.info(f"Skip publish on {website_kind} {self.pid}")
+            operation.finish(user, completed=True, detail=detail)
+            return
+
         logging.info(f"publish {self} on {website_kind}")
         if website_kind == collection_choices.QA:
             self.qa_ws_status = tracker_choices.PROGRESS_STATUS_DOING
@@ -676,7 +694,8 @@ class BaseProc(CommonControlField):
             response = callable_publish(self, api_data)
         completed = bool(response.get("result") == "OK")
         self.update_publication_stage(website_kind, completed)
-        operation.finish(user, completed=completed, detail=response)
+        detail.update(response)
+        operation.finish(user, completed=completed, detail=detail)
         return completed
 
     def update_publication_stage(self, website_kind, completed):
@@ -1192,7 +1211,13 @@ class IssueProc(BaseProc, ClusterableModel):
                 done += 1
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
-                errors.append({"pid": record.item_pid, "error_type": str(exc_type), "error_message": str(exc_value)})
+                errors.append(
+                    {
+                        "pid": record.item_pid,
+                        "error_type": str(exc_type),
+                        "error_message": str(exc_value),
+                    }
+                )
                 UnexpectedEvent.create(
                     e=e,
                     exc_traceback=exc_traceback,
@@ -1207,12 +1232,14 @@ class IssueProc(BaseProc, ClusterableModel):
                 )
         got = id_file_records.count()
         detail = params
-        detail.update({
-            "total issue documents": self.issue.total_documents,
-            "total records": got,
-            "total done": done,
-            "errors": errors,
-        })
+        detail.update(
+            {
+                "total issue documents": self.issue.total_documents,
+                "total records": got,
+                "total done": done,
+                "errors": errors,
+            }
+        )
         completed = got == done
         operation.finish(
             user,
@@ -1686,16 +1713,10 @@ class ArticleProc(BaseProc, ClusterableModel):
             self.sps_pkg.fix_pid_v2(user, correct_pid_v2=self.migrated_data.pid)
 
     def update_sps_pkg_status(self):
-        if not self.sps_pkg:
-            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
-        elif self.sps_pkg.is_complete:
-            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DONE
-        elif not self.sps_pkg.registered_in_core:
-            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
-        elif not self.sps_pkg.valid_components:
+        if not self.sps_pkg or not self.sps_pkg.xml_with_pre:
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
         else:
-            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_PENDING
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DONE
         self.save()
 
     @property
@@ -1716,18 +1737,13 @@ class ArticleProc(BaseProc, ClusterableModel):
         if not self.get_xml(user, body_and_back_xml):
             return None
 
-        if not self.generate_sps_package(
+        self.generate_sps_package(
             user,
             body_and_back_xml,
             html_to_xml,
-        ):
-            return None
+        )
 
-        if self.sps_pkg:
-            article = self.create_or_update_item(
-                user, force_update, create_or_update_article
-            )
-            return article
+        return self.create_or_update_item(user, force_update, create_or_update_article)
 
     def synchronize(self, user):
         try:
