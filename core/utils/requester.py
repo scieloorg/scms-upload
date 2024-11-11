@@ -83,10 +83,8 @@ def post_data(
     try:
         response.raise_for_status()
     except requests.HTTPError as exc:
-        try:
-            return response.json()
-        except Exception as json_error:
-            pass
+        if response := is_http_error_json_response(json, response):
+            return response
         if 400 <= exc.response.status_code < 500:
             raise NonRetryableError(exc) from exc
         elif 500 <= exc.response.status_code < 600:
@@ -98,6 +96,22 @@ def post_data(
             raise
 
     return response.content if not json else response.json()
+
+
+def is_http_error_json_response(json, response):
+    """
+    Algumas API, por exemplo, opac_5, retornam a mensagem de erro em formato
+    JSON
+    """
+    if not json:
+        return
+
+    try:
+        data = response.json()
+        if isinstance(data, dict):
+            return data
+    except Exception as json_error:
+        return
 
 
 @retry(
