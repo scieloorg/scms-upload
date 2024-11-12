@@ -887,10 +887,14 @@ class IssueProc(BaseProc, ClusterableModel):
     )
 
     def __unicode__(self):
-        return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection})"
+        if self.journal_proc:
+            return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection})"
+        return f"{self.collection} {self.pid}"
 
     def __str__(self):
-        return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection})"
+        if self.journal_proc:
+            return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection})"
+        return f"{self.collection} {self.pid}"
 
     journal_proc = models.ForeignKey(
         JournalProc, on_delete=models.SET_NULL, null=True, blank=True
@@ -1162,7 +1166,17 @@ class IssueProc(BaseProc, ClusterableModel):
             # logging.info(f"Skip migrate_document_records {self.pid}")
             return
 
+        self.docs_status = tracker_choices.PROGRESS_STATUS_DOING
+        self.save()
+
         operation = self.start(user, "migrate_document_records")
+
+        if not self.journal_proc:
+            self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            self.save()
+            operation.finish(user, completed=False, detail={"journal_proc": None})
+            return
+
         done = 0
         journal_data = self.journal_proc.migrated_data.data
 
