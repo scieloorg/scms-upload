@@ -84,11 +84,11 @@ class PublicationAPI:
             if not self.token:
                 self.get_token()
             response = self._post_data(payload, self.token, kwargs)
-            response = self.format_response(response)
+            response = self.format_response(response, payload)
             if not response.get("result"):
                 self.get_token()
                 response = self._post_data(payload, self.token, kwargs)
-                return self.format_response(response)
+                return self.format_response(response, payload)
             return response
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -101,11 +101,12 @@ class PublicationAPI:
             }
             return response
 
-    def format_response(self, response):
+    def format_response(self, response, payload):
         if response.get("id") and response["id"] != "None":
             response["result"] = "OK"
         elif response.get("failed") is False:
             response["result"] = "OK"
+        response["payload"] = json.dumps(payload)
         return response or {}
 
     def get_token(self):
