@@ -303,8 +303,6 @@ def task_validate_original_zip_file(
         name, ext = os.path.splitext(xml_path)
         logging.info(f"xmlpre: {xml_with_pre.xmlpre}")
         package = Package.objects.get(pk=package_id)
-        package.name = xml_with_pre.sps_pkg_name
-        package.save()
 
         # FIXME nao usar o otimizado neste momento
         optimised_filepath = task_optimise_package(file_path)
