@@ -88,7 +88,7 @@ class Article(ClusterableModel, CommonControlField):
     )
     panel_article_ids.children = [
         # FieldPanel("pid_v2"),
-        FieldPanel("pid_v3"),
+        FieldPanel("pid_v3", read_only=True),
         # FieldPanel("aop_pid"),
     ]
 
@@ -96,19 +96,19 @@ class Article(ClusterableModel, CommonControlField):
         heading="Article details", classname="collapsible"
     )
     panel_article_details.children = [
-        FieldPanel("first_publication_date"),
-        FieldPanel("article_type"),
-        FieldPanel("status"),
+        FieldPanel("first_publication_date", read_only=True),
+        FieldPanel("article_type", read_only=True),
+        FieldPanel("status", read_only=True),
         InlinePanel(relation_name="title_with_lang", label="Title with Language"),
-        FieldPanel("elocation_id"),
-        FieldPanel("fpage"),
-        FieldPanel("lpage"),
+        FieldPanel("elocation_id", read_only=True),
+        FieldPanel("fpage", read_only=True),
+        FieldPanel("lpage", read_only=True),
     ]
 
     panels = [
         panel_article_ids,
         panel_article_details,
-        FieldPanel("issue", classname="collapsible"),
+        FieldPanel("issue", classname="collapsible", read_only=True),
     ]
 
     base_form_class = ArticleForm
@@ -347,8 +347,18 @@ class Article(ClusterableModel, CommonControlField):
         return str(self.multilingual_sections)
 
     def update_status(self, new_status=None):
+        # AS_UPDATE_SUBMITTED = "update-submitted"
+        # AS_ERRATUM_SUBMITTED = "erratum-submitted"
+        # AS_REQUIRE_UPDATE = "required-update"
+        # AS_REQUIRE_ERRATUM = "required-erratum"
+        # AS_PREPARE_TO_PUBLISH = "prepare-to-publish"
+        # AS_READY_TO_PUBLISH = "ready-to-publish"
+        # AS_SCHEDULED_TO_PUBLISH = "scheduled-to-publish"
+        # AS_PUBLISHED = "published"
+
         # TODO create PublicationEvent
-        if self.status == choices.AS_UPDATE_SUBMITTED:
+
+        if self.status in (choices.AS_UPDATE_SUBMITTED, choices.AS_READY_TO_PUBLISH, choices.AS_PUBLISHED):
             self.status = choices.AS_REQUIRE_UPDATE
             self.save()
             return
@@ -358,10 +368,16 @@ class Article(ClusterableModel, CommonControlField):
             self.save()
             return
 
-        # AS_PREPARE_TO_PUBLISH = "prepare-to-publish"
-        # AS_READY_TO_PUBLISH = "ready-to-publish"
-        # AS_SCHEDULED_TO_PUBLISH = "scheduled-to-publish"
-        # AS_PUBLISHED = "published"
+        if self.status == choices.AS_REQUIRE_UPDATE:
+            self.status = choices.AS_UPDATE_SUBMITTED
+            self.save()
+            return
+        
+        if self.status == choices.AS_REQUIRE_ERRATUM:
+            self.status = choices.AS_ERRATUM_SUBMITTED
+            self.save()
+            return
+
         self.status = new_status or choices.AS_PUBLISHED
         self.save()
 
@@ -380,6 +396,10 @@ class ArticleTitle(HTMLTextModel, CommonControlField):
         "Article", on_delete=models.CASCADE, related_name="title_with_lang"
     )
 
+    panels = [
+        FieldPanel("text", read_only=True),
+        FieldPanel("language", read_only=True),
+    ]
 
 class RelatedItem(CommonControlField):
     item_type = models.CharField(
