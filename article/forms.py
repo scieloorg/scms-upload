@@ -49,7 +49,7 @@ class RequestArticleChangeForm(CoreAdminModelForm):
 
     def save_all(self, user):
         request_article_change = super().save_all(user)
-        article = request_article_change
+        article = request_article_change.article
         if request_article_change.change_type == choices.RCT_ERRATUM:
             article.status = choices.AS_REQUIRE_ERRATUM
         elif request_article_change.change_type == choices.RCT_UPDATE:
