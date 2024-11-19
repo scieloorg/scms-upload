@@ -346,7 +346,7 @@ class Article(ClusterableModel, CommonControlField):
     def display_sections(self):
         return str(self.multilingual_sections)
 
-    def update_status(self, new_status=None):
+    def update_status(self, new_status=None, rollback=False):
         # AS_UPDATE_SUBMITTED = "update-submitted"
         # AS_ERRATUM_SUBMITTED = "erratum-submitted"
         # AS_REQUIRE_UPDATE = "required-update"
@@ -358,28 +358,26 @@ class Article(ClusterableModel, CommonControlField):
 
         # TODO create PublicationEvent
 
-        if self.status in (choices.AS_UPDATE_SUBMITTED, choices.AS_READY_TO_PUBLISH, choices.AS_PUBLISHED):
-            self.status = choices.AS_REQUIRE_UPDATE
+        if rollback:
+            if self.status == choices.AS_ERRATUM_SUBMITTED:
+                self.status = choices.AS_REQUIRE_ERRATUM
+                self.save()
+                return
+            elif self.status not in (choices.AS_REQUIRE_UPDATE, choices.AS_REQUIRE_ERRATUM):
+                self.status = choices.AS_REQUIRE_UPDATE
+                self.save()
+                return
+        else:
+            if self.status == choices.AS_REQUIRE_UPDATE:
+                self.status = choices.AS_UPDATE_SUBMITTED
+                self.save()
+                return
+            if self.status == choices.AS_REQUIRE_ERRATUM:
+                self.status = choices.AS_ERRATUM_SUBMITTED
+                self.save()
+                return
+            self.status = new_status or choices.AS_PUBLISHED
             self.save()
-            return
-
-        if self.status == choices.AS_ERRATUM_SUBMITTED:
-            self.status = choices.AS_REQUIRE_ERRATUM
-            self.save()
-            return
-
-        if self.status == choices.AS_REQUIRE_UPDATE:
-            self.status = choices.AS_UPDATE_SUBMITTED
-            self.save()
-            return
-        
-        if self.status == choices.AS_REQUIRE_ERRATUM:
-            self.status = choices.AS_ERRATUM_SUBMITTED
-            self.save()
-            return
-
-        self.status = new_status or choices.AS_PUBLISHED
-        self.save()
 
     def get_zip_filename_and_content(self):
         return self.sps_pkg.get_zip_filename_and_content()
