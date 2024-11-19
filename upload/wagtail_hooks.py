@@ -35,6 +35,7 @@ from .models import (
     XMLInfoReport,
     choices,
     PackageZip,
+    ArchivedPackage,
 )
 from .permission_helper import UploadPermissionHelper
 from team.models import has_permission
@@ -73,9 +74,9 @@ class PackageZipAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        if self.permission_helper.user_can_access_all_packages(request.user, None):
-            params = {}
-        elif self.permission_helper.user_can_finish_deposit(request.user, None):
+
+        params = {}
+        if not self.permission_helper.user_is_analyst_team_member(request.user, None):
             params = {"creator": request.user}
 
         return super().get_queryset(request).filter(**params)
@@ -89,6 +90,7 @@ class PackageAdmin(ModelAdmin):
     # create_view_class = PackageCreateView
     inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
+    inspect_template_name = "modeladmin/upload/package/inspect.html"
     menu_label = _("Package Validation")
     menu_icon = "folder"
     menu_order = 200
@@ -135,15 +137,14 @@ class PackageAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        params = {}
 
+        params = {}
         try:
             params["pkg_zip__id"] = request.GET["pkg_zip_id"]
         except KeyError:
             logging.info(request.GET)
 
-        if self.permission_helper.user_can_access_all_packages(request.user, None):
-            params = {}
+        if self.permission_helper.user_is_analyst_team_member(request.user, None):
             waiting_status = [
                 choices.PS_ENQUEUED_FOR_VALIDATION,
                 choices.PS_PENDING_CORRECTION,
@@ -174,7 +175,7 @@ class PackageAdmin(ModelAdmin):
                 + action_required_qa_menu
                 + action_required_publication_menu
             )
-        elif self.permission_helper.user_can_finish_deposit(request.user, None):
+        else:
             params["creator"] = request.user
             action_required = [
                 choices.PS_VALIDATED_WITH_ERRORS,
@@ -260,12 +261,12 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
             choices.PS_PENDING_CORRECTION,
             choices.PS_PENDING_QA_DECISION,
         ]
-        if self.permission_helper.user_can_access_all_packages(request.user, None):
+        if self.permission_helper.user_is_analyst_team_member(request.user, None):
             params = {}
             return super().get_queryset(request).filter(
                 Q(assignee__isnull=True) | Q(assignee=request.user),
                 status__in=status, **params)
-        elif self.permission_helper.user_can_finish_deposit(request.user, None):
+        else:
             params = {"creator": request.user}
 
         return super().get_queryset(request).filter(status__in=status, **params)
@@ -322,13 +323,13 @@ class ReadyToPublishPackageAdmin(ModelAdmin):
             choices.PS_READY_TO_PREVIEW,
             choices.PS_PREVIEW,
             choices.PS_READY_TO_PUBLISH,
+            choices.PS_PUBLISHED,
             # choices.PS_SCHEDULED_PUBLICATION,
         ]
-        if self.permission_helper.user_can_access_all_packages(request.user, None):
+        if self.permission_helper.user_is_analyst_team_member(request.user, None):
             params = {}
-            return super().get_queryset(request).filter(
-                status__in=status, **params)
-        elif self.permission_helper.user_can_finish_deposit(request.user, None):
+            return super().get_queryset(request).filter(status__in=status, **params)
+        else:
             params = {"creator": request.user}
 
         return super().get_queryset(request).filter(status__in=status, **params)
@@ -364,10 +365,8 @@ class XMLErrorReportAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        if (
-            request.user.is_superuser
-            or self.permission_helper.user_can_access_all_packages(request.user, None)
-        ):
+
+        if self.permission_helper.user_is_analyst_team_member(request.user, None):
             return super().get_queryset(request)
 
         return super().get_queryset(request).filter(package__creator=request.user)
@@ -408,10 +407,8 @@ class XMLErrorAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        if (
-            request.user.is_superuser
-            or self.permission_helper.user_can_access_all_packages(request.user, None)
-        ):
+        
+        if self.permission_helper.user_is_analyst_team_member(request.user, None):
             return super().get_queryset(request)
 
         return super().get_queryset(request).filter(package__creator=request.user)
@@ -447,10 +444,8 @@ class XMLInfoReportAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        if (
-            request.user.is_superuser
-            or self.permission_helper.user_can_access_all_packages(request.user, None)
-        ):
+
+        if self.permission_helper.user_is_analyst_team_member(request.user, None):
             return super().get_queryset(request)
 
         return super().get_queryset(request).filter(package__creator=request.user)
@@ -491,10 +486,8 @@ class XMLInfoAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        if (
-            request.user.is_superuser
-            or self.permission_helper.user_can_access_all_packages(request.user, None)
-        ):
+
+        if self.permission_helper.user_is_analyst_team_member(request.user, None):
             return super().get_queryset(request)
 
         return super().get_queryset(request).filter(package__creator=request.user)
@@ -531,10 +524,8 @@ class ValidationReportAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        if (
-            request.user.is_superuser
-            or self.permission_helper.user_can_access_all_packages(request.user, None)
-        ):
+
+        if self.permission_helper.user_is_analyst_team_member(request.user, None):
             return super().get_queryset(request)
 
         return super().get_queryset(request).filter(package__creator=request.user)
@@ -566,10 +557,8 @@ class ValidationAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        if (
-            request.user.is_superuser
-            or self.permission_helper.user_can_access_all_packages(request.user, None)
-        ):
+
+        if self.permission_helper.user_is_analyst_team_member(request.user, None):
             return super().get_queryset(request)
 
         return super().get_queryset(request).filter(package__creator=request.user)
@@ -601,13 +590,74 @@ class UploadValidatorAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        if (
-            request.user.is_superuser
-            or self.permission_helper.user_can_access_all_packages(request.user, None)
-        ):
+
+        if self.permission_helper.user_is_analyst_team_member(request.user, None):
             return super().get_queryset(request)
 
         return super().get_queryset(request).none()
+
+
+class ArchivedPackageAdmin(ModelAdmin):
+    model = ArchivedPackage
+    button_helper_class = UploadButtonHelper
+    permission_helper_class = UploadPermissionHelper
+    create_view_enabled = False
+    # create_view_class = PackageCreateView
+    inspect_view_enabled = True
+    inspect_view_class = PackageAdminInspectView
+    inspect_template_name = "modeladmin/upload/package/inspect.html"
+    menu_label = _("Archived Packages")
+    menu_icon = "folder"
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+    list_per_page = 20
+
+    list_display = (
+        "__str__",
+        "critical_errors",
+        "xml_errors_percentage",
+        "category",
+        "status",
+        "creator",
+        "updated",
+        "expiration_date",
+    )
+    list_filter = (
+        "creator",
+        "category",
+        "status",
+    )
+    search_fields = (
+        "name",
+        "journal__official_journal__title",
+        "issue__journal__official_journal__title",
+        "article__pid_v3",
+        "creator__username",
+        "updated_by__username",
+        "pkg_zip__file",
+    )
+    inspect_view_fields = (
+        "article",
+        "issue",
+        "category",
+        "status",
+        "file",
+        "created",
+        "updated",
+        "expiration_date",
+        "files_list",
+    )
+
+    def get_queryset(self, request):
+        if not self.permission_helper.user_can_use_upload_module(request.user, None):
+            return super().get_queryset(request).none()
+
+        params = {}
+        if not self.permission_helper.user_is_analyst_team_member(request.user, None):
+            params = {"creator": request.user}
+
+        return super().get_queryset(request).filter(~Q(status__in=choices.PS_WIP), **params)
 
 
 class UploadModelAdminGroup(ModelAdminGroup):
@@ -618,6 +668,7 @@ class UploadModelAdminGroup(ModelAdminGroup):
         PackageAdmin,
         QualityAnalysisPackageAdmin,
         ReadyToPublishPackageAdmin,
+        ArchivedPackageAdmin,
     )
     menu_order = get_menu_order("upload")
 
