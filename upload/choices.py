@@ -56,6 +56,21 @@ PS_PUBLISHED = "published"
 PS_REQUIRED_ERRATUM = "required-erratum"
 PS_REQUIRED_UPDATE = "required-update"
 PS_DEPUBLISHED = "depublished"
+PS_ARCHIVED = "archived"
+
+PS_WIP = (
+    PS_SUBMITTED,
+    PS_ENQUEUED_FOR_VALIDATION,
+    PS_VALIDATED_WITH_ERRORS,
+    PS_PENDING_QA_DECISION,
+    # PS_UNEXPECTED,
+    PS_READY_TO_PREVIEW,
+    PS_PREVIEW,
+    PS_READY_TO_PUBLISH,
+    # PS_PUBLISHED,
+    # PS_DEPUBLISHED,
+    # PS_ARCHIVED,
+)
 
 PACKAGE_STATUS = (
     (PS_REQUIRED_ERRATUM, _("Required erratum")),
@@ -70,6 +85,7 @@ PACKAGE_STATUS = (
     (PS_PREVIEW, _("Preview")),
     (PS_READY_TO_PUBLISH, _("Ready to publish on public website")),
     (PS_PUBLISHED, _("Published")),
+    (PS_ARCHIVED, _("Archived")),
 )
 
 CRITICAL_ERROR_DECISION = (
@@ -122,6 +138,8 @@ VAL_CAT_RENDITION = "rendition"
 VAL_CAT_RENDITION_CONTENT = "rendition-content"
 VAL_CAT_WEB_PAGE_CONTENT = "web-page-content"
 VAL_CAT_GROUP_DATA = "group"
+VAL_CAT_QA_CONCLUSION = "qa-conclusion"
+
 
 VALIDATION_CATEGORY = (
     (VAL_CAT_ARTICLE_JOURNAL_COMPATIBILITY, "ARTICLE_JOURNAL_COMPATIBILITY"),
@@ -137,6 +155,7 @@ VALIDATION_CATEGORY = (
     (VAL_CAT_ASSET, "ASSET"),
     (VAL_CAT_RENDITION, "RENDITION"),
     (VAL_CAT_PACKAGE_FILE, "PACKAGE_FILE"),
+    (VAL_CAT_QA_CONCLUSION, "QA conclusion"),
 )
 
 # Model ValidationResult, Field status
