@@ -139,7 +139,7 @@ class PackageZip(CommonControlField):
         try:
             self.file.delete(save=True)
         except Exception as e:
-            pass
+            logging.exception(f"Unable to delete {self.file.path} {e} {type(e)}")
         self.file.save(filename, ContentFile(content))
 
     @property
@@ -153,7 +153,7 @@ class PackageZip(CommonControlField):
         with ZipFile(self.file.path) as zf:
             # obtém os components do zip
             file_paths = set(zf.namelist() or [])
-            logging.info(file_paths)
+            logging.info(f"file_paths: {file_paths}")
 
             other_files = {}
             xmls = {}
@@ -172,21 +172,23 @@ class PackageZip(CommonControlField):
                     other_files.setdefault(name, [])
                     other_files[name].append(data)
 
-            logging.info(xmls)
-            logging.info(other_files)
-
+            logging.info(f"xmls: {xmls}")
+            logging.info(f"other_files: {other_files}")
+            
             for key in xmls.keys():
                 other_files_copy = other_files.copy()
                 for other_files_key in other_files_copy.keys():
+                    logging.info(f"xml: {key}, other_files_key: {other_files_key}")
                     if other_files_key.startswith(key + "."):
                         xmls[key].extend(other_files.pop(other_files_key))
-                        break
+                        logging.info(f"files ({key}): {xmls[key]}")
                     elif other_files_key.startswith(key + "-"):
                         xmls[key].extend(other_files.pop(other_files_key))
-                        break
+                        logging.info(f"files ({key}): {xmls[key]}")
 
             logging.info(xmls)
             for key, files in xmls.items():
+                logging.info(f"{key} {files}")
                 try:
                     with TemporaryDirectory() as tmpdirname:
                         zfile = os.path.join(tmpdirname, f"{key}.zip")
@@ -559,7 +561,7 @@ class Package(CommonControlField, ClusterableModel):
             return False
         return True
 
-    def finish_validations(self, task_process_qa_decision=None):
+    def finish_validations(self, task_process_qa_decision=None, blocking_error_status=None):
         """
         1. Verifica se as validações que executaram em paralelo, finalizaram
         2. Calcula os números de problemas do pacote
@@ -588,7 +590,8 @@ class Package(CommonControlField, ClusterableModel):
         # verifica status a partir destes números
         if metrics["total_blocking"]:
             # pacote tem erros indiscutíveis
-            self.status = choices.PS_PENDING_CORRECTION
+            # choices.PS_PENDING_CORRECTION | choices.PS_UNEXPECTED
+            self.status = blocking_error_status or choices.PS_PENDING_CORRECTION
         elif (
             metrics["total_validations"] > 0
             and (metrics["total_xml_issues"] + metrics["total_pkg_issues"]) == 0
@@ -891,6 +894,10 @@ class Package(CommonControlField, ClusterableModel):
     def process_qa_decision(self, user):
         operation = self.start(user, "process_qa_decision")
 
+        if self.qa_decision == choices.PS_PENDING_QA_DECISION:
+            self.finish_qa_decision(user, operation, websites=None, result=None, rule=None)
+            return []
+
         if self.qa_decision == choices.PS_PENDING_CORRECTION:
             self.finish_qa_decision(user, operation, websites=None, result=None, rule=None)
             return []
@@ -990,6 +997,9 @@ class Package(CommonControlField, ClusterableModel):
             exception = result.pop("exception")
         except (KeyError, AttributeError, TypeError, ValueError):
             exception = None
+
+        if self.qa_comment:
+            self.register_qa_comment_as_error(user)
 
         if result and result.get("request_correction"):
             self.qa_decision = choices.PS_PENDING_CORRECTION
@@ -1178,6 +1188,27 @@ class Package(CommonControlField, ClusterableModel):
         except Exception as e:
             pass
         self.file.save(filename, ContentFile(content))
+
+    def register_qa_comment_as_error(self, user, data=None):
+        data = data or {}
+        data.update({"qa_decision": self.qa_decision})
+        report_title = _("QA decision report")
+        category = choices.VAL_CAT_QA_CONCLUSION
+        report = ValidationReport.create_or_update(
+            user,
+            self,
+            report_title,
+            category,
+            reset_validations=False,
+        )
+        validation_result = report.add_validation_result(
+            status=choices.VALIDATION_RESULT_FAILURE,
+            message=self.qa_comment,
+            data=data,
+            subject="qa decision",
+        )
+        report.creation = choices.REPORT_CREATION_DONE
+        report.save()
 
 
 class QAPackage(Package):
@@ -1955,3 +1986,10 @@ class UploadValidator(CommonControlField):
 
     def check_impossible_to_fix_percentage(self, value):
         return value <= self.max_impossible_to_fix_percentage
+
+
+class ArchivedPackage(Package):
+
+    class Meta:
+        proxy = True
+
