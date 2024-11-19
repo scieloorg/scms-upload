@@ -432,7 +432,7 @@ class Package(CommonControlField, ClusterableModel):
 
         if self.status == choices.PS_PENDING_CORRECTION and self.article:
             # volta article.status para o status antes da submissão do pacote
-            self.article.update_status()
+            self.article.update_status(rollback=True)
 
         super(Package, self).save(*args, **kwargs)
 
@@ -1166,11 +1166,13 @@ class Package(CommonControlField, ClusterableModel):
                 self.qa_ws_pubdate = datetime.utcnow()
                 self.status = choices.PS_PREVIEW
                 self.save()
+                self.article.update_status(new_status=article_choices.AS_PREPARE_TO_PUBLISH)
             elif website_kind == collection_choices.PUBLIC:
                 self.public_ws_status = status
                 self.public_ws_pubdate = datetime.utcnow()
                 self.status = choices.PS_PUBLISHED
                 self.save()
+                self.article.update_status(new_status=article_choices.PS_PUBLISHED)
 
     @property
     def toc_sections(self):
