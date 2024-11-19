@@ -158,7 +158,7 @@ class BasicXMLFile(models.Model):
         try:
             self.file.delete(save=True)
         except Exception as e:
-            pass
+            logging.exception(f"Unable to delete {self.file.path} {e} {type(e)}")
         try:
             self.file.save(name, ContentFile(content))
         except Exception as e:
@@ -340,7 +340,7 @@ class PreviewArticlePage(Orderable):
         try:
             self.file.delete(save=True)
         except Exception as e:
-            pass
+            logging.exception(f"Unable to delete {self.file.path} {e} {type(e)}")
         try:
             self.file.save(name, ContentFile(content))
         except Exception as e:
@@ -628,45 +628,29 @@ class SPSPkg(CommonControlField, ClusterableModel):
     def save_pkg_zip_file(self, user, zip_file_path, article_proc):
         operation = article_proc.start(user, "save_pkg_zip_file")
         filename = self.sps_pkg_name + ".zip"
+        # saved original
         try:
-            with TemporaryDirectory() as targetdir:
-                with TemporaryDirectory() as workdir:
-                    target = os.path.join(targetdir, filename)
-                    package = SPPackage.from_file(zip_file_path, workdir)
-                    package.optimise(new_package_file_path=target, preserve_files=False)
-
-                # saved optimised
-                with open(target, "rb") as fp:
-                    self.save_file(filename, fp.read())
-                operation.finish(
-                    user,
-                    completed=True,
-                    detail={"source": target, "optimized": True},
-                )
+            with open(zip_file_path, "rb") as fp:
+                self.save_file(filename, fp.read())
+            operation.finish(
+                user,
+                completed=True,
+                detail={"source": zip_file_path, "optimized": False},
+            )
         except Exception as e:
-            # saved original
-            try:
-                with open(zip_file_path, "rb") as fp:
-                    self.save_file(filename, fp.read())
-                operation.finish(
-                    user,
-                    completed=True,
-                    detail={"source": zip_file_path, "optimized": False, "message": str(e)},
-                )
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                operation.finish(
-                    user,
-                    exc_traceback=exc_traceback,
-                    exception=e,
-                    detail={"source": zip_file_path, "optimized": False},
-                )
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            operation.finish(
+                user,
+                exc_traceback=exc_traceback,
+                exception=e,
+                detail={"source": zip_file_path, "optimized": False},
+            )
 
     def save_file(self, name, content):
         try:
             self.file.delete(save=True)
         except Exception as e:
-            pass
+            logging.exception(f"Unable to delete {self.file.path} {e} {type(e)}")
         try:
             self.file.save(name, ContentFile(content))
         except Exception as e:
@@ -688,8 +672,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
         xml_with_pre = self.upload_items_to_the_cloud(
             user,
             article_proc,
-            "upload_assets_to_the_cloud",
-            self.upload_assets_to_the_cloud,
+            "upload_zip_content_to_the_cloud",
+            self.upload_zip_content_to_the_cloud,
             **{"original_pkg_components": original_pkg_components},
         )
         self.upload_items_to_the_cloud(
@@ -776,10 +760,27 @@ class SPSPkg(CommonControlField, ClusterableModel):
         response["filename"] = filename
         return response
 
-    def upload_assets_to_the_cloud(self, user, original_pkg_components):
+    def upload_zip_content_to_the_cloud(self, user, original_pkg_components):
+        filename = self.sps_pkg_name + ".zip"
+        try:
+            result = {}
+            with TemporaryDirectory() as targetdir:
+                with TemporaryDirectory() as workdir:
+                    zip_file_path = os.path.join(targetdir, filename)
+                    package = SPPackage.from_file(zip_file_path, workdir)
+                    package.optimise(new_package_file_path=target, preserve_files=False)
+                    result = self.upload_components_to_the_cloud(user, original_pkg_components, zip_file_path)
+            return result
+        except Exception as e:
+            zip_file_path = self.file.path
+            return self.upload_components_to_the_cloud(user, original_pkg_components, zip_file_path)
+
+
+    def upload_components_to_the_cloud(self, user, original_pkg_components, zip_file_path):
         xml_with_pre = None
         items = []
-        with ZipFile(self.file.path) as optimised_fp:
+
+        with ZipFile(zip_file_path) as optimised_fp:
             for item in set(optimised_fp.namelist()):
                 name, ext = os.path.splitext(item)
                 content = optimised_fp.read(item)
