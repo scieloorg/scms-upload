@@ -137,6 +137,11 @@ class ArticlePayload:
         # )
         # self.data["authors"].append(_author)
 
+    def add_collab(self, name):
+        # collab
+        self.data.setdefault("collabs", [])
+        self.data["collabs"].append({"name": name})
+
     def add_translated_title(self, language, text):
         # translated_titles"] = EmbeddedDocumentListField(TranslatedTitle))
         if self.data["translated_titles"] is None:
@@ -184,16 +189,24 @@ class ArticlePayload:
         _doi_with_lang_item["language"] = language
         self.data["doi_with_lang"].append(_doi_with_lang_item)
 
-    def add_related_article(self, doi, ref_id, related_type):
+    def add_related_article(self, ref_id, related_type, ext_link_type, href):
         # related_article"] = EmbeddedDocumentListField(RelatedArticle))
         if self.data["related_articles"] is None:
             self.data["related_articles"] = []
         _related_article = {}
-        _related_article["doi"] = doi
-        _related_article["ref_id"] = ref_id
-        _related_article["related_type"] = related_type
-        self.data["related_articles"].append(_related_article)
-
+        if ext_link_type == "doi":
+            _related_article["doi"] = href
+            _related_article["ref_id"] = ref_id
+            _related_article["related_type"] = related_type
+            self.data["related_articles"].append(_related_article)
+        else:
+            pass
+            # TODO depende de resolver https://github.com/scieloorg/opac_5/issues/212
+            # _related_article["href"] = href
+            # _related_article["ref_id"] = ref_id
+            # _related_article["related_type"] = related_type
+            # self.data["related_articles"].append(_related_article)
+  
     def add_xml(self, xml):
         self.data["xml"] = xml
 
