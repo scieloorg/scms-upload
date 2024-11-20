@@ -631,8 +631,16 @@ class BaseProc(CommonControlField):
         website_kind=None,
         api_data=None,
         force_update=None,
+        content_type=None,
     ):
         website_kind = website_kind or collection_choices.QA
+
+        if not content_type:
+            try:
+                content_type = self.migrated_data.content_type
+            except AttributeError:
+                raise Exception("*Proc.publish requires content_type parameter")
+
         detail = {
             "website_kind": website_kind,
             "force_update": force_update,
@@ -647,7 +655,7 @@ class BaseProc(CommonControlField):
                 self.migrated_data.content_type == "article" and 
                 (not self.sps_pkg or not self.sps_pkg.registered_in_core)
             ):
-                detail["registered_in_core"] = self.self.sps_pkg.registered_in_core
+                detail["registered_in_core"] = self.sps_pkg.registered_in_core
                 doit = False
             else:
                 doit = tracker_choices.allowed_to_run(
@@ -656,7 +664,7 @@ class BaseProc(CommonControlField):
 
         detail["doit"] = doit
         operation = self.start(
-            user, f"publish {self.migrated_data.content_type} {self} on {website_kind}"
+            user, f"publish {content_type} {self} on {website_kind}"
         )
 
         if not doit:
@@ -673,7 +681,7 @@ class BaseProc(CommonControlField):
         self.save()
 
         api_data = api_data or get_api_data(
-            self.collection, self.migrated_data.content_type, website_kind
+            self.collection, content_type, website_kind
         )
         if api_data.get("error"):
             response = api_data
