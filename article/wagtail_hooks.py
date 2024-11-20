@@ -154,7 +154,7 @@ class ArticleModelAdminGroup(ModelAdminGroup):
     items = (
         ArticleModelAdmin,
         # RelatedItemModelAdmin,
-        RequestArticleChangeModelAdmin,
+        # omitir temporariamente RequestArticleChangeModelAdmin,
         # ApprovedArticleModelAdmin,
     )
 

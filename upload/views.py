@@ -317,3 +317,21 @@ def assign(request):
         #     messages.warning(request, _("Package has been reassigned with success."))
 
     return redirect(f"/admin/upload/qapackage/edit/{package_id}")
+
+
+def archive_package(request):
+    package_id = request.GET.get("package_id")
+    user = request.user
+
+    if not user.has_perm("upload.user_can_packagezip_create"):
+        messages.error(request, _("You do not have permission to archive packages."))
+    elif package_id:
+        package = get_object_or_404(Package, pk=package_id)
+
+        if package.status == choices.PS_UNEXPECTED:
+            package.status = choices.PS_ARCHIVED
+            package.save()
+            messages.success(request, _("Package was archived."))
+        else:
+            messages.warning(request, _("Unable to archive package which status = {}.").format(package.status))
+    return redirect(f"/admin/upload/package/")

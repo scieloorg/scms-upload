@@ -660,7 +660,7 @@ class BaseProc(CommonControlField):
                 self.migrated_data.content_type == "article" and 
                 (not self.sps_pkg or not self.sps_pkg.registered_in_core)
             ):
-                detail["registered_in_core"] = self.self.sps_pkg.registered_in_core
+                detail["registered_in_core"] = self.sps_pkg.registered_in_core
                 doit = False
             else:
                 doit = tracker_choices.allowed_to_run(

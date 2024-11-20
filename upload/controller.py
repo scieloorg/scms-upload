@@ -38,12 +38,10 @@ from upload.utils import file_utils, package_utils, xml_utils
 pp = PidRequester()
 
 
-class UnexpectedPackageError(Exception):
-    ...
+class UnexpectedPackageError(Exception): ...
 
 
-class PackageDataError(Exception):
-    ...
+class PackageDataError(Exception): ...
 
 
 def get_last_package(article_id, **kwargs):
@@ -70,7 +68,6 @@ def receive_package(user, package):
                     if item is not package:
                         package.linked.add(item)
             package.main_doi = xml_with_pre.main_doi
-            package.name = xml_with_pre.sps_pkg_name
             package.add_order(xml_with_pre.order, xml_with_pre.fpage)
             package.save()
 
@@ -87,7 +84,7 @@ def receive_package(user, package):
             )
             package.category = response.get("package_category")
             package.status = response.get("package_status")
-            package.expiration_date = response.get("previous_package")
+            package.expiration_date = response.get("expiration_date")
             package.save()
 
             error = (
@@ -111,7 +108,7 @@ def receive_package(user, package):
                 )
                 # falhou, retorna response
                 report.finish_validations()
-                package.finish_validations()
+                package.finish_validations(blocking_error_status=response.get("package_status"))
                 return response
 
             if package.article:
@@ -168,7 +165,8 @@ def _check_article_and_journal(package, xml_with_pre, user):
         response = pp.is_registered_xml_with_pre(xml_with_pre, xml_with_pre.filename)
         logging.info(f"is_registered_xml_with_pre: {response}")
         # verifica se o XML é esperado (novo, requer correção, requer atualização)
-        _check_package_is_expected(response, package, xml_with_pre.sps_pkg_name)
+        name, ext = os.path.splitext(xml_with_pre.filename)
+        _check_package_is_expected(response, package, name)
         logging.info(f"_check_package_is_expected: {response}")
 
         # verifica se journal e issue estão registrados
@@ -185,6 +183,8 @@ def _check_article_and_journal(package, xml_with_pre, user):
         logging.info(f"_check_xml_and_registered_data_compability: {response}")
 
         response["package_status"] = choices.PS_ENQUEUED_FOR_VALIDATION
+
+        _archive_pending_correction_package(response, name)
         return response
     except UnexpectedPackageError as e:
         response["package_status"] = choices.PS_UNEXPECTED
@@ -212,6 +212,7 @@ def _check_package_is_expected(response, package, sps_pkg_name):
         article = None
         params = {"name": sps_pkg_name}
 
+    logging.info(f"_check_package_is_expected: {params}")
     try:
         # se o pacote anterior está pendente de correção, então é aceitável
         previous_package = Package.objects.filter(**params).order_by("-created")[1]
@@ -220,48 +221,40 @@ def _check_package_is_expected(response, package, sps_pkg_name):
 
     response["article"] = article
 
-    if article:
-        if previous_package:
-            if previous_package.status == choices.PS_PENDING_CORRECTION:
-                response["previous_package"] = previous_package.expiration_date
-                if previous_package.expiration_date < datetime.utcnow():
-                    raise UnexpectedPackageError(
-                        _("The package is late. It was expected until {}").format(
-                            previous_package.expiration_date.isoformat())
-                    )
-            elif previous_package.status not in (
-                choices.PS_REQUIRED_ERRATUM,
-                choices.PS_REQUIRED_UPDATE,
-            ):
-                raise UnexpectedPackageError(
-                    _("There is a previous package in progress ({}) for {}").format(
-                        previous_package.status, article)
-                )
+    if previous_package and previous_package.status in choices.PS_WIP:
+        raise UnexpectedPackageError(
+            _("Not allowed to accept new package because there is a package already being processed ({}). To force updating, package status must be changed to '{}'").format(
+                previous_package.status, choices.PS_PENDING_CORRECTION
+            )
+        )
 
+    if article:
         if article.status == article_choices.AS_REQUIRE_UPDATE:
             response["package_category"] = choices.PC_UPDATE
-            article.status = article_choices.AS_UPDATE_SUBMITTED
-            article.save()
         elif article.status == article_choices.AS_REQUIRE_ERRATUM:
             response["package_category"] = choices.PC_ERRATUM
-            article.status = article_choices.AS_ERRATUM_SUBMITTED
-            article.save()
         else:
             response["package_category"] = choices.PC_UPDATE
-            raise UnexpectedPackageError(
-                _("Package is rejected because the article status is: {}").format(article.status)
-            )
 
+            raise UnexpectedPackageError(
+                _("Not allowed to accept new package because there is a package already being processed ({}). To force updating, package status must be changed to '{}'").format(
+                    article.status, choices.PS_PENDING_CORRECTION
+                )
+            )
     else:
-        if (
-            not previous_package
-            or previous_package.status == choices.PS_PENDING_CORRECTION
-        ):
-            response["package_category"] = choices.PC_NEW_DOCUMENT
-            return
-        raise UnexpectedPackageError(
-            _("Unexpected package {} (status={})").format(sps_pkg_name, previous_package.status)
-        )
+        response["package_category"] = choices.PC_NEW_DOCUMENT
+        return
+
+
+def _archive_pending_correction_package(response, name):
+    params = {}
+    if response.get("article"):
+        params["article"] = response.get("article")
+    else:
+        params["name"] = name
+    Package.objects.filter(
+        **params, status=choices.PS_PENDING_CORRECTION
+    ).update(status=choices.PS_ARCHIVED)
 
 
 def _check_journal(response, xmltree, user):
@@ -284,15 +277,19 @@ def _check_journal(response, xmltree, user):
         }
         similar_journals = []
         for j in Journal.get_similar_items(journal_title, issn_electronic, issn_print):
-            similar_journals.append({
-                "journal_title": j.title,
-                "issn_electronic": j.official_journal.issn_electronic,
-                "issn_print": j.official_journal.issn_print,
-            })
+            similar_journals.append(
+                {
+                    "journal_title": j.title,
+                    "issn_electronic": j.official_journal.issn_electronic,
+                    "issn_print": j.official_journal.issn_print,
+                }
+            )
         if similar_journals:
             similar_journals = _("Expected journal data: {}. ").format(similar_journals)
         else:
-            similar_journals = _("No journal with similar data is registered in the system")
+            similar_journals = _(
+                "No journal with similar data is registered in the system"
+            )
         raise PackageDataError(
             _(
                 "Journal data in XML: {}. {}Check and fix the journal data in XML"
@@ -328,22 +325,25 @@ def _check_issue(response, xmltree, user):
         if publication_year and xml.volume:
             items = Issue.objects.filter(
                 Q(publication_year=publication_year) | Q(volume=xml.volume),
-                journal=response["journal"])
+                journal=response["journal"],
+            )
         elif publication_year:
             items = Issue.objects.filter(
-                Q(publication_year=publication_year),
-                journal=response["journal"])
+                Q(publication_year=publication_year), journal=response["journal"]
+            )
         if not items or not items.count():
             items = Issue.objects.filter(journal=response["journal"])
 
         issues = []
         for item in items.order_by("-publication_year"):
-            issues.append({
-                "publication_year": publication_year,
-                "volume": item.volume,
-                "number": item.number,
-                "supplement": item.supplement,
-            })
+            issues.append(
+                {
+                    "publication_year": publication_year,
+                    "volume": item.volume,
+                    "number": item.number,
+                    "supplement": item.supplement,
+                }
+            )
         if issues:
             issues = _("Expected issue data: {}. ").format(issues)
         else:
@@ -360,7 +360,7 @@ def _check_xml_and_registered_data_compability(response):
 
     if article:
         journal = response["journal"]
-        if journal is not article.journal:
+        if not journal == article.journal:
             raise PackageDataError(
                 _("{} (registered, {}) differs from {} (XML, {})").format(
                     article.journal, article.journal.id, journal, journal.id
@@ -368,7 +368,7 @@ def _check_xml_and_registered_data_compability(response):
             )
 
         issue = response["issue"]
-        if issue is not article.issue:
+        if not issue == article.issue:
             raise PackageDataError(
                 _("{} (registered, {}) differs from {} (XML, {})").format(
                     article.issue, article.issue.id, issue, issue.id

@@ -20,8 +20,6 @@ from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
 from tracker.models import UnexpectedEvent
 
-# FIXME
-# from upload.models import Package
 
 User = get_user_model()
 
@@ -355,33 +353,34 @@ def task_publish_article(
     """
     try:
         user = _get_user(user_id, username)
-        manager = None
         op_main = None
-
+        manager = None
         if upload_package_id:
             manager = Package.objects.get(pk=upload_package_id)
             issue = manager.article.issue
         elif article_proc_id:
             manager = ArticleProc.objects.get(pk=article_proc_id)
             issue = manager.issue_proc.issue
+        op_main = manager.start(user, f"publish on {website_kind}")
 
         article = manager.article
         journal = article.journal
         issue = article.issue
 
-        op_main = manager.start(user, f"publish on {website_kind}")
-
         if not JournalProc.objects.filter(journal=journal).exists():
-            create_or_update_journal(
+            op_journal_proc = manager.start(user, f"publish on {website_kind} - create_or_update_journal")
+            created = create_or_update_journal(
                 journal_title=journal.title,
                 issn_electronic=journal.official_journal.issn_electronic,
                 issn_print=journal.official_journal.issn_print,
                 user=user,
                 force_update=True,
             )
+            op_journal_proc.finish(user, completed=bool(created))
 
         if not IssueProc.objects.filter(issue=issue).exists():
-            create_or_update_issue(
+            op_issue_proc = manager.start(user, f"publish on {website_kind} - create_or_update_issue")
+            created = create_or_update_issue(
                 journal=journal,
                 pub_year=issue.publication_year,
                 volume=issue.volume,
@@ -390,6 +389,7 @@ def task_publish_article(
                 user=user,
                 force_update=True,
             )
+            op_issue_proc.finish(user, completed=bool(created))
 
         for journal_proc in JournalProc.objects.filter(journal=journal):
 

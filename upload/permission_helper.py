@@ -1,6 +1,6 @@
 from wagtail.contrib.modeladmin.helpers import PermissionHelper
 
-from team.models import has_permission
+from team.models import has_permission, CollectionTeamMember
 
 
 ACCESS_ALL_PACKAGES = "access_all_packages"
@@ -33,3 +33,11 @@ class UploadPermissionHelper(PermissionHelper):
         return self.user_has_specific_permission(
             user, ANALYSE_VALIDATION_ERROR_RESOLUTION
         )
+
+    def user_is_analyst_team_member(self, user, obj):
+        if self.user_can_use_upload_module(user, obj):
+            return CollectionTeamMember.objects.filter(user=user).exists()
+
+    def user_is_xml_producer(self, user, obj):
+        if self.user_can_use_upload_module(user, obj):
+            return not self.user_is_analyst_team_member(user, obj)
