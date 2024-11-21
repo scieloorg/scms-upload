@@ -657,7 +657,7 @@ class BaseProc(CommonControlField):
         else:
             detail["public_ws_status"] = self.public_ws_status
             if (
-                self.migrated_data.content_type == "article" and 
+                content_type == "article" and 
                 (not self.sps_pkg or not self.sps_pkg.registered_in_core)
             ):
                 detail["registered_in_core"] = self.sps_pkg.registered_in_core
