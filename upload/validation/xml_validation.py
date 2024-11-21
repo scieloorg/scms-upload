@@ -4,7 +4,7 @@ import logging
 import os
 import sys
 
-from importlib_resources import files
+from importlib.resources import files
 from packtools.sps.models.dates import ArticleDates
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from packtools.sps.validation.aff import (
