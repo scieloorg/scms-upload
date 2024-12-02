@@ -144,7 +144,7 @@ class XMLArticle:
                         orcid=contrib_ids.get("orcid"),
                     )
                 )
-            if contrib := item.get("collab"):
+            if collab := item.get("collab"):
                 collabs.append({"name": collab})
         return {"names": names, "collabs": collabs}
 
