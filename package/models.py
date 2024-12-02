@@ -768,7 +768,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 with TemporaryDirectory() as workdir:
                     zip_file_path = os.path.join(targetdir, filename)
                     package = SPPackage.from_file(zip_file_path, workdir)
-                    package.optimise(new_package_file_path=target, preserve_files=False)
+                    package.optimise(new_package_file_path=zip_file_path, preserve_files=False)
                     result = self.upload_components_to_the_cloud(user, original_pkg_components, zip_file_path)
             return result
         except Exception as e:
