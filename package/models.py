@@ -351,7 +351,7 @@ class PreviewArticlePage(Orderable):
 
 class SPSPkg(CommonControlField, ClusterableModel):
     pid_v3 = models.CharField(max_length=23, null=True, blank=True)
-    sps_pkg_name = models.CharField(_("SPS Name"), max_length=32, null=True, blank=True)
+    sps_pkg_name = models.CharField(_("SPS Name"), max_length=40, null=True, blank=True)
 
     # zip
     file = models.FileField(upload_to=pkg_directory_path, null=True, blank=True)
@@ -513,7 +513,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
             obj.upload_package_to_the_cloud(user, original_pkg_components, article_proc)
             obj.validate(True)
 
-            article_proc.update_sps_pkg_status()
             operation.finish(user, completed=obj.is_complete, detail=obj.data)
 
             return obj
@@ -635,7 +634,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             operation.finish(
                 user,
                 completed=True,
-                detail={"source": zip_file_path, "optimized": False},
+                detail={"source": zip_file_path, "saved": self.file.path},
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -643,7 +642,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
-                detail={"source": zip_file_path, "optimized": False},
+                detail={"source": zip_file_path, "saved": False},
             )
 
     def save_file(self, name, content):
@@ -761,20 +760,28 @@ class SPSPkg(CommonControlField, ClusterableModel):
         return response
 
     def upload_zip_content_to_the_cloud(self, user, original_pkg_components):
-        filename = self.sps_pkg_name + ".zip"
+        result = {}
         try:
-            result = {}
             with TemporaryDirectory() as targetdir:
                 with TemporaryDirectory() as workdir:
+                    filename = self.sps_pkg_name + ".zip"
                     zip_file_path = os.path.join(targetdir, filename)
-                    package = SPPackage.from_file(zip_file_path, workdir)
-                    package.optimise(new_package_file_path=target, preserve_files=False)
+                    package = SPPackage.from_file(self.file.path, workdir)
+                    package.optimise(new_package_file_path=zip_file_path, preserve_files=False)
                     result = self.upload_components_to_the_cloud(user, original_pkg_components, zip_file_path)
-            return result
+                    detail = {"source": self.file.path, "zip_file_path": zip_file_path, "optimized": True}
         except Exception as e:
             zip_file_path = self.file.path
-            return self.upload_components_to_the_cloud(user, original_pkg_components, zip_file_path)
-
+            detail = {
+                "source": zip_file_path,
+                "zip_file_path": zip_file_path,
+                "optimized": False,
+                "message": str(e),
+                "error": str(type(e)),
+            }
+            result = self.upload_components_to_the_cloud(user, original_pkg_components, zip_file_path)
+        result.update(detail)
+        return result
 
     def upload_components_to_the_cloud(self, user, original_pkg_components, zip_file_path):
         xml_with_pre = None

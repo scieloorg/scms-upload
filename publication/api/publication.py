@@ -81,28 +81,32 @@ class PublicationAPI:
         # logging.info(f"payload={payload}")
         response = None
         try:
-            try:
-                if not self.token:
-                    self.get_token()
-                response = self._post_data(payload, self.token, kwargs)
-            except Exception as e:
+            if not self.token:
+                self.get_token()
+            response = self._post_data(payload, self.token, kwargs)
+            response = self.format_response(response, payload)
+            if not response.get("result"):
                 self.get_token()
                 response = self._post_data(payload, self.token, kwargs)
+                return self.format_response(response, payload)
+            return response
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             response = {
                 "post_data_url": self.post_data_url,
-                "payload": payload,
+                "payload": json.dumps(payload),
                 "traceback": traceback.format_tb(exc_traceback),
                 "error": str(e),
                 "error_type": str(type(e)),
             }
             return response
 
+    def format_response(self, response, payload):
         if response.get("id") and response["id"] != "None":
             response["result"] = "OK"
         elif response.get("failed") is False:
             response["result"] = "OK"
+        response["payload"] = json.dumps(payload)
         return response or {}
 
     def get_token(self):
