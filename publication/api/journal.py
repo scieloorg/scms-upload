@@ -27,9 +27,7 @@ def publish_journal(journal_proc, api_data):
     )
 
     api = PublicationAPI(**api_data)
-    response = api.post_data(payload)
-    response["payload"] = payload
-    return response
+    return api.post_data(payload)
 
 
 class JournalPayload:

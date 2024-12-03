@@ -657,7 +657,7 @@ class BaseProc(CommonControlField):
         else:
             detail["public_ws_status"] = self.public_ws_status
             if (
-                self.migrated_data.content_type == "article" and 
+                content_type == "article" and 
                 (not self.sps_pkg or not self.sps_pkg.registered_in_core)
             ):
                 detail["registered_in_core"] = self.sps_pkg.registered_in_core
@@ -1182,7 +1182,17 @@ class IssueProc(BaseProc, ClusterableModel):
             # logging.info(f"Skip migrate_document_records {self.pid}")
             return
 
+        self.docs_status = tracker_choices.PROGRESS_STATUS_DOING
+        self.save()
+
         operation = self.start(user, "migrate_document_records")
+
+        if not self.journal_proc:
+            self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            self.save()
+            operation.finish(user, completed=False, detail={"journal_proc": None})
+            return
+
         done = 0
         journal_data = self.journal_proc.migrated_data.data
 

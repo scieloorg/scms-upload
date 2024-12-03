@@ -15,9 +15,7 @@ def publish_issue(issue_proc, api_data):
     builder = IssuePayload(data)
     build_issue(builder, journal_id, issue, issue_id)
     api = PublicationAPI(**api_data)
-    response = api.post_data(data, {"journal_id": journal_id})
-    response["payload"] = data
-    return response
+    return api.post_data(data, {"journal_id": journal_id})
 
 
 class IssuePayload:
