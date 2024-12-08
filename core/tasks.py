@@ -1,15 +1,15 @@
 import logging
-import feedparser
-from config import celery_app
 from datetime import datetime
+
+import feedparser
 from django.db.models import Q
 
-from core.utils.requester import fetch_data
-from core.models import PressRelease
 from collection.models import Language
-from pid_provider.tasks import _get_user
+from config import celery_app
+from core.models import PressRelease
+from core.utils.requester import fetch_data
 from journal.models import Journal
-
+from pid_provider.tasks import _get_user
 
 RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY = {
     'pt_BR': {

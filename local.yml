@@ -11,9 +11,9 @@ services:
       - redis
       - postgres
       - mailhog
-      - pgbouncer
-    links:
-      - pgbouncer
+      # - pgbouncer
+    # links:
+    #   # - pgbouncer
     volumes:
       - .:/app:z
     env_file:
@@ -23,31 +23,19 @@ services:
       - "8007:8000"
     command: /start
 
-  minio:
-    image: 'minio/minio:RELEASE.2022-09-17T00-09-45Z'
-    container_name: upload_production_minio
-    hostname: opac-minio
-    ports:
-        - '9000:9000'
-        - '9001:9001'
-    env_file:
-      - ./.envs/.local/.minio
-    volumes:
-        - '../minio/data:/data'
-    command: server --console-address ":9001" /data
-  pgbouncer:
-    image: edoburu/pgbouncer:1.14.0
-    restart: always
-    container_name: upload_local_pgbouncer
-    environment:
-      - DATABASE_URL=postgres://GVRFlLmcCNfGLhsFvSnCioYOPJPYpyfj:BQ4hSUL4rdj5WZLdR8ilDLRQMvCtzo0caMaXDO0olGsmycQjlcZlTVK9DepZR8kk@postgres/uploaddb
-      - MAX_CLIENT_CONN=100
-    ports:
-      - 6437:5432
-    depends_on:
-      - postgres
-    links:
-      - postgres
+  # pgbouncer:
+  #   image: edoburu/pgbouncer:1.14.0
+  #   restart: always
+  #   container_name: upload_local_pgbouncer
+  #   environment:
+  #     - DATABASE_URL=postgres://GVRFlLmcCNfGLhsFvSnCioYOPJPYpyfj:BQ4hSUL4rdj5WZLdR8ilDLRQMvCtzo0caMaXDO0olGsmycQjlcZlTVK9DepZR8kk@postgres/uploaddb
+  #     - MAX_CLIENT_CONN=100
+  #   ports:
+  #     - 6437:5432
+  #   depends_on:
+  #     - postgres
+  #   links:
+  #     - postgres
 
   postgres:
     build:

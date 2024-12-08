@@ -1,16 +1,32 @@
 import logging
 import sys
+from datetime import datetime
 
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from collection.models import Collection
 from core.utils.get_user import _get_user
+from collection.choices import QA, PUBLIC
+from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
+from migration import controller
+from proc.controller import (
+    create_or_update_migrated_issue,
+    create_or_update_migrated_journal,
+    migrate_journal,
+    migrate_issue,
+    publish_journals,
+)
 from proc.models import ArticleProc, IssueProc, JournalProc
+from publication.api.document import publish_article
+from publication.api.journal import publish_journal
+from publication.api.issue import publish_issue
+from publication.api.publication import get_api_data, get_api
+from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
-
 from . import controller
+
 
 
 def _get_collections(collection_acron):
@@ -33,204 +49,7 @@ def _get_collections(collection_acron):
 
 ############################################
 @celery_app.task(bind=True)
-def task_create_or_update_journals(
-    self,
-    user_id=None,
-    username=None,
-    collection_acron=None,
-    force_update=False,
-):
-    """
-    Percorre os registros MigratedData (source="journal"),
-    e com seus dados, cria registros OfficialJournal, JournalProc e Journal
-
-    Parameters
-    ----------
-    user_id : int
-        identificacao do usuário
-    username : str
-        identificacao do usuário
-    collection_acron : str
-        acrônimo da coleção
-    force_update : bool
-        atualiza mesmo se já existe
-
-    """
-    try:
-        content_type = "journal"
-        for collection in _get_collections(collection_acron):
-            items = JournalProc.items_to_register(
-                collection, content_type, force_update
-            )
-            for item in items:
-                # dispara tarefas para criar/atualizar os registros
-                # OfficialJournal, JournalProc e Journal
-                task_create_or_update_journal.apply_async(
-                    kwargs=dict(
-                        user_id=user_id,
-                        username=username,
-                        item_id=item.id,
-                        force_update=force_update,
-                    )
-                )
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "proc.tasks.task_create_or_update_journals",
-                "user_id": user_id,
-                "username": username,
-                "collection_acron": collection_acron,
-                "force_update": force_update,
-            },
-        )
-
-
-@celery_app.task(bind=True)
-def task_create_or_update_journal(
-    self,
-    user_id=None,
-    username=None,
-    item_id=None,
-    force_update=False,
-):
-    """
-    Para um dado registro de MigratedData(journal),
-    cria ou atualiza os registros de OfficialJournal, JournalProc e Journal
-
-    Parameters
-    ----------
-    user_id : int
-        identificacao do usuário
-    username : str
-        identificacao do usuário
-    item_id : int
-        id de MigratedData(journal)
-    force_update : bool
-        atualiza mesmo se já existe
-
-    """
-    try:
-        user = _get_user(self.request, user_id, username)
-        item = JournalProc.objects.get(pk=item_id)
-        item.create_or_update_item(
-            user, force_update, controller.create_or_update_journal
-        )
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "proc.tasks.task_create_or_update_journal",
-                "user_id": user_id,
-                "username": username,
-                "item_id": item_id,
-                "force_update": force_update,
-            },
-        )
-        raise e
-
-
-@celery_app.task(bind=True)
-def task_create_or_update_issues(
-    self,
-    user_id=None,
-    username=None,
-    collection_acron=None,
-    force_update=False,
-):
-    """
-    Percorre os registros MigratedData (source="issue"),
-    e com seus dados, cria registros IssueProc e Issue
-
-    Parameters
-    ----------
-    user_id : int
-        identificacao do usuário
-    username : str
-        identificacao do usuário
-    force_update : bool
-        atualiza mesmo se já existe
-
-    """
-    try:
-        for collection in _get_collections(collection_acron):
-            items = IssueProc.items_to_register(collection, "issue", force_update)
-            for item in items:
-                # dispara tarefas para criar/atualizar os registros
-                # IssueProc e Issue
-                task_create_or_update_issue.apply_async(
-                    kwargs=dict(
-                        user_id=user_id,
-                        username=username,
-                        item_id=item.id,
-                        force_update=force_update,
-                    )
-                )
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "proc.tasks.task_create_or_update_issues",
-                "user_id": user_id,
-                "username": username,
-                "collection_acron": collection_acron,
-                "force_update": force_update,
-            },
-        )
-
-
-@celery_app.task(bind=True)
-def task_create_or_update_issue(
-    self,
-    user_id=None,
-    username=None,
-    item_id=None,
-    force_update=False,
-):
-    """
-    Para um dado registro de MigratedData(issue),
-    cria ou atualiza os registros de IssueProc e Issue
-
-    Parameters
-    ----------
-    user_id : int
-        identificacao do usuário
-    username : str
-        identificacao do usuário
-    item_id : int
-        id de MigratedData(issue)
-    force_update : bool
-        atualiza mesmo se já existe
-
-    """
-    try:
-        user = _get_user(self.request, user_id, username)
-        item = IssueProc.objects.get(pk=item_id)
-        item.create_or_update_item(
-            user, force_update, controller.create_or_update_issue
-        )
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "proc.tasks.task_create_or_update_issue",
-                "item_id": item_id,
-                "user_id": user_id,
-                "username": username,
-            },
-        )
-
-
-@celery_app.task(bind=True)
-def task_generate_sps_packages(
+def task_migrate_and_publish(
     self,
     user_id=None,
     username=None,
@@ -239,37 +58,144 @@ def task_generate_sps_packages(
     publication_year=None,
     issue_folder=None,
     force_update=False,
-    body_and_back_xml=False,
-    html_to_xml=False,
-    force_core_update=True,
+    force_import_acron_id_file=False,
+    force_migrate_document_records=False,
 ):
     try:
+        user = _get_user(user_id, username)
+        journal_filter = {}
+        if journal_acron:
+            journal_filter["acron"] = journal_acron
+
+        issue_filter = {}
+        if journal_acron:
+            issue_filter["journal_proc__acron"] = journal_acron
+        if issue_folder:
+            issue_filter["issue_folder"] = issue_folder
+        if publication_year:
+            issue_filter["issue__publication_year"] = publication_year
+
+        logging.info(f"journal_filter: {journal_filter}")
+        logging.info(f"issue_filter: {issue_filter}")
+
         for collection in _get_collections(collection_acron):
-            items = ArticleProc.items_to_build_sps_pkg(
-                collection_acron,
-                journal_acron,
-                publication_year,
-                issue_folder,
+            # obtém os dados do site clássico
+            classic_website = controller.get_classic_website(collection.acron)
+
+            # import title.id, cria MigratedJournal
+            create_or_update_migrated_journal(
+                user,
+                collection,
+                classic_website,
                 force_update,
             )
-            for item in items:
-                task_generate_sps_package.apply_async(
-                    kwargs={
-                        "username": username,
-                        "user_id": user_id,
-                        "item_id": item.id,
-                        "body_and_back_xml": body_and_back_xml,
-                        "html_to_xml": html_to_xml,
-                        "force_core_update": force_core_update,
-                    }
+            # import issue.id, cria MigratedIssue
+            create_or_update_migrated_issue(
+                user,
+                collection,
+                classic_website,
+                force_update,
+            )
+
+            items = JournalProc.items_to_process(collection, "journal", journal_filter, force_update)
+            logging.info(f"journals to process: {items.count()}")
+            for journal_proc in items:
+                migrate_journal(
+                    user,
+                    journal_proc,
+                    issue_filter,
+                    force_update,
+                    force_import_acron_id_file=force_import_acron_id_file,
+                    force_migrate_document_records=force_migrate_document_records,
+                    migrate_issues=False,
+                    migrate_articles=False,
                 )
+
+            items = IssueProc.items_to_process(
+                collection,
+                "issue",
+                issue_filter,
+                force_update,
+            )
+            logging.info(f"issues to process: {items.count()}")
+            for issue_proc in items:
+                migrate_issue(
+                    user,
+                    issue_proc,
+                    force_update,
+                    force_migrate_document_records=force_migrate_document_records,
+                    migrate_articles=False,
+                )
+
+            article_filter = {}
+            if issue_filter:
+                article_filter = {f"issue_proc__{k}": v for k, v in issue_filter.items()}
+
+            logging.info(f"article_filter: {article_filter}")
+            items = ArticleProc.items_to_process(collection, "article", article_filter, force_update)
+            logging.info(f"articles to process: {items.count()}")
+            for article_proc in items:
+                article_proc.migrate_article(user, force_update)
+
+            for website_kind in (QA, PUBLIC):
+                publish_journals(
+                    user,
+                    website_kind,
+                    collection,
+                    journal_filter,
+                    issue_filter,
+                    force_update,
+                    run_publish_issues=False,
+                    run_publish_articles=False,
+                    task_publish_article=task_publish_article,
+                )
+
+                items = IssueProc.items_to_publish(
+                    website_kind=website_kind,
+                    content_type="issue",
+                    collection=collection,
+                    force_update=force_update,
+                    params=issue_filter,
+                )
+                logging.info(f"publish_issues: {issue_filter} {items.count()}")
+                api_data = get_api_data(collection, "issue", website_kind)
+                for issue_proc in items:
+                    published = issue_proc.publish(
+                        user,
+                        publish_issue,
+                        website_kind=website_kind,
+                        api_data=api_data,
+                        force_update=force_update,
+                    )
+
+                items = ArticleProc.items_to_publish(
+                    website_kind=website_kind,
+                    content_type="article",
+                    collection=collection,
+                    force_update=force_update,
+                    params=article_filter,
+                )
+                api_data = get_api_data(collection, "article", website_kind)
+                logging.info(f"publish_articles: {article_filter} {items.count()}")
+                for article_proc in items:
+                    task_publish_article.apply_async(
+                        kwargs=dict(
+                            user_id=user.id,
+                            username=user.username,
+                            website_kind=website_kind,
+                            article_proc_id=article_proc.id,
+                            api_data=api_data,
+                            force_update=force_update,
+                        )
+                    )
+
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "task": "proc.tasks.task_generate_sps_packages",
+                "task": "proc.tasks.task_migrate_and_publish",
                 "user_id": user_id,
                 "username": username,
                 "collection_acron": collection_acron,
@@ -277,183 +203,625 @@ def task_generate_sps_packages(
                 "publication_year": publication_year,
                 "issue_folder": issue_folder,
                 "force_update": force_update,
-                "body_and_back_xml": body_and_back_xml,
-                "html_to_xml": html_to_xml,
-                "force_core_update": force_core_update,
+                "force_import_acron_id_file": force_import_acron_id_file,
+                "force_migrate_document_records": force_migrate_document_records,
             },
         )
 
 
+############################################
 @celery_app.task(bind=True)
-def task_generate_sps_package(
-    self,
-    item_id=None,
-    body_and_back_xml=False,
-    html_to_xml=False,
-    username=None,
-    user_id=None,
-    force_core_update=None,
-):
-    try:
-        user = _get_user(self.request, user_id, username)
-        item = ArticleProc.objects.get(pk=item_id)
-        if force_core_update and item.sps_pkg:
-            item.sps_pkg.set_registered_in_core(False)
-        item.generate_sps_package(
-            user,
-            body_and_back_xml,
-            html_to_xml,
-        )
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "proc.tasks.task_generate_sps_package",
-                "item_id": item_id,
-                "user_id": user_id,
-                "username": username,
-                "body_and_back_xml": body_and_back_xml,
-                "html_to_xml": html_to_xml,
-            },
-        )
-
-
-@celery_app.task(bind=True)
-def task_create_or_update_articles(
+def task_migrate_and_publish_journals(
     self,
     user_id=None,
     username=None,
     collection_acron=None,
+    journal_acron=None,
     force_update=False,
+    force_import_acron_id_file=False,
+    force_migrate_document_records=False,
 ):
-    """
-    Percorre os registros MigratedData (source="article"),
-    e com seus dados, cria registros ArticleProc e Article
-
-    Parameters
-    ----------
-    user_id : int
-        identificacao do usuário
-    username : str
-        identificacao do usuário
-    force_update : bool
-        atualiza mesmo se já existe
-
-    """
     try:
+        user = _get_user(self.request, user_id, username)
+        journal_filter = {}
+        if journal_acron:
+            journal_filter["acron"] = journal_acron
+
         for collection in _get_collections(collection_acron):
-            items = ArticleProc.items_to_register(collection, "article", force_update)
-            for item in items:
-                # dispara tarefas para criar/atualizar os registros
-                # ArticleProc e Article
-                task_create_or_update_article.apply_async(
-                    kwargs=dict(
-                        user_id=user_id,
-                        username=username,
-                        item_id=item.id,
+            # obtém os dados do site clássico
+            classic_website = controller.get_classic_website(collection.acron)
+
+            create_or_update_migrated_journal(
+                user,
+                collection,
+                classic_website,
+                force_update,
+            )
+
+            qa_api_data = get_api_data(collection, "journal", "QA")
+            public_api_data = get_api_data(collection, "journal", "PUBLIC")
+
+            for journal_proc in JournalProc.objects.filter(
+                collection=collection, **journal_filter
+            ):
+                try:
+                    # cria ou atualiza Journal e atualiza journal_proc
+                    migrate_journal(
+                        user,
+                        journal_proc,
+                        issue_filter=None,
                         force_update=force_update,
+                        force_import_acron_id_file=force_import_acron_id_file,
+                        force_migrate_document_records=force_migrate_document_records,
+                        migrate_issues=False,
+                        migrate_articles=False,
                     )
-                )
+                    task_publish_journal.apply_async(
+                        kwargs=dict(
+                            user_id=user_id,
+                            username=username,
+                            website_kind="QA",
+                            journal_proc_id=journal_proc.id,
+                            api_data=qa_api_data,
+                            force_update=force_update,
+                        )
+                    )
+                    task_publish_journal.apply_async(
+                        kwargs=dict(
+                            user_id=user_id,
+                            username=username,
+                            website_kind="PUBLIC",
+                            journal_proc_id=journal_proc.id,
+                            api_data=public_api_data,
+                            force_update=force_update,
+                        )
+                    )
+
+                except Exception as e:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    UnexpectedEvent.create(
+                        e=e,
+                        exc_traceback=exc_traceback,
+                        detail={
+                            "task": "proc.tasks.migrate_and_publish_journals",
+                            "user_id": user.id,
+                            "username": user.username,
+                            "collection": collection.acron,
+                            "journal_acron": journal_acron,
+                            "pid": journal_proc.pid,
+                            "force_update": force_update,
+                        },
+                    )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "task": "proc.tasks.task_create_or_update_articles",
+                "task": "proc.tasks.task_migrate_and_publish_journals",
                 "user_id": user_id,
                 "username": username,
                 "collection_acron": collection_acron,
+                "journal_acron": journal_acron,
                 "force_update": force_update,
             },
         )
 
 
 @celery_app.task(bind=True)
-def task_create_or_update_article(
+def task_publish_journals(
     self,
     user_id=None,
     username=None,
-    item_id=None,
+    collection_acron=None,
+    journal_acron=None,
     force_update=False,
 ):
-    """
-    Para um dado registro de MigratedData(article),
-    cria ou atualiza os registros de ArticleProc e Article
-
-    Parameters
-    ----------
-    user_id : int
-        identificacao do usuário
-    username : str
-        identificacao do usuário
-    item_id : int
-        id de MigratedData(article)
-    force_update : bool
-        atualiza mesmo se já existe
-
-    """
     try:
-        user = _get_user(self.request, user_id, username)
-        item = ArticleProc.objects.get(pk=item_id)
-        item.create_or_update_item(
-            user, force_update, controller.create_or_update_article
-        )
+        user = _get_user(user_id, username)
+        params = {}
+        if journal_acron:
+            params["acron"] = journal_acron
+
+        logging.info(f"task_publish_journals {params}")
+        for collection in _get_collections(collection_acron):
+
+            for website_kind in (QA, PUBLIC):
+
+                try:
+                    api = get_api(collection, "journal", website_kind)
+                except WebSiteConfiguration.DoesNotExist:
+                    continue
+                api.get_token()
+                api_data = api.data
+
+                items = JournalProc.items_to_publish(
+                    website_kind=website_kind,
+                    content_type="journal",
+                    collection=collection,
+                    force_update=force_update,
+                    params=params,
+                )
+                logging.info(f"publish_journals {items.count()}")
+                for journal_proc in items:
+                    logging.info(f"{website_kind} {journal_proc}")
+                    try:
+                        task_publish_journal.apply_async(
+                            kwargs=dict(
+                                user_id=user_id,
+                                username=username,
+                                website_kind=website_kind,
+                                journal_proc_id=journal_proc.id,
+                                api_data=api_data,
+                                force_update=force_update,
+                            )
+                        )
+
+                    except Exception as e:
+                        exc_type, exc_value, exc_traceback = sys.exc_info()
+                        UnexpectedEvent.create(
+                            e=e,
+                            exc_traceback=exc_traceback,
+                            detail={
+                                "task": "proc.task.publish_journals",
+                                "user_id": user.id,
+                                "username": user.username,
+                                "collection": collection.acron,
+                                "pid": journal_proc.pid,
+                                "force_update": force_update,
+                            },
+                        )
+
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "task": "proc.tasks.task_create_or_update_article",
-                "item_id": item_id,
+                "task": "proc.tasks.task_publish_journals",
                 "user_id": user_id,
                 "username": username,
+                "collection_acron": collection_acron,
+                "journal_acron": journal_acron,
+                "force_update": force_update,
             },
         )
 
 
 @celery_app.task(bind=True)
-def task_synchronize_to_pid_provider(
+def task_publish_journal(
     self,
-    username=None,
     user_id=None,
+    username=None,
+    website_kind=None,
+    journal_proc_id=None,
+    api_data=None,
+    force_update=None,
 ):
+    try:
+        user = _get_user(self.request, user_id, username)
+        user = _get_user(user_id, username)
+        journal_proc = JournalProc.objects.get(pk=journal_proc_id)
+        journal_proc.publish(
+            user,
+            publish_journal,
+            website_kind=website_kind,
+            api_data=api_data,
+            force_update=force_update,
+        )
 
-    for item in ArticleProc.objects.filter(
-        sps_pkg__isnull=False,
-        sps_pkg__registered_in_core=False,
-    ).iterator():
-        try:
-            subtask_synchronize_to_pid_provider.apply_async(
-                kwargs=dict(
-                    user_id=user_id,
-                    username=username,
-                    item_id=item.id,
-                )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.tasks.publish_journal",
+                "user_id": user.id,
+                "username": user.username,
+                "website_kind": website_kind,
+                "pid": journal_proc.pid,
+            },
+        )
+
+
+############################################
+@celery_app.task(bind=True)
+def task_migrate_and_publish_issues(
+    self,
+    user_id=None,
+    username=None,
+    collection_acron=None,
+    journal_acron=None,
+    publication_year=None,
+    issue_folder=None,
+    force_update=False,
+    force_migrate_document_records=False
+):
+    try:
+        user = _get_user(user_id, username)
+        params = {}
+        if journal_acron:
+            params["journal_proc__acron"] = journal_acron
+        if issue_folder:
+            params["issue_folder"] = issue_folder
+        if publication_year:
+            params["issue__publication_year"] = publication_year
+
+        logging.info(params)
+        for collection in _get_collections(collection_acron):
+            # obtém os dados do site clássico
+            classic_website = controller.get_classic_website(collection.acron)
+
+            create_or_update_migrated_issue(
+                user,
+                collection,
+                classic_website,
+                force_update,
             )
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            UnexpectedEvent.create(
-                e=e,
-                exc_traceback=exc_traceback,
-                detail={
-                    "task": "proc.tasks.task_synchronize_to_pid_provider",
-                    "user_id": user_id,
-                    "username": username,
-                },
-            )
+
+            qa_api_data = get_api_data(collection, "issue", "QA")
+            public_api_data = get_api_data(collection, "issue", "PUBLIC")
+            items = IssueProc.items_to_process(collection, "issue", params, force_update)
+            logging.info(items.count())
+            for issue_proc in items:
+                try:
+                    migrate_issue(
+                        user,
+                        issue_proc,
+                        force_update,
+                        force_migrate_document_records=force_migrate_document_records,
+                        migrate_articles=False,
+                    )
+
+                    task_publish_issue.apply_async(
+                        kwargs=dict(
+                            user_id=user_id,
+                            username=username,
+                            website_kind="QA",
+                            issue_proc_id=issue_proc.id,
+                            api_data=qa_api_data,
+                            force_update=force_update,
+                        )
+                    )
+                    task_publish_issue.apply_async(
+                        kwargs=dict(
+                            user_id=user_id,
+                            username=username,
+                            website_kind="PUBLIC",
+                            issue_proc_id=issue_proc.id,
+                            api_data=public_api_data,
+                            force_update=force_update,
+                        )
+                    )
+
+                except Exception as e:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    UnexpectedEvent.create(
+                        e=e,
+                        exc_traceback=exc_traceback,
+                        detail={
+                            "task": "proc.task.migrate_and_publish_issues",
+                            "user_id": user.id,
+                            "username": user.username,
+                            "collection": collection.acron,
+                            "pid": issue_proc.pid,
+                            "force_update": force_update,
+                            "force_migrate_document_records": force_migrate_document_records,
+                        },
+                    )
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.tasks.task_migrate_and_publish_issues",
+                "user_id": user_id,
+                "username": username,
+                "collection_acron": collection_acron,
+                "journal_acron": journal_acron,
+                "publication_year": publication_year,
+                "issue_folder": issue_folder,
+                "force_update": force_update,
+                "force_migrate_document_records": force_migrate_document_records,
+            },
+        )
 
 
 @celery_app.task(bind=True)
-def subtask_synchronize_to_pid_provider(
+def task_publish_issues(
     self,
-    username=None,
     user_id=None,
-    item_id=None
+    username=None,
+    collection_acron=None,
+    journal_acron=None,
+    issue_folder=None,
+    publication_year=None,
+    force_update=False,
 ):
-    user = _get_user(self.request, user_id, username)
-    item = ArticleProc.objects.get(pk=item_id)
-    item.synchronize(user)
+    try:
+        params = {}
+        if journal_acron:
+            params["journal_proc__acron"] = journal_acron
+        if issue_folder:
+            params["issue_folder"] = str(issue_folder)
+        if publication_year:
+            params["issue__publication_year"] = str(publication_year)
+        for collection in _get_collections(collection_acron):
+            for website_kind in (QA, PUBLIC):
+
+                try:
+                    api = get_api(collection, "issue", website_kind)
+                except WebSiteConfiguration.DoesNotExist:
+                    continue
+                api.get_token()
+                api_data = api.data
+
+                for issue_proc in IssueProc.items_to_publish(
+                    website_kind=website_kind,
+                    content_type="issue",
+                    collection=collection,
+                    force_update=force_update,
+                    params=params,
+                ):
+                    try:
+                        task_publish_issue.apply_async(
+                            kwargs=dict(
+                                user_id=user_id,
+                                username=username,
+                                website_kind=website_kind,
+                                issue_proc_id=issue_proc.id,
+                                api_data=api_data,
+                                force_update=force_update,
+                            )
+                        )
+
+                    except Exception as e:
+                        exc_type, exc_value, exc_traceback = sys.exc_info()
+                        UnexpectedEvent.create(
+                            e=e,
+                            exc_traceback=exc_traceback,
+                            detail={
+                                "task": "proc.tasks.publish_issues",
+                                "user_id": user_id,
+                                "username": username,
+                                "collection": collection.acron,
+                                "pid": issue_proc.pid,
+                                "force_update": force_update,
+                            },
+                        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.tasks.task_publish_issues",
+                "user_id": user_id,
+                "username": username,
+                "collection_acron": collection_acron,
+                "journal_acron": journal_acron,
+                "issue_folder": issue_folder,
+                "publication_year": publication_year,
+                "force_update": force_update,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_publish_issue(
+    self,
+    user_id=None,
+    username=None,
+    website_kind=None,
+    issue_proc_id=None,
+    api_data=None,
+    force_update=None,
+):
+    try:
+        user = _get_user(self.request, user_id, username)
+        user = _get_user(user_id, username)
+        issue_proc = IssueProc.objects.get(pk=issue_proc_id)
+        issue_proc.publish(
+            user,
+            publish_issue,
+            website_kind=website_kind,
+            api_data=api_data,
+            force_update=force_update,
+        )
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.tasks.publish_issue",
+                "user_id": user.id,
+                "username": user.username,
+                "website_kind": website_kind,
+                "pid": issue_proc.pid,
+            },
+        )
+
+
+############################################
+@celery_app.task(bind=True)
+def task_migrate_and_publish_articles(
+    self,
+    user_id=None,
+    username=None,
+    collection_acron=None,
+    journal_acron=None,
+    publication_year=None,
+    issue_folder=None,
+    force_update=False,
+):
+    try:
+        user = _get_user(user_id, username)
+
+        params = {}
+        if journal_acron:
+            params["issue_proc__journal_proc__acron"] = journal_acron
+        if issue_folder:
+            params["issue_proc__issue_folder"] = issue_folder
+        if publication_year:
+            params["issue_proc__issue__publication_year"] = publication_year
+
+        logging.info(f"task_migrate_and_publish_articles: {params}")
+
+        for collection in _get_collections(collection_acron):
+            qa_api_data = get_api_data(collection, "article", QA)
+            public_api_data = get_api_data(collection, "article", PUBLIC)
+
+            items = ArticleProc.items_to_process(collection, "article", params, force_update)
+            logging.info(f"articles to process: {items.count()}")
+            logging.info(f"article_filter: {params}")
+            logging.info(list(ArticleProc.items_to_process_info(items)))
+
+            for article_proc in items:
+                article = article_proc.migrate_article(user, force_update)
+                if not article:
+                    continue
+
+                task_publish_article.apply_async(
+                        kwargs=dict(
+                            user_id=user_id,
+                            username=username,
+                            website_kind="QA",
+                            article_proc_id=article_proc.id,
+                            api_data=qa_api_data,
+                            force_update=force_update,
+                        )
+                    )
+                task_publish_article.apply_async(
+                    kwargs=dict(
+                        user_id=user_id,
+                        username=username,
+                        website_kind="PUBLIC",
+                        article_proc_id=article_proc.id,
+                        api_data=public_api_data,
+                        force_update=force_update,
+                    )
+                )
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.tasks.task_migrate_and_publish_articles",
+                "user_id": user_id,
+                "username": username,
+                "collection_acron": collection_acron,
+                "journal_acron": journal_acron,
+                "publication_year": publication_year,
+                "issue_folder": issue_folder,
+                "force_update": force_update,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_publish_articles(
+    self,
+    user_id=None,
+    username=None,
+    collection_acron=None,
+    journal_acron=None,
+    issue_folder=None,
+    publication_year=None,
+    force_update=False,
+):
+    try:
+        params = {}
+
+        if journal_acron:
+            params["issue_proc__journal_proc__acron"] = journal_acron
+        if issue_folder:
+            params["issue_proc__issue_folder"] = issue_folder
+        if publication_year:
+            params["issue_proc__issue__publication_year"] = publication_year
+
+        for collection in _get_collections(collection_acron):
+            for website_kind in (QA, PUBLIC):
+                try:
+                    api = get_api(collection, "article", website_kind)
+                except WebSiteConfiguration.DoesNotExist:
+                    continue
+                api.get_token()
+                api_data = api.data
+
+                # for article_proc in ArticleProc.objects.filter(collection=collection, **params):
+                for article_proc in ArticleProc.items_to_publish(
+                    website_kind=website_kind,
+                    content_type="article",
+                    collection=collection,
+                    force_update=force_update,
+                    params=params,
+                ):
+                    task_publish_article.apply_async(
+                        kwargs=dict(
+                            user_id=user_id,
+                            username=username,
+                            website_kind=website_kind,
+                            article_proc_id=article_proc.id,
+                            api_data=api_data,
+                            force_update=force_update,
+                        )
+                    )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.tasks.task_publish_articles",
+                "user_id": user_id,
+                "username": username,
+                "collection_acron": collection_acron,
+                "journal_acron": journal_acron,
+                "issue_folder": issue_folder,
+                "publication_year": publication_year,
+                "force_update": force_update,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_publish_article(
+    self,
+    user_id=None,
+    username=None,
+    website_kind=None,
+    article_proc_id=None,
+    api_data=None,
+    force_update=None,
+):
+    try:
+        user = _get_user(self.request, user_id, username)
+        article_proc = ArticleProc.objects.get(pk=article_proc_id)
+        article_proc.publish(
+            user,
+            publish_article,
+            website_kind=website_kind,
+            api_data=api_data,
+            force_update=force_update,
+        )
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.task.publish_article",
+                "user_id": user_id,
+                "username": username,
+                "website_kind": website_kind,
+                "pid": article_proc.pid,
+            },
+        )

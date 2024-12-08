@@ -3,7 +3,7 @@ import logging
 from lxml import etree
 from packtools.sps.models.article_abstract import Abstract
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
-from packtools.sps.models.article_authors import Authors
+from packtools.sps.models.article_contribs import ArticleContribs
 from packtools.sps.models.article_doi_with_lang import DoiWithLang
 from packtools.sps.models.article_ids import ArticleIds
 from packtools.sps.models.article_renditions import ArticleRenditions
@@ -17,7 +17,7 @@ from packtools.sps.models.related_articles import RelatedItems
 from publication.utils.issue import get_bundle_id
 
 
-def build_article(article, journal_proc, builder):
+def build_article(builder, article, journal_id, order, pub_date):
     sps_pkg = article.sps_pkg
     xml_with_pre = sps_pkg.xml_with_pre
 
@@ -34,7 +34,7 @@ def build_article(article, journal_proc, builder):
     builder.add_dates(article.created, article.updated)
     builder.add_issue(
         get_bundle_id(
-            issn_id=journal_proc.pid,
+            issn_id=journal_id,
             year=article.issue.publication_year,
             volume=article.issue.volume,
             number=article.issue.number,
@@ -48,36 +48,48 @@ def build_article(article, journal_proc, builder):
     for item in article_xml.get_htmls():
         builder.add_html(language=item["language"], uri=item.get("uri"))
     for item in sps_pkg.pdfs:
-        lang = item.lang and item.lang.code2 or metadata.get("lang")
+        # {"lang": item.lang, "url": item.uri, "legacy_uri": item.legacy_uri}
+        lang = item.get("lang") or metadata.get("lang")
         builder.add_pdf(
             lang=lang,
-            url=item.uri,
-            filename=item.basename,
-            type=item.component_type,
+            url=item["url"],
+            filename=item["basename"],
+            type=item.get("component_type"),
+            classic_uri=item.get("legacy_uri"),
         )
-    for item in sps_pkg.supplementary_material:
+    for item in sps_pkg.supplementary_materials:
         builder.add_mat_suppl(
-            lang=item.lang and item.lang.code2,
-            url=item.uri,
-            ref_id=None,
-            filename=item.basename,
+            **{
+                "ref_id": item["xml_elem_id"],
+                "lang": item["lang"],
+                "url": item["url"],
+                "filename": item["basename"],
+                "classic_uri": item["legacy_uri"],
+            }
         )
 
     builder.add_main_metadata(**metadata)
     builder.add_document_type(article_xml.main_article_type)
 
-    builder.add_in_issue(**article_xml.get_in_issue())
+    builder.add_in_issue(**article_xml.get_in_issue(order))
 
-    builder.add_publication_date(**article_xml.get_publication_date())
+    builder.add_publication_date(**article_xml.get_publication_date(pub_date))
 
-    for item in article_xml.get_authors():
+    contribs = article_xml.get_contribs()
+    for item in contribs.get("names") or []:
         builder.add_author(**item)
+
+    # depende de https://github.com/scieloorg/opac_5/issues/214
+    # TODO
+    # for item in contribs.get("collabs") or []:
+    #     builder.add_collab(**item)
 
     for item in article_xml.get_translated_title():
         builder.add_translated_title(**item)
 
-    for item in article_xml.get_section():
-        builder.add_section(**item)
+    for language, text in article.multilingual_sections.items():
+        # pega as seções a partir do Article
+        builder.add_section(language=language, text=text, code=None)
 
     for item in article_xml.get_keywords():
         builder.add_keywords(**item)
@@ -98,44 +110,52 @@ class XMLArticle:
     def __init__(self, xml_with_pre):
         self.xmltree = xml_with_pre.xmltree
 
-    def get_publication_date(self):
-        xml_article_dates = ArticleDates(self.xmltree)
-        date = xml_article_dates.article_date
-        if date:
-            month = date.get("month")
-            if month:
-                date["month"] = month.zfill(2)
-            day = date.get("day")
-            if day:
-                date["day"] = day.zfill(2)
-        if date:
-            return {k: v for k, v in date.items() if k in ("year", "month", "day")}
-        return {}
+    def get_publication_date(self, pub_date):
+        return {
+            "year": str(pub_date.year),
+            "month": str(pub_date.month).zfill(2),
+            "day": str(pub_date.day).zfill(2),
+        }
 
-    def get_authors(self):
-        for item in Authors(self.xmltree).contribs_with_affs:
-            try:
-                affiliation = ", ".join(
-                    [a.get("original") or a.get("orgname") for a in item["affs"]]
+    def get_contribs(self):
+        authors = ArticleContribs(self.xmltree)
+
+        names = []
+        collabs = []
+        for item in authors.contribs:
+            if item.get("parent") != "article":
+                break
+
+            if contrib := item.get("contrib_name"):
+                try:
+                    affs = item.get("affs") or []
+                    affiliation = ", ".join(
+                        [a.get("original") or a.get("orgname") for a in affs]
+                    )
+                except KeyError:
+                    affiliation = None
+                contrib_ids = item.get("contrib_ids") or {}
+                names.append(
+                    dict(
+                        surname=contrib.get("surname"),
+                        given_names=contrib.get("given-names"),
+                        suffix=contrib.get("suffix"),
+                        affiliation=affiliation,
+                        orcid=contrib_ids.get("orcid"),
+                    )
                 )
-            except KeyError:
-                affiliation = None
-            yield dict(
-                surname=item["surname"],
-                given_names=item["given_names"],
-                suffix=item.get("suffix"),
-                affiliation=affiliation,
-                orcid=item.get("orcid"),
-            )
+            if collab := item.get("collab"):
+                collabs.append({"name": collab})
+        return {"names": names, "collabs": collabs}
 
     def get_related_articles(self):
         items = RelatedItems(self.xmltree)
         for item in items.related_articles:
             yield {
-                "ext-link-type": item["ext-link-type"],
-                "ref_id": item["id"],
-                "href": item["href"],
-                "related_type": item["related-article-type"],
+                "ext_link_type": item.get("ext-link-type"),
+                "ref_id": item.get("id"),
+                "href": item.get("href"),
+                "related_type": item.get("related-article-type"),
             }
 
     def get_translated_title(self):
@@ -201,11 +221,11 @@ class XMLArticle:
         for item in root.data:
             yield {"language": item["lang"]}
 
-    def get_in_issue(self):
+    def get_in_issue(self, order):
         aids = ArticleIds(self.xmltree)
         article_meta_issue = ArticleMetaIssue(self.xmltree)
         return dict(
-            order=int(aids.other),
+            order=order,
             fpage=article_meta_issue.fpage,
             fpage_seq=article_meta_issue.fpage_seq,
             lpage=article_meta_issue.lpage,

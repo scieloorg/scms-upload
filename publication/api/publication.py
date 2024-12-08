@@ -8,8 +8,39 @@ from django.utils.translation import gettext_lazy as _
 from requests import HTTPError
 from requests.auth import HTTPBasicAuth
 
+from collection.models import WebSiteConfiguration
+from collection import choices as collection_choices
 from core.utils.requester import post_data
 from publication.api import exceptions
+
+
+def get_api(collection, content_type, website_kind=None):
+    website = WebSiteConfiguration.get(
+        collection=collection,
+        purpose=website_kind,
+    )
+
+    API_URLS = {
+        "journal": website.api_url_journal,
+        "issue": website.api_url_issue,
+        "article": website.api_url_article,
+    }
+    return PublicationAPI(
+        post_data_url=API_URLS.get(content_type),
+        get_token_url=website.api_get_token_url,
+        username=website.api_username,
+        password=website.api_password,
+    )
+
+
+def get_api_data(collection, content_type, website_kind=None):
+    try:
+        api = get_api(collection, content_type, website_kind)
+    except WebSiteConfiguration.DoesNotExist:
+        return {"error": f"Website does not exist: {collection} {website_kind}"}
+
+    api.get_token()
+    return api.data
 
 
 class PublicationAPI:
@@ -40,6 +71,7 @@ class PublicationAPI:
             get_token_url=self.get_token_url,
             username=self.username,
             password=self.password,
+            token=self.token,
         )
 
     def post_data(self, payload, kwargs=None):
@@ -49,27 +81,32 @@ class PublicationAPI:
         # logging.info(f"payload={payload}")
         response = None
         try:
-            try:
-                self.token = self.token or self.get_token()
+            if not self.token:
+                self.get_token()
+            response = self._post_data(payload, self.token, kwargs)
+            response = self.format_response(response, payload)
+            if not response.get("result"):
+                self.get_token()
                 response = self._post_data(payload, self.token, kwargs)
-            except Exception as e:
-                self.token = self.get_token()
-                response = self._post_data(payload, self.token, kwargs)
+                return self.format_response(response, payload)
+            return response
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             response = {
                 "post_data_url": self.post_data_url,
-                "payload": payload,
+                "payload": json.dumps(payload),
                 "traceback": traceback.format_tb(exc_traceback),
                 "error": str(e),
                 "error_type": str(type(e)),
             }
             return response
 
+    def format_response(self, response, payload):
         if response.get("id") and response["id"] != "None":
             response["result"] = "OK"
         elif response.get("failed") is False:
             response["result"] = "OK"
+        response["payload"] = json.dumps(payload)
         return response or {}
 
     def get_token(self):
@@ -88,7 +125,8 @@ class PublicationAPI:
             json=True,
         )
         # logging.info(resp)
-        return resp.get("token")
+        self.token = resp.get("token")
+        return self.token
 
     def _post_data(self, payload, token, kwargs=None):
         """

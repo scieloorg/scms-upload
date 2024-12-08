@@ -60,7 +60,7 @@ CACHES = {
 # https://docs.djangoproject.com/en/dev/ref/middleware/#x-content-type-options-nosniff
 # SECURE_CONTENT_TYPE_NOSNIFF = env.bool(
 #    "DJANGO_SECURE_CONTENT_TYPE_NOSNIFF", default=True
-#)
+# )
 
 # STATIC
 # ------------------------
@@ -217,3 +217,6 @@ LOGGING = {
 
 # Your stuff...
 # ------------------------------------------------------------------------------
+
+JOURNAL_API_URL = "http://core.scielo.org/api/v1/journal"
+ISSUE_API_URL = "http://core.scielo.org/api/v1/issue"

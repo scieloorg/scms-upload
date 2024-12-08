@@ -17,7 +17,6 @@ from core.utils.requester import post_data
 from pid_provider import exceptions
 from pid_provider.models import PidProviderConfig
 
-
 LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
@@ -64,7 +63,7 @@ class PidProviderAPIClient:
         if not hasattr(self, "_fix_pid_v2_url") or not self._fix_pid_v2_url:
             try:
                 self._fix_pid_v2_url = None
-                endpoint = self.config.endpoint.filter(name='fix-pid-v2')[0]
+                endpoint = self.config.endpoint.filter(name="fix-pid-v2")[0]
                 if endpoint.enabled:
                     self._fix_pid_v2_url = endpoint.url
             except IndexError:
@@ -155,7 +154,7 @@ class PidProviderAPIClient:
                 timeout=timeout,
                 json=True,
             )
-            return resp.get("access")
+            return resp["access"]
         except Exception as e:
             # TODO tratar as exceções
             logging.exception(e)
@@ -177,21 +176,22 @@ class PidProviderAPIClient:
             name, ext = os.path.splitext(name)
             zip_xml_file_path = os.path.join(tmpdirname, name + ".zip")
 
-            logging.info(f"Posting xml with {xml_with_pre.data}")
-
             create_xml_zip_file(
                 zip_xml_file_path, xml_with_pre.tostring(pretty_print=True)
             )
-
             try:
-                return self._post_xml(zip_xml_file_path, self.token, self.timeout)
+                response = self._post_xml(zip_xml_file_path, self.token, self.timeout)
+                if isinstance(response, list):
+                    return response
             except Exception as e:
-                self.token = self._get_token(
-                    username=self.api_username,
-                    password=self.api_password,
-                    timeout=self.timeout,
-                )
-                return self._post_xml(zip_xml_file_path, self.token, self.timeout)
+                logging.exception(e)
+
+            self.token = self._get_token(
+                username=self.api_username,
+                password=self.api_password,
+                timeout=self.timeout,
+            )
+            return self._post_xml(zip_xml_file_path, self.token, self.timeout)
 
     def _post_xml(self, zip_xml_file_path, token, timeout):
         """
@@ -201,21 +201,21 @@ class PidProviderAPIClient:
             -H 'Authorization: Bearer eyJ0b2tlb' \
             http://localhost:8000/api/v2/pid/pid_provider/ --output output.json
         """
-        basename = os.path.basename(zip_xml_file_path)
-
-        files = {
-            "file": (
-                basename,
-                open(zip_xml_file_path, "rb"),
-                "application/zip",
-            )
-        }
-        header = {
-            "Authorization": "Bearer " + token,
-            "content-type": "multi-part/form-data",
-            "Content-Disposition": "attachment; filename=%s" % basename,
-        }
         try:
+            basename = os.path.basename(zip_xml_file_path)
+
+            files = {
+                "file": (
+                    basename,
+                    open(zip_xml_file_path, "rb"),
+                    "application/zip",
+                )
+            }
+            header = {
+                "Authorization": "Bearer " + token,
+                "content-type": "multi-part/form-data",
+                "Content-Disposition": "attachment; filename=%s" % basename,
+            }
             return post_data(
                 self.pid_provider_api_post_xml,
                 files=files,
@@ -236,43 +236,55 @@ class PidProviderAPIClient:
             )
 
     def _process_post_xml_response(self, response, xml_with_pre, created=None):
+        logging.info(f"Pid Provider Post: {xml_with_pre.data}")
         if not response:
+            logging.info(f"Pid Provider Response: none")
             return
         for item in response:
-            logging.info(f"_process_post_xml_response ({xml_with_pre.data}): {item}")
-
-            if not item.get("xml_changed"):
-                # pids do xml_with_pre não mudaram
-                logging.info("No xml changes")
-                return
-
             try:
-                # atualiza xml_with_pre com valor do XML registrado no Core
-                if not item.get("apply_xml_changes"):
-                    # exceto 'apply_xml_changes=True' ou
-                    # exceto se o registro do Core foi criado posteriormente
-                    if created and created < item["created"]:
-                        # não atualizar com os dados do Core
-                        logging.info({
-                            "created_at_upload": created,
-                            "created_at_core": item['created'],
-                        })
-                        return
+                self._process_item_response(item, xml_with_pre, created)
+            except AttributeError:
+                raise ValueError(
+                    f"Unexpected pid provider response: {response}"
+                )
 
-                for pid_type, pid_value in item["xml_changed"].items():
-                    try:
-                        if pid_type == "pid_v3":
-                            xml_with_pre.v3 = pid_value
-                        elif pid_type == "pid_v2":
-                            xml_with_pre.v2 = pid_value
-                        elif pid_type == "aop_pid":
-                            xml_with_pre.aop_pid = pid_value
-                        logging.info("XML changed")
-                    except Exception as e:
-                        pass
-                return
-            except KeyError:
-                pass
+    def _process_item_response(self, item, xml_with_pre, created=None):
+        logging.info(f"Pid Provider Response: {item}")
+
+        if not item.get("xml_changed"):
+            # pids do xml_with_pre não mudaram
+            logging.info("No xml changes")
+            return
+
+        try:
+            # atualiza xml_with_pre com valor do XML registrado no Core
+            if not item.get("apply_xml_changes"):
+                # exceto 'apply_xml_changes=True' ou
+                # exceto se o registro do Core foi criado posteriormente
+                if created and created < item["created"]:
+                    # não atualizar com os dados do Core
+                    logging.info(
+                        {
+                            "created_at_upload": created,
+                            "created_at_core": item["created"],
+                        }
+                    )
+                    return
+
+            for pid_type, pid_value in item["xml_changed"].items():
+                try:
+                    if pid_type == "pid_v3":
+                        xml_with_pre.v3 = pid_value
+                    elif pid_type == "pid_v2":
+                        xml_with_pre.v2 = pid_value
+                    elif pid_type == "aop_pid":
+                        xml_with_pre.aop_pid = pid_value
+                    logging.info("XML changed")
+                except Exception as e:
+                    pass
+            return
+        except KeyError:
+            pass
 
     def fix_pid_v2(self, pid_v3, correct_pid_v2):
         """
@@ -288,7 +300,9 @@ class PidProviderAPIClient:
                 password=self.api_password,
                 timeout=self.timeout,
             )
-            response = self._post_fix_pid_v2(pid_v3, correct_pid_v2, self.token, self.timeout)
+            response = self._post_fix_pid_v2(
+                pid_v3, correct_pid_v2, self.token, self.timeout
+            )
             response["fixed_in_core"] = response.get("v2") == correct_pid_v2
             return response
         except (

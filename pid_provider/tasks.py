@@ -8,7 +8,6 @@ from pid_provider.requester import PidRequester
 from proc.models import ArticleProc
 
 
-
 @celery_app.task(bind=True, name="provide_pid_for_file")
 def provide_pid_for_file(
     self,

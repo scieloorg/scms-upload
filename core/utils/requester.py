@@ -83,6 +83,8 @@ def post_data(
     try:
         response.raise_for_status()
     except requests.HTTPError as exc:
+        if response := is_http_error_json_response(json, response):
+            return response
         if 400 <= exc.response.status_code < 500:
             raise NonRetryableError(exc) from exc
         elif 500 <= exc.response.status_code < 600:
@@ -96,12 +98,28 @@ def post_data(
     return response.content if not json else response.json()
 
 
+def is_http_error_json_response(json, response):
+    """
+    Algumas API, por exemplo, opac_5, retornam a mensagem de erro em formato
+    JSON
+    """
+    if not json:
+        return
+
+    try:
+        data = response.json()
+        if isinstance(data, dict):
+            return data
+    except Exception as json_error:
+        return
+
+
 @retry(
     retry=retry_if_exception_type(RetryableError),
     wait=wait_exponential(multiplier=1, min=1, max=5),
     stop=stop_after_attempt(5),
 )
-def fetch_data(url, headers=None, json=False, timeout=2, verify=True):
+def fetch_data(url, params=None, headers=None, json=False, timeout=2, verify=True):
     """
     Get the resource with HTTP
     Retry: Wait 2^x * 1 second between each retry starting with 4 seconds,
@@ -118,8 +136,10 @@ def fetch_data(url, headers=None, json=False, timeout=2, verify=True):
     """
 
     try:
-        logger.info("Fetching the URL: %s" % url)
-        response = requests.get(url, headers=headers, timeout=timeout, verify=verify)
+        logger.info("Fetching the URL: %s %s" % (url, params))
+        response = requests.get(
+            url, params=params, headers=headers, timeout=timeout, verify=verify
+        )
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
         logger.error("Erro fetching the content: %s, retry..., erro: %s" % (url, exc))
         raise RetryableError(exc) from exc

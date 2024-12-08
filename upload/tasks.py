@@ -17,11 +17,10 @@ from config import celery_app
 from issue.models import Issue
 from journal.controller import get_journal_dict_for_validation
 from libs.dsm.publication.documents import get_document, get_similar_documents
+from upload.models import Package
 
 from . import choices, controller, exceptions
 from .utils import file_utils, package_utils, xml_utils
-from upload.models import Package
-
 
 def run_validations(
     filename, package_id, package_category, article_id=None, issue_id=None

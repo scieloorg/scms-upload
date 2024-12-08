@@ -1,9 +1,5 @@
 default: build
 
-COMPOSE_FILE_DEV = local.yml
-
-compose = ${COMPOSE_FILE_DEV}
-
 export SCMS_BUILD_DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 export SCMS_VCS_REF=$(strip $(shell git rev-parse --short HEAD))
 export SCMS_WEBAPP_VERSION=$(strip $(shell cat VERSION))
@@ -124,3 +120,16 @@ clean_project_images:  ## Remove all images with "upload" on name
 
 volume_down:  ## Remove all volume
 	@docker-compose -f $(compose) down -v
+
+clean_celery_logs:
+	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' scielo_core_local_celeryworker)
+
+exclude_upload_production_django:  ## Exclude all productions containers
+	@if [ -n "$$(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'infrascielo/upload' | grep -v 'upload_production_postgres')" ]; then \
+		docker rmi -f $$(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'infrascielo/upload' | grep -v 'upload_production_postgres'); \
+		echo "Excluded all upload production containers"; \
+	else \
+		echo "No images found for 'upload_production*'"; \
+	fi
+
+update: stop rm exclude_upload_production_django build up

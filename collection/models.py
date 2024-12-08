@@ -7,12 +7,12 @@ from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
+from collection import choices
+from collection.utils import language_iso
+from core.choices import LANGUAGE
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 
-from collection import choices
-from core.choices import LANGUAGE
-from collection.utils import language_iso
 
 class LanguageGetOrCreateError(Exception):
     ...
@@ -115,7 +115,6 @@ class WebSiteConfiguration(CommonControlField, ClusterableModel):
     @classmethod
     def get(cls, url=None, collection=None, purpose=None):
         params = dict(url=url, collection=collection, purpose=purpose)
-        logging.info(f"Collection.get({params})")
         if url:
             return cls.objects.get(url=url)
         if collection and purpose:
@@ -164,7 +163,7 @@ class WebSiteConfiguration(CommonControlField, ClusterableModel):
 
         obj.save()
         data = []
-        for api in api_url:
+        for api in api_url or []:
             if api:
                 we, created = WebSiteConfigurationEndpoint.objects.get_or_create(
                     url=api.get("url"),
@@ -203,7 +202,6 @@ class Language(CommonControlField):
     def autocomplete_label(self):
         return self.code2
 
-    
     @classmethod
     def load(cls, user=None):
         if cls.objects.count() == 0:
@@ -243,6 +241,10 @@ class Language(CommonControlField):
                 )
             return obj
 
+    @property
+    def data(self):
+        return {"value": self.name, "code": self.code2}
+
     base_form_class = CoreAdminModelForm
 
 
@@ -259,9 +261,7 @@ class WebSiteConfigurationEndpoint(CommonControlField):
         related_name="endpoint",
     )
     name = models.CharField(_("Endpoint name"), max_length=255, null=True, blank=True)
-    url = models.URLField(
-        _("Endpoint URL"), max_length=128, null=True, blank=True
-    )
+    url = models.URLField(_("Endpoint URL"), max_length=128, null=True, blank=True)
     enabled = models.BooleanField(default=False)
 
     panels = [

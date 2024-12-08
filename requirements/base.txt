@@ -20,7 +20,7 @@ django-compressor==4.4  # https://github.com/django-compressor/django-compressor
 django-redis==5.4.0  # https://github.com/jazzband/django-redis4
 
 # Django REST
-djangorestframework==3.15.0
+djangorestframework==3.15.2
 djangorestframework-simplejwt==5.3.1  # https://django-rest-framework-simplejwt.readthedocs.io/en/latest/
 
 
@@ -59,7 +59,10 @@ minio==7.2.5
 # Upload
 # ------------------------------------------------------------------------------
 lxml==4.9.4 # https://github.com/lxml/lxml
--e git+https://github.com/scieloorg/packtools.git@4.1.1#egg=packtools
+# packtools dependence
+langdetect==1.0.9 
+#-e git+https://github.com/scieloorg/packtools.git@master#egg=packtools
+-e git+https://github.com/scieloorg/packtools.git@4.7.1#egg=packtools
 -e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
 
 # DSM Publication
@@ -69,16 +72,18 @@ mongoengine==0.28.2
 aiohttp==3.9.1
 # DSM Migration
 # ------------------------------------------------------------------------------
--e git+https://github.com/scieloorg/scielo_migration.git@1.6.4#egg=scielo_classic_website
-#-e git+https://github.com/scieloorg/scielo_migration.git#egg=scielo_classic_website
+-e git+https://github.com/scieloorg/scielo_migration.git@1.7.5#egg=scielo_classic_website
 python-dateutil==2.8.2
 tornado>=6.3.2 # not directly required, pinned by Snyk to avoid a vulnerability
 
 # Tenacity
 # ------------------------------------------------------------------------------
 tenacity==8.2.3  # https://pypi.org/project/tenacity/
-urllib3==2.2.1
+urllib3==2.2.2
 
-# feedparser
+# iso639-langs
 # ------------------------------------------------------------------------------
+iso639-lang==2.2.3
 feedparser==6.0.11
+requests>=2.32.2 # not directly required, pinned by Snyk to avoid a vulnerability
+certifi>=2023.7.22 # not directly required, pinned by Snyk to avoid a vulnerability

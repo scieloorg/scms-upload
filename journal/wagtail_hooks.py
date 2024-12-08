@@ -62,8 +62,14 @@ class JournalAdmin(ModelAdmin):
     add_to_settings_menu = False
     exclude_from_explorer = False
 
-    list_display = ("title", "short_title")
-    search_fields = ("official_journal__issn_electronic", "official_journal__issn_print", "short_title")
+    list_display = ("title", "journal_acron", "issn_electronic", "issn_print")
+    search_fields = (
+        "official_journal__issn_electronic",
+        "official_journal__issn_print",
+        "official_journal__title",
+        "title",
+        "journal_acron",
+    )
 
 
 class JournalModelAdminGroup(ModelAdminGroup):
@@ -71,7 +77,7 @@ class JournalModelAdminGroup(ModelAdminGroup):
     menu_label = _("Journals")
     menu_order = get_menu_order("journal")
     items = (
-        OfficialJournalAdmin,
+        # OfficialJournalAdmin,
         JournalAdmin,
         # JournalProcAdmin,
     )

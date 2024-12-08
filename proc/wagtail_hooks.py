@@ -9,16 +9,22 @@ from wagtail.contrib.modeladmin.options import (
     ModelAdminGroup,
     modeladmin_register,
 )
-from wagtail.contrib.modeladmin.views import CreateView, InspectView
+from wagtail.contrib.modeladmin.views import CreateView, EditView, InspectView
 
 from config.menu import get_menu_order
-from package.models import SPSPkg
 from htmlxml.models import HTMLXML
+from package.models import SPSPkg
 
 from .models import ArticleProc, IssueProc, JournalProc, ProcReport
 
 
 class ProcCreateView(CreateView):
+    def form_valid(self, form):
+        self.object = form.save_all(self.request.user)
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class ProcEditView(EditView):
     def form_valid(self, form):
         self.object = form.save_all(self.request.user)
         return HttpResponseRedirect(self.get_success_url())
@@ -37,10 +43,12 @@ class JournalProcModelAdmin(ModelAdmin):
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
+    edit_view_class = ProcEditView
 
     list_display = (
         "journal",
         "acron",
+        "availability_status",
         "migration_status",
         "qa_ws_status",
         "public_ws_status",
@@ -55,9 +63,10 @@ class JournalProcModelAdmin(ModelAdmin):
     )
     search_fields = (
         "acron",
-        "availability_status",
-        "scielo_issn",
-        "title",
+        "pid",
+        "journal__title",
+        "journal__official_journal__issn_print",
+        "journal__official_journal__issn_electronic",
     )
 
 
@@ -66,6 +75,7 @@ class IssueProcModelAdmin(ModelAdmin):
     inspect_view_enabled = True
     menu_label = _("Issue Processing")
     create_view_class = ProcCreateView
+    edit_view_class = ProcEditView
     menu_icon = "folder"
     # menu_order = get_menu_order("issue")
     menu_order = 300
@@ -91,6 +101,7 @@ class IssueProcModelAdmin(ModelAdmin):
     )
     search_fields = (
         "journal_proc__acron",
+        "journal_proc__journal__title",
         "issue_folder",
         "issue__publication_year",
         "issue__volume",
@@ -148,6 +159,7 @@ class SPSPkgModelAdmin(ModelAdmin):
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
+    list_per_page = 10
 
     list_display = (
         "sps_pkg_name",
@@ -172,7 +184,6 @@ class SPSPkgModelAdmin(ModelAdmin):
     search_fields = (
         "pid_v3",
         "sps_pkg_name",
-        "scheduled",
     )
 
 
@@ -184,8 +195,10 @@ class ArticleProcModelAdmin(ModelAdmin):
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
-
+    edit_view_class = ProcEditView
+    list_per_page = 10
     list_display = (
+        "__str__",
         "pkg_name",
         "issue_proc",
         "xml_status",
@@ -207,6 +220,8 @@ class ArticleProcModelAdmin(ModelAdmin):
         "pid",
         "sps_pkg__sps_pkg_name",
         "pkg_name",
+        "issue_proc__issue_folder",
+        "issue_proc__journal_proc__acron",
     )
 
 

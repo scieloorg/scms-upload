@@ -8,13 +8,14 @@ from wagtail.contrib.modeladmin.options import (
 from wagtail.contrib.modeladmin.views import CreateView
 
 from config.menu import get_menu_order
+
 from .models import (
-    PidProviderConfig,
     CollectionPidRequest,
+    FixPidV2,
     OtherPid,
+    PidProviderConfig,
     PidProviderXML,
     PidRequest,
-    FixPidV2,
 )
 
 

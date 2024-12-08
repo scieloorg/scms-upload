@@ -1,4 +1,5 @@
 import logging
+import json
 from datetime import datetime
 
 from django.utils.translation import gettext_lazy as _
@@ -7,16 +8,32 @@ from publication.api.publication import PublicationAPI
 from publication.utils.document import build_article
 
 
-def publish_article(user, article_proc, api_data):
+def publish_article(article_proc, api_data, journal_pid=None):
+    """
+    {"failed": False, "id": article.id}
+    {"failed": True, "error": str(ex)}
+    """
     data = {}
     builder = ArticlePayload(data)
-    build_article(article_proc.article, article_proc.journal_proc, builder)
+
+    try:
+        # somente se article_proc é instancia de ArticleProc
+        journal_pid = article_proc.issue_proc.journal_proc.pid
+    except AttributeError:
+        if not journal_pid:
+            raise ValueError(
+                "publication.api.document.publish_article requires journal_pid")
+
+    order = article_proc.article.position
+    pub_date = article_proc.article.first_publication_date or datetime.utcnow()
+
+    build_article(builder, article_proc.article, journal_pid, order, pub_date)
 
     api = PublicationAPI(**api_data)
     kwargs = dict(
         article_id=data.get("_id"),
         issue_id=data.get("issue_id"),
-        order=data.get("order"),
+        order=order,
         article_url=data.get("xml"),
     )
     return api.post_data(data, kwargs)
@@ -120,6 +137,11 @@ class ArticlePayload:
         # )
         # self.data["authors"].append(_author)
 
+    def add_collab(self, name):
+        # collab
+        self.data.setdefault("collabs", [])
+        self.data["collabs"].append({"name": name})
+
     def add_translated_title(self, language, text):
         # translated_titles"] = EmbeddedDocumentListField(TranslatedTitle))
         if self.data["translated_titles"] is None:
@@ -129,7 +151,7 @@ class ArticlePayload:
         _translated_title["language"] = language
         self.data["translated_titles"].append(_translated_title)
 
-    def add_section(self, language, text):
+    def add_section(self, language, text, code):
         # sections"] = EmbeddedDocumentListField(TranslatedSection))
         if self.data["translated_sections"] is None:
             self.data["translated_sections"] = []
@@ -167,16 +189,24 @@ class ArticlePayload:
         _doi_with_lang_item["language"] = language
         self.data["doi_with_lang"].append(_doi_with_lang_item)
 
-    def add_related_article(self, doi, ref_id, related_type):
+    def add_related_article(self, ref_id, related_type, ext_link_type, href):
         # related_article"] = EmbeddedDocumentListField(RelatedArticle))
         if self.data["related_articles"] is None:
             self.data["related_articles"] = []
         _related_article = {}
-        _related_article["doi"] = doi
-        _related_article["ref_id"] = ref_id
-        _related_article["related_type"] = related_type
-        self.data["related_articles"].append(_related_article)
-
+        if ext_link_type == "doi":
+            _related_article["doi"] = href
+            _related_article["ref_id"] = ref_id
+            _related_article["related_type"] = related_type
+            self.data["related_articles"].append(_related_article)
+        else:
+            pass
+            # TODO depende de resolver https://github.com/scieloorg/opac_5/issues/212
+            # _related_article["href"] = href
+            # _related_article["ref_id"] = ref_id
+            # _related_article["related_type"] = related_type
+            # self.data["related_articles"].append(_related_article)
+  
     def add_xml(self, xml):
         self.data["xml"] = xml
 
@@ -204,7 +234,7 @@ class ArticlePayload:
                 lang=lang,
                 url=url,
                 filename=filename,
-                type=type,
+                type="pdf",
                 classic_uri=classic_uri,
             )
         )
@@ -219,7 +249,7 @@ class ArticlePayload:
         _mat_suppl_item["ref_id"] = ref_id
         _mat_suppl_item["filename"] = filename
         # TODO
-        # _mat_suppl_item.classic_uri"] = classic_uri
+        _mat_suppl_item["classic_uri"] = classic_uri
         self.data["mat_suppl_items"].append(_mat_suppl_item)
 
     def add_status(self):

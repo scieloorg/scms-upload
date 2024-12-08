@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
-from django.db import models, IntegrityError
+from django.db import IntegrityError, models
 from django.utils.translation import gettext as _
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
@@ -55,11 +55,57 @@ class CommonControlField(models.Model):
         abstract = True
 
 
-class RichTextWithLang(models.Model):
-    text = RichTextField(null=False, blank=False)
-    language = models.CharField(
-        _("Language"), max_length=2, choices=choices.LANGUAGE, null=False, blank=False
+class BaseTextModel(models.Model):
+    language = models.ForeignKey(
+        "collection.Language", null=True, blank=True, on_delete=models.SET_NULL
     )
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    def get(cls, parent, language):
+        return cls.objects.get(parent=parent, language=language)
+
+    @classmethod
+    def create(cls, user, parent, language, **kwargs):
+        try:
+            obj = cls(creator=user, parent=parent, language=language, **kwargs)
+            obj.save()
+            return obj
+        except IntegrityError as e:
+            return cls.get(parent=parent, language=language)
+
+    @classmethod
+    def create_or_update(cls, user, parent, language=None, **kwargs):
+        if not language:
+            data = {
+                "parent": str(parent),
+            }
+            data.update(kwargs)
+
+        try:
+            obj = cls.get(parent=parent, language=language)
+            for name, value in kwargs.items():
+                try:
+                    obj.setattr(name, value)
+                except AttributeError:
+                    pass
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(user, parent, language, **kwargs)
+
+    @property
+    def data(self):
+        d = {}
+        d.update(self.language.data)
+        d["text"] = self.text
+        return d
+
+
+class TextModel(BaseTextModel):
+    text = models.CharField(max_length=200, null=False, blank=False)
 
     panels = [FieldPanel("text"), FieldPanel("language")]
 
@@ -67,45 +113,8 @@ class RichTextWithLang(models.Model):
         abstract = True
 
 
-class TextWithLangAndValidity(models.Model):
-    text = models.TextField(_("Text"), null=False, blank=False)
-    language = models.CharField(
-        _("Language"), max_length=2, choices=choices.LANGUAGE, null=False, blank=False
-    )
-    initial_date = models.DateField(null=True, blank=True)
-    final_date = models.DateField(null=True, blank=True)
-
-    panels = [
-        FieldPanel("text"),
-        FieldPanel("language"),
-        FieldPanel("initial_date"),
-        FieldPanel("final_date"),
-    ]
-
-    class Meta:
-        abstract = True
-
-
-class RichTextWithLangAndValidity(RichTextWithLang):
-    initial_date = models.DateField(null=True, blank=True)
-    final_date = models.DateField(null=True, blank=True)
-
-    panels = [
-        FieldPanel("text"),
-        FieldPanel("language"),
-        FieldPanel("initial_date"),
-        FieldPanel("final_date"),
-    ]
-
-    class Meta:
-        abstract = True
-
-
-class TextWithLang(models.Model):
-    text = models.TextField(_("Text"), null=False, blank=False)
-    language = models.CharField(
-        _("Language"), max_length=2, choices=choices.LANGUAGE, null=False, blank=False
-    )
+class HTMLTextModel(BaseTextModel):
+    text = RichTextField(null=False, blank=False)
 
     panels = [FieldPanel("text"), FieldPanel("language")]
 
@@ -349,41 +358,29 @@ class PressRelease(CommonControlField):
         null=True,
     )
     article = models.ForeignKey(
-        "article.Article",
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True
+        "article.Article", on_delete=models.SET_NULL, blank=True, null=True
     )
-    title = models.TextField(_("Title"),
-        blank=True,
-        null=True
-    )
-    doi = models.TextField(
-        blank=True,
-        null=True        
-    )
+    title = models.TextField(_("Title"), blank=True, null=True)
+    doi = models.TextField(blank=True, null=True)
     language = models.ForeignKey(
-        "collection.Language",
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True
+        "collection.Language", on_delete=models.SET_NULL, blank=True, null=True
     )
     content = RichTextField(
-        null=True, 
+        null=True,
         blank=True,
     )
     url = models.URLField(
         max_length=255,
-        null=True, 
+        null=True,
         blank=True,
     )
     media_content = models.URLField(
         max_length=255,
-        null=True, 
+        null=True,
         blank=True,
     )
     publication_date = models.DateTimeField(
-        null=True, 
+        null=True,
         blank=True,
     )
 
@@ -403,7 +400,7 @@ class PressRelease(CommonControlField):
         user,
     ):
         self.journal = journal
-        self.issue = issue 
+        self.issue = issue
         self.article = article
         self.title = title
         self.language = language
@@ -413,7 +410,6 @@ class PressRelease(CommonControlField):
         self.updated_by = user
         self.save()
         return self
-
 
     @classmethod
     def get(cls, url):
@@ -434,7 +430,7 @@ class PressRelease(CommonControlField):
         media_content,
         publication_date,
         user,
-        ):
+    ):
         try:
             obj = cls(
                 url=url,
@@ -466,7 +462,7 @@ class PressRelease(CommonControlField):
         content=None,
         media_content=None,
         publication_date=None,
-        ):
+    ):
         try:
             obj = cls.get(url=url)
             return obj.update(
