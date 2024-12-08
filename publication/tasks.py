@@ -1,13 +1,13 @@
 import logging
 import sys
 
-from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from core.models import PressRelease
+from core.utils.get_user import _get_user
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
@@ -15,6 +15,7 @@ from publication.api.journal import publish_journal
 from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
 from tracker.models import UnexpectedEvent
+
 
 # FIXME
 # from upload.models import Package
@@ -34,25 +35,6 @@ PUBLISH_FUNCTIONS = {
     "article": publish_article,
     "pressrelease": publish_pressrelease,
 }
-
-
-def _get_user(user_id, username):
-    try:
-        if user_id:
-            return User.objects.get(pk=user_id)
-        if username:
-            return User.objects.get(username=username)
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "migration.tasks._get_user",
-                "user_id": user_id,
-                "username": username,
-            },
-        )
 
 
 def _get_collections(collection_acron):
@@ -281,7 +263,7 @@ def task_publish_model_inline(
 ):
     website_kind = website_kind or QA
     collection = Collection.get(acron=collection_acron)
-    user = _get_user(user_id, username)
+    user = _get_user(self.request, user_id, username)
 
     website = WebSiteConfiguration.get(
         collection=collection,

@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
+from core.utils.get_user import _get_user
 from collection.choices import QA, PUBLIC
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
@@ -24,27 +25,8 @@ from publication.api.issue import publish_issue
 from publication.api.publication import get_api_data, get_api
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
+from . import controller
 
-User = get_user_model()
-
-
-def _get_user(user_id, username):
-    try:
-        if user_id:
-            return User.objects.get(pk=user_id)
-        if username:
-            return User.objects.get(username=username)
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "proc.tasks._get_user",
-                "user_id": user_id,
-                "username": username,
-            },
-        )
 
 
 def _get_collections(collection_acron):
@@ -240,7 +222,7 @@ def task_migrate_and_publish_journals(
     force_migrate_document_records=False,
 ):
     try:
-        user = _get_user(user_id, username)
+        user = _get_user(self.request, user_id, username)
         journal_filter = {}
         if journal_acron:
             journal_filter["acron"] = journal_acron
@@ -310,7 +292,6 @@ def task_migrate_and_publish_journals(
                             "force_update": force_update,
                         },
                     )
-
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -418,6 +399,7 @@ def task_publish_journal(
     force_update=None,
 ):
     try:
+        user = _get_user(self.request, user_id, username)
         user = _get_user(user_id, username)
         journal_proc = JournalProc.objects.get(pk=journal_proc_id)
         journal_proc.publish(
@@ -639,6 +621,7 @@ def task_publish_issue(
     force_update=None,
 ):
     try:
+        user = _get_user(self.request, user_id, username)
         user = _get_user(user_id, username)
         issue_proc = IssueProc.objects.get(pk=issue_proc_id)
         issue_proc.publish(
@@ -790,7 +773,6 @@ def task_publish_articles(
                             force_update=force_update,
                         )
                     )
-
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -820,7 +802,7 @@ def task_publish_article(
     force_update=None,
 ):
     try:
-        user = _get_user(user_id, username)
+        user = _get_user(self.request, user_id, username)
         article_proc = ArticleProc.objects.get(pk=article_proc_id)
         article_proc.publish(
             user,
