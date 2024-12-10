@@ -146,6 +146,7 @@ class QAPackageEditView(EditView):
             return HttpResponseRedirect(self.get_success_url())
         package = form.save_all(self.request.user)
 
+        messages.success(self.request, _("Decision: {}").format(package.qa_decision))
         process_qa_decision(self.request, package)
 
         return HttpResponseRedirect(self.get_success_url())
@@ -161,6 +162,7 @@ class ReadyToPublishPackageEditView(EditView):
             return HttpResponseRedirect(self.get_success_url())
         package = form.save_all(self.request.user)
 
+        messages.success(self.request, _("Decision: {}").format(package.qa_decision))
         process_qa_decision(self.request, package)
 
         return HttpResponseRedirect(self.get_success_url())
@@ -182,6 +184,7 @@ def process_qa_decision(request, package):
     """
     This view function enables the user to finish deposit of a package through the graphic-interface.
     """
+    logging.info(f"process_qa_decision: {package.qa_decision}")
     task_process_qa_decision.apply_async(
         kwargs=dict(
             user_id=request.user.id,
@@ -220,18 +223,18 @@ def finish_deposit(request):
         if not package.is_error_review_finished:
             messages.error(
                 request,
-                _("XML producer must review the errors and comment them"),
+                _("The XML package needs review and comment"),
             )
             return redirect(f"/admin/upload/package/inspect/{package_id}")
 
         if not package.is_acceptable_package:
             messages.error(
                 request,
-                _("Package could not be deposited due to validation errors"),
+                _("Package deposit failed due to errors"),
             )
             messages.error(
                 request,
-                _("Review the downloaded report and submit the corrected package"),
+                _("Correct package based on report and resubmit"),
             )
         return redirect(f"/admin/upload/package/inspect/{package_id}")
 

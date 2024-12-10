@@ -192,12 +192,12 @@ ER_REACTION_NOT_TO_FIX = "not-to-fix"
 ER_REACTION_IMPOSSIBLE_TO_FIX = "unable-to-fix"
 
 ERROR_REACTION = (
-    (ER_REACTION_FIX, _("XML producer will fix this error")),
+    (ER_REACTION_FIX, _("The error will be fixed")),
     (
         ER_REACTION_IMPOSSIBLE_TO_FIX,
-        _("XML producer declares that correction is impossible"),
+        _("Impossible to fix it"),
     ),
-    (ER_REACTION_NOT_TO_FIX, _("XML producer disagrees that there is an error")),
+    (ER_REACTION_NOT_TO_FIX, _("There's disagreement about the error")),
 )
 
 
