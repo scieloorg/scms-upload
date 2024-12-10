@@ -482,14 +482,14 @@ def publish_journals(
         )
         logging.info(f"publish_journals: {items.count()}")
         for journal_proc in items:
-            published = journal_proc.publish(
+            response = journal_proc.publish(
                 user,
                 publish_journal,
                 website_kind=website_kind,
                 api_data=api_data,
                 force_update=force_update,
             )
-            if run_publish_issues and published:
+            if run_publish_issues and response.get("completed"):
                 publish_issues(
                     user,
                     website_kind,
@@ -536,14 +536,14 @@ def publish_issues(
         )
         logging.info(f"publish_issues: {items.count()}")
         for issue_proc in items:
-            published = issue_proc.publish(
+            response = issue_proc.publish(
                 user,
                 publish_issue,
                 website_kind=website_kind,
                 api_data=api_data,
                 force_update=force_update,
             )
-            if run_publish_articles and published:
+            if run_publish_articles and response.get("completed"):
                 publish_articles(
                     user,
                     website_kind,
