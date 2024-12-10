@@ -927,14 +927,14 @@ class Package(CommonControlField, ClusterableModel):
 
         websites = []
 
-        # gera pacote sps e o valida quanto a compontentes disponíveis no minio
-        result = self.prepare_sps_package(user) or {}
-
-        # verifica pela regra de publicação e pela situação do pacote
-        # se pode ser publicado em PUBLIC
-        rule = UploadValidator.get_publication_rule()
-
         try:
+            # gera pacote sps e o valida quanto a compontentes disponíveis no minio
+            result = self.prepare_sps_package(user) or {}
+
+            # verifica pela regra de publicação e pela situação do pacote
+            # se pode ser publicado em PUBLIC
+            rule = UploadValidator.get_publication_rule()
+
             self.analyze_result(user, result, websites, rule)
         except QADecisionException as exc:
             logging.exception(exc)
@@ -955,6 +955,7 @@ class Package(CommonControlField, ClusterableModel):
 
         self.finish_qa_decision(user, operation, websites, result, rule)
         return websites
+
 
     def analyze_result(self, user, result, websites, rule):
         if result.get("blocking_errors"):
