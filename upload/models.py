@@ -352,8 +352,8 @@ class Package(CommonControlField, ClusterableModel):
     base_form_class = UploadPackageForm
 
     class Meta:
-        verbose_name = _("Package")
-        verbose_name_plural = _("Packages")
+        verbose_name = _("Package admin")
+        verbose_name_plural = _("Package admin")
         permissions = (
             (FINISH_DEPOSIT, _("Can finish deposit")),
             (ACCESS_ALL_PACKAGES, _("Can access all packages from all users")),
@@ -1251,8 +1251,8 @@ class QAPackage(Package):
 
     class Meta:
         proxy = True
-        verbose_name = _("Pending decision package")
-        verbose_name_plural = _("Pending decision packages")
+        verbose_name = _("Quality control admin")
+        verbose_name_plural = _("Quality control admin")
 
 
 class ReadyToPublishPackage(Package):
@@ -1287,8 +1287,8 @@ class ReadyToPublishPackage(Package):
 
     class Meta:
         proxy = True
-        verbose_name = _("Package ready to publish")
-        verbose_name_plural = _("Packages ready to publish")
+        verbose_name = _("Publication admin")
+        verbose_name_plural = _("Publication admin")
 
 
 class BaseValidationResult(CommonControlField):
