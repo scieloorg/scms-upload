@@ -227,7 +227,7 @@ class Package(CommonControlField, ClusterableModel):
         blank=False,
     )
     main_doi = models.CharField(_("DOI"), max_length=128, null=True, blank=True)
-    name = models.CharField(_("SPS Package name"), max_length=32, null=True, blank=True)
+    name = models.CharField(_("SPS Package name"), max_length=40, null=True, blank=True)
     signature = models.CharField(_("Signature"), max_length=32, null=True, blank=True)
     category = models.CharField(
         _("Category"),
