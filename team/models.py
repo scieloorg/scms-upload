@@ -17,7 +17,7 @@ from team.forms import CollectionTeamMemberModelForm
 User = get_user_model()
 
 
-ALLOWED_COLLECTIONS = ["dom", "spa", "scl"]
+ALLOWED_COLLECTIONS = ["dom", "spa", "scl", "pan"]
 
 
 def has_permission(user=None):

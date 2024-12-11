@@ -332,7 +332,9 @@ def task_publish_item_inline(
 
 def is_registered(url):
     try:
+        logging.info(url)
         x = requests.get(url, timeout=30)
+        logging.info(x.status_code)
         return x.status_code == HTTPStatus.OK
     except Exception as e:
         return None
@@ -355,6 +357,7 @@ def task_publish_article(
         user = _get_user(user_id, username)
         op_main = None
         manager = None
+        tracking = []
         if upload_package_id:
             manager = Package.objects.get(pk=upload_package_id)
             issue = manager.article.issue
@@ -394,6 +397,7 @@ def task_publish_article(
         for journal_proc in JournalProc.objects.filter(journal=journal):
 
             webiste_id = f"{website_kind} {journal_proc.collection}"
+            executing = {"website": webiste_id}
             op_collection = manager.start(
                 user, f"> publish on {webiste_id}"
             )
@@ -422,46 +426,53 @@ def task_publish_article(
             api.get_token()
             api_data = api.data
 
-            issue_url = f"{website.url}/j/{journal_proc.acron}/i/{issue.publication_year}.{issue.issue_folder}"
+            issue_proc = IssueProc.objects.get(
+                journal_proc=journal_proc, issue=issue
+            )
+            # issue_url = f"{website.url}/j/{journal_proc.acron}/i/{issue.publication_year}.{issue.issue_folder}"
+            issue_url = f"{website.url}/scielo.php?pid={issue_proc.pid}&script=sci_issuetoc"
             if not is_registered(issue_url):
 
-                journal_url = f"{website.url}/j/{journal_proc.acron}"
+                journal_url = f"{website.url}/scielo.php?pid={journal_proc.pid}&script=sci_serial"
                 if not is_registered(journal_url):
+                    op_published_journal = manager.start(user, f"publish journal on {website_kind}")
                     api_data["post_data_url"] = website.api_url_journal
-                    if not journal_proc.publish(
+                    response = journal_proc.publish(
                         user,
                         publish_journal,
                         website_kind=website_kind,
                         api_data=api_data,
                         force_update=True,
                         content_type="journal"
-                    ):
-                        logging.exception(f"Unable to publish journal {journal_url}")
+                    )
+                    response["url"] = journal_url
+                    op_published_journal.finish(user, completed=response.get("completed"), detail=response)
 
+                op_published_issue = manager.start(user, f"publish issue on {website_kind}")
                 api_data["post_data_url"] = website.api_url_issue
-                logging.info(f"{journal_proc} - {issue}")
-
-                if not IssueProc.objects.get(
-                    journal_proc=journal_proc, issue=issue
-                ).publish(
+                response = issue_proc.publish(
                     user,
                     publish_issue,
                     website_kind=website_kind,
                     api_data=api_data,
                     force_update=True,
                     content_type="issue"
-                ):
-                    logging.exception(f"Unable to publish issue {issue_url}")
+                )
+                response["url"] = issue_url
+                op_published_issue.finish(user, completed=response.get("completed"), detail=response)
 
             api_data["post_data_url"] = website.api_url_article
             response = publish_article(manager, api_data, journal_proc.pid)
             completed = response.get("result") == "OK"
             manager.update_publication_stage(website_kind, completed=completed)
+
+            executing["completed"] = completed
             op_collection.finish(
                 user,
                 completed=completed,
                 detail=response,
             )
+            tracking.append(executing)
         if not JournalProc.objects.filter(journal=journal).exists():
             raise JournalProc.DoesNotExist(f"No journal_proc for {article} {journal}")
         if not IssueProc.objects.filter(issue=issue).exists():
@@ -469,12 +480,12 @@ def task_publish_article(
 
         op_main.finish(
             user,
-            completed=True,
+            completed=len(tracking)==len([item for item in tracking if item["completed"]]),
             exception=None,
             message_type=None,
             message=None,
             exc_traceback=None,
-            detail=None,
+            detail=tracking,
         )
 
     except Exception as e:

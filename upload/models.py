@@ -227,7 +227,7 @@ class Package(CommonControlField, ClusterableModel):
         blank=False,
     )
     main_doi = models.CharField(_("DOI"), max_length=128, null=True, blank=True)
-    name = models.CharField(_("SPS Package name"), max_length=32, null=True, blank=True)
+    name = models.CharField(_("SPS Package name"), max_length=40, null=True, blank=True)
     signature = models.CharField(_("Signature"), max_length=32, null=True, blank=True)
     category = models.CharField(
         _("Category"),
@@ -352,8 +352,8 @@ class Package(CommonControlField, ClusterableModel):
     base_form_class = UploadPackageForm
 
     class Meta:
-        verbose_name = _("Package")
-        verbose_name_plural = _("Packages")
+        verbose_name = _("Package admin")
+        verbose_name_plural = _("Package admin")
         permissions = (
             (FINISH_DEPOSIT, _("Can finish deposit")),
             (ACCESS_ALL_PACKAGES, _("Can access all packages from all users")),
@@ -720,33 +720,33 @@ class Package(CommonControlField, ClusterableModel):
 
     def get_conclusion(self):
         if self.status == choices.PS_PENDING_QA_DECISION:
-            return _("The XML producer has finished the errors review")
+            return _("The error review has been completed")
 
         if self.status == choices.PS_VALIDATED_WITH_ERRORS:
-            return _("The XML producer is reviewing the errors")
+            return _("The error review is in progress")
 
         if self.status == choices.PS_PENDING_CORRECTION:
-            return _("The XML producer must correct the package and submit again")
+            return _("The XML package needs to be fixed and sent again")
 
         metrics = self.metrics
         if self.is_error_review_finished:
             msgs = []
             if metrics["total_contested_xml_errors"]:
                 msgs.append(
-                    _("The XML producer concluded that {} are not errors").format(
+                    _("It was concluded that {} are not errors").format(
                         metrics["total_contested_xml_errors"]
                     )
                 )
             if metrics["total_declared_impossible_to_fix"]:
                 msgs.append(
                     _(
-                        "The XML producer concluded that {} are impossible to fix"
+                        "It was concluded that {} are impossible to fix"
                     ).format(metrics["total_declared_impossible_to_fix"])
                 )
             if not self.is_acceptable_package:
                 # <!-- User must finish the error review -->
                 msgs.append(
-                    _("The XML producer must correct the package and submit again")
+                    _("The XML package needs to be fixed and sent again")
                 )
 
             else:
@@ -927,14 +927,14 @@ class Package(CommonControlField, ClusterableModel):
 
         websites = []
 
-        # gera pacote sps e o valida quanto a compontentes disponíveis no minio
-        result = self.prepare_sps_package(user) or {}
-
-        # verifica pela regra de publicação e pela situação do pacote
-        # se pode ser publicado em PUBLIC
-        rule = UploadValidator.get_publication_rule()
-
         try:
+            # gera pacote sps e o valida quanto a compontentes disponíveis no minio
+            result = self.prepare_sps_package(user) or {}
+
+            # verifica pela regra de publicação e pela situação do pacote
+            # se pode ser publicado em PUBLIC
+            rule = UploadValidator.get_publication_rule()
+
             self.analyze_result(user, result, websites, rule)
         except QADecisionException as exc:
             logging.exception(exc)
@@ -960,7 +960,9 @@ class Package(CommonControlField, ClusterableModel):
         if result.get("blocking_errors"):
             # não foi possível criar sps package
             result["request_correction"] = True
-            raise QADecisionException("Found blocking errors")
+            raise QADecisionException(
+                _("Cannot publish article: blocking errors")
+            )
 
         if self.qa_decision == choices.PS_READY_TO_PREVIEW:
             try:
@@ -969,20 +971,26 @@ class Package(CommonControlField, ClusterableModel):
             except Exception as e:
                 result["request_correction"] = True
                 result.update({"exception_message": str(e), "exception_type": str(type(e))})
-                raise QADecisionException(e)
+                raise QADecisionException(
+                    _("Cannot publish article: unexpected errors")
+                )
             # publica em QA não importa a gravidade dos erros
             websites.append("QA")
 
         if result.get("critical_errors"):
             # com erros críticos somente publica em QA
             result["request_correction"] = True
-            raise QADecisionException("Found critical errors")
+            raise QADecisionException(
+                _("Cannot publish article: critical errors")
+            )
 
         if rule == choices.STRICT_AUTO_PUBLICATION:
             if result.get("error") or self.has_errors:
                 # Há erros e é modo rígido, somente publica em QA
                 result["request_correction"] = True
-                raise QADecisionException("Found errors")
+                raise QADecisionException(
+                    _("Article has errors. System settings (STRICT_AUTO_PUBLICATION) blocks its publication")
+                )
 
         elif rule == choices.MANUAL_PUBLICATION:
             # No modo de publicação manual no website PUBLIC,
@@ -990,7 +998,9 @@ class Package(CommonControlField, ClusterableModel):
             if self.qa_decision == choices.PS_READY_TO_PREVIEW:
                 # publica somente em QA
                 result["request_correction"] = False
-                raise QADecisionException("Publish only on QA website")
+                raise QADecisionException(
+                    _("It requires manual publication due to system settings (MANUAL_PUBLICATION)")
+                )
 
     def finish_qa_decision(self, user, operation, websites, result, rule):
         try:
@@ -1090,7 +1100,7 @@ class Package(CommonControlField, ClusterableModel):
         if self.sps_pkg:
             if not self.sps_pkg.registered_in_core:
                 critical_errors.append(
-                    _("SPS package is not registered in the central system (core)")
+                    _("SPS package must be registered in the Core system")
                 )
             if not self.sps_pkg.valid_components:
                 missing = ", ".join(
@@ -1241,8 +1251,8 @@ class QAPackage(Package):
 
     class Meta:
         proxy = True
-        verbose_name = _("Pending decision package")
-        verbose_name_plural = _("Pending decision packages")
+        verbose_name = _("Quality control admin")
+        verbose_name_plural = _("Quality control admin")
 
 
 class ReadyToPublishPackage(Package):
@@ -1277,8 +1287,8 @@ class ReadyToPublishPackage(Package):
 
     class Meta:
         proxy = True
-        verbose_name = _("Package ready to publish")
-        verbose_name_plural = _("Packages ready to publish")
+        verbose_name = _("Publication admin")
+        verbose_name_plural = _("Publication admin")
 
 
 class BaseValidationResult(CommonControlField):
@@ -1814,7 +1824,7 @@ class XMLErrorReport(BaseValidationReport, ClusterableModel):
         related_name="xml_error_report",
     )
     xml_producer_ack = models.BooleanField(
-        _("The XML producer finished adding a response to each error."),
+        _("The error review is complete"),
         blank=True,
         null=True,
         default=False,

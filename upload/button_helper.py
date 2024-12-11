@@ -28,22 +28,7 @@ class UploadButtonHelper(ButtonHelper):
         analyst_team_member = ph.user_is_analyst_team_member(usr, obj)
 
         exclude = ["delete"]
-        if analyst_team_member:
-            if obj.status in (
-                choices.PS_SUBMITTED,
-                choices.PS_ENQUEUED_FOR_VALIDATION,
-                choices.PS_VALIDATED_WITH_ERRORS,
-                choices.PS_PENDING_QA_DECISION,
-                choices.PS_PENDING_CORRECTION,
-                choices.PS_UNEXPECTED,
-                choices.PS_PUBLISHED,
-                choices.PS_REQUIRED_ERRATUM,
-                choices.PS_REQUIRED_UPDATE,
-                choices.PS_ARCHIVED,
-            ):
-                exclude.append("edit")
-        else:
-            # usuário sem poder de análise
+        if not analyst_team_member:
             exclude.append("edit")
         if url_name.endswith("_modeladmin_inspect"):
             exclude.append("inspect")

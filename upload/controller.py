@@ -223,7 +223,7 @@ def _check_package_is_expected(response, package, sps_pkg_name):
 
     if previous_package and previous_package.status in choices.PS_WIP:
         raise UnexpectedPackageError(
-            _("Not allowed to accept new package because there is a package already being processed ({}). To force updating, package status must be changed to '{}'").format(
+            _("Not allowed to accept new package. There is a previous package which status={}. Search it and change the status to '{}'").format(
                 previous_package.status, choices.PS_PENDING_CORRECTION
             )
         )
@@ -237,7 +237,7 @@ def _check_package_is_expected(response, package, sps_pkg_name):
             response["package_category"] = choices.PC_UPDATE
 
             raise UnexpectedPackageError(
-                _("Not allowed to accept new package because there is a package already being processed ({}). To force updating, package status must be changed to '{}'").format(
+                _("Not allowed to accept new package. There is a previous package which status={}. Search it and change the status to '{}'").format(
                     article.status, choices.PS_PENDING_CORRECTION
                 )
             )

@@ -91,7 +91,7 @@ class PackageAdmin(ModelAdmin):
     inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
-    menu_label = _("Package Validation")
+    menu_label = _("Package admin")
     menu_icon = "folder"
     menu_order = 200
     add_to_settings_menu = False
@@ -202,7 +202,7 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
     model = QAPackage
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
-    menu_label = _("Pending decision packages")
+    menu_label = _("Quality control admin")
     menu_icon = "folder"
     menu_order = 200
     edit_view_class = QAPackageEditView
@@ -277,7 +277,7 @@ class ReadyToPublishPackageAdmin(ModelAdmin):
 
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
-    menu_label = _("Package publication")
+    menu_label = _("Publication admin")
     menu_icon = "folder"
     menu_order = 200
     edit_view_class = ReadyToPublishPackageEditView
