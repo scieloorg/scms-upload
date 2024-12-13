@@ -59,8 +59,7 @@ class QADecisionException(Exception):
     pass
 
 
-class NotFinishedValitionsError(Exception):
-    ...
+class NotFinishedValitionsError(Exception): ...
 
 
 User = get_user_model()
@@ -106,8 +105,11 @@ class PackageZip(CommonControlField):
         blank=False,
     )
     show_package_validations = models.BooleanField(
-        _("Show package validations"), default=False,
-        help_text=_("Unchecked to be redirect to package upload. Checked to be redirect to package validation"),
+        _("Show package validations"),
+        default=False,
+        help_text=_(
+            "Unchecked to be redirect to package upload. Checked to be redirect to package validation"
+        ),
     )
     name = models.CharField(max_length=40, null=True, blank=True)
 
@@ -174,7 +176,7 @@ class PackageZip(CommonControlField):
 
             logging.info(f"xmls: {xmls}")
             logging.info(f"other_files: {other_files}")
-            
+
             for key in xmls.keys():
                 other_files_copy = other_files.copy()
                 for other_files_key in other_files_copy.keys():
@@ -248,17 +250,26 @@ class Package(CommonControlField, ClusterableModel):
         choices=choices.QA_DECISION,
         null=True,
         blank=True,
-        help_text=_("Make a decision about the package or choose the analyst who will decide it"),
+        help_text=_(
+            "Make a decision about the package or choose the analyst who will decide it"
+        ),
     )
     qa_comment = models.TextField(
         _("Quality analysis comment"),
         null=True,
         blank=True,
-        help_text=_("Comment the decision about the package or choose the analyst who will comment it"),
+        help_text=_(
+            "Comment the decision about the package or choose the analyst who will comment it"
+        ),
     )
     analyst = models.ForeignKey(
-        CollectionTeamMember, blank=True, null=True, on_delete=models.SET_NULL,
-        help_text=_("Choose the analyst who will decide about the package or add your decision")
+        CollectionTeamMember,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        help_text=_(
+            "Choose the analyst who will decide about the package or add your decision"
+        ),
     )
     sps_pkg = models.ForeignKey(
         SPSPkg,
@@ -283,28 +294,24 @@ class Package(CommonControlField, ClusterableModel):
     numbers = models.JSONField(null=True, default=dict)
     critical_errors = models.PositiveSmallIntegerField(default=0)
     xml_errors_percentage = models.DecimalField(
-        verbose_name=_("Error percentual"), max_digits=5, decimal_places=2,
+        verbose_name=_("Error percentual"),
+        max_digits=5,
+        decimal_places=2,
         default=0.00,
-        help_text=_("0 to 100")
+        help_text=_("0 to 100"),
     )
     xml_warnings_percentage = models.DecimalField(
         verbose_name=_("Warning percentual"),
         max_digits=5,
         decimal_places=2,
         default=0.00,
-        help_text=_("0 to 100")
+        help_text=_("0 to 100"),
     )
     contested_xml_errors_percentage = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=0.00,
-        help_text=_("0 to 100")
+        max_digits=5, decimal_places=2, default=0.00, help_text=_("0 to 100")
     )
     declared_impossible_to_fix_percentage = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=0.00,
-        help_text=_("0 to 100")
+        max_digits=5, decimal_places=2, default=0.00, help_text=_("0 to 100")
     )
     order = models.PositiveSmallIntegerField(default=0, null=True, blank=True)
     pid_v2 = models.CharField(max_length=23, null=True, blank=True)
@@ -561,7 +568,9 @@ class Package(CommonControlField, ClusterableModel):
             return False
         return True
 
-    def finish_validations(self, task_process_qa_decision=None, blocking_error_status=None):
+    def finish_validations(
+        self, task_process_qa_decision=None, blocking_error_status=None
+    ):
         """
         1. Verifica se as validações que executaram em paralelo, finalizaram
         2. Calcula os números de problemas do pacote
@@ -739,15 +748,13 @@ class Package(CommonControlField, ClusterableModel):
                 )
             if metrics["total_declared_impossible_to_fix"]:
                 msgs.append(
-                    _(
-                        "It was concluded that {} are impossible to fix"
-                    ).format(metrics["total_declared_impossible_to_fix"])
+                    _("It was concluded that {} are impossible to fix").format(
+                        metrics["total_declared_impossible_to_fix"]
+                    )
                 )
             if not self.is_acceptable_package:
                 # <!-- User must finish the error review -->
-                msgs.append(
-                    _("The XML package needs to be fixed and sent again")
-                )
+                msgs.append(_("The XML package needs to be fixed and sent again"))
 
             else:
                 msgs.append(_("Finish the deposit"))
@@ -831,7 +838,9 @@ class Package(CommonControlField, ClusterableModel):
 
         metrics = self.metrics
 
-        logging.info(f"Package.is_acceptable_package - review finished: {self.is_error_review_finished}")
+        logging.info(
+            f"Package.is_acceptable_package - review finished: {self.is_error_review_finished}"
+        )
         if self.is_error_review_finished:
             # avalia os números de erros, deduzindo os falsos positivos
             return UploadValidator.check_max_xml_errors_percentage(
@@ -895,11 +904,15 @@ class Package(CommonControlField, ClusterableModel):
         operation = self.start(user, "process_qa_decision")
 
         if self.qa_decision == choices.PS_PENDING_QA_DECISION:
-            self.finish_qa_decision(user, operation, websites=None, result=None, rule=None)
+            self.finish_qa_decision(
+                user, operation, websites=None, result=None, rule=None
+            )
             return []
 
         if self.qa_decision == choices.PS_PENDING_CORRECTION:
-            self.finish_qa_decision(user, operation, websites=None, result=None, rule=None)
+            self.finish_qa_decision(
+                user, operation, websites=None, result=None, rule=None
+            )
             return []
 
         if self.qa_decision == choices.PS_DEPUBLISHED:
@@ -945,9 +958,10 @@ class Package(CommonControlField, ClusterableModel):
         # nenhum erro ou regra flexível, permissão de publicar no site público
         self.qa_decision = choices.PS_READY_TO_PUBLISH
         self.status = choices.PS_READY_TO_PUBLISH
-        if not self.linked or not self.linked.filter(
-            ~Q(status=choices.PS_READY_TO_PUBLISH)
-        ).exists():
+        if (
+            not self.linked
+            or not self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists()
+        ):
             # nenhum pacote vinculado como outros ou
             # todos os pacotes vinculados estão com o mesmo status
             # (choices.PS_READY_TO_PUBLISH), então pode publicar em PUBLIC
@@ -960,9 +974,7 @@ class Package(CommonControlField, ClusterableModel):
         if result.get("blocking_errors"):
             # não foi possível criar sps package
             result["request_correction"] = True
-            raise QADecisionException(
-                _("Cannot publish article: blocking errors")
-            )
+            raise QADecisionException(_("Cannot publish article: blocking errors"))
 
         if self.qa_decision == choices.PS_READY_TO_PREVIEW:
             try:
@@ -970,7 +982,9 @@ class Package(CommonControlField, ClusterableModel):
                 self.create_or_update_article(user, save=False)
             except Exception as e:
                 result["request_correction"] = True
-                result.update({"exception_message": str(e), "exception_type": str(type(e))})
+                result.update(
+                    {"exception_message": str(e), "exception_type": str(type(e))}
+                )
                 raise QADecisionException(
                     _("Cannot publish article: unexpected errors")
                 )
@@ -980,16 +994,16 @@ class Package(CommonControlField, ClusterableModel):
         if result.get("critical_errors"):
             # com erros críticos somente publica em QA
             result["request_correction"] = True
-            raise QADecisionException(
-                _("Cannot publish article: critical errors")
-            )
+            raise QADecisionException(_("Cannot publish article: critical errors"))
 
         if rule == choices.STRICT_AUTO_PUBLICATION:
             if result.get("error") or self.has_errors:
                 # Há erros e é modo rígido, somente publica em QA
                 result["request_correction"] = True
                 raise QADecisionException(
-                    _("Article has errors. System settings (STRICT_AUTO_PUBLICATION) blocks its publication")
+                    _(
+                        "Article has errors. System settings (STRICT_AUTO_PUBLICATION) blocks its publication"
+                    )
                 )
 
         elif rule == choices.MANUAL_PUBLICATION:
@@ -999,7 +1013,9 @@ class Package(CommonControlField, ClusterableModel):
                 # publica somente em QA
                 result["request_correction"] = False
                 raise QADecisionException(
-                    _("It requires manual publication due to system settings (MANUAL_PUBLICATION)")
+                    _(
+                        "It requires manual publication due to system settings (MANUAL_PUBLICATION)"
+                    )
                 )
 
     def finish_qa_decision(self, user, operation, websites, result, rule):
@@ -1176,7 +1192,9 @@ class Package(CommonControlField, ClusterableModel):
                 self.qa_ws_pubdate = datetime.utcnow()
                 self.status = choices.PS_PREVIEW
                 self.save()
-                self.article.update_status(new_status=article_choices.AS_PREPARE_TO_PUBLISH)
+                self.article.update_status(
+                    new_status=article_choices.AS_PREPARE_TO_PUBLISH
+                )
             elif website_kind == collection_choices.PUBLIC:
                 self.public_ws_status = status
                 self.public_ws_pubdate = datetime.utcnow()
@@ -1970,7 +1988,9 @@ class UploadValidator(CommonControlField):
             obj = UploadValidator.objects.get(collection=collection)
         except UploadValidator.DoesNotExist:
             obj = UploadValidator.create_default()
-        logging.info(f"check_max_xml_errors_percentage: {value} <= {obj.max_xml_errors_percentage}")
+        logging.info(
+            f"check_max_xml_errors_percentage: {value} <= {obj.max_xml_errors_percentage}"
+        )
         return value <= obj.max_xml_errors_percentage
 
     @staticmethod
@@ -1979,7 +1999,9 @@ class UploadValidator(CommonControlField):
             obj = UploadValidator.objects.get(collection=collection)
         except UploadValidator.DoesNotExist:
             obj = UploadValidator.create_default()
-        logging.info(f"check_max_xml_warnings_percentage: {value} <= {obj.max_xml_warnings_percentage}")
+        logging.info(
+            f"check_max_xml_warnings_percentage: {value} <= {obj.max_xml_warnings_percentage}"
+        )
         return value <= obj.max_xml_warnings_percentage
 
     @staticmethod
@@ -2004,4 +2026,3 @@ class ArchivedPackage(Package):
 
     class Meta:
         proxy = True
-
