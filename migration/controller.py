@@ -47,8 +47,23 @@ def create_or_update_journal(
     """
     Create/update OfficialJournal, JournalProc e Journal
     """
+
     if not tracker_choices.allowed_to_run(journal_proc.migration_status, force_update):
+        journal_proc_event = journal_proc.start(user, "create_or_update_journal")
+        journal_proc_event.finish(
+            user,
+            completed=True,
+            detail={
+                "skip": True,
+                "force_update": force_update,
+                "migration_status": journal_proc.migration_status,
+            },
+        )
         return journal_proc.journal
+
+    journal_proc_event = journal_proc.start(
+        user, "create_or_update_journal"
+    )
     collection = journal_proc.collection
     journal_data = journal_proc.migrated_data.data
 
@@ -74,97 +89,171 @@ def create_or_update_journal(
 
         if not eissn and not pissn:
             raise ValueError(f"Missing ISSN for {journal_data}")
-        official_journal = OfficialJournal.create_or_update(
-            user=user,
+
+        params = dict(
             issn_electronic=eissn,
             issn_print=pissn,
             title=classic_website_journal.title,
             title_iso=classic_website_journal.title_iso,
             foundation_year=year,
         )
+        official_journal = OfficialJournal.create_or_update(user=user, **params)
         official_journal.add_related_journal(
             classic_website_journal.previous_title,
             classic_website_journal.next_title,
         )
-    except ValueError as e:
-        logging.exception(f"{journal_proc} {journal_data} {e}")
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        params["event"] = "OfficialJournal.create_or_update"
+        journal_proc_event.finish(
+            user,
+            completed=False,
+            detail=params,
+            exception=e,
+            exc_traceback=exc_traceback,
+        )
         raise e
-    journal = Journal.create_or_update(
-        user=user,
-        official_journal=official_journal,
-        short_title=classic_website_journal.abbreviated_title,
-        title=classic_website_journal.title,
-        journal_acron=classic_website_journal.acronym,
-    )
-    journal.license_code = classic_website_journal.permissions
-    journal.nlm_title = classic_website_journal.title_nlm
-    journal.doi_prefix = None
-    journal.contact_name = "; ".join(classic_website_journal.raw_publisher_names)
-    journal.contact_location = Location.create_or_update(
-        user=user,
-        city_name=classic_website_journal.publisher_city,
-        state_acronym=classic_website_journal.publisher_state,
-        country_acronym=classic_website_journal.publisher_country,
-    )
-    journal.contact_address = ", ".join(classic_website_journal.publisher_address)
-    journal.add_email(classic_website_journal.publisher_email)
-    journal.save()
 
-    journal_proc.update(
-        user=user,
-        journal=journal,
-        acron=classic_website_journal.acronym,
-        title=classic_website_journal.title,
-        availability_status=classic_website_journal.current_status,
-        migration_status=tracker_choices.PROGRESS_STATUS_DONE,
-        force_update=force_update,
-    )
-
-    missions = {}
-    for item in classic_website_journal.mission:
-        try:
-            text = item["text"]
-        except KeyError as exc:
-            text = ""
-            logging.exception(f"{journal} - Missing mission data {item}")
-            continue
-        try:
-            lang = item["language"]
-        except KeyError as exc:
-            lang = None
-            logging.info(f"Mission no lang (1). {journal_proc} {item}")
-
-        if not lang or not text:
-            logging.info(f"Mission no lang or no text (2). {journal_proc} {item}")
-            continue
-        missions.setdefault(lang, [])
-        missions[lang].append(text)
-
-    for lang, text in missions.items():
-        language = Language.get_or_create(name=None, code2=lang, creator=user)
-        journal.mission.add(
-            Mission.create_or_update(user, journal, language, "\n".join(text))
+    try:
+        params = dict(
+            short_title=classic_website_journal.abbreviated_title,
+            title=classic_website_journal.title,
+            journal_acron=classic_website_journal.acronym,
         )
-
-    for code in classic_website_journal.subject_areas:
-        journal.subject.add(Subject.create_or_update(user, code))
-
-    for publisher_name in classic_website_journal.raw_publisher_names:
-        institution = Institution.get_or_create(
-            inst_name=publisher_name,
-            inst_acronym=None,
-            level_1=None,
-            level_2=None,
-            level_3=None,
-            location=None,
+        journal = Journal.create_or_update(
             user=user,
+            official_journal=official_journal,
+            **params,
         )
-        journal.owner.add(Owner.create_or_update(user, journal, institution))
-        journal.publisher.add(Publisher.create_or_update(user, journal, institution))
+        journal.license_code = classic_website_journal.permissions
+        journal.nlm_title = classic_website_journal.title_nlm
+        journal.doi_prefix = None
+        journal.contact_name = "; ".join(classic_website_journal.raw_publisher_names)
+        journal.contact_location = Location.create_or_update(
+            user=user,
+            city_name=classic_website_journal.publisher_city,
+            state_acronym=classic_website_journal.publisher_state,
+            country_acronym=classic_website_journal.publisher_country,
+        )
+        journal.contact_address = ", ".join(classic_website_journal.publisher_address)
+        journal.add_email(classic_website_journal.publisher_email)
+        journal.save()
 
-    jc = JournalCollection.create_or_update(user, collection, journal)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        params["event"] = "Journal.create_or_update"
+        journal_proc_event.finish(
+            user,
+            completed=False,
+            detail=params,
+            exception=e,
+            exc_traceback=exc_traceback,
+        )
+        raise e
 
-    create_journal_history(user, jc, classic_website_journal)
+    try:
+        missions = {}
+        for item in classic_website_journal.mission:
+            text = item["text"]
+            lang = item["language"]
+            missions.setdefault(lang, [])
+            missions[lang].append(text)
+
+            for lang, text in missions.items():
+                language = Language.get_or_create(name=None, code2=lang, creator=user)
+                journal.mission.add(
+                    Mission.create_or_update(user, journal, language, "\n".join(text))
+                )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        journal_proc_event.finish(
+            user,
+            completed=False,
+            detail={"missions": missions, "advice": "Remove line breaks"},
+            exception=e,
+            exc_traceback=exc_traceback,
+        )
+        raise e
+
+    try:
+        for code in classic_website_journal.subject_areas:
+            journal.subject.add(Subject.create_or_update(user, code))
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        journal_proc_event.finish(
+            user,
+            completed=False,
+            detail={"subject_areas": classic_website_journal.subject_areas},
+            exception=e,
+            exc_traceback=exc_traceback,
+        )
+        raise e
+
+    try:
+        for publisher_name in classic_website_journal.raw_publisher_names:
+            institution = Institution.get_or_create(
+                inst_name=publisher_name,
+                inst_acronym=None,
+                level_1=None,
+                level_2=None,
+                level_3=None,
+                location=None,
+                user=user,
+            )
+            journal.owner.add(Owner.create_or_update(user, journal, institution))
+            journal.publisher.add(Publisher.create_or_update(user, journal, institution))
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        journal_proc_event.finish(
+            user,
+            completed=False,
+            detail={"publisher_name": classic_website_journal.raw_publisher_names},
+            exception=e,
+            exc_traceback=exc_traceback,
+        )
+        raise e
+
+    try:
+        jc = JournalCollection.create_or_update(user, collection, journal)
+        create_journal_history(user, jc, classic_website_journal)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        journal_proc_event.finish(
+            user,
+            completed=False,
+            detail={"status_history": classic_website_journal.status_history},
+            exception=e,
+            exc_traceback=exc_traceback,
+        )
+        raise e
+
+    try:
+        params = dict(
+            acron=classic_website_journal.acronym,
+            title=classic_website_journal.title,
+            availability_status=classic_website_journal.current_status,
+            migration_status=tracker_choices.PROGRESS_STATUS_DONE,
+            force_update=force_update,
+        )
+        journal_proc.update(
+            user=user,
+            journal=journal,
+            **params
+        )
+        journal_proc_event.finish(user, completed=True, detail=params)
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        params["event"] = "journal_proc.update"
+        journal_proc_event.finish(
+            user,
+            completed=False,
+            detail=params,
+            exception=e,
+            exc_traceback=exc_traceback,
+        )
+        raise e
     return journal
 
 
@@ -813,6 +902,7 @@ def register_acron_id_file_content(
     """
     try:
         # Importa os registros de documentos
+        operation = None
         operation = journal_proc.start(user, "register_acron_id_file_content")
         detail = {}
         journal = journal_proc.journal
@@ -890,6 +980,8 @@ def register_acron_id_file_content(
                 "username": user.username,
                 "collection_acron": journal_proc.collection.acron,
                 "journal_acron": journal_proc.acron,
+                "pid": journal_proc.pid,
+                "metadata": journal_proc.migrated_data,
             },
         )
 
