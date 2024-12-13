@@ -1,3 +1,5 @@
+import traceback
+import sys
 import csv
 import logging
 import os
@@ -981,9 +983,16 @@ class Package(CommonControlField, ClusterableModel):
                 # cria ou atualiza Article
                 self.create_or_update_article(user, save=False)
             except Exception as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
                 result["request_correction"] = True
                 result.update(
-                    {"exception_message": str(e), "exception_type": str(type(e))}
+                    {
+                        "exception": {
+                            "message": str(e),
+                            "type": str(type(e)),
+                            "traceback": str(traceback.format_tb(exc_traceback)),
+                        }
+                    }
                 )
                 raise QADecisionException(
                     _("Cannot publish article: unexpected errors")
@@ -1200,7 +1209,7 @@ class Package(CommonControlField, ClusterableModel):
                 self.public_ws_pubdate = datetime.utcnow()
                 self.status = choices.PS_PUBLISHED
                 self.save()
-                self.article.update_status(new_status=article_choices.PS_PUBLISHED)
+                self.article.update_status(new_status=article_choices.AS_PUBLISHED)
 
     @property
     def toc_sections(self):
