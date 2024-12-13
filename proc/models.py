@@ -807,10 +807,14 @@ class JournalProc(BaseProc, ClusterableModel):
         ]
 
     def __unicode__(self):
-        return f"{self.acron} ({self.collection.name})"
+        if self.acron:
+            return f"{self.acron} ({self.collection.name})"
+        return f"{self.pid} ({self.collection.name})"
 
     def __str__(self):
-        return f"{self.acron} ({self.collection.name})"
+        if self.acron:
+            return f"{self.acron} ({self.collection.name})"
+        return f"{self.pid} ({self.collection.name})"
 
     @staticmethod
     def autocomplete_custom_queryset_filter(search_term):

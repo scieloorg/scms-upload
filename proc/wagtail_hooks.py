@@ -48,12 +48,12 @@ class JournalProcModelAdmin(ModelAdmin):
     list_display = (
         "journal",
         "acron",
+        "pid",
         "availability_status",
         "migration_status",
         "qa_ws_status",
         "public_ws_status",
         "updated",
-        "created",
     )
     list_filter = (
         "availability_status",
