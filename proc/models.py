@@ -696,7 +696,8 @@ class BaseProc(CommonControlField):
         self.update_publication_stage(website_kind, completed)
         detail.update(response)
         operation.finish(user, completed=completed, detail=detail)
-        return completed
+        detail["completed"] = completed
+        return detail
 
     def update_publication_stage(self, website_kind, completed):
         """
