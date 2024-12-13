@@ -79,10 +79,8 @@ def build_article(builder, article, journal_id, order, pub_date, is_public=True)
     for item in contribs.get("names") or []:
         builder.add_author(**item)
 
-    # depende de https://github.com/scieloorg/opac_5/issues/214
-    # TODO
-    # for item in contribs.get("collabs") or []:
-    #     builder.add_collab(**item)
+    for item in contribs.get("collabs") or []:
+        builder.add_collab(**item)
 
     for item in article_xml.get_translated_title():
         builder.add_translated_title(**item)

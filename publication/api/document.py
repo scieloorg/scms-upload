@@ -200,12 +200,10 @@ class ArticlePayload:
             _related_article["related_type"] = related_type
             self.data["related_articles"].append(_related_article)
         else:
-            pass
-            # TODO depende de resolver https://github.com/scieloorg/opac_5/issues/212
-            # _related_article["href"] = href
-            # _related_article["ref_id"] = ref_id
-            # _related_article["related_type"] = related_type
-            # self.data["related_articles"].append(_related_article)
+            _related_article["href"] = href
+            _related_article["ref_id"] = ref_id
+            _related_article["related_type"] = related_type
+            self.data["related_articles"].append(_related_article)
   
     def add_xml(self, xml):
         self.data["xml"] = xml
