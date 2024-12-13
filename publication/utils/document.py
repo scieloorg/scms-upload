@@ -17,7 +17,7 @@ from packtools.sps.models.related_articles import RelatedItems
 from publication.utils.issue import get_bundle_id
 
 
-def build_article(builder, article, journal_id, order, pub_date):
+def build_article(builder, article, journal_id, order, pub_date, is_public=True):
     sps_pkg = article.sps_pkg
     xml_with_pre = sps_pkg.xml_with_pre
 
@@ -100,7 +100,7 @@ def build_article(builder, article, journal_id, order, pub_date):
     for item in article_xml.get_related_articles():
         builder.add_related_article(**item)
 
-    builder.add_status()
+    builder.add_status(is_public)
 
     for item in article_xml.get_abstracts():
         builder.add_abstract(**item)
