@@ -61,9 +61,11 @@ def create_or_update_journal(
         pissn = classic_website_journal.print_issn
         if not eissn and not pissn:
             issn = classic_website_journal.get_field_content(
-                "v935", subfields={"_": "issn"}, single=True, simple=True)
+                "v935", subfields={"_": "issn"}, single=True, simple=True
+            )
             issn_type = classic_website_journal.get_field_content(
-                "v035", subfields={"_": "issn_type"}, single=True, simple=True)
+                "v035", subfields={"_": "issn_type"}, single=True, simple=True
+            )
             if issn and issn_type:
                 if issn_type["issn_type"] == "PRINT":
                     pissn = issn["issn"]
@@ -123,7 +125,7 @@ def create_or_update_journal(
         try:
             text = item["text"]
         except KeyError as exc:
-            text = ''
+            text = ""
             logging.exception(f"{journal} - Missing mission data {item}")
             continue
         try:
@@ -139,9 +141,7 @@ def create_or_update_journal(
         missions[lang].append(text)
 
     for lang, text in missions.items():
-        language = Language.get_or_create(
-            name=None, code2=lang, creator=user
-        )
+        language = Language.get_or_create(name=None, code2=lang, creator=user)
         journal.mission.add(
             Mission.create_or_update(user, journal, language, "\n".join(text))
         )
@@ -298,8 +298,7 @@ def create_or_update_article(
     return article
 
 
-class XMLVersionXmlWithPreError(Exception):
-    ...
+class XMLVersionXmlWithPreError(Exception): ...
 
 
 def get_classic_website(collection_acron):
@@ -525,9 +524,9 @@ class DocumentRecordsImporter:
 
     def merge_journal_issue_and_docs_records(self, doc_records):
         if not self.journal_issue_and_doc_data.get("issue"):
-            self.journal_issue_and_doc_data[
-                "issue"
-            ] = self.issue_proc.migrated_data.data
+            self.journal_issue_and_doc_data["issue"] = (
+                self.issue_proc.migrated_data.data
+            )
 
         records = deepcopy(self.journal_issue_and_doc_data)
         records["article"] = doc_records
@@ -863,12 +862,14 @@ def register_acron_id_file_content(
                     done += 1
                 completed = total == done
 
-                detail.update({
-                    "force_update": force_update,
-                    "done": done,
-                    "changed": changed,
-                    "updated": journal_id_file.updated.isoformat(),
-                })
+                detail.update(
+                    {
+                        "force_update": force_update,
+                        "done": done,
+                        "changed": changed,
+                        "updated": journal_id_file.updated.isoformat(),
+                    }
+                )
             operation.finish(
                 user,
                 completed=completed,
