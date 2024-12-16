@@ -11,7 +11,7 @@ from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from scielo_classic_website import classic_ws
-from scielo_classic_website.controller import pids_and_their_records
+from scielo_classic_website.iid2json.id2json3 import get_doc_records
 
 from article.models import Article
 from collection.models import Language
@@ -987,70 +987,45 @@ def register_acron_id_file_content(
 
 
 def read_bases_work_acron_id_file(user, source_path, classic_website, journal_proc):
+    event = journal_proc.start(user, "read_bases_work_acron_id_file")
+
+    errors = []
     data = {}
     classic_ws_issue = None
     classic_ws_doc = None
+    for item in get_doc_records(source_path):
+        issue_id = item.get("issue_id")
+        data["issue"] = item.get("issue_data")
+ 
+        doc_id = item.get("doc_id")
+        data["article"] = item.get("doc_data")
 
-    for item_pid, item_records in pids_and_their_records(source_path, "article"):
-        # info = {"item_pid": item_pid}
-        # operation = journal_proc.start(
-        #     user, f"get data from {os.path.basename(source_path)} for {item_pid}"
-        # )
-        if len(item_records) == 1:
-            data["issue"] = item_records[0]
-            classic_ws_issue = classic_ws.Issue(data["issue"])
-            # info["classic_ws_issue_pid"] = classic_ws_issue.pid
+        if data["issue"] and issue_id:
+            try:
+                classic_ws_issue = classic_ws.Issue(data["issue"])
 
-            yield dict(
-                item_type="issue",
-                item_pid=item_pid,
-                data=data["issue"],
-                issue_folder=classic_ws_issue.issue_label,
-                article_filename=None,
-                processing_date=classic_ws_issue.isis_updated_date,
-            )
-            # operation.finish(
-            #     user,
-            #     completed=True,
-            #     detail={"item_type": "issue", "issue_folder": d["issue_folder"]},
-            # )
+                try:
+                    issue_folder = classic_ws_issue.issue_label
+                except Exception as e:
+                    issue_folder = ""
+                yield dict(
+                    item_type="issue",
+                    item_pid=issue_id,
+                    data=data["issue"],
+                    issue_folder=issue_folder,
+                    article_filename=None,
+                    processing_date=classic_ws_issue.isis_updated_date,
+                )
+            except Exception as e:
+                errors.append(f"{e} {issue_id} {data['issue']}")
+                continue
+
+        if not data["article"]:
             continue
 
-        if not classic_ws_issue:
-            # raise ValueError(f"{source_path} must have 'i' record for {item_pid}")
-
-            # operation.finish(
-            #     user,
-            #     completed=False,
-            #     detail={"classic_ws_issue": None},
-            # )
-            continue
-
-        # item = documento
-        data["article"] = item_records
-        # instancia Document com os dados de journal, issue e article
+        # instancia Document com os dados de issue e article
         classic_ws_doc = classic_ws.Document(data)
-
-        try:
-            scielo_pid_v2 = classic_ws_doc.scielo_pid_v2
-        except AttributeError:
-            logging.info(f"Missing scielo_pid_v2 for {item_pid} {data}")
-
-        # info.update(
-        #     dict(
-        #         item_type="article",
-        #         classic_ws_doc_pid=scielo_pid_v2,
-        #         issue_folder=classic_ws_doc.issue.issue_label,
-        #         article_filename=classic_ws_doc.filename_without_extension,
-        #         article_filetype=classic_ws_doc.file_type,
-        #         processing_date=classic_ws_doc.processing_date,
-        #     )
-        # )
-
-        if (
-            classic_ws_issue.pid not in item_pid
-            or item_pid != classic_ws_doc.scielo_pid_v2
-        ):
+        if not classic_ws_doc.scielo_pid_v2:
             # raise ValueError(f"{classic_ws_issue.pid} and {item_pid} do not match")
             # detail = {"error": "unmatched issue_pid and item_pid"}
             # detail.update(info)
@@ -1058,26 +1033,26 @@ def read_bases_work_acron_id_file(user, source_path, classic_website, journal_pr
             continue
 
         # se houver bases-work/p/<pid>, obtém os registros de parágrafo
-        ign_pid, p_records = classic_website.get_p_records(item_pid)
+        ign_pid, p_records = classic_website.get_p_records(doc_id)
         p_records = list(p_records)
         if p_records:
             # adiciona registros p aos registros do artigo
             # info["external_p_records_count"] = len(p_records)
             yield dict(
                 item_type="paragraph",
-                item_pid=item_pid,
+                item_pid=doc_id,
                 data=p_records,
-                issue_folder=classic_ws_issue.issue_label,
+                issue_folder="",
                 processing_date=classic_ws_doc.processing_date,
             )
 
         yield dict(
             item_type="article",
-            item_pid=item_pid,
-            data=item_records,
-            issue_folder=classic_ws_doc.issue.issue_label,
+            item_pid=doc_id,
+            data=data["article"],
+            issue_folder="",
             article_filename=classic_ws_doc.filename_without_extension,
             article_filetype=classic_ws_doc.file_type,
             processing_date=classic_ws_doc.processing_date,
         )
-        # operation.finish(user, completed=True, detail=info)
+    event.finish(user, completed=True, detail={"errors": errors})
