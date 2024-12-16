@@ -1205,6 +1205,8 @@ class IssueProc(BaseProc, ClusterableModel):
         logging.info(f"Migrate documents from {resumption}")
         # registros novos ou atualizados
 
+        IdFileRecord.add_issue_folder(self.pid, self.issue_folder)
+
         params = dict(
             collection=self.journal_proc.collection,
             journal_acron=self.journal_proc.acron,
@@ -1217,7 +1219,7 @@ class IssueProc(BaseProc, ClusterableModel):
         for record in id_file_records:
             try:
                 logging.info(f"migrate_document_records: {record.item_pid}")
-                data = record.get_record_data(journal_data)
+                data = record.get_record_data(journal_data, issue_data=self.migrated_data.data)
                 article_proc = self.create_or_update_article_proc(
                     user, record.item_pid, data["data"], force_update
                 )
