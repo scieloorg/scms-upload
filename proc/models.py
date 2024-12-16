@@ -696,7 +696,8 @@ class BaseProc(CommonControlField):
         self.update_publication_stage(website_kind, completed)
         detail.update(response)
         operation.finish(user, completed=completed, detail=detail)
-        return completed
+        detail["completed"] = completed
+        return detail
 
     def update_publication_stage(self, website_kind, completed):
         """
@@ -806,10 +807,14 @@ class JournalProc(BaseProc, ClusterableModel):
         ]
 
     def __unicode__(self):
-        return f"{self.acron} ({self.collection.name})"
+        if self.acron:
+            return f"{self.acron} ({self.collection.name})"
+        return f"{self.pid} ({self.collection.name})"
 
     def __str__(self):
-        return f"{self.acron} ({self.collection.name})"
+        if self.acron:
+            return f"{self.acron} ({self.collection.name})"
+        return f"{self.pid} ({self.collection.name})"
 
     @staticmethod
     def autocomplete_custom_queryset_filter(search_term):
