@@ -48,6 +48,14 @@ class PidProviderAPIClient:
         except (AttributeError, ValueError, TypeError):
             return False
 
+    def reset(self):
+        self._pid_provider_api_post_xml = None
+        self._pid_provider_api_get_token = None
+        self._api_username = None
+        self._api_password = None
+        self.token = None
+        self._config = PidProviderConfig.get_or_create()
+
     @property
     def config(self):
         if not hasattr(self, "_config") or not self._config:
@@ -156,12 +164,22 @@ class PidProviderAPIClient:
             )
             return resp["access"]
         except Exception as e:
+            previous_data = (self.pid_provider_api_get_token, username, password)
+            self.reset()
+            current_data = (self.pid_provider_api_get_token, self.api_username, self.api_password)
+            if current_data != previous_data:
+                return self._get_token(
+                    username=self.api_username,
+                    password=self.api_password,
+                    timeout=self.timeout,
+                )
+
             # TODO tratar as exceções
             logging.exception(e)
             raise exceptions.GetAPITokenError(
                 _("Unable to get api token {} {} {} {}").format(
                     self.pid_provider_api_get_token,
-                    username,
+                    self.api_username,
                     type(e),
                     e,
                 )
@@ -225,6 +243,18 @@ class PidProviderAPIClient:
                 json=True,
             )
         except Exception as e:
+            previous_data = self.pid_provider_api_post_xml
+            self.reset()
+            current_data = self.pid_provider_api_post_xml
+            if current_data != previous_data:
+                return post_data(
+                    self.pid_provider_api_post_xml,
+                    files=files,
+                    headers=header,
+                    timeout=timeout,
+                    verify=False,
+                    json=True,
+                )
             logging.exception(e)
             raise exceptions.APIPidProviderPostError(
                 _("Unable to get pid from pid provider {} {} {} {}").format(
