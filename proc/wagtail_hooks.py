@@ -107,6 +107,7 @@ class IssueProcModelAdmin(ModelAdmin):
         "issue__volume",
         "issue__number",
         "issue__supplement",
+        "pid",
     )
 
 
