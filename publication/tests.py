@@ -13,7 +13,7 @@ from core.users.models import User
 from core.utils.requester import RetryableError, NonRetryableError
 
 
-class ArticleAvailabilityTeste(TestCase):
+class ArticleAvailabilityTest(TestCase):
     def setUp(self):
         self.user = User.objects.create(username="user_test")
         self.collection = Collection.objects.create(acron="scl", creator=self.user)
