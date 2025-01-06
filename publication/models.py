@@ -8,6 +8,7 @@ from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel
 
 from article.models import Article
+from collection.models import Collection
 from core.models import CommonControlField
 from publication.choices import VERIFY_HTTP_ERROR_CODE
 
@@ -135,3 +136,81 @@ class ScieloURLStatus(CommonControlField, Orderable):
                 available=available,
                 user=user,
             )
+
+
+def upload_path_for_verification_files(instance, filename):
+    try:
+        return f"verification_article_files/{instance.collection.acron}"
+    except:
+        return f"verification_article_files/{filename}"
+
+
+class CollectionVerificationFile(CommonControlField):
+    """
+        Modelo para armazenar o arquivo que contém os pids v2 da migração de acordo com a coleção
+    """
+    collection = models.ForeignKey(
+        Collection,
+        on_delete=models.CASCADE,
+        unique=True,
+    )
+    uploaded_file = models.FileField(upload_to=upload_path_for_verification_files)
+
+    class Meta:
+        unique_together = [("collection", "uploaded_file")]
+
+    def __str__(self):
+        return f"{self.collection} - {self.uploaded_file}"
+
+
+class MissingArticle(CommonControlField):
+    collection_file = models.ForeignKey(
+        CollectionVerificationFile,
+        on_delete=models.SET_NULL,
+        null=True,
+    )
+    pid_v2 = models.CharField(_("PID v2"), max_length=23, blank=True, null=True)
+
+    def get_collection_name(self,):
+        if self.collection_file and self.collection_file.collection:
+            return self.collection_file.collection.name 
+        
+    get_collection_name.short_description = "Collection name"
+
+    @classmethod
+    def get(
+        cls,
+        collection_file,
+        pid_v2,
+    ):
+        return cls.objects.get(collection_file=collection_file, pid_v2=pid_v2)
+
+    @classmethod
+    def create(
+        cls,
+        collection_file,
+        pid_v2,
+        user,
+    ):
+        try:
+            obj = cls(
+                collection_file=collection_file,
+                pid_v2=pid_v2,
+                creator=user,
+            )
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(collection_file=collection_file, pid_v2=pid_v2)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        collection_file,
+        pid_v2,
+        user,
+    ):
+        try:
+            return cls.get(collection_file=collection_file, pid_v2=pid_v2)
+        except cls.DoesNotExist:
+            return cls.create(collection_file=collection_file, pid_v2=pid_v2, user=user)
