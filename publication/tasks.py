@@ -1,5 +1,5 @@
 import logging
-import re
+import gzip
 import sys
 from datetime import datetime
 
@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from .models import Article, ScieloURLStatus
+from .models import Article, ScieloURLStatus, CollectionVerificationFile, MissingArticle
 from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
@@ -528,4 +528,41 @@ def process_article_availability(
                 "urls": urls,
                 "url": url,
             },
+        )
+
+
+@celery_app.task(bind=True)
+def create_or_update_missing_article(self, pid_v2, collection_verification_file_id, username):
+    user = _get_user(user_id=None, username=username)
+    collection_verification = CollectionVerificationFile.objects.get(id=collection_verification_file_id)
+    MissingArticle.create_or_update(collection_file=collection_verification, pid_v2=pid_v2, user=user)
+
+
+@celery_app.task(bind=True)
+def process_file_to_check_migrated_articles(self, username, collection_acron):
+    try:
+        collection = Collection.get(acron=collection_acron)
+        file_with_pid_v2 = CollectionVerificationFile.objects.get(collection=collection)
+        with gzip.open(file_with_pid_v2.uploaded_file.path, "rt") as file:
+            values_pid_v2 = {line.strip() for line in file}
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "publication.tasks.process_file_to_check_migrated_articles",
+            },
+        )
+
+    matching_articles = Article.objects.filter(pid_v2__in=values_pid_v2).values_list(
+        "pid_v2", flat=True
+    )
+    missing_articles = values_pid_v2 - set(matching_articles)
+
+    for pid_v2 in missing_articles:
+        create_or_update_missing_article.apply_async(
+            pid_v2=pid_v2,
+            collection_verification_file_id=file_with_pid_v2.id,
+            username=username,
         )
