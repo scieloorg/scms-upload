@@ -82,10 +82,10 @@ django_migrate: ## Run migrate from django container using $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py migrate
 
 django_makemessages: ## Run ./manage.py makemessages $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py makemessages
+	@docker-compose -f $(compose) run --rm django python manage.py makemessages --all
 
 django_compilemessages: ## Run ./manage.py compilemessages $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py compilemessages
+	@docker-compose -f $(compose) run --rm django python manage.py compilemessages 
 
 django_dump_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
 	@docker-compose -f $(compose) run --rm django python manage.py dumpdata auth --indent=2  --output=fixtures/auth.json
