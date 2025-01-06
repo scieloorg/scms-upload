@@ -1,0 +1,2623 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-06 05:08+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
+"1 : 2;\n"
+
+#: article/button_helper.py:11
+msgid "See instructions"
+msgstr ""
+
+#: article/button_helper.py:21 article/button_helper.py:84
+msgid "Submit change"
+msgstr ""
+
+#: article/button_helper.py:75
+msgid "Request change"
+msgstr ""
+
+#: article/choices.py:8 upload/choices.py:40
+msgid "Update"
+msgstr ""
+
+#: article/choices.py:9 upload/choices.py:41
+msgid "Erratum"
+msgstr ""
+
+#: article/choices.py:22 article/choices.py:72
+msgid "Addendum"
+msgstr ""
+
+#: article/choices.py:23
+msgid "Commentary article"
+msgstr ""
+
+#: article/choices.py:24
+msgid "Corrected article"
+msgstr ""
+
+#: article/choices.py:25 article/choices.py:92
+msgid "Letter"
+msgstr ""
+
+#: article/choices.py:26
+msgid "Partial retraction"
+msgstr ""
+
+#: article/choices.py:27
+msgid "Retracted article"
+msgstr ""
+
+#: article/choices.py:71
+msgid "Abstract"
+msgstr ""
+
+#: article/choices.py:73
+msgid "Announcement"
+msgstr ""
+
+#: article/choices.py:74
+msgid "Article-Commentary"
+msgstr ""
+
+#: article/choices.py:75
+msgid "Book-Review"
+msgstr ""
+
+#: article/choices.py:76
+msgid "Books-Received"
+msgstr ""
+
+#: article/choices.py:77
+msgid "Brief-Report"
+msgstr ""
+
+#: article/choices.py:78
+msgid "Calendar"
+msgstr ""
+
+#: article/choices.py:79
+msgid "Case-Report"
+msgstr ""
+
+#: article/choices.py:80
+msgid "Clinical-Trial"
+msgstr ""
+
+#: article/choices.py:81
+msgid "Collection"
+msgstr ""
+
+#: article/choices.py:82
+msgid "Correction"
+msgstr ""
+
+#: article/choices.py:83
+msgid "Data-Article"
+msgstr ""
+
+#: article/choices.py:84
+msgid "Discussion"
+msgstr ""
+
+#: article/choices.py:85
+msgid "Dissertation"
+msgstr ""
+
+#: article/choices.py:86
+msgid "Editorial"
+msgstr ""
+
+#: article/choices.py:87
+msgid "Editorial-Material"
+msgstr ""
+
+#: article/choices.py:88
+msgid "Guideline"
+msgstr ""
+
+#: article/choices.py:89
+msgid "In-Brief"
+msgstr ""
+
+#: article/choices.py:90
+msgid "Interview"
+msgstr ""
+
+#: article/choices.py:91
+msgid "Introduction"
+msgstr ""
+
+#: article/choices.py:93
+msgid "Meeting-Report"
+msgstr ""
+
+#: article/choices.py:94
+msgid "News"
+msgstr ""
+
+#: article/choices.py:95
+msgid "Obituary"
+msgstr ""
+
+#: article/choices.py:96
+msgid "Oration"
+msgstr ""
+
+#: article/choices.py:97
+msgid "Other"
+msgstr ""
+
+#: article/choices.py:98
+msgid "Partial-Retraction"
+msgstr ""
+
+#: article/choices.py:99
+msgid "Product-Review"
+msgstr ""
+
+#: article/choices.py:100
+msgid "Rapid-Communication"
+msgstr ""
+
+#: article/choices.py:101
+msgid "Reply"
+msgstr ""
+
+#: article/choices.py:102
+msgid "Reprint"
+msgstr ""
+
+#: article/choices.py:103
+msgid "Research-Article"
+msgstr ""
+
+#: article/choices.py:104
+msgid "Retraction"
+msgstr ""
+
+#: article/choices.py:105
+msgid "Review-Article"
+msgstr ""
+
+#: article/choices.py:106
+msgid "Technical-Report"
+msgstr ""
+
+#: article/choices.py:107
+msgid "Translation"
+msgstr ""
+
+#: article/choices.py:125
+msgid "Erratum submitted"
+msgstr ""
+
+#: article/choices.py:126
+msgid "Update submitted"
+msgstr ""
+
+#: article/choices.py:127
+msgid "Required update"
+msgstr ""
+
+#: article/choices.py:128
+msgid "Required erratum"
+msgstr ""
+
+#: article/choices.py:129
+msgid "Prepare to publish"
+msgstr ""
+
+#: article/choices.py:130
+msgid "Ready to publish"
+msgstr ""
+
+#: article/choices.py:131
+msgid "Scheduled to publish"
+msgstr ""
+
+#: article/choices.py:132 migration/choices.py:17 upload/choices.py:30
+msgid "Published"
+msgstr ""
+
+#: article/controller.py:48
+msgid "Unable to update article {} {} {}"
+msgstr ""
+
+#: article/forms.py:37
+msgid "Inform the article that needs to be changed"
+msgstr ""
+
+#: article/forms.py:42
+msgid "Comment what needs to be changed"
+msgstr ""
+
+#: article/forms.py:47
+msgid "Inform the type of change"
+msgstr ""
+
+#: article/models.py:45 pid_provider/models.py:263
+msgid "PID v3"
+msgstr ""
+
+#: article/models.py:46
+msgid "PID v2"
+msgstr ""
+
+#: article/models.py:50
+msgid "Article type"
+msgstr ""
+
+#: article/models.py:59
+msgid "Article status"
+msgstr ""
+
+#: article/models.py:65 issue/models.py:320
+msgid "Position"
+msgstr ""
+
+#: article/models.py:70
+msgid "Elocation ID"
+msgstr ""
+
+#: article/models.py:72
+msgid "First page"
+msgstr ""
+
+#: article/models.py:73
+msgid "Last page"
+msgstr ""
+
+#: article/models.py:84
+msgid "sections"
+msgstr ""
+
+#: article/models.py:124
+msgid "Can make article change"
+msgstr ""
+
+#: article/models.py:125
+msgid "Can request article change"
+msgstr ""
+
+#: article/models.py:404
+msgid "Related item type"
+msgstr ""
+
+#: article/models.py:440
+msgid "Change type"
+msgstr ""
+
+#: article/models.py:446
+msgid "Comment"
+msgstr ""
+
+#: article/models.py:473 core/models.py:29 tracker/models.py:55
+msgid "Creation date"
+msgstr ""
+
+#: article/models.py:477
+msgid "Publication"
+msgstr ""
+
+#: article/models.py:478
+msgid "Publications"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:6
+#: upload/templates/modeladmin/upload/package/inspect.html:6
+#: upload/templates/modeladmin/upload/validationresult/inspect.html:20
+msgid "Details"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:21
+msgid "Article change instructions"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:24
+msgid "Identifier"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:26
+#: migration/models.py:693
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:25
+msgid "Type"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:28
+msgid "Deadline"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:30
+msgid "Instructions"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:36
+msgid "Available packages"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:40
+#: core/models.py:37
+msgid "Creator"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:41
+msgid "Created"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:42
+#: htmlxml/models.py:448 htmlxml/models.py:486 package/models.py:405
+#: proc/models.py:337 proc/models.py:385 proc/models.py:796 proc/models.py:957
+#: proc/models.py:1385 upload/models.py:38 upload/models.py:172
+#: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:22
+msgid "Status"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:43
+#: upload/models.py:31
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:21
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:21
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:24
+#: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:21
+msgid "Category"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:44
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:27
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:63
+msgid "Link"
+msgstr ""
+
+#: article/templates/modeladmin/article/article/inspect.html:60
+msgid "Download package"
+msgstr ""
+
+#: article/wagtail_hooks.py:29 article/wagtail_hooks.py:151
+msgid "Articles"
+msgstr ""
+
+#: article/wagtail_hooks.py:85
+msgid "Related items"
+msgstr ""
+
+#: article/wagtail_hooks.py:119
+msgid "Changes request"
+msgstr ""
+
+#: bigbang/tasks_scheduler.py:113
+msgid "Migra e publica"
+msgstr ""
+
+#: bigbang/tasks_scheduler.py:138
+msgid "Migra e publica os periódicos"
+msgstr ""
+
+#: bigbang/tasks_scheduler.py:165
+msgid "Migra e publica os fascículos"
+msgstr ""
+
+#: bigbang/tasks_scheduler.py:187
+msgid "Migra e publica artigos"
+msgstr ""
+
+#: bigbang/tasks_scheduler.py:232
+msgid "Publica periódicos"
+msgstr ""
+
+#: bigbang/tasks_scheduler.py:257
+msgid "Publica fascículos"
+msgstr ""
+
+#: bigbang/tasks_scheduler.py:278
+msgid "Publica artigos"
+msgstr ""
+
+#: bigbang/utils/scheduler.py:55 core/utils/scheduler.py:51
+msgid "Scheduled task: {}"
+msgstr ""
+
+#: collection/choices.py:13 journal/choices.py:17
+msgid "Suspended"
+msgstr ""
+
+#: collection/choices.py:14 collection/choices.py:23 journal/choices.py:18
+#: journal/choices.py:26
+msgid "Unknown"
+msgstr ""
+
+#: collection/choices.py:15 journal/choices.py:19
+msgid "Ceased"
+msgstr ""
+
+#: collection/choices.py:16 journal/choices.py:20
+msgid "Not informed"
+msgstr ""
+
+#: collection/choices.py:17 collection/choices.py:24 journal/choices.py:21
+#: journal/choices.py:27
+msgid "Current"
+msgstr ""
+
+#: collection/choices.py:32
+msgid "QA"
+msgstr ""
+
+#: collection/choices.py:33
+msgid "PUBLIC"
+msgstr ""
+
+#: collection/models.py:32
+msgid "Collection Acronym"
+msgstr ""
+
+#: collection/models.py:33
+msgid "Collection Name"
+msgstr ""
+
+#: collection/models.py:65
+msgid "Website URL"
+msgstr ""
+
+#: collection/models.py:67
+msgid "Article API URL"
+msgstr ""
+
+#: collection/models.py:70
+msgid "Issue API URL"
+msgstr ""
+
+#: collection/models.py:73
+msgid "Journal API URL"
+msgstr ""
+
+#: collection/models.py:76
+msgid "Get token API URL"
+msgstr ""
+
+#: collection/models.py:81
+msgid "Purpose"
+msgstr ""
+
+#: collection/models.py:112
+msgid "EndPoints"
+msgstr ""
+
+#: collection/models.py:189
+msgid "Language Name"
+msgstr ""
+
+#: collection/models.py:190
+msgid "Language code 2"
+msgstr ""
+
+#: collection/models.py:193 doi/models.py:12 migration/models.py:331
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:59
+msgid "Language"
+msgstr ""
+
+#: collection/models.py:194
+msgid "Languages"
+msgstr ""
+
+#: collection/models.py:263 pid_provider/models.py:225
+msgid "Endpoint name"
+msgstr ""
+
+#: collection/models.py:264 pid_provider/models.py:231
+msgid "Endpoint URL"
+msgstr ""
+
+#: collection/wagtail_hooks.py:27 collection/wagtail_hooks.py:123
+msgid "Collections"
+msgstr ""
+
+#: collection/wagtail_hooks.py:55
+msgid "New WebSites Configurations"
+msgstr ""
+
+#: collection/wagtail_hooks.py:80
+msgid "Files Storage Configuration"
+msgstr ""
+
+#: collection/wagtail_hooks.py:107 migration/wagtail_hooks.py:68
+msgid "Classic Website Configuration"
+msgstr ""
+
+#: core/choices.py:206
+msgid "JANUARY"
+msgstr ""
+
+#: core/choices.py:207
+msgid "FEBRUARY"
+msgstr ""
+
+#: core/choices.py:208
+msgid "MARCH"
+msgstr ""
+
+#: core/choices.py:209
+msgid "APRIL"
+msgstr ""
+
+#: core/choices.py:210
+msgid "MAY"
+msgstr ""
+
+#: core/choices.py:211
+msgid "JUNE"
+msgstr ""
+
+#: core/choices.py:212
+msgid "JULY"
+msgstr ""
+
+#: core/choices.py:213
+msgid "AUGUST"
+msgstr ""
+
+#: core/choices.py:214
+msgid "SEPTEMBER"
+msgstr ""
+
+#: core/choices.py:215
+msgid "OCTOBER"
+msgstr ""
+
+#: core/choices.py:216
+msgid "NOVEMBER"
+msgstr ""
+
+#: core/choices.py:217
+msgid "DECEMBER"
+msgstr ""
+
+#: core/models.py:32
+msgid "Last update date"
+msgstr ""
+
+#: core/models.py:46
+msgid "Updater"
+msgstr ""
+
+#: core/models.py:132
+msgid "Publication month number"
+msgstr ""
+
+#: core/models.py:138
+msgid "Publication month name"
+msgstr ""
+
+#: core/models.py:155
+msgid "Publication initial month number"
+msgstr ""
+
+#: core/models.py:161
+msgid "Publication initial month name"
+msgstr ""
+
+#: core/models.py:167
+msgid "Publication final month number"
+msgstr ""
+
+#: core/models.py:173
+msgid "Publication final month name"
+msgstr ""
+
+#: core/models.py:189
+msgid "Publication date text"
+msgstr ""
+
+#: core/models.py:194 core/models.py:220
+msgid "Publication year"
+msgstr ""
+
+#: core/models.py:363 journal/models.py:251 proc/models.py:772
+msgid "Title"
+msgstr ""
+
+#: core/templates/account/account_inactive.html:5
+#: core/templates/account/account_inactive.html:8
+msgid "Account Inactive"
+msgstr ""
+
+#: core/templates/account/account_inactive.html:10
+msgid "This account is inactive."
+msgstr ""
+
+#: core/templates/account/email.html:7
+msgid "Account"
+msgstr ""
+
+#: core/templates/account/email.html:10
+msgid "E-mail Addresses"
+msgstr ""
+
+#: core/templates/account/email.html:13
+msgid "The following e-mail addresses are associated with your account:"
+msgstr ""
+
+#: core/templates/account/email.html:27
+msgid "Verified"
+msgstr ""
+
+#: core/templates/account/email.html:29
+msgid "Unverified"
+msgstr ""
+
+#: core/templates/account/email.html:31
+msgid "Primary"
+msgstr ""
+
+#: core/templates/account/email.html:37
+msgid "Make Primary"
+msgstr ""
+
+#: core/templates/account/email.html:38
+msgid "Re-send Verification"
+msgstr ""
+
+#: core/templates/account/email.html:39
+msgid "Remove"
+msgstr ""
+
+#: core/templates/account/email.html:46
+msgid "Warning:"
+msgstr ""
+
+#: core/templates/account/email.html:46
+msgid ""
+"You currently do not have any e-mail address set up. You should really add "
+"an e-mail address so you can receive notifications, reset your password, etc."
+msgstr ""
+
+#: core/templates/account/email.html:51
+msgid "Add E-mail Address"
+msgstr ""
+
+#: core/templates/account/email.html:56
+msgid "Add E-mail"
+msgstr ""
+
+#: core/templates/account/email.html:66
+msgid "Do you really want to remove the selected e-mail address?"
+msgstr ""
+
+#: core/templates/account/email_confirm.html:6
+#: core/templates/account/email_confirm.html:10
+msgid "Confirm E-mail Address"
+msgstr ""
+
+#: core/templates/account/email_confirm.html:16
+#, python-format
+msgid ""
+"Please confirm that <a href=\"mailto:%(email)s\">%(email)s</a> is an e-mail "
+"address for user %(user_display)s."
+msgstr ""
+
+#: core/templates/account/email_confirm.html:20
+msgid "Confirm"
+msgstr ""
+
+#: core/templates/account/email_confirm.html:27
+#, python-format
+msgid ""
+"This e-mail confirmation link expired or is invalid. Please <a href="
+"\"%(email_url)s\">issue a new e-mail confirmation request</a>."
+msgstr ""
+
+#: core/templates/account/login.html:7 core/templates/account/login.html:11
+#: core/templates/account/login.html:56 core/templates/base.html:83
+msgid "Sign In"
+msgstr ""
+
+#: core/templates/account/login.html:17
+msgid "Please sign in with one of your existing third party accounts:"
+msgstr ""
+
+#: core/templates/account/login.html:19
+#, python-format
+msgid ""
+"Or, <a href=\"%(signup_url)s\">sign up</a> for a %(site_name)s account and "
+"sign in below:"
+msgstr ""
+
+#: core/templates/account/login.html:32
+msgid "or"
+msgstr ""
+
+#: core/templates/account/login.html:41
+#, python-format
+msgid ""
+"If you have not created an account yet, then please <a href=\"%(signup_url)s"
+"\">sign up</a> first."
+msgstr ""
+
+#: core/templates/account/login.html:55
+msgid "Forgot Password?"
+msgstr ""
+
+#: core/templates/account/logout.html:5 core/templates/account/logout.html:8
+#: core/templates/account/logout.html:17 core/templates/base.html:72
+msgid "Sign Out"
+msgstr ""
+
+#: core/templates/account/logout.html:10
+msgid "Are you sure you want to sign out?"
+msgstr ""
+
+#: core/templates/account/password_change.html:6
+#: core/templates/account/password_change.html:9
+#: core/templates/account/password_change.html:14
+#: core/templates/account/password_reset_from_key.html:5
+#: core/templates/account/password_reset_from_key.html:8
+#: core/templates/account/password_reset_from_key_done.html:4
+#: core/templates/account/password_reset_from_key_done.html:7
+msgid "Change Password"
+msgstr ""
+
+#: core/templates/account/password_reset.html:7
+#: core/templates/account/password_reset.html:11
+#: core/templates/account/password_reset_done.html:6
+#: core/templates/account/password_reset_done.html:9
+msgid "Password Reset"
+msgstr ""
+
+#: core/templates/account/password_reset.html:16
+msgid ""
+"Forgotten your password? Enter your e-mail address below, and we'll send you "
+"an e-mail allowing you to reset it."
+msgstr ""
+
+#: core/templates/account/password_reset.html:21
+msgid "Reset My Password"
+msgstr ""
+
+#: core/templates/account/password_reset.html:24
+msgid "Please contact us if you have any trouble resetting your password."
+msgstr ""
+
+#: core/templates/account/password_reset_done.html:15
+msgid ""
+"We have sent you an e-mail. Please contact us if you do not receive it "
+"within a few minutes."
+msgstr ""
+
+#: core/templates/account/password_reset_from_key.html:8
+msgid "Bad Token"
+msgstr ""
+
+#: core/templates/account/password_reset_from_key.html:12
+#, python-format
+msgid ""
+"The password reset link was invalid, possibly because it has already been "
+"used.  Please request a <a href=\"%(passwd_reset_url)s\">new password reset</"
+"a>."
+msgstr ""
+
+#: core/templates/account/password_reset_from_key.html:18
+msgid "change password"
+msgstr ""
+
+#: core/templates/account/password_reset_from_key.html:21
+#: core/templates/account/password_reset_from_key_done.html:8
+msgid "Your password is now changed."
+msgstr ""
+
+#: core/templates/account/password_set.html:6
+#: core/templates/account/password_set.html:9
+#: core/templates/account/password_set.html:14
+msgid "Set Password"
+msgstr ""
+
+#: core/templates/account/signup.html:6
+msgid "Signup"
+msgstr ""
+
+#: core/templates/account/signup.html:9 core/templates/account/signup.html:19
+#: core/templates/base.html:78
+msgid "Sign Up"
+msgstr ""
+
+#: core/templates/account/signup.html:11
+#, python-format
+msgid ""
+"Already have an account? Then please <a href=\"%(login_url)s\">sign in</a>."
+msgstr ""
+
+#: core/templates/account/signup_closed.html:5
+#: core/templates/account/signup_closed.html:8
+msgid "Sign Up Closed"
+msgstr ""
+
+#: core/templates/account/signup_closed.html:10
+msgid "We are sorry, but the sign up is currently closed."
+msgstr ""
+
+#: core/templates/account/verification_sent.html:5
+#: core/templates/account/verification_sent.html:8
+#: core/templates/account/verified_email_required.html:5
+#: core/templates/account/verified_email_required.html:8
+msgid "Verify Your E-mail Address"
+msgstr ""
+
+#: core/templates/account/verification_sent.html:10
+msgid ""
+"We have sent an e-mail to you for verification. Follow the link provided to "
+"finalize the signup process. Please contact us if you do not receive it "
+"within a few minutes."
+msgstr ""
+
+#: core/templates/account/verified_email_required.html:12
+msgid ""
+"This part of the site requires us to verify that\n"
+"you are who you claim to be. For this purpose, we require that you\n"
+"verify ownership of your e-mail address. "
+msgstr ""
+
+#: core/templates/account/verified_email_required.html:16
+msgid ""
+"We have sent an e-mail to you for\n"
+"verification. Please click on the link inside this e-mail. Please\n"
+"contact us if you do not receive it within a few minutes."
+msgstr ""
+
+#: core/templates/account/verified_email_required.html:20
+#, python-format
+msgid ""
+"<strong>Note:</strong> you can still <a href=\"%(email_url)s\">change your e-"
+"mail address</a>."
+msgstr ""
+
+#: core/templates/base.html:68
+msgid "My Profile"
+msgstr ""
+
+#: core/templates/home/welcome_page.html:53
+#: core/templates/home/welcome_page.html:56
+msgid "View the release notes"
+msgstr ""
+
+#: core/templates/home/welcome_page.html:68
+msgid "Welcome to your SciELO Content Manager"
+msgstr ""
+
+#: core/templates/home/welcome_page.html:69
+msgid ""
+"Please feel free to <a href=\"https://github.com/wagtail/wagtail/wiki/Slack"
+"\">join our community on Slack</a>, or get started with one of the links "
+"below."
+msgstr ""
+
+#: core/templates/home/welcome_page.html:77
+msgid "Wagtail Documentation"
+msgstr ""
+
+#: core/templates/home/welcome_page.html:78
+msgid "Topics, references, & how-tos"
+msgstr ""
+
+#: core/templates/home/welcome_page.html:85
+msgid "Tutorial"
+msgstr ""
+
+#: core/templates/home/welcome_page.html:86
+msgid "Build your first Wagtail site"
+msgstr ""
+
+#: core/templates/home/welcome_page.html:93
+msgid "Admin Interface"
+msgstr ""
+
+#: core/templates/home/welcome_page.html:94
+msgid "Create your superuser first!"
+msgstr ""
+
+#: core/templates/modeladmin/edit.html:9
+#: upload/templates/modeladmin/upload/validationresult/inspect.html:9
+#, python-format
+msgid "Back to %(model_name)s list"
+msgstr ""
+
+#: core/templates/wagtailadmin/home.html:5
+msgid "Welcome to the administrative area of SciELO Upload"
+msgstr ""
+
+#: core/templates/wagtailadmin/login.html:5
+msgid "Administrative area of SciELO Upload"
+msgstr ""
+
+#: core/templates/wagtailadmin/summary_items/article_summary_item.html:6
+#, python-format
+msgid ""
+"<span>%(total_article)s</span> Article <span class=\"visuallyhidden"
+"\">created in %(site_name)s</span>"
+msgid_plural ""
+"<span>%(total_article)s</span> Articles <span class=\"visuallyhidden"
+"\">created in %(site_name)s</span>"
+msgstr[0] ""
+msgstr[1] ""
+
+#: core/templates/wagtailadmin/summary_items/collection_summary_item.html:6
+#, python-format
+msgid ""
+"<span>%(total_collection)s</span> Collection <span class=\"visuallyhidden"
+"\">created in %(site_name)s</span>"
+msgid_plural ""
+"<span>%(total_collection)s</span> Collections <span class=\"visuallyhidden"
+"\">created in %(site_name)s</span>"
+msgstr[0] ""
+msgstr[1] ""
+
+#: core/templates/wagtailadmin/summary_items/journal_summary_item.html:6
+#, python-format
+msgid ""
+"<span>%(total_journal)s</span> Journal <span class=\"visuallyhidden"
+"\">created in %(site_name)s</span>"
+msgid_plural ""
+"<span>%(total_journal)s</span> Journals <span class=\"visuallyhidden"
+"\">created in %(site_name)s</span>"
+msgstr[0] ""
+msgstr[1] ""
+
+#: core/users/admin.py:17
+msgid "Personal info"
+msgstr ""
+
+#: core/users/admin.py:19
+msgid "Permissions"
+msgstr ""
+
+#: core/users/admin.py:30
+msgid "Important dates"
+msgstr ""
+
+#: core/users/apps.py:7
+msgid "Users"
+msgstr ""
+
+#: core/users/forms.py:25 core/users/tests/test_forms.py:39
+msgid "This username has already been taken."
+msgstr ""
+
+#: core/users/models.py:15
+msgid "Name of User"
+msgstr ""
+
+#: core/users/views.py:23
+msgid "Information successfully updated"
+msgstr ""
+
+#: doi/models.py:11 pid_provider/models.py:512
+msgid "DOI"
+msgstr ""
+
+#: files_storage/models.py:19 institution/models.py:16 proc/models.py:60
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:24
+msgid "Name"
+msgstr ""
+
+#: files_storage/models.py:20
+msgid "Host"
+msgstr ""
+
+#: files_storage/models.py:21
+msgid "Bucket root"
+msgstr ""
+
+#: files_storage/models.py:22
+msgid "Bucket app subdir"
+msgstr ""
+
+#: files_storage/models.py:23
+msgid "Access key"
+msgstr ""
+
+#: files_storage/models.py:24
+msgid "Secret key"
+msgstr ""
+
+#: files_storage/models.py:26
+msgid "Secure"
+msgstr ""
+
+#: files_storage/models.py:106
+msgid "Basename"
+msgstr ""
+
+#: files_storage/models.py:107
+msgid "URI"
+msgstr ""
+
+#: files_storage/wagtail_hooks.py:18
+msgid "Minio Configuration"
+msgstr ""
+
+#: htmlxml/choices.py:9
+msgid "approved automatically"
+msgstr ""
+
+#: htmlxml/choices.py:10
+msgid "approved"
+msgstr ""
+
+#: htmlxml/choices.py:11
+msgid "rejected"
+msgstr ""
+
+#: htmlxml/choices.py:12
+msgid "not evaluated"
+msgstr ""
+
+#: htmlxml/models.py:111
+msgid "Unable to create_or_update_body and back file with empty content {} {}"
+msgstr ""
+
+#: htmlxml/models.py:137
+msgid "Unable to create_or_update_body and back file {} {} {} {}"
+msgstr ""
+
+#: htmlxml/models.py:454
+msgid "Quality"
+msgstr ""
+
+#: htmlxml/models.py:478
+msgid "Body and Back XML files"
+msgstr ""
+
+#: htmlxml/models.py:487
+msgid "Generated XML and Report"
+msgstr ""
+
+#: htmlxml/models.py:488
+msgid "Body and Back XML Files"
+msgstr ""
+
+#: htmlxml/models.py:566
+msgid ""
+"Unable to create or update the record of the conversion of HTML to XML for "
+"{} {} {}"
+msgstr ""
+
+#: institution/choices.py:13
+msgid "agência de apoio à pesquisa"
+msgstr ""
+
+#: institution/choices.py:14
+msgid "universidade e instâncias ligadas à universidades"
+msgstr ""
+
+#: institution/choices.py:15
+msgid "empresa ou instituto ligadas ao governo"
+msgstr ""
+
+#: institution/choices.py:16
+msgid "organização privada"
+msgstr ""
+
+#: institution/choices.py:17
+msgid "organização sem fins de lucros"
+msgstr ""
+
+#: institution/choices.py:20
+msgid "sociedade científica, associação pós-graduação, associação profissional"
+msgstr ""
+
+#: institution/choices.py:22
+msgid "outros"
+msgstr ""
+
+#: institution/models.py:18
+msgid "Institution Type"
+msgstr ""
+
+#: institution/models.py:29
+msgid "Institution Acronym"
+msgstr ""
+
+#: institution/models.py:31
+msgid "Organization Level 1"
+msgstr ""
+
+#: institution/models.py:33
+msgid "Organization Level 2"
+msgstr ""
+
+#: institution/models.py:35
+msgid "Organization Level 3"
+msgstr ""
+
+#: institution/models.py:39
+msgid "Logo"
+msgstr ""
+
+#: institution/models.py:165
+msgid "Initial Date"
+msgstr ""
+
+#: institution/models.py:166
+msgid "Final Date"
+msgstr ""
+
+#: institution/models.py:169 institution/wagtail_hooks.py:20
+msgid "Institution"
+msgstr ""
+
+#: issue/models.py:41
+msgid "Volume"
+msgstr ""
+
+#: issue/models.py:42
+msgid "Number"
+msgstr ""
+
+#: issue/models.py:43
+msgid "Supplement"
+msgstr ""
+
+#: issue/models.py:44
+msgid "Year"
+msgstr ""
+
+#: issue/models.py:51
+msgid ""
+"This number controls the order issues appear for a specific year on the "
+"website grid"
+msgstr ""
+
+#: issue/models.py:273
+msgid "Sections"
+msgstr ""
+
+#: issue/wagtail_hooks.py:16 issue/wagtail_hooks.py:78
+msgid "Issues"
+msgstr ""
+
+#: issue/wagtail_hooks.py:51
+msgid "Table of contents sections"
+msgstr ""
+
+#: journal/choices.py:6
+msgid "Journal URL"
+msgstr ""
+
+#: journal/choices.py:31
+msgid "Ceased journal"
+msgstr ""
+
+#: journal/choices.py:32
+msgid "Not open access"
+msgstr ""
+
+#: journal/choices.py:33
+msgid "by the committee"
+msgstr ""
+
+#: journal/choices.py:34
+msgid "by the editor"
+msgstr ""
+
+#: journal/choices.py:39
+msgid "Admitted to the collection"
+msgstr ""
+
+#: journal/choices.py:40
+msgid "Indexing interrupted"
+msgstr ""
+
+#: journal/choices.py:45
+msgid "Agricultural Sciences"
+msgstr ""
+
+#: journal/choices.py:46
+msgid "Applied Social Sciences"
+msgstr ""
+
+#: journal/choices.py:47
+msgid "Biological Sciences"
+msgstr ""
+
+#: journal/choices.py:48
+msgid "Engineering"
+msgstr ""
+
+#: journal/choices.py:49
+msgid "Exact and Earth Sciences"
+msgstr ""
+
+#: journal/choices.py:50
+msgid "Health Sciences"
+msgstr ""
+
+#: journal/choices.py:51
+msgid "Human Sciences"
+msgstr ""
+
+#: journal/choices.py:52
+msgid "Linguistic, Literature and Arts"
+msgstr ""
+
+#: journal/choices.py:53
+msgid "Psicanalise"
+msgstr ""
+
+#: journal/models.py:141
+msgid "Official Title"
+msgstr ""
+
+#: journal/models.py:142
+msgid "ISO Title"
+msgstr ""
+
+#: journal/models.py:144
+msgid "Foundation Year"
+msgstr ""
+
+#: journal/models.py:146
+msgid "ISSN Print"
+msgstr ""
+
+#: journal/models.py:148
+msgid "ISSN Eletronic"
+msgstr ""
+
+#: journal/models.py:150
+msgid "ISSNL"
+msgstr ""
+
+#: journal/models.py:162
+msgid "Official Journal"
+msgstr ""
+
+#: journal/models.py:163 journal/wagtail_hooks.py:23
+msgid "Official Journals"
+msgstr ""
+
+#: journal/models.py:249
+msgid "Short Title"
+msgstr ""
+
+#: journal/models.py:252
+msgid "Journal Acronym"
+msgstr ""
+
+#: journal/models.py:261
+msgid "Submission online URL"
+msgstr ""
+
+#: journal/models.py:265
+msgid "Study Areas"
+msgstr ""
+
+#: journal/models.py:273
+msgid "Address"
+msgstr ""
+
+#: journal/models.py:293
+msgid "Owner"
+msgstr ""
+
+#: journal/models.py:297 journal/models.py:308
+msgid "Publisher"
+msgstr ""
+
+#: journal/models.py:301 journal/models.py:309
+msgid "Mission"
+msgstr ""
+
+#: journal/models.py:306 pid_provider/models.py:569 proc/models.py:196
+#: upload/models.py:202
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:23
+msgid "Identification"
+msgstr ""
+
+#: journal/models.py:307
+msgid "Owners"
+msgstr ""
+
+#: journal/models.py:723
+msgid "Journal collection"
+msgstr ""
+
+#: journal/models.py:724
+msgid "Journal collections"
+msgstr ""
+
+#: journal/models.py:773
+msgid "Event year"
+msgstr ""
+
+#: journal/models.py:775
+msgid "Event month"
+msgstr ""
+
+#: journal/models.py:781
+msgid "Event day"
+msgstr ""
+
+#: journal/models.py:784
+msgid "Event type"
+msgstr ""
+
+#: journal/models.py:791
+msgid "Indexing interruption reason"
+msgstr ""
+
+#: journal/models.py:809
+msgid "Collection journal event"
+msgstr ""
+
+#: journal/models.py:810
+msgid "Collection journal events"
+msgstr ""
+
+#: journal/wagtail_hooks.py:58
+msgid "Journal"
+msgstr ""
+
+#: journal/wagtail_hooks.py:77
+msgid "Journals"
+msgstr ""
+
+#: location/models.py:17
+msgid "City Name"
+msgstr ""
+
+#: location/models.py:20 location/models.py:208
+msgid "City"
+msgstr ""
+
+#: location/models.py:21
+msgid "Cities"
+msgstr ""
+
+#: location/models.py:63
+msgid "State Name"
+msgstr ""
+
+#: location/models.py:65
+msgid "State Acronym"
+msgstr ""
+
+#: location/models.py:69 location/models.py:215
+msgid "State"
+msgstr ""
+
+#: location/models.py:70
+msgid "States"
+msgstr ""
+
+#: location/models.py:149
+msgid "Country Name"
+msgstr ""
+
+#: location/models.py:151
+msgid "Country Acronym"
+msgstr ""
+
+#: location/models.py:155 location/models.py:222
+msgid "Country"
+msgstr ""
+
+#: location/models.py:156
+msgid "Countries"
+msgstr ""
+
+#: location/models.py:229 location/wagtail_hooks.py:20
+msgid "Location"
+msgstr ""
+
+#: location/models.py:230
+msgid "Locations"
+msgstr ""
+
+#: migration/button_helper.py:12
+msgid "View migration failure"
+msgstr ""
+
+#: migration/choices.py:14
+msgid "To migrate"
+msgstr ""
+
+#: migration/choices.py:15
+msgid "To ignore"
+msgstr ""
+
+#: migration/choices.py:16
+msgid "Imported"
+msgstr ""
+
+#: migration/controller.py:801
+msgid "Unable to get xml with pre from migrated article ({}) {}: {} {}"
+msgstr ""
+
+#: migration/controller.py:879
+#, python-brace-format
+msgid "{source_path} does not exist"
+msgstr ""
+
+#: migration/models.py:54
+msgid "Title path"
+msgstr ""
+
+#: migration/models.py:58
+msgid "Title path: title.id path or title.mst path without extension"
+msgstr ""
+
+#: migration/models.py:61
+msgid "Issue path"
+msgstr ""
+
+#: migration/models.py:65
+msgid "Issue path: issue.id path or issue.mst path without extension"
+msgstr ""
+
+#: migration/models.py:68 migration/models.py:72
+msgid "Serial path"
+msgstr ""
+
+#: migration/models.py:75
+msgid "Cisis path"
+msgstr ""
+
+#: migration/models.py:79
+msgid "Cisis path where there are CISIS utilities such as mx and i2id"
+msgstr ""
+
+#: migration/models.py:82 migration/models.py:86
+msgid "Bases work path"
+msgstr ""
+
+#: migration/models.py:89
+msgid "Bases pdf path"
+msgstr ""
+
+#: migration/models.py:93 migration/models.py:96 migration/models.py:100
+msgid "Bases translation path"
+msgstr ""
+
+#: migration/models.py:103 migration/models.py:107
+msgid "Bases XML path"
+msgstr ""
+
+#: migration/models.py:110 migration/models.py:114
+msgid "Htdocs img revistas path"
+msgstr ""
+
+#: migration/models.py:166 migration/models.py:692 proc/models.py:190
+#: proc/models.py:334
+msgid "PID"
+msgstr ""
+
+#: migration/models.py:167
+msgid "Origin"
+msgstr ""
+
+#: migration/models.py:172
+msgid "ISIS updated date"
+msgstr ""
+
+#: migration/models.py:175
+msgid "ISIS created date"
+msgstr ""
+
+#: migration/models.py:178
+msgid "Migration Status"
+msgstr ""
+
+#: migration/models.py:290
+msgid "Unable to create_or_update_migrated_data {} {} {} {}"
+msgstr ""
+
+#: migration/models.py:318
+msgid "Original Path"
+msgstr ""
+
+#: migration/models.py:321
+msgid "Original name"
+msgstr ""
+
+#: migration/models.py:326
+msgid "Original href"
+msgstr ""
+
+#: migration/models.py:329
+msgid "Component type"
+msgstr ""
+
+#: migration/models.py:332
+msgid "Pkg name"
+msgstr ""
+
+#: migration/models.py:333
+msgid "Part"
+msgstr ""
+
+#: migration/models.py:511 migration/models.py:699
+msgid "File type"
+msgstr ""
+
+#: migration/models.py:563
+msgid "Source"
+msgstr ""
+
+#: migration/models.py:694
+msgid "Issue folder"
+msgstr ""
+
+#: migration/models.py:696
+msgid "Filename"
+msgstr ""
+
+#: migration/wagtail_hooks.py:89
+msgid "Migrated Data"
+msgstr ""
+
+#: migration/wagtail_hooks.py:126
+msgid "Migrated Article"
+msgstr ""
+
+#: migration/wagtail_hooks.py:162
+msgid "Migrated Journal"
+msgstr ""
+
+#: migration/wagtail_hooks.py:194
+msgid "Migrated Issue"
+msgstr ""
+
+#: migration/wagtail_hooks.py:226
+msgid "Migrated files"
+msgstr ""
+
+#: migration/wagtail_hooks.py:291
+msgid "Article id file"
+msgstr ""
+
+#: migration/wagtail_hooks.py:323
+msgid "Migration"
+msgstr ""
+
+#: package/choices.py:8
+msgid "MIGRATION"
+msgstr ""
+
+#: package/choices.py:9
+msgid "UPLOAD"
+msgstr ""
+
+#: package/models.py:152 pid_provider/models.py:108
+msgid "Unable to get xml with pre (XMLVersion) {}: {} {}"
+msgstr ""
+
+#: package/models.py:202
+msgid "Package component type"
+msgstr ""
+
+#: package/models.py:354
+msgid "SPS Name"
+msgstr ""
+
+#: package/models.py:390
+msgid "Article Page"
+msgstr ""
+
+#: package/models.py:391
+msgid "Package component"
+msgstr ""
+
+#: package/models.py:406 proc/models.py:1386
+msgid "Files"
+msgstr ""
+
+#: pid_provider/client.py:162
+msgid "Unable to get api token {} {} {} {}"
+msgstr ""
+
+#: pid_provider/client.py:230
+msgid "Unable to get pid from pid provider {} {} {} {}"
+msgstr ""
+
+#: pid_provider/client.py:341
+msgid "Unable to get pid from pid provider {} {} {} {} {}"
+msgstr ""
+
+#: pid_provider/models.py:163
+msgid "XML Post URI"
+msgstr ""
+
+#: pid_provider/models.py:166
+msgid "Get Token URI"
+msgstr ""
+
+#: pid_provider/models.py:168
+msgid "Timeout"
+msgstr ""
+
+#: pid_provider/models.py:169
+msgid "API Username"
+msgstr ""
+
+#: pid_provider/models.py:170
+msgid "API Password"
+msgstr ""
+
+#: pid_provider/models.py:206
+msgid "Endpoints"
+msgstr ""
+
+#: pid_provider/models.py:252
+msgid "Request origin"
+msgstr ""
+
+#: pid_provider/models.py:254
+msgid "Result type"
+msgstr ""
+
+#: pid_provider/models.py:255
+msgid "Result message"
+msgstr ""
+
+#: pid_provider/models.py:259
+msgid "Detail"
+msgstr ""
+
+#: pid_provider/models.py:261 pid_provider/models.py:525
+msgid "Origin date"
+msgstr ""
+
+#: pid_provider/models.py:421
+msgid "PID type"
+msgstr ""
+
+#: pid_provider/models.py:423
+msgid "PID pid_in_xml"
+msgstr ""
+
+#: pid_provider/models.py:482
+msgid "journal title"
+msgstr ""
+
+#: pid_provider/models.py:485
+msgid "issn_epub"
+msgstr ""
+
+#: pid_provider/models.py:487
+msgid "issn_ppub"
+msgstr ""
+
+#: pid_provider/models.py:488
+msgid "pub_year"
+msgstr ""
+
+#: pid_provider/models.py:489
+msgid "volume"
+msgstr ""
+
+#: pid_provider/models.py:490
+msgid "number"
+msgstr ""
+
+#: pid_provider/models.py:491
+msgid "suppl"
+msgstr ""
+
+#: pid_provider/models.py:497 proc/models.py:1331
+msgid "Package name"
+msgstr ""
+
+#: pid_provider/models.py:498
+msgid "v3"
+msgstr ""
+
+#: pid_provider/models.py:499
+msgid "v2"
+msgstr ""
+
+#: pid_provider/models.py:500
+msgid "AOP PID"
+msgstr ""
+
+#: pid_provider/models.py:503
+msgid "elocation id"
+msgstr ""
+
+#: pid_provider/models.py:505
+msgid "fpage"
+msgstr ""
+
+#: pid_provider/models.py:506
+msgid "fpage_seq"
+msgstr ""
+
+#: pid_provider/models.py:507
+msgid "lpage"
+msgstr ""
+
+#: pid_provider/models.py:509
+msgid "Document Publication Year"
+msgstr ""
+
+#: pid_provider/models.py:511
+msgid "main_toc_section"
+msgstr ""
+
+#: pid_provider/models.py:515
+msgid "article_titles_texts"
+msgstr ""
+
+#: pid_provider/models.py:517
+msgid "surnames"
+msgstr ""
+
+#: pid_provider/models.py:518
+msgid "collab"
+msgstr ""
+
+#: pid_provider/models.py:519
+msgid "links"
+msgstr ""
+
+#: pid_provider/models.py:521
+msgid "partial_body"
+msgstr ""
+
+#: pid_provider/models.py:530
+msgid "Available since"
+msgstr ""
+
+#: pid_provider/models.py:564
+msgid "Other PID"
+msgstr ""
+
+#: pid_provider/models.py:570
+msgid "Other PIDs"
+msgstr ""
+
+#: pid_provider/models.py:845
+msgid "Found {} records for {}"
+msgstr ""
+
+#: pid_provider/models.py:940
+msgid ""
+"The XML content is an ahead of print version but the document {} is already "
+"published in an issue"
+msgstr ""
+
+#: pid_provider/models.py:1384 pid_provider/models.py:1396
+#: pid_provider/models.py:1419
+msgid "No attribute enough for disambiguations {}"
+msgstr ""
+
+#: pid_provider/models.py:1579
+msgid "Incorrect v2"
+msgstr ""
+
+#: pid_provider/models.py:1582
+msgid "Correct v2"
+msgstr ""
+
+#: pid_provider/wagtail_hooks.py:32
+msgid "Pid Requests"
+msgstr ""
+
+#: pid_provider/wagtail_hooks.py:60
+msgid "Collection Pid Requests"
+msgstr ""
+
+#: pid_provider/wagtail_hooks.py:90
+msgid "Pid Provider XMLs"
+msgstr ""
+
+#: pid_provider/wagtail_hooks.py:135
+msgid "Pid Changes"
+msgstr ""
+
+#: pid_provider/wagtail_hooks.py:166
+msgid "Pid Provider Config"
+msgstr ""
+
+#: pid_provider/wagtail_hooks.py:189
+msgid "Fix pid v2"
+msgstr ""
+
+#: pid_provider/wagtail_hooks.py:212
+msgid "Pid Provider"
+msgstr ""
+
+#: proc/models.py:192
+msgid "Procedure name"
+msgstr ""
+
+#: proc/models.py:198
+msgid "Item type"
+msgstr ""
+
+#: proc/models.py:212
+msgid "Processing report"
+msgstr ""
+
+#: proc/models.py:213
+msgid "Processing reports"
+msgstr ""
+
+#: proc/models.py:344
+msgid "QA Website Status"
+msgstr ""
+
+#: proc/models.py:350
+msgid "Public Website Status"
+msgstr ""
+
+#: proc/models.py:386 proc/models.py:798 proc/models.py:959 proc/models.py:1387
+msgid "Events"
+msgstr ""
+
+#: proc/models.py:771
+msgid "Acronym"
+msgstr ""
+
+#: proc/models.py:774
+msgid "Availability Status"
+msgstr ""
+
+#: proc/models.py:790 proc/models.py:949 proc/models.py:1381
+msgid "Event newest to oldest"
+msgstr ""
+
+#: proc/models.py:797 proc/models.py:958
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:23
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:23
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:26
+#: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:24
+msgid "Data"
+msgstr ""
+
+#: proc/models.py:843
+msgid "Unable to update journal {} {} {} {}"
+msgstr ""
+
+#: proc/models.py:915
+msgid "Issue Folder"
+msgstr ""
+
+#: proc/models.py:919
+msgid "Files migration status"
+msgstr ""
+
+#: proc/models.py:927
+msgid "Document records migration status"
+msgstr ""
+
+#: proc/models.py:1029
+msgid "Unable to update issue {} {} {} {}"
+msgstr ""
+
+#: proc/models.py:1333
+msgid "Main lang"
+msgstr ""
+
+#: proc/models.py:1347
+msgid "XML status"
+msgstr ""
+
+#: proc/models.py:1355
+msgid "SPS Pkg status"
+msgstr ""
+
+#: proc/models.py:1447
+msgid "Unable to update article_proc{} {} {} {}"
+msgstr ""
+
+#: proc/wagtail_hooks.py:41
+msgid "Journal Processing"
+msgstr ""
+
+#: proc/wagtail_hooks.py:76
+msgid "Issue Processing"
+msgstr ""
+
+#: proc/wagtail_hooks.py:115
+msgid "XML from HTML"
+msgstr ""
+
+#: proc/wagtail_hooks.py:156
+msgid "SPS Package"
+msgstr ""
+
+#: proc/wagtail_hooks.py:192
+msgid "Article Processing"
+msgstr ""
+
+#: proc/wagtail_hooks.py:230
+msgid "Processing Report"
+msgstr ""
+
+#: proc/wagtail_hooks.py:261
+msgid "Processing"
+msgstr ""
+
+#: publication/choices.py:6
+msgid "Excessively long response time. Retry later"
+msgstr ""
+
+#: publication/choices.py:7
+msgid "Url not found."
+msgstr ""
+
+#: researcher/choices.py:3
+msgid "Mujer"
+msgstr ""
+
+#: researcher/choices.py:3
+msgid "Hombre"
+msgstr ""
+
+#: researcher/choices.py:6
+msgid "Declarado por el investigador"
+msgstr ""
+
+#: researcher/choices.py:7
+msgid "Identificado automáticamente por programa de computador"
+msgstr ""
+
+#: researcher/choices.py:8
+msgid "Identificado por algun usuario"
+msgstr ""
+
+#: researcher/models.py:21
+msgid "Given names"
+msgstr ""
+
+#: researcher/models.py:24
+msgid "Last name"
+msgstr ""
+
+#: researcher/models.py:26
+msgid "Suffix"
+msgstr ""
+
+#: researcher/models.py:27
+msgid "ORCID"
+msgstr ""
+
+#: researcher/models.py:28
+msgid "Lattes"
+msgstr ""
+
+#: researcher/models.py:29
+msgid "Gender"
+msgstr ""
+
+#: researcher/models.py:31
+msgid "Gender identification status"
+msgstr ""
+
+#: researcher/models.py:60 researcher/models.py:71
+msgid "Email"
+msgstr ""
+
+#: researcher/models.py:63
+msgid "Affiliation"
+msgstr ""
+
+#: researcher/wagtail_hooks.py:20
+msgid "Researcher"
+msgstr ""
+
+#: team/models.py:42
+msgid "Team"
+msgstr ""
+
+#: team/models.py:43 team/wagtail_hooks.py:51
+msgid "Teams"
+msgstr ""
+
+#: team/models.py:66
+msgid "Team member"
+msgstr ""
+
+#: team/models.py:67
+msgid "Team members"
+msgstr ""
+
+#: team/views.py:14
+msgid "Member has been successfully created"
+msgstr ""
+
+#: team/wagtail_hooks.py:23
+msgid "Collection Team Members"
+msgstr ""
+
+#: tracker/choices.py:9
+msgid "error"
+msgstr ""
+
+#: tracker/choices.py:10
+msgid "warning"
+msgstr ""
+
+#: tracker/choices.py:11
+msgid "info"
+msgstr ""
+
+#: tracker/choices.py:12
+msgid "exception"
+msgstr ""
+
+#: tracker/choices.py:25
+msgid "To reprocess"
+msgstr ""
+
+#: tracker/choices.py:26
+msgid "To do"
+msgstr ""
+
+#: tracker/choices.py:27
+msgid "Done"
+msgstr ""
+
+#: tracker/choices.py:28
+msgid "Doing"
+msgstr ""
+
+#: tracker/choices.py:29
+msgid "Blocked"
+msgstr ""
+
+#: tracker/choices.py:30
+msgid "Pending"
+msgstr ""
+
+#: tracker/choices.py:31
+msgid "ignored"
+msgstr ""
+
+#: tracker/models.py:56
+msgid "Exception Type"
+msgstr ""
+
+#: tracker/models.py:57
+msgid "Exception Msg"
+msgstr ""
+
+#: tracker/models.py:112
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:22
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:22
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:25
+#: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:23
+msgid "Message"
+msgstr ""
+
+#: tracker/models.py:114
+msgid "Message type"
+msgstr ""
+
+#: tracker/wagtail_hooks.py:18
+msgid "Unexpected Events"
+msgstr ""
+
+#: tracker/wagtail_hooks.py:47
+msgid "Unexpected errors"
+msgstr ""
+
+#: upload/button_helper.py:16
+msgid "Assign"
+msgstr ""
+
+#: upload/button_helper.py:25
+msgid "Finish deposit"
+msgstr ""
+
+#: upload/button_helper.py:35
+msgid "View document"
+msgstr ""
+
+#: upload/button_helper.py:78
+msgid "Reassign"
+msgstr ""
+
+#: upload/choices.py:20
+msgid "Submitted"
+msgstr ""
+
+#: upload/choices.py:21
+msgid "Enqueued for validation"
+msgstr ""
+
+#: upload/choices.py:22
+msgid "Validated with errors"
+msgstr ""
+
+#: upload/choices.py:23
+msgid "Validated without errors"
+msgstr ""
+
+#: upload/choices.py:24
+msgid "Pending for correction"
+msgstr ""
+
+#: upload/choices.py:25
+msgid "Ready to be finished"
+msgstr ""
+
+#: upload/choices.py:26
+msgid "Waiting for quality analysis"
+msgstr ""
+
+#: upload/choices.py:27
+msgid "Rejected"
+msgstr ""
+
+#: upload/choices.py:28
+msgid "Accepted"
+msgstr ""
+
+#: upload/choices.py:29
+msgid "Scheduled for publication"
+msgstr ""
+
+#: upload/choices.py:42
+msgid "New document"
+msgstr ""
+
+#: upload/choices.py:141
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:7
+msgid "I will fix this error"
+msgstr ""
+
+#: upload/choices.py:142
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:8
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:7
+msgid "This is not an error"
+msgstr ""
+
+#: upload/choices.py:151
+msgid "Fixed"
+msgstr ""
+
+#: upload/choices.py:152
+msgid "Error has to be fixed"
+msgstr ""
+
+#: upload/models.py:28
+msgid "Package File"
+msgstr ""
+
+#: upload/models.py:29
+msgid "Signature"
+msgstr ""
+
+#: upload/models.py:48
+msgid "Expiration date"
+msgstr ""
+
+#: upload/models.py:86
+msgid "Can finish deposit"
+msgstr ""
+
+#: upload/models.py:87
+msgid "Can access all packages from all users"
+msgstr ""
+
+#: upload/models.py:88
+msgid "Can assign package"
+msgstr ""
+
+#: upload/models.py:163
+msgid "Error category"
+msgstr ""
+
+#: upload/models.py:169
+msgid "Error data"
+msgstr ""
+
+#: upload/models.py:170
+msgid "Error message"
+msgstr ""
+
+#: upload/models.py:211
+msgid "Content"
+msgstr ""
+
+#: upload/models.py:218
+msgid "Can send error resolution"
+msgstr ""
+
+#: upload/models.py:219
+msgid "Can analyse error resolution"
+msgstr ""
+
+#: upload/models.py:274
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:4
+msgid "Action"
+msgstr ""
+
+#: upload/models.py:280
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:10
+msgid "Rationale"
+msgstr ""
+
+#: upload/models.py:323
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:26
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:4
+msgid "Opinion"
+msgstr ""
+
+#: upload/models.py:329
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:10
+msgid "Guidance"
+msgstr ""
+
+#: upload/tasks.py:150
+msgid "XML article has incompatible journal ISSN."
+msgstr ""
+
+#: upload/tasks.py:152
+msgid "XML article has incompatible journal title."
+msgstr ""
+
+#: upload/tasks.py:154
+msgid "XML article has incompatible journal acronym."
+msgstr ""
+
+#: upload/tasks.py:156
+msgid "XML article has incompatible journal data."
+msgstr ""
+
+#: upload/tasks.py:188
+msgid "It was not possible to connect to the site database."
+msgstr ""
+
+#: upload/tasks.py:195
+msgid "XML article refers to a existant document."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/create.html:23
+msgid "Saving…"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/create.html:24
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:12
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:12
+msgid "Save"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:15
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:15
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:15
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:15
+#: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:15
+msgid "Back to package inspection"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:24
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:24
+msgid "Resolution action"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:25
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:25
+msgid "Resolution rationale"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:47
+msgid "Add validation error"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:52
+msgid "Send opinions"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:26
+msgid "Quality analyst opinion"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:27
+msgid "Quality analyst guidance"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:19
+msgid "If you don\\"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:19
+msgid "Google Groups"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:27
+msgid "Resolution"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:48
+msgid "Send resolutions"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:6
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:6
+msgid "Choose an option"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:8
+msgid "This error has to be fixed"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:31
+msgid "Reports"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:42
+msgid "XML and/or DTD formation"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:44
+#: upload/templates/modeladmin/upload/package/inspect.html:67
+#: upload/templates/modeladmin/upload/package/inspect.html:84
+#: upload/templates/modeladmin/upload/package/inspect.html:101
+#: upload/templates/modeladmin/upload/package/inspect.html:118
+#: upload/templates/modeladmin/upload/package/inspect.html:135
+msgid "This report is not available yet."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:49
+msgid "XML file has errors."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:51
+#: upload/templates/modeladmin/upload/package/inspect.html:74
+#: upload/templates/modeladmin/upload/package/inspect.html:91
+#: upload/templates/modeladmin/upload/package/inspect.html:108
+#: upload/templates/modeladmin/upload/package/inspect.html:125
+msgid "There are no errors."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:55
+msgid "See the XML and/or DTD Formation Report: "
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:65
+msgid "Digital assets and renditions"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:72
+msgid "Digital assets and/or renditions validation failed."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:77
+msgid "See the Digital Assets and Renditions Report."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:82
+msgid "Stylesheet"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:89
+msgid "Stylesheet validation failed."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:99
+msgid "Individual content validation"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:106
+#: upload/templates/modeladmin/upload/package/inspect.html:123
+msgid "Individual content validation failed."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:111
+msgid "See the Individual Content Report."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:116
+msgid "Grouped content validation"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:133
+msgid "Quality analysis opinion"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:140
+msgid "There are pending corrections."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:142
+msgid "Package has been accepted."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:145
+msgid "See Quality Analysis Report."
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:161
+msgid "Actions"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:164
+msgid "Start Error Resolution"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect.html:167
+msgid "Analyse Error Resolution"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:4
+msgid "Preview (optimized package)"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:8
+msgid "HTML"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:18
+msgid "Preview HTML "
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:27
+msgid "XML"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:35
+msgid "View XML "
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:43
+msgid "PDF"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:51
+msgid "Download PDF"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:4
+msgid "Download"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:12
+msgid "Original package"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:20
+msgid "Optimized package"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:19
+msgid "Digital assets"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:26
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:62
+msgid "Is present in the package?"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:38
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:72
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:77
+msgid "Yes"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:40
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:74
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:79
+msgid "No"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:46
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:85
+msgid "File is missing"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:55
+msgid "Renditions"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:60
+msgid "Expected filename"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:61
+msgid "Is the main Language"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/validationresult/inspect.html:15
+msgid "Back to related package"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/validationresult/inspect.html:37
+msgid "Missing file"
+msgstr ""
+
+#: upload/templates/modeladmin/upload/validationresult/inspect.html:46
+msgid "Snippet"
+msgstr ""
+
+#: upload/views.py:53
+msgid "Thank you for submitting your responses."
+msgstr ""
+
+#: upload/views.py:77
+msgid "Errors Resolution"
+msgstr ""
+
+#: upload/views.py:86
+msgid ""
+"It is not possible to see the Error Resolution page for a rejected package."
+msgstr ""
+
+#: upload/views.py:103
+msgid "Package has been submitted to QA"
+msgstr ""
+
+#: upload/views.py:108
+msgid ""
+"Package could not be submitted to QA due to validation errors. Go to Error "
+"Resolution page for more details."
+msgstr ""
+
+#: upload/views.py:134
+msgid "It is not possible to preview HTML of an invalid XML."
+msgstr ""
+
+#: upload/views.py:169
+msgid "Individual Content Report"
+msgstr ""
+
+#: upload/views.py:185
+msgid "Digital Assets and Renditions Report"
+msgstr ""
+
+#: upload/views.py:204
+msgid "You do have permission to assign packages."
+msgstr ""
+
+#: upload/views.py:213
+msgid "Package has been assigned with success."
+msgstr ""
+
+#: upload/views.py:215
+msgid "Package has been reassigned with success."
+msgstr ""
+
+#: upload/wagtail_hooks.py:74
+msgid "It is necessary to select an Article."
+msgstr ""
+
+#: upload/wagtail_hooks.py:80
+msgid "Package to change article has been successfully submitted."
+msgstr ""
+
+#: upload/wagtail_hooks.py:85
+msgid "It is necessary to select an Issue."
+msgstr ""
+
+#: upload/wagtail_hooks.py:90
+msgid "Package to create article has been successfully submitted."
+msgstr ""
+
+#: upload/wagtail_hooks.py:213
+msgid "This error was reported by an user."
+msgstr ""
+
+#: upload/wagtail_hooks.py:241
+msgid "Packages"
+msgstr ""
+
+#: upload/wagtail_hooks.py:298
+msgid "Validation results"
+msgstr ""
+
+#: upload/wagtail_hooks.py:340
+msgid "Waiting for QA"
+msgstr ""
