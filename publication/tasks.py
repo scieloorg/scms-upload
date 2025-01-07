@@ -496,28 +496,40 @@ def process_article_availability(
         f"{domain}/j/{journal_acron}/a/{pid_v3}/?format=pdf&lang={lang}",
     ]
 
+    for url in urls:
+        fetch_data_and_register_result.apply_async(
+            kwargs=dict(
+                pid_v3=pid_v3,
+                url=url,
+                username=username,
+                user_id=user_id,
+            )
+        )
+
+
+@celery_app.task(bind=True)
+def fetch_data_and_register_result(self, pid_v3, url, username, user_id):
     try:
         user = _get_user(user_id=user_id, username=username)
         article = Article.objects.get(pid_v3=pid_v3)
 
-        for url in urls:
+        try:
+            response = fetch_data(url, timeout=2, verify=True)
+        except Exception as e:
+            ScieloURLStatus.create_or_update(
+                article=article,
+                url=url,
+                check_date=datetime.now(),
+                status=e.__class__,
+                available=False,
+                user=user,
+            )
+        else:
             try:
-                response = fetch_data(url, timeout=2, verify=True)
-            except Exception as e:
-                ScieloURLStatus.create_or_update(
-                    article=article,
-                    url=url,
-                    check_date=datetime.now(),
-                    status=e.__class__,
-                    available=False,
-                    user=user,
-                )
-            else:
-                try:
-                    obj = ScieloURLStatus.get(article=article, url=url)
-                    obj.delete()
-                except ScieloURLStatus.DoesNotExist:
-                    continue
+                obj = ScieloURLStatus.get(article=article, url=url)
+                obj.delete()
+            except ScieloURLStatus.DoesNotExist:
+                pass
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -525,7 +537,6 @@ def process_article_availability(
             exc_traceback=exc_traceback,
             detail={
                 "function": "publication.tasks.process_article_availability",
-                "urls": urls,
                 "url": url,
             },
         )
