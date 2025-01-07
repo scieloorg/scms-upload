@@ -2,7 +2,7 @@ from django.db.models import Q
 from django.test import TestCase
 from unittest.mock import patch
 
-from .tasks import initiate_article_availability_check, process_article_availability
+from .tasks import initiate_article_availability_check, process_article_availability, fetch_data_and_register_result
 from .models import ScieloURLStatus, ArticleAvailability
 from article.models import Article, ArticleDOIWithLang
 from collection.models import Collection, WebSiteConfiguration
@@ -52,6 +52,12 @@ class ArticleAvailabilityTeste(TestCase):
             lang="pt",
             creator=self.user,
         )
+        self.urls = [
+            f"{self.web_site_configuration.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang={self.doi_en.lang}&nrm=iso",
+            f"{self.web_site_configuration.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?lang={self.doi_en.lang}",
+            f"{self.web_site_configuration.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&format=pdf&lng={self.doi_en.lang}&nrm=iso",
+            f"{self.web_site_configuration.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?format=pdf&lang={self.doi_en.lang}",
+        ]
 
     @patch("publication.tasks.process_article_availability.apply_async")
     def test_initiate_article_availability_check(
@@ -64,10 +70,8 @@ class ArticleAvailabilityTeste(TestCase):
 
         self.assertEqual(mock_process_apply_async.call_count, 2)
 
-    @patch("publication.tasks.fetch_data")
-    def test_process_article_availability_success(self, mock_fetch_data):
-        mock_fetch_data.return_value = "mock content"
-
+    @patch("publication.tasks.fetch_data_and_register_result.apply_async")
+    def test_process_article_availability_call_times(self, mock_apply_async):
         process_article_availability(
             user_id=None,
             username="user_test",
@@ -86,27 +90,23 @@ class ArticleAvailabilityTeste(TestCase):
             lang="pt",
             domain=self.web_site_configuration.url,
         )
-        self.assertEqual(mock_fetch_data.call_count, 8)
-        self.assertEqual(ArticleAvailability.objects.all().count(), 0)
-        self.assertEqual(ScieloURLStatus.objects.all().count(), 0)
+        self.assertEqual(mock_apply_async.call_count, 8)
 
     @patch("publication.tasks.fetch_data")
-    def test_process_article_avaibility_some_fail(self, mock_fetch_data):
+    def test_fetch_data_and_register_result_some_fail(self, mock_fetch_data):
         mock_fetch_data.side_effect = [
             RetryableError,
             "mock content",
             "mock content",
             NonRetryableError,
         ]
-        process_article_availability(
-            user_id=None,
-            username="user_test",
-            pid_v3=self.article.pid_v3,
-            pid_v2=self.article.pid_v2,
-            journal_acron=self.article.journal.journal_acron,
-            lang=self.doi_en.lang,
-            domain=self.web_site_configuration.url,
-        )
+        for url in self.urls:
+            fetch_data_and_register_result(
+                user_id=None,
+                username="user_test",
+                pid_v3=self.article.pid_v3,
+                url=url,
+            )
         self.assertEqual(mock_fetch_data.call_count, 4)
 
         scielo_url_status_first = ScieloURLStatus.objects.filter(
@@ -136,15 +136,13 @@ class ArticleAvailabilityTeste(TestCase):
             "mock content",
             "mock content",
         ]
-        process_article_availability(
-            user_id=None,
-            username="user_test",
-            pid_v3=self.article.pid_v3,
-            pid_v2=self.article.pid_v2,
-            journal_acron=self.article.journal.journal_acron,
-            lang=self.doi_en.lang,
-            domain=self.web_site_configuration.url,
-        )
+        for url in self.urls:
+            fetch_data_and_register_result(
+                user_id=None,
+                username="user_test",
+                pid_v3=self.article.pid_v3,
+                url=url,
+            )
         self.assertEqual(mock_fetch_data.call_count, 4)
 
         scielo_url_status_first = ScieloURLStatus.objects.filter(
@@ -165,14 +163,12 @@ class ArticleAvailabilityTeste(TestCase):
             "mock content",
             "mock content",
         ]
-        process_article_availability(
-            user_id=None,
-            username="user_test",
-            pid_v3=self.article.pid_v3,
-            pid_v2=self.article.pid_v2,
-            journal_acron=self.article.journal.journal_acron,
-            lang=self.doi_en.lang,
-            domain=self.web_site_configuration.url,
-        )
+        for url in self.urls:
+            fetch_data_and_register_result(
+                user_id=None,
+                username="user_test",
+                pid_v3=self.article.pid_v3,
+                url=url,
+            )
 
         self.assertEqual(ScieloURLStatus.objects.filter(available=False).count(), 0)
