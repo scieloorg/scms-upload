@@ -439,13 +439,14 @@ def initiate_article_availability_check(
     updated=None,
     article_pid_v3=None,
     collection_acron=None,
+    purpose="PUBLIC",
 ):
     if collection_acron:
         collection = Collection.objects.filter(acron=collection_acron)
     else:
         collection = Collection.objects.all()
 
-    query = Q(journal__journalproc__collection__in=collection)
+    query = Q()
     if not updated:
         if article_pid_v3:
             query |= Q(pid_v3=article_pid_v3)
@@ -456,24 +457,23 @@ def initiate_article_availability_check(
         if publication_year:
             query |= Q(issue__publication_year=publication_year)
 
-    articles = Article.objects.filter(query)
 
     try:
-        for article in articles:
-            for doi in article.doi_with_lang.all():
-                process_article_availability.apply_async(
-                    kwargs=dict(
-                        user_id=user_id,
-                        username=username,
-                        pid_v3=article.pid_v3,
-                        pid_v2=article.pid_v2,
-                        journal_acron=article.journal.journal_acron,
-                        lang=doi.lang,
-                        domain=article.journal.journalproc_set.first()
-                        .collection.websiteconfiguration_set.get(enabled=True)
-                        .url,
-                    )
-                )
+        for col in collection:
+            for journal_collection in col.journalcollection_set.all():
+                for article in journal_collection.journal.article_set.filter(query):
+                    for doi in article.doi_with_lang.all():
+                        process_article_availability.apply_async(
+                            kwargs=dict(
+                                user_id=user_id,
+                                username=username,
+                                pid_v3=article.pid_v3,
+                                pid_v2=article.pid_v2,
+                                journal_acron=article.journal.journal_acron,
+                                lang=doi.lang,
+                                domain=journal_collection.collection.websiteconfiguration_set.get(enabled=True, purpose=purpose).url,
+                            )
+                        )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
