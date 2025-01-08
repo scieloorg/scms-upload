@@ -11,14 +11,13 @@ from .tasks import (
 )
 from .models import (
     ScieloURLStatus,
-    ArticleAvailability,
     CollectionVerificationFile,
     MissingArticle,
 )
 from article.models import Article, ArticleDOIWithLang
 from collection.models import Collection, WebSiteConfiguration
 from issue.models import Issue
-from journal.models import Journal
+from journal.models import Journal, JournalCollection, OfficialJournal
 from proc.models import JournalProc
 from core.users.models import User
 from core.utils.requester import RetryableError, NonRetryableError
@@ -27,19 +26,50 @@ from core.utils.requester import RetryableError, NonRetryableError
 class ArticleAvailabilityTest(TestCase):
     def setUp(self):
         self.user = User.objects.create(username="user_test")
-        self.collection = Collection.objects.create(acron="scl", creator=self.user)
-        self.web_site_configuration = WebSiteConfiguration.objects.create(
+        self.collection_scl = Collection.objects.create(acron="scl", creator=self.user)
+        self.collection_mex = Collection.objects.create(acron="mex", creator=self.user)
+        self.web_site_configuration_mex = WebSiteConfiguration.objects.create(
             creator=self.user,
-            collection=self.collection,
+            collection=self.collection_mex,
+            url="https://mocked-domain2.com",
+            enabled=True,
+            purpose="PUBLIC",
+        )
+        self.web_site_configuration_scl = WebSiteConfiguration.objects.create(
+            creator=self.user,
+            collection=self.collection_scl,
             url="https://mocked-domain.com",
             enabled=True,
+            purpose="PUBLIC",
+        )
+        self.web_site_configuration_scl = WebSiteConfiguration.objects.create(
+            creator=self.user,
+            collection=self.collection_scl,
+            url="https://qa-mocked-domain.com",
+            enabled=True,
+            purpose="QA",
+        )        
+        self.official_journal = OfficialJournal.objects.create(
+            issn_print="0000-0000",
+            issn_electronic="XXXX-XXXX",
+            creator=self.user,
         )
         self.journal = Journal.objects.create(
-            official_journal=None, journal_acron="scl", creator=self.user
+            official_journal=self.official_journal, journal_acron="abdc", creator=self.user
+        )
+        self.journal_collection_scl  = JournalCollection.objects.create(
+            journal=self.journal,
+            collection=self.collection_scl,
+            creator=self.user,
+        )
+        self.journal_collection_mex = JournalCollection.objects.create(
+            journal=self.journal,
+            collection=self.collection_mex,
+            creator=self.user,
         )
         self.journal_proc = JournalProc.objects.create(
             journal=self.journal,
-            collection=self.collection,
+            collection=self.collection_scl,
             acron="abdc",
             creator=self.user,
         )
@@ -64,10 +94,10 @@ class ArticleAvailabilityTest(TestCase):
             creator=self.user,
         )
         self.urls = [
-            f"{self.web_site_configuration.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang={self.doi_en.lang}&nrm=iso",
-            f"{self.web_site_configuration.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?lang={self.doi_en.lang}",
-            f"{self.web_site_configuration.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&format=pdf&lng={self.doi_en.lang}&nrm=iso",
-            f"{self.web_site_configuration.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?format=pdf&lang={self.doi_en.lang}",
+            f"{self.web_site_configuration_scl.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang={self.doi_en.lang}&nrm=iso",
+            f"{self.web_site_configuration_scl.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?lang={self.doi_en.lang}",
+            f"{self.web_site_configuration_scl.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&format=pdf&lng={self.doi_en.lang}&nrm=iso",
+            f"{self.web_site_configuration_scl.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?format=pdf&lang={self.doi_en.lang}",
         ]
 
     @patch("publication.tasks.process_article_availability.apply_async")
@@ -76,10 +106,38 @@ class ArticleAvailabilityTest(TestCase):
         mock_process_apply_async,
     ):
         initiate_article_availability_check(
-            user_id=1, username="user_test", collection_acron="scl"
+            user_id=1, username="user_test", collection_acron="scl", purpose="PUBLIC"
         )
 
         self.assertEqual(mock_process_apply_async.call_count, 2)
+    
+    @patch("publication.tasks.process_article_availability.apply_async")
+    def test_initiate_article_availability_check_with_params(
+        self,
+        mock_process_apply_async,
+    ):
+        initiate_article_availability_check(
+            user_id=1, 
+            username="user_test",
+            issn_print="0000-0000",
+            issn_electronic="XXXX-XXXX",
+            article_pid_v3="test_pid_v3",
+            purpose="PUBLIC",
+            collection_acron="scl"
+        )
+
+        self.assertEqual(mock_process_apply_async.call_count, 2)
+
+    @patch("publication.tasks.process_article_availability.apply_async")
+    def test_initiate_article_availability_check_all_collections(
+        self,
+        mock_process_apply_async,
+    ):
+        initiate_article_availability_check(
+            user_id=1, username="user_test", purpose="PUBLIC"
+        )
+
+        self.assertEqual(mock_process_apply_async.call_count, 4)        
 
     @patch("publication.tasks.fetch_data_and_register_result.apply_async")
     def test_process_article_availability_call_times(self, mock_apply_async):
@@ -90,7 +148,7 @@ class ArticleAvailabilityTest(TestCase):
             pid_v2=self.article.pid_v2,
             journal_acron=self.article.journal.journal_acron,
             lang="en",
-            domain=self.web_site_configuration.url,
+            domain=self.web_site_configuration_scl.url,
         )
         process_article_availability(
             user_id=None,
@@ -99,7 +157,7 @@ class ArticleAvailabilityTest(TestCase):
             pid_v2=self.article.pid_v2,
             journal_acron=self.article.journal.journal_acron,
             lang="pt",
-            domain=self.web_site_configuration.url,
+            domain=self.web_site_configuration_scl.url,
         )
         self.assertEqual(mock_apply_async.call_count, 8)
 
@@ -132,11 +190,11 @@ class ArticleAvailabilityTest(TestCase):
         self.assertEqual(scielo_url_status_last.available, False)
         self.assertEqual(
             scielo_url_status_first.url,
-            f"{self.web_site_configuration.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang={self.doi_en.lang}&nrm=iso",
+            f"{self.web_site_configuration_scl.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang={self.doi_en.lang}&nrm=iso",
         )
         self.assertEqual(
             scielo_url_status_last.url,
-            f"{self.web_site_configuration.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?format=pdf&lang={self.doi_en.lang}",
+            f"{self.web_site_configuration_scl.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?format=pdf&lang={self.doi_en.lang}",
         )
 
     @patch("publication.tasks.fetch_data")
@@ -165,7 +223,7 @@ class ArticleAvailabilityTest(TestCase):
         self.assertEqual(scielo_url_status_first.available, False)
         self.assertEqual(
             scielo_url_status_first.url,
-            f"{self.web_site_configuration.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang={self.doi_en.lang}&nrm=iso",
+            f"{self.web_site_configuration_scl.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang={self.doi_en.lang}&nrm=iso",
         )
 
         mock_fetch_data.side_effect = [
@@ -201,7 +259,7 @@ class CollectionVerificationFileTest(TestCase):
         self,
     ):
         self.user = User.objects.create(username="user_test")
-        self.collection = Collection.objects.create(acron="scl", creator=self.user)
+        self.collection_scl = Collection.objects.create(acron="scl", creator=self.user)
         self.list_of_pids_v2 = [
             "S0104-12902018000200XX1",
             "S0104-12902018000200XX4",
@@ -226,13 +284,13 @@ class CollectionVerificationFileTest(TestCase):
         gzip_file = self.create_gzip_file(content=self.list_of_pids_v2[4:])
 
         self.instance = CollectionVerificationFile.objects.create(
-            collection=self.collection,
+            collection=self.collection_scl,
             uploaded_file=gzip_file,
             creator=self.user,
         )
 
     def test_upload_to_function(self):
-        expected_path = f"verification_article_files/{self.collection}"
+        expected_path = f"verification_article_files/{self.collection_scl}"
         media_root_path = f"/app/core/media/{expected_path}"
         self.assertTrue(self.instance.uploaded_file.name.startswith(expected_path))
         self.assertTrue(self.instance.uploaded_file.path.startswith(media_root_path))
