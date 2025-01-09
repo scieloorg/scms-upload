@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from .models import Article, ScieloURLStatus, CollectionVerificationFile, MissingArticle
+from .models import Article, ScieloURLStatus, CollectionVerificationFile
 from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
@@ -20,6 +20,7 @@ from publication.api.journal import publish_journal
 from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
 from tracker.models import UnexpectedEvent
+from migration.models import MigratedArticle
 
 # FIXME
 # from upload.models import Package
@@ -543,10 +544,15 @@ def fetch_data_and_register_result(self, pid_v3, url, username, user_id):
 
 
 @celery_app.task(bind=True)
-def create_or_update_missing_article(self, pid_v2, collection_verification_file_id, username):
+def create_or_updated_migrated_article(self, pid_v2, collection_acron, username):
     user = _get_user(user_id=None, username=username)
-    collection_verification = CollectionVerificationFile.objects.get(id=collection_verification_file_id)
-    MissingArticle.create_or_update(collection_file=collection_verification, pid_v2=pid_v2, user=user)
+    collection = Collection.get(acron=collection_acron)
+    obj = MigratedArticle.create_or_update_migrated_data(
+        pid=pid_v2,
+        collection=collection,
+        migration_status="PENDING",
+        user=user,
+    )
 
 
 @celery_app.task(bind=True)
@@ -572,8 +578,8 @@ def process_file_to_check_migrated_articles(self, username, collection_acron):
     missing_articles = values_pid_v2 - set(matching_articles)
 
     for pid_v2 in missing_articles:
-        create_or_update_missing_article.apply_async(
+        create_or_updated_migrated_article.apply_async(
             pid_v2=pid_v2,
-            collection_verification_file_id=file_with_pid_v2.id,
+            collection_acron=collection_acron,
             username=username,
         )
