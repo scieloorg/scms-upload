@@ -8,11 +8,11 @@ from .tasks import (
     process_article_availability,
     process_file_to_check_migrated_articles,
     fetch_data_and_register_result,
+    create_or_updated_migrated_article
 )
 from .models import (
     ScieloURLStatus,
     CollectionVerificationFile,
-    MissingArticle,
 )
 from article.models import Article, ArticleDOIWithLang
 from collection.models import Collection, WebSiteConfiguration
@@ -21,6 +21,7 @@ from journal.models import Journal, JournalCollection, OfficialJournal
 from proc.models import JournalProc
 from core.users.models import User
 from core.utils.requester import RetryableError, NonRetryableError
+from migration.models import MigratedArticle
 
 
 class ArticleAvailabilityTest(TestCase):
@@ -283,7 +284,7 @@ class CollectionVerificationFileTest(TestCase):
 
         gzip_file = self.create_gzip_file(content=self.list_of_pids_v2[4:])
 
-        self.instance = CollectionVerificationFile.objects.create(
+        self.collection_file = CollectionVerificationFile.objects.create(
             collection=self.collection_scl,
             uploaded_file=gzip_file,
             creator=self.user,
@@ -292,13 +293,13 @@ class CollectionVerificationFileTest(TestCase):
     def test_upload_to_function(self):
         expected_path = f"verification_article_files/{self.collection_scl}"
         media_root_path = f"/app/core/media/{expected_path}"
-        self.assertTrue(self.instance.uploaded_file.name.startswith(expected_path))
-        self.assertTrue(self.instance.uploaded_file.path.startswith(media_root_path))
-        with gzip.open(self.instance.uploaded_file.path, "rt") as f:
+        self.assertTrue(self.collection_file.uploaded_file.name.startswith(expected_path))
+        self.assertTrue(self.collection_file.uploaded_file.path.startswith(media_root_path))
+        with gzip.open(self.collection_file.uploaded_file.path, "rt") as f:
             lines = f.read().splitlines()
             self.assertEqual(lines, self.list_of_pids_v2[4:])
 
-    @patch("publication.tasks.create_or_update_missing_article.apply_async")
+    @patch("publication.tasks.create_or_updated_migrated_article.apply_async")
     def test_process_file_to_check_migrated_articles(self, mock_apply_async):
         process_file_to_check_migrated_articles(
             username="user_test", collection_acron="scl"
@@ -308,7 +309,7 @@ class CollectionVerificationFileTest(TestCase):
         expected_calls = [
             {
                 "pid_v2": pid_v2,
-                "collection_verification_file_id": self.instance.id,
+                "collection_acron": "scl",
                 "username": "user_test",
             }
             for pid_v2 in missing_pids
@@ -316,11 +317,11 @@ class CollectionVerificationFileTest(TestCase):
         self.assertEqual(mock_apply_async.call_count, len(missing_pids))        
         self.assertEqual(set(tuple(call.kwargs.items()) for call in mock_apply_async.call_args_list), set(tuple(expected_call.items()) for expected_call in expected_calls))
 
-    def test_create_or_update_missing_articles(self,):
-        MissingArticle.create_or_update(
-            pid_v2="S0104-12902018000200XX4",
-            collection_file=self.instance,
-            user=self.user,
-        )
+    def test_create_or_updated_migrated_article(self,):
+        create_or_updated_migrated_article(Article.objects.first().pid_v2, self.collection_scl.acron, self.user.username)
+        migrated_article = MigratedArticle.objects.first()
 
-        self.assertEqual(MissingArticle.objects.count(), 1)
+        self.assertEqual(MigratedArticle.objects.count(), 1)
+        self.assertEqual(migrated_article.pid, Article.objects.first().pid_v2)
+        self.assertEqual(migrated_article.collection, self.collection_scl)
+        self.assertEqual(migrated_article.migration_status, "PENDING")
