@@ -1,7 +1,7 @@
 import gzip
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
-from unittest.mock import patch
+from unittest.mock import patch, PropertyMock
 
 from .tasks import (
     initiate_article_availability_check,
@@ -94,29 +94,43 @@ class ArticleAvailabilityTest(TestCase):
             lang="pt",
             creator=self.user,
         )
-        self.urls = [
-            f"{self.web_site_configuration_scl.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang={self.doi_en.lang}&nrm=iso",
-            f"{self.web_site_configuration_scl.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?lang={self.doi_en.lang}",
-            f"{self.web_site_configuration_scl.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&format=pdf&lng={self.doi_en.lang}&nrm=iso",
-            f"{self.web_site_configuration_scl.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?format=pdf&lang={self.doi_en.lang}",
+
+    def get_url(self, domain, journal_acron, pid_v2, pid_v3, lang):
+        return [
+            f"{domain}/scielo.php?script=sci_arttext&pid={pid_v2}&lang={lang}&nrm=iso",
+            f"{domain}/j/{journal_acron}/a/{pid_v3}/?lang={lang}",
+            f"{domain}/scielo.php?script=sci_arttext&pid={pid_v2}&format=pdf&lng={lang}&nrm=iso",
+            f"{domain}/j/{journal_acron}/a/{pid_v3}/?format=pdf&lang={lang}",            
         ]
 
+    @patch('publication.tasks.Article.article_langs', new_callable=PropertyMock)
     @patch("publication.tasks.process_article_availability.apply_async")
     def test_initiate_article_availability_check(
         self,
         mock_process_apply_async,
+        mock_property_article_langs,
     ):
+        mock_property_article_langs.side_effect = [
+            "pt",
+            "es"
+        ]                
         initiate_article_availability_check(
             user_id=1, username="user_test", collection_acron="scl", purpose="PUBLIC"
         )
 
         self.assertEqual(mock_process_apply_async.call_count, 2)
     
+    @patch('publication.tasks.Article.article_langs', new_callable=PropertyMock)
     @patch("publication.tasks.process_article_availability.apply_async")
     def test_initiate_article_availability_check_with_params(
         self,
         mock_process_apply_async,
+        mock_property_article_langs,
     ):
+        mock_property_article_langs.side_effect = [
+            "pt",
+            "es"
+        ]        
         initiate_article_availability_check(
             user_id=1, 
             username="user_test",
@@ -129,11 +143,17 @@ class ArticleAvailabilityTest(TestCase):
 
         self.assertEqual(mock_process_apply_async.call_count, 2)
 
+    @patch('publication.tasks.Article.article_langs', new_callable=PropertyMock)
     @patch("publication.tasks.process_article_availability.apply_async")
     def test_initiate_article_availability_check_all_collections(
         self,
         mock_process_apply_async,
+        mock_property_article_langs,
     ):
+        mock_property_article_langs.side_effect = [
+            "pt",
+            "es"
+        ]
         initiate_article_availability_check(
             user_id=1, username="user_test", purpose="PUBLIC"
         )
@@ -170,7 +190,14 @@ class ArticleAvailabilityTest(TestCase):
             "mock content",
             NonRetryableError,
         ]
-        for url in self.urls:
+        urls = self.get_url(
+            domain=self.web_site_configuration_scl.url,
+            journal_acron=self.journal.journal_acron,
+            pid_v2=self.article.pid_v2,
+            pid_v3=self.article.pid_v3,
+            lang="en",
+            )
+        for url in urls:
             fetch_data_and_register_result(
                 user_id=None,
                 username="user_test",
@@ -191,11 +218,11 @@ class ArticleAvailabilityTest(TestCase):
         self.assertEqual(scielo_url_status_last.available, False)
         self.assertEqual(
             scielo_url_status_first.url,
-            f"{self.web_site_configuration_scl.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang={self.doi_en.lang}&nrm=iso",
+            f"{self.web_site_configuration_scl.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang=en&nrm=iso",
         )
         self.assertEqual(
             scielo_url_status_last.url,
-            f"{self.web_site_configuration_scl.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?format=pdf&lang={self.doi_en.lang}",
+            f"{self.web_site_configuration_scl.url}/j/{self.article.journal.journal_acron}/a/{self.article.pid_v3}/?format=pdf&lang=en",
         )
 
     @patch("publication.tasks.fetch_data")
@@ -206,7 +233,14 @@ class ArticleAvailabilityTest(TestCase):
             "mock content",
             "mock content",
         ]
-        for url in self.urls:
+        urls = self.get_url(
+            domain=self.web_site_configuration_scl.url,
+            journal_acron=self.journal.journal_acron,
+            pid_v2=self.article.pid_v2,
+            pid_v3=self.article.pid_v3,
+            lang="en",
+            )        
+        for url in urls:
             fetch_data_and_register_result(
                 user_id=None,
                 username="user_test",
@@ -224,7 +258,7 @@ class ArticleAvailabilityTest(TestCase):
         self.assertEqual(scielo_url_status_first.available, False)
         self.assertEqual(
             scielo_url_status_first.url,
-            f"{self.web_site_configuration_scl.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang={self.doi_en.lang}&nrm=iso",
+            f"{self.web_site_configuration_scl.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang=en&nrm=iso",
         )
 
         mock_fetch_data.side_effect = [
@@ -233,7 +267,7 @@ class ArticleAvailabilityTest(TestCase):
             "mock content",
             "mock content",
         ]
-        for url in self.urls:
+        for url in urls:
             fetch_data_and_register_result(
                 user_id=None,
                 username="user_test",
