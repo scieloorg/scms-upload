@@ -463,7 +463,7 @@ def initiate_article_availability_check(
         for col in collection:
             for journal_collection in col.journalcollection_set.all():
                 for article in journal_collection.journal.article_set.filter(query):
-                    for doi in article.doi_with_lang.all():
+                    for lang in article.article_langs:
                         process_article_availability.apply_async(
                             kwargs=dict(
                                 user_id=user_id,
@@ -471,7 +471,7 @@ def initiate_article_availability_check(
                                 pid_v3=article.pid_v3,
                                 pid_v2=article.pid_v2,
                                 journal_acron=article.journal.journal_acron,
-                                lang=doi.lang,
+                                lang=lang,
                                 domain=journal_collection.collection.websiteconfiguration_set.get(enabled=True, purpose=purpose).url,
                             )
                         )
