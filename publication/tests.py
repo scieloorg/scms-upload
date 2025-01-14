@@ -320,12 +320,15 @@ class CollectionVerificationFileTest(TestCase):
     ):
         self.user = User.objects.create(username="user_test")
         self.collection_scl = Collection.objects.create(acron="scl", creator=self.user)
-        self.list_of_pids_v2 = [
+        self.list_of_pids_v2_file = [
             "S0104-12902018000200XX1",
             "S0104-12902018000200XX4",
             "S0104-12902018000200556",
             "S0104-12902018000200298",
             "S0104-12902018000200423",
+        ]
+
+        self.list_of_pids_v2_migrated_article = [
             "S0104-12902018000200495",
             "S0104-12902018000200481",
             "S0104-12902018000200338",
@@ -335,13 +338,13 @@ class CollectionVerificationFileTest(TestCase):
             "S0104-12902018000200XX4",
         ]
 
-        for v2 in self.list_of_pids_v2[:4]:
-            Article.objects.create(
-                pid_v2=v2,
+        for v2 in self.list_of_pids_v2_migrated_article:
+            MigratedArticle.objects.create(
+                pid=v2,
                 creator=self.user,
             )
 
-        gzip_file = self.create_gzip_file(content=self.list_of_pids_v2[4:])
+        gzip_file = self.create_gzip_file(content=self.list_of_pids_v2_file)
 
         self.collection_file = CollectionVerificationFile.objects.create(
             collection=self.collection_scl,
@@ -356,7 +359,7 @@ class CollectionVerificationFileTest(TestCase):
         self.assertTrue(self.collection_file.uploaded_file.path.startswith(media_root_path))
         with gzip.open(self.collection_file.uploaded_file.path, "rt") as f:
             lines = f.read().splitlines()
-            self.assertEqual(lines, self.list_of_pids_v2[4:])
+            self.assertEqual(lines, self.list_of_pids_v2_file)
 
     @patch("publication.tasks.create_or_updated_migrated_article.apply_async")
     def test_process_file_to_check_migrated_articles(self, mock_apply_async):
@@ -364,7 +367,7 @@ class CollectionVerificationFileTest(TestCase):
             username="user_test", collection_acron="scl"
         )
 
-        missing_pids = set(self.list_of_pids_v2[4:]) - set(self.list_of_pids_v2[:4])
+        missing_pids = set(self.list_of_pids_v2_file) - set(self.list_of_pids_v2_migrated_article)
         expected_calls = [
             {
                 "pid_v2": pid_v2,
@@ -377,10 +380,9 @@ class CollectionVerificationFileTest(TestCase):
         self.assertEqual(set(tuple(call.kwargs.items()) for call in mock_apply_async.call_args_list), set(tuple(expected_call.items()) for expected_call in expected_calls))
 
     def test_create_or_updated_migrated_article(self,):
-        create_or_updated_migrated_article(Article.objects.first().pid_v2, self.collection_scl.acron, self.user.username)
-        migrated_article = MigratedArticle.objects.first()
+        create_or_updated_migrated_article(self.list_of_pids_v2_file[0], self.collection_scl.acron, self.user.username)
+        migrated_article = MigratedArticle.objects.get(pid=self.list_of_pids_v2_file[0])
 
-        self.assertEqual(MigratedArticle.objects.count(), 1)
-        self.assertEqual(migrated_article.pid, Article.objects.first().pid_v2)
+        self.assertEqual(migrated_article.pid, self.list_of_pids_v2_file[0])
         self.assertEqual(migrated_article.collection, self.collection_scl)
         self.assertEqual(migrated_article.migration_status, "PENDING")
