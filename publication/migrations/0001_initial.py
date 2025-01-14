@@ -105,21 +105,6 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("url", models.URLField(max_length=500, unique=True)),
-                (
-                    "status",
-                    models.CharField(
-                        blank=True,
-                        choices=[
-                            (
-                                core.utils.requester.RetryableError,
-                                "Excessively long response time. Retry later",
-                            ),
-                            (core.utils.requester.NonRetryableError, "Url not found."),
-                        ],
-                        max_length=80,
-                        null=True,
-                    ),
-                ),
                 ("available", models.BooleanField(default=False)),
                 (
                     "article_availability",

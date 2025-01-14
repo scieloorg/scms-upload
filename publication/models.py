@@ -10,7 +10,6 @@ from wagtail.admin.panels import FieldPanel, InlinePanel
 from article.models import Article
 from collection.models import Collection
 from core.models import CommonControlField
-from publication.choices import VERIFY_HTTP_ERROR_CODE
 
 
 class ArticleAvailability(ClusterableModel, CommonControlField):
@@ -60,19 +59,14 @@ class ScieloURLStatus(CommonControlField, Orderable):
         related_name="scielo_url",
     )
     url = models.URLField(max_length=500, unique=True)
-    status = models.CharField(
-        max_length=80, choices=VERIFY_HTTP_ERROR_CODE, null=True, blank=True
-    )
     available = models.BooleanField(default=False)
 
     def update(
         self,
         available,
-        status,
         check_date,
     ):
         self.updated = check_date or datetime.now()
-        self.status = status
         self.available = available
         self.save()
         return self
@@ -90,7 +84,6 @@ class ScieloURLStatus(CommonControlField, Orderable):
         cls,
         article,
         url,
-        status,
         available,
         user,
     ):
@@ -103,7 +96,6 @@ class ScieloURLStatus(CommonControlField, Orderable):
         obj = cls(
             article_availability=article_availability,
             url=url,
-            status=status,
             available=available,
             creator=user,
         )
@@ -117,7 +109,6 @@ class ScieloURLStatus(CommonControlField, Orderable):
         article,
         url,
         check_date,
-        status,
         available,
     ):
         try:
@@ -125,14 +116,12 @@ class ScieloURLStatus(CommonControlField, Orderable):
             obj.update(
                 check_date=check_date,
                 available=available,
-                status=status,
             )
             return obj
         except cls.DoesNotExist:
             return cls.create(
                 article=article,
                 url=url,
-                status=status,
                 available=available,
                 user=user,
             )
