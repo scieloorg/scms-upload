@@ -9,7 +9,6 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.models.article_titles import ArticleTitles
 from packtools.sps.models.article_toc_sections import ArticleTocSections
-from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.dates import ArticleDates
 from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
@@ -174,13 +173,12 @@ class Article(ClusterableModel, CommonControlField):
     @property
     def article_langs(self):
         langs = set()
-        article_and_sub_article = ArticleAndSubArticles(xmltree=self.sps_pkg.xml_with_pre.xmltree)
-        langs.add(article_and_sub_article.main_lang)
-        for sub_article in article_and_sub_article.sub_articles:
-            if sub_article.get("article-type") not in {"replay", "letter"}:
-                lang = sub_article.get("{http://www.w3.org/XML/1998/namespace}lang")
-                if lang:
-                    langs.add(lang)
+        for item in self.sps_pkg.htmls:
+            if item.get("lang"):
+                langs.add(item.get("lang"))
+        for item in self.sps_pkg.pdfs:
+            if item.get("lang"):
+                langs.add(item.get("lang"))
         return list(langs)
 
     @classmethod
