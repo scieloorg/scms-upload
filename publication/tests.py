@@ -277,7 +277,7 @@ class ArticleAvailabilityTest(TestCase):
         self.assertEqual(ScieloURLStatus.objects.filter(available=False).count(), 0)
     
     @patch("publication.tasks.fetch_data_and_register_result.apply_async")
-    def test_recover_fail_tasks(self, mock_apply_async):
+    def test_retry_failed_scielo_urls(self, mock_apply_async):
         article_availability = ArticleAvailability.objects.create(
             article=self.article,
             creator=self.user
