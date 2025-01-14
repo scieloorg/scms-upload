@@ -584,8 +584,8 @@ def process_file_to_check_migrated_articles(self, username, collection_acron):
             },
         )
 
-    matching_articles = Article.objects.filter(pid_v2__in=values_pid_v2).values_list(
-        "pid_v2", flat=True
+    matching_articles = MigratedArticle.objects.filter(pid__in=values_pid_v2).values_list(
+        "pid", flat=True
     )
     missing_articles = values_pid_v2 - set(matching_articles)
 
