@@ -1,29 +1,25 @@
 import gzip
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
-from unittest.mock import patch, PropertyMock, call
+from unittest.mock import PropertyMock, call, patch
 
-from .tasks import (
-    initiate_article_availability_check,
-    process_article_availability,
-    process_file_to_check_migrated_articles,
-    fetch_data_and_register_result,
-    create_or_updated_migrated_article,
-    retry_failed_scielo_urls,
-)
-from .models import (
-    ScieloURLStatus,
-    CollectionVerificationFile,
-    ArticleAvailability,
-)
 from article.models import Article, ArticleDOIWithLang
 from collection.models import Collection, WebSiteConfiguration
+from core.users.models import User
+from core.utils.requester import NonRetryableError, RetryableError
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase
 from issue.models import Issue
 from journal.models import Journal, JournalCollection, OfficialJournal
-from proc.models import JournalProc
-from core.users.models import User
-from core.utils.requester import RetryableError, NonRetryableError
 from migration.models import MigratedArticle
+from proc.models import JournalProc
+
+from .models import (ArticleAvailability, CollectionVerificationFile,
+                     ScieloURLStatus)
+from .tasks import (create_or_updated_migrated_article,
+                    fetch_data_and_register_result,
+                    initiate_article_availability_check,
+                    process_article_availability,
+                    process_file_to_check_migrated_articles,
+                    retry_failed_scielo_urls)
 
 
 class ArticleAvailabilityTest(TestCase):

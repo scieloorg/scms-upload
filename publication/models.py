@@ -1,15 +1,14 @@
 from datetime import datetime
 
-from wagtail.models import Orderable
+from article.models import Article
+from collection.models import Collection
+from core.models import CommonControlField
 from django.db import IntegrityError, models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel
-
-from article.models import Article
-from collection.models import Collection
-from core.models import CommonControlField
+from wagtail.models import Orderable
 
 
 class ArticleAvailability(ClusterableModel, CommonControlField):

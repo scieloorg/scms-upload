@@ -1,18 +1,17 @@
-import logging
 import gzip
+import logging
 import sys
 from datetime import datetime
 
-from django.contrib.auth import get_user_model
-from django.db.models import Q
-from django.utils.translation import gettext_lazy as _
-
-from .models import Article, ScieloURLStatus, CollectionVerificationFile
 from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from core.models import PressRelease
 from core.utils.requester import fetch_data
+from django.contrib.auth import get_user_model
+from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
+from migration.models import MigratedArticle
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
@@ -20,7 +19,8 @@ from publication.api.journal import publish_journal
 from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
 from tracker.models import UnexpectedEvent
-from migration.models import MigratedArticle
+
+from .models import Article, CollectionVerificationFile, ScieloURLStatus
 
 # FIXME
 # from upload.models import Package
