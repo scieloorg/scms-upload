@@ -22,7 +22,8 @@ def publish_article(article_proc, api_data, journal_pid=None):
     except AttributeError:
         if not journal_pid:
             raise ValueError(
-                "publication.api.document.publish_article requires journal_pid")
+                "publication.api.document.publish_article requires journal_pid"
+            )
 
     order = article_proc.article.position
     pub_date = article_proc.article.first_publication_date or datetime.utcnow()
@@ -206,7 +207,7 @@ class ArticlePayload:
             # _related_article["ref_id"] = ref_id
             # _related_article["related_type"] = related_type
             # self.data["related_articles"].append(_related_article)
-  
+
     def add_xml(self, xml):
         self.data["xml"] = xml
 

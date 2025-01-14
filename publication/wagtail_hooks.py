@@ -18,5 +18,5 @@ class ArticleAvailabilitySiteViewSet(SnippetViewSet):
         "article__pid_v2",
     )
 
-register_snippet(ArticleAvailabilitySiteViewSet)
 
+register_snippet(ArticleAvailabilitySiteViewSet)

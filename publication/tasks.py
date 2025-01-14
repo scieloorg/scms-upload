@@ -458,7 +458,6 @@ def initiate_article_availability_check(
         if publication_year:
             query |= Q(issue__publication_year=publication_year)
 
-
     try:
         for col in collection:
             for journal_collection in col.journalcollection_set.all():
@@ -472,7 +471,9 @@ def initiate_article_availability_check(
                                 pid_v2=article.pid_v2,
                                 journal_acron=article.journal.journal_acron,
                                 lang=lang,
-                                domain=journal_collection.collection.websiteconfiguration_set.get(enabled=True, purpose=purpose).url,
+                                domain=journal_collection.collection.websiteconfiguration_set.get(
+                                    enabled=True, purpose=purpose
+                                ).url,
                             )
                         )
     except Exception as e:
@@ -584,9 +585,9 @@ def process_file_to_check_migrated_articles(self, username, collection_acron):
             },
         )
 
-    matching_articles = MigratedArticle.objects.filter(pid__in=values_pid_v2).values_list(
-        "pid", flat=True
-    )
+    matching_articles = MigratedArticle.objects.filter(
+        pid__in=values_pid_v2
+    ).values_list("pid", flat=True)
     missing_articles = values_pid_v2 - set(matching_articles)
 
     for pid_v2 in missing_articles:

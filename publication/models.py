@@ -136,8 +136,9 @@ def upload_path_for_verification_files(instance, filename):
 
 class CollectionVerificationFile(CommonControlField):
     """
-        Modelo para armazenar o arquivo que contém os pids v2 da migração de acordo com a coleção
+    Modelo para armazenar o arquivo que contém os pids v2 da migração de acordo com a coleção
     """
+
     collection = models.ForeignKey(
         Collection,
         on_delete=models.CASCADE,

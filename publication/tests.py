@@ -9,7 +9,7 @@ from .tasks import (
     process_file_to_check_migrated_articles,
     fetch_data_and_register_result,
     create_or_updated_migrated_article,
-    retry_failed_scielo_urls
+    retry_failed_scielo_urls,
 )
 from .models import (
     ScieloURLStatus,
@@ -51,16 +51,18 @@ class ArticleAvailabilityTest(TestCase):
             url="https://qa-mocked-domain.com",
             enabled=True,
             purpose="QA",
-        )        
+        )
         self.official_journal = OfficialJournal.objects.create(
             issn_print="0000-0000",
             issn_electronic="XXXX-XXXX",
             creator=self.user,
         )
         self.journal = Journal.objects.create(
-            official_journal=self.official_journal, journal_acron="abdc", creator=self.user
+            official_journal=self.official_journal,
+            journal_acron="abdc",
+            creator=self.user,
         )
-        self.journal_collection_scl  = JournalCollection.objects.create(
+        self.journal_collection_scl = JournalCollection.objects.create(
             journal=self.journal,
             collection=self.collection_scl,
             creator=self.user,
@@ -102,65 +104,56 @@ class ArticleAvailabilityTest(TestCase):
             f"{domain}/scielo.php?script=sci_arttext&pid={pid_v2}&lang={lang}&nrm=iso",
             f"{domain}/j/{journal_acron}/a/{pid_v3}/?lang={lang}",
             f"{domain}/scielo.php?script=sci_arttext&pid={pid_v2}&format=pdf&lng={lang}&nrm=iso",
-            f"{domain}/j/{journal_acron}/a/{pid_v3}/?format=pdf&lang={lang}",            
+            f"{domain}/j/{journal_acron}/a/{pid_v3}/?format=pdf&lang={lang}",
         ]
 
-    @patch('publication.tasks.Article.article_langs', new_callable=PropertyMock)
+    @patch("publication.tasks.Article.article_langs", new_callable=PropertyMock)
     @patch("publication.tasks.process_article_availability.apply_async")
     def test_initiate_article_availability_check(
         self,
         mock_process_apply_async,
         mock_property_article_langs,
     ):
-        mock_property_article_langs.side_effect = [
-            "pt",
-            "es"
-        ]                
+        mock_property_article_langs.side_effect = ["pt", "es"]
         initiate_article_availability_check(
             user_id=1, username="user_test", collection_acron="scl", purpose="PUBLIC"
         )
 
         self.assertEqual(mock_process_apply_async.call_count, 2)
-    
-    @patch('publication.tasks.Article.article_langs', new_callable=PropertyMock)
+
+    @patch("publication.tasks.Article.article_langs", new_callable=PropertyMock)
     @patch("publication.tasks.process_article_availability.apply_async")
     def test_initiate_article_availability_check_with_params(
         self,
         mock_process_apply_async,
         mock_property_article_langs,
     ):
-        mock_property_article_langs.side_effect = [
-            "pt",
-            "es"
-        ]        
+        mock_property_article_langs.side_effect = ["pt", "es"]
         initiate_article_availability_check(
-            user_id=1, 
+            user_id=1,
             username="user_test",
             issn_print="0000-0000",
             issn_electronic="XXXX-XXXX",
             article_pid_v3="test_pid_v3",
             purpose="PUBLIC",
-            collection_acron="scl"
+            collection_acron="scl",
         )
 
         self.assertEqual(mock_process_apply_async.call_count, 2)
 
-    @patch('publication.tasks.Article.article_langs', new_callable=PropertyMock)
+    @patch("publication.tasks.Article.article_langs", new_callable=PropertyMock)
     @patch("publication.tasks.process_article_availability.apply_async")
     def test_initiate_article_availability_check_all_collections(
         self,
         mock_process_apply_async,
         mock_property_article_langs,
     ):
-        mock_property_article_langs.side_effect = [
-            "pt",
-            "es"
-        ]
+        mock_property_article_langs.side_effect = ["pt", "es"]
         initiate_article_availability_check(
             user_id=1, username="user_test", purpose="PUBLIC"
         )
 
-        self.assertEqual(mock_process_apply_async.call_count, 4)        
+        self.assertEqual(mock_process_apply_async.call_count, 4)
 
     @patch("publication.tasks.fetch_data_and_register_result.apply_async")
     def test_process_article_availability_call_times(self, mock_apply_async):
@@ -198,7 +191,7 @@ class ArticleAvailabilityTest(TestCase):
             pid_v2=self.article.pid_v2,
             pid_v3=self.article.pid_v3,
             lang="en",
-            )
+        )
         for url in urls:
             fetch_data_and_register_result(
                 user_id=None,
@@ -239,7 +232,7 @@ class ArticleAvailabilityTest(TestCase):
             pid_v2=self.article.pid_v2,
             pid_v3=self.article.pid_v3,
             lang="en",
-            )        
+        )
         for url in urls:
             fetch_data_and_register_result(
                 user_id=None,
@@ -275,12 +268,11 @@ class ArticleAvailabilityTest(TestCase):
             )
 
         self.assertEqual(ScieloURLStatus.objects.filter(available=False).count(), 0)
-    
+
     @patch("publication.tasks.fetch_data_and_register_result.apply_async")
     def test_retry_failed_scielo_urls(self, mock_apply_async):
         article_availability = ArticleAvailability.objects.create(
-            article=self.article,
-            creator=self.user
+            article=self.article, creator=self.user
         )
         ScieloURLStatus.objects.create(
             article_availability=article_availability,
@@ -291,11 +283,11 @@ class ArticleAvailabilityTest(TestCase):
         expected_calls = [
             call(
                 kwargs={
-                        "pid_v3": "test_pid_v3", 
-                        "url": "https://www.example.com", 
-                        "username": "user_test", 
-                        "user_id": None
-                    }
+                    "pid_v3": "test_pid_v3",
+                    "url": "https://www.example.com",
+                    "username": "user_test",
+                    "user_id": None,
+                }
             )
         ]
         retry_failed_scielo_urls(username="user_test")
@@ -355,8 +347,12 @@ class CollectionVerificationFileTest(TestCase):
     def test_upload_to_function(self):
         expected_path = f"verification_article_files/{self.collection_scl}"
         media_root_path = f"/app/core/media/{expected_path}"
-        self.assertTrue(self.collection_file.uploaded_file.name.startswith(expected_path))
-        self.assertTrue(self.collection_file.uploaded_file.path.startswith(media_root_path))
+        self.assertTrue(
+            self.collection_file.uploaded_file.name.startswith(expected_path)
+        )
+        self.assertTrue(
+            self.collection_file.uploaded_file.path.startswith(media_root_path)
+        )
         with gzip.open(self.collection_file.uploaded_file.path, "rt") as f:
             lines = f.read().splitlines()
             self.assertEqual(lines, self.list_of_pids_v2_file)
@@ -367,7 +363,9 @@ class CollectionVerificationFileTest(TestCase):
             username="user_test", collection_acron="scl"
         )
 
-        missing_pids = set(self.list_of_pids_v2_file) - set(self.list_of_pids_v2_migrated_article)
+        missing_pids = set(self.list_of_pids_v2_file) - set(
+            self.list_of_pids_v2_migrated_article
+        )
         expected_calls = [
             {
                 "pid_v2": pid_v2,
@@ -376,11 +374,18 @@ class CollectionVerificationFileTest(TestCase):
             }
             for pid_v2 in missing_pids
         ]
-        self.assertEqual(mock_apply_async.call_count, len(missing_pids))        
-        self.assertEqual(set(tuple(call.kwargs.items()) for call in mock_apply_async.call_args_list), set(tuple(expected_call.items()) for expected_call in expected_calls))
+        self.assertEqual(mock_apply_async.call_count, len(missing_pids))
+        self.assertEqual(
+            set(tuple(call.kwargs.items()) for call in mock_apply_async.call_args_list),
+            set(tuple(expected_call.items()) for expected_call in expected_calls),
+        )
 
-    def test_create_or_updated_migrated_article(self,):
-        create_or_updated_migrated_article(self.list_of_pids_v2_file[0], self.collection_scl.acron, self.user.username)
+    def test_create_or_updated_migrated_article(
+        self,
+    ):
+        create_or_updated_migrated_article(
+            self.list_of_pids_v2_file[0], self.collection_scl.acron, self.user.username
+        )
         migrated_article = MigratedArticle.objects.get(pid=self.list_of_pids_v2_file[0])
 
         self.assertEqual(migrated_article.pid, self.list_of_pids_v2_file[0])
