@@ -433,7 +433,7 @@ def task_publish_article(
 def initiate_article_availability_check(
     self,
     username,
-    user_id,
+    user_id=None,
     issn_print=None,
     issn_electronic=None,
     publication_year=None,
@@ -509,6 +509,19 @@ def process_article_availability(
 
 
 @celery_app.task(bind=True)
+def retry_failed_scielo_urls(self, username, user_id=None):
+    for scielo_url_status in ScieloURLStatus.objects.filter(available=False):
+        fetch_data_and_register_result.apply_async(
+            kwargs=dict(
+                pid_v3=scielo_url_status.article_availability.article.pid_v3,
+                url=scielo_url_status.url,
+                username=username,
+                user_id=user_id,
+            )
+        )
+
+
+@celery_app.task(bind=True)
 def fetch_data_and_register_result(self, pid_v3, url, username, user_id):
     try:
         user = _get_user(user_id=user_id, username=username)
@@ -521,7 +534,6 @@ def fetch_data_and_register_result(self, pid_v3, url, username, user_id):
                 article=article,
                 url=url,
                 check_date=datetime.now(),
-                status=e.__class__,
                 available=False,
                 user=user,
             )
