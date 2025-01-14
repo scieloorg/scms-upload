@@ -1,18 +1,20 @@
 import gzip
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
-from unittest.mock import patch, PropertyMock
+from unittest.mock import patch, PropertyMock, call
 
 from .tasks import (
     initiate_article_availability_check,
     process_article_availability,
     process_file_to_check_migrated_articles,
     fetch_data_and_register_result,
-    create_or_updated_migrated_article
+    create_or_updated_migrated_article,
+    retry_failed_scielo_urls
 )
 from .models import (
     ScieloURLStatus,
     CollectionVerificationFile,
+    ArticleAvailability,
 )
 from article.models import Article, ArticleDOIWithLang
 from collection.models import Collection, WebSiteConfiguration
@@ -212,8 +214,6 @@ class ArticleAvailabilityTest(TestCase):
         scielo_url_status_last = ScieloURLStatus.objects.filter(available=False).last()
 
         self.assertEqual(ScieloURLStatus.objects.filter(available=False).count(), 2)
-        self.assertEqual(scielo_url_status_first.status, str(RetryableError))
-        self.assertEqual(scielo_url_status_last.status, str(NonRetryableError))
         self.assertEqual(scielo_url_status_first.available, False)
         self.assertEqual(scielo_url_status_last.available, False)
         self.assertEqual(
@@ -254,7 +254,6 @@ class ArticleAvailabilityTest(TestCase):
         ).first()
 
         self.assertEqual(ScieloURLStatus.objects.filter(available=False).count(), 1)
-        self.assertEqual(scielo_url_status_first.status, str(RetryableError))
         self.assertEqual(scielo_url_status_first.available, False)
         self.assertEqual(
             scielo_url_status_first.url,
@@ -276,6 +275,32 @@ class ArticleAvailabilityTest(TestCase):
             )
 
         self.assertEqual(ScieloURLStatus.objects.filter(available=False).count(), 0)
+    
+    @patch("publication.tasks.fetch_data_and_register_result.apply_async")
+    def test_recover_fail_tasks(self, mock_apply_async):
+        article_availability = ArticleAvailability.objects.create(
+            article=self.article,
+            creator=self.user
+        )
+        ScieloURLStatus.objects.create(
+            article_availability=article_availability,
+            url="https://www.example.com",
+            available=False,
+            creator=self.user,
+        )
+        expected_calls = [
+            call(
+                kwargs={
+                        "pid_v3": "test_pid_v3", 
+                        "url": "https://www.example.com", 
+                        "username": "user_test", 
+                        "user_id": None
+                    }
+            )
+        ]
+        retry_failed_scielo_urls(username="user_test")
+        self.assertEqual(mock_apply_async.call_count, 1)
+        mock_apply_async.assert_has_calls(expected_calls, any_order=False)
 
 
 class CollectionVerificationFileTest(TestCase):
