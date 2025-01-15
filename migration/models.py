@@ -878,3 +878,10 @@ class IdFileRecord(CommonControlField, Orderable):
 
         logging.info(f"IdFileRecord.document_records_to_migrate {params}")
         return cls.objects.filter(item_type="article", **params)
+
+    @classmethod
+    def add_issue_folder(cls, issue_pid, issue_folder):
+        return cls.objects.filter(
+            Q(item_pid__startswith=f"S{issue_pid}") | Q(item_pid=issue_pid),
+            issue_folder__in=["", None]
+        ).update(issue_folder=issue_folder)
