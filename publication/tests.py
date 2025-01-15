@@ -310,10 +310,16 @@ class CollectionVerificationFileTest(TestCase):
         self.collection_scl = Collection.objects.create(acron="scl", creator=self.user)
         self.list_of_pids_v2_file = [
             "S0104-12902018000200XX1",
-            "S0104-12902018000200XX4",
             "S0104-12902018000200556",
             "S0104-12902018000200298",
             "S0104-12902018000200423",
+            "S0104-12902018000200XX4",
+            "S0104-12902018000200495",
+            "S0104-12902018000200481",
+            "S0104-12902018000200338",
+            "S0104-12902018000200588",
+            "S0104-12902018000200544",
+            "S0104-12902018000200435",
         ]
 
         self.list_of_pids_v2_migrated_article = [
@@ -370,6 +376,7 @@ class CollectionVerificationFileTest(TestCase):
             }
             for pid_v2 in missing_pids
         ]
+        import ipdb; ipdb.set_trace()
         self.assertEqual(mock_apply_async.call_count, len(missing_pids))
         self.assertEqual(
             set(tuple(call.kwargs.items()) for call in mock_apply_async.call_args_list),
