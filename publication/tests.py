@@ -376,7 +376,7 @@ class CollectionVerificationFileTest(TestCase):
             }
             for pid_v2 in missing_pids
         ]
-        import ipdb; ipdb.set_trace()
+
         self.assertEqual(mock_apply_async.call_count, len(missing_pids))
         self.assertEqual(
             set(tuple(call.kwargs.items()) for call in mock_apply_async.call_args_list),
