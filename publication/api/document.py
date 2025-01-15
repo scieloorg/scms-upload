@@ -8,7 +8,7 @@ from publication.api.publication import PublicationAPI
 from publication.utils.document import build_article
 
 
-def publish_article(article_proc, api_data, journal_pid=None):
+def publish_article(article_proc, api_data, journal_pid=None, is_public=True):
     """
     {"failed": False, "id": article.id}
     {"failed": True, "error": str(ex)}
@@ -28,7 +28,7 @@ def publish_article(article_proc, api_data, journal_pid=None):
     order = article_proc.article.position
     pub_date = article_proc.article.first_publication_date or datetime.utcnow()
 
-    build_article(builder, article_proc.article, journal_pid, order, pub_date)
+    build_article(builder, article_proc.article, journal_pid, order, pub_date, is_public)
 
     api = PublicationAPI(**api_data)
     kwargs = dict(
@@ -201,13 +201,11 @@ class ArticlePayload:
             _related_article["related_type"] = related_type
             self.data["related_articles"].append(_related_article)
         else:
-            pass
-            # TODO depende de resolver https://github.com/scieloorg/opac_5/issues/212
-            # _related_article["href"] = href
-            # _related_article["ref_id"] = ref_id
-            # _related_article["related_type"] = related_type
-            # self.data["related_articles"].append(_related_article)
-
+            _related_article["href"] = href
+            _related_article["ref_id"] = ref_id
+            _related_article["related_type"] = related_type
+            self.data["related_articles"].append(_related_article)
+  
     def add_xml(self, xml):
         self.data["xml"] = xml
 
@@ -253,9 +251,9 @@ class ArticlePayload:
         _mat_suppl_item["classic_uri"] = classic_uri
         self.data["mat_suppl_items"].append(_mat_suppl_item)
 
-    def add_status(self):
+    def add_status(self, is_public=True):
         # atualiza status
-        self.data["is_public"] = True
+        self.data["is_public"] = is_public
 
 
 def format_author_name(surname, given_names, suffix):
