@@ -22,8 +22,12 @@ def publish_journal(journal_proc, api_data):
 
     journal_payload_builder = JournalPayload(payload)
     build_journal(
-        journal_payload_builder, journal, journal_pid, journal_acron, journal_history,
-        journal_proc.availability_status
+        journal_payload_builder,
+        journal,
+        journal_pid,
+        journal_acron,
+        journal_history,
+        journal_proc.availability_status,
     )
 
     api = PublicationAPI(**api_data)

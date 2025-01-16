@@ -22,7 +22,8 @@ def publish_article(article_proc, api_data, journal_pid=None, is_public=True):
     except AttributeError:
         if not journal_pid:
             raise ValueError(
-                "publication.api.document.publish_article requires journal_pid")
+                "publication.api.document.publish_article requires journal_pid"
+            )
 
     order = article_proc.article.position
     pub_date = article_proc.article.first_publication_date or datetime.utcnow()

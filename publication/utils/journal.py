@@ -1,4 +1,6 @@
-def build_journal(builder, journal, journal_id, journal_acron, journal_history, availability_status):
+def build_journal(
+    builder, journal, journal_id, journal_acron, journal_history, availability_status
+):
     official_journal = journal.official_journal
 
     builder.add_ids(journal_id)
@@ -34,7 +36,7 @@ def build_journal(builder, journal, journal_id, journal_acron, journal_history, 
     if builder.data.get("status_history"):
         try:
             current_status = sorted(builder.data["status_history"], key=lambda x: x['date'])[-1]["status"]
-        except IndexError:
+        except (IndexError, KeyError):
             current_status = None
         if current_status == "current" and availability_status != "C":
             current_status = "inprogress"
@@ -54,7 +56,9 @@ def build_journal(builder, journal, journal_id, journal_acron, journal_history, 
     )
     try:
         # FIXME
-        builder.add_logo_url(journal.logo_url or "https://www.scielo.org/journal_logo_missing.gif")
+        builder.add_logo_url(
+            journal.logo_url or "https://www.scielo.org/journal_logo_missing.gif"
+        )
     except AttributeError:
         builder.add_logo_url("https://www.scielo.org/journal_logo_missing.gif")
     builder.add_online_submission_url(journal.submission_online_url)  # Adicionar

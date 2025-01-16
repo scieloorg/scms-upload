@@ -11,7 +11,9 @@ def publish_pressrelease(pressrelease, api_data):
     builder = PressReleasePayload(data=payload)
     build_pressrelease(pressrelease, builder)
     api = PublicationAPI(**api_data)
-    return api.post_data(payload, {"journal_acronym": pressrelease.journal.journal_acron})
+    return api.post_data(
+        payload, {"journal_acronym": pressrelease.journal.journal_acron}
+    )
 
 
 class PressReleasePayload:
@@ -25,7 +27,7 @@ class PressReleasePayload:
         "url": "",
         "publication_date": "",
     }
-    
+
     """
 
     def __init__(self, data=None):
@@ -55,4 +57,3 @@ class PressReleasePayload:
 
     def add_publication_data(self, publication_data):
         self.data["publication_data"] = publication_data
-

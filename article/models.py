@@ -170,6 +170,17 @@ class Article(ClusterableModel, CommonControlField):
             updated=self.updated.isoformat(),
         )
 
+    @property
+    def article_langs(self):
+        langs = set()
+        for item in self.sps_pkg.htmls:
+            if item.get("lang"):
+                langs.add(item.get("lang"))
+        for item in self.sps_pkg.pdfs:
+            if item.get("lang"):
+                langs.add(item.get("lang"))
+        return list(langs)
+
     @classmethod
     def get(cls, pid_v3):
         if pid_v3:

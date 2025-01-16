@@ -1,9 +1,7 @@
 import logging
 import sys
-from datetime import datetime
 
 from django.contrib.auth import get_user_model
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from collection.choices import QA, PUBLIC
@@ -22,7 +20,6 @@ from publication.api.document import publish_article
 from publication.api.journal import publish_journal
 from publication.api.issue import publish_issue
 from publication.api.publication import get_api_data, get_api
-from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
 
 User = get_user_model()
