@@ -23,7 +23,10 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         null=True,
         unique=True,
     )
-    panels = [FieldPanel("article"), InlinePanel("scielo_url")]
+    panels = [
+        FieldPanel("article"),
+        InlinePanel("scielo_url", label="URLs", classname="collapsible"),
+    ]
 
     @classmethod
     def get(
@@ -59,6 +62,8 @@ class ScieloURLStatus(CommonControlField, Orderable):
     )
     url = models.URLField(max_length=500, unique=True)
     available = models.BooleanField(default=False)
+
+    panels = [FieldPanel("url"), FieldPanel("available", read_only=True)]
 
     def update(
         self,
