@@ -9,9 +9,8 @@ from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from scielo_classic_website import classic_ws
-from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
+from wagtail.admin.panels import FieldPanel
 from wagtail.models import Orderable
-from wagtailautocomplete.edit_handlers import AutocompletePanel
 from pathlib import Path
 
 from collection.models import Collection
