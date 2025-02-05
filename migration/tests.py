@@ -39,7 +39,6 @@ class TestMigratedFilesDirectoryPath(TestCase):
 
     def test_migrated_files_directory_path_bases_work(self):
         mock_instance = Mock(spec_set=['original_path', 'collection', 'collection.acron'])
-        # Garante que `source_path` está definido para ser usado no except
         for path, path_relative in zip(self.paths, self.paths_relative):
             with self.subTest(path=path):
                 mock_instance.original_path = path
