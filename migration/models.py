@@ -296,9 +296,7 @@ class MigratedData(CommonControlField):
 def extract_relative_path(full_path):
     parts = Path(full_path).parts
     for i, part in enumerate(parts):
-        if part == "bases-work":
-            return "bases-work"
-        elif part == "htdocs" or part == "bases":
+        if part in ["htdocs", "bases", "bases-work"]:
             return str(Path(*parts[i:]))
     return None
 
@@ -570,7 +568,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
     file = models.FileField(
         upload_to=migrated_files_directory_path, null=True, blank=True
     )
-    # bases/pdf/acron/volnum/pt_a01.pdf
+    # classic_website/spa/scielo_www/hercules-spa/new_platform/bases_for_upload/bases-work/acron/file_asdg.id
     source_path = models.TextField(_("Source"), null=True, blank=True)
 
     file_size = models.IntegerField(null=True, blank=True)
