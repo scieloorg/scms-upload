@@ -7,19 +7,20 @@ from unittest.mock import Mock, PropertyMock
 
 class TestMigratedFilesDirectoryPath(TestCase):
     def setUp(self):
+        # original_path or source_path
         self.paths = [
-            "classic_website/spa/scielo_www/hercules-spa/new_platform/bases_for_upload/bases-work",
-            "classic_website/spa/scielo_www/scielosp/bases/pdf",
-            "classic_website/spa/scielo_www/scielosp/bases/xml",
-            "classic_website/spa/scielo_www/scielosp/bases/translation",
-            "classic_website/spa/scielo_www/scielosp/htdocs/img/revistas",
+            "classic_website/spa/scielo_www/hercules-spa/new_platform/bases_for_upload/bases-work/acron/file_asdg.id",
+            "classic_website/spa/scielo_www/scielosp/bases/pdf/acron/file_asdg.pdf",
+            "classic_website/spa/scielo_www/scielosp/bases/xml/acron/file_asdg.xml",
+            "classic_website/spa/scielo_www/scielosp/bases/translation/acron/file_asdg.xml",
+            "classic_website/spa/scielo_www/scielosp/htdocs/img/revistas/acron/file_asdg.jpg",
         ]
         self.paths_relative = [
-            "bases-work",
-            "bases/pdf",
-            "bases/xml",
-            "bases/translation",
-            "htdocs/img/revistas",
+            "bases-work/acron/file_asdg.id",
+            "bases/pdf/acron/file_asdg.pdf",
+            "bases/xml/acron/file_asdg.xml",
+            "bases/translation/acron/file_asdg.xml",
+            "htdocs/img/revistas/acron/file_asdg.jpg",
         ]
 
     def test_extract_relative_path(self):
