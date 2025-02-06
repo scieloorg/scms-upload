@@ -1,12 +1,9 @@
-import os
-from datetime import datetime
-
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, models
 from django.utils.translation import gettext as _
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
-from wagtail.snippets.models import register_snippet
+
 
 from . import choices
 from .exceptions import PressReleaseInvalidURL

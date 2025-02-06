@@ -9,9 +9,9 @@ from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from scielo_classic_website import classic_ws
-from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
+from wagtail.admin.panels import FieldPanel
 from wagtail.models import Orderable
-from wagtailautocomplete.edit_handlers import AutocompletePanel
+from pathlib import Path
 
 from collection.models import Collection
 from core.forms import CoreAdminModelForm
@@ -293,6 +293,13 @@ class MigratedData(CommonControlField):
             )
 
 
+def extract_relative_path(full_path):
+    parts = Path(full_path).parts
+    for i, part in enumerate(parts):
+        if part in ["htdocs", "bases", "bases-work"]:
+            return str(Path(*parts[i:]))
+    return None
+
 def migrated_files_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
 
@@ -301,8 +308,10 @@ def migrated_files_directory_path(instance, filename):
     except (AttributeError, TypeError) as e:
         path = instance.source_path
 
+    path_relative = extract_relative_path(path)
+    
     try:
-        return f"classic_website/{instance.collection.acron}/{path}"
+        return f"classic_website/{instance.collection.acron}/{path_relative}"
     except (AttributeError, TypeError) as e:
         return f"classic_website/{filename}"
 
@@ -559,7 +568,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
     file = models.FileField(
         upload_to=migrated_files_directory_path, null=True, blank=True
     )
-    # bases/pdf/acron/volnum/pt_a01.pdf
+    # classic_website/spa/scielo_www/hercules-spa/new_platform/bases_for_upload/bases-work/acron/file_asdg.id
     source_path = models.TextField(_("Source"), null=True, blank=True)
 
     file_size = models.IntegerField(null=True, blank=True)
