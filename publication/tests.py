@@ -203,6 +203,8 @@ class ArticleAvailabilityTest(TestCase):
         scielo_url_status_last = ScieloURLStatus.objects.filter(available=False).last()
 
         self.assertEqual(ScieloURLStatus.objects.filter(available=False).count(), 2)
+        self.assertEqual(ScieloURLStatus.objects.filter(available=True).count(), 2)
+                
         self.assertEqual(scielo_url_status_first.available, False)
         self.assertEqual(scielo_url_status_last.available, False)
         self.assertEqual(
@@ -238,14 +240,10 @@ class ArticleAvailabilityTest(TestCase):
             )
         self.assertEqual(mock_fetch_data.call_count, 4)
 
-        scielo_url_status_first = ScieloURLStatus.objects.filter(
-            available=False
-        ).first()
-
         self.assertEqual(ScieloURLStatus.objects.filter(available=False).count(), 1)
-        self.assertEqual(scielo_url_status_first.available, False)
+        self.assertEqual(ScieloURLStatus.objects.filter(available=True).count(), 3)
         self.assertEqual(
-            scielo_url_status_first.url,
+            ScieloURLStatus.objects.get(available=False).url,
             f"{self.web_site_configuration_scl.url}/scielo.php?script=sci_arttext&pid={self.article.pid_v2}&lang=en&nrm=iso",
         )
 
