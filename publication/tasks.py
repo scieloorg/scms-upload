@@ -541,9 +541,16 @@ def fetch_data_and_register_result(self, pid_v3, url, username, user_id):
         else:
             try:
                 obj = ScieloURLStatus.get(article=article, url=url)
-                obj.delete()
+                obj.available = True
+                obj.save()
             except ScieloURLStatus.DoesNotExist:
-                pass
+                ScieloURLStatus.create_or_update(
+                    article=article,
+                    url=url,
+                    check_date=datetime.now(),
+                    available=True,
+                    user=user,
+                )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
