@@ -702,7 +702,7 @@ class IdFileRecord(CommonControlField, Orderable):
     item_type = models.CharField(_("Type"), max_length=10)
     issue_folder = models.CharField(_("Issue folder"), max_length=30)
     article_filename = models.CharField(
-        _("Filename"), max_length=30, null=True, blank=True
+        _("Filename"), max_length=40, null=True, blank=True
     )
     article_filetype = models.CharField(
         _("File type"), max_length=4, null=True, blank=True
