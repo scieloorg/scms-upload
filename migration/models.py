@@ -1,9 +1,10 @@
 import logging
 import os
+import sys
 from datetime import datetime
 
 from django.core.files.base import ContentFile
-from django.db import IntegrityError, models
+from django.db import IntegrityError, models, DataError
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -17,7 +18,7 @@ from collection.models import Collection
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from tracker import choices as tracker_choices
-
+from tracker.models import UnexpectedEvent
 from . import exceptions
 
 
@@ -787,6 +788,24 @@ class IdFileRecord(CommonControlField, Orderable):
             return obj
         except IntegrityError:
             return cls.get(parent, item_type, item_pid)
+        except DataError as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "task": "migrations.models.IdFileRecord.create",
+                    "user_id": user.id,
+                    "username": user.username,
+                    "item_type": item_type,
+                    "item_pid": item_pid,
+                    "data": data,
+                    "issue_folder": issue_folder,
+                    "article_filename": article_filename,
+                    "article_filetype": article_filetype,
+                    "processing_date": processing_date,
+                },
+            )            
 
     @classmethod
     def create_or_update(
