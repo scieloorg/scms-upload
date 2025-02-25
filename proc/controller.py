@@ -138,6 +138,7 @@ def fetch_and_create_journal(
         journal.license_code = (result.get("journal_use_license") or {}).get("license_type")
         journal.nlm_title = result.get("nlm_title")
         journal.doi_prefix = result.get("doi_prefix")
+        journal.wos_areas = result["wos_areas"]
         journal.save()
 
         for item in result.get("Subject") or []:

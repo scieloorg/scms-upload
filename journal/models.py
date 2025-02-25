@@ -274,6 +274,7 @@ class Journal(CommonControlField, ClusterableModel):
     contact_location = models.ForeignKey(
         Location, on_delete=models.SET_NULL, null=True, blank=True
     )
+    wos_areas = models.JSONField(null=True, blank=True)
 
     def __unicode__(self):
         return self.title or self.short_title or str(self.official_journal)
