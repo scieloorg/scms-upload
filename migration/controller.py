@@ -138,6 +138,8 @@ def create_or_update_journal(
         )
         journal.contact_address = ", ".join(classic_website_journal.publisher_address)
         journal.add_email(classic_website_journal.publisher_email)
+        # core wos_areas
+        journal.wos_areas = classic_website_journal.wos_subject_areas
         journal.save()
 
     except Exception as e:
