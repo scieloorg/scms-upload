@@ -139,6 +139,7 @@ def fetch_and_create_journal(
         journal.nlm_title = result.get("nlm_title")
         journal.doi_prefix = result.get("doi_prefix")
         journal.wos_areas = result["wos_areas"]
+        journal.logo_url = result["url_logo"]
         journal.save()
 
         for item in result.get("Subject") or []:

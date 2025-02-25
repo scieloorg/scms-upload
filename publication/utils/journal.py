@@ -32,16 +32,15 @@ def build_journal(
             journal_history.date,
             journal_history.interruption_reason,
         )
+
     current_status = "inprogress"
     if builder.data.get("status_history"):
         try:
             current_status = sorted(builder.data["status_history"], key=lambda x: x['date'])[-1]["status"]
+            if current_status not in ("inprogress", "current"):
+                current_status = "no-current"
         except (IndexError, KeyError):
-            current_status = None
-        if current_status == "current" and availability_status != "C":
-            current_status = "inprogress"
-        elif current_status != "current":
-            current_status = "no-current"
+            pass
     builder.data["current_status"] = current_status
 
     builder.add_journal_issns(
