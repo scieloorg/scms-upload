@@ -82,7 +82,7 @@ def build_journal(
             builder.add_publisher(name)
 
     builder.add_thematic_scopes(
-        subject_categories=None,
+        subject_categories=journal.wos_areas,
         subject_areas=journal.subject_areas,
     )
     builder.add_is_public(availability_status)
