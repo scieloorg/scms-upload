@@ -47,7 +47,6 @@ def create_or_update_journal(
     """
     Create/update OfficialJournal, JournalProc e Journal
     """
-
     if not tracker_choices.allowed_to_run(journal_proc.migration_status, force_update):
         journal_proc_event = journal_proc.start(user, "create_or_update_journal")
         journal_proc_event.finish(
@@ -905,8 +904,8 @@ def register_acron_id_file_content(
     try:
         # Importa os registros de documentos
         operation = None
-        operation = journal_proc.start(user, "register_acron_id_file_content")
         detail = {}
+        operation = journal_proc.start(user, "register_acron_id_file_content")
         journal = journal_proc.journal
         collection = journal_proc.collection
         journal_acron = journal_proc.acron
@@ -972,6 +971,12 @@ def register_acron_id_file_content(
                 user, completed=False, message=_(f"{source_path} does not exist")
             )
     except Exception as e:
+        logging.error(f"journal_proc: {journal_proc} {type(e)} {e}")
+        if operation:
+            operation.finish(
+                user, completed=False, exception=e, detail=detail
+            )
+            return
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             e=e,
