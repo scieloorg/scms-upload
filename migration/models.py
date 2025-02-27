@@ -370,6 +370,26 @@ class MigratedFile(CommonControlField):
         ]
 
     @classmethod
+    def has_changes(cls, user, collection, file_path, force_update):
+        if not force_update:
+            try:
+                file_date = modified_date(file_path)
+                if cls.objects.filter(collection=collection, original_path=file_path, file_date=file_date).exists():
+                    return False
+            except cls.DoesNotExist:
+                pass
+
+        cls.create_or_update(
+            user=user,
+            collection=collection,
+            original_path=file_path,
+            source_path=file_path,
+            component_type="id_file",
+            force_update=force_update,
+        )
+        return True
+
+    @classmethod
     def get(
         cls,
         collection=None,
@@ -590,6 +610,27 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         indexes = [
             models.Index(fields=["source_path"]),
         ]
+
+    @classmethod
+    def has_changes(cls, user, collection, journal_acron, file_path, force_update):
+        if not force_update:
+            try:
+                file_size = JournalAcronIdFile.get_file_size(source_path)
+                if cls.objects.filter(collection=collection, source_path=file_path, file_size=file_size).exists():
+                    return False
+            except cls.DoesNotExist:
+                pass
+            except cls.MultipleObjectsReturned:
+                pass
+
+        cls.create_or_update(
+            user=user,
+            collection=collection,
+            journal_acron=journal_acron,
+            source_path=file_path,
+            force_update=force_update,
+        )
+        return True
 
     @classmethod
     def get(
