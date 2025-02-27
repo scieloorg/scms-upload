@@ -916,8 +916,13 @@ def register_acron_id_file_content(
             journal_acron,
             journal_acron + ".id",
         )
-        if os.path.isfile(source_path):
-
+        if not os.path.isfile(source_path):
+            operation.finish(
+                user, completed=False, message=_(f"{source_path} does not exist")
+            )
+        elif JournalAcronIdFile.has_changes(
+            user, collection, source_path, force_update
+        ):
             start = datetime.utcnow().isoformat()
             journal_id_file = JournalAcronIdFile.create_or_update(
                 user=user,
@@ -968,7 +973,7 @@ def register_acron_id_file_content(
             )
         else:
             operation.finish(
-                user, completed=False, message=_(f"{source_path} does not exist")
+                user, completed=False, message=_(f"{source_path} has no changes")
             )
     except Exception as e:
         logging.error(f"journal_proc: {journal_proc} {type(e)} {e}")
@@ -1063,3 +1068,8 @@ def read_bases_work_acron_id_file(user, source_path, classic_website, journal_pr
             processing_date=classic_ws_doc.processing_date,
         )
     event.finish(user, completed=True, detail={"errors": errors})
+
+
+def id_file_has_changes(user, collection, id_path, force_update):
+    return MigratedFile.has_changes(user, collection, id_path, force_update)
+    
