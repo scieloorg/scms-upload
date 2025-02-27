@@ -410,16 +410,25 @@ class BaseProc(CommonControlField):
 
     @classmethod
     def get_or_create(cls, user, collection, pid):
+        if collection and pid:
+            try:
+                return cls.get(collection, pid)
+            except cls.DoesNotExist:
+                return cls.create(user, collection, pid)
+        raise ValueError(f"{cls}.get_or_create requires collection ({collection}) and pid ({pid})")
+
+    @classmethod
+    def create(cls, user, collection, pid):
         try:
-            obj = cls.get(collection, pid)
-        except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
             obj.collection = collection
             obj.pid = pid
             obj.public_ws_status = tracker_choices.PROGRESS_STATUS_TODO
             obj.save()
-        return obj
+            return obj
+        except IntegrityError:
+            return self.get(collection, pid)
 
     def start(self, user, name):
         # self.save()
