@@ -298,6 +298,15 @@ def create_or_update_migrated_journal(
     classic_website,
     force_update,
 ):
+    has_changes = controller.id_file_has_changes(
+        user,
+        collection,
+        classic_website.classic_website_paths.title_path,
+        force_update,
+    )
+    if not has_changes:
+        logging.info(f"skip reading {classic_website.classic_website_paths.title_path}")
+        return
     for (
         scielo_issn,
         journal_data,
@@ -336,6 +345,16 @@ def create_or_update_migrated_issue(
     classic_website,
     force_update,
 ):
+    has_changes = controller.id_file_has_changes(
+        user,
+        collection,
+        classic_website.classic_website_paths.issue_path,
+        force_update,
+    )
+
+    if not has_changes:
+        logging.info(f"skip reading {classic_website.classic_website_paths.issue_path}")
+        return
     for (
         pid,
         issue_data,
