@@ -72,13 +72,6 @@ class ClassicWebsiteConfiguration(CommonControlField):
         blank=True,
         help_text=_("Serial path"),
     )
-    cisis_path = models.CharField(
-        _("Cisis path"),
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text=_("Cisis path where there are CISIS utilities such as mx and i2id"),
-    )
     bases_work_path = models.CharField(
         _("Bases work path"),
         max_length=255,
@@ -114,6 +107,13 @@ class ClassicWebsiteConfiguration(CommonControlField):
         blank=True,
         help_text=_("Htdocs img revistas path"),
     )
+    pid_list_path = models.CharField(
+        _("PID list path"),
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text=_("Path of a text file which contains all the article PIDs from artigo.mst"),
+    )
 
     def __str__(self):
         return f"{self.collection}"
@@ -131,7 +131,7 @@ class ClassicWebsiteConfiguration(CommonControlField):
         title_path=None,
         issue_path=None,
         serial_path=None,
-        cisis_path=None,
+        pid_list_path=None,
         bases_work_path=None,
         bases_pdf_path=None,
         bases_translation_path=None,
@@ -146,7 +146,7 @@ class ClassicWebsiteConfiguration(CommonControlField):
             obj.title_path = title_path
             obj.issue_path = issue_path
             obj.serial_path = serial_path
-            obj.cisis_path = cisis_path
+            obj.pid_list_path = pid_list_path
             obj.bases_work_path = bases_work_path
             obj.bases_pdf_path = bases_pdf_path
             obj.bases_translation_path = bases_translation_path
@@ -221,22 +221,31 @@ class MigratedData(CommonControlField):
         content_type,
         force_update=False,
     ):
-        classic_ws_obj = cls.get_data_from_classic_website(data)
-
-        status = tracker_choices.PROGRESS_STATUS_TODO
-
         try:
-            if classic_ws_obj.is_press_release:
-                status = tracker_choices.PROGRESS_STATUS_IGNORED
-        except AttributeError:
-            pass
+            if data:
+                classic_ws_obj = cls.get_data_from_classic_website(data)
+        except Exception as e:
+            classic_ws_obj = None
 
+        if classic_ws_obj:
+            status = tracker_choices.PROGRESS_STATUS_TODO
+            isis_created_date = classic_ws_obj.isis_created_date
+            isis_updated_date = classic_ws_obj.isis_updated_date
+            try:
+                if classic_ws_obj.is_press_release:
+                    status = tracker_choices.PROGRESS_STATUS_IGNORED
+            except AttributeError:
+                pass
+        else:
+            status = tracker_choices.PROGRESS_STATUS_PENDING
+            isis_created_date = None
+            isis_updated_date = None
         return cls.create_or_update_migrated_data(
             collection=collection,
             pid=pid,
             user=user,
-            isis_created_date=classic_ws_obj.isis_created_date,
-            isis_updated_date=classic_ws_obj.isis_updated_date,
+            isis_created_date=isis_created_date,
+            isis_updated_date=isis_updated_date,
             data=data,
             migration_status=status,
             content_type=content_type,

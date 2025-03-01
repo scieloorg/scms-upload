@@ -14,6 +14,7 @@ from proc.controller import (
     migrate_journal,
     migrate_issue,
     publish_journals,
+    create_collection_procs_from_pid_list,
 )
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
@@ -838,5 +839,53 @@ def task_publish_article(
                 "username": username,
                 "website_kind": website_kind,
                 "pid": article_proc.pid,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_create_procs_from_pid_list(self, username, user_id=None, collection_acron=None, force_update=None):
+    user = _get_user(user_id=None, username=username)
+    try:
+        for collection in _get_collections(collection_acron):
+            task_create_collection_procs_from_pid_list.apply_async(
+                kwargs=dict(
+                    username=username,
+                    collection_acron=collection.acron,
+                    force_update=force_update,
+                )
+            )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "proc.tasks.task_create_procs_from_pid_list",
+                "collection_acron": collection_acron,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_create_collection_procs_from_pid_list(self, username, collection_acron, force_update):
+    user = _get_user(user_id=None, username=username)
+    try:
+        classic_website_config = controller.get_classic_website_config(collection_acron)
+        collection = classic_website_config.collection
+        create_collection_procs_from_pid_list(
+            user,
+            classic_website_config.collection,
+            classic_website_config.pid_list_path,
+            force_update,
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "proc.tasks.task_create_collection_procs_from_pid_list",
+                "collection_acron": collection_acron,
             },
         )

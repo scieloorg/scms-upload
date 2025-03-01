@@ -1,4 +1,3 @@
-import gzip
 from unittest.mock import PropertyMock, call, patch
 
 from article.models import Article, ArticleDOIWithLang
@@ -9,13 +8,11 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from issue.models import Issue
 from journal.models import Journal, JournalCollection, OfficialJournal
-from migration.models import MigratedArticle
 from proc.models import JournalProc
 
-from .models import (ArticleAvailability, CollectionVerificationFile,
+from .models import (ArticleAvailability,
                      ScieloURLStatus)
-from .tasks import (create_or_updated_migrated_article,
-                    fetch_data_and_register_result,
+from .tasks import (fetch_data_and_register_result,
                     initiate_article_availability_check,
                     process_article_availability,
                     process_file_to_check_migrated_articles,
@@ -287,108 +284,3 @@ class ArticleAvailabilityTest(TestCase):
         retry_failed_scielo_urls(username="user_test")
         self.assertEqual(mock_apply_async.call_count, 1)
         mock_apply_async.assert_has_calls(expected_calls, any_order=False)
-
-
-class CollectionVerificationFileTest(TestCase):
-    @classmethod
-    def create_gzip_file(cls, content, file_name="test_file_pid_v2.txt.gz"):
-        txt_content = "\n".join(content).encode("utf-8")
-
-        gzip_file = SimpleUploadedFile(file_name, b"")
-        with gzip.GzipFile(fileobj=gzip_file, mode="wb") as gz:
-            gz.write(txt_content)
-
-        gzip_file.seek(0)
-        return gzip_file
-
-    def setUp(
-        self,
-    ):
-        self.user = User.objects.create(username="user_test")
-        self.collection_scl = Collection.objects.create(acron="scl", creator=self.user)
-        self.list_of_pids_v2_file = [
-            "S0104-12902018000200XX1",
-            "S0104-12902018000200556",
-            "S0104-12902018000200298",
-            "S0104-12902018000200423",
-            "S0104-12902018000200XX4",
-            "S0104-12902018000200495",
-            "S0104-12902018000200481",
-            "S0104-12902018000200338",
-            "S0104-12902018000200588",
-            "S0104-12902018000200544",
-            "S0104-12902018000200435",
-        ]
-
-        self.list_of_pids_v2_migrated_article = [
-            "S0104-12902018000200495",
-            "S0104-12902018000200481",
-            "S0104-12902018000200338",
-            "S0104-12902018000200588",
-            "S0104-12902018000200544",
-            "S0104-12902018000200435",
-            "S0104-12902018000200XX4",
-        ]
-
-        for v2 in self.list_of_pids_v2_migrated_article:
-            MigratedArticle.objects.create(
-                pid=v2,
-                creator=self.user,
-            )
-
-        gzip_file = self.create_gzip_file(content=self.list_of_pids_v2_file)
-
-        self.collection_file = CollectionVerificationFile.objects.create(
-            collection=self.collection_scl,
-            uploaded_file=gzip_file,
-            creator=self.user,
-        )
-
-    def test_upload_to_function(self):
-        expected_path = f"verification_article_files/{self.collection_scl}"
-        media_root_path = f"/app/core/media/{expected_path}"
-        self.assertTrue(
-            self.collection_file.uploaded_file.name.startswith(expected_path)
-        )
-        self.assertTrue(
-            self.collection_file.uploaded_file.path.startswith(media_root_path)
-        )
-        with gzip.open(self.collection_file.uploaded_file.path, "rt") as f:
-            lines = f.read().splitlines()
-            self.assertEqual(lines, self.list_of_pids_v2_file)
-
-    @patch("publication.tasks.create_or_updated_migrated_article.apply_async")
-    def test_process_file_to_check_migrated_articles(self, mock_apply_async):
-        process_file_to_check_migrated_articles(
-            username="user_test", collection_acron="scl"
-        )
-
-        missing_pids = set(self.list_of_pids_v2_file) - set(
-            self.list_of_pids_v2_migrated_article
-        )
-        expected_calls = [
-            {
-                "pid_v2": pid_v2,
-                "collection_acron": "scl",
-                "username": "user_test",
-            }
-            for pid_v2 in missing_pids
-        ]
-
-        self.assertEqual(mock_apply_async.call_count, len(missing_pids))
-        self.assertEqual(
-            set(tuple(call.kwargs.items()) for call in mock_apply_async.call_args_list),
-            set(tuple(expected_call.items()) for expected_call in expected_calls),
-        )
-
-    def test_create_or_updated_migrated_article(
-        self,
-    ):
-        create_or_updated_migrated_article(
-            self.list_of_pids_v2_file[0], self.collection_scl.acron, self.user.username
-        )
-        migrated_article = MigratedArticle.objects.get(pid=self.list_of_pids_v2_file[0])
-
-        self.assertEqual(migrated_article.pid, self.list_of_pids_v2_file[0])
-        self.assertEqual(migrated_article.collection, self.collection_scl)
-        self.assertEqual(migrated_article.migration_status, "PENDING")

@@ -32,7 +32,7 @@ def setup(user, file_path=None, config=None):
         title_path=config["title_path"],
         issue_path=config["issue_path"],
         serial_path=config["SERIAL_PATH"],
-        cisis_path=config.get("CISIS_PATH"),
+        pid_list_path=config.get("pid_list_path"),
         bases_work_path=config["BASES_WORK_PATH"],
         bases_pdf_path=config["BASES_PDF_PATH"],
         bases_translation_path=config["BASES_TRANSLATION_PATH"],
