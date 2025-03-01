@@ -200,8 +200,7 @@ class ArticleProcModelAdmin(ModelAdmin):
     list_per_page = 10
     list_display = (
         "__str__",
-        "pkg_name",
-        "issue_proc",
+        "migration_status",
         "xml_status",
         "sps_pkg_status",
         "qa_ws_status",
