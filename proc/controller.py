@@ -387,6 +387,77 @@ def create_or_update_migrated_issue(
             )
 
 
+def create_collection_procs_from_pid_list(
+    user,
+    collection,
+    pid_list_path,
+    force_update,
+):
+    has_changes = controller.id_file_has_changes(
+        user,
+        collection,
+        pid_list_path,
+        force_update,
+    )
+    if not has_changes:
+        logging.info(f"skip reading {pid_list_path}")
+        return
+
+    try:
+        pid = None
+        journal_pids = set()
+        issue_pids = set()
+        with open(pid_list_path, "r") as fp:
+            # para cada registro da base de dados "title",
+            # cria um registro MigratedData (source="journal")
+            pids = fp.readlines()
+
+        for pid in pids:
+            pid = pid.strip() or ''
+            if not len(pid) == 23:
+                continue
+            ArticleProc.register_pid(
+                user,
+                collection,
+                pid,
+                force_update=False,
+            )
+            issue_pid = pid[1:-5]
+            if issue_pid not in issue_pids:
+                issue_pids.add(issue_pid)
+                IssueProc.register_pid(
+                    user,
+                    collection,
+                    issue_pid,
+                    force_update=False,
+                )
+
+                journal_pid = pid[1:10]
+                if journal_pid not in journal_pids:
+                    journal_pids.add(journal_pid)
+                    JournalProc.register_pid(
+                        user,
+                        collection,
+                        journal_pid,
+                        force_update=False,
+                    )
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.controller.create_collection_procs_from_pid_list",
+                "user_id": user.id,
+                "username": user.username,
+                "collection": collection.acron,
+                "pid_list_path": pid_list_path,
+                "force_update": force_update,
+            },
+        )
+
+
 def migrate_journal(
     user, journal_proc, issue_filter, force_update, force_import_acron_id_file, force_migrate_document_records, migrate_issues, migrate_articles
 ):
