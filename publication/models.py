@@ -136,22 +136,3 @@ def upload_path_for_verification_files(instance, filename):
         return f"verification_article_files/{instance.collection.acron}"
     except:
         return f"verification_article_files/{filename}"
-
-
-class CollectionVerificationFile(CommonControlField):
-    """
-    Modelo para armazenar o arquivo que contém os pids v2 da migração de acordo com a coleção
-    """
-
-    collection = models.ForeignKey(
-        Collection,
-        on_delete=models.CASCADE,
-        unique=True,
-    )
-    uploaded_file = models.FileField(upload_to=upload_path_for_verification_files)
-
-    class Meta:
-        unique_together = [("collection", "uploaded_file")]
-
-    def __str__(self):
-        return f"{self.collection} - {self.uploaded_file}"
