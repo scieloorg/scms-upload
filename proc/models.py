@@ -428,7 +428,7 @@ class BaseProc(CommonControlField):
             obj.save()
             return obj
         except IntegrityError:
-            return self.get(collection, pid)
+            return cls.get(collection, pid)
 
     def start(self, user, name):
         # self.save()
