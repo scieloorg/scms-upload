@@ -334,7 +334,7 @@ class BaseProc(CommonControlField):
     pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
 
     migration_status = models.CharField(
-        _("Status"),
+        _("Migration Status"),
         max_length=8,
         choices=tracker_choices.PROGRESS_STATUS,
         default=tracker_choices.PROGRESS_STATUS_TODO,
@@ -495,6 +495,41 @@ class BaseProc(CommonControlField):
                     exc_traceback=exc_traceback,
                     detail={
                         "task": "proc.BaseProc.register_classic_website_data",
+                        "username": user.username,
+                        "collection": collection.acron,
+                        "pid": pid,
+                    },
+                )
+
+    @classmethod
+    def register_pid(
+        cls,
+        user,
+        collection,
+        pid,
+        force_update=False,
+    ):
+        try:
+            operation = None
+            obj = cls.get_or_create(user, collection, pid)
+            operation = obj.start(user, f"register {pid}")
+            if obj.migrated_data and obj.migrated_data.data:
+                operation.finish(user, completed=False, message="migrated")
+            else:
+                obj.migration_status = tracker_choices.PROGRESS_STATUS_PENDING
+                obj.save()
+                operation.finish(user, completed=True, message="to be migrated")
+            return obj
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            if operation:
+                operation.finish(user, exc_traceback=exc_traceback, exception=e)
+            else:
+                UnexpectedEvent.create(
+                    e=e,
+                    exc_traceback=exc_traceback,
+                    detail={
+                        "task": "proc.BaseProc.register_pid",
                         "username": user.username,
                         "collection": collection.acron,
                         "pid": pid,
@@ -1431,12 +1466,14 @@ class ArticleProc(BaseProc, ClusterableModel):
 
     @property
     def identification(self):
-        return f"{self.issue_proc} {self.pkg_name}"
-
-    def __str__(self):
         if self.sps_pkg:
             return self.sps_pkg.sps_pkg_name
-        return f"{self.issue_proc} {self.pkg_name}"
+        if self.issue_proc:
+            return f"{self.issue_proc} {self.pkg_name}"
+        return f"{self.pid} {self.collection}"
+
+    def __str__(self):
+        return self.identification
 
     def autocomplete_label(self):
         return self.identification
