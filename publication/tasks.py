@@ -11,7 +11,6 @@ from core.utils.requester import fetch_data
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-from migration.models import MigratedArticle
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
@@ -20,7 +19,7 @@ from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
 from tracker.models import UnexpectedEvent
 
-from .models import Article, CollectionVerificationFile, ScieloURLStatus
+from .models import Article, ScieloURLStatus
 
 # FIXME
 # from upload.models import Package
@@ -560,46 +559,4 @@ def fetch_data_and_register_result(self, pid_v3, url, username, user_id):
                 "function": "publication.tasks.process_article_availability",
                 "url": url,
             },
-        )
-
-
-@celery_app.task(bind=True)
-def create_or_updated_migrated_article(self, pid_v2, collection_acron, username):
-    user = _get_user(user_id=None, username=username)
-    collection = Collection.get(acron=collection_acron)
-    obj = MigratedArticle.create_or_update_migrated_data(
-        pid=pid_v2,
-        collection=collection,
-        migration_status="PENDING",
-        user=user,
-    )
-
-
-@celery_app.task(bind=True)
-def process_file_to_check_migrated_articles(self, username, collection_acron):
-    try:
-        collection = Collection.get(acron=collection_acron)
-        file_with_pid_v2 = CollectionVerificationFile.objects.get(collection=collection)
-        with gzip.open(file_with_pid_v2.uploaded_file.path, "rt") as file:
-            values_pid_v2 = {line.strip() for line in file}
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "function": "publication.tasks.process_file_to_check_migrated_articles",
-            },
-        )
-
-    matching_articles = MigratedArticle.objects.filter(
-        pid__in=values_pid_v2
-    ).values_list("pid", flat=True)
-    missing_articles = values_pid_v2 - set(matching_articles)
-
-    for pid_v2 in missing_articles:
-        create_or_updated_migrated_article.apply_async(
-            pid_v2=pid_v2,
-            collection_acron=collection_acron,
-            username=username,
         )
