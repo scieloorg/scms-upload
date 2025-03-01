@@ -38,6 +38,12 @@ from tracker.models import UnexpectedEvent, format_traceback
 from .models import ClassicWebsiteConfiguration
 
 
+def get_classic_website_config(collection_acron):
+    return ClassicWebsiteConfiguration.objects.get(
+        collection__acron=collection_acron
+    )
+
+
 def create_or_update_journal(
     user,
     journal_proc,
@@ -404,7 +410,6 @@ def get_classic_website(collection_acron):
             bases_xml_path=config.bases_xml_path,
             htdocs_img_revistas_path=config.htdocs_img_revistas_path,
             serial_path=config.serial_path,
-            cisis_path=config.cisis_path,
             title_path=config.title_path,
             issue_path=config.issue_path,
         )
@@ -1072,4 +1077,3 @@ def read_bases_work_acron_id_file(user, source_path, classic_website, journal_pr
 
 def id_file_has_changes(user, collection, id_path, force_update):
     return MigratedFile.has_changes(user, collection, id_path, force_update)
-    
