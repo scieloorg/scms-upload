@@ -36,9 +36,11 @@ class RequestArticleChangeCreateView(CreateView):
 
 class ArticleAdminInspectView(InspectView):
     def get_context_data(self):
+        # FIXME
+        # Colocar packages como download para package
         data = {
             "status": self.instance.status,
-            "packages": self.instance.package_set.all(),
+            # "packages": self.instance.package_set.all(),
         }
 
         if self.instance.status in (

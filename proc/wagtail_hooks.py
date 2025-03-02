@@ -46,12 +46,12 @@ class JournalProcModelAdmin(ModelAdmin):
     list_display = (
         "journal",
         "acron",
+        "pid",
         "availability_status",
         "migration_status",
         "qa_ws_status",
         "public_ws_status",
         "updated",
-        "created",
     )
     list_filter = (
         "availability_status",
@@ -105,6 +105,7 @@ class IssueProcModelAdmin(ModelAdmin):
         "issue__volume",
         "issue__number",
         "issue__supplement",
+        "pid",
     )
 
 
@@ -197,8 +198,7 @@ class ArticleProcModelAdmin(ModelAdmin):
     list_per_page = 10
     list_display = (
         "__str__",
-        "pkg_name",
-        "issue_proc",
+        "migration_status",
         "xml_status",
         "sps_pkg_status",
         "qa_ws_status",

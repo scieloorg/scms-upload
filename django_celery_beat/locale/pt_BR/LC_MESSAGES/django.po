@@ -1,0 +1,525 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-06 05:08+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+#: django_celery_beat/admin.py:69 django_celery_beat/forms.py:55
+msgid "Task (registered)"
+msgstr ""
+
+#: django_celery_beat/admin.py:73 django_celery_beat/forms.py:59
+msgid "Task (custom)"
+msgstr ""
+
+#: django_celery_beat/admin.py:90 django_celery_beat/forms.py:75
+msgid "Need name of task"
+msgstr ""
+
+#: django_celery_beat/admin.py:96 django_celery_beat/forms.py:81
+#: django_celery_beat/models.py:672
+msgid "Only one can be set, in expires and expire_seconds"
+msgstr ""
+
+#: django_celery_beat/admin.py:106 django_celery_beat/forms.py:91
+#, python-format
+msgid "Unable to parse JSON: %s"
+msgstr ""
+
+#: django_celery_beat/admin.py:151
+msgid "Schedule"
+msgstr ""
+
+#: django_celery_beat/admin.py:167
+msgid "Arguments"
+msgstr ""
+
+#: django_celery_beat/admin.py:174
+msgid "Execution Options"
+msgstr ""
+
+#: django_celery_beat/admin.py:226 django_celery_beat/wagtail_hooks.py:69
+#, python-brace-format
+msgid "{0} task{1} {2} successfully {3}"
+msgstr ""
+
+#: django_celery_beat/admin.py:229 django_celery_beat/admin.py:310
+#: django_celery_beat/wagtail_hooks.py:72
+#: django_celery_beat/wagtail_hooks.py:153
+msgid "was,were"
+msgstr ""
+
+#: django_celery_beat/admin.py:239 django_celery_beat/wagtail_hooks.py:82
+msgid "Enable selected tasks"
+msgstr ""
+
+#: django_celery_beat/admin.py:246 django_celery_beat/wagtail_hooks.py:89
+msgid "Disable selected tasks"
+msgstr ""
+
+#: django_celery_beat/admin.py:261 django_celery_beat/wagtail_hooks.py:104
+msgid "Toggle activity of selected tasks"
+msgstr ""
+
+#: django_celery_beat/admin.py:286
+#, python-brace-format
+msgid "task \"{not_found_task_name}\" not found"
+msgstr ""
+
+#: django_celery_beat/admin.py:307 django_celery_beat/wagtail_hooks.py:150
+#, python-brace-format
+msgid "{0} task{1} {2} successfully run"
+msgstr ""
+
+#: django_celery_beat/admin.py:314 django_celery_beat/wagtail_hooks.py:157
+msgid "Run selected tasks"
+msgstr ""
+
+#: django_celery_beat/apps.py:13
+msgid "Periodic Tasks"
+msgstr ""
+
+#: django_celery_beat/button_helper.py:15
+msgid "Run"
+msgstr ""
+
+#: django_celery_beat/models.py:35
+msgid "Days"
+msgstr ""
+
+#: django_celery_beat/models.py:36
+msgid "Hours"
+msgstr ""
+
+#: django_celery_beat/models.py:37
+msgid "Minutes"
+msgstr ""
+
+#: django_celery_beat/models.py:38
+msgid "Seconds"
+msgstr ""
+
+#: django_celery_beat/models.py:39
+msgid "Microseconds"
+msgstr ""
+
+#: django_celery_beat/models.py:43
+msgid "Day"
+msgstr ""
+
+#: django_celery_beat/models.py:44
+msgid "Hour"
+msgstr ""
+
+#: django_celery_beat/models.py:45
+msgid "Minute"
+msgstr ""
+
+#: django_celery_beat/models.py:46
+msgid "Second"
+msgstr ""
+
+#: django_celery_beat/models.py:47
+msgid "Microsecond"
+msgstr ""
+
+#: django_celery_beat/models.py:51
+msgid "Astronomical dawn"
+msgstr ""
+
+#: django_celery_beat/models.py:52
+msgid "Civil dawn"
+msgstr ""
+
+#: django_celery_beat/models.py:53
+msgid "Nautical dawn"
+msgstr ""
+
+#: django_celery_beat/models.py:54
+msgid "Astronomical dusk"
+msgstr ""
+
+#: django_celery_beat/models.py:55
+msgid "Civil dusk"
+msgstr ""
+
+#: django_celery_beat/models.py:56
+msgid "Nautical dusk"
+msgstr ""
+
+#: django_celery_beat/models.py:57
+msgid "Solar noon"
+msgstr ""
+
+#: django_celery_beat/models.py:58
+msgid "Sunrise"
+msgstr ""
+
+#: django_celery_beat/models.py:59
+msgid "Sunset"
+msgstr ""
+
+#: django_celery_beat/models.py:93
+msgid "Solar Event"
+msgstr ""
+
+#: django_celery_beat/models.py:94
+msgid "The type of solar event when the job should run"
+msgstr ""
+
+#: django_celery_beat/models.py:99
+msgid "Latitude"
+msgstr ""
+
+#: django_celery_beat/models.py:100
+msgid "Run the task when the event happens at this latitude"
+msgstr ""
+
+#: django_celery_beat/models.py:106
+msgid "Longitude"
+msgstr ""
+
+#: django_celery_beat/models.py:107
+msgid "Run the task when the event happens at this longitude"
+msgstr ""
+
+#: django_celery_beat/models.py:114
+msgid "solar event"
+msgstr ""
+
+#: django_celery_beat/models.py:115
+msgid "solar events"
+msgstr ""
+
+#: django_celery_beat/models.py:164
+msgid "Number of Periods"
+msgstr ""
+
+#: django_celery_beat/models.py:166
+msgid "Number of interval periods to wait before running the task again"
+msgstr ""
+
+#: django_celery_beat/models.py:173
+msgid "Interval Period"
+msgstr ""
+
+#: django_celery_beat/models.py:174
+msgid "The type of period between task runs (Example: days)"
+msgstr ""
+
+#: django_celery_beat/models.py:180
+msgid "interval"
+msgstr ""
+
+#: django_celery_beat/models.py:181
+msgid "intervals"
+msgstr ""
+
+#: django_celery_beat/models.py:207
+msgid "every {}"
+msgstr ""
+
+#: django_celery_beat/models.py:212
+msgid "every {} {}"
+msgstr ""
+
+#: django_celery_beat/models.py:223
+msgid "Clock Time"
+msgstr ""
+
+#: django_celery_beat/models.py:224
+msgid "Run the task at clocked time"
+msgstr ""
+
+#: django_celery_beat/models.py:230 django_celery_beat/models.py:231
+msgid "clocked"
+msgstr ""
+
+#: django_celery_beat/models.py:272
+msgid "Minute(s)"
+msgstr ""
+
+#: django_celery_beat/models.py:273
+msgid "Cron Minutes to Run. Use \"*\" for \"all\". (Example: \"0,30\")"
+msgstr ""
+
+#: django_celery_beat/models.py:279
+msgid "Hour(s)"
+msgstr ""
+
+#: django_celery_beat/models.py:280
+msgid "Cron Hours to Run. Use \"*\" for \"all\". (Example: \"8,20\")"
+msgstr ""
+
+#: django_celery_beat/models.py:286
+msgid "Day(s) Of The Week"
+msgstr ""
+
+#: django_celery_beat/models.py:288
+msgid ""
+"Cron Days Of The Week to Run. Use \"*\" for \"all\", Sunday is 0 or 7, "
+"Monday is 1. (Example: \"0,5\")"
+msgstr ""
+
+#: django_celery_beat/models.py:296
+msgid "Day(s) Of The Month"
+msgstr ""
+
+#: django_celery_beat/models.py:298
+msgid ""
+"Cron Days Of The Month to Run. Use \"*\" for \"all\". (Example: \"1,15\")"
+msgstr ""
+
+#: django_celery_beat/models.py:305
+msgid "Month(s) Of The Year"
+msgstr ""
+
+#: django_celery_beat/models.py:307
+msgid ""
+"Cron Months (1-12) Of The Year to Run. Use \"*\" for \"all\". (Example: "
+"\"1,12\")"
+msgstr ""
+
+#: django_celery_beat/models.py:316
+msgid "Cron Timezone"
+msgstr ""
+
+#: django_celery_beat/models.py:317
+msgid "Timezone to Run the Cron Schedule on. Default is UTC."
+msgstr ""
+
+#: django_celery_beat/models.py:323
+msgid "crontab"
+msgstr ""
+
+#: django_celery_beat/models.py:324
+msgid "crontabs"
+msgstr ""
+
+#: django_celery_beat/models.py:432
+msgid "Name"
+msgstr ""
+
+#: django_celery_beat/models.py:433
+msgid "Short Description For This Task"
+msgstr ""
+
+#: django_celery_beat/models.py:439
+msgid ""
+"The Name of the Celery Task that Should be Run.  (Example: \"proj.tasks."
+"import_contacts\")"
+msgstr ""
+
+#: django_celery_beat/models.py:451
+msgid "Interval Schedule"
+msgstr ""
+
+#: django_celery_beat/models.py:453
+msgid ""
+"Interval Schedule to run the task on.  Set only one schedule type, leave the "
+"others null."
+msgstr ""
+
+#: django_celery_beat/models.py:462
+msgid "Crontab Schedule"
+msgstr ""
+
+#: django_celery_beat/models.py:464
+msgid ""
+"Crontab Schedule to run the task on.  Set only one schedule type, leave the "
+"others null."
+msgstr ""
+
+#: django_celery_beat/models.py:473
+msgid "Solar Schedule"
+msgstr ""
+
+#: django_celery_beat/models.py:475
+msgid ""
+"Solar Schedule to run the task on.  Set only one schedule type, leave the "
+"others null."
+msgstr ""
+
+#: django_celery_beat/models.py:484
+msgid "Clocked Schedule"
+msgstr ""
+
+#: django_celery_beat/models.py:486
+msgid ""
+"Clocked Schedule to run the task on.  Set only one schedule type, leave the "
+"others null."
+msgstr ""
+
+#: django_celery_beat/models.py:494
+msgid "Positional Arguments"
+msgstr ""
+
+#: django_celery_beat/models.py:495
+msgid "JSON encoded positional arguments (Example: [\"arg1\", \"arg2\"])"
+msgstr ""
+
+#: django_celery_beat/models.py:500
+msgid "Keyword Arguments"
+msgstr ""
+
+#: django_celery_beat/models.py:502
+msgid "JSON encoded keyword arguments (Example: {\"argument\": \"value\"})"
+msgstr ""
+
+#: django_celery_beat/models.py:511
+msgid "Queue Override"
+msgstr ""
+
+#: django_celery_beat/models.py:513
+msgid "Queue defined in CELERY_TASK_QUEUES. Leave None for default queuing."
+msgstr ""
+
+#: django_celery_beat/models.py:525
+msgid "Exchange"
+msgstr ""
+
+#: django_celery_beat/models.py:526
+msgid "Override Exchange for low-level AMQP routing"
+msgstr ""
+
+#: django_celery_beat/models.py:533
+msgid "Routing Key"
+msgstr ""
+
+#: django_celery_beat/models.py:534
+msgid "Override Routing Key for low-level AMQP routing"
+msgstr ""
+
+#: django_celery_beat/models.py:539
+msgid "AMQP Message Headers"
+msgstr ""
+
+#: django_celery_beat/models.py:540
+msgid "JSON encoded message headers for the AMQP message."
+msgstr ""
+
+#: django_celery_beat/models.py:548
+msgid "Priority"
+msgstr ""
+
+#: django_celery_beat/models.py:550
+msgid ""
+"Priority Number between 0 and 255. Supported by: RabbitMQ, Redis (priority "
+"reversed, 0 is highest)."
+msgstr ""
+
+#: django_celery_beat/models.py:557
+msgid "Expires Datetime"
+msgstr ""
+
+#: django_celery_beat/models.py:559
+msgid ""
+"Datetime after which the schedule will no longer trigger the task to run"
+msgstr ""
+
+#: django_celery_beat/models.py:566
+msgid "Expires timedelta with seconds"
+msgstr ""
+
+#: django_celery_beat/models.py:568
+msgid ""
+"Timedelta with seconds which the schedule will no longer trigger the task to "
+"run"
+msgstr ""
+
+#: django_celery_beat/models.py:574
+msgid "One-off Task"
+msgstr ""
+
+#: django_celery_beat/models.py:575
+msgid "If True, the schedule will only run the task a single time"
+msgstr ""
+
+#: django_celery_beat/models.py:580
+msgid "Start Datetime"
+msgstr ""
+
+#: django_celery_beat/models.py:582
+msgid "Datetime when the schedule should begin triggering the task to run"
+msgstr ""
+
+#: django_celery_beat/models.py:587
+msgid "Enabled"
+msgstr ""
+
+#: django_celery_beat/models.py:588
+msgid "Set to False to disable the schedule"
+msgstr ""
+
+#: django_celery_beat/models.py:596
+msgid "Last Run Datetime"
+msgstr ""
+
+#: django_celery_beat/models.py:598
+msgid ""
+"Datetime that the schedule last triggered the task to run. Reset to None if "
+"enabled is set to False."
+msgstr ""
+
+#: django_celery_beat/models.py:605
+msgid "Total Run Count"
+msgstr ""
+
+#: django_celery_beat/models.py:607
+msgid "Running count of how many times the schedule has triggered the task"
+msgstr ""
+
+#: django_celery_beat/models.py:612
+msgid "Last Modified"
+msgstr ""
+
+#: django_celery_beat/models.py:613
+msgid "Datetime that this PeriodicTask was last modified"
+msgstr ""
+
+#: django_celery_beat/models.py:617
+msgid "Description"
+msgstr ""
+
+#: django_celery_beat/models.py:618
+msgid "Detailed description about the details of this Periodic Task"
+msgstr ""
+
+#: django_celery_beat/models.py:627
+msgid "periodic task"
+msgstr ""
+
+#: django_celery_beat/models.py:628
+msgid "periodic tasks"
+msgstr ""
+
+#: django_celery_beat/templates/admin/djcelery/change_list.html:6
+msgid "Home"
+msgstr ""
+
+#: django_celery_beat/views.py:39
+#, python-brace-format
+msgid "Task {0} was successfully run"
+msgstr ""
+
+#: django_celery_beat/wagtail_hooks.py:129
+#, python-brace-format
+msgid "task \"{0}\" not found"
+msgstr ""
+
+#: django_celery_beat/wagtail_hooks.py:192
+msgid "Tasks"
+msgstr ""

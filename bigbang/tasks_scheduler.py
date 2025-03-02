@@ -86,12 +86,37 @@ def schedule_migration_subtasks(username):
     _schedule_migrate_and_publish_issues(username, enabled)
     _schedule_migrate_and_publish_journals(username, enabled)
     _schedule_migration_and_publication(username, enabled)
+    _schedule_create_procs_from_pid_list(username, enabled)
 
 
 def schedule_publication_subtasks(username):
     _schedule_publish_articles(username)
     _schedule_publish_issues(username)
     _schedule_publish_journals(username)
+
+
+
+def _schedule_create_procs_from_pid_list(username, enabled):
+    """
+    Agenda a tarefa de migrar os registros da base de dados TITLE
+    Deixa a tarefa desabilitada
+    """
+    schedule_task(
+        task="proc.tasks.task_create_procs_from_pid_list",
+        name="create_procs_from_pid_list",
+        kwargs=dict(
+            username=username,
+            collection_acron=None,
+            force_update=False,
+        ),
+        description=_("Create Journal, Issue e Article Processing items"),
+        priority=MIGRATION_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=MIGRATION_MINUTES,
+    )
 
 
 def _schedule_migration_and_publication(username, enabled):

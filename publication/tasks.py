@@ -1,3 +1,4 @@
+import gzip
 import logging
 import sys
 import requests
@@ -5,11 +6,16 @@ from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
+from datetime import datetime
 
 from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from core.models import PressRelease
+from core.utils.requester import fetch_data
+from django.contrib.auth import get_user_model
+from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 from proc.models import ArticleProc, IssueProc, JournalProc
 from proc.controller import create_or_update_journal, create_or_update_issue
 from upload.models import Package
@@ -20,6 +26,10 @@ from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
 from tracker.models import UnexpectedEvent
 
+from .models import Article, ScieloURLStatus
+
+# FIXME
+# from upload.models import Package
 
 User = get_user_model()
 
@@ -510,3 +520,148 @@ def task_publish_article(
                     website_kind=website_kind,
                 ),
             )
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail=dict(
+                task="task_publish_article",
+                item=str(manager),
+                article_proc_id=article_proc_id,
+                upload_package_id=article_proc_id,
+                website_kind=website_kind,
+            ),
+        )
+
+
+@celery_app.task(bind=True)
+def initiate_article_availability_check(
+    self,
+    username,
+    user_id=None,
+    issn_print=None,
+    issn_electronic=None,
+    publication_year=None,
+    updated=None,
+    article_pid_v3=None,
+    collection_acron=None,
+    purpose="PUBLIC",
+):
+    if collection_acron:
+        collection = Collection.objects.filter(acron=collection_acron)
+    else:
+        collection = Collection.objects.all()
+
+    query = Q()
+    if not updated:
+        if article_pid_v3:
+            query |= Q(pid_v3=article_pid_v3)
+        if issn_print:
+            query |= Q(journal__official_journal__issn_print=issn_print)
+        if issn_electronic:
+            query |= Q(journal__official_journal__issn_electronic=issn_electronic)
+        if publication_year:
+            query |= Q(issue__publication_year=publication_year)
+
+    try:
+        for col in collection:
+            for journal_collection in col.journalcollection_set.all():
+                for article in journal_collection.journal.article_set.filter(query):
+                    for lang in article.article_langs:
+                        process_article_availability.apply_async(
+                            kwargs=dict(
+                                user_id=user_id,
+                                username=username,
+                                pid_v3=article.pid_v3,
+                                pid_v2=article.pid_v2,
+                                journal_acron=article.journal.journal_acron,
+                                lang=lang,
+                                domain=journal_collection.collection.websiteconfiguration_set.get(
+                                    enabled=True, purpose=purpose
+                                ).url,
+                            )
+                        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "publication.tasks.initiate_article_availability_check",
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def process_article_availability(
+    self, user_id, username, pid_v3, pid_v2, journal_acron, lang, domain
+):
+    urls = [
+        f"{domain}/scielo.php?script=sci_arttext&pid={pid_v2}&lang={lang}&nrm=iso",
+        f"{domain}/j/{journal_acron}/a/{pid_v3}/?lang={lang}",
+        f"{domain}/scielo.php?script=sci_arttext&pid={pid_v2}&format=pdf&lng={lang}&nrm=iso",
+        f"{domain}/j/{journal_acron}/a/{pid_v3}/?format=pdf&lang={lang}",
+    ]
+
+    for url in urls:
+        fetch_data_and_register_result.apply_async(
+            kwargs=dict(
+                pid_v3=pid_v3,
+                url=url,
+                username=username,
+                user_id=user_id,
+            )
+        )
+
+
+@celery_app.task(bind=True)
+def retry_failed_scielo_urls(self, username, user_id=None):
+    for scielo_url_status in ScieloURLStatus.objects.filter(available=False):
+        fetch_data_and_register_result.apply_async(
+            kwargs=dict(
+                pid_v3=scielo_url_status.article_availability.article.pid_v3,
+                url=scielo_url_status.url,
+                username=username,
+                user_id=user_id,
+            )
+        )
+
+
+@celery_app.task(bind=True)
+def fetch_data_and_register_result(self, pid_v3, url, username, user_id):
+    try:
+        user = _get_user(user_id=user_id, username=username)
+        article = Article.objects.get(pid_v3=pid_v3)
+
+        try:
+            response = fetch_data(url, timeout=2, verify=True)
+        except Exception as e:
+            ScieloURLStatus.create_or_update(
+                article=article,
+                url=url,
+                check_date=datetime.now(),
+                available=False,
+                user=user,
+            )
+        else:
+            try:
+                obj = ScieloURLStatus.get(article=article, url=url)
+                obj.available = True
+                obj.save()
+            except ScieloURLStatus.DoesNotExist:
+                ScieloURLStatus.create_or_update(
+                    article=article,
+                    url=url,
+                    check_date=datetime.now(),
+                    available=True,
+                    user=user,
+                )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "publication.tasks.process_article_availability",
+                "url": url,
+            },
+        )

@@ -76,13 +76,18 @@ class IssuePayload:
             self.data["volume"] = volume
         if supplement is not None:
             self.data["supplement"] = supplement
+            self.data["type"] = "supplement"
         if number:
+            self.data["number"] = number
             if "spe" in number:
-                self.data["spe_text"] = number
+                self.data["type"] = "special"
+                # self.data["spe_text"] = number.split("spe")[-1]
+            elif number == "ahead":
+                self.data["type"] = "ahead"
             else:
-                self.data["number"] = number
-
-        self.add_issue_type()
+                self.data["type"] = "regular"
+        elif not supplement:
+            self.data["type"] = "volume_issue"
 
     @property
     def has_docs(self):
@@ -99,26 +104,6 @@ class IssuePayload:
             ``outdated_ahead``, para que não apareça na grade de fascículos
             """
             self.data["type"] = "outdated_ahead"
-
-    def add_issue_type(self):
-        if self.data.get("supplement"):
-            self.data["type"] = "supplement"
-            return
-
-        if self.data.get("volume") and not self.data.get("number"):
-            self.data["type"] = "volume_issue"
-            return
-
-        if self.data.get("number") == "ahead":
-            self.data["type"] = "ahead"
-            self.data["publication_year"] = "9999"
-            return
-
-        if self.data.get("number") and "spe" in self.data["number"]:
-            self.data["type"] = "special"
-            return
-
-        self.data["type"] = "regular"
 
     def add_journal(self, journal_id):
         self.data["journal_id"] = journal_id

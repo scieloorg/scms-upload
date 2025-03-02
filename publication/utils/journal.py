@@ -35,13 +35,15 @@ def build_journal(builder, journal, journal_id, journal_acron, journal_history, 
             journal_history.date,
             journal_history.interruption_reason,
         )
+
     current_status = "inprogress"
     if builder.data.get("status_history"):
-        current_status = sorted(builder.data["status_history"], key=lambda x: x['date'])[-1]["status"]
-        if current_status == "current" and availability_status != "C":
-            current_status = "inprogress"
-        elif current_status != "current":
-            current_status = "no-current"
+        try:
+            current_status = sorted(builder.data["status_history"], key=lambda x: x['date'])[-1]["status"]
+            if current_status not in ("inprogress", "current"):
+                current_status = "no-current"
+        except (IndexError, KeyError):
+            pass
     builder.data["current_status"] = current_status
 
     builder.add_journal_issns(
@@ -56,7 +58,9 @@ def build_journal(builder, journal, journal_id, journal_acron, journal_history, 
     )
     try:
         # FIXME
-        builder.add_logo_url(journal.logo_url or "https://www.scielo.org/journal_logo_missing.gif")
+        builder.add_logo_url(
+            journal.logo_url or "https://www.scielo.org/journal_logo_missing.gif"
+        )
     except AttributeError:
         builder.add_logo_url("https://www.scielo.org/journal_logo_missing.gif")
     builder.add_online_submission_url(journal.submission_online_url)  # Adicionar
@@ -80,7 +84,7 @@ def build_journal(builder, journal, journal_id, journal_acron, journal_history, 
             builder.add_publisher(name)
 
     builder.add_thematic_scopes(
-        subject_categories=None,
+        subject_categories=journal.wos_areas,
         subject_areas=journal.subject_areas,
     )
     builder.add_is_public(availability_status)
