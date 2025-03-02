@@ -1,23 +1,24 @@
 import logging
 import os
+import sys
 from datetime import datetime
 
 from django.core.files.base import ContentFile
-from django.db import IntegrityError, models
+from django.db import IntegrityError, models, DataError
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from scielo_classic_website import classic_ws
-from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
+from wagtail.admin.panels import FieldPanel
 from wagtail.models import Orderable
-from wagtailautocomplete.edit_handlers import AutocompletePanel
+from pathlib import Path
 
 from collection.models import Collection
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from tracker import choices as tracker_choices
-
+from tracker.models import UnexpectedEvent
 from . import exceptions
 
 
@@ -71,13 +72,6 @@ class ClassicWebsiteConfiguration(CommonControlField):
         blank=True,
         help_text=_("Serial path"),
     )
-    cisis_path = models.CharField(
-        _("Cisis path"),
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text=_("Cisis path where there are CISIS utilities such as mx and i2id"),
-    )
     bases_work_path = models.CharField(
         _("Bases work path"),
         max_length=255,
@@ -113,6 +107,13 @@ class ClassicWebsiteConfiguration(CommonControlField):
         blank=True,
         help_text=_("Htdocs img revistas path"),
     )
+    pid_list_path = models.CharField(
+        _("PID list path"),
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text=_("Path of a text file which contains all the article PIDs from artigo.mst"),
+    )
 
     def __str__(self):
         return f"{self.collection}"
@@ -130,7 +131,7 @@ class ClassicWebsiteConfiguration(CommonControlField):
         title_path=None,
         issue_path=None,
         serial_path=None,
-        cisis_path=None,
+        pid_list_path=None,
         bases_work_path=None,
         bases_pdf_path=None,
         bases_translation_path=None,
@@ -145,7 +146,7 @@ class ClassicWebsiteConfiguration(CommonControlField):
             obj.title_path = title_path
             obj.issue_path = issue_path
             obj.serial_path = serial_path
-            obj.cisis_path = cisis_path
+            obj.pid_list_path = pid_list_path
             obj.bases_work_path = bases_work_path
             obj.bases_pdf_path = bases_pdf_path
             obj.bases_translation_path = bases_translation_path
@@ -220,22 +221,31 @@ class MigratedData(CommonControlField):
         content_type,
         force_update=False,
     ):
-        classic_ws_obj = cls.get_data_from_classic_website(data)
-
-        status = tracker_choices.PROGRESS_STATUS_TODO
-
         try:
-            if classic_ws_obj.is_press_release:
-                status = tracker_choices.PROGRESS_STATUS_IGNORED
-        except AttributeError:
-            pass
+            if data:
+                classic_ws_obj = cls.get_data_from_classic_website(data)
+        except Exception as e:
+            classic_ws_obj = None
 
+        if classic_ws_obj:
+            status = tracker_choices.PROGRESS_STATUS_TODO
+            isis_created_date = classic_ws_obj.isis_created_date
+            isis_updated_date = classic_ws_obj.isis_updated_date
+            try:
+                if classic_ws_obj.is_press_release:
+                    status = tracker_choices.PROGRESS_STATUS_IGNORED
+            except AttributeError:
+                pass
+        else:
+            status = tracker_choices.PROGRESS_STATUS_PENDING
+            isis_created_date = None
+            isis_updated_date = None
         return cls.create_or_update_migrated_data(
             collection=collection,
             pid=pid,
             user=user,
-            isis_created_date=classic_ws_obj.isis_created_date,
-            isis_updated_date=classic_ws_obj.isis_updated_date,
+            isis_created_date=isis_created_date,
+            isis_updated_date=isis_updated_date,
             data=data,
             migration_status=status,
             content_type=content_type,
@@ -293,6 +303,13 @@ class MigratedData(CommonControlField):
             )
 
 
+def extract_relative_path(full_path):
+    parts = Path(full_path).parts
+    for i, part in enumerate(parts):
+        if part in ["htdocs", "bases", "bases-work"]:
+            return str(Path(*parts[i:]))
+    return None
+
 def migrated_files_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
 
@@ -301,8 +318,10 @@ def migrated_files_directory_path(instance, filename):
     except (AttributeError, TypeError) as e:
         path = instance.source_path
 
+    path_relative = extract_relative_path(path)
+    
     try:
-        return f"classic_website/{instance.collection.acron}/{path}"
+        return f"classic_website/{instance.collection.acron}/{path_relative}"
     except (AttributeError, TypeError) as e:
         return f"classic_website/{filename}"
 
@@ -358,6 +377,26 @@ class MigratedFile(CommonControlField):
             models.Index(fields=["original_path"]),
             models.Index(fields=["original_href"]),
         ]
+
+    @classmethod
+    def has_changes(cls, user, collection, file_path, force_update):
+        if not force_update:
+            try:
+                file_date = modified_date(file_path)
+                if cls.objects.filter(collection=collection, original_path=file_path, file_date=file_date).exists():
+                    return False
+            except cls.DoesNotExist:
+                pass
+
+        cls.create_or_update(
+            user=user,
+            collection=collection,
+            original_path=file_path,
+            source_path=file_path,
+            component_type="id_file",
+            force_update=force_update,
+        )
+        return True
 
     @classmethod
     def get(
@@ -559,7 +598,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
     file = models.FileField(
         upload_to=migrated_files_directory_path, null=True, blank=True
     )
-    # bases/pdf/acron/volnum/pt_a01.pdf
+    # classic_website/spa/scielo_www/hercules-spa/new_platform/bases_for_upload/bases-work/acron/file_asdg.id
     source_path = models.TextField(_("Source"), null=True, blank=True)
 
     file_size = models.IntegerField(null=True, blank=True)
@@ -580,6 +619,27 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         indexes = [
             models.Index(fields=["source_path"]),
         ]
+
+    @classmethod
+    def has_changes(cls, user, collection, journal_acron, file_path, force_update):
+        if not force_update:
+            try:
+                file_size = JournalAcronIdFile.get_file_size(source_path)
+                if cls.objects.filter(collection=collection, source_path=file_path, file_size=file_size).exists():
+                    return False
+            except cls.DoesNotExist:
+                pass
+            except cls.MultipleObjectsReturned:
+                pass
+
+        cls.create_or_update(
+            user=user,
+            collection=collection,
+            journal_acron=journal_acron,
+            source_path=file_path,
+            force_update=force_update,
+        )
+        return True
 
     @classmethod
     def get(
@@ -693,7 +753,7 @@ class IdFileRecord(CommonControlField, Orderable):
     item_type = models.CharField(_("Type"), max_length=10)
     issue_folder = models.CharField(_("Issue folder"), max_length=30)
     article_filename = models.CharField(
-        _("Filename"), max_length=30, null=True, blank=True
+        _("Filename"), max_length=40, null=True, blank=True
     )
     article_filetype = models.CharField(
         _("File type"), max_length=4, null=True, blank=True
@@ -778,6 +838,24 @@ class IdFileRecord(CommonControlField, Orderable):
             return obj
         except IntegrityError:
             return cls.get(parent, item_type, item_pid)
+        except DataError as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "task": "migrations.models.IdFileRecord.create",
+                    "user_id": user.id,
+                    "username": user.username,
+                    "item_type": item_type,
+                    "item_pid": item_pid,
+                    "data": data,
+                    "issue_folder": issue_folder,
+                    "article_filename": article_filename,
+                    "article_filetype": article_filetype,
+                    "processing_date": processing_date,
+                },
+            )            
 
     @classmethod
     def create_or_update(
@@ -878,3 +956,10 @@ class IdFileRecord(CommonControlField, Orderable):
 
         logging.info(f"IdFileRecord.document_records_to_migrate {params}")
         return cls.objects.filter(item_type="article", **params)
+
+    @classmethod
+    def add_issue_folder(cls, issue_pid, issue_folder):
+        return cls.objects.filter(
+            Q(item_pid__startswith=f"S{issue_pid}") | Q(item_pid=issue_pid),
+            issue_folder__in=["", None]
+        ).update(issue_folder=issue_folder)

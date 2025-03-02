@@ -334,7 +334,7 @@ class BaseProc(CommonControlField):
     pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
 
     migration_status = models.CharField(
-        _("Status"),
+        _("Migration Status"),
         max_length=8,
         choices=tracker_choices.PROGRESS_STATUS,
         default=tracker_choices.PROGRESS_STATUS_TODO,
@@ -410,16 +410,25 @@ class BaseProc(CommonControlField):
 
     @classmethod
     def get_or_create(cls, user, collection, pid):
+        if collection and pid:
+            try:
+                return cls.get(collection, pid)
+            except cls.DoesNotExist:
+                return cls.create(user, collection, pid)
+        raise ValueError(f"{cls}.get_or_create requires collection ({collection}) and pid ({pid})")
+
+    @classmethod
+    def create(cls, user, collection, pid):
         try:
-            obj = cls.get(collection, pid)
-        except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
             obj.collection = collection
             obj.pid = pid
             obj.public_ws_status = tracker_choices.PROGRESS_STATUS_TODO
             obj.save()
-        return obj
+            return obj
+        except IntegrityError:
+            return cls.get(collection, pid)
 
     def start(self, user, name):
         # self.save()
@@ -486,6 +495,41 @@ class BaseProc(CommonControlField):
                     exc_traceback=exc_traceback,
                     detail={
                         "task": "proc.BaseProc.register_classic_website_data",
+                        "username": user.username,
+                        "collection": collection.acron,
+                        "pid": pid,
+                    },
+                )
+
+    @classmethod
+    def register_pid(
+        cls,
+        user,
+        collection,
+        pid,
+        force_update=False,
+    ):
+        try:
+            operation = None
+            obj = cls.get_or_create(user, collection, pid)
+            operation = obj.start(user, f"register {pid}")
+            if obj.migrated_data and obj.migrated_data.data:
+                operation.finish(user, completed=False, message="migrated")
+            else:
+                obj.migration_status = tracker_choices.PROGRESS_STATUS_PENDING
+                obj.save()
+                operation.finish(user, completed=True, message="to be migrated")
+            return obj
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            if operation:
+                operation.finish(user, exc_traceback=exc_traceback, exception=e)
+            else:
+                UnexpectedEvent.create(
+                    e=e,
+                    exc_traceback=exc_traceback,
+                    detail={
+                        "task": "proc.BaseProc.register_pid",
                         "username": user.username,
                         "collection": collection.acron,
                         "pid": pid,
@@ -807,10 +851,14 @@ class JournalProc(BaseProc, ClusterableModel):
         ]
 
     def __unicode__(self):
-        return f"{self.acron} ({self.collection.name})"
+        if self.acron:
+            return f"{self.acron} ({self.collection.name})"
+        return f"{self.pid} ({self.collection.name})"
 
     def __str__(self):
-        return f"{self.acron} ({self.collection.name})"
+        if self.acron:
+            return f"{self.acron} ({self.collection.name})"
+        return f"{self.pid} ({self.collection.name})"
 
     @staticmethod
     def autocomplete_custom_queryset_filter(search_term):
@@ -1201,6 +1249,8 @@ class IssueProc(BaseProc, ClusterableModel):
         logging.info(f"Migrate documents from {resumption}")
         # registros novos ou atualizados
 
+        IdFileRecord.add_issue_folder(self.pid, self.issue_folder)
+
         params = dict(
             collection=self.journal_proc.collection,
             journal_acron=self.journal_proc.acron,
@@ -1213,7 +1263,7 @@ class IssueProc(BaseProc, ClusterableModel):
         for record in id_file_records:
             try:
                 logging.info(f"migrate_document_records: {record.item_pid}")
-                data = record.get_record_data(journal_data)
+                data = record.get_record_data(journal_data, issue_data=self.migrated_data.data)
                 article_proc = self.create_or_update_article_proc(
                     user, record.item_pid, data["data"], force_update
                 )
@@ -1416,12 +1466,14 @@ class ArticleProc(BaseProc, ClusterableModel):
 
     @property
     def identification(self):
-        return f"{self.issue_proc} {self.pkg_name}"
-
-    def __str__(self):
         if self.sps_pkg:
             return self.sps_pkg.sps_pkg_name
-        return f"{self.issue_proc} {self.pkg_name}"
+        if self.issue_proc:
+            return f"{self.issue_proc} {self.pkg_name}"
+        return f"{self.pid} {self.collection}"
+
+    def __str__(self):
+        return self.identification
 
     def autocomplete_label(self):
         return self.identification

@@ -210,7 +210,7 @@ class SPSPkgComponent(FileLocation, Orderable):
         null=True,
         blank=True,
     )
-    legacy_uri = models.CharField(max_length=120, null=True, blank=True)
+    legacy_uri = models.CharField(max_length=250, null=True, blank=True)
 
     def autocomplete_label(self):
         return f"{self.sps_pkg} {self.basename}"
@@ -351,17 +351,17 @@ class PreviewArticlePage(Orderable):
 
 class SPSPkg(CommonControlField, ClusterableModel):
     pid_v3 = models.CharField(max_length=23, null=True, blank=True)
-    sps_pkg_name = models.CharField(_("SPS Name"), max_length=40, null=True, blank=True)
+    sps_pkg_name = models.CharField(_("SPS Name"), max_length=50, null=True, blank=True)
 
     # zip
-    file = models.FileField(upload_to=pkg_directory_path, null=True, blank=True)
+    file = models.FileField(upload_to=pkg_directory_path, null=True, blank=True, max_length=150)
 
     # XML URI
     xml_uri = models.URLField(null=True, blank=True)
 
     # pacote veio da migração ou do ingresso de novos conteúdos
     origin = models.CharField(
-        max_length=32,
+        max_length=50,
         null=True,
         blank=True,
         choices=choices.PKG_ORIGIN,

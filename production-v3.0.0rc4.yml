@@ -13,7 +13,7 @@ services:
       - ./.envs/.production/.postgres
     volumes:
       - ../scielo/www:/scielo_www
-      - ./core/media:/app/core/media
+      - upload_media:/app/core/media
     ports:
       - "8000:8000"
     command: /start
@@ -61,3 +61,8 @@ services:
     container_name: upload_production_flower
     command: /start-flower
     ports: []
+
+
+volumes:
+  upload_media:
+    name: upload_media

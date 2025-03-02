@@ -54,7 +54,6 @@ def build_issue(builder, journal_id, issue, issue_pid):
     # TODO obj_setter.has_docs(self)
     # builder.has_docs(documents)
     builder.identify_outdated_ahead()
-    builder.add_issue_type()
     # builder.add_is_public()
     # builder.add_journal(journal_id)
 
