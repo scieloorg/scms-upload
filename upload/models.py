@@ -55,6 +55,7 @@ from upload.forms import (
 from upload.permission_helper import ACCESS_ALL_PACKAGES, ASSIGN_PACKAGE, FINISH_DEPOSIT
 from upload.utils import file_utils
 from upload.utils.package_utils import update_zip_file
+from upload.utils.zip_pkg import PkgZip
 
 
 class QADecisionException(Exception):
@@ -153,67 +154,22 @@ class PackageZip(CommonControlField):
             yield item.filename
 
     def split(self, user):
-        found = False
-        with ZipFile(self.file.path) as zf:
-            # obtém os components do zip
-            file_paths = set(zf.namelist() or [])
-            logging.info(f"file_paths: {file_paths}")
-
-            other_files = {}
-            xmls = {}
-            for file_path in file_paths:
-                basename = os.path.basename(file_path)
-                if basename.startswith("."):
-                    continue
-                name, ext = os.path.splitext(basename)
-                data = {"file_path": file_path, "basename": basename}
-                logging.info(f"{self.file.path} {data}")
-
-                if ext == ".xml":
-                    xmls.setdefault(name, [])
-                    xmls[name].append(data)
-                else:
-                    other_files.setdefault(name, [])
-                    other_files[name].append(data)
-
-            logging.info(f"xmls: {xmls}")
-            logging.info(f"other_files: {other_files}")
-
-            for key in xmls.keys():
-                other_files_copy = other_files.copy()
-                for other_files_key in other_files_copy.keys():
-                    logging.info(f"xml: {key}, other_files_key: {other_files_key}")
-                    if other_files_key.startswith(key + "."):
-                        xmls[key].extend(other_files.pop(other_files_key))
-                        logging.info(f"files ({key}): {xmls[key]}")
-                    elif other_files_key.startswith(key + "-"):
-                        xmls[key].extend(other_files.pop(other_files_key))
-                        logging.info(f"files ({key}): {xmls[key]}")
-
-            logging.info(xmls)
-            for key, files in xmls.items():
-                logging.info(f"{key} {files}")
-                try:
-                    with TemporaryDirectory() as tmpdirname:
-                        zfile = os.path.join(tmpdirname, f"{key}.zip")
-                        with ZipFile(zfile, "w", compression=ZIP_DEFLATED) as zfw:
-                            for item in files:
-                                zfw.writestr(
-                                    item["basename"], zf.read(item["file_path"])
-                                )
-
-                        with open(zfile, "rb") as zfw:
-                            content = zfw.read()
-
-                    yield {
-                        "xml_name": key,
-                        "package": Package.create_or_update(
-                            user, key, self, key + ".zip", content
-                        ),
-                    }
-                except Exception as exc:
-                    logging.exception(exc)
-                    yield {"xml_name": key, "error": str(exc)}
+        pkg_zip = PkgZip(self.file.path)
+        for item in pkg_zip.split():
+            if item.get("error"):
+                yield item
+            else:
+                key = item["xml_name"]
+                yield {
+                    "xml_name": key,
+                    "package": Package.create_or_update(
+                        user,
+                        key,
+                        self,
+                        key + ".zip",
+                        item["content"]
+                    ),
+                }
 
 
 class Package(CommonControlField, ClusterableModel):
