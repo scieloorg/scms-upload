@@ -169,11 +169,14 @@ def fetch_and_create_journal(
             )
             journal.owner.add(Owner.create_or_update(user, journal, institution))
 
+        journal_proc = None
+        expected_registered_collections = set()
         for item in result.get("scielo_journal") or []:
             logging.info(f"fetch_and_create_journal {params}: scielo_journal {item}")
             try:
                 collection = Collection.objects.get(acron=item["collection_acron"])
             except Collection.DoesNotExist:
+                expected_registered_collections.add(item["collection_acron"])
                 continue
 
             journal_proc = JournalProc.get_or_create(user, collection, item["issn_scielo"])
@@ -200,7 +203,14 @@ def fetch_and_create_journal(
                     jh["day"],
                     jh["interruption_reason"],
                 )
+        if not journal_proc:
+            found_collections = set()
+            for item in Collection.objects.all():
+                found_collections.add(item.acron)
 
+            raise JournalProc.DoesNotExist(
+                f"Unable to create JournalProc for {journal_title}. Expected collections: {expected_registered_collections}. Found: {found_collections}"
+            )
 
 def create_or_update_issue(journal, pub_year, volume, suppl, number, user, force_update=None):
     # esta função por enquanto é chamada somente no fluxo de ingresso de conteúdo novo
