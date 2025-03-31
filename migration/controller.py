@@ -410,6 +410,7 @@ def get_classic_website(collection_acron):
             bases_xml_path=config.bases_xml_path,
             htdocs_img_revistas_path=config.htdocs_img_revistas_path,
             serial_path=config.serial_path,
+            cisis_path=None,
             title_path=config.title_path,
             issue_path=config.issue_path,
         )
