@@ -401,6 +401,11 @@ class Package(CommonControlField, ClusterableModel):
 
         super(Package, self).save(*args, **kwargs)
 
+    @property
+    def xml_with_pre(self):
+        for item in XMLWithPre.create(path=self.file.path):
+            return item
+
     @classmethod
     def get(cls, name, pkg_zip):
         return cls.objects.get(pkg_zip=pkg_zip, name=name)
@@ -433,10 +438,9 @@ class Package(CommonControlField, ClusterableModel):
     @property
     def xml(self):
         try:
-            for item in XMLWithPre.create(path=self.file.path):
-                return item.tostring(pretty_print=True)
+            return self.xml_with_pre.tostring(pretty_print=True)
         except Exception as e:
-            return f"<root>invalid xml {e}</root>"
+            return f"<root>Unable to read xml file: {e}</root>"
 
     @property
     def renditions(self):
@@ -450,18 +454,16 @@ class Package(CommonControlField, ClusterableModel):
             "content": b'',
         }
         """
-        for item in XMLWithPre.create(path=self.file.path):
-            renditions = item.renditions
+        renditions = self.xml_with_pre.renditions
 
-            with ZipFile(self.file.path) as zf:
-                for rendition in renditions:
-                    rendition["content"] = zf.read(rendition["name"])
-                    yield rendition
+        with ZipFile(self.file.path) as zf:
+            for rendition in renditions:
+                rendition["content"] = zf.read(rendition["name"])
+                yield rendition
 
     def files_list(self):
         try:
-            for xml_with_pre in XMLWithPre.create(path=self.file.path):
-                return {"files": xml_with_pre.files}
+            return {"files": self.xml_with_pre.files}
         except file_utils.BadPackageFileError:
             return {"files": []}
 
@@ -1046,61 +1048,39 @@ class Package(CommonControlField, ClusterableModel):
     def prepare_sps_package(self, user):
         # Aplica-se também para um pacote de atualização de um conteúdo anteriormente migrado
         # TODO components, texts
-        for xml_with_pre in XMLWithPre.create(path=self.file.path):
-            if (
-                self.xml_file_changed(
-                    xml_with_pre,
-                )
-                or not self.sps_pkg
-                or not self.sps_pkg.valid_components
-            ):
-                texts = {
-                    "xml_langs": list(xml_with_pre.langs),
-                    "pdf_langs": [
-                        rendition["lang"]
-                        for rendition in xml_with_pre.renditions
-                        if rendition in xml_with_pre.filenames
-                    ],
-                }
-                self.sps_pkg = SPSPkg.create_or_update(
-                    user,
-                    sps_pkg_zip_path=self.file.path,
-                    origin=package_choices.PKG_ORIGIN_UPLOAD,
-                    is_public=bool(self.article and self.article.is_public),
-                    original_pkg_components=xml_with_pre.components,
-                    texts=texts,
-                    article_proc=self,
-                )
-                self.save()
+        xml_with_pre = self.xml_with_pre
+        if (
+            self.xml_file_changed(xml_with_pre)
+            or not self.sps_pkg
+            or not self.sps_pkg.valid_components
+        ):
+            print(xml_with_pre.filenames)
+            print(list(xml_with_pre.renditions))
+            texts = {
+                "xml_langs": list(xml_with_pre.langs),
+                "pdf_langs": [
+                    rendition["lang"]
+                    for rendition in xml_with_pre.renditions
+                    if rendition["name"] in xml_with_pre.filenames
+                ],
+            }
+            self.sps_pkg = SPSPkg.create_or_update(
+                user,
+                sps_pkg_zip_path=self.file.path,
+                origin=package_choices.PKG_ORIGIN_UPLOAD,
+                is_public=bool(self.article and self.article.is_public),
+                original_pkg_components=xml_with_pre.components,
+                texts=texts,
+                article_proc=self,
+            )
+            self.save()
 
-        warnings = []
-        errors = []
-        critical_errors = []
-        blocking_errors = []
-        if self.sps_pkg:
-            if not self.sps_pkg.registered_in_core:
-                critical_errors.append(
-                    _("SPS package must be registered in the Core system")
-                )
-            if not self.sps_pkg.valid_components:
-                missing = ", ".join(
-                    [
-                        component.basename
-                        for component in self.sps_pkg.components.filter(uri=None)
-                    ]
-                )
-                errors.append(_("{} is/are not stored in the cloud").format())
-            if not self.sps_pkg.valid_texts:
-                warnings.append(_("Total of XML, PDF, HTML do not match"))
-        else:
-            blocking_errors.append(_("Unable to prepare the package to publish"))
+            if self.sps_pkg:
+                self.create_or_update_article(user, save=True)
 
-        return {
-            "blocking_errors": blocking_errors,
-            "critical_errors": critical_errors,
-            "errors": errors,
-            "warnings": warnings,
-        }
+        if not self.sps_pkg:
+            raise PublishingPrepException(_("Unable to prepare the package to publish"))
+
 
     def start(self, user, name):
         # self.save()
