@@ -1002,26 +1002,25 @@ class Package(CommonControlField, ClusterableModel):
         detail.update(result or {})
         operation.finish(user, completed=True, detail=detail, exception=exception)
 
-    def xml_file_changed(self, xml_with_pre, first_release_date):
+    def xml_file_changed(self, xml_with_pre):
         """
         Se aplicável, atualiza o XML com a data de publicação do artigo
         """
         changed = False
         try:
-            article_publication_date = xml_with_pre.article_publication_date
-            article_publication_date = datetime.fromisoformat(article_publication_date)
-            a_date = (
-                article_publication_date.year,
-                article_publication_date.month,
-                article_publication_date.day,
-            )
+            xml_pub_data = xml_with_pre.article_publication_date
+            xml_pub_data = datetime.fromisoformat(xml_pub_data)
         except Exception as e:
-            a_date = None
+            xml_pub_data = None
 
-        release_date = first_release_date or datetime.utcnow()
-        r_date = (release_date.year, release_date.month, release_date.day)
-        if a_date != r_date:
-            # atualiza a data de publicação do artigo no site público
+        release_date = None
+        if self.article and self.article.first_publication_date:
+            if xml_pub_data != self.article.first_publication_date:
+                release_date = self.article.first_publication_date
+        elif not xml_pub_data:
+            release_date = datetime.utcnow()
+
+        if release_date:
             xml_with_pre.article_publication_date = {
                 "year": release_date.year,
                 "month": release_date.month,
@@ -1050,7 +1049,7 @@ class Package(CommonControlField, ClusterableModel):
         for xml_with_pre in XMLWithPre.create(path=self.file.path):
             if (
                 self.xml_file_changed(
-                    xml_with_pre, self.article and self.article.first_publication_date
+                    xml_with_pre,
                 )
                 or not self.sps_pkg
                 or not self.sps_pkg.valid_components
