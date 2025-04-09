@@ -1165,6 +1165,8 @@ class Package(CommonControlField, ClusterableModel):
                 self.public_ws_pubdate = datetime.utcnow()
                 self.status = choices.PS_PUBLISHED
                 self.save()
+                self.article.sps_pkg.is_public = True
+                self.article.add_article_publication_date()
                 self.article.update_status(new_status=article_choices.AS_PUBLISHED)
 
     @property
