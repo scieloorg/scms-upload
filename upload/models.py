@@ -1883,6 +1883,7 @@ class UploadValidator(CommonControlField):
         choices=choices.PUBLICATION_RULE,
         default=choices.FLEXIBLE_AUTO_PUBLICATION,
     )
+    validation_params = models.JSONField(null=True, blank=True)
 
     panels = [
         FieldPanel("max_xml_warnings_percentage"),
@@ -1890,6 +1891,7 @@ class UploadValidator(CommonControlField):
         FieldPanel("max_impossible_to_fix_percentage"),
         FieldPanel("decision_for_critical_errors"),
         FieldPanel("publication_rule"),
+        FieldPanel("validation_params")
     ]
     base_form_class = UploadValidatorForm
 
@@ -1899,6 +1901,13 @@ class UploadValidator(CommonControlField):
     #     return _("Validation rules")
 
     @classmethod
+    def get(cls, collection):
+        try:
+            return UploadValidator.objects.get(collection=collection)
+        except UploadValidator.DoesNotExist:
+            return UploadValidator.create_default()
+
+    @classmethod
     def create_default(cls):
         obj = UploadValidator(creator_id=1, collection=None)
         obj.save()
@@ -1906,34 +1915,22 @@ class UploadValidator(CommonControlField):
 
     @staticmethod
     def get_publication_rule(collection=None):
-        try:
-            obj = UploadValidator.objects.get(collection=collection)
-        except UploadValidator.DoesNotExist:
-            obj = UploadValidator.create_default()
+        obj = UploadValidator.get(collection)
         return obj.publication_rule
 
     @staticmethod
     def get_decision_for_critical_errors(collection=None):
-        try:
-            obj = UploadValidator.objects.get(collection=collection)
-        except UploadValidator.DoesNotExist:
-            obj = UploadValidator.create_default()
+        obj = UploadValidator.get(collection)
         return obj.decision_for_critical_errors
 
     @staticmethod
     def calculate_publication_date(qa_publication_date, collection=None):
-        try:
-            obj = UploadValidator.objects.get(collection=collection)
-        except UploadValidator.DoesNotExist:
-            obj = UploadValidator.create_default()
+        obj = UploadValidator.get(collection)
         return obj.get_publication_date(qa_publication_date)
 
     @staticmethod
     def check_max_xml_errors_percentage(value, collection=None):
-        try:
-            obj = UploadValidator.objects.get(collection=collection)
-        except UploadValidator.DoesNotExist:
-            obj = UploadValidator.create_default()
+        obj = UploadValidator.get(collection)
         logging.info(
             f"check_max_xml_errors_percentage: {value} <= {obj.max_xml_errors_percentage}"
         )
@@ -1941,10 +1938,7 @@ class UploadValidator(CommonControlField):
 
     @staticmethod
     def check_max_xml_warnings_percentage(value, collection=None):
-        try:
-            obj = UploadValidator.objects.get(collection=collection)
-        except UploadValidator.DoesNotExist:
-            obj = UploadValidator.create_default()
+        obj = UploadValidator.get(collection)
         logging.info(
             f"check_max_xml_warnings_percentage: {value} <= {obj.max_xml_warnings_percentage}"
         )
@@ -1952,10 +1946,7 @@ class UploadValidator(CommonControlField):
 
     @staticmethod
     def check_max_impossible_to_fix_percentage(value, collection=None):
-        try:
-            obj = UploadValidator.objects.get(collection=collection)
-        except UploadValidator.DoesNotExist:
-            obj = UploadValidator.create_default()
+        obj = UploadValidator.get(collection)
         return value <= obj.max_impossible_to_fix_percentage
 
     def check_xml_errors_percentage(self, value):
