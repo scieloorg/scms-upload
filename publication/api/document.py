@@ -26,7 +26,7 @@ def publish_article(article_proc, api_data, journal_pid=None, is_public=True):
             )
 
     order = article_proc.article.position
-    pub_date = article_proc.article.first_publication_date or datetime.utcnow()
+    pub_date = article_proc.sps_pkg.pub_date
 
     build_article(builder, article_proc.article, journal_pid, order, pub_date, is_public)
 
