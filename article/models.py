@@ -326,10 +326,9 @@ class Article(ClusterableModel, CommonControlField):
             TocSection.create_or_update(user, toc, group, section)
 
     def add_article_publication_date(self):
-        if self.sps_pkg.xml_with_pre.article_publication_date:
-            self.first_publication_date = datetime.strptime(
-                self.sps_pkg.xml_with_pre.article_publication_date, "%Y-%m-%d"
-            )
+        if self.sps_pkg.is_public:
+            self.first_publication_date = self.sps_pkg.pub_date
+            self.save()
 
     def add_position(self, position=None, fpage=None):
         try:
