@@ -563,8 +563,6 @@ class Package(CommonControlField, ClusterableModel):
                     )
                 )
 
-        self.save()
-
     def calculate_validation_numbers(self):
         """
         Calcula o total de errors, warnings, blocking errors, etc
