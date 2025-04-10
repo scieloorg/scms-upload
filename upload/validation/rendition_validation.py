@@ -57,7 +57,7 @@ def absent_xml_data_in_rendition(rendition, xml_with_pre):
     # selecionar os dados do idioma de acordo com o idioma do PDF
     # lembrar de considerar que os dados não associados ao idioma
     # tem que ser encontrados em todos os PDFs
-    pass
+    return []
 
 
 def absent_pdf_words_in_xml_data(rendition, xml_with_pre):
@@ -79,4 +79,4 @@ def absent_pdf_words_in_xml_data(rendition, xml_with_pre):
     -------
     Gerador de textos faltantes no XML
     """
-    pass
+    return []
