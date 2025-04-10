@@ -58,7 +58,7 @@ from upload.utils.package_utils import update_zip_file
 from upload.utils.zip_pkg import PkgZip
 
 
-class QADecisionException(Exception):
+class PublishingPrepException(Exception):
     pass
 
 
@@ -830,135 +830,92 @@ class Package(CommonControlField, ClusterableModel):
         return {"content": content, "filename": filename, "columns": fieldnames}
 
     def process_qa_decision(self, user):
+        # (PS_DEPUBLISHED, _("Depublish")),
+        # (PS_PENDING_CORRECTION, _("Pending for correction")),
+        # (PS_PENDING_QA_DECISION, _("Pending quality analysis decision")),
+        # (PS_READY_TO_PREVIEW, _("Ready to preview on QA website")),
+        # (PS_READY_TO_PUBLISH, _("Ready to publish on public website")),
+
         operation = self.start(user, "process_qa_decision")
 
-        if self.qa_decision == choices.PS_PENDING_QA_DECISION:
-            self.finish_qa_decision(
+        if self.qa_decision in (
+            choices.PS_PENDING_QA_DECISION, choices.PS_PENDING_CORRECTION
+        ):
+            self.register_qa_decision(
                 user, operation, websites=None, result=None, rule=None
             )
             return []
 
-        if self.qa_decision == choices.PS_PENDING_CORRECTION:
-            self.finish_qa_decision(
-                user, operation, websites=None, result=None, rule=None
-            )
-            return []
+        if self.qa_decision in (
+            choices.PS_READY_TO_PREVIEW, choices.PS_READY_TO_PUBLISH,
+        ):
+            return self.prepare_to_publish(user, operation)
 
         if self.qa_decision == choices.PS_DEPUBLISHED:
             # TODO
-            operation.finish(
-                user,
-                completed=True,
-                detail={"decision": self.qa_decision, "error": "not implemented"},
-            )
-            return []
+            error = "not implemented"
+        else:
+            error = "unexpected decision"
 
-        if self.qa_decision not in (
-            choices.PS_READY_TO_PREVIEW,
-            choices.PS_READY_TO_PUBLISH,
-        ):
-            operation.finish(
-                user,
-                completed=True,
-                detail={"decision": self.qa_decision, "error": "unexpected decision"},
-            )
-            return []
+        operation.finish(
+            user,
+            completed=True,
+            detail={"decision": self.qa_decision, "error": error},
+        )
+        return []
 
-        save = False
-        user = user or self.updated_by or self.creator
+    def analyze_sps_package(self):
+        result = {"critical_errors": None, "errors": None, "warnings": None}
 
-        websites = []
+        if not self.sps_pkg.registered_in_core:
+            result["critical_errors"] = [
+                _("SPS package must be registered in the Core system")
+            ]
 
-        try:
-            # gera pacote sps e o valida quanto a compontentes disponíveis no minio
-            result = self.prepare_sps_package(user) or {}
+        if not self.sps_pkg.valid_components:
+            result["errors"] = []
+            for component in self.sps_pkg.components.filter(uri=None):
+                result["errors"].append(_("{} is not published on MinIO").format(component.basename))
 
-            # verifica pela regra de publicação e pela situação do pacote
-            # se pode ser publicado em PUBLIC
-            rule = UploadValidator.get_publication_rule()
+        if not self.sps_pkg.valid_texts:
+            result["warnings"] = []
+            result["warnings"].append(_("Total of XML, PDF, HTML do not match {}").format(self.sps_pkg.texts))
+        return result
 
-            self.analyze_result(user, result, websites, rule)
-        except QADecisionException as exc:
-            logging.exception(exc)
-            result["exception"] = exc
-            self.finish_qa_decision(user, operation, websites, result, rule)
-            return websites
-
-        # nenhum erro ou regra flexível, permissão de publicar no site público
-        self.qa_decision = choices.PS_READY_TO_PUBLISH
-        self.status = choices.PS_READY_TO_PUBLISH
-        if (
-            not self.linked
-            or not self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists()
-        ):
-            # nenhum pacote vinculado como outros ou
-            # todos os pacotes vinculados estão com o mesmo status
-            # (choices.PS_READY_TO_PUBLISH), então pode publicar em PUBLIC
-            websites.append("PUBLIC")
-
-        self.finish_qa_decision(user, operation, websites, result, rule)
-        return websites
-
-    def analyze_result(self, user, result, websites, rule):
-        if result.get("blocking_errors"):
-            # não foi possível criar sps package
-            result["request_correction"] = True
-            raise QADecisionException(_("Cannot publish article: blocking errors"))
-
-        if self.qa_decision == choices.PS_READY_TO_PREVIEW:
-            try:
-                # cria ou atualiza Article
-                self.create_or_update_article(user, save=False)
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                result["request_correction"] = True
-                result.update(
-                    {
-                        "exception": {
-                            "message": str(e),
-                            "type": str(type(e)),
-                            "traceback": str(traceback.format_tb(exc_traceback)),
-                        }
-                    }
-                )
-                raise QADecisionException(
-                    _("Cannot publish article: unexpected errors")
-                )
-            # publica em QA não importa a gravidade dos erros
-            websites.append("QA")
-
-        if result.get("critical_errors"):
-            # com erros críticos somente publica em QA
-            result["request_correction"] = True
-            raise QADecisionException(_("Cannot publish article: critical errors"))
-
+    def analyze_result(self, result, rule):
         if rule == choices.STRICT_AUTO_PUBLICATION:
-            if result.get("error") or self.has_errors:
-                # Há erros e é modo rígido, somente publica em QA
+            if result.get("critical_errors") or result.get("errors") or self.has_errors:
                 result["request_correction"] = True
-                raise QADecisionException(
+                # Há erros e é modo rígido, somente publica em QA
+                raise PublishingPrepException(
                     _(
                         "Article has errors. System settings (STRICT_AUTO_PUBLICATION) blocks its publication"
                     )
                 )
-
         elif rule == choices.MANUAL_PUBLICATION:
             # No modo de publicação manual no website PUBLIC,
             # com ou sem erros, é decisão do analista
             if self.qa_decision == choices.PS_READY_TO_PREVIEW:
                 # publica somente em QA
                 result["request_correction"] = False
-                raise QADecisionException(
+                raise PublishingPrepException(
                     _(
                         "It requires manual publication due to system settings (MANUAL_PUBLICATION)"
                     )
                 )
 
-    def finish_qa_decision(self, user, operation, websites, result, rule):
+    def register_qa_decision(self, user, operation, websites, result, rule):
         try:
             exception = result.pop("exception")
         except (KeyError, AttributeError, TypeError, ValueError):
             exception = None
+
+        comments = [exception or '']
+        for k in ("critical_errors", "errors", "warnings"):
+            comments.extend(result.get(k) or [])
+        
+        if not self.qa_comment:
+            self.qa_comment = "\n".join([str(item) for item in comments if item])
 
         if self.qa_comment:
             self.register_qa_comment_as_error(user)
@@ -969,6 +926,7 @@ class Package(CommonControlField, ClusterableModel):
 
         self.status = self.qa_decision
         self.save()
+
         detail = {"decision": self.qa_decision, "websites": websites, "rule": rule}
         detail.update(result or {})
         operation.finish(user, completed=True, detail=detail, exception=exception)
@@ -1049,7 +1007,6 @@ class Package(CommonControlField, ClusterableModel):
 
         if not self.sps_pkg:
             raise PublishingPrepException(_("Unable to prepare the package to publish"))
-
 
     def start(self, user, name):
         # self.save()
@@ -1154,6 +1111,46 @@ class Package(CommonControlField, ClusterableModel):
         )
         report.creation = choices.REPORT_CREATION_DONE
         report.save()
+
+    def prepare_to_publish(self, user, operation):
+        user = user or self.updated_by or self.creator
+        websites = []
+        result = {}
+        rule = None
+        try:
+            if self.qa_decision == choices.PS_READY_TO_PREVIEW:
+                websites.append("QA")
+
+            # gera pacote sps e o valida quanto a compontentes disponíveis no minio
+            self.prepare_sps_package(user)
+            result = self.analyze_sps_package()
+            # verifica pela regra de publicação e pela situação do pacote
+            # se pode ser publicado em PUBLIC
+            rule = UploadValidator.get_publication_rule()
+            self.analyze_result(result, rule)
+
+        except PublishingPrepException as exc:
+            logging.exception(exc)
+            result["exception"] = exc
+            self.register_qa_decision(user, operation, websites, result, rule)
+            return websites
+
+        # nenhum erro ou regra flexível, permissão de publicar no site público
+        self.qa_decision = choices.PS_READY_TO_PUBLISH
+        self.status = choices.PS_READY_TO_PUBLISH
+        self.save()
+
+        if (
+            not self.linked
+            or not self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists()
+        ):
+            # nenhum pacote vinculado como outros ou
+            # todos os pacotes vinculados estão com o mesmo status
+            # (choices.PS_READY_TO_PUBLISH), então pode publicar em PUBLIC
+            websites.append("PUBLIC")
+
+        self.register_qa_decision(user, operation, websites, result, rule)
+        return websites
 
 
 class QAPackage(Package):
