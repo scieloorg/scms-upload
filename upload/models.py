@@ -528,7 +528,7 @@ class Package(CommonControlField, ClusterableModel):
             return False
         return True
 
-    def finish_validations(
+    def finish_reception(
         self, task_process_qa_decision=None, blocking_error_status=None
     ):
         """
@@ -550,7 +550,7 @@ class Package(CommonControlField, ClusterableModel):
         self.status = self.get_status_after_xml_data_checking(blocking_error_status)
         self.save()
 
-        logging.info(f"Package.finish_validations - status: {self.status}")
+        logging.info(f"Package.finish_reception - status: {self.status}")
 
         if self.status == choices.PS_READY_TO_PREVIEW:
             self.qa_decision = choices.PS_READY_TO_PREVIEW
