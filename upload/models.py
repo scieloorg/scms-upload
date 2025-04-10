@@ -658,36 +658,6 @@ class Package(CommonControlField, ClusterableModel):
         metrics.update(self.numbers or {})
         return metrics
 
-    def calculate_error_review_numbers(self):
-        if not self.is_validation_finished:
-            raise NotFinishedValitionsError(f"Validation is not finished: {self}")
-
-        # TODO abater as validações com status=WARNING e reação IMPOSSIBLE_TO_FIX
-        xml_numbers = XMLError.get_numbers(package=self)
-
-        total_contested_xml_errors = xml_numbers.get("reaction_not_to_fix") or 0
-        self.contested_xml_errors_percentage = round(
-            total_contested_xml_errors * 100 / xml_numbers["total"], 2
-        )
-
-        total_declared_impossible_to_fix = (
-            xml_numbers.get("reaction_impossible_to_fix") or 0
-        )
-        self.declared_impossible_to_fix_percentage = round(
-            total_declared_impossible_to_fix * 100 / xml_numbers["total"], 2
-        )
-
-        data = {
-            "total_accepted_to_fix": xml_numbers.get("reaction_to_fix") or 0,
-            "total_contested_xml_errors": total_contested_xml_errors,
-            "total_declared_impossible_to_fix": total_declared_impossible_to_fix,
-        }
-        if not self.numbers:
-            self.numbers = {}
-        self.numbers.update(data)
-        self.save()
-        logging.info(f"Package.calculate_error_review_numbers: {self.metrics}")
-
     def get_conclusion(self):
         if self.status == choices.PS_PENDING_QA_DECISION:
             return _("The error review has been completed")
