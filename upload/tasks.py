@@ -21,9 +21,10 @@ from publication.tasks import task_publish_article
 from tracker.models import UnexpectedEvent
 from upload import choices
 from upload.controller import receive_package
-from upload.models import Package, ValidationReport, PackageZip
+from upload.models import Package, ValidationReport, PackageZip, UploadValidator
 from upload.validation.rendition_validation import validate_rendition
 from upload.validation.html_validation import validate_webpage
+from upload.validation.xml_data_checker import XMLDataChecker
 
 from . import choices, controller, exceptions
 from .utils import file_utils, package_utils, xml_utils
@@ -157,7 +158,7 @@ def task_validate_assets(package_id, xml_path, package_files, xml_assets):
     # devido às tarefas serem executadas concorrentemente,
     # necessário verificar se todas tarefas finalizaram e
     # então finalizar o pacote
-    package.finish_validations(task_process_qa_decision)
+    package.finish_reception(task_process_qa_decision)
     # if package.is_approved:
     #     task_process_approved_package.apply_async(
     #         kwargs=dict(package_id=package.id, package_status=package.status)
@@ -198,7 +199,7 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
         )
 
     report.finish_validations()
-    package.finish_validations(task_process_qa_decision)
+    package.finish_reception(task_process_qa_decision)
     # devido às tarefas serem executadas concorrentemente,
     # necessário verificar se todas tarefas finalizaram e
     # então finalizar o pacote
@@ -244,7 +245,7 @@ def task_validate_renditions_content(package_id, xml_path):
             },
         )
     report.finish_validations()
-    package.finish_validations(task_process_qa_decision)
+    package.finish_reception(task_process_qa_decision)
 
 
 @celery_app.task(bind=True, priority=0)
@@ -280,31 +281,20 @@ def task_receive_package(
     package = Package.objects.get(pk=pkg_id)
 
     response = receive_package(user, package)
+
     logging.info(response)
     if response.get("error_level") != choices.VALIDATION_RESULT_BLOCKING:
-        task_validate_original_zip_file.apply_async(
-            kwargs=dict(
-                package_id=package.id,
-                file_path=package.file.path,
-                journal_id=response["journal"].id,
-                issue_id=response["issue"].id,
-                article_id=package.article and package.article.id or None,
-            )
-        )
 
+        file_path = package.file.path
+        journal_id = response["journal"].id
+        issue_id = response["issue"].id
+        article_id = package.article and package.article.id or None
 
-@celery_app.task(bind=True, priority=0)
-def task_validate_original_zip_file(
-    self, package_id, file_path, journal_id, issue_id, article_id
-):
-
-    for xml_with_pre in XMLWithPre.create(path=file_path):
+        xml_with_pre = package.xml_with_pre
         xml_path = xml_with_pre.filename
         name, ext = os.path.splitext(xml_path)
-        logging.info(f"xmlpre: {xml_with_pre.xmlpre}")
-        package = Package.objects.get(pk=package_id)
 
-        # FIXME nao usar o otimizado neste momento
+        # FIXME para nao usar o otimizado
         optimised_filepath = task_optimise_package(file_path)
 
         for optimised_xml_with_pre in XMLWithPre.create(path=optimised_filepath):
@@ -314,7 +304,7 @@ def task_validate_original_zip_file(
             # Aciona validação de Assets
             task_validate_assets.apply_async(
                 kwargs={
-                    "package_id": package_id,
+                    "package_id": pkg_id,
                     "xml_path": xml_path,
                     "package_files": package_files,
                     "xml_assets": list(optimised_xml_with_pre.assets),
@@ -324,7 +314,7 @@ def task_validate_original_zip_file(
             # Aciona validação de Renditions
             task_validate_renditions.apply_async(
                 kwargs={
-                    "package_id": package_id,
+                    "package_id": pkg_id,
                     "xml_path": xml_path,
                     "package_files": package_files,
                     "xml_renditions": list(optimised_xml_with_pre.renditions),
@@ -335,7 +325,7 @@ def task_validate_original_zip_file(
                 kwargs={
                     "file_path": file_path,
                     "xml_path": xml_path,
-                    "package_id": package_id,
+                    "package_id": pkg_id,
                     "journal_id": journal_id,
                     "issue_id": issue_id,
                     "article_id": article_id,
@@ -347,7 +337,7 @@ def task_validate_original_zip_file(
                 kwargs={
                     "file_path": file_path,
                     "xml_path": xml_path,
-                    "package_id": package_id,
+                    "package_id": pkg_id,
                     "journal_id": journal_id,
                     "issue_id": issue_id,
                     "article_id": article_id,
@@ -357,7 +347,7 @@ def task_validate_original_zip_file(
             # Aciona validação do conteúdo de Renditions
             task_validate_renditions_content.apply_async(
                 kwargs={
-                    "package_id": package_id,
+                    "package_id": pkg_id,
                     "xml_path": xml_path,
                 },
             )
@@ -451,7 +441,7 @@ def task_validate_xml_structure(
         # devido às tarefas serem executadas concorrentemente,
         # necessário verificar se todas tarefas finalizaram e
         # então finalizar o pacote
-        package.finish_validations(task_process_qa_decision)
+        package.finish_reception(task_process_qa_decision)
         # if package.is_approved:
         #     task_process_approved_package.apply_async(
         #         kwargs=dict(package_id=package.id)
@@ -463,7 +453,9 @@ def task_validate_xml_content(
     self, file_path, xml_path, package_id, journal_id, issue_id, article_id
 ):
     try:
+        operation = None
         package = Package.objects.get(pk=package_id)
+        operation = package.start(package.creator, "xml_data_checker")
         if journal_id:
             journal = Journal.objects.get(pk=journal_id)
         else:
@@ -474,11 +466,22 @@ def task_validate_xml_content(
         else:
             issue = None
 
-        if controller.validate_xml_content(package, journal):
-            package.finish_validations(task_process_qa_decision)
+        try:
+            params = UploadValidator.get().validation_params
+        except Exception as e:
+            params = {}
 
+        xml_data_checker = XMLDataChecker(package, journal, issue, params)
+        xml_data_checker.validate()
+        package.finish_reception(task_process_qa_decision)
+        operation.finish(package.creator, completed=True)
     except Exception as e:
+        logging.exception(e)
         exc_type, exc_value, exc_traceback = sys.exc_info()
+        if operation:
+            operation.finish(package.creator, completed=False, exception=e, exc_traceback=exc_traceback)
+            return
+
         UnexpectedEvent.create(
             exception=e,
             exc_traceback=exc_traceback,
@@ -583,4 +586,4 @@ def task_validate_webpages_content(package_id):
             },
         )
     report.finish_validations()
-    package.finish_validations(task_process_qa_decision)
+    package.finish_reception(task_process_qa_decision)
