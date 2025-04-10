@@ -914,27 +914,26 @@ class Package(CommonControlField, ClusterableModel):
 
     def xml_file_changed(self, xml_with_pre):
         """
-        Se aplicável, atualiza o XML com a data de publicação do artigo
+        Atualiza data de publicação do artigo e/ou pid v2, se necessário
         """
         changed = False
         try:
-            xml_pub_data = xml_with_pre.article_publication_date
-            xml_pub_data = datetime.fromisoformat(xml_pub_data)
+            xml_pub_date = datetime.fromisoformat(xml_with_pre.article_publication_date)
         except Exception as e:
-            xml_pub_data = None
+            xml_pub_date = None
 
-        release_date = None
+        changed_date = None
         if self.article and self.article.first_publication_date:
-            if xml_pub_data != self.article.first_publication_date:
-                release_date = self.article.first_publication_date
-        elif not xml_pub_data:
-            release_date = datetime.utcnow()
+            if xml_pub_date != self.article.first_publication_date:
+                changed_date = self.article.first_publication_date
+        elif not xml_pub_date:
+            changed_date = datetime.utcnow()
 
-        if release_date:
+        if changed_date:
             xml_with_pre.article_publication_date = {
-                "year": release_date.year,
-                "month": release_date.month,
-                "day": release_date.day,
+                "year": changed_date.year,
+                "month": changed_date.month,
+                "day": changed_date.day,
             }
             changed = True
 
@@ -962,8 +961,6 @@ class Package(CommonControlField, ClusterableModel):
             or not self.sps_pkg
             or not self.sps_pkg.valid_components
         ):
-            print(xml_with_pre.filenames)
-            print(list(xml_with_pre.renditions))
             texts = {
                 "xml_langs": list(xml_with_pre.langs),
                 "pdf_langs": [
