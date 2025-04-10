@@ -546,15 +546,14 @@ class Package(CommonControlField, ClusterableModel):
             return
 
         self.calculate_validation_numbers()
-
         self.status = self.get_status_after_xml_data_checking(blocking_error_status)
         self.save()
 
         logging.info(f"Package.finish_reception - status: {self.status}")
-
         if self.status == choices.PS_READY_TO_PREVIEW:
             self.qa_decision = choices.PS_READY_TO_PREVIEW
             self.save()
+
             if task_process_qa_decision:
                 task_process_qa_decision.apply_async(
                     kwargs=dict(
@@ -638,6 +637,7 @@ class Package(CommonControlField, ClusterableModel):
             else:
                 # solicita revisão dos problemas
                 return choices.PS_VALIDATED_WITH_ERRORS
+
     @property
     def has_errors(self):
         return self.numbers.get("total_xml_issues") or self.numbers.get(
@@ -787,29 +787,9 @@ class Package(CommonControlField, ClusterableModel):
     def get_errors_report_content(self):
         filename = self.name + f"-{report_datetime()}-errors.csv"
 
-        item = XMLError.objects.filter(report__package=self).first()
-        item2 = PkgValidationResult.objects.filter(report__package=self).first()
-
         content = None
-        fieldnames = (
-            "package",
-            "group",
-            "article / sub-article",
-            "@id",
-            "@article-type",
-            "item",
-            "sub-item",
-            "validation type",
-            "focus on",
-            "status",
-            "expected value",
-            "got value",
-            "message",
-            "advice",
-            "reaction",
-            "data",
-        )
-        default_data = {k: None for k in fieldnames}
+        fieldnames = ["package"]
+        fieldnames.extend(XMLError.cols)
 
         with TemporaryDirectory() as targetdir:
             target = os.path.join(targetdir, filename)
@@ -817,6 +797,7 @@ class Package(CommonControlField, ClusterableModel):
             with open(target, "w", newline="") as csvfile:
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
+
                 for row in PkgValidationResult.rows(self, fieldnames):
                     writer.writerow(row)
 
@@ -1075,8 +1056,6 @@ class Package(CommonControlField, ClusterableModel):
                 self.public_ws_pubdate = datetime.utcnow()
                 self.status = choices.PS_PUBLISHED
                 self.save()
-                self.article.sps_pkg.is_public = True
-                self.article.add_article_publication_date()
                 self.article.update_status(new_status=article_choices.AS_PUBLISHED)
 
     @property
@@ -1236,7 +1215,7 @@ class BaseValidationResult(CommonControlField):
         help_text=_("Item being analyzed"),
     )
     data = models.JSONField(_("Data"), default=dict, null=True, blank=True)
-    message = models.TextField(_("Message"), null=True, blank=True)
+    message = models.CharField(_("Message"), null=True, blank=True, max_length=500)
     status = models.CharField(
         _("Result"),
         max_length=8,
@@ -1254,6 +1233,12 @@ class BaseValidationResult(CommonControlField):
         FieldPanel("data", read_only=True),
     ]
 
+    cols = (
+        "status",
+        "subject",
+        "message",
+        "data"
+    )
     # autocomplete_search_field = "subject"
 
     # def autocomplete_label(self):
@@ -1304,11 +1289,18 @@ class BaseValidationResult(CommonControlField):
 
     @property
     def row(self):
+        # subject = group
+        # message = advice
+        try:
+            s = json.dumps(self.data)
+            data = self.data
+        except Exception as e:
+            data = str(self.data)
         return dict(
             subject=self.subject,
             status=self.status,
             message=self.message,
-            data=str(self.data),
+            data=data,
         )
 
     @classmethod
@@ -1330,10 +1322,8 @@ class BaseValidationResult(CommonControlField):
 
     @classmethod
     def rows(cls, package, fieldnames):
-        default_data = {k: None for k in fieldnames}
-
         for item in cls.objects.filter(report__package=package).iterator():
-            data = dict(default_data)
+            data = {}
             data.update(item.row)
             data["package"] = package.package_name
             data["report"] = item.report.title
@@ -1362,38 +1352,23 @@ class BaseXMLValidationResult(BaseValidationResult):
     )
     # geralemente article / sub-article e id
     parent = models.CharField(
-        "article / sub-article", null=True, blank=True, max_length=16
+        "article / sub-article", null=True, blank=True, max_length=11
     )
-    parent_id = models.CharField("@id", null=True, blank=True, max_length=8)
+    parent_id = models.CharField("@id", null=True, blank=True, max_length=13)
     parent_article_type = models.CharField(
         "@article-type", null=True, blank=True, max_length=32
     )
 
     panels = [
         FieldPanel("subject", read_only=True),
-        FieldPanel("attribute", read_only=True),
-        FieldPanel("focus", read_only=True),
-        FieldPanel("parent", read_only=True),
-        FieldPanel("parent_id", read_only=True),
-        FieldPanel("parent_article_type", read_only=True),
-        FieldPanel("data", read_only=True),
+        # FieldPanel("attribute", read_only=True),
+        # FieldPanel("focus", read_only=True),
+        # FieldPanel("parent", read_only=True),
+        # FieldPanel("parent_id", read_only=True),
+        # FieldPanel("parent_article_type", read_only=True),
         FieldPanel("message", read_only=True),
+        FieldPanel("data", read_only=True),
     ]
-
-    @property
-    def row(self):
-        return {
-            "status": self.status,
-            "item": self.subject,
-            "sub-item": self.attribute,
-            "focus on": self.focus,
-            "article / sub-article": self.parent,
-            "@id": self.parent_id,
-            "@article-type": self.parent_article_type,
-            "message": self.message,
-            "validation type": self.validation_type,
-            "data": str(self.data),
-        }
 
     # def __str__(self):
     #     return str(self.row)
@@ -1451,7 +1426,7 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
         blank=True,
     )
     got_value = models.JSONField(_("Got value"), null=True, blank=True)
-    advice = models.CharField(_("Advice"), null=True, blank=True, max_length=256)
+    advice = models.CharField(_("Advice"), null=True, blank=True, max_length=500)
     reaction = models.CharField(
         _("Reaction"),
         max_length=16,
@@ -1470,16 +1445,8 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
 
     panels = [
         FieldPanel("status", read_only=True),
-        FieldPanel("subject", read_only=True),
-        FieldPanel("attribute", read_only=True),
-        FieldPanel("focus", read_only=True),
-        FieldPanel("parent", read_only=True),
-        FieldPanel("parent_id", read_only=True),
-        FieldPanel("data", read_only=True),
-        FieldPanel("expected_value", read_only=True),
-        FieldPanel("got_value", read_only=True),
-        FieldPanel("message", read_only=True),
         FieldPanel("advice", read_only=True),
+        FieldPanel("data", read_only=True),
         FieldPanel("reaction"),
     ]
 
@@ -1498,26 +1465,6 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
                 ]
             ),
         ]
-
-    @property
-    def row(self):
-        data = {
-            "status": self.status,
-            "item": self.subject,
-            "sub-item": self.attribute,
-            "focus on": self.focus,
-            "article / sub-article": self.parent,
-            "@id": self.parent_id,
-            "@article-type": self.parent_article_type,
-            "expected value": self.expected_value,
-            "got value": self.got_value,
-            "message": self.message,
-            "advice": self.advice,
-            "reaction": self.reaction,
-            "validation type": self.validation_type,
-            "data": str(self.data),
-        }
-        return data
 
 
 class BaseValidationReport(CommonControlField):
@@ -1716,18 +1663,8 @@ class XMLInfoReport(BaseValidationReport, ClusterableModel):
         if not item:
             return
 
-        fieldnames = (
-            "package",
-            "article / sub-article",
-            "@id",
-            "@article-type",
-            "item",
-            "sub-item",
-            "validation type",
-            "focus on",
-            "message",
-            "data",
-        )
+        fieldnames = ["package"]
+        fieldnames.extend(XMLInfo.cols)
 
         filename = self.package.name + f"-{report_datetime()}-xml_info.csv"
         with TemporaryDirectory() as targetdir:
