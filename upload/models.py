@@ -1027,20 +1027,25 @@ class Package(CommonControlField, ClusterableModel):
             pass
 
     def create_or_update_article(self, user, save):
-        logging.info(f"create_or_update_article - status: {self.status}")
-        if not self.issue:
-            ValueError("Unable to create or update article: missing issue")
-        if not self.journal:
-            ValueError("Unable to create or update article: missing journal")
+        try:
+            logging.info(f"create_or_update_article - status: {self.status}")
+            if not self.issue:
+                raise ValueError("Unable to create or update article: missing issue")
+            if not self.journal:
+                raise ValueError("Unable to create or update article: missing journal")
 
-        self.article = Article.create_or_update(
-            user, self.sps_pkg, self.issue, self.journal, self.order
-        )
+            self.article = Article.create_or_update(
+                user, self.sps_pkg, self.issue, self.journal, self.order
+            )
 
-        # atualizar package.order com article.order, cujo valor position or fpage
-        self.order = self.article.position
-        if save:
-            self.save()
+            # atualizar package.order com article.order, cujo valor position or fpage
+            self.order = self.article.position
+            if save:
+                self.save()
+        except Exception as e:
+            raise PublishingPrepException(
+                f"Unable to create or update Article {self}"
+            )
 
     # def update_status(self):
     #     if self.status == choices.PS_READY_TO_PREVIEW:
