@@ -1,4 +1,5 @@
 import sys
+import logging
 
 from django.utils.translation import gettext as _
 from packtools.sps.validation import xml_validator as packtools_xml_data_checker
@@ -60,13 +61,18 @@ class XMLDataChecker:
             operation = self.package.start(self.user, "xml data validation")
             XMLError.objects.filter(report__package=self.package).delete()
 
-            for group, results in packtools_xml_data_checker.validate_xml_content(
+            for response in packtools_xml_data_checker.validate_xml_content(
                 self.xmltree, self.params
             ):
+                group = response["group"]
+                results = response["items"]
                 try:
                     for index, result in enumerate(results):
+                        if not result:
+                            continue
                         self._handle_result(group, result, index)
                 except Exception as exc:
+                    logging.exception(exc_traceback)
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     self._handle_exception({"group": group, "exception": exc, "exc_traceback": exc_traceback})
 
@@ -109,7 +115,7 @@ class XMLDataChecker:
 
             validation_result = report.add_validation_result(
                 status=status_,
-                message=result.get("message"),
+                message=result.get("advice"),
                 data=result,
                 subject=subject,
             )
@@ -130,10 +136,11 @@ class XMLDataChecker:
             validation_result.save()
             return validation_result
         except Exception as e:
+            logging.exception(e)
             exc_type, exc_value, exc_traceback = sys.exc_info()
             operation = self.package.start(self.user, f"result {index}")
             detail = {}
-            detail.update(result)
+            detail.update(result or {})
             detail["len"] = {k: len(v) for k, v in result.items() if v}
             operation.finish(
                 self.user,
