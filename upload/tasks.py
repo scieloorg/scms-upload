@@ -151,7 +151,7 @@ def task_validate_assets(package_id, xml_path, package_files, xml_assets):
             status=choices.VALIDATION_RESULT_SUCCESS,
             message=_("Package has all the expected asset files"),
             data=list(xml_assets),
-            subject=_("assets"),
+            subject=_("Assets"),
         )
 
     report.finish_validations()
@@ -187,7 +187,7 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
                 status=choices.VALIDATION_RESULT_FAILURE,
                 message=f'{xml_rendition["lang"]} {_("language is mentioned in the XML but its PDF file not present in the package.")}',
                 data=xml_rendition,
-                subject=xml_rendition["lang"],
+                subject="{} {}".format(_("Renditions"), xml_rendition["lang"]),
             )
 
     if not has_errors:
@@ -296,6 +296,7 @@ def task_receive_package(
 
         # FIXME para nao usar o otimizado
         optimised_filepath = task_optimise_package(file_path)
+        logging.info(optimised_filepath)
 
         for optimised_xml_with_pre in XMLWithPre.create(path=optimised_filepath):
 
@@ -388,11 +389,14 @@ def task_validate_xml_structure(
                         "apparent_line": item.line,
                         "message": item.message,
                     },
+                    subject=_("XML Structure"),
                 )
             if summary["dtd_is_valid"]:
                 validation_result = report.add_validation_result(
                     status=choices.VALIDATION_RESULT_SUCCESS,
                     message=_("No error found"),
+                    data=str(summary),
+                    subject=_("XML Structure"),
                 )
         except Exception as exc:
             logging.exception(f"{exc}: {summary}")
@@ -400,6 +404,7 @@ def task_validate_xml_structure(
                 status=choices.VALIDATION_RESULT_CRITICAL,
                 message=str(exc),
                 data=str(summary),
+                subject=_("XML Structure"),
             )
 
         report.finish_validations()
@@ -422,11 +427,14 @@ def task_validate_xml_structure(
                         "label": item.label,
                         "level": item.level,
                     },
+                    subject=_("XML Style"),
                 )
             if summary["style_is_valid"]:
                 validation_result = report.add_validation_result(
                     status=choices.VALIDATION_RESULT_SUCCESS,
                     message=_("No error found"),
+                    data=str(summary),
+                    subject=_("XML Style")
                 )
         except Exception as exc:
             logging.exception(f"{exc}: {summary}")
@@ -434,6 +442,7 @@ def task_validate_xml_structure(
                 status=choices.VALIDATION_RESULT_CRITICAL,
                 message=str(exc),
                 data=str(summary),
+                subject=_("XML Style")
             )
 
         report.finish_validations()
@@ -453,6 +462,8 @@ def task_validate_xml_content(
     self, file_path, xml_path, package_id, journal_id, issue_id, article_id
 ):
     try:
+        logging.info("\ntask_validate_xml_content")
+        logging.info((file_path, xml_path, package_id, journal_id, issue_id, article_id))
         operation = None
         package = Package.objects.get(pk=package_id)
         operation = package.start(package.creator, "xml_data_checker")
@@ -470,6 +481,8 @@ def task_validate_xml_content(
             params = UploadValidator.get().validation_params
         except Exception as e:
             params = {}
+
+        logging.info((issue, journal))
 
         xml_data_checker = XMLDataChecker(package, journal, issue, params)
         xml_data_checker.validate()
