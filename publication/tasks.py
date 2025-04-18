@@ -370,16 +370,20 @@ def task_publish_article(
         tracking = []
         if upload_package_id:
             manager = Package.objects.get(pk=upload_package_id)
-            issue = manager.article.issue
+            issue = manager.issue
+            journal = manager.journal
+            logging.info(journal)
+            logging.info(issue)
+
         elif article_proc_id:
             manager = ArticleProc.objects.get(pk=article_proc_id)
             issue = manager.issue_proc.issue
+            journal = manager.journal_proc.journal
+
         op_main = manager.start(user, f"publish on {website_kind}")
 
         article = manager.article
-        journal = article.journal
-        issue = article.issue
-
+ 
         if not JournalProc.objects.filter(journal=journal).exists():
             op_journal_proc = manager.start(user, f"publish on {website_kind} - create_or_update_journal")
             created = create_or_update_journal(
