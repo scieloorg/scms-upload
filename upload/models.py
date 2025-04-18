@@ -823,7 +823,7 @@ class Package(CommonControlField, ClusterableModel):
             choices.PS_PENDING_QA_DECISION, choices.PS_PENDING_CORRECTION
         ):
             self.register_qa_decision(
-                user, operation, websites=None, result=None, rule=None
+                user, operation, websites=None, result={}, rule=None
             )
             return []
 
@@ -1266,6 +1266,10 @@ class BaseValidationResult(CommonControlField):
             ),
         ]
 
+    def save(self):
+        self.message = self.message and self.message[:500]
+        return super().save()
+
     @classmethod
     def create(cls, subject=None, status=None, message=None, data=None, creator=None):
         val_res = cls()
@@ -1462,6 +1466,10 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
                 ]
             ),
         ]
+
+    def save(self):
+        self.advice = self.advice and self.advice[:500]
+        return super().save()
 
 
 class BaseValidationReport(CommonControlField):
