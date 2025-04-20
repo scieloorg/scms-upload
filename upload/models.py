@@ -1141,14 +1141,25 @@ class QAPackage(Package):
 
     """
 
-    panel_decision = [
+    panel_numbers = [
+        FieldPanel("critical_errors", read_only=True),
+        FieldPanel("xml_errors_percentage", read_only=True),
+        FieldPanel("xml_warnings_percentage", read_only=True),
+        FieldPanel("contested_xml_errors_percentage", read_only=True),
+        FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
         FieldPanel("status", read_only=True),
+    ]
+    panel_qa_decision = [
         FieldPanel("qa_decision"),
         FieldPanel("qa_comment"),
         AutocompletePanel("analyst"),
+    ]
+    panel_publication = [
         FieldPanel("order"),
         AutocompletePanel("linked"),
     ]
+    panel_decision = panel_numbers + panel_qa_decision + panel_publication
+
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
     ]
@@ -1171,18 +1182,18 @@ class ReadyToPublishPackage(Package):
     Package ready to publish
     """
 
-    panel_data = [
-        FieldPanel("status", read_only=True),
-        AutocompletePanel("analyst", read_only=True),
+    panel_publication_status = [
         FieldPanel("qa_ws_status", read_only=True),
         FieldPanel("qa_ws_pubdate", read_only=True),
         FieldPanel("public_ws_status", read_only=True),
         FieldPanel("public_ws_pubdate", read_only=True),
+    ]
+    panel_qa_decision = [
+        FieldPanel("analyst", read_only=True),
         FieldPanel("qa_decision"),
         FieldPanel("qa_comment"),
-        FieldPanel("order"),
-        AutocompletePanel("linked"),
     ]
+    panel_data = QAPackage.panel_numbers + panel_publication_status + panel_qa_decision + QAPackage.panel_publication
 
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
