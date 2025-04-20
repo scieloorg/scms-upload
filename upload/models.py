@@ -546,7 +546,7 @@ class Package(CommonControlField, ClusterableModel):
             return
 
         self.calculate_validation_numbers()
-        self.status = self.get_status_after_xml_data_checking(blocking_error_status)
+        self.status = self.evaluate_validation_numbers(blocking_error_status)
         self.save()
 
         logging.info(f"Package.finish_reception - status: {self.status}")
@@ -595,9 +595,9 @@ class Package(CommonControlField, ClusterableModel):
         }
         self.save()
 
-    def get_status_after_xml_data_checking(self, blocking_error_status):
+    def evaluate_validation_numbers(self, blocking_error_status):
         metrics = self.metrics
-        logging.info(f"Package.get_status_after_xml_data_checking - {metrics}")
+        logging.info(f"Package.evaluate_validation_numbers - {metrics}")
 
         total_validations = metrics["total_validations"]
         if not total_validations:
@@ -615,7 +615,7 @@ class Package(CommonControlField, ClusterableModel):
             return choices.PS_READY_TO_PREVIEW
 
         rule = UploadValidator.get_publication_rule()
-        logging.info(f"Package.get_status_after_xml_data_checking - rule: {rule}")
+        logging.info(f"Package.evaluate_validation_numbers - rule: {rule}")
         # algum erro identificado
         if rule == choices.STRICT_AUTO_PUBLICATION:
             # não importa o nível de criticidade, solicita correção
