@@ -616,27 +616,23 @@ class Package(CommonControlField, ClusterableModel):
 
         rule = UploadValidator.get_publication_rule()
         logging.info(f"Package.get_status_after_xml_data_checking - rule: {rule}")
+        # algum erro identificado
         if rule == choices.STRICT_AUTO_PUBLICATION:
             # não importa o nível de criticidade, solicita correção
             return choices.PS_PENDING_CORRECTION
 
-        if rule == choices.MANUAL_PUBLICATION:
-            # avalia o nível de criticidade, solicita correção ou revisão dos problemas
-            if metrics["critical_errors"]:
-                # solicita correção ou revisão dos problemas
-                # PS_PENDING_CORRECTION or PS_VALIDATED_WITH_ERRORS
-                return UploadValidator.get_decision_for_critical_errors()
-            else:
-                # solicita revisão dos problemas
-                return choices.PS_VALIDATED_WITH_ERRORS
+        if metrics["critical_errors"]:
+            # solicita correção ou revisão dos problemas
+            # PS_PENDING_CORRECTION or PS_VALIDATED_WITH_ERRORS
+            return UploadValidator.get_decision_for_critical_errors()
 
         if rule == choices.FLEXIBLE_AUTO_PUBLICATION:
             if self.is_acceptable_package:
                 # pacote com erros tolerados, pode seguir
                 return choices.PS_READY_TO_PREVIEW
-            else:
-                # solicita revisão dos problemas
-                return choices.PS_VALIDATED_WITH_ERRORS
+
+        # solicita revisão dos problemas
+        return choices.PS_VALIDATED_WITH_ERRORS
 
     @property
     def has_errors(self):
