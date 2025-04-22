@@ -594,9 +594,14 @@ class Package(CommonControlField, ClusterableModel):
         }
         self.save()
 
+    @property
+    def upload_validator(self):
+        if not hasattr(self, '_upload_validator') or not self._upload_validor:
+            self._upload_validor = UploadValidator.get()
+        return self._upload_validor
+
     def evaluate_validation_numbers(self, blocking_error_status):
-        validator = UploadValidator.get()
-        self.status = validator.get_pos_validation_status(
+        self.status = self.upload_validator.get_pos_validation_status(
             self,
             blocking_error_status=blocking_error_status
         )
@@ -726,8 +731,7 @@ class Package(CommonControlField, ClusterableModel):
         - As porcentagens de erros e avisos XML estiverem dentro dos limites aceitáveis.
         - As porcentagens de erros XML contestados e declarados impossíveis de corrigir estiverem dentro dos limites aceitáveis.
         """
-        validator = UploadValidator.get()
-        return validator.is_acceptable_package(self)
+        return self.upload_validator.is_acceptable_package(self)
 
     def get_errors_report_content(self):
         filename = self.name + f"-{report_datetime()}-errors.csv"
