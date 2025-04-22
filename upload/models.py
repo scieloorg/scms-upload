@@ -1913,6 +1913,39 @@ class UploadValidator(CommonControlField):
         #     return True
         return value <= max_value
 
+    def is_acceptable_package(self, package):
+        """
+        Determina se o pacote é aceitável com base em vários critérios.
+
+        Retorna:
+            bool: True se o pacote for aceitável, False caso contrário.
+
+        O pacote é considerado aceitável se:
+        - Não houver erros bloqueadores.
+        - O total de problemas for zero.
+        - As porcentagens de erros e avisos XML estiverem dentro dos limites aceitáveis.
+        - As porcentagens de erros XML contestados e declarados impossíveis de corrigir estiverem dentro dos limites aceitáveis.
+        """
+        if not package.is_validation_finished:
+            return False
+
+        logging.info(
+            f"UploadValidator.is_acceptable_package - review finished: {package.is_error_review_finished}"
+        )
+        if package.is_error_review_finished:
+            # avalia os números de erros, deduzindo os falsos positivos
+            if not self.check_impossible_to_fix_percentage(package.declared_impossible_to_fix_percentage):
+                return False
+            if not self.check_xml_errors_percentage(package.xml_errors_percentage):
+                return False
+            return True
+
+        if not self.check_xml_errors_percentage(package.xml_errors_percentage):
+            return False
+        if not self.check_xml_warnings_percentage(package.xml_warnings_percentage):
+            return False
+        return True
+
 
 class ArchivedPackage(Package):
 
