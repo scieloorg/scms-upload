@@ -1478,6 +1478,32 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
         self.advice = self.advice and self.advice[:500]
         return super().save()
 
+    @classmethod
+    def get_numbers(cls, package, report=None):
+        # ER_REACTION_FIX = "to-fix"
+        # ER_REACTION_NOT_TO_FIX = "not-to-fix"
+        # ER_REACTION_IMPOSSIBLE_TO_FIX = "unable-to-fix"
+
+        # FIXME
+        params = {}
+        if report:
+            params["report"] = report
+        else:
+            params["report__package"] = package
+
+        total = 0
+        items = _get_numbers()
+        items.update({"total_to-fix": 0, "total_not-to-fix": 0, "total_unable-to-fix": 0})
+        for item in (
+            cls.objects.filter(**params).values("status", "reaction").annotate(total=Count("id"))
+        ):
+            items["total_" + item["status"].lower()] += item["total"]
+            items["total_" + item["reaction"]] += item["total"]
+            total += item["total"]
+
+        items["total"] = total
+        logging.info(f"XMLError.get_numbers : {items}")
+        return items
 
 class BaseValidationReport(CommonControlField):
     title = models.CharField(_("Title"), null=True, blank=True, max_length=128)
