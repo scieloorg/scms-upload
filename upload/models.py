@@ -1814,35 +1814,9 @@ class UploadValidator(CommonControlField):
         return obj.publication_rule
 
     @staticmethod
-    def get_decision_for_critical_errors(collection=None):
-        obj = UploadValidator.get(collection)
-        return obj.decision_for_critical_errors
-
-    @staticmethod
     def calculate_publication_date(qa_publication_date, collection=None):
         obj = UploadValidator.get(collection)
         return obj.get_publication_date(qa_publication_date)
-
-    @staticmethod
-    def check_max_xml_errors_percentage(value, collection=None):
-        obj = UploadValidator.get(collection)
-        logging.info(
-            f"check_max_xml_errors_percentage: {value} <= {obj.max_xml_errors_percentage}"
-        )
-        return value <= obj.max_xml_errors_percentage
-
-    @staticmethod
-    def check_max_xml_warnings_percentage(value, collection=None):
-        obj = UploadValidator.get(collection)
-        logging.info(
-            f"check_max_xml_warnings_percentage: {value} <= {obj.max_xml_warnings_percentage}"
-        )
-        return value <= obj.max_xml_warnings_percentage
-
-    @staticmethod
-    def check_max_impossible_to_fix_percentage(value, collection=None):
-        obj = UploadValidator.get(collection)
-        return value <= obj.max_impossible_to_fix_percentage
 
     def check_xml_errors_percentage(self, value):
         return self.validate_number(value, self.max_xml_errors_percentage)
