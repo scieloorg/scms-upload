@@ -758,27 +758,8 @@ class Package(CommonControlField, ClusterableModel):
         - As porcentagens de erros e avisos XML estiverem dentro dos limites aceitáveis.
         - As porcentagens de erros XML contestados e declarados impossíveis de corrigir estiverem dentro dos limites aceitáveis.
         """
-        if not self.is_validation_finished:
-            return False
-
-        metrics = self.metrics
-
-        logging.info(
-            f"Package.is_acceptable_package - review finished: {self.is_error_review_finished}"
-        )
-        if self.is_error_review_finished:
-            # avalia os números de erros, deduzindo os falsos positivos
-            return UploadValidator.check_max_xml_errors_percentage(
-                self.contested_xml_errors_percentage
-            ) and UploadValidator.check_max_impossible_to_fix_percentage(
-                self.declared_impossible_to_fix_percentage
-            )
-        # avalia os números de erros, sem deduzir os falsos positivos
-        return UploadValidator.check_max_xml_errors_percentage(
-            self.xml_errors_percentage
-        ) and UploadValidator.check_max_xml_warnings_percentage(
-            self.xml_warnings_percentage
-        )
+        validator = UploadValidator.get()
+        return validator.is_acceptable_package(self)
 
     def get_errors_report_content(self):
         filename = self.name + f"-{report_datetime()}-errors.csv"
