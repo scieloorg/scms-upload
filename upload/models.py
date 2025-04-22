@@ -72,6 +72,10 @@ class UploadProcResult(Operation, Orderable):
     proc = ParentalKey("Package", related_name="upload_proc_result")
 
 
+def calculate_percentage(value, total):
+    return round(value * 100 / total, 2)
+
+
 def _get_numbers():
     return {
         "total_blocking": 0,
@@ -574,16 +578,12 @@ class Package(CommonControlField, ClusterableModel):
             + xml_numbers["total"]
             + pkg_numbers["total"]
         )
+        self.critical_errors = pkg_numbers["total_critical"] + xml_numbers["total_critical"]
 
-        self.critical_errors = pkg_numbers["total_critical"]
-
-        self.xml_errors_percentage = round(
-            xml_numbers["total_error"] * 100 / total_validations, 2
-        )
-        self.xml_warnings_percentage = round(
-            xml_numbers["total_warning"] * 100 / total_validations, 2
-        )
-
+        self.xml_errors_percentage = calculate_percentage(xml_numbers["total_error"], total_validations)
+        self.xml_warnings_percentage = calculate_percentage(xml_numbers["total_warning"], total_validations)
+        self.contested_xml_errors_percentage = calculate_percentage(xml_numbers["reaction_not_to_fix"], xml_numbers["total"])
+        self.declared_impossible_to_fix_percentage = calculate_percentage(xml_numbers["reaction_impossible_to_fix"], xml_numbers["total"])
         self.numbers = {
             "total_blocking": pkg_numbers["total_blocking"],
             "total_validations": total_validations,
