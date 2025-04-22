@@ -1946,6 +1946,47 @@ class UploadValidator(CommonControlField):
             return False
         return True
 
+    def get_pos_validation_status(self, package, blocking_error_status=None):
+        metrics = package.metrics
+        logging.info(f"UploadValidator.get_pos_validation_status - {metrics}")
+
+        total_validations = metrics["total_validations"]
+        if not total_validations:
+            # zero validações: problema inesperado
+            return choices.PS_ENQUEUED_FOR_VALIDATION
+
+        # verifica status a partir destes números
+        if metrics["total_blocking"]:
+            # pacote tem erros indiscutíveis
+            # choices.PS_PENDING_CORRECTION | choices.PS_UNEXPECTED
+            return blocking_error_status or choices.PS_PENDING_CORRECTION
+
+        if metrics["total_xml_issues"] + metrics["total_pkg_issues"] == 0:
+            # pacote sem erros identificados no XML, pode seguir
+            return choices.PS_READY_TO_PREVIEW
+
+        logging.info(f"UploadValidator.get_pos_validation_status: {self.publication_rule}")
+        # algum erro identificado
+        if self.rule == choices.STRICT_AUTO_PUBLICATION:
+            # não importa o nível de criticidade, solicita correção
+            return choices.PS_PENDING_CORRECTION
+
+        if package.metrics["critical_errors"]:
+            # solicita correção ou revisão dos problemas
+            # PS_PENDING_CORRECTION or PS_VALIDATED_WITH_ERRORS
+            return self.decision_for_critical_errors
+
+        if self.rule == choices.FLEXIBLE_AUTO_PUBLICATION:
+            if self.is_acceptable_package(package):
+                # pacote com erros tolerados, pode seguir
+                return choices.PS_READY_TO_PREVIEW
+
+        if self.rule == choices.MANUAL_PUBLICATION:
+            return choices.PS_VALIDATED_WITH_ERRORS
+
+        # solicita revisão dos problemas
+        return choices.PS_VALIDATED_WITH_ERRORS
+
 
 class ArchivedPackage(Package):
 
