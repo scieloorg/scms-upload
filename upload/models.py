@@ -550,9 +550,8 @@ class Package(CommonControlField, ClusterableModel):
             return
 
         self.calculate_validation_numbers()
-        self.status = self.evaluate_validation_numbers(blocking_error_status)
-        self.save()
-
+        self.evaluate_validation_numbers(blocking_error_status)
+        
         logging.info(f"Package.finish_reception - status: {self.status}")
         if self.status == choices.PS_READY_TO_PREVIEW:
             self.qa_decision = choices.PS_READY_TO_PREVIEW
@@ -596,43 +595,12 @@ class Package(CommonControlField, ClusterableModel):
         self.save()
 
     def evaluate_validation_numbers(self, blocking_error_status):
-        metrics = self.metrics
-        logging.info(f"Package.evaluate_validation_numbers - {metrics}")
-
-        total_validations = metrics["total_validations"]
-        if not total_validations:
-            # zero validações: problema inesperado
-            return choices.PS_ENQUEUED_FOR_VALIDATION
-
-        # verifica status a partir destes números
-        if metrics["total_blocking"]:
-            # pacote tem erros indiscutíveis
-            # choices.PS_PENDING_CORRECTION | choices.PS_UNEXPECTED
-            return blocking_error_status or choices.PS_PENDING_CORRECTION
-
-        if metrics["total_xml_issues"] + metrics["total_pkg_issues"] == 0:
-            # pacote sem erros identificados no XML, pode seguir
-            return choices.PS_READY_TO_PREVIEW
-
-        rule = UploadValidator.get_publication_rule()
-        logging.info(f"Package.evaluate_validation_numbers - rule: {rule}")
-        # algum erro identificado
-        if rule == choices.STRICT_AUTO_PUBLICATION:
-            # não importa o nível de criticidade, solicita correção
-            return choices.PS_PENDING_CORRECTION
-
-        if metrics["critical_errors"]:
-            # solicita correção ou revisão dos problemas
-            # PS_PENDING_CORRECTION or PS_VALIDATED_WITH_ERRORS
-            return UploadValidator.get_decision_for_critical_errors()
-
-        if rule == choices.FLEXIBLE_AUTO_PUBLICATION:
-            if self.is_acceptable_package:
-                # pacote com erros tolerados, pode seguir
-                return choices.PS_READY_TO_PREVIEW
-
-        # solicita revisão dos problemas
-        return choices.PS_VALIDATED_WITH_ERRORS
+        validator = UploadValidator.get()
+        self.status = validator.get_pos_validation_status(
+            self,
+            blocking_error_status=blocking_error_status
+        )
+        self.save()
 
     @property
     def has_errors(self):
