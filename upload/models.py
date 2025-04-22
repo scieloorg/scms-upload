@@ -1896,13 +1896,22 @@ class UploadValidator(CommonControlField):
         return value <= obj.max_impossible_to_fix_percentage
 
     def check_xml_errors_percentage(self, value):
-        return value <= self.max_xml_errors_percentage
+        return self.validate_number(value, self.max_xml_errors_percentage)
 
     def check_xml_warnings_percentage(self, value):
-        return value <= self.max_xml_warnings_percentage
+        return self.validate_number(value, self.max_xml_warnings_percentage)
 
     def check_impossible_to_fix_percentage(self, value):
-        return value <= self.max_impossible_to_fix_percentage
+        return self.validate_number(value, self.max_impossible_to_fix_percentage)
+
+    def validate_number(self, value, max_value):
+        if not value:
+            return True
+        if self.rule == choices.STRICT_AUTO_PUBLICATION:
+            return False
+        # if self.rule == choices.MANUAL_PUBLICATION:
+        #     return True
+        return value <= max_value
 
 
 class ArchivedPackage(Package):
