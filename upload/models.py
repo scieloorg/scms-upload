@@ -827,32 +827,25 @@ class Package(CommonControlField, ClusterableModel):
             blocking_errors.append(_("Total error limit exceeded"))
         return blocking_errors
 
-    def register_qa_decision(self, user, operation, websites, result, rule):
-        try:
-            exception = result.pop("exception")
-        except (KeyError, AttributeError, TypeError, ValueError):
-            exception = None
-
-        comments = [exception or '']
-        for k in ("critical_errors", "errors", "warnings"):
-            comments.extend(result.get(k) or [])
-        
-        if not self.qa_comment:
+    def register_qa_decision(self, user, result, new_status=None):
+        if result:
+            comments = []
+            for k in ("blocking_errors", "errors", "warnings"):
+                comments.extend(result.get(k) or [])
+            if self.qa_comment:
+                comments.insert(0, self.qa_comment)
             self.qa_comment = "\n".join([str(item) for item in comments if item])
+
+            if result.get("request_correction"):
+                self.qa_decision = choices.PS_PENDING_CORRECTION
+                self.assignee = self.creator
+
+            if new_status:
+                self.status = new_status
+            self.save()
 
         if self.qa_comment:
             self.register_qa_comment_as_error(user)
-
-        if result and result.get("request_correction"):
-            self.qa_decision = choices.PS_PENDING_CORRECTION
-            self.assignee = self.creator
-
-        self.status = self.qa_decision
-        self.save()
-
-        detail = {"decision": self.qa_decision, "websites": websites, "rule": rule}
-        detail.update(result or {})
-        operation.finish(user, completed=True, detail=detail, exception=exception)
 
     def xml_file_changed_pub_date(self, xml_with_pre):
         """
