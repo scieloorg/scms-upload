@@ -1092,45 +1092,44 @@ class Package(CommonControlField, ClusterableModel):
         report.creation = choices.REPORT_CREATION_DONE
         report.save()
 
-    def prepare_to_publish(self, user, operation):
-        user = user or self.updated_by or self.creator
-        websites = []
+    def prepare_to_publish(self, user, qa=None, public=None):
+        # verifica se há impedimentos de tornar o artigo público
+        blocking_errors = self.has_publication_blockers()
+        block_public = bool(blocking_errors)
+
+        if block_public:
+            public = False
+
+        if not qa and not public:
+            return {}
+
         result = {}
-        rule = None
-        try:
-            if self.qa_decision == choices.PS_READY_TO_PREVIEW:
-                websites.append("QA")
+        websites = []
+        xml_changed = False
+        xml_with_pre = self.xml_with_pre
+        if qa:
+            xml_changed = self.xml_file_changed_pid_v2(xml_with_pre)
+            websites.append("QA")
+            new_status = choices.PS_READY_TO_PREVIEW
+        if public:
+            xml_changed = self.xml_file_changed_pub_date(xml_with_pre)
 
-            # gera pacote sps e o valida quanto a compontentes disponíveis no minio
-            self.prepare_sps_package(user)
-            result = self.analyze_sps_package()
-            # verifica pela regra de publicação e pela situação do pacote
-            # se pode ser publicado em PUBLIC
-            rule = UploadValidator.get_publication_rule()
-            self.analyze_result(result, rule)
+        user = user or self.updated_by or self.creator
+        self.prepare_sps_package(user, xml_with_pre, xml_changed)
 
-        except PublishingPrepException as exc:
-            logging.exception(exc)
-            result["exception"] = exc
-            self.register_qa_decision(user, operation, websites, result, rule)
-            return websites
+        # valida o pacote sps
+        result = self.analyze_sps_package()
+        if result.get("blocking_errors"):
+            return result
 
-        # nenhum erro ou regra flexível, permissão de publicar no site público
-        self.qa_decision = choices.PS_READY_TO_PUBLISH
-        self.status = choices.PS_READY_TO_PUBLISH
-        self.save()
-
-        if (
-            not self.linked
-            or not self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists()
-        ):
-            # nenhum pacote vinculado como outros ou
-            # todos os pacotes vinculados estão com o mesmo status
-            # (choices.PS_READY_TO_PUBLISH), então pode publicar em PUBLIC
+        if public and not self.sps_pkg.registered_in_core:
+            result["blocking_errors"].append(
+                _("SPS package requires PID provider registration")
+            )
             websites.append("PUBLIC")
+            new_status = choices.PS_READY_TO_PUBLISH
 
-        self.register_qa_decision(user, operation, websites, result, rule)
-        return websites
+        return {"websites": websites, "result": result, "new_status": new_status}
 
 
 class QAPackage(Package):
