@@ -1014,8 +1014,13 @@ class Package(CommonControlField, ClusterableModel):
             if save:
                 self.save()
         except Exception as e:
-            raise PublishingPrepException(
-                f"Unable to create or update Article {self}"
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            operation = self.start(user, "create_or_update_article")
+            operation.finish(
+                user,
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
             )
 
     # def update_status(self):
