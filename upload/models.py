@@ -565,6 +565,21 @@ class Package(CommonControlField, ClusterableModel):
                     )
                 )
 
+    def create_preview_and_publish(self, task_publish_article):
+        is_ready_to_preview = False
+        if self.status == choices.PS_READY_TO_PREVIEW:
+            is_ready_to_preview = True
+        elif self.status == choices.PS_VALIDATED_WITH_ERRORS:
+            if self.upload_validator.rule == choices.MANUAL_PUBLICATION:
+                is_ready_to_preview = True
+
+        if task_publish_article and is_ready_to_preview:
+            user = self.updated_by or self.creator
+            # é desejável que o artigo seja publicado diretamente
+            # prepare_to_publish verficará se há impedimentos
+            response = self.prepare_to_publish(user, qa=True, public=True)
+            self.publish(user, task_publish_article, response.get("websites") or [])
+
     def calculate_validation_numbers(self):
         """
         Calcula o total de errors, warnings, blocking errors, etc
