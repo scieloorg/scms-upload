@@ -812,28 +812,6 @@ class Package(CommonControlField, ClusterableModel):
             result["warnings"].append(_("Total of XML, PDF, HTML do not match {}").format(self.sps_pkg.texts))
         return result
 
-    def analyze_result(self, result, rule):
-        if rule == choices.STRICT_AUTO_PUBLICATION:
-            if result.get("critical_errors") or result.get("errors") or self.has_errors:
-                result["request_correction"] = True
-                # Há erros e é modo rígido, somente publica em QA
-                raise PublishingPrepException(
-                    _(
-                        "Article has errors. System settings (STRICT_AUTO_PUBLICATION) blocks its publication"
-                    )
-                )
-        elif rule == choices.MANUAL_PUBLICATION:
-            # No modo de publicação manual no website PUBLIC,
-            # com ou sem erros, é decisão do analista
-            if self.qa_decision == choices.PS_READY_TO_PREVIEW:
-                # publica somente em QA
-                result["request_correction"] = False
-                raise PublishingPrepException(
-                    _(
-                        "It requires manual publication due to system settings (MANUAL_PUBLICATION)"
-                    )
-                )
-
     def has_publication_blockers(self):
         blocking_errors = []
         if self.linked and self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists():
@@ -875,40 +853,6 @@ class Package(CommonControlField, ClusterableModel):
         detail = {"decision": self.qa_decision, "websites": websites, "rule": rule}
         detail.update(result or {})
         operation.finish(user, completed=True, detail=detail, exception=exception)
-
-    def xml_file_changed(self, xml_with_pre):
-        """
-        Atualiza data de publicação do artigo e/ou pid v2, se necessário
-        """
-        changed = False
-        try:
-            xml_pub_date = datetime.fromisoformat(xml_with_pre.article_publication_date)
-        except Exception as e:
-            xml_pub_date = None
-
-        changed_date = None
-        if self.article and self.article.first_publication_date:
-            if xml_pub_date != self.article.first_publication_date:
-                changed_date = self.article.first_publication_date
-        elif not xml_pub_date:
-            changed_date = datetime.utcnow()
-
-        if changed_date:
-            xml_with_pre.article_publication_date = {
-                "year": changed_date.year,
-                "month": changed_date.month,
-                "day": changed_date.day,
-            }
-            changed = True
-
-        if not xml_with_pre.v2:
-            xml_with_pre.v2 = self.get_or_generate_pid_v2()
-            changed = True
-
-        if changed:
-            # xml_with_pre.update_xml_in_zip_file()
-            update_zip_file(self.file.path, xml_with_pre)
-            return True
 
     def xml_file_changed_pub_date(self, xml_with_pre):
         """
