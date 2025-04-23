@@ -147,7 +147,7 @@ class QAPackageEditView(EditView):
         package = form.save_all(self.request.user)
 
         messages.success(self.request, _("Decision: {}").format(package.qa_decision))
-        process_qa_decision(self.request, package)
+        package.process_qa_decision(self.request.user, task_publish_article)
 
         return HttpResponseRedirect(self.get_success_url())
 
@@ -163,7 +163,7 @@ class ReadyToPublishPackageEditView(EditView):
         package = form.save_all(self.request.user)
 
         messages.success(self.request, _("Decision: {}").format(package.qa_decision))
-        process_qa_decision(self.request, package)
+        package.process_qa_decision(self.request.user, task_publish_article)
 
         return HttpResponseRedirect(self.get_success_url())
 
@@ -180,31 +180,6 @@ class UploadValidatorEditView(EditView):
         return HttpResponseRedirect(self.get_success_url())
 
 
-def process_qa_decision(request, package):
-    """
-    This view function enables the user to finish deposit of a package through the graphic-interface.
-    """
-    logging.info(f"process_qa_decision: {package.qa_decision}")
-    task_process_qa_decision.apply_async(
-        kwargs=dict(
-            user_id=request.user.id,
-            package_id=package.id,
-        )
-    )
-    # package.process_qa_decision(request.user, task_publish_article)
-
-    # if package.qa_decision == choices.PS_PUBLISHED:
-    #     messages.success(request, _("Package {} is published").format(package))
-    # elif package.qa_decision == choices.PS_READY_TO_PUBLISH:
-    #     for item in package.pkg_zip.packages.all():
-    #         if item.qa_decision == choices.PS_READY_TO_PUBLISH:
-    #             messages.success(request, _("Package {} is ready to publish").format(item))
-    #         else:
-    #             messages.warning(
-    #                 request,
-    #                 _("Package {} is not ready to publish ({})").format(item, item.qa_decision))
-
-
 def finish_deposit(request):
     """
     This view function enables the user to finish deposit of a package through the graphic-interface.
@@ -214,10 +189,9 @@ def finish_deposit(request):
     if package_id:
         package = get_object_or_404(Package, pk=package_id)
 
-        if package.finish_deposit():
+        if package.finish_deposit(task_publish_article):
             # muda o status para a próxima etapa
             messages.success(request, _("Package has been deposited"))
-            process_qa_decision(request, package)
             return redirect("/admin/upload/package/")
 
         if not package.is_error_review_finished:
