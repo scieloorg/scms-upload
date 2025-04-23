@@ -1131,6 +1131,30 @@ class Package(CommonControlField, ClusterableModel):
 
         return {"websites": websites, "result": result, "new_status": new_status}
 
+    def publish(self, user, task_publish_article, websites):
+        for website in websites:
+            task_publish_article.apply_async(
+                kwargs=dict(
+                    user_id=user.id,
+                    username=user.username,
+                    api_data=api_data,
+                    website_kind=website,
+                    article_proc_id=None,
+                    upload_package_id=self.id,
+                )
+            )
+            if website == "PUBLIC":
+                for item in self.linked.all():
+                    task_publish_article.apply_async(
+                        kwargs=dict(
+                            user_id=user.id,
+                            username=user.username,
+                            api_data=api_data,
+                            website_kind=website,
+                            article_proc_id=None,
+                            upload_package_id=item.id,
+                        )
+                    )
 
 class QAPackage(Package):
     """
