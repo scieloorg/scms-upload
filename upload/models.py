@@ -759,40 +759,59 @@ class Package(CommonControlField, ClusterableModel):
 
         return {"content": content, "filename": filename, "columns": fieldnames}
 
-    def process_qa_decision(self, user):
+    def process_qa_decision(self, user, task_publish_article=None):
         # (PS_DEPUBLISHED, _("Depublish")),
-        # (PS_PENDING_CORRECTION, _("Pending for correction")),
-        # (PS_PENDING_QA_DECISION, _("Pending quality analysis decision")),
-        # (PS_READY_TO_PREVIEW, _("Ready to preview on QA website")),
-        # (PS_READY_TO_PUBLISH, _("Ready to publish on public website")),
+        # (PS_PENDING_CORRECTION, _("Request correction")),
+        # (PS_PENDING_QA_DECISION, _("Delegate quality review to other analyst")),
+        # (PS_READY_TO_PREVIEW, _("Publish on QA website")),
+        # (PS_READY_TO_PUBLISH, _("Publish on public website")),
 
-        operation = self.start(user, "process_qa_decision")
+        try:
+            operation = self.start(user, "process_qa_decision")
+            detail = {
+                "decision": self.qa_decision,
+            }
+            result = {}
+            new_status = None
+            
+            if self.qa_decision in (
+                choices.PS_PENDING_QA_DECISION, choices.PS_PENDING_CORRECTION
+            ):
+                new_status = self.qa_decision
+                self.register_qa_decision(user, result, new_status)
+                operation.finish(user, completed=True, detail=detail)
 
-        if self.qa_decision in (
-            choices.PS_PENDING_QA_DECISION, choices.PS_PENDING_CORRECTION
-        ):
-            self.register_qa_decision(
-                user, operation, websites=None, result={}, rule=None
+            elif self.qa_decision in (
+                choices.PS_READY_TO_PREVIEW, choices.PS_READY_TO_PUBLISH,
+            ):
+                qa = self.qa_decision == choices.PS_READY_TO_PREVIEW
+                public = self.qa_decision == choices.PS_READY_TO_PUBLISH
+
+                # é desejável que qa e public sejam publicados simultaneamente
+                # exceto se há impedimento de em tornar público
+                response = self.prepare_to_publish(user, qa, public or qa)
+            
+                detail.update(response or {})
+                # FIXME
+                new_status = response.get("new_status")
+                self.register_qa_decision(user, response.get("result"), new_status)
+                operation.finish(user, completed=True, detail=detail)
+                self.publish(user, task_publish_article, response.get("websites") or [])
+
+            elif self.qa_decision == choices.PS_DEPUBLISHED:
+                # TODO
+                detail["error"] = "not implemented"
+
+                operation.finish(user, completed=False, detail=detail)
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            operation.finish(
+                user,
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
+                detail=detail,
             )
-            return []
-
-        if self.qa_decision in (
-            choices.PS_READY_TO_PREVIEW, choices.PS_READY_TO_PUBLISH,
-        ):
-            return self.prepare_to_publish(user, operation)
-
-        if self.qa_decision == choices.PS_DEPUBLISHED:
-            # TODO
-            error = "not implemented"
-        else:
-            error = "unexpected decision"
-
-        operation.finish(
-            user,
-            completed=True,
-            detail={"decision": self.qa_decision, "error": error},
-        )
-        return []
 
     def analyze_sps_package(self):
         result = {"critical_errors": None, "errors": None, "warnings": None}
