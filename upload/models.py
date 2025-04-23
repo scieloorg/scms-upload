@@ -834,6 +834,21 @@ class Package(CommonControlField, ClusterableModel):
                     )
                 )
 
+    def has_publication_blockers(self):
+        blocking_errors = []
+        if self.linked and self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists():
+            blocking_errors.append(
+                _("Packages linked - will publish together when all ready")
+            )
+        if self.is_acceptable_package:
+            if self.upload_validator.rule == choices.MANUAL_PUBLICATION:
+                blocking_errors.append(
+                    _("Packages linked - will publish together when all ready"),
+                )
+        else:
+            blocking_errors.append(_("Total error limit exceeded"))
+        return blocking_errors
+
     def register_qa_decision(self, user, operation, websites, result, rule):
         try:
             exception = result.pop("exception")
