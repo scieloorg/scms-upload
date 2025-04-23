@@ -910,6 +910,35 @@ class Package(CommonControlField, ClusterableModel):
             update_zip_file(self.file.path, xml_with_pre)
             return True
 
+    def xml_file_changed_pub_date(self, xml_with_pre):
+        """
+        Atualiza data de publicação do artigo e/ou pid v2, se necessário
+        """
+        try:
+            xml_pub_date = datetime.fromisoformat(xml_with_pre.article_publication_date)
+        except Exception as e:
+            xml_pub_date = None
+
+        changed_date = None
+        if self.article and self.article.first_publication_date:
+            if xml_pub_date != self.article.first_publication_date:
+                changed_date = self.article.first_publication_date
+        elif not xml_pub_date:
+            changed_date = datetime.utcnow()
+
+        if changed_date:
+            xml_with_pre.article_publication_date = {
+                "year": changed_date.year,
+                "month": changed_date.month,
+                "day": changed_date.day,
+            }
+            return True
+
+    def xml_file_changed_pid_v2(self, xml_with_pre):
+        if not xml_with_pre.v2:
+            xml_with_pre.v2 = self.get_or_generate_pid_v2()
+            return True
+
     def get_or_generate_pid_v2(self):
         issue_pid = IssueProc.get_or_generate_issue_pid(self.issue)
         # Nota: order não é o mesmo que pid
