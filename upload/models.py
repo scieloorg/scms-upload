@@ -533,7 +533,7 @@ class Package(CommonControlField, ClusterableModel):
         return True
 
     def finish_reception(
-        self, task_process_qa_decision=None, blocking_error_status=None
+        self, task_publish_article=None, blocking_error_status=None
     ):
         """
         1. Verifica se as validações que executaram em paralelo, finalizaram
@@ -551,19 +551,7 @@ class Package(CommonControlField, ClusterableModel):
 
         self.calculate_validation_numbers()
         self.evaluate_validation_numbers(blocking_error_status)
-        
-        logging.info(f"Package.finish_reception - status: {self.status}")
-        if self.status == choices.PS_READY_TO_PREVIEW:
-            self.qa_decision = choices.PS_READY_TO_PREVIEW
-            self.save()
-
-            if task_process_qa_decision:
-                task_process_qa_decision.apply_async(
-                    kwargs=dict(
-                        user_id=self.creator.id,
-                        package_id=self.id,
-                    )
-                )
+        self.create_preview_and_publish(task_publish_article)
 
     def create_preview_and_publish(self, task_publish_article):
         is_ready_to_preview = False
@@ -692,7 +680,7 @@ class Package(CommonControlField, ClusterableModel):
         data.update(self.metrics)
         return data
 
-    def finish_deposit(self):
+    def finish_deposit(self, task_publish_article):
         """
         1. Analisa as respostas do produtor de XML aos problemas encontrados no pacote
         O produtor de XML pode concordar ou discordar com os erros
@@ -721,6 +709,8 @@ class Package(CommonControlField, ClusterableModel):
             self.status = choices.PS_READY_TO_PREVIEW
             self.qa_decision = choices.PS_READY_TO_PREVIEW
             self.save()
+
+            self.create_preview_and_publish(task_publish_article)
             return True
 
         if not self.is_error_review_finished:
