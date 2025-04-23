@@ -945,15 +945,19 @@ class Package(CommonControlField, ClusterableModel):
         number = str(self.order or randint(0, 100000)).zfill(5)
         return f"S{issue_pid}{number}"
 
-    def prepare_sps_package(self, user):
+    def prepare_sps_package(self, user, xml_with_pre, xml_file_changed):
         # Aplica-se também para um pacote de atualização de um conteúdo anteriormente migrado
         # TODO components, texts
-        xml_with_pre = self.xml_with_pre
+        if xml_file_changed:
+            update_zip_file(self.file.path, xml_with_pre)
+
         if (
-            self.xml_file_changed(xml_with_pre)
+            # self.xml_file_changed(xml_with_pre, set_pub_date)
+            xml_file_changed
             or not self.sps_pkg
             or not self.sps_pkg.valid_components
         ):
+
             texts = {
                 "xml_langs": list(xml_with_pre.langs),
                 "pdf_langs": [
@@ -975,9 +979,6 @@ class Package(CommonControlField, ClusterableModel):
 
             if self.sps_pkg:
                 self.create_or_update_article(user, save=True)
-
-        if not self.sps_pkg:
-            raise PublishingPrepException(_("Unable to prepare the package to publish"))
 
     def start(self, user, name):
         # self.save()
