@@ -58,13 +58,6 @@ from upload.utils.package_utils import update_zip_file
 from upload.utils.zip_pkg import PkgZip
 
 
-class PublishingPrepException(Exception):
-    pass
-
-
-class NotFinishedValitionsError(Exception): ...
-
-
 User = get_user_model()
 
 
@@ -819,21 +812,22 @@ class Package(CommonControlField, ClusterableModel):
             )
 
     def analyze_sps_package(self):
-        result = {"critical_errors": None, "errors": None, "warnings": None}
+        result = {"blocking_errors": [], "errors": [], "warnings": []}
 
-        if not self.sps_pkg.registered_in_core:
-            result["critical_errors"] = [
-                _("SPS package must be registered in the Core system")
-            ]
-
-        if not self.sps_pkg.valid_components:
-            result["errors"] = []
-            for component in self.sps_pkg.components.filter(uri=None):
-                result["errors"].append(_("{} is not published on MinIO").format(component.basename))
-
-        if not self.sps_pkg.valid_texts:
-            result["warnings"] = []
-            result["warnings"].append(_("Total of XML, PDF, HTML do not match {}").format(self.sps_pkg.texts))
+        if not self.sps_pkg:
+            result["blocking_errors"].append(
+                _("SPS Package was not created")
+            )
+        if not self.article:
+            result["blocking_errors"].append(
+                _("Article was not created")
+            )
+        if self.sps_pkg:
+            if not self.sps_pkg.valid_components:
+                for component in self.sps_pkg.components.filter(uri=None):
+                    result["errors"].append(_("{} is not published on MinIO").format(component.basename))
+            if not self.sps_pkg.valid_texts:
+                result["warnings"].append(_("Total of XML, PDF, HTML do not match {}").format(self.sps_pkg.texts))
         return result
 
     def has_publication_blockers(self):
@@ -1834,7 +1828,7 @@ class UploadValidator(CommonControlField):
     #     return _("Validation rules")
 
     @classmethod
-    def get(cls, collection):
+    def get(cls, collection=None):
         try:
             return UploadValidator.objects.get(collection=collection)
         except UploadValidator.DoesNotExist:
