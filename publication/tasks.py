@@ -381,7 +381,7 @@ def task_publish_article(
     
         response = list(
             controller.publish_article_collection_websites(
-                user, website_kinds, article))
+                user, websites, article))
 
         op_main.finish(
             user,
@@ -412,7 +412,7 @@ def task_publish_article(
                     item=str(manager),
                     article_proc_id=article_proc_id,
                     upload_package_id=upload_package_id,
-                    website_kind=website_kind,
+                    websites=websites,
                 ),
             )
 

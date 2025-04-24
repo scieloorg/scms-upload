@@ -552,7 +552,7 @@ class Package(CommonControlField, ClusterableModel):
         if self.status == choices.PS_READY_TO_PREVIEW:
             is_ready_to_preview = True
         elif self.status == choices.PS_VALIDATED_WITH_ERRORS:
-            if self.upload_validator.rule == choices.MANUAL_PUBLICATION:
+            if self.upload_validator.publication_rule == choices.MANUAL_PUBLICATION:
                 is_ready_to_preview = True
 
         if task_publish_article and is_ready_to_preview:
@@ -560,7 +560,7 @@ class Package(CommonControlField, ClusterableModel):
             # é desejável que o artigo seja publicado diretamente
             # prepare_to_publish verficará se há impedimentos
             response = self.prepare_to_publish(user, qa=True, public=True)
-            self.publish_article(user, task_publish_article, response.get("websites") or [])
+            self.run_task_publish_article(user, task_publish_article, response.get("websites") or [])
 
     def calculate_validation_numbers(self):
         """
@@ -575,11 +575,11 @@ class Package(CommonControlField, ClusterableModel):
             + pkg_numbers["total"]
         )
         self.critical_errors = pkg_numbers["total_critical"] + xml_numbers["total_critical"]
-
+        logging.info(xml_numbers)
         self.xml_errors_percentage = calculate_percentage(xml_numbers["total_error"], total_validations)
         self.xml_warnings_percentage = calculate_percentage(xml_numbers["total_warning"], total_validations)
-        self.contested_xml_errors_percentage = calculate_percentage(xml_numbers["reaction_not_to_fix"], xml_numbers["total"])
-        self.declared_impossible_to_fix_percentage = calculate_percentage(xml_numbers["reaction_impossible_to_fix"], xml_numbers["total"])
+        self.contested_xml_errors_percentage = calculate_percentage(xml_numbers["total_not-to-fix"], xml_numbers["total"])
+        self.declared_impossible_to_fix_percentage = calculate_percentage(xml_numbers["total_unable-to-fix"], xml_numbers["total"])
         self.numbers = {
             "total_blocking": pkg_numbers["total_blocking"],
             "total_validations": total_validations,
@@ -795,7 +795,7 @@ class Package(CommonControlField, ClusterableModel):
                 new_status = response.get("new_status")
                 self.register_qa_decision(user, response.get("result"), new_status)
                 operation.finish(user, completed=True, detail=detail)
-                self.publish_article(user, task_publish_article, response.get("websites") or [])
+                self.run_task_publish_article(user, task_publish_article, response.get("websites") or [])
 
             elif self.qa_decision == choices.PS_DEPUBLISHED:
                 # TODO
@@ -838,7 +838,7 @@ class Package(CommonControlField, ClusterableModel):
                 _("Packages linked - will publish together when all ready")
             )
         if self.is_acceptable_package:
-            if self.upload_validator.rule == choices.MANUAL_PUBLICATION:
+            if self.upload_validator.publication_rule == choices.MANUAL_PUBLICATION:
                 blocking_errors.append(
                     _("Packages linked - will publish together when all ready"),
                 )
@@ -980,6 +980,35 @@ class Package(CommonControlField, ClusterableModel):
                 exc_traceback=exc_traceback,
             )
 
+    def publish(
+        self,
+        user,
+        callable_publish,
+        website_kind=None,
+        api_data=None,
+        force_update=None,
+        content_type=None,
+    ):
+        # manter a compatibilidade com ArticleProc
+        website_kind = website_kind or collection_choices.QA
+        detail = {
+            "website_kind": website_kind,
+            "force_update": force_update,
+        }
+        operation = self.start(
+            user, f"publish {content_type} {self} on {website_kind}"
+        )
+        if api_data.get("error"):
+            response = api_data
+        else:
+            response = callable_publish(self, api_data)
+        completed = bool(response.get("result") == "OK")
+        self.update_publication_stage(website_kind, completed)
+        detail.update(response)
+        operation.finish(user, completed=completed, detail=detail)
+        detail["completed"] = completed
+        return detail
+
     # def update_status(self):
     #     if self.status == choices.PS_READY_TO_PREVIEW:
     #         self.status = choices.PS_PREVIEW
@@ -1087,7 +1116,7 @@ class Package(CommonControlField, ClusterableModel):
 
         return {"websites": websites, "result": result, "new_status": new_status}
 
-    def publish_article(self, user, task_publish_article, websites):
+    def run_task_publish_article(self, user, task_publish_article, websites):
         task_publish_article.apply_async(
             kwargs=dict(
                 user_id=user.id,
@@ -1861,9 +1890,9 @@ class UploadValidator(CommonControlField):
     def validate_number(self, value, max_value):
         if not value:
             return True
-        if self.rule == choices.STRICT_AUTO_PUBLICATION:
+        if self.publication_rule == choices.STRICT_AUTO_PUBLICATION:
             return False
-        # if self.rule == choices.MANUAL_PUBLICATION:
+        # if self.publication_rule == choices.MANUAL_PUBLICATION:
         #     return True
         return value <= max_value
 
@@ -1921,7 +1950,7 @@ class UploadValidator(CommonControlField):
 
         logging.info(f"UploadValidator.get_pos_validation_status: {self.publication_rule}")
         # algum erro identificado
-        if self.rule == choices.STRICT_AUTO_PUBLICATION:
+        if self.publication_rule == choices.STRICT_AUTO_PUBLICATION:
             # não importa o nível de criticidade, solicita correção
             return choices.PS_PENDING_CORRECTION
 
@@ -1930,12 +1959,12 @@ class UploadValidator(CommonControlField):
             # PS_PENDING_CORRECTION or PS_VALIDATED_WITH_ERRORS
             return self.decision_for_critical_errors
 
-        if self.rule == choices.FLEXIBLE_AUTO_PUBLICATION:
+        if self.publication_rule == choices.FLEXIBLE_AUTO_PUBLICATION:
             if self.is_acceptable_package(package):
                 # pacote com erros tolerados, pode seguir
                 return choices.PS_READY_TO_PREVIEW
 
-        if self.rule == choices.MANUAL_PUBLICATION:
+        if self.publication_rule == choices.MANUAL_PUBLICATION:
             return choices.PS_VALIDATED_WITH_ERRORS
 
         # solicita revisão dos problemas
