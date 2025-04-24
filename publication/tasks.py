@@ -1,12 +1,8 @@
-import gzip
 import logging
 import sys
 import requests
-from http import HTTPStatus
-
-from django.contrib.auth import get_user_model
-from django.utils.translation import gettext_lazy as _
 from datetime import datetime
+from http import HTTPStatus
 
 from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
@@ -17,8 +13,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from proc.models import ArticleProc, IssueProc, JournalProc
-from proc.controller import create_or_update_journal, create_or_update_issue
-from upload.models import Package
+from publication import controller
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
 from publication.api.journal import publish_journal
@@ -355,8 +350,7 @@ def task_publish_article(
     self,
     user_id,
     username,
-    api_data,
-    website_kind,
+    websites,
     article_proc_id=None,
     upload_package_id=None,
 ):
@@ -368,138 +362,35 @@ def task_publish_article(
         op_main = None
         manager = None
         tracking = []
-        if upload_package_id:
-            manager = Package.objects.get(pk=upload_package_id)
-            issue = manager.issue
-            journal = manager.journal
-            logging.info(journal)
-            logging.info(issue)
 
-        elif article_proc_id:
-            manager = ArticleProc.objects.get(pk=article_proc_id)
-            issue = manager.issue_proc.issue
-            journal = manager.journal_proc.journal
-
-        op_main = manager.start(user, f"publish on {website_kind}")
-
+        # Obter gerenciador e informações do artigo
+        manager = controller.get_manager_info(article_proc_id, upload_package_id)
+        
         article = manager.article
- 
-        if not JournalProc.objects.filter(journal=journal).exists():
-            op_journal_proc = manager.start(user, f"publish on {website_kind} - create_or_update_journal")
-            created = create_or_update_journal(
-                journal_title=journal.title,
-                issn_electronic=journal.official_journal.issn_electronic,
-                issn_print=journal.official_journal.issn_print,
-                user=user,
-                force_update=True,
-            )
-            op_journal_proc.finish(user, completed=bool(created))
+        journal = article.journal
+        issue = article.issue
 
-        if not IssueProc.objects.filter(issue=issue).exists():
-            op_issue_proc = manager.start(user, f"publish on {website_kind} - create_or_update_issue")
-            created = create_or_update_issue(
-                journal=journal,
-                pub_year=issue.publication_year,
-                volume=issue.volume,
-                suppl=issue.supplement,
-                number=issue.number,
-                user=user,
-                force_update=True,
-            )
-            op_issue_proc.finish(user, completed=bool(created))
+        # Iniciar operação principal
+        op_main = manager.start(user, f"Publishing article to {', '.join(websites)}")
+        
+        # Garantir que o JournalProc existe (pré-requisito comum)
+        controller.ensure_journal_proc_exists(user, journal)
 
-        for journal_proc in JournalProc.objects.filter(journal=journal):
-
-            webiste_id = f"{website_kind} {journal_proc.collection}"
-            executing = {"website": webiste_id}
-            op_collection = manager.start(
-                user, f"> publish on {webiste_id}"
-            )
-            try:
-                website = WebSiteConfiguration.get(
-                    collection=journal_proc.collection,
-                    purpose=website_kind,
-                )
-            except WebSiteConfiguration.DoesNotExist as exc:
-                op_collection.finish(
-                    user,
-                    completed=False,
-                    message=f"{webiste_id} does not exist",
-                    exception=exc,
-                    detail=None,
-                )
-                continue
-
-            api = PublicationAPI(
-                post_data_url=website.api_url_article,
-                get_token_url=website.api_get_token_url,
-                username=website.api_username,
-                password=website.api_password,
-                timeout=15,
-            )
-            api.get_token()
-            api_data = api.data
-
-            issue_proc = IssueProc.objects.get(
-                journal_proc=journal_proc, issue=issue
-            )
-            # issue_url = f"{website.url}/j/{journal_proc.acron}/i/{issue.publication_year}.{issue.issue_folder}"
-            issue_url = f"{website.url}/scielo.php?pid={issue_proc.pid}&script=sci_issuetoc"
-            if not is_registered(issue_url):
-
-                journal_url = f"{website.url}/scielo.php?pid={journal_proc.pid}&script=sci_serial"
-                if not is_registered(journal_url):
-                    op_published_journal = manager.start(user, f"publish journal on {website_kind}")
-                    api_data["post_data_url"] = website.api_url_journal
-                    response = journal_proc.publish(
-                        user,
-                        publish_journal,
-                        website_kind=website_kind,
-                        api_data=api_data,
-                        force_update=True,
-                        content_type="journal"
-                    )
-                    response["url"] = journal_url
-                    op_published_journal.finish(user, completed=response.get("completed"), detail=response)
-
-                op_published_issue = manager.start(user, f"publish issue on {website_kind}")
-                api_data["post_data_url"] = website.api_url_issue
-                response = issue_proc.publish(
-                    user,
-                    publish_issue,
-                    website_kind=website_kind,
-                    api_data=api_data,
-                    force_update=True,
-                    content_type="issue"
-                )
-                response["url"] = issue_url
-                op_published_issue.finish(user, completed=response.get("completed"), detail=response)
-
-            api_data["post_data_url"] = website.api_url_article
-            response = publish_article(manager, api_data, journal_proc.pid)
-            completed = response.get("result") == "OK"
-            manager.update_publication_stage(website_kind, completed=completed)
-
-            executing["completed"] = completed
-            op_collection.finish(
-                user,
-                completed=completed,
-                detail=response,
-            )
-            tracking.append(executing)
-        if not JournalProc.objects.filter(journal=journal).exists():
-            raise JournalProc.DoesNotExist(f"No journal_proc for {article} {journal}")
-        if not IssueProc.objects.filter(issue=issue).exists():
-            raise IssueProc.DoesNotExist(f"No issue_proc for {article} {issue}")
+        # Garantir que o IssueProc existe (pré-requisito comum)
+        controller.ensure_issue_proc_exists(user, issue)
+    
+        response = list(
+            controller.publish_article_collection_websites(
+                user, website_kinds, article))
 
         op_main.finish(
             user,
-            completed=len(tracking)==len([item for item in tracking if item["completed"]]),
+            completed=bool(any([item["published"] for item in response])),
             exception=None,
             message_type=None,
             message=None,
             exc_traceback=None,
-            detail=tracking,
+            detail=response,
         )
 
     except Exception as e:
@@ -524,17 +415,6 @@ def task_publish_article(
                     website_kind=website_kind,
                 ),
             )
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail=dict(
-                task="task_publish_article",
-                item=str(manager),
-                article_proc_id=article_proc_id,
-                upload_package_id=article_proc_id,
-                website_kind=website_kind,
-            ),
-        )
 
 
 @celery_app.task(bind=True)
