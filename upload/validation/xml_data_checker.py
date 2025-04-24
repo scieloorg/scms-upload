@@ -72,8 +72,8 @@ class XMLDataChecker:
                             continue
                         self._handle_result(group, result, index)
                 except Exception as exc:
-                    logging.exception(exc_traceback)
                     exc_type, exc_value, exc_traceback = sys.exc_info()
+                    logging.exception(exc_traceback)
                     self._handle_exception({"group": group, "exception": exc, "exc_traceback": exc_traceback})
 
             # devido às tarefas serem executadas concorrentemente,
