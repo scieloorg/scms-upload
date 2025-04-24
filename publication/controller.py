@@ -118,7 +118,7 @@ def publish_article_on_websites(user, issue_proc, website_kinds, article):
     journal_proc = issue_proc.journal_proc
     collection = journal_proc.collection
     published_article = None
-    allowed_to_be_public = None
+    qa_published = None
     result = []
     for website_kind in website_kinds:
         try:
@@ -137,27 +137,15 @@ def publish_article_on_websites(user, issue_proc, website_kinds, article):
             api_data = api.data
         except WebSiteConfiguration.DoesNotExist as exc:
             continue
-        
-        if website_kind == PUBLIC:
-            if QA not in website_kinds:
-                try:
-                    qa_website = WebSiteConfiguration.get(collection=collection, purpose=QA)
-                    allowed_to_be_public = check_article_is_published(qa_website, article)
-                except WebSiteConfiguration.DoesNotExist:
-                    allowed_to_be_public = True
-                
-            if not allowed_to_be_public:
-                yield {"collection": collection.acron, "website": website_kind, "published": False}
-                break
 
         published_article = publish_article_on_website(
-            user, manager, issue_proc, website, api_data)
+            user, manager, issue_proc, website, api_data, qa_published)
         if website_kind == QA:
-            allowed_to_be_public = published_article
+            qa_published = published_article
         yield {"collection": collection.acron, "website": website_kind, "published": published_article}
 
 
-def publish_article_on_website(user, manager, issue_proc, website, api_data):
+def publish_article_on_website(user, manager, issue_proc, website, api_data, qa_published=None):
     """
     Publica um artigo verificando e garantindo as dependências (journal e issue)
     
@@ -175,6 +163,18 @@ def publish_article_on_website(user, manager, issue_proc, website, api_data):
     Raises:
         PublicationError: Se ocorrer erro na publicação
     """
+    if website.purpose == PUBLIC and not qa_published:
+        try:
+            qa_website = WebSiteConfiguration.get(collection=collection, purpose=QA)
+            qa_published = check_article_is_published(qa_website, article)
+        except WebSiteConfiguration.DoesNotExist:
+            # site QA inexistente, a ausencia do artigo em QA não impede publicação em PUBLIC
+            qa_published = True
+            
+    if not qa_published:
+        yield {"collection": collection.acron, "website": website_kind, "published": False}
+        return
+
     article = manager.article
     journal_proc = issue_proc.journal_proc
     api_data["post_data_url"] = website.api_url_journal
@@ -196,7 +196,8 @@ def publish_article_on_website(user, manager, issue_proc, website, api_data):
         website_kind=website.purpose,
         api_data=api_data,
         force_update=True,
-        content_type="article"
+        content_type="article",
+        journal_pid=journal_proc.pid
     )
     return response.get("completed")
 
