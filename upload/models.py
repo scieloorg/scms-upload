@@ -988,6 +988,7 @@ class Package(CommonControlField, ClusterableModel):
         api_data=None,
         force_update=None,
         content_type=None,
+        journal_pid=None
     ):
         # manter a compatibilidade com ArticleProc
         website_kind = website_kind or collection_choices.QA
@@ -1001,7 +1002,11 @@ class Package(CommonControlField, ClusterableModel):
         if api_data.get("error"):
             response = api_data
         else:
-            response = callable_publish(self, api_data)
+            response = callable_publish(
+                self, api_data,
+                journal_pid=journal_pid,
+                is_public=True,
+            )
         completed = bool(response.get("result") == "OK")
         self.update_publication_stage(website_kind, completed)
         detail.update(response)
