@@ -1,3 +1,4 @@
+import json
 import traceback
 import sys
 import csv
@@ -559,7 +560,7 @@ class Package(CommonControlField, ClusterableModel):
             # é desejável que o artigo seja publicado diretamente
             # prepare_to_publish verficará se há impedimentos
             response = self.prepare_to_publish(user, qa=True, public=True)
-            self.publish(user, task_publish_article, response.get("websites") or [])
+            self.publish_article(user, task_publish_article, response.get("websites") or [])
 
     def calculate_validation_numbers(self):
         """
@@ -794,7 +795,7 @@ class Package(CommonControlField, ClusterableModel):
                 new_status = response.get("new_status")
                 self.register_qa_decision(user, response.get("result"), new_status)
                 operation.finish(user, completed=True, detail=detail)
-                self.publish(user, task_publish_article, response.get("websites") or [])
+                self.publish_article(user, task_publish_article, response.get("websites") or [])
 
             elif self.qa_decision == choices.PS_DEPUBLISHED:
                 # TODO
@@ -1086,30 +1087,28 @@ class Package(CommonControlField, ClusterableModel):
 
         return {"websites": websites, "result": result, "new_status": new_status}
 
-    def publish(self, user, task_publish_article, websites):
-        for website in websites:
-            task_publish_article.apply_async(
-                kwargs=dict(
-                    user_id=user.id,
-                    username=user.username,
-                    api_data=api_data,
-                    website_kind=website,
-                    article_proc_id=None,
-                    upload_package_id=self.id,
-                )
+    def publish_article(self, user, task_publish_article, websites):
+        task_publish_article.apply_async(
+            kwargs=dict(
+                user_id=user.id,
+                username=user.username,
+                websites=websites,
+                article_proc_id=None,
+                upload_package_id=self.id,
             )
-            if website == "PUBLIC":
-                for item in self.linked.all():
-                    task_publish_article.apply_async(
-                        kwargs=dict(
-                            user_id=user.id,
-                            username=user.username,
-                            api_data=api_data,
-                            website_kind=website,
-                            article_proc_id=None,
-                            upload_package_id=item.id,
-                        )
+        )
+        if"PUBLIC" in websites:
+            for item in self.linked.all():
+                task_publish_article.apply_async(
+                    kwargs=dict(
+                        user_id=user.id,
+                        username=user.username,
+                        websites=websites,
+                        article_proc_id=None,
+                        upload_package_id=item.id,
                     )
+                )
+
 
 class QAPackage(Package):
     """
