@@ -23,8 +23,13 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         null=True,
         unique=True,
     )
+    published_by = models.CharField(
+        _("published by"), max_length=30, null=True, blank=True)
+    publication_rule = models.CharField(
+        _("publication rule"), max_length=10, null=True, blank=True)
     panels = [
-        FieldPanel("article"),
+        FieldPanel("publication_rule"),
+        FieldPanel("published_by"),
         InlinePanel("scielo_url", label="URLs", classname="collapsible"),
     ]
 
@@ -40,16 +45,42 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         cls,
         user,
         article,
+        published_by=None,
+        publication_rule=None,
     ):
         try:
             obj = cls(
                 article=article,
                 creator=user,
+                published_by=published_by,
+                publication_rule=publication_rule,
             )
             obj.save()
             return obj
         except IntegrityError:
             return cls.get(article=article)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        user,
+        article,
+        published_by=None,
+        publication_rule=None,
+    ):
+        try:
+            return cls.objects.get(article=article)
+        except cls.DoesNotExist:
+            return cls.create(user, article, published_by, publication_rule)
+
+    def create_or_update_url_status(self, user, url, available, check_date):
+        ScieloURLStatus.create_or_update(
+            user,
+            self.article,
+            url,
+            check_date,
+            available,
+        )
 
 
 class ScieloURLStatus(CommonControlField, Orderable):
@@ -92,19 +123,16 @@ class ScieloURLStatus(CommonControlField, Orderable):
         user,
     ):
         try:
-            article_availability = ArticleAvailability.get(article=article)
-        except ArticleAvailability.DoesNotExist:
-            article_availability = ArticleAvailability.create(
-                user=user, article=article
+            obj = cls(
+                article_availability=ArticleAvailability.get(article),
+                url=url,
+                available=available,
+                creator=user,
             )
-        obj = cls(
-            article_availability=article_availability,
-            url=url,
-            available=available,
-            creator=user,
-        )
-        obj.save()
-        return obj
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(article, url)
 
     @classmethod
     def create_or_update(
