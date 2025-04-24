@@ -5,13 +5,9 @@ import traceback
 import urllib
 
 from django.utils.translation import gettext_lazy as _
-from requests import HTTPError
-from requests.auth import HTTPBasicAuth
 
 from collection.models import WebSiteConfiguration
-from collection import choices as collection_choices
 from core.utils.requester import post_data
-from publication.api import exceptions
 
 
 def get_api(collection, content_type, website_kind=None):
