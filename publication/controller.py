@@ -107,19 +107,23 @@ def ensure_published_issue(issue_proc, website, user, api_data):
         return response.get("completed")
 
 
-def publish_article_collection_websites(user, article, website_kinds):
-    for issue_proc in IssueProc.objects.filter(journal_proc__journal=article.journal):
+def publish_article_collection_websites(user, manager, website_kinds):
+    for issue_proc in IssueProc.objects.filter(
+        issue=manager.article.issue,
+    ):
+        if not manager.article.journal.journal_acron:
+            manager.article.journal.journal_acron = issue_proc.journal_proc.acron
+            manager.article.journal.save()
         yield from publish_article_on_websites(
-            user, issue_proc, website_kinds, article
+            user, manager, issue_proc, website_kinds
         )
 
 
-def publish_article_on_websites(user, issue_proc, website_kinds, article):
-    journal_proc = issue_proc.journal_proc
-    collection = journal_proc.collection
+def publish_article_on_websites(user, manager, issue_proc, website_kinds):
+    collection = issue_proc.collection
     published_article = None
     qa_published = None
-    result = []
+    article = manager.article
     for website_kind in website_kinds:
         try:
             website = WebSiteConfiguration.get(
@@ -142,7 +146,9 @@ def publish_article_on_websites(user, issue_proc, website_kinds, article):
             user, manager, issue_proc, website, api_data, qa_published)
         if website_kind == QA:
             qa_published = published_article
-        yield {"collection": collection.acron, "website": website_kind, "published": published_article}
+        data = {"collection": collection.acron, "website": website_kind, "published": published_article}
+        logging.info(data)            
+        yield data
 
 
 def publish_article_on_website(user, manager, issue_proc, website, api_data, qa_published=None):
@@ -170,15 +176,12 @@ def publish_article_on_website(user, manager, issue_proc, website, api_data, qa_
         except WebSiteConfiguration.DoesNotExist:
             # site QA inexistente, a ausencia do artigo em QA não impede publicação em PUBLIC
             qa_published = True
-            
-    if not qa_published:
-        yield {"collection": collection.acron, "website": website_kind, "published": False}
-        return
+        return False
 
     article = manager.article
     journal_proc = issue_proc.journal_proc
     api_data["post_data_url"] = website.api_url_journal
-    if not ensure_published_journal(issue_proc.journal_proc, website, user, api_data):
+    if not ensure_published_journal(journal_proc, website, user, api_data):
         raise PublicationError(
             f"Unable to publish article {article}: {journal_proc} is not published on {website.purpose}"
         )
@@ -230,4 +233,4 @@ def get_manager_info(article_proc_id=None, upload_package_id=None):
     else:
         raise ValueError("Either article_proc_id or upload_package_id must be provided")
     
-    return manager, journal, issue, article
+    return manager
