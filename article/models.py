@@ -402,14 +402,14 @@ class Article(ClusterableModel, CommonControlField):
             if not lang:
                 continue
             yield f"{website_url}/j/{journal_acron}/a/{pid_v3}/?lang={lang}"
-            yield f"{website_url}/scielo.php?script=sci_arttext&pid={pid_v2}&lang={lang}"
+            yield f"{website_url}/scielo.php?script=sci_arttext&pid={pid_v2}&tlng={lang}"
         
         for item in self.pdfs:
             lang = item.get("lang")
             if not lang:
                 continue
             yield f"{website_url}/j/{journal_acron}/a/{pid_v3}/?lang={lang}&format=pdf"
-            yield f"{website_url}/scielo.php?script=sci_pdf&pid={pid_v2}&lng={lang}"
+            yield f"{website_url}/scielo.php?script=sci_pdf&pid={pid_v2}&tlng={lang}"
 
 
 class ArticleDOIWithLang(Orderable, DOIWithLang):
