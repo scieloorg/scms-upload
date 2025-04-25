@@ -8,12 +8,13 @@ from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from core.models import PressRelease
-from core.utils.requester import fetch_data
+from core.utils.requester import fetch_data, NonRetryableError
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication import controller
+from publication.models import ArticleAvailability
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
 from publication.api.journal import publish_journal
@@ -293,6 +294,7 @@ def task_publish_model_inline(
     website = WebSiteConfiguration.get(
         collection=collection,
         purpose=website_kind,
+        enabled=True,
     )
     for ws in website.endpoint.all().filter(name="pressrelease"):
         SciELOModel = SCIELO_MODELS.get(ws.name)
@@ -353,15 +355,25 @@ def task_publish_article(
     websites,
     article_proc_id=None,
     upload_package_id=None,
+    publication_rule=None,
 ):
     """
     Tarefa que publica artigos ingressados pelo Upload
     """
     try:
+        logging.info(dict(
+            user_id=user_id,
+            username=username,
+            websites=websites,
+            article_proc_id=article_proc_id,
+            upload_package_id=upload_package_id,
+            publication_rule=publication_rule,
+        ))
+        
         user = _get_user(user_id, username)
         op_main = None
         manager = None
-        tracking = []
+        responses = []
 
         # Obter gerenciador e informações do artigo
         manager = controller.get_manager_info(article_proc_id, upload_package_id)
@@ -370,6 +382,16 @@ def task_publish_article(
         journal = article.journal
         issue = article.issue
 
+        if len(websites) > 1:
+            published_by = "SYSTEM"
+        elif manager.assignee:
+            published_by = manager.assignee.username or manager.assignee.id
+        elif manager.analyst:
+            published_by = manager.analyst.user.username or manager.analyst.user.id 
+        elif manager.updated_by:
+            published_by = manager.updated_by.username or manager.updated_by.id 
+        elif manager.creator:
+            published_by = manager.creator.username or manager.creator.id 
         # Iniciar operação principal
         op_main = manager.start(user, f"Publishing article to {', '.join(websites)}")
         
@@ -379,18 +401,17 @@ def task_publish_article(
         # Garantir que o IssueProc existe (pré-requisito comum)
         controller.ensure_issue_proc_exists(user, issue)
     
-        response = list(
+        responses = list(
             controller.publish_article_collection_websites(
-                user, websites, article))
-
+                user, manager, websites))
         op_main.finish(
             user,
-            completed=bool(any([item["published"] for item in response])),
+            completed=bool(any([item["published"] for item in responses])),
             exception=None,
             message_type=None,
             message=None,
             exc_traceback=None,
-            detail=response,
+            detail=responses,
         )
 
     except Exception as e:
@@ -416,97 +437,170 @@ def task_publish_article(
                 ),
             )
 
+    try:
+        # check availability
+        op_main = manager.start(user, f"Check article availability on {', '.join(websites)}")
+        logging.info("ArticleAvailabilityArticleAvailabilityArticleAvailability")
+        logging.info(responses)
+        logging.info(dict(publication_rule=publication_rule, published_by=published_by))           
+        if responses:
+            obj = ArticleAvailability.create_or_update(
+                user,
+                article,
+                published_by=published_by,
+                publication_rule=publication_rule,
+            )
+        for response in responses:
+            for website in WebSiteConfiguration.objects.filter(
+                collection__acron=response["collection"],
+                purpose__in=websites,
+                enabled=True,
+            ):
+                process_article_availability.apply_async(
+                    kwargs=dict(
+                        pid_v3=article.pid_v3,
+                        user_id=user_id,
+                        username=username,
+                        domain=website.url,
+                    )
+                )
+        op_main.finish(
+            user,
+            completed=True,
+            detail=dict(
+                pid_v3=article.pid_v3,
+                domain=website.url,
+            ),
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        if op_main:
+            op_main.finish(
+                user,
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
+                detail=None,
+            )
+        else:
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail=dict(
+                    task="task_publish_article",
+                    item=str(manager),
+                    article_proc_id=article_proc_id,
+                    upload_package_id=upload_package_id,
+                    websites=websites,
+                ),
+            )
+
 
 @celery_app.task(bind=True)
-def initiate_article_availability_check(
+def task_check_article_availability(
     self,
     username,
     user_id=None,
     issn_print=None,
     issn_electronic=None,
     publication_year=None,
-    updated=None,
     article_pid_v3=None,
     collection_acron=None,
-    purpose="PUBLIC",
+    purpose=None,
 ):
+
     if collection_acron:
         collection = Collection.objects.filter(acron=collection_acron)
     else:
         collection = Collection.objects.all()
 
-    query = Q()
-    if not updated:
-        if article_pid_v3:
-            query |= Q(pid_v3=article_pid_v3)
-        if issn_print:
-            query |= Q(journal__official_journal__issn_print=issn_print)
-        if issn_electronic:
-            query |= Q(journal__official_journal__issn_electronic=issn_electronic)
-        if publication_year:
-            query |= Q(issue__publication_year=publication_year)
+    journal_query = Q()
+    if collection:
+        journal_query |= Q(collection__in=collection)
+    if issn_print:
+        journal_query |= Q(journal__official_journal__issn_print=issn_print)
+    if issn_electronic:
+        journal_query |= Q(journal__official_journal__issn_electronic=issn_electronic)
+
+    article_query = Q()
+    if article_pid_v3:
+        article_query |= Q(pid_v3=article_pid_v3)
+    if publication_year:
+        article_query |= Q(issue__publication_year=publication_year)
 
     try:
-        for col in collection:
-            for journal_collection in col.journalcollection_set.all():
-                for article in journal_collection.journal.article_set.filter(query):
-                    for lang in article.article_langs:
-                        process_article_availability.apply_async(
-                            kwargs=dict(
-                                user_id=user_id,
-                                username=username,
-                                pid_v3=article.pid_v3,
-                                pid_v2=article.pid_v2,
-                                journal_acron=article.journal.journal_acron,
-                                lang=lang,
-                                domain=journal_collection.collection.websiteconfiguration_set.get(
-                                    enabled=True, purpose=purpose
-                                ).url,
-                            )
+        for journal_proc in JournalProc.objects.filter(journal_query, journal__isnull=False):
+            if not journal_proc.journal.journal_acron:
+                journal_proc.journal.journal_acron = journal_proc.acron
+                journal_proc.journal.save()
+            for article in Article.objects.filter(
+                article_query, journal=journal_proc.journal
+            ):
+                for item in WebSiteConfiguration.objects.filter(
+                    enabled=True, collection=journal_proc.collection
+                ):
+                    process_article_availability.apply_async(
+                        kwargs=dict(
+                            pid_v3=article.pid_v3,
+                            user_id=user_id,
+                            username=username,
+                            domain=item.url,
                         )
+                    )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "function": "publication.tasks.initiate_article_availability_check",
+                "function": "publication.tasks.task_check_article_availability",
             },
         )
 
 
 @celery_app.task(bind=True)
 def process_article_availability(
-    self, user_id, username, pid_v3, pid_v2, journal_acron, lang, domain
+    self, pid_v3, domain, user_id, username, timeout=None,
 ):
-    urls = [
-        f"{domain}/scielo.php?script=sci_arttext&pid={pid_v2}&lang={lang}&nrm=iso",
-        f"{domain}/j/{journal_acron}/a/{pid_v3}/?lang={lang}",
-        f"{domain}/scielo.php?script=sci_arttext&pid={pid_v2}&format=pdf&lng={lang}&nrm=iso",
-        f"{domain}/j/{journal_acron}/a/{pid_v3}/?format=pdf&lang={lang}",
-    ]
-
-    for url in urls:
-        fetch_data_and_register_result.apply_async(
-            kwargs=dict(
-                pid_v3=pid_v3,
-                url=url,
-                username=username,
-                user_id=user_id,
-            )
+    try:
+        user = _get_user(user_id=user_id, username=username)
+        article = Article.objects.get(pid_v3=pid_v3)
+        logging.info(f"{domain} {pid_v3}")
+        obj = ArticleAvailability.create_or_update(user, article)
+        obj.create_or_update_urls(user, website_url=domain, timeout=timeout)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "publication.tasks.process_article_availability",
+                "domain": domain,
+                "pid_v3": pid_v3,
+            },
         )
 
 
 @celery_app.task(bind=True)
-def retry_failed_scielo_urls(self, username, user_id=None):
-    for scielo_url_status in ScieloURLStatus.objects.filter(available=False):
-        fetch_data_and_register_result.apply_async(
-            kwargs=dict(
-                pid_v3=scielo_url_status.article_availability.article.pid_v3,
-                url=scielo_url_status.url,
-                username=username,
-                user_id=user_id,
-            )
+def retry_failed_scielo_urls(self, username=None, user_id=None, pid_v3=None, timeout=None):
+    try:
+        user = _get_user(user_id=user_id, username=username)
+        params = {}
+        params["available"] = False
+        if pid_v3:
+            params["article_availability__article__pid_v3"] = pid_v3
+
+        for scielo_url_status in ScieloURLStatus.objects.filter(**params):
+            scielo_url_status.update(user, timeout)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "publication.tasks.retry_failed_scielo_urls",
+                "pid_v3": pid_v3,
+            },
         )
 
 
@@ -515,37 +609,19 @@ def fetch_data_and_register_result(self, pid_v3, url, username, user_id):
     try:
         user = _get_user(user_id=user_id, username=username)
         article = Article.objects.get(pid_v3=pid_v3)
-
-        try:
-            response = fetch_data(url, timeout=2, verify=True)
-        except Exception as e:
-            ScieloURLStatus.create_or_update(
-                article=article,
-                url=url,
-                check_date=datetime.now(),
-                available=False,
-                user=user,
-            )
-        else:
-            try:
-                obj = ScieloURLStatus.get(article=article, url=url)
-                obj.available = True
-                obj.save()
-            except ScieloURLStatus.DoesNotExist:
-                ScieloURLStatus.create_or_update(
-                    article=article,
-                    url=url,
-                    check_date=datetime.now(),
-                    available=True,
-                    user=user,
-                )
+        ScieloURLStatus.create_or_update(
+            user=user,
+            article=article,
+            url=url,
+        )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "function": "publication.tasks.process_article_availability",
+                "function": "publication.tasks.fetch_data_and_register_result",
                 "url": url,
+                "pid_v3": pid_v3,
             },
         )
