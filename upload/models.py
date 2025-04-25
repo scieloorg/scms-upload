@@ -560,7 +560,12 @@ class Package(CommonControlField, ClusterableModel):
             # é desejável que o artigo seja publicado diretamente
             # prepare_to_publish verficará se há impedimentos
             response = self.prepare_to_publish(user, qa=True, public=True)
-            self.run_task_publish_article(user, task_publish_article, response.get("websites") or [])
+            self.run_task_publish_article(
+                user,
+                task_publish_article,
+                response.get("websites") or [],
+                self.upload_validator.publication_rule,
+            )
 
     def calculate_validation_numbers(self):
         """
@@ -795,7 +800,13 @@ class Package(CommonControlField, ClusterableModel):
                 new_status = response.get("new_status")
                 self.register_qa_decision(user, response.get("result"), new_status)
                 operation.finish(user, completed=True, detail=detail)
-                self.run_task_publish_article(user, task_publish_article, response.get("websites") or [])
+                logging.info(self.upload_validator.publication_rule)
+                self.run_task_publish_article(
+                    user,
+                    task_publish_article,
+                    response.get("websites") or [],
+                    self.upload_validator.publication_rule,
+                )
 
             elif self.qa_decision == choices.PS_DEPUBLISHED:
                 # TODO
@@ -1121,7 +1132,8 @@ class Package(CommonControlField, ClusterableModel):
 
         return {"websites": websites, "result": result, "new_status": new_status}
 
-    def run_task_publish_article(self, user, task_publish_article, websites):
+    def run_task_publish_article(self, user, task_publish_article, websites, publication_rule):
+        logging.info(f"run_task_publish_article: {publication_rule}")
         task_publish_article.apply_async(
             kwargs=dict(
                 user_id=user.id,
@@ -1129,6 +1141,7 @@ class Package(CommonControlField, ClusterableModel):
                 websites=websites,
                 article_proc_id=None,
                 upload_package_id=self.id,
+                publication_rule=publication_rule,
             )
         )
         if"PUBLIC" in websites:
@@ -1140,6 +1153,7 @@ class Package(CommonControlField, ClusterableModel):
                         websites=websites,
                         article_proc_id=None,
                         upload_package_id=item.id,
+                        publication_rule=publication_rule,
                     )
                 )
 
