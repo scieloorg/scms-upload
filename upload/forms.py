@@ -85,6 +85,12 @@ class ReadyToPublishPackageForm(CoreAdminModelForm):
             #         ),
             #     )
 
+    def save_all(self, user):
+        qa_package = super().save_all(user)
+        qa_package.analyst = CollectionTeamMember.objects.get(user=user)
+        self.save()
+        return qa_package
+
 
 class ValidationResultForm(CoreAdminModelForm):
     pass
