@@ -1,14 +1,25 @@
+import logging
 from datetime import datetime
 
 from article.models import Article
 from collection.models import Collection
 from core.models import CommonControlField
+from core.utils.requester import fetch_data, NonRetryableError
 from django.db import IntegrityError, models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.models import Orderable
+
+
+def check_url(url, timeout=None):
+    try:
+        fetch_data(url, timeout=timeout or 2)
+    except NonRetryableError as e:
+        return False
+    else:
+        return True
 
 
 class ArticleAvailability(ClusterableModel, CommonControlField):
@@ -33,11 +44,12 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         InlinePanel("scielo_url", label="URLs", classname="collapsible"),
     ]
 
+    def __str__(self):
+        return str(self.article)
+
     @classmethod
-    def get(
-        cls,
-        article,
-    ):
+    def get(cls, article):
+        logging.info(f"ArticleAvailability.get {article}")
         return cls.objects.get(article=article)
 
     @classmethod
@@ -47,8 +59,15 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         article,
         published_by=None,
         publication_rule=None,
+        website_url=None,
+        timeout=None,
     ):
         try:
+            logging.info(f"ArticleAvailability.create {article}")
+            logging.info(dict(
+                published_by=published_by,
+                publication_rule=publication_rule,
+            ))
             obj = cls(
                 article=article,
                 creator=user,
@@ -56,6 +75,8 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
                 publication_rule=publication_rule,
             )
             obj.save()
+            if website_url:
+                obj.create_or_update_urls(user, website_url, timeout)
             return obj
         except IntegrityError:
             return cls.get(article=article)
@@ -67,19 +88,44 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         article,
         published_by=None,
         publication_rule=None,
+        website_url=None,
+        timeout=None
     ):
         try:
-            return cls.objects.get(article=article)
-        except cls.DoesNotExist:
-            return cls.create(user, article, published_by, publication_rule)
+            logging.info(f"ArticleAvailability.create_or_update {article}")
+            logging.info(dict(
+                published_by=published_by,
+                publication_rule=publication_rule,
+            ))
+            obj = cls.get(article=article)
 
-    def create_or_update_url_status(self, user, url, available, check_date):
-        ScieloURLStatus.create_or_update(
-            user,
-            self.article,
-            url,
-            check_date,
-            available,
+            obj.published_by = obj.published_by or published_by
+            obj.publication_rule = obj.publication_rule or publication_rule
+            if published_by or publication_rule:
+                obj.save()
+            if website_url:
+                obj.create_or_update_urls(user, website_url, timeout)
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(
+                user, article, published_by, publication_rule, website_url, timeout
+            )
+
+    def create_or_update_urls(self, user, website_url, timeout=None):
+        logging.info(f"ArticleAvailability.create_or_update_urls {website_url}")
+        for url in self.article.get_urls(website_url):
+            ScieloURLStatus.create_or_update(
+                user=user,
+                article=self.article,
+                url=url,
+                timeout=timeout,
+            )
+
+    def retry(self, user, website_url, timeout=None):
+        ScieloURLStatus.retry(
+            user=user,
+            article=self.article,
+            timeout=timeout,
         )
 
 
@@ -96,43 +142,32 @@ class ScieloURLStatus(CommonControlField, Orderable):
 
     panels = [FieldPanel("url"), FieldPanel("available", read_only=True)]
 
-    def update(
-        self,
-        available,
-        check_date,
-    ):
-        self.updated = check_date or datetime.now()
-        self.available = available
-        self.save()
-        return self
-
     @classmethod
-    def get(
-        cls,
-        article,
-        url,
-    ):
-        return cls.objects.get(article_availability__article=article, url=url)
+    def get(cls, url):
+        logging.info(f"ScieloURLStatus.get {url}")
+        return cls.objects.get(url=url)
 
     @classmethod
     def create(
         cls,
+        user,
         article,
         url,
-        available,
-        user,
+        timeout=None,
     ):
         try:
+            logging.info(f"ScieloURLStatus.create {article}")
+            article_availability = ArticleAvailability.create_or_update(user, article)
             obj = cls(
-                article_availability=ArticleAvailability.get(article),
+                article_availability=article_availability,
                 url=url,
-                available=available,
+                available=check_url(url, timeout),
                 creator=user,
             )
             obj.save()
             return obj
         except IntegrityError:
-            return cls.get(article, url)
+            return cls.get(url)
 
     @classmethod
     def create_or_update(
@@ -140,23 +175,36 @@ class ScieloURLStatus(CommonControlField, Orderable):
         user,
         article,
         url,
-        check_date,
-        available,
+        timeout=None,
     ):
         try:
-            obj = cls.get(article=article, url=url)
-            obj.update(
-                check_date=check_date,
-                available=available,
-            )
+            logging.info(f"ScieloURLStatus.create_or_update {article}")
+            obj = cls.get(url=url)
+            obj.update(user, timeout)
             return obj
         except cls.DoesNotExist:
             return cls.create(
                 article=article,
                 url=url,
-                available=available,
                 user=user,
+                timeout=timeout or 2
             )
+
+    def update(self, user, timeout=None):
+        logging.info(f"ScieloURLStatus.update {self.url}")
+        self.available = check_url(self.url, timeout)
+        self.updated_by = user
+        self.save()
+
+    @classmethod
+    def retry(
+        cls,
+        user,
+        article,
+        timeout=None,
+    ):
+        for item in cls.objects.filter(available=False, article_availability__article=article):
+            cls.create_or_update(user, article, item.url, timeout)
 
 
 def upload_path_for_verification_files(instance, filename):
