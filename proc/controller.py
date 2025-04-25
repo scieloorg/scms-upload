@@ -707,7 +707,7 @@ def ensure_journal_proc_exists(user, journal):
         JournalProc.DoesNotExist: Se não foi possível criar JournalProc
     """
     # Verificar se já existe
-    journal_procs = JournalProc.objects.filter(journal=journal)
+    journal_procs = JournalProc.objects.filter(journal=journal, acron__isnull=False)
     if journal_procs.exists():
         return journal_procs.first()
         
