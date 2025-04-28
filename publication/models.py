@@ -49,7 +49,6 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
 
     @classmethod
     def get(cls, article):
-        logging.info(f"ArticleAvailability.get {article}")
         return cls.objects.get(article=article)
 
     @classmethod
@@ -63,11 +62,6 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         timeout=None,
     ):
         try:
-            logging.info(f"ArticleAvailability.create {article}")
-            logging.info(dict(
-                published_by=published_by,
-                publication_rule=publication_rule,
-            ))
             obj = cls(
                 article=article,
                 creator=user,
@@ -92,11 +86,6 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         timeout=None
     ):
         try:
-            logging.info(f"ArticleAvailability.create_or_update {article}")
-            logging.info(dict(
-                published_by=published_by,
-                publication_rule=publication_rule,
-            ))
             obj = cls.get(article=article)
 
             obj.published_by = obj.published_by or published_by
@@ -112,7 +101,6 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
             )
 
     def create_or_update_urls(self, user, website_url, timeout=None):
-        logging.info(f"ArticleAvailability.create_or_update_urls {website_url}")
         for url in self.article.get_urls(website_url):
             ScieloURLStatus.create_or_update(
                 user=user,
@@ -144,7 +132,6 @@ class ScieloURLStatus(CommonControlField, Orderable):
 
     @classmethod
     def get(cls, url):
-        logging.info(f"ScieloURLStatus.get {url}")
         return cls.objects.get(url=url)
 
     @classmethod
@@ -156,7 +143,6 @@ class ScieloURLStatus(CommonControlField, Orderable):
         timeout=None,
     ):
         try:
-            logging.info(f"ScieloURLStatus.create {article}")
             article_availability = ArticleAvailability.create_or_update(user, article)
             obj = cls(
                 article_availability=article_availability,
@@ -178,7 +164,6 @@ class ScieloURLStatus(CommonControlField, Orderable):
         timeout=None,
     ):
         try:
-            logging.info(f"ScieloURLStatus.create_or_update {article}")
             obj = cls.get(url=url)
             obj.update(user, timeout)
             return obj
@@ -191,7 +176,6 @@ class ScieloURLStatus(CommonControlField, Orderable):
             )
 
     def update(self, user, timeout=None):
-        logging.info(f"ScieloURLStatus.update {self.url}")
         self.available = check_url(self.url, timeout)
         self.updated_by = user
         self.save()
