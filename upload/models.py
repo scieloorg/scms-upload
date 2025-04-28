@@ -545,27 +545,44 @@ class Package(CommonControlField, ClusterableModel):
 
         self.calculate_validation_numbers()
         self.evaluate_validation_numbers(blocking_error_status)
-        self.create_preview_and_publish(task_publish_article)
+        self.process_system_decision(task_publish_article)
 
-    def create_preview_and_publish(self, task_publish_article):
+    def process_system_decision(self, task_publish_article):
         is_ready_to_preview = False
-        if self.status == choices.PS_READY_TO_PREVIEW:
+        
+        if self.status in (choices.PS_READY_TO_PREVIEW, choices.PS_VALIDATED_WITH_ERRORS):
             is_ready_to_preview = True
-        elif self.status == choices.PS_VALIDATED_WITH_ERRORS:
-            if self.upload_validator.publication_rule == choices.MANUAL_PUBLICATION:
-                is_ready_to_preview = True
-
+  
         if task_publish_article and is_ready_to_preview:
             user = self.updated_by or self.creator
             # é desejável que o artigo seja publicado diretamente
             # prepare_to_publish verficará se há impedimentos
-            response = self.prepare_to_publish(user, qa=True, public=True)
+            op = self.start(user, "process_system_decision")
+
+            is_ready_to_publish = self.is_ready_to_publish
+            detail = {"is_ready_to_publish": is_ready_to_publish}
+
+            response = self.prepare_to_publish(user, qa=is_ready_to_preview, public=is_ready_to_publish)
+            detail.update(response)
+
+            op.finish(user, completed=True, detail=detail)
+
             self.run_task_publish_article(
                 user,
                 task_publish_article,
                 response.get("websites") or [],
                 self.upload_validator.publication_rule,
             )
+
+    @property
+    def is_ready_to_publish(self):
+        if self.linked and self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists():
+            return False
+        if self.qa_decision == choices.PS_READY_TO_PUBLISH:
+            return True
+        if self.upload_validator.publication_rule == choices.FLEXIBLE_AUTO_PUBLICATION:
+            return self.is_acceptable_package
+        return False
 
     def calculate_validation_numbers(self):
         """
@@ -580,7 +597,6 @@ class Package(CommonControlField, ClusterableModel):
             + pkg_numbers["total"]
         )
         self.critical_errors = pkg_numbers["total_critical"] + xml_numbers["total_critical"]
-        logging.info(xml_numbers)
         self.xml_errors_percentage = calculate_percentage(xml_numbers["total_error"], total_validations)
         self.xml_warnings_percentage = calculate_percentage(xml_numbers["total_warning"], total_validations)
         self.contested_xml_errors_percentage = calculate_percentage(xml_numbers["total_not-to-fix"], xml_numbers["total"])
@@ -705,11 +721,7 @@ class Package(CommonControlField, ClusterableModel):
         if self.is_acceptable_package:
             # pode finalizar, se a quantidade de erros é tolerável
             # para passar para o próximo passo
-            self.status = choices.PS_READY_TO_PREVIEW
-            self.qa_decision = choices.PS_READY_TO_PREVIEW
-            self.save()
-
-            self.create_preview_and_publish(task_publish_article)
+            self.process_system_decision(task_publish_article)
             return True
 
         if not self.is_error_review_finished:
@@ -789,18 +801,17 @@ class Package(CommonControlField, ClusterableModel):
                 choices.PS_READY_TO_PREVIEW, choices.PS_READY_TO_PUBLISH,
             ):
                 qa = self.qa_decision == choices.PS_READY_TO_PREVIEW
-                public = self.qa_decision == choices.PS_READY_TO_PUBLISH
+                public = self.is_ready_to_publish
 
                 # é desejável que qa e public sejam publicados simultaneamente
                 # exceto se há impedimento de em tornar público
-                response = self.prepare_to_publish(user, qa, public or qa)
+                response = self.prepare_to_publish(user, qa, public)
             
                 detail.update(response or {})
                 # FIXME
                 new_status = response.get("new_status")
                 self.register_qa_decision(user, response.get("result"), new_status)
                 operation.finish(user, completed=True, detail=detail)
-                logging.info(self.upload_validator.publication_rule)
                 self.run_task_publish_article(
                     user,
                     task_publish_article,
@@ -842,21 +853,6 @@ class Package(CommonControlField, ClusterableModel):
                 result["warnings"].append(_("Total of XML, PDF, HTML do not match {}").format(self.sps_pkg.texts))
         return result
 
-    def has_publication_blockers(self):
-        blocking_errors = []
-        if self.linked and self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists():
-            blocking_errors.append(
-                _("Packages linked - will publish together when all ready")
-            )
-        if self.is_acceptable_package:
-            if self.upload_validator.publication_rule == choices.MANUAL_PUBLICATION:
-                blocking_errors.append(
-                    _("Packages linked - will publish together when all ready"),
-                )
-        else:
-            blocking_errors.append(_("Total error limit exceeded"))
-        return blocking_errors
-
     def register_qa_decision(self, user, result, new_status=None):
         if result:
             comments = []
@@ -872,6 +868,7 @@ class Package(CommonControlField, ClusterableModel):
 
             if new_status:
                 self.status = new_status
+                self.qa_decision = new_status
             self.save()
 
         if self.qa_comment:
@@ -967,7 +964,6 @@ class Package(CommonControlField, ClusterableModel):
 
     def create_or_update_article(self, user, save):
         try:
-            logging.info(f"create_or_update_article - status: {self.status}")
             if not self.issue:
                 raise ValueError("Unable to create or update article: missing issue")
             if not self.journal:
@@ -1095,16 +1091,11 @@ class Package(CommonControlField, ClusterableModel):
 
     def prepare_to_publish(self, user, qa=None, public=None):
         # verifica se há impedimentos de tornar o artigo público
-        blocking_errors = self.has_publication_blockers()
-        block_public = bool(blocking_errors)
-
-        if block_public:
-            public = False
+        detail = {"qa": qa, "public": public}
 
         if not qa and not public:
-            return {}
+            return detail
 
-        result = {}
         websites = []
         xml_changed = False
         xml_with_pre = self.xml_with_pre
@@ -1115,25 +1106,29 @@ class Package(CommonControlField, ClusterableModel):
         if public:
             xml_changed = self.xml_file_changed_pub_date(xml_with_pre)
 
-        user = user or self.updated_by or self.creator
         self.prepare_sps_package(user, xml_with_pre, xml_changed)
 
         # valida o pacote sps
         result = self.analyze_sps_package()
+        detail["result"] = result
         if result.get("blocking_errors"):
-            return result
+            return detail
 
-        if public and not self.sps_pkg.registered_in_core:
-            result["blocking_errors"].append(
-                _("SPS package requires PID provider registration")
-            )
-            websites.append("PUBLIC")
-            new_status = choices.PS_READY_TO_PUBLISH
+        if public:
+            if self.sps_pkg.registered_in_core:
+                websites.append("PUBLIC")
+                new_status = choices.PS_READY_TO_PUBLISH
+            else:
+                result["blocking_errors"].append(
+                    _("SPS package requires PID provider registration")
+                )
 
-        return {"websites": websites, "result": result, "new_status": new_status}
+        detail.update(
+            {"websites": websites, "result": result, "new_status": new_status}
+        )
+        return detail
 
     def run_task_publish_article(self, user, task_publish_article, websites, publication_rule):
-        logging.info(f"run_task_publish_article: {publication_rule}")
         task_publish_article.apply_async(
             kwargs=dict(
                 user_id=user.id,
@@ -1977,14 +1972,6 @@ class UploadValidator(CommonControlField):
             # solicita correção ou revisão dos problemas
             # PS_PENDING_CORRECTION or PS_VALIDATED_WITH_ERRORS
             return self.decision_for_critical_errors
-
-        if self.publication_rule == choices.FLEXIBLE_AUTO_PUBLICATION:
-            if self.is_acceptable_package(package):
-                # pacote com erros tolerados, pode seguir
-                return choices.PS_READY_TO_PREVIEW
-
-        if self.publication_rule == choices.MANUAL_PUBLICATION:
-            return choices.PS_VALIDATED_WITH_ERRORS
 
         # solicita revisão dos problemas
         return choices.PS_VALIDATED_WITH_ERRORS
