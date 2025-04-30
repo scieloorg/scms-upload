@@ -358,7 +358,7 @@ class PressRelease(CommonControlField):
         "article.Article", on_delete=models.SET_NULL, blank=True, null=True
     )
     title = models.TextField(_("Title"), blank=True, null=True)
-    doi = models.TextField(blank=True, null=True)
+    doi = models.CharField(max_length=64, blank=True, null=True)
     language = models.ForeignKey(
         "collection.Language", on_delete=models.SET_NULL, blank=True, null=True
     )

@@ -334,21 +334,21 @@ class MigratedFile(CommonControlField):
         upload_to=migrated_files_directory_path, null=True, blank=True
     )
     # bases/pdf/acron/volnum/pt_a01.pdf
-    original_path = models.TextField(_("Original Path"), null=True, blank=True)
+    original_path = models.CharField(_("Original Path"), max_length=200, null=True, blank=True)
 
     # pt_a01.pdf
-    original_name = models.TextField(_("Original name"), null=True, blank=True)
+    original_name = models.CharField(_("Original name"), max_length=60, null=True, blank=True)
 
     file_date = models.DateField(null=True, blank=True)
 
     # /pdf/acron/volnum/pt_a01.pdf
-    original_href = models.TextField(_("Original href"), null=True, blank=True)
+    original_href = models.CharField(_("Original href"), max_length=150, null=True, blank=True)
 
     component_type = models.CharField(
         _("Component type"), max_length=16, null=True, blank=True
     )
     lang = models.CharField(_("Language"), max_length=2, null=True, blank=True)
-    pkg_name = models.CharField(_("Pkg name"), max_length=32, null=True, blank=True)
+    pkg_name = models.CharField(_("Pkg name"), max_length=50, null=True, blank=True)
     part = models.CharField(_("Part"), max_length=1, null=True, blank=True)
 
     autocomplete_search_field = "original_path"
@@ -599,7 +599,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         upload_to=migrated_files_directory_path, null=True, blank=True
     )
     # classic_website/spa/scielo_www/hercules-spa/new_platform/bases_for_upload/bases-work/acron/file_asdg.id
-    source_path = models.TextField(_("Source"), null=True, blank=True)
+    source_path = models.CharField(_("Source"), max_length=200, null=True, blank=True)
 
     file_size = models.IntegerField(null=True, blank=True)
 
