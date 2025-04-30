@@ -138,8 +138,8 @@ class OfficialJournal(CommonControlField):
     Class that represent the Official Journal
     """
 
-    title = models.TextField(_("Official Title"), null=True, blank=True)
-    title_iso = models.TextField(_("ISO Title"), null=True, blank=True)
+    title = models.CharField(_("Official Title"), max_length=128, null=True, blank=True)
+    title_iso = models.CharField(_("ISO Title"), max_length=100, null=True, blank=True)
     foundation_year = models.CharField(
         _("Foundation Year"), max_length=4, null=True, blank=True
     )
@@ -248,7 +248,7 @@ class Journal(CommonControlField, ClusterableModel):
     short_title = models.CharField(
         _("Short Title"), max_length=100, null=True, blank=True
     )
-    title = models.CharField(_("Title"), max_length=265, null=True, blank=True)
+    title = models.CharField(_("Title"), max_length=128, null=True, blank=True)
     journal_acron = models.CharField(_("Journal Acronym"), max_length=16, null=True, blank=True)
     official_journal = models.ForeignKey(
         "OfficialJournal",
@@ -266,11 +266,11 @@ class Journal(CommonControlField, ClusterableModel):
         blank=True,
     )
     license_code = models.CharField(max_length=16, null=True, blank=True)
-    nlm_title = models.CharField(max_length=265, null=True, blank=True)
+    nlm_title = models.CharField(max_length=100, null=True, blank=True)
     doi_prefix = models.CharField(max_length=16, null=True, blank=True)
     logo_url = models.URLField(null=True, blank=True)
-    contact_name = models.TextField(null=True, blank=True)
-    contact_address = models.TextField(_("Address"), null=True, blank=True)
+    contact_name = models.CharField(max_length=128, null=True, blank=True)
+    contact_address = models.CharField(_("Address"), max_length=128, null=True, blank=True)
     contact_location = models.ForeignKey(
         Location, on_delete=models.SET_NULL, null=True, blank=True
     )
