@@ -100,11 +100,21 @@ django_dump_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
 django_load_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py loaddata --database=default fixtures/auth.json
 
+dump_data: BACKUP_FILE = dump_`date +%d-%m-%Y"_"%H_%M_%S`.sql
 dump_data: ## Dump database into .sql $(compose)
-	docker exec -t upload_local_postgres pg_dumpall -c -U debug > dump_`date +%d-%m-%Y"_"%H_%M_%S`.sql
+	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'pg_dumpall -c -U $$POSTGRES_USER -f /backups/"$(BACKUP_FILE)"'
+	@echo "Database dump complete at $(BACKUP_FILE)"
 
+restore_data: RESTORE_FILE = $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 restore_data: ## Restore database into from latest.sql file $(compose)
-	cat backup/latest.sql | docker exec -i upload_local_postgres psql -U debug
+	@echo "Restoring Postgres data ..."
+	@if [ -z "$(RESTORE_FILE)" ]; then \
+		echo "File to restore not defined. Use: make restore_data compose=$(compose) <dump file name>.sql"; \
+		exit 1; \
+	fi; \
+	echo "Restoring data from $(RESTORE_FILE) ..."; \
+	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'psql -U $$POSTGRES_USER -f /backups/"$(RESTORE_FILE)" $$POSTGRES_DB';
+	@echo "Restore data from $(RESTORE_FILE) complete!"
 
 ############################################
 ## Atalhos Úteis                          ##
