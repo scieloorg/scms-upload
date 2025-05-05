@@ -84,20 +84,17 @@ class Issue(CommonControlField, IssuePublicationDate):
 
     @staticmethod
     def autocomplete_custom_queryset_filter(search_term):
-        parts = search_term.split()
-        if parts[-1].isdigit():
-            return Issue.objects.filter(
-                Q(journal__title__icontains=parts[0])
-                | Q(publication_year__icontains=parts[-1])
-            )
-        return Issue.objects.filter(Q(journal__title__icontains=parts[0]))
+        return Issue.objects.filter(
+            Q(journal__title__icontains=search_term)
+            | Q(publication_year__icontains=search_term)
+            | Q(volume__icontains=search_term)
+            | Q(number__icontains=search_term)
+        )
 
     def autocomplete_label(self):
-        return "%s %s%s%s" % (
+        return "%s %s" % (
             self.journal,
-            self.volume and f"v{self.volume}",
-            self.number and f"n{self.number}",
-            self.supplement and f"s{self.supplement}",
+            self.issue_folder,
         )
 
     panels = [
@@ -351,13 +348,14 @@ class TocSection(CommonControlField, Orderable):
         return cls.objects.get(toc=toc, group=group, section=section)
 
     @staticmethod
-    def get_section_position(issue, sections=None):
+    def get_section_position(issue, article_sections):
         codes = []
         sections = []
-        for item in sections.all():
+        for item in article_sections.all():
             if item.code:
                 codes.append(item.code)
             sections.append(item.text)
+
         params = {}
         if sections:
             params["section__text__in"] = sections
