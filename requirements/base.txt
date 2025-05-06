@@ -32,7 +32,7 @@ django_celery_results==2.5.1
 
 # Wagtail
 # ------------------------------------------------------------------------------
-wagtail==5.2.3  # https://github.com/wagtail/wagtail
+wagtail==5.2.6  # https://github.com/wagtail/wagtail
 
 # Wagtail Recaptcha
 # ------------------------------------------------------------------------------
