@@ -2,6 +2,7 @@ import logging
 import sys
 
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from collection.choices import QA, PUBLIC
@@ -22,6 +23,8 @@ from publication.api.journal import publish_journal
 from publication.api.issue import publish_issue
 from publication.api.publication import get_api_data, get_api
 from tracker.models import UnexpectedEvent
+from tracker import choices as tracker_choices
+
 
 User = get_user_model()
 
@@ -234,6 +237,7 @@ def task_migrate_and_publish_journals(
     collection_acron=None,
     journal_acron=None,
     force_update=False,
+    status=None,
     force_import_acron_id_file=False,
     force_migrate_document_records=False,
 ):
@@ -243,6 +247,13 @@ def task_migrate_and_publish_journals(
         if journal_acron:
             journal_filter["acron"] = journal_acron
 
+        query_by_status = Q()
+        status = tracker_choices.get_valid_status(status, force_update)
+        query_by_status = (
+            Q(migration_status__in=status) |
+            Q(qa_ws_status__in=status) |
+            Q(public_ws_status__in=status)
+        )
         for collection in _get_collections(collection_acron):
             # obtém os dados do site clássico
             classic_website = controller.get_classic_website(collection.acron)
@@ -258,7 +269,7 @@ def task_migrate_and_publish_journals(
             public_api_data = get_api_data(collection, "journal", "PUBLIC")
 
             for journal_proc in JournalProc.objects.filter(
-                collection=collection, **journal_filter
+                query_by_status, collection=collection, **journal_filter
             ):
                 try:
                     # cria ou atualiza Journal e atualiza journal_proc
@@ -272,26 +283,28 @@ def task_migrate_and_publish_journals(
                         migrate_issues=False,
                         migrate_articles=False,
                     )
-                    task_publish_journal.apply_async(
-                        kwargs=dict(
-                            user_id=user_id,
-                            username=username,
-                            website_kind="QA",
-                            journal_proc_id=journal_proc.id,
-                            api_data=qa_api_data,
-                            force_update=force_update,
+                    if not qa_api_data.get("error"):
+                        task_publish_journal.apply_async(
+                            kwargs=dict(
+                                user_id=user_id,
+                                username=username,
+                                website_kind="QA",
+                                journal_proc_id=journal_proc.id,
+                                api_data=qa_api_data,
+                                force_update=force_update,
+                            )
                         )
-                    )
-                    task_publish_journal.apply_async(
-                        kwargs=dict(
-                            user_id=user_id,
-                            username=username,
-                            website_kind="PUBLIC",
-                            journal_proc_id=journal_proc.id,
-                            api_data=public_api_data,
-                            force_update=force_update,
+                    if not public_api_data.get("error"):
+                        task_publish_journal.apply_async(
+                            kwargs=dict(
+                                user_id=user_id,
+                                username=username,
+                                website_kind="PUBLIC",
+                                journal_proc_id=journal_proc.id,
+                                api_data=public_api_data,
+                                force_update=force_update,
+                            )
                         )
-                    )
 
                 except Exception as e:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -451,6 +464,7 @@ def task_migrate_and_publish_issues(
     journal_acron=None,
     publication_year=None,
     issue_folder=None,
+    status=None,
     force_update=False,
     force_migrate_document_records=False
 ):
@@ -463,6 +477,16 @@ def task_migrate_and_publish_issues(
             params["issue_folder"] = issue_folder
         if publication_year:
             params["issue__publication_year"] = publication_year
+
+        query_by_status = Q()
+        status = tracker_choices.get_valid_status(status, force_update)
+        query_by_status = (
+            Q(migration_status__in=status) |
+            Q(docs_status__in=status) |
+            Q(files_status__in=status) |
+            Q(qa_ws_status__in=status) |
+            Q(public_ws_status__in=status)
+        )
 
         logging.info(params)
         for collection in _get_collections(collection_acron):
@@ -478,7 +502,13 @@ def task_migrate_and_publish_issues(
 
             qa_api_data = get_api_data(collection, "issue", "QA")
             public_api_data = get_api_data(collection, "issue", "PUBLIC")
-            items = IssueProc.items_to_process(collection, "issue", params, force_update)
+            # items = IssueProc.items_to_process(collection, "issue", params, force_update)
+            
+            items = IssueProc.objects.filter(
+                query_by_status,
+                collection=collection,
+                **params,
+            )
             logging.info(items.count())
             for issue_proc in items:
                 try:
@@ -490,26 +520,28 @@ def task_migrate_and_publish_issues(
                         migrate_articles=False,
                     )
 
-                    task_publish_issue.apply_async(
-                        kwargs=dict(
-                            user_id=user_id,
-                            username=username,
-                            website_kind="QA",
-                            issue_proc_id=issue_proc.id,
-                            api_data=qa_api_data,
-                            force_update=force_update,
+                    if not qa_api_data.get("error"):
+                        task_publish_issue.apply_async(
+                            kwargs=dict(
+                                user_id=user_id,
+                                username=username,
+                                website_kind="QA",
+                                issue_proc_id=issue_proc.id,
+                                api_data=qa_api_data,
+                                force_update=force_update,
+                            )
                         )
-                    )
-                    task_publish_issue.apply_async(
-                        kwargs=dict(
-                            user_id=user_id,
-                            username=username,
-                            website_kind="PUBLIC",
-                            issue_proc_id=issue_proc.id,
-                            api_data=public_api_data,
-                            force_update=force_update,
+                    if not public_api_data.get("error"):
+                        task_publish_issue.apply_async(
+                            kwargs=dict(
+                                user_id=user_id,
+                                username=username,
+                                website_kind="PUBLIC",
+                                issue_proc_id=issue_proc.id,
+                                api_data=public_api_data,
+                                force_update=force_update,
+                            )
                         )
-                    )
 
                 except Exception as e:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -672,10 +704,21 @@ def task_migrate_and_publish_articles(
     journal_acron=None,
     publication_year=None,
     issue_folder=None,
+    status=None,
     force_update=False,
 ):
     try:
         user = _get_user(user_id, username)
+
+        query_by_status = Q()
+        status = tracker_choices.get_valid_status(status, force_update)
+        query_by_status = (
+            Q(migration_status__in=status) |
+            Q(xml_status__in=status) |
+            Q(sps_pkg_status__in=status) |
+            Q(qa_ws_status__in=status) |
+            Q(public_ws_status__in=status)
+        )
 
         params = {}
         if journal_acron:
@@ -691,17 +734,23 @@ def task_migrate_and_publish_articles(
             qa_api_data = get_api_data(collection, "article", QA)
             public_api_data = get_api_data(collection, "article", PUBLIC)
 
-            items = ArticleProc.items_to_process(collection, "article", params, force_update)
+            # items = ArticleProc.items_to_process(collection, "article", params, force_update)
+            items = ArticleProc.objects.filter(
+                query_by_status,
+                collection=collection,
+                **params
+            )
+
             logging.info(f"articles to process: {items.count()}")
             logging.info(f"article_filter: {params}")
-            logging.info(list(ArticleProc.items_to_process_info(items)))
 
             for article_proc in items:
                 article = article_proc.migrate_article(user, force_update)
                 if not article:
                     continue
 
-                task_publish_article.apply_async(
+                if not qa_api_data.get("error"):
+                    task_publish_article.apply_async(
                         kwargs=dict(
                             user_id=user_id,
                             username=username,
@@ -711,16 +760,17 @@ def task_migrate_and_publish_articles(
                             force_update=force_update,
                         )
                     )
-                task_publish_article.apply_async(
-                    kwargs=dict(
-                        user_id=user_id,
-                        username=username,
-                        website_kind="PUBLIC",
-                        article_proc_id=article_proc.id,
-                        api_data=public_api_data,
-                        force_update=force_update,
+                if not public_api_data.get("error"):
+                    task_publish_article.apply_async(
+                        kwargs=dict(
+                            user_id=user_id,
+                            username=username,
+                            website_kind="PUBLIC",
+                            article_proc_id=article_proc.id,
+                            api_data=public_api_data,
+                            force_update=force_update,
+                        )
                     )
-                )
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
