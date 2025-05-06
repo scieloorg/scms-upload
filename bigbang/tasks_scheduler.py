@@ -76,6 +76,8 @@ def delete_migration_tasks():
             "migrate_title_databases",
             "task_migrate_document_files",
             "task_migrate_document_records",
+            "migrate_and_publish",
+            "create_procs_from_pid_list"
         ]
     )
 
@@ -85,8 +87,8 @@ def schedule_migration_subtasks(username):
     _schedule_migrate_and_publish_articles(username, enabled)
     _schedule_migrate_and_publish_issues(username, enabled)
     _schedule_migrate_and_publish_journals(username, enabled)
-    _schedule_migration_and_publication(username, enabled)
-    _schedule_create_procs_from_pid_list(username, enabled)
+    # _schedule_migration_and_publication(username, enabled)
+    # _schedule_create_procs_from_pid_list(username, enabled)
 
 
 def schedule_publication_subtasks(username):
@@ -154,10 +156,11 @@ def _schedule_migrate_and_publish_journals(username, enabled):
         task="proc.tasks.task_migrate_and_publish_journals",
         name="migrate_and_publish_journals",
         kwargs=dict(
-            username=None,
+            username=username,
             collection_acron=None,
             journal_acron=None,
             force_update=False,
+            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_import_acron_id_file=False,
         ),
         description=_("Migra e publica os periódicos"),
@@ -184,6 +187,7 @@ def _schedule_migrate_and_publish_issues(username, enabled):
             journal_acron=None,
             publication_year=None,
             issue_folder=None,
+            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
             force_migrate_document_records=False,
         ),
@@ -207,6 +211,7 @@ def _schedule_migrate_and_publish_articles(username, enabled):
             journal_acron=None,
             publication_year=None,
             issue_folder=None,
+            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
         ),
         description=_("Migra e publica artigos"),
