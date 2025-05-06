@@ -462,6 +462,14 @@ def migrate_journal(
     user, journal_proc, issue_filter, force_update, force_import_acron_id_file, force_migrate_document_records, migrate_issues, migrate_articles
 ):
     try:
+        event = None
+        detail = None
+        detail = {
+            "journal_proc": str(journal_proc),
+            "force_update": force_update,
+        }
+        event = journal_proc.start(user, "create or update journal")
+
         # cria ou atualiza Journal e atualiza journal_proc
         journal_proc.create_or_update_item(
             user, force_update, controller.create_or_update_journal
@@ -472,9 +480,14 @@ def migrate_journal(
             journal_proc,
             force_update=force_import_acron_id_file,
         )
+        event.finish(user, completed=True, detail=detail)
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
+        if event:
+            event.finish(user, completed=False, detail=detail, exception=e, exc_traceback=exc_traceback)
+            return
+
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
@@ -496,6 +509,13 @@ def migrate_journal(
 
 def migrate_issue(user, issue_proc, force_update, force_migrate_document_records, migrate_articles):
     try:
+        event = None
+        detail = None
+        detail = {
+            "issue_proc": str(issue_proc),
+            "force_update": force_update,
+        }
+        event = issue_proc.start(user, "create or update issue")
         collection = issue_proc.collection
         issue_proc.create_or_update_item(
             user,
@@ -520,8 +540,13 @@ def migrate_issue(user, issue_proc, force_update, force_migrate_document_records
             logging.info(f"article_filter: {article_filter}")
             for article_proc in items:
                 article_proc.migrate_article(user, force_update)
+        event.finish(user, completed=True, detail=detail)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
+        if event:
+            event.finish(user, completed=False, detail=detail, exception=e, exc_traceback=exc_traceback)
+            return
+
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
