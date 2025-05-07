@@ -5,6 +5,7 @@ from django.utils.translation import gettext as _
 from packtools.sps.validation import xml_validator as packtools_xml_data_checker
 from upload.models import (
     XMLError,
+    XMLInfo,
     XMLErrorReport,
     XMLInfoReport,
     choices,
@@ -44,7 +45,7 @@ class XMLDataChecker:
             self.package,
             _("XML Info Report"),
             choices.VAL_CAT_XML_CONTENT,
-            reset_validations=True,
+            reset_validations=False,
         )
 
     def create_error_report(self, report_name):
@@ -53,14 +54,15 @@ class XMLDataChecker:
             self.package,
             _("XML Error Report") + f': {report_name}',
             choices.VAL_CAT_XML_CONTENT,
-            reset_validations=True,
+            reset_validations=False,
         )
 
     def validate(self):
         try:
+            index = None
             operation = self.package.start(self.user, "xml data validation")
+            XMLInfo.objects.filter(report__package=self.package).delete()
             XMLError.objects.filter(report__package=self.package).delete()
-
             for response in packtools_xml_data_checker.validate_xml_content(
                 self.xmltree, self.params
             ):
@@ -73,13 +75,8 @@ class XMLDataChecker:
                         self._handle_result(group, result, index)
                 except Exception as exc:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
-                    logging.exception(exc_traceback)
+                    logging.exception(exc)
                     self._handle_exception({"group": group, "exception": exc, "exc_traceback": exc_traceback})
-
-            # devido às tarefas serem executadas concorrentemente,
-            # necessário registrar as tarefas finalizadas
-            if self.info_report:
-                self.info_report.finish_validations()
 
             for error_report in self.package.xml_error_report.all():
                 if error_report.xml_error.count():
@@ -87,6 +84,16 @@ class XMLDataChecker:
                 else:
                     error_report.delete()
 
+            # devido às tarefas serem executadas concorrentemente,
+            # necessário registrar as tarefas finalizadas
+            if self.info_report:
+                self.info_report.finish_validations()
+
+            operation.finish(
+                self.user,
+                completed=True,
+                detail={},
+            )
             return True
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
