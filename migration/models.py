@@ -624,7 +624,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
     def has_changes(cls, user, collection, journal_acron, file_path, force_update):
         if not force_update:
             try:
-                file_size = JournalAcronIdFile.get_file_size(source_path)
+                file_size = JournalAcronIdFile.get_file_size(file_path)
                 if cls.objects.filter(collection=collection, source_path=file_path, file_size=file_size).exists():
                     return False
             except cls.DoesNotExist:
