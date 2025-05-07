@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-05-07 22:46+0000\n"
+"POT-Creation-Date: 2025-05-07 13:08+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -412,31 +412,31 @@ msgstr ""
 
 #: bigbang/tasks_scheduler.py:138
 msgid "Migra e publica"
-msgstr ""
+msgstr "Migrate and publish"
 
 #: bigbang/tasks_scheduler.py:163
 msgid "Migra e publica os periódicos"
-msgstr ""
+msgstr "Migrate and publish journals"
 
 #: bigbang/tasks_scheduler.py:190
 msgid "Migra e publica os fascículos"
-msgstr ""
+msgstr "Migrate and publish issues"
 
 #: bigbang/tasks_scheduler.py:212
 msgid "Migra e publica artigos"
-msgstr ""
+msgstr "Migrate and publish articles"
 
 #: bigbang/tasks_scheduler.py:257
 msgid "Publica periódicos"
-msgstr ""
+msgstr "Publish journals"
 
 #: bigbang/tasks_scheduler.py:282
 msgid "Publica fascículos"
-msgstr ""
+msgstr "Publish issues"
 
 #: bigbang/tasks_scheduler.py:303
 msgid "Publica artigos"
-msgstr ""
+msgstr "Publish articles"
 
 #: bigbang/utils/scheduler.py:55 core/utils/scheduler.py:51
 msgid "Scheduled task: {}"
@@ -1114,31 +1114,31 @@ msgstr ""
 
 #: institution/choices.py:13
 msgid "agência de apoio à pesquisa"
-msgstr ""
+msgstr "research support agency"
 
 #: institution/choices.py:14
 msgid "universidade e instâncias ligadas à universidades"
-msgstr ""
+msgstr "university and instances linked to universities"
 
 #: institution/choices.py:15
 msgid "empresa ou instituto ligadas ao governo"
-msgstr ""
+msgstr "company or institute linked to government"
 
 #: institution/choices.py:16
 msgid "organização privada"
-msgstr ""
+msgstr "private organization"
 
 #: institution/choices.py:17
 msgid "organização sem fins de lucros"
-msgstr ""
+msgstr "non-profit organization"
 
 #: institution/choices.py:20
 msgid "sociedade científica, associação pós-graduação, associação profissional"
-msgstr ""
+msgstr "scientific society, post-graduate association, professional association"
 
 #: institution/choices.py:22
 msgid "outros"
-msgstr ""
+msgstr "others"
 
 #: institution/models.py:18
 msgid "Institution Type"
@@ -1994,23 +1994,23 @@ msgstr ""
 
 #: researcher/choices.py:3
 msgid "Mujer"
-msgstr ""
+msgstr "Woman"
 
 #: researcher/choices.py:3
 msgid "Hombre"
-msgstr ""
+msgstr "Man"
 
 #: researcher/choices.py:6
 msgid "Declarado por el investigador"
-msgstr ""
+msgstr "Declared by the researcher"
 
 #: researcher/choices.py:7
 msgid "Identificado automáticamente por programa de computador"
-msgstr ""
+msgstr "Automatically identified by computer program"
 
 #: researcher/choices.py:8
 msgid "Identificado por algun usuario"
-msgstr ""
+msgstr "Identified by some user"
 
 #: researcher/models.py:21
 msgid "Given names"
