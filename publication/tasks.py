@@ -469,7 +469,7 @@ def task_publish_article(
             completed=True,
             detail=dict(
                 pid_v3=article.pid_v3,
-                domain=website.url,
+                websites=websites,
             ),
         )
     except Exception as e:
@@ -480,7 +480,7 @@ def task_publish_article(
                 completed=False,
                 exception=e,
                 exc_traceback=exc_traceback,
-                detail=None,
+                websites=websites,
             )
         else:
             UnexpectedEvent.create(
