@@ -1009,6 +1009,19 @@ class IssueProc(BaseProc, ClusterableModel):
         ]
     )
 
+    @staticmethod
+    def create_from_journal_proc_and_issue(user, journal_proc, issue):
+        issue_pid_suffix = issue.issue_pid_suffix
+        issue_proc = IssueProc.get_or_create(
+            user,
+            journal_proc.collection,
+            pid=f"{journal_proc.pid}{issue.publication_year}{issue_pid_suffix}",
+        )
+        issue_proc.issue = issue
+        issue_proc.journal_proc = journal_proc
+        issue_proc.save()
+        return issue_proc
+
     def set_status(self):
         if self.migration_status == tracker_choices.PROGRESS_STATUS_REPROC:
             self.qa_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
@@ -1351,15 +1364,17 @@ class IssueProc(BaseProc, ClusterableModel):
         return article_proc
 
     @staticmethod
-    def get_or_generate_issue_pid(issue):
-        try:
-            issue_proc = IssueProc.objects.filter(issue=issue).first()
+    def get_issue_pid(issue, journal):
+        issue_proc = IssueProc.objects.filter(issue=issue).first()
+        if issue_proc:
             return issue_proc.pid
-        except AttributeError:
-            issn_id = issue_proc.journal_proc.pid
-            year = issue.publication_year
-            issue_order = str(issue.order).zfill(4)
-            return f"{issn_id}{year}{issue_order}"
+        if journal:
+            journal_proc = JournalProc.objects.filter(journal=journal).first() 
+            if journal_proc:
+                issn_id = journal_proc.pid
+                year = issue.publication_year
+                issue_pid_suffix = issue.issue_pid_suffix
+        return f"{issn_id}{year}{issue_pid_suffix}"
 
 
 class ArticleEventCreateError(Exception):

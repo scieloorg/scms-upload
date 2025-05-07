@@ -291,15 +291,11 @@ def fetch_and_create_issues(journal, pub_year, volume, suppl, number, user):
                         collection=journal_proc.collection, issue=issue
                     )
                 except IssueProc.DoesNotExist:
-                    issue_pid_suffix = str(issue.order).zfill(4)
-                    issue_proc = IssueProc.get_or_create(
+                    issue_proc = IssueProc.create_from_journal_proc_and_issue(
                         user,
-                        journal_proc.collection,
-                        pid=f"{journal_proc.pid}{issue.publication_year}{issue_pid_suffix}",
+                        journal_proc,
+                        issue
                     )
-                    issue_proc.issue = issue
-                    issue_proc.journal_proc = journal_proc
-                    issue_proc.save()
 
 
 def create_or_update_migrated_journal(
