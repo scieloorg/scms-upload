@@ -38,9 +38,10 @@ def check_article_is_published(article, website):
         bool: True se o artigo já está publicado, False caso contrário
     """
     try:
-        article_url = f"{website.url}/j/{article.journal.acron}/a/{article.pid_v3}"
+        article_url = f"{website.url}/j/{article.journal.journal_acron}/a/{article.pid_v3}/?format=xml"
         return bool(fetch_data(article_url))
     except Exception as e:
+        logging.exception(e)
         return False
 
 
@@ -169,14 +170,20 @@ def publish_article_on_website(user, manager, issue_proc, website, api_data, qa_
     Raises:
         PublicationError: Se ocorrer erro na publicação
     """
+    article = manager.article
+    collection = issue_proc.collection
+    logging.info(f"publish_article_on_website: qa_published {qa_published}")
+    logging.info(f"publish_article_on_website: website.purpose {website.purpose}")
     if website.purpose == PUBLIC and not qa_published:
         try:
             qa_website = WebSiteConfiguration.get(collection=collection, purpose=QA)
-            qa_published = check_article_is_published(qa_website, article)
-        except WebSiteConfiguration.DoesNotExist:
+            qa_published = check_article_is_published(article, qa_website)
+        except WebSiteConfiguration.DoesNotExist as exc:
             # site QA inexistente, a ausencia do artigo em QA não impede publicação em PUBLIC
+            logging.exception(exc)
             qa_published = True
-        return False
+        if not qa_published:
+            return False
 
     article = manager.article
     journal_proc = issue_proc.journal_proc
