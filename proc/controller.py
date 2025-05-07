@@ -291,15 +291,11 @@ def fetch_and_create_issues(journal, pub_year, volume, suppl, number, user):
                         collection=journal_proc.collection, issue=issue
                     )
                 except IssueProc.DoesNotExist:
-                    issue_pid_suffix = str(issue.order).zfill(4)
-                    issue_proc = IssueProc.get_or_create(
+                    issue_proc = IssueProc.create_from_journal_proc_and_issue(
                         user,
-                        journal_proc.collection,
-                        pid=f"{journal_proc.pid}{issue.publication_year}{issue_pid_suffix}",
+                        journal_proc,
+                        issue
                     )
-                    issue_proc.issue = issue
-                    issue_proc.journal_proc = journal_proc
-                    issue_proc.save()
 
 
 def create_or_update_migrated_journal(
@@ -690,3 +686,77 @@ def publish_articles(
                     force_update=force_update,
                 )
             )
+
+
+def ensure_journal_proc_exists(user, journal):
+    """
+    Verifica e garante a existência de JournalProc para o journal
+
+    Args:
+        user: O usuário que executa a operação
+        journal: O journal que deve ter um JournalProc
+
+    Returns:
+        JournalProc: O objeto JournalProc existente ou recém-criado
+
+    Raises:
+        JournalProc.DoesNotExist: Se não foi possível criar JournalProc
+    """
+    # Verificar se já existe
+    journal_procs = JournalProc.objects.filter(journal=journal, acron__isnull=False)
+    if journal_procs.exists():
+        return journal_procs.first()
+        
+    # Não existe, criar um novo
+    create_or_update_journal(
+        journal_title=journal.title,
+        issn_electronic=journal.official_journal.issn_electronic,
+        issn_print=journal.official_journal.issn_print,
+        user=user,
+        force_update=True,
+    )
+    
+    # Verificar se foi criado
+    journal_procs = JournalProc.objects.filter(journal=journal)
+    if journal_procs.exists():
+        return journal_procs.first()
+    
+    raise JournalProc.DoesNotExist(f"JournalProc does not exist: {journal}")
+
+
+def ensure_issue_proc_exists(user, issue):
+    """
+    Verifica e garante a existência de IssueProc para o issue
+
+    Args:
+        user: O usuário que executa a operação
+        issue: O issue que deve ter um IssueProc
+
+    Returns:
+        IssueProc: O objeto IssueProc existente ou recém-criado
+
+    Raises:
+        IssuePrerequisiteError: Se não foi possível criar IssueProc
+    """
+    # Verificar se o IssueProc já existe
+    issue_procs = IssueProc.objects.filter(issue=issue)
+    if issue_procs.exists():
+        return issue_procs.first()
+    
+    # Não existe, criar um novo
+    create_or_update_issue(
+        journal=issue.journal,
+        pub_year=issue.publication_year,
+        volume=issue.volume,
+        suppl=issue.supplement,
+        number=issue.number,
+        user=user,
+        force_update=True,
+    )
+    
+    # Verificar se foi criado
+    issue_procs = IssueProc.objects.filter(issue=issue)
+    if issue_procs.exists():
+        return issue_procs.first()
+    
+    raise IssueProc.DoesNotExist(f"IssueProc does not exist: {issue}")

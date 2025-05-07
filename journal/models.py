@@ -346,17 +346,17 @@ class Journal(CommonControlField, ClusterableModel):
                 official_journal__issn_electronic=issn_electronic,
                 official_journal__issn_print=issn_print,
             )
-        except (Journal.DoesNotExist, Journal.MultipleObjectsReturned):
-            journal = Journal.objects.filter(
+        except Journal.DoesNotExist:
+            raise Journal.DoesNotExist({
+                "journal_title": journal_title,
+                "issn_electronic": issn_electronic,
+                "issn_print": issn_print,
+            })
+        except Journal.MultipleObjectsReturned:
+            return Journal.objects.filter(
                 Q(official_journal__issn_electronic=issn_electronic)|
                 Q(official_journal__issn_print=issn_print)
-            ).first()
-            if not journal:
-                raise Journal.DoesNotExist({
-                    "journal_title": journal_title,
-                    "issn_electronic": issn_electronic,
-                    "issn_print": issn_print,
-                })
+            ).order_by('-created').first()
 
     @staticmethod
     def get_similar_items(journal_title, issn_electronic, issn_print):

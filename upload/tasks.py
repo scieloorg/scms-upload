@@ -151,14 +151,14 @@ def task_validate_assets(package_id, xml_path, package_files, xml_assets):
             status=choices.VALIDATION_RESULT_SUCCESS,
             message=_("Package has all the expected asset files"),
             data=list(xml_assets),
-            subject=_("assets"),
+            subject=_("Assets"),
         )
 
     report.finish_validations()
     # devido às tarefas serem executadas concorrentemente,
     # necessário verificar se todas tarefas finalizaram e
     # então finalizar o pacote
-    package.finish_reception(task_process_qa_decision)
+    package.finish_reception(task_publish_article)
     # if package.is_approved:
     #     task_process_approved_package.apply_async(
     #         kwargs=dict(package_id=package.id, package_status=package.status)
@@ -187,7 +187,7 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
                 status=choices.VALIDATION_RESULT_FAILURE,
                 message=f'{xml_rendition["lang"]} {_("language is mentioned in the XML but its PDF file not present in the package.")}',
                 data=xml_rendition,
-                subject=xml_rendition["lang"],
+                subject="{} {}".format(_("Renditions"), xml_rendition["lang"]),
             )
 
     if not has_errors:
@@ -199,7 +199,7 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
         )
 
     report.finish_validations()
-    package.finish_reception(task_process_qa_decision)
+    package.finish_reception(task_publish_article)
     # devido às tarefas serem executadas concorrentemente,
     # necessário verificar se todas tarefas finalizaram e
     # então finalizar o pacote
@@ -245,7 +245,7 @@ def task_validate_renditions_content(package_id, xml_path):
             },
         )
     report.finish_validations()
-    package.finish_reception(task_process_qa_decision)
+    package.finish_reception(task_publish_article)
 
 
 @celery_app.task(bind=True, priority=0)
@@ -296,6 +296,7 @@ def task_receive_package(
 
         # FIXME para nao usar o otimizado
         optimised_filepath = task_optimise_package(file_path)
+        logging.info(optimised_filepath)
 
         for optimised_xml_with_pre in XMLWithPre.create(path=optimised_filepath):
 
@@ -388,11 +389,14 @@ def task_validate_xml_structure(
                         "apparent_line": item.line,
                         "message": item.message,
                     },
+                    subject=_("XML Structure"),
                 )
             if summary["dtd_is_valid"]:
                 validation_result = report.add_validation_result(
                     status=choices.VALIDATION_RESULT_SUCCESS,
                     message=_("No error found"),
+                    data=str(summary),
+                    subject=_("XML Structure"),
                 )
         except Exception as exc:
             logging.exception(f"{exc}: {summary}")
@@ -400,6 +404,7 @@ def task_validate_xml_structure(
                 status=choices.VALIDATION_RESULT_CRITICAL,
                 message=str(exc),
                 data=str(summary),
+                subject=_("XML Structure"),
             )
 
         report.finish_validations()
@@ -422,11 +427,14 @@ def task_validate_xml_structure(
                         "label": item.label,
                         "level": item.level,
                     },
+                    subject=_("XML Style"),
                 )
             if summary["style_is_valid"]:
                 validation_result = report.add_validation_result(
                     status=choices.VALIDATION_RESULT_SUCCESS,
                     message=_("No error found"),
+                    data=str(summary),
+                    subject=_("XML Style")
                 )
         except Exception as exc:
             logging.exception(f"{exc}: {summary}")
@@ -434,6 +442,7 @@ def task_validate_xml_structure(
                 status=choices.VALIDATION_RESULT_CRITICAL,
                 message=str(exc),
                 data=str(summary),
+                subject=_("XML Style")
             )
 
         report.finish_validations()
@@ -441,7 +450,7 @@ def task_validate_xml_structure(
         # devido às tarefas serem executadas concorrentemente,
         # necessário verificar se todas tarefas finalizaram e
         # então finalizar o pacote
-        package.finish_reception(task_process_qa_decision)
+        package.finish_reception(task_publish_article)
         # if package.is_approved:
         #     task_process_approved_package.apply_async(
         #         kwargs=dict(package_id=package.id)
@@ -453,6 +462,8 @@ def task_validate_xml_content(
     self, file_path, xml_path, package_id, journal_id, issue_id, article_id
 ):
     try:
+        logging.info("\ntask_validate_xml_content")
+        logging.info((file_path, xml_path, package_id, journal_id, issue_id, article_id))
         operation = None
         package = Package.objects.get(pk=package_id)
         operation = package.start(package.creator, "xml_data_checker")
@@ -471,9 +482,11 @@ def task_validate_xml_content(
         except Exception as e:
             params = {}
 
+        logging.info((issue, journal))
+
         xml_data_checker = XMLDataChecker(package, journal, issue, params)
         xml_data_checker.validate()
-        package.finish_reception(task_process_qa_decision)
+        package.finish_reception(task_publish_article)
         operation.finish(package.creator, completed=True)
     except Exception as e:
         logging.exception(e)
@@ -490,64 +503,6 @@ def task_validate_xml_content(
                 "detail": dict(file_path=file_path, xml_path=xml_path),
             },
         )
-
-
-@celery_app.task(bind=True, priority=0)
-def task_process_qa_decision(
-    self,
-    user_id,
-    package_id,
-):
-    user = User.objects.get(pk=user_id)
-    package = Package.objects.get(pk=package_id)
-    websites = package.process_qa_decision(user)
-
-    logging.info(f"Process qa decision. Publish on {websites}")
-
-    if websites and "QA" in websites:
-        task_publish_article.apply_async(
-            kwargs=dict(
-                user_id=user.id,
-                username=user.username,
-                api_data=None,
-                website_kind="QA",
-                article_proc_id=None,
-                upload_package_id=package.id,
-            )
-        )
-    if websites and "PUBLIC" in websites:
-        task_publish_article.apply_async(
-            kwargs=dict(
-                user_id=user.id,
-                username=user.username,
-                api_data=None,
-                website_kind="PUBLIC",
-                article_proc_id=None,
-                upload_package_id=package.id,
-            )
-        )
-        for item in package.linked.all():
-            task_publish_article.apply_async(
-                kwargs=dict(
-                    user_id=user.id,
-                    username=user.username,
-                    api_data=None,
-                    website_kind="PUBLIC",
-                    article_proc_id=None,
-                    upload_package_id=item.id,
-                )
-            )
-
-    # if package.qa_decision == choices.PS_PUBLISHED:
-    #     messages.success(request, _("Package {} is published").format(package))
-    # elif package.qa_decision == choices.PS_READY_TO_PUBLISH:
-    #     for item in package.pkg_zip.packages.all():
-    #         if item.qa_decision == choices.PS_READY_TO_PUBLISH:
-    #             messages.success(request, _("Package {} is ready to publish").format(item))
-    #         else:
-    #             messages.warning(
-    #                 request,
-    #                 _("Package {} is not ready to publish ({})").format(item, item.qa_decision))
 
 
 @celery_app.task(priority=0)
@@ -586,4 +541,4 @@ def task_validate_webpages_content(package_id):
             },
         )
     report.finish_validations()
-    package.finish_reception(task_process_qa_decision)
+    package.finish_reception(task_publish_article)

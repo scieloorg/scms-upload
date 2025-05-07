@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 
 
 def build_journal(builder, journal, journal_id, journal_acron, journal_history, availability_status):

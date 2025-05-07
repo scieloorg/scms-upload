@@ -95,10 +95,10 @@ CRITICAL_ERROR_DECISION = (
 
 QA_DECISION = (
     (PS_DEPUBLISHED, _("Depublish")),
-    (PS_PENDING_CORRECTION, _("Pending for correction")),
-    (PS_PENDING_QA_DECISION, _("Pending quality analysis decision")),
-    (PS_READY_TO_PREVIEW, _("Ready to preview on QA website")),
-    (PS_READY_TO_PUBLISH, _("Ready to publish on public website")),
+    (PS_PENDING_CORRECTION, _("Request correction")),
+    (PS_PENDING_QA_DECISION, _("Assign quality review")),
+    (PS_READY_TO_PREVIEW, _("Publish on QA website")),
+    (PS_READY_TO_PUBLISH, _("Publish on public website")),
 )
 
 # Model Package, Field category

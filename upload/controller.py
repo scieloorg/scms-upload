@@ -2,9 +2,6 @@ import os
 import logging
 import sys
 import traceback
-from datetime import datetime
-from zipfile import ZIP_DEFLATED, ZipFile
-from tempfile import TemporaryDirectory
 
 from django.db.models import Q
 from django.utils.translation import gettext as _
@@ -15,24 +12,19 @@ from packtools.sps.pid_provider.xml_sps_lib import GetXMLItemsError, XMLWithPre
 
 from article import choices as article_choices
 from article.models import Article
-from collection.models import WebSiteConfiguration
 from issue.models import Issue
-from journal.models import Journal, OfficialJournal
-from package import choices as package_choices
-from package.models import SPSPkg, update_zip_file
+from journal.models import Journal
+from package.models import update_zip_file
 from pid_provider.requester import PidRequester
 from proc.controller import create_or_update_journal, create_or_update_issue
+
 from tracker.models import UnexpectedEvent
 from upload.models import (
     Package,
-    PackageZip,
     ValidationReport,
-    XMLError,
-    XMLErrorReport,
-    XMLInfoReport,
     choices,
 )
-from upload.utils import file_utils, package_utils, xml_utils
+from upload.utils import file_utils, xml_utils
 
 pp = PidRequester()
 

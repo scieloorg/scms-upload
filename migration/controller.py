@@ -927,7 +927,7 @@ def register_acron_id_file_content(
                 user, completed=False, message=_(f"{source_path} does not exist")
             )
         elif JournalAcronIdFile.has_changes(
-            user, collection, source_path, force_update
+            user, collection, journal_acron, source_path, force_update
         ):
             start = datetime.utcnow().isoformat()
             journal_id_file = JournalAcronIdFile.create_or_update(

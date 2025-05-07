@@ -1,9 +1,11 @@
 import sys
+import logging
 
 from django.utils.translation import gettext as _
 from packtools.sps.validation import xml_validator as packtools_xml_data_checker
 from upload.models import (
     XMLError,
+    XMLInfo,
     XMLErrorReport,
     XMLInfoReport,
     choices,
@@ -43,7 +45,7 @@ class XMLDataChecker:
             self.package,
             _("XML Info Report"),
             choices.VAL_CAT_XML_CONTENT,
-            reset_validations=True,
+            reset_validations=False,
         )
 
     def create_error_report(self, report_name):
@@ -52,28 +54,29 @@ class XMLDataChecker:
             self.package,
             _("XML Error Report") + f': {report_name}',
             choices.VAL_CAT_XML_CONTENT,
-            reset_validations=True,
+            reset_validations=False,
         )
 
     def validate(self):
         try:
+            index = None
             operation = self.package.start(self.user, "xml data validation")
+            XMLInfo.objects.filter(report__package=self.package).delete()
             XMLError.objects.filter(report__package=self.package).delete()
-
-            for group, results in packtools_xml_data_checker.validate_xml_content(
+            for response in packtools_xml_data_checker.validate_xml_content(
                 self.xmltree, self.params
             ):
+                group = response["group"]
+                results = response["items"]
                 try:
                     for index, result in enumerate(results):
+                        if not result:
+                            continue
                         self._handle_result(group, result, index)
                 except Exception as exc:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
+                    logging.exception(exc)
                     self._handle_exception({"group": group, "exception": exc, "exc_traceback": exc_traceback})
-
-            # devido às tarefas serem executadas concorrentemente,
-            # necessário registrar as tarefas finalizadas
-            if self.info_report:
-                self.info_report.finish_validations()
 
             for error_report in self.package.xml_error_report.all():
                 if error_report.xml_error.count():
@@ -81,6 +84,16 @@ class XMLDataChecker:
                 else:
                     error_report.delete()
 
+            # devido às tarefas serem executadas concorrentemente,
+            # necessário registrar as tarefas finalizadas
+            if self.info_report:
+                self.info_report.finish_validations()
+
+            operation.finish(
+                self.user,
+                completed=True,
+                detail={},
+            )
             return True
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -109,7 +122,7 @@ class XMLDataChecker:
 
             validation_result = report.add_validation_result(
                 status=status_,
-                message=result.get("message"),
+                message=result.get("advice"),
                 data=result,
                 subject=subject,
             )
@@ -130,10 +143,11 @@ class XMLDataChecker:
             validation_result.save()
             return validation_result
         except Exception as e:
+            logging.exception(e)
             exc_type, exc_value, exc_traceback = sys.exc_info()
             operation = self.package.start(self.user, f"result {index}")
             detail = {}
-            detail.update(result)
+            detail.update(result or {})
             detail["len"] = {k: len(v) for k, v in result.items() if v}
             operation.finish(
                 self.user,
