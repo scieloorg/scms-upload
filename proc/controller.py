@@ -459,7 +459,7 @@ def create_collection_procs_from_pid_list(
 
 
 def migrate_journal(
-    user, journal_proc, issue_filter, force_update, force_import_acron_id_file, force_migrate_document_records, migrate_issues, migrate_articles
+    user, journal_proc, force_update,
 ):
     try:
         event = None
@@ -473,12 +473,6 @@ def migrate_journal(
         # cria ou atualiza Journal e atualiza journal_proc
         journal_proc.create_or_update_item(
             user, force_update, controller.create_or_update_journal
-        )
-        # acron.id
-        controller.register_acron_id_file_content(
-            user,
-            journal_proc,
-            force_update=force_import_acron_id_file,
         )
         event.finish(user, completed=True, detail=detail)
 
