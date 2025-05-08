@@ -507,6 +507,19 @@ def migrate_journal(
         )
 
 
+def create_or_update_journal_acron_id_file(
+    user, query_by_status, collection, journal_filter, force_update=None
+):
+    for journal_proc in JournalProc.objects.filter(
+        query_by_status, collection=collection, **journal_filter
+    ):
+        controller.register_acron_id_file_content(
+            user,
+            journal_proc,
+            force_update=force_update,
+        )
+
+
 def migrate_issue(user, issue_proc, force_update, force_migrate_document_records, migrate_articles):
     try:
         event = None

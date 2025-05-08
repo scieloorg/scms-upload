@@ -982,13 +982,13 @@ def register_acron_id_file_content(
                 user, completed=False, message=_(f"{source_path} has no changes")
             )
     except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
         logging.error(f"journal_proc: {journal_proc} {type(e)} {e}")
         if operation:
             operation.finish(
-                user, completed=False, exception=e, detail=detail
+                user, completed=False, exception=e, exc_traceback=exc_traceback, detail=detail
             )
             return
-        exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
