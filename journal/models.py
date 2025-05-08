@@ -148,7 +148,7 @@ class OfficialJournal(CommonControlField):
         _("ISSN Eletronic"), max_length=9, null=True, blank=True
     )
     issnl = models.CharField(_("ISSNL"), max_length=9, null=True, blank=True)
-    previous_journal_title = models.CharField(max_length=128, null=True, blank=True)
+    previous_journal_title = models.CharField(max_length=500, null=True, blank=True)
     next_journal_title = models.CharField(max_length=128, null=True, blank=True)
 
     base_form_class = OfficialJournalForm
@@ -186,6 +186,23 @@ class OfficialJournal(CommonControlField):
         return self.title or self.issn_electronic or self.issn_print or ""
 
     @property
+    def is_completed(self):
+        """
+        Verifica se todos os campos do OfficialJournal estão preenchidos.
+        Retorna True se todos os campos estiverem preenchidos, False caso contrário.
+        """
+        # Verificar todos os campos CharField
+        if (
+            not self.title
+            or not self.title_iso
+            or not self.foundation_year
+            or not (self.issn_print or self.issn_electronic)
+        ):
+            return False
+        # Se passou por todas as verificações, todos os campos estão preenchidos
+        return True
+
+    @property
     def data(self):
         d = {
             "official_journal__title": self.title,
@@ -204,7 +221,9 @@ class OfficialJournal(CommonControlField):
             return cls.objects.get(issn_print=issn_print)
         if issnl:
             return cls.objects.get(issnl=issnl)
-        raise ValueError(f"{title} - OfficialJournal.get requires issn_print, issn_electronic")
+        raise ValueError(
+            f"{title} - OfficialJournal.get requires issn_print, issn_electronic"
+        )
 
     @classmethod
     def create_or_update(
@@ -249,7 +268,9 @@ class Journal(CommonControlField, ClusterableModel):
         _("Short Title"), max_length=100, null=True, blank=True
     )
     title = models.CharField(_("Title"), max_length=128, null=True, blank=True)
-    journal_acron = models.CharField(_("Journal Acronym"), max_length=16, null=True, blank=True)
+    journal_acron = models.CharField(
+        _("Journal Acronym"), max_length=16, null=True, blank=True
+    )
     official_journal = models.ForeignKey(
         "OfficialJournal",
         null=True,
@@ -270,7 +291,9 @@ class Journal(CommonControlField, ClusterableModel):
     doi_prefix = models.CharField(max_length=16, null=True, blank=True)
     logo_url = models.URLField(null=True, blank=True)
     contact_name = models.CharField(max_length=128, null=True, blank=True)
-    contact_address = models.CharField(_("Address"), max_length=128, null=True, blank=True)
+    contact_address = models.CharField(
+        _("Address"), max_length=128, null=True, blank=True
+    )
     contact_location = models.ForeignKey(
         Location, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -312,6 +335,42 @@ class Journal(CommonControlField, ClusterableModel):
     )
 
     @property
+    def is_completed(self):
+        """
+        Verifica se todos os campos de um objeto Journal estão preenchidos.
+        Retorna True se todos os campos estiverem preenchidos, False caso contrário.
+        """
+        # Verificar campos CharField, URLField
+        if (
+            not self.short_title
+            or not self.title
+            or not self.journal_acron
+            or not self.submission_online_url
+            or not self.license_code
+            or not self.nlm_title
+            or not self.doi_prefix
+            or not self.logo_url
+            or not self.contact_name
+            or not self.contact_address
+        ):
+            return False
+
+        # Verificar campos de relacionamento ForeignKey
+        if not self.official_journal or not self.contact_location:
+            return False
+
+        # Verificar campo ManyToManyField
+        if not self.subject.exists():
+            return False
+
+        # Verificar campo JSONField
+        if not self.wos_areas:
+            return False
+
+        # Se passou por todas as verificações, todos os campos estão preenchidos
+        return True
+
+    @property
     def issn_print(self):
         return self.official_journal.issn_print
 
@@ -348,16 +407,22 @@ class Journal(CommonControlField, ClusterableModel):
                 official_journal__issn_print=issn_print,
             )
         except Journal.DoesNotExist:
-            raise Journal.DoesNotExist({
-                "journal_title": journal_title,
-                "issn_electronic": issn_electronic,
-                "issn_print": issn_print,
-            })
+            raise Journal.DoesNotExist(
+                {
+                    "journal_title": journal_title,
+                    "issn_electronic": issn_electronic,
+                    "issn_print": issn_print,
+                }
+            )
         except Journal.MultipleObjectsReturned:
-            return Journal.objects.filter(
-                Q(official_journal__issn_electronic=issn_electronic)|
-                Q(official_journal__issn_print=issn_print)
-            ).order_by('-created').first()
+            return (
+                Journal.objects.filter(
+                    Q(official_journal__issn_electronic=issn_electronic)
+                    | Q(official_journal__issn_print=issn_print)
+                )
+                .order_by("-created")
+                .first()
+            )
 
     @classmethod
     def create(
@@ -506,7 +571,9 @@ class JournalEmail(Orderable):
     def get(cls, journal, email):
         if journal and email:
             return cls.objects.get(journal=journal, email=email)
-        raise ValueError(f"Journal.get requires email and journal ({dict(journal=journal, email=email)})")
+        raise ValueError(
+            f"Journal.get requires email and journal ({dict(journal=journal, email=email)})"
+        )
 
     @classmethod
     def create_or_update(
@@ -559,9 +626,7 @@ class BaseInstitutionHistory(InstitutionHistory):
             obj.save()
             return obj
         except IntegrityError:
-            return cls.get(
-                journal, institution, initial_date, final_date
-            )
+            return cls.get(journal, institution, initial_date, final_date)
 
     @classmethod
     def create_or_update(
@@ -575,15 +640,13 @@ class BaseInstitutionHistory(InstitutionHistory):
         # Institution
         # check if exists the institution
         try:
-            return cls.get(
-                journal, institution, initial_date, final_date
-            )
+            return cls.get(journal, institution, initial_date, final_date)
         except cls.MultipleObjectsReturned:
             cls.objects.filter(
                 journal=journal,
                 institution=institution,
                 initial_date=initial_date,
-                final_date=final_date
+                final_date=final_date,
             ).delete()
             return cls.create(
                 user,
@@ -899,7 +962,9 @@ class JournalHistory(CommonControlField):
 
     @property
     def date(self):
-        return "-".join((str(i).zfill(2) for i in [self.year, self.month, self.day] if i))
+        return "-".join(
+            (str(i).zfill(2) for i in [self.year, self.month, self.day] if i)
+        )
 
     @property
     def opac_event_type(self):

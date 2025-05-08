@@ -239,7 +239,6 @@ def task_migrate_and_publish_journals(
     force_update=False,
     status=None,
     force_import_acron_id_file=False,
-    force_migrate_document_records=False,
 ):
     try:
         user = _get_user(user_id, username)
@@ -247,7 +246,6 @@ def task_migrate_and_publish_journals(
         if journal_acron:
             journal_filter["acron"] = journal_acron
 
-        query_by_status = Q()
         status = tracker_choices.get_valid_status(status, force_update)
         query_by_status = (
             Q(migration_status__in=status) |
@@ -271,57 +269,42 @@ def task_migrate_and_publish_journals(
             for journal_proc in JournalProc.objects.filter(
                 query_by_status, collection=collection, **journal_filter
             ):
-                try:
-                    # cria ou atualiza Journal e atualiza journal_proc
-                    migrate_journal(
-                        user,
-                        journal_proc,
-                        issue_filter=None,
-                        force_update=force_update,
-                        force_import_acron_id_file=force_import_acron_id_file,
-                        force_migrate_document_records=force_migrate_document_records,
-                        migrate_issues=False,
-                        migrate_articles=False,
-                    )
-                    if not qa_api_data.get("error"):
-                        task_publish_journal.apply_async(
-                            kwargs=dict(
-                                user_id=user_id,
-                                username=username,
-                                website_kind="QA",
-                                journal_proc_id=journal_proc.id,
-                                api_data=qa_api_data,
-                                force_update=force_update,
-                            )
-                        )
-                    if not public_api_data.get("error"):
-                        task_publish_journal.apply_async(
-                            kwargs=dict(
-                                user_id=user_id,
-                                username=username,
-                                website_kind="PUBLIC",
-                                journal_proc_id=journal_proc.id,
-                                api_data=public_api_data,
-                                force_update=force_update,
-                            )
-                        )
+                # cria ou atualiza Journal e atualiza journal_proc
+                migrate_journal(user, journal_proc, force_update)
 
-                except Exception as e:
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    UnexpectedEvent.create(
-                        e=e,
-                        exc_traceback=exc_traceback,
-                        detail={
-                            "task": "proc.tasks.migrate_and_publish_journals",
-                            "user_id": user.id,
-                            "username": user.username,
-                            "collection": collection.acron,
-                            "journal_acron": journal_acron,
-                            "pid": journal_proc.pid,
-                            "force_update": force_update,
-                        },
+                if not qa_api_data.get("error"):
+                    task_publish_journal.apply_async(
+                        kwargs=dict(
+                            user_id=user_id,
+                            username=username,
+                            website_kind="QA",
+                            journal_proc_id=journal_proc.id,
+                            api_data=qa_api_data,
+                            force_update=force_update,
+                        )
+                    )
+                if not public_api_data.get("error"):
+                    task_publish_journal.apply_async(
+                        kwargs=dict(
+                            user_id=user_id,
+                            username=username,
+                            website_kind="PUBLIC",
+                            journal_proc_id=journal_proc.id,
+                            api_data=public_api_data,
+                            force_update=force_update,
+                        )
                     )
 
+            task_create_journal_acron_id_files.apply_async(
+                kwargs=dict(
+                    user_id=user.id,
+                    username=user.username,
+                    collection=collection,
+                    journal_filter=journal_filter,
+                    status=status,
+                    force_update=force_import_acron_id_file,
+                )
+            )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -333,6 +316,45 @@ def task_migrate_and_publish_journals(
                 "username": username,
                 "collection_acron": collection_acron,
                 "journal_acron": journal_acron,
+                "force_update": force_update,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_create_journal_acron_id_files(
+    self,
+    user_id=None,
+    username=None,
+    collection_acron=None,
+    journal_filter=None,
+    status=None,
+    force_update=False,
+):
+    
+    status = tracker_choices.get_valid_status(status, force_update)
+    query_by_status = (
+        Q(migration_status__in=status) |
+        Q(qa_ws_status__in=status) |
+        Q(public_ws_status__in=status)
+    )
+    try:
+        user = _get_user(user_id, username)
+        collection = Collection.objects.get(acron=collection_acron)
+        create_or_update_journal_acron_id_file(
+            user, query_by_status, collection, journal_filter, force_update
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.tasks.task_create_journal_acron_id_files",
+                "user_id": user_id,
+                "username": username,
+                "collection_acron": collection_acron,
+                "journal_filter": journal_filter,
                 "force_update": force_update,
             },
         )
@@ -478,7 +500,6 @@ def task_migrate_and_publish_issues(
         if publication_year:
             params["issue__publication_year"] = publication_year
 
-        query_by_status = Q()
         status = tracker_choices.get_valid_status(status, force_update)
         query_by_status = (
             Q(migration_status__in=status) |
@@ -710,7 +731,6 @@ def task_migrate_and_publish_articles(
     try:
         user = _get_user(user_id, username)
 
-        query_by_status = Q()
         status = tracker_choices.get_valid_status(status, force_update)
         query_by_status = (
             Q(migration_status__in=status) |
