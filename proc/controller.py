@@ -493,10 +493,6 @@ def migrate_journal(
                 "pid": journal_proc.pid,
                 "issue_filter": issue_filter,
                 "force_update": force_update,
-                "force_import_acron_id_file": force_import_acron_id_file,
-                "force_migrate_document_records": force_migrate_document_records,
-                "migrate_issues": migrate_issues,
-                "migrate_articles": migrate_articles,
             },
         )
 
