@@ -239,7 +239,6 @@ def task_migrate_and_publish_journals(
     force_update=False,
     status=None,
     force_import_acron_id_file=False,
-    force_migrate_document_records=False,
 ):
     try:
         user = _get_user(user_id, username)
@@ -303,7 +302,7 @@ def task_migrate_and_publish_journals(
                     collection=collection,
                     journal_filter=journal_filter,
                     status=status,
-                    force_update=force_update,
+                    force_update=force_import_acron_id_file,
                 )
             )
     except Exception as e:
