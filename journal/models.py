@@ -148,7 +148,7 @@ class OfficialJournal(CommonControlField):
         _("ISSN Eletronic"), max_length=9, null=True, blank=True
     )
     issnl = models.CharField(_("ISSNL"), max_length=9, null=True, blank=True)
-    previous_journal_title = models.CharField(max_length=128, null=True, blank=True)
+    previous_journal_title = models.CharField(max_length=500, null=True, blank=True)
     next_journal_title = models.CharField(max_length=128, null=True, blank=True)
 
     base_form_class = OfficialJournalForm
@@ -184,6 +184,21 @@ class OfficialJournal(CommonControlField):
 
     def __str__(self):
         return self.title or self.issn_electronic or self.issn_print or ""
+
+    @property
+    def is_completed(self):
+        """
+        Verifica se todos os campos do OfficialJournal estão preenchidos.
+        Retorna True se todos os campos estiverem preenchidos, False caso contrário.
+        """
+        # Verificar todos os campos CharField
+        if not self.title or \
+           not self.title_iso or \
+           not self.foundation_year or \
+           not (self.issn_print or self.issn_electronic):
+            return False
+        # Se passou por todas as verificações, todos os campos estão preenchidos
+        return True
 
     @property
     def data(self):
@@ -310,6 +325,34 @@ class Journal(CommonControlField, ClusterableModel):
             ObjectList(panels_mission, heading=_("Mission")),
         ]
     )
+
+    @property
+    def is_completed(self):
+        """
+        Verifica se todos os campos de um objeto Journal estão preenchidos.
+        Retorna True se todos os campos estiverem preenchidos, False caso contrário.
+        """
+        # Verificar campos CharField, URLField
+        if not self.short_title or not self.title or not self.journal_acron or \
+           not self.submission_online_url or not self.license_code or \
+           not self.nlm_title or not self.doi_prefix or not self.logo_url or \
+           not self.contact_name or not self.contact_address:
+            return False
+        
+        # Verificar campos de relacionamento ForeignKey
+        if not self.official_journal or not self.contact_location:
+            return False
+        
+        # Verificar campo ManyToManyField
+        if not self.subject.exists():
+            return False
+        
+        # Verificar campo JSONField
+        if not self.wos_areas:
+            return False
+        
+        # Se passou por todas as verificações, todos os campos estão preenchidos
+        return True
 
     @property
     def issn_print(self):
