@@ -16,6 +16,9 @@ from proc.controller import (
     migrate_issue,
     publish_journals,
     create_collection_procs_from_pid_list,
+    create_or_update_journal_acron_id_file,
+    get_files_from_classic_website,
+    migrate_document_records,
 )
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
@@ -733,11 +736,19 @@ def task_migrate_and_publish_articles(
     issue_folder=None,
     status=None,
     force_update=False,
+    force_import_acron_id_file=False,
+    force_migrate_document_records=False,
+    force_migrate_document_files=False,
 ):
     try:
         user = _get_user(user_id, username)
 
         status = tracker_choices.get_valid_status(status, force_update)
+        journal_query_by_status = (
+            Q(migration_status__in=status)
+            | Q(qa_ws_status__in=status)
+            | Q(public_ws_status__in=status)
+        )
         query_by_status = (
             Q(migration_status__in=status)
             | Q(xml_status__in=status)
@@ -745,6 +756,10 @@ def task_migrate_and_publish_articles(
             | Q(qa_ws_status__in=status)
             | Q(public_ws_status__in=status)
         )
+
+        journal_filter = {}
+        if journal_acron:
+            journal_filter["acron"] = journal_acron
 
         params = {}
         if journal_acron:
@@ -757,6 +772,41 @@ def task_migrate_and_publish_articles(
         logging.info(f"task_migrate_and_publish_articles: {params}")
 
         for collection in _get_collections(collection_acron):
+
+            # A partir do bases-work/acron/acron.id dos journals selecionados
+            # cria ou atualiza JournalAcronIdFile e IdFileRecord
+            create_or_update_journal_acron_id_file(
+                user,
+                journal_query_by_status,
+                collection,
+                journal_filter,
+                force_update=force_import_acron_id_file,
+            )
+
+            # le IdFileRecord dos issues selecionados e gera ArticleProc
+            # A partir do bases-work/acron/acron.id dos journals selecionados
+            # cria ou atualiza JournalAcronIdFile e IdFileRecord
+            migrate_document_records(
+                user,
+                collection_acron=collection_acron,
+                journal_acron=journal_acron,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                status=status,
+                force_update=force_migrate_document_records,
+            )
+
+            # le IssueProc selecionados e gera ArticleProc
+            get_files_from_classic_website(
+                user,
+                collection_acron=collection_acron,
+                journal_acron=journal_acron,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                status=status,
+                force_update=force_migrate_document_files,
+            )
+
             qa_api_data = get_api_data(collection, "article", QA)
             public_api_data = get_api_data(collection, "article", PUBLIC)
 
