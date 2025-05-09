@@ -521,7 +521,6 @@ def migrate_journal(
                 "username": user.username,
                 "collection": journal_proc.collection.acron,
                 "pid": journal_proc.pid,
-                "issue_filter": issue_filter,
                 "force_update": force_update,
             },
         )
@@ -603,6 +602,57 @@ def migrate_issue(
                 "force_migrate_document_records": force_migrate_document_records,
                 "migrate_articles": migrate_articles,
             },
+        )
+
+def migrate_document_records(
+    user,
+    collection_acron=None,
+    journal_acron=None,
+    issue_folder=None,
+    publication_year=None,
+    status=None,
+    force_update=None,
+):
+    params = {}
+    if collection_acron:
+        params["collection__acron"] = collection_acron
+    if journal_acron:
+        params["journal_proc__acron"] = journal_acron
+    if issue_folder:
+        params["issue_folder"] = str(issue_folder)
+    if publication_year:
+        params["issue__publication_year"] = str(publication_year)
+    if status:
+        params["docs_status__in"] = tracker_choices.get_valid_status(status, force_update)
+
+    for issue_proc in IssueProc.objects.filter(**params):
+        issue_proc.migrate_document_records(user, force_update)
+
+
+def get_files_from_classic_website(
+    user,
+    collection_acron=None,
+    journal_acron=None,
+    issue_folder=None,
+    publication_year=None,
+    status=None,
+    force_update=None,
+):
+    params = {}
+    if collection_acron:
+        params["collection__acron"] = collection_acron
+    if journal_acron:
+        params["journal_proc__acron"] = journal_acron
+    if issue_folder:
+        params["issue_folder"] = str(issue_folder)
+    if publication_year:
+        params["issue__publication_year"] = str(publication_year)
+    if status:
+        params["files_status__in"] = tracker_choices.get_valid_status(status, force_update)
+
+    for issue_proc in IssueProc.objects.filter(**params):
+        issue_proc.get_files_from_classic_website(
+            user, force_update, controller.import_one_issue_files
         )
 
 
