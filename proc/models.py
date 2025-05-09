@@ -1218,88 +1218,109 @@ class IssueProc(BaseProc, ClusterableModel):
         )
 
     def migrate_document_records(self, user, force_update=None):
+        try:
+            operation = None
+            detail = None
+            params = None
+            doit = tracker_choices.allowed_to_run(self.docs_status, force_update)
+            if not doit:
+                # logging.info(f"Skip migrate_document_records {self.pid}")
+                return
 
-        doit = tracker_choices.allowed_to_run(self.docs_status, force_update)
-        if not doit:
-            # logging.info(f"Skip migrate_document_records {self.pid}")
-            return
+            operation = self.start(user, "migrate_document_records")
 
-        self.docs_status = tracker_choices.PROGRESS_STATUS_DOING
-        self.save()
+            if not self.journal_proc:
+                self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+                self.save()
+                operation.finish(user, completed=False, detail={"journal_proc": None})
+                return
 
-        operation = self.start(user, "migrate_document_records")
-
-        if not self.journal_proc:
-            self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            self.docs_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
-            operation.finish(user, completed=False, detail={"journal_proc": None})
-            return
 
-        done = 0
-        errors = 0
-        journal_data = self.journal_proc.migrated_data.data
+            done = 0
+            errors = 0
+            journal_data = self.journal_proc.migrated_data.data
+            resumption = None if force_update else self.resumption_date
+            
+            params = dict(
+                collection=self.journal_proc.collection,
+                issue_pid=self.pid,
+                resumption=resumption
+            )
+            logging.info(f"Migrate documents {params}")
+            
+            # registros novos ou atualizados
+            id_file_records = IdFileRecord.document_records_to_migrate(**params)
+            resumption_date = resumption
+            for record in id_file_records:
+                try:
+                    logging.info(f"migrate_document_records: {record.item_pid}")
+                    detail = dict(
+                        pid=record.item_pid,
+                    )
+                    data = record.get_record_data(
+                        journal_data, issue_data=self.migrated_data.data
+                    )
+                    detail["data"] = data
+                    article_proc = self.create_or_update_article_proc(
+                        user, record.item_pid, data["data"], force_update
+                    )
+                    resumption_date = max(record.updated, resumption_date)
+                    done += 1
+                except Exception as e:
+                    errors += 1
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    subevent = self.start(user, "migrate documet records / item")
+                    subevent.finish(
+                        user, completed=False, detail=detail,
+                        exception=e, exc_traceback=exc_traceback)
 
-        resumption = None if force_update else self.resumption_date
-        logging.info(f"Migrate documents from {resumption}")
-        # registros novos ou atualizados
+            self.resumption_date = resumption_date
+            self.save()
 
-        id_file_records = IdFileRecord.document_records_to_migrate(
-            collection=self.journal_proc.collection,
-            issue_pid=self.pid,
-            resumption=resumption
-        )
-        resumption_date = resumption
-        for record in id_file_records:
-            try:
-                logging.info(f"migrate_document_records: {record.item_pid}")
-
-                data = record.get_record_data(
-                    journal_data, issue_data=self.migrated_data.data
-                )
-                article_proc = self.create_or_update_article_proc(
-                    user, record.item_pid, data["data"], force_update
-                )
-                resumption_date = max(record.updated, resumption_date)
-                done += 1
-            except Exception as e:
-                errors += 1
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                subevent = self.start(user, "migrate documet records / item")
-                subevent.finish(
-                    user, completed=False, detail=record.item_pid,
-                    exception=e, exc_traceback=exc_traceback)
-
-        self.resumption_date = resumption_date
-        self.save()
-
-        got = id_file_records.count()
-        detail = params
-        detail.update(
-            {
-                "total issue documents": self.issue.total_documents,
-                "total records": got,
-                "total done": done,
-                "errors": errors,
-            }
-        )
-        completed = got == done
-        operation.finish(user, completed=completed, detail=detail)
-        if completed:
-            self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
-        else:
+            got = id_file_records.count()
+            detail = params
+            detail.update(
+                {
+                    "total issue documents": self.issue.total_documents,
+                    "total records": got,
+                    "total done": done,
+                    "errors": errors,
+                }
+            )
+            completed = got == done
+            operation.finish(user, completed=completed, detail=detail)
+            if completed:
+                self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
+            else:
+                self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
+            self.save()
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
             self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
-        self.save()
+            self.save()
+            operation.finish(
+                user,
+                exc_traceback=exc_traceback,
+                exception=e,
+                detail=detail or params
+            )
 
     def create_or_update_article_proc(self, user, pid, data, force_update):
-        article_proc = ArticleProc.register_classic_website_data(
-            user=user,
-            collection=self.collection,
-            pid=pid,
-            data=data,
-            content_type="article",
-            force_update=force_update,
-        )
-        if article_proc:
+        try:
+            article_proc = ArticleProc.register_classic_website_data(
+                user=user,
+                collection=self.collection,
+                pid=pid,
+                data=data,
+                content_type="article",
+                force_update=force_update,
+            )
+            if not article_proc:
+                raise Exception(f"Unable to create ArticleProc for {pid}")
+
+            article_proc.start(user, "create_or_update_article_proc")
             migrated_article = article_proc.migrated_data
             document = migrated_article.document
 
@@ -1307,15 +1328,6 @@ class IssueProc(BaseProc, ClusterableModel):
                 migrated_article.file_type = document.file_type
                 migrated_article.save()
 
-            # d = dict(
-            #     issue_proc=self,
-            #     pkg_name=document.filename_without_extension,
-            #     migration_status=tracker_choices.PROGRESS_STATUS_TODO,
-            #     user=user,
-            #     main_lang=document.original_language,
-            #     force_update=force_update,
-            # )
-            # logging.info(f"article_proc.... {d}")
             article_proc.update(
                 issue_proc=self,
                 pkg_name=document.filename_without_extension,
@@ -1323,6 +1335,21 @@ class IssueProc(BaseProc, ClusterableModel):
                 user=user,
                 main_lang=document.original_language,
                 force_update=force_update,
+            )
+            event.finish(
+                user,
+                completed=True,
+                detail=str(article_proc)
+            )
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
+            self.save()
+            event.finish(
+                user,
+                exc_traceback=exc_traceback,
+                exception=e,
+                detail=detail or params
             )
         return article_proc
 
