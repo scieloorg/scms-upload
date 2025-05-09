@@ -415,7 +415,9 @@ class BaseProc(CommonControlField):
                 return cls.get(collection, pid)
             except cls.DoesNotExist:
                 return cls.create(user, collection, pid)
-        raise ValueError(f"{cls}.get_or_create requires collection ({collection}) and pid ({pid})")
+        raise ValueError(
+            f"{cls}.get_or_create requires collection ({collection}) and pid ({pid})"
+        )
 
     @classmethod
     def create(cls, user, collection, pid):
@@ -700,9 +702,8 @@ class BaseProc(CommonControlField):
             doit = tracker_choices.allowed_to_run(self.qa_ws_status, force_update)
         else:
             detail["public_ws_status"] = self.public_ws_status
-            if (
-                content_type == "article" and 
-                (not self.sps_pkg or not self.sps_pkg.registered_in_core)
+            if content_type == "article" and (
+                not self.sps_pkg or not self.sps_pkg.registered_in_core
             ):
                 detail["registered_in_core"] = self.sps_pkg.registered_in_core
                 doit = False
@@ -712,9 +713,7 @@ class BaseProc(CommonControlField):
                 )
 
         detail["doit"] = doit
-        operation = self.start(
-            user, f"publish {content_type} {self} on {website_kind}"
-        )
+        operation = self.start(user, f"publish {content_type} {self} on {website_kind}")
 
         if not doit:
             # logging.info(f"Skip publish on {website_kind} {self.pid}")
@@ -729,9 +728,7 @@ class BaseProc(CommonControlField):
             self.public_ws_status = tracker_choices.PROGRESS_STATUS_DOING
         self.save()
 
-        api_data = api_data or get_api_data(
-            self.collection, content_type, website_kind
-        )
+        api_data = api_data or get_api_data(self.collection, content_type, website_kind)
         if api_data.get("error"):
             response = api_data
         else:
@@ -916,20 +913,16 @@ class JournalProc(BaseProc, ClusterableModel):
 
 
 ################################################
-class IssueGetOrCreateError(Exception):
-    ...
+class IssueGetOrCreateError(Exception): ...
 
 
-class IssueProcGetOrCreateError(Exception):
-    ...
+class IssueProcGetOrCreateError(Exception): ...
 
 
-class IssueEventCreateError(Exception):
-    ...
+class IssueEventCreateError(Exception): ...
 
 
-class IssueEventReportCreateError(Exception):
-    ...
+class IssueEventReportCreateError(Exception): ...
 
 
 def modified_date(file_path):
@@ -1263,7 +1256,9 @@ class IssueProc(BaseProc, ClusterableModel):
         for record in id_file_records:
             try:
                 logging.info(f"migrate_document_records: {record.item_pid}")
-                data = record.get_record_data(journal_data, issue_data=self.migrated_data.data)
+                data = record.get_record_data(
+                    journal_data, issue_data=self.migrated_data.data
+                )
                 article_proc = self.create_or_update_article_proc(
                     user, record.item_pid, data["data"], force_update
                 )
@@ -1362,12 +1357,10 @@ class IssueProc(BaseProc, ClusterableModel):
             return f"{issn_id}{year}{issue_order}"
 
 
-class ArticleEventCreateError(Exception):
-    ...
+class ArticleEventCreateError(Exception): ...
 
 
-class ArticleEventReportCreateError(Exception):
-    ...
+class ArticleEventReportCreateError(Exception): ...
 
 
 class ArticleProc(BaseProc, ClusterableModel):
@@ -1657,7 +1650,10 @@ class ArticleProc(BaseProc, ClusterableModel):
                 | Q(sps_pkg_status=tracker_choices.PROGRESS_STATUS_PENDING)
                 | Q(sps_pkg_status=tracker_choices.PROGRESS_STATUS_BLOCKED)
             )
-        cls.objects.filter(q, **params,).update(
+        cls.objects.filter(
+            q,
+            **params,
+        ).update(
             sps_pkg_status=tracker_choices.PROGRESS_STATUS_TODO,
         )
         return cls.objects.filter(

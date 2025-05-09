@@ -3,7 +3,7 @@ import sys
 
 from django.conf import settings
 from django.db.models import Q
-from requests.exceptions import HTTPError 
+from requests.exceptions import HTTPError
 
 from collection.models import Collection
 from collection.choices import PUBLIC, QA
@@ -51,7 +51,10 @@ class FetchIssueDataException(Exception):
 
 try:
     DEFAULT_CORE_TIMEOUT = 15
-    CORE_TIMEOUT = int(PidProviderConfig.objects.filter(timeout__isnull=False).first().timeout or DEFAULT_CORE_TIMEOUT)
+    CORE_TIMEOUT = int(
+        PidProviderConfig.objects.filter(timeout__isnull=False).first().timeout
+        or DEFAULT_CORE_TIMEOUT
+    )
 except Exception as e:
     CORE_TIMEOUT = DEFAULT_CORE_TIMEOUT
 
@@ -61,10 +64,13 @@ def create_or_update_journal(
 ):
     # esta função por enquanto é chamada somente no fluxo de ingresso de conteúdo novo
     # no fluxo de migração, existe migration.controller.create_or_update_journal
-    force_update = force_update or not JournalProc.objects.filter(
-        Q(journal__official_journal__issn_electronic=issn_electronic) |
-        Q(journal__official_journal__issn_print=issn_print)
-    ).exists()
+    force_update = (
+        force_update
+        or not JournalProc.objects.filter(
+            Q(journal__official_journal__issn_electronic=issn_electronic)
+            | Q(journal__official_journal__issn_print=issn_print)
+        ).exists()
+    )
 
     if not force_update:
         try:
@@ -107,10 +113,14 @@ def fetch_and_create_journal(
             timeout=CORE_TIMEOUT,
         )
     except Exception as e:
-        raise FetchJournalDataException(f"fetch_and_create_journal: {settings.JOURNAL_API_URL} {params} {e}")
+        raise FetchJournalDataException(
+            f"fetch_and_create_journal: {settings.JOURNAL_API_URL} {params} {e}"
+        )
 
     if response["count"] > 1:
-        raise FetchMultipleJournalsError(f"{settings.JOURNAL_API_URL} with {params} returned {response['count']} journals. Ask for support to solve this issue")
+        raise FetchMultipleJournalsError(
+            f"{settings.JOURNAL_API_URL} with {params} returned {response['count']} journals. Ask for support to solve this issue"
+        )
 
     for result in response.get("results") or []:
         logging.info(f"fetch_and_create_journal {params}: {result}")
@@ -135,7 +145,9 @@ def fetch_and_create_journal(
             title=result.get("title"),
             short_title=result.get("short_title"),
         )
-        journal.license_code = (result.get("journal_use_license") or {}).get("license_type")
+        journal.license_code = (result.get("journal_use_license") or {}).get(
+            "license_type"
+        )
         journal.nlm_title = result.get("nlm_title")
         journal.doi_prefix = result.get("doi_prefix")
         journal.wos_areas = result["wos_areas"]
@@ -155,7 +167,9 @@ def fetch_and_create_journal(
                 location=None,
                 user=user,
             )
-            journal.publisher.add(Publisher.create_or_update(user, journal, institution))
+            journal.publisher.add(
+                Publisher.create_or_update(user, journal, institution)
+            )
 
         for item in result.get("owner") or []:
             institution = Institution.get_or_create(
@@ -176,7 +190,9 @@ def fetch_and_create_journal(
             except Collection.DoesNotExist:
                 continue
 
-            journal_proc = JournalProc.get_or_create(user, collection, item["issn_scielo"])
+            journal_proc = JournalProc.get_or_create(
+                user, collection, item["issn_scielo"]
+            )
             journal_proc.update(
                 user=user,
                 journal=journal,
@@ -202,16 +218,21 @@ def fetch_and_create_journal(
                 )
 
 
-def create_or_update_issue(journal, pub_year, volume, suppl, number, user, force_update=None):
+def create_or_update_issue(
+    journal, pub_year, volume, suppl, number, user, force_update=None
+):
     # esta função por enquanto é chamada somente no fluxo de ingresso de conteúdo novo
     # no fluxo de migração, existe migration.controller.create_or_update_issue
-    force_update = force_update or not IssueProc.objects.filter(
-        journal_proc__journal=journal,
-        issue__publication_year=pub_year,
-        issue__volume=volume,
-        issue__number=number,
-        issue__supplement=suppl,
-    ).exists()
+    force_update = (
+        force_update
+        or not IssueProc.objects.filter(
+            journal_proc__journal=journal,
+            issue__publication_year=pub_year,
+            issue__volume=volume,
+            issue__number=number,
+            issue__supplement=suppl,
+        ).exists()
+    )
 
     if not force_update:
         try:
@@ -225,8 +246,7 @@ def create_or_update_issue(journal, pub_year, volume, suppl, number, user, force
             pass
 
     try:
-        fetch_and_create_issues(
-            journal, pub_year, volume, suppl, number, user)
+        fetch_and_create_issues(journal, pub_year, volume, suppl, number, user)
     except FetchIssueDataException as exc:
         pass
 
@@ -261,7 +281,9 @@ def fetch_and_create_issues(journal, pub_year, volume, suppl, number, user):
             )
 
         except Exception as e:
-            raise FetchIssueDataException(f"fetch_and_create_issue: {settings.ISSUE_API_URL} {params} {e}")
+            raise FetchIssueDataException(
+                f"fetch_and_create_issue: {settings.ISSUE_API_URL} {params} {e}"
+            )
 
         issue = None
         for result in response.get("results") or []:
@@ -413,7 +435,7 @@ def create_collection_procs_from_pid_list(
             pids = fp.readlines()
 
         for pid in pids:
-            pid = pid.strip() or ''
+            pid = pid.strip() or ""
             if not len(pid) == 23:
                 continue
             ArticleProc.register_pid(
@@ -459,7 +481,9 @@ def create_collection_procs_from_pid_list(
 
 
 def migrate_journal(
-    user, journal_proc, force_update,
+    user,
+    journal_proc,
+    force_update,
 ):
     try:
         event = None
@@ -479,7 +503,13 @@ def migrate_journal(
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         if event:
-            event.finish(user, completed=False, detail=detail, exception=e, exc_traceback=exc_traceback)
+            event.finish(
+                user,
+                completed=False,
+                detail=detail,
+                exception=e,
+                exc_traceback=exc_traceback,
+            )
             return
 
         UnexpectedEvent.create(
@@ -491,7 +521,6 @@ def migrate_journal(
                 "username": user.username,
                 "collection": journal_proc.collection.acron,
                 "pid": journal_proc.pid,
-                "issue_filter": issue_filter,
                 "force_update": force_update,
             },
         )
@@ -510,7 +539,9 @@ def create_or_update_journal_acron_id_file(
         )
 
 
-def migrate_issue(user, issue_proc, force_update, force_migrate_document_records, migrate_articles):
+def migrate_issue(
+    user, issue_proc, force_update
+):
     try:
         event = None
         detail = None
@@ -526,28 +557,17 @@ def migrate_issue(user, issue_proc, force_update, force_migrate_document_records
             controller.create_or_update_issue,
             JournalProc=JournalProc,
         )
-
-        issue_proc.migrate_document_records(
-            user,
-            force_update=force_migrate_document_records,
-        )
-
-        issue_proc.get_files_from_classic_website(
-            user, force_update, controller.import_one_issue_files
-        )
-
-        if migrate_articles:
-            article_filter = {"issue_proc": issue_proc}
-            items = ArticleProc.items_to_process(issue_proc.collection, "article", article_filter, force_update)
-            logging.info(f"articles to process: {items.count()}")
-            logging.info(f"article_filter: {article_filter}")
-            for article_proc in items:
-                article_proc.migrate_article(user, force_update)
         event.finish(user, completed=True, detail=detail)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         if event:
-            event.finish(user, completed=False, detail=detail, exception=e, exc_traceback=exc_traceback)
+            event.finish(
+                user,
+                completed=False,
+                detail=detail,
+                exception=e,
+                exc_traceback=exc_traceback,
+            )
             return
 
         UnexpectedEvent.create(
@@ -560,9 +580,59 @@ def migrate_issue(user, issue_proc, force_update, force_migrate_document_records
                 "collection": issue_proc.collection.acron,
                 "pid": issue_proc.pid,
                 "force_update": force_update,
-                "force_migrate_document_records": force_migrate_document_records,
-                "migrate_articles": migrate_articles,
             },
+        )
+
+
+def migrate_document_records(
+    user,
+    collection_acron=None,
+    journal_acron=None,
+    issue_folder=None,
+    publication_year=None,
+    status=None,
+    force_update=None,
+):
+    params = {}
+    if collection_acron:
+        params["collection__acron"] = collection_acron
+    if journal_acron:
+        params["journal_proc__acron"] = journal_acron
+    if issue_folder:
+        params["issue_folder"] = str(issue_folder)
+    if publication_year:
+        params["issue__publication_year"] = str(publication_year)
+    if status:
+        params["docs_status__in"] = tracker_choices.get_valid_status(status, force_update)
+
+    for issue_proc in IssueProc.objects.filter(**params):
+        issue_proc.migrate_document_records(user, force_update)
+
+
+def get_files_from_classic_website(
+    user,
+    collection_acron=None,
+    journal_acron=None,
+    issue_folder=None,
+    publication_year=None,
+    status=None,
+    force_update=None,
+):
+    params = {}
+    if collection_acron:
+        params["collection__acron"] = collection_acron
+    if journal_acron:
+        params["journal_proc__acron"] = journal_acron
+    if issue_folder:
+        params["issue_folder"] = str(issue_folder)
+    if publication_year:
+        params["issue__publication_year"] = str(publication_year)
+    if status:
+        params["files_status__in"] = tracker_choices.get_valid_status(status, force_update)
+
+    for issue_proc in IssueProc.objects.filter(**params):
+        issue_proc.get_files_from_classic_website(
+            user, force_update, controller.import_one_issue_files
         )
 
 
@@ -585,7 +655,9 @@ def publish_journals(
         force_update=force_update,
         run_publish_issues=run_publish_issues,
         run_publish_articles=run_publish_articles,
-        task_publish_article="call task_publish_article" if task_publish_article else None
+        task_publish_article=(
+            "call task_publish_article" if task_publish_article else None
+        ),
     )
     logging.info(f"publish_journals {params}")
     api_data = get_api_data(collection, "journal", website_kind)
@@ -638,7 +710,9 @@ def publish_issues(
         issue_filter=issue_filter,
         force_update=force_update,
         run_publish_articles=run_publish_articles,
-        task_publish_article="call task_publish_article" if task_publish_article else None
+        task_publish_article=(
+            "call task_publish_article" if task_publish_article else None
+        ),
     )
     logging.info(f"publish_issues {params}")
     api_data = get_api_data(collection, "issue", website_kind)
@@ -682,7 +756,9 @@ def publish_articles(
         collection=collection,
         issue_proc=issue_proc,
         force_update=force_update,
-        task_publish_article="call task_publish_article" if task_publish_article else None
+        task_publish_article=(
+            "call task_publish_article" if task_publish_article else None
+        ),
     )
     logging.info(f"publish_articles {params}")
     api_data = get_api_data(collection, "article", website_kind)
