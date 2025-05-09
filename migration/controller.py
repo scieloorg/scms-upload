@@ -947,7 +947,8 @@ def register_acron_id_file_content(
                 changed = 0
 
                 logging.info(f"Reading {source_path}")
-                for item in read_bases_work_acron_id_file(
+                # replaced for item in read_bases_work_acron_id_file(
+                for item in get_bases_work_acron_id_file_records(
                     user,
                     source_path,
                     classic_website,
@@ -1075,6 +1076,66 @@ def read_bases_work_acron_id_file(user, source_path, classic_website, journal_pr
         )
     event.finish(user, completed=True, detail={"errors": errors})
 
+
+def get_bases_work_acron_id_file_records(user, source_path, classic_website, journal_proc):
+    try:
+        event = None
+        event = journal_proc.start(user, "get_bases_work_acron_id_file_records")
+        for item in get_doc_records(source_path):
+            try:
+                subevent = None
+                subevent = journal_proc.start(user, "get_bases_work_acron_id_file_records item")
+                issue_id = item.get("issue_id")
+                doc_id = item.get("doc_id")
+                if doc_id:
+                    yield dict(
+                        item_type="article",
+                        item_pid=doc_id,
+                        data=item.get("doc_data"),
+                    )
+
+                    # se houver bases-work/p/<pid>, obtém os registros de parágrafo
+                    ign_pid, p_records = classic_website.get_p_records(doc_id)
+                    p_records = list(p_records)
+                    if p_records:
+                        # adiciona registros p aos registros do artigo
+                        # info["external_p_records_count"] = len(p_records)
+                        yield dict(
+                            item_type="paragraph",
+                            item_pid=doc_id,
+                            data=p_records,
+                        )
+
+                elif issue_id:
+                    yield dict(
+                        item_type="issue",
+                        item_pid=issue_id,
+                        data=item.get("issue_data"),
+                    )
+            except Exception as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                if subevent:
+                    subevent.finish(
+                        user,
+                        completed=False,
+                        detail=item,
+                        exception=e,
+                        exc_traceback=exc_traceback,
+                    )
+
+        event.finish(user, completed=True, detail={"errors": errors})
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        if event:
+            event.finish(
+                user,
+                completed=False,
+                detail=None,
+                exception=e,
+                exc_traceback=exc_traceback,
+            )
+
+        
 
 def id_file_has_changes(user, collection, id_path, force_update):
     return MigratedFile.has_changes(user, collection, id_path, force_update)
