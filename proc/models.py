@@ -1236,56 +1236,42 @@ class IssueProc(BaseProc, ClusterableModel):
             return
 
         done = 0
+        errors = 0
         journal_data = self.journal_proc.migrated_data.data
 
         resumption = None if force_update else self.resumption_date
         logging.info(f"Migrate documents from {resumption}")
         # registros novos ou atualizados
 
-        IdFileRecord.add_issue_folder(self.pid, self.issue_folder)
-
-        params = dict(
+        id_file_records = IdFileRecord.document_records_to_migrate(
             collection=self.journal_proc.collection,
-            journal_acron=self.journal_proc.acron,
-            issue_folder=self.issue_folder,
-            resumption=resumption,
+            issue_pid=self.pid,
+            resumption=resumption
         )
-        id_file_records = IdFileRecord.document_records_to_migrate(**params)
-
-        errors = []
+        resumption_date = resumption
         for record in id_file_records:
             try:
                 logging.info(f"migrate_document_records: {record.item_pid}")
+
                 data = record.get_record_data(
                     journal_data, issue_data=self.migrated_data.data
                 )
                 article_proc = self.create_or_update_article_proc(
                     user, record.item_pid, data["data"], force_update
                 )
-                self.resumption_date = record.updated
-                self.save()
+                resumption_date = max(record.updated, resumption_date)
                 done += 1
             except Exception as e:
+                errors += 1
                 exc_type, exc_value, exc_traceback = sys.exc_info()
-                errors.append(
-                    {
-                        "pid": record.item_pid,
-                        "error_type": str(exc_type),
-                        "error_message": str(exc_value),
-                    }
-                )
-                UnexpectedEvent.create(
-                    e=e,
-                    exc_traceback=exc_traceback,
-                    detail={
-                        "task": "IssueProc.migrate_document_records",
-                        "user_id": user.id,
-                        "username": user.username,
-                        "collection": self.collection.acron,
-                        "item": record.item_pid,
-                        "force_update": force_update,
-                    },
-                )
+                subevent = self.start(user, "migrate documet records / item")
+                subevent.finish(
+                    user, completed=False, detail=record.item_pid,
+                    exception=e, exc_traceback=exc_traceback)
+
+        self.resumption_date = resumption_date
+        self.save()
+
         got = id_file_records.count()
         detail = params
         detail.update(
@@ -1297,16 +1283,11 @@ class IssueProc(BaseProc, ClusterableModel):
             }
         )
         completed = got == done
-        operation.finish(
-            user,
-            completed=completed,
-            detail=detail,
-        )
+        operation.finish(user, completed=completed, detail=detail)
         if completed:
             self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
         else:
             self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
-        self.files_status = tracker_choices.PROGRESS_STATUS_TODO
         self.save()
 
     def create_or_update_article_proc(self, user, pid, data, force_update):

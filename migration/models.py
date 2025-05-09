@@ -914,8 +914,10 @@ class IdFileRecord(CommonControlField, Orderable):
         if not issue_data:
             issue_data = (
                 IdFileRecord.objects.filter(
+                    parent=self.parent,
                     item_pid=self.item_pid[1:-5],
                     item_type="issue",
+                    deleted__in=[False, None]
                 )
                 .first()
                 .data
@@ -924,8 +926,10 @@ class IdFileRecord(CommonControlField, Orderable):
         try:
             p_records = (
                 IdFileRecord.objects.filter(
+                    parent=self.parent,
                     item_pid=self.item_pid,
                     item_type="paragraph",
+                    deleted__in=[False, None]
                 )
                 .first()
                 .data
@@ -941,25 +945,22 @@ class IdFileRecord(CommonControlField, Orderable):
         }
 
     @classmethod
-    def document_records_to_migrate(cls, collection=None, journal_acron=None, issue_folder=None, pid_prefix=None, resumption=None):
+    def document_records_to_migrate(cls, collection, issue_pid, resumption):
         params = {}
         if collection:
             params["parent__collection"] = collection
-        if journal_acron:
-            params["parent__journal_acron"] = journal_acron
-        if issue_folder:
-            params["issue_folder"] = issue_folder
-        if pid_prefix:
-            params["item_pid__startswith"] = pid_prefix
+        if issue_pid:
+            params["item_pid__startswith"] = f"S{issue_pid}"
         if resumption:
             params["updated__gt"] = resumption
+        params["deleted__in"] = [False, None]
 
         logging.info(f"IdFileRecord.document_records_to_migrate {params}")
         return cls.objects.filter(item_type="article", **params)
 
-    @classmethod
-    def add_issue_folder(cls, issue_pid, issue_folder):
-        return cls.objects.filter(
-            Q(item_pid__startswith=f"S{issue_pid}") | Q(item_pid=issue_pid),
-            issue_folder__in=["", None]
-        ).update(issue_folder=issue_folder)
+    # @classmethod
+    # def add_issue_folder(cls, issue_pid, issue_folder):
+    #     return cls.objects.filter(
+    #         Q(item_pid__startswith=f"S{issue_pid}") | Q(item_pid=issue_pid),
+    #         issue_folder__in=["", None]
+    #     ).update(issue_folder=issue_folder)
