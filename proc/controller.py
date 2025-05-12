@@ -495,10 +495,10 @@ def migrate_journal(
         event = journal_proc.start(user, "create or update journal")
 
         # cria ou atualiza Journal e atualiza journal_proc
-        journal_proc.create_or_update_item(
+        completed = journal_proc.create_or_update_item(
             user, force_update, controller.create_or_update_journal
         )
-        event.finish(user, completed=True, detail=detail)
+        event.finish(user, completed=bool(completed), detail=detail)
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()

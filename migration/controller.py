@@ -77,6 +77,7 @@ def create_or_update_journal(
 
     year, month, day = parse_yyyymmdd(classic_website_journal.first_year)
     try:
+        params = {}
         eissn = classic_website_journal.electronic_issn
         pissn = classic_website_journal.print_issn
         if not eissn and not pissn:
@@ -93,7 +94,7 @@ def create_or_update_journal(
                     eissn = issn["issn"]
 
         if not eissn and not pissn:
-            raise ValueError(f"Missing ISSN for {journal_data}")
+            raise ValueError(f"Before migrating, use Title Manager or SciELO Manager to complete print ISSN and/or electronic ISSN for {classic_website_journal.title}")
 
         params = dict(
             issn_electronic=eissn,
@@ -947,7 +948,8 @@ def register_acron_id_file_content(
                 changed = 0
 
                 logging.info(f"Reading {source_path}")
-                for item in read_bases_work_acron_id_file(
+                # replaced for item in read_bases_work_acron_id_file(
+                for item in get_bases_work_acron_id_file_records(
                     user,
                     source_path,
                     classic_website,
@@ -1075,6 +1077,54 @@ def read_bases_work_acron_id_file(user, source_path, classic_website, journal_pr
         )
     event.finish(user, completed=True, detail={"errors": errors})
 
+
+def get_bases_work_acron_id_file_records(user, source_path, classic_website, journal_proc):
+    try:
+        event = None
+        event = journal_proc.start(user, "get_bases_work_acron_id_file_records")
+        for item in get_doc_records(source_path):
+            try:
+                issue_id = item.get("issue_id")
+                doc_id = item.get("doc_id")
+                if doc_id:
+                    # se houver bases-work/p/<pid>, obtém os registros de parágrafo
+                    ign_pid, p_records = classic_website.get_p_records(doc_id)
+                    yield dict(
+                        item_type="article",
+                        item_pid=doc_id,
+                        data=item["doc_data"] + list(p_records),
+                    )
+
+                elif issue_id:
+                    yield dict(
+                        item_type="issue",
+                        item_pid=issue_id,
+                        data=item["issue_data"],
+                    )
+            except Exception as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                subevent = journal_proc.start(user, "get_bases_work_acron_id_file_records item")
+                subevent.finish(
+                    user,
+                    completed=False,
+                    detail=item,
+                    exception=e,
+                    exc_traceback=exc_traceback,
+                )
+
+        event.finish(user, completed=True, detail={"errors": errors})
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        if event:
+            event.finish(
+                user,
+                completed=False,
+                detail=None,
+                exception=e,
+                exc_traceback=exc_traceback,
+            )
+
+        
 
 def id_file_has_changes(user, collection, id_path, force_update):
     return MigratedFile.has_changes(user, collection, id_path, force_update)
