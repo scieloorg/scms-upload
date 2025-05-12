@@ -764,9 +764,6 @@ class IdFileRecord(CommonControlField, Orderable):
     panels = [
         FieldPanel("item_pid", read_only=True),
         FieldPanel("item_type", read_only=True),
-        FieldPanel("issue_folder", read_only=True),
-        FieldPanel("article_filename", read_only=True),
-        FieldPanel("article_filetype", read_only=True),
         FieldPanel("data", read_only=True),
     ]
 
@@ -776,7 +773,6 @@ class IdFileRecord(CommonControlField, Orderable):
             models.Index(fields=["parent"]),
             models.Index(fields=["item_pid"]),
             models.Index(fields=["item_type"]),
-            models.Index(fields=["issue_folder"]),
         ]
 
     def __str__(self):
@@ -808,10 +804,6 @@ class IdFileRecord(CommonControlField, Orderable):
         item_type,
         item_pid,
         data,
-        issue_folder,
-        article_filename=None,
-        article_filetype=None,
-        processing_date=None,
     ):
         if not user and not item_type and not parent and not item_pid:
             d = dict(
@@ -829,10 +821,6 @@ class IdFileRecord(CommonControlField, Orderable):
                 item_type=item_type,
                 item_pid=item_pid,
                 data=data,
-                issue_folder=issue_folder,
-                article_filename=article_filename,
-                article_filetype=article_filetype,
-                processing_date=processing_date,
             )
             obj.save()
             return obj
@@ -850,10 +838,6 @@ class IdFileRecord(CommonControlField, Orderable):
                     "item_type": item_type,
                     "item_pid": item_pid,
                     "data": data,
-                    "issue_folder": issue_folder,
-                    "article_filename": article_filename,
-                    "article_filetype": article_filetype,
-                    "processing_date": processing_date,
                 },
             )            
 
@@ -865,11 +849,6 @@ class IdFileRecord(CommonControlField, Orderable):
         item_type,
         item_pid,
         data,
-        issue_folder,
-        force_update=None,
-        article_filename=None,
-        article_filetype=None,
-        processing_date=None,
     ):
         if not user and not item_type and not parent and not item_pid:
             d = dict(
@@ -895,12 +874,6 @@ class IdFileRecord(CommonControlField, Orderable):
             obj.updated_by = user
             obj.updated = datetime.utcnow()
             obj.data = data
-            # itens a seguir não serão usados porque podem ser obtidos 
-            # com a instanciação da classe classic_website.Document(data)
-            obj.issue_folder = issue_folder
-            obj.article_filename = article_filename
-            obj.article_filetype = article_filetype
-            obj.processing_date = processing_date
             obj.save()
             return obj
         except cls.DoesNotExist:
@@ -910,10 +883,6 @@ class IdFileRecord(CommonControlField, Orderable):
                 item_type,
                 item_pid,
                 data,
-                issue_folder,
-                article_filename,
-                article_filetype,
-                processing_date,
             )
 
     def get_record_data(self, journal_data=None, issue_data=None):
@@ -948,7 +917,6 @@ class IdFileRecord(CommonControlField, Orderable):
         return {
             "data": data,
             "pid": self.item_pid,
-            "issue_folder": self.issue_folder,
             "deleted": self.deleted,
         }
 
@@ -965,10 +933,3 @@ class IdFileRecord(CommonControlField, Orderable):
 
         logging.info(f"IdFileRecord.document_records_to_migrate {params}")
         return cls.objects.filter(item_type="article", **params)
-
-    # @classmethod
-    # def add_issue_folder(cls, issue_pid, issue_folder):
-    #     return cls.objects.filter(
-    #         Q(item_pid__startswith=f"S{issue_pid}") | Q(item_pid=issue_pid),
-    #         issue_folder__in=["", None]
-    #     ).update(issue_folder=issue_folder)
