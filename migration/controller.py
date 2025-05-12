@@ -77,6 +77,7 @@ def create_or_update_journal(
 
     year, month, day = parse_yyyymmdd(classic_website_journal.first_year)
     try:
+        params = {}
         eissn = classic_website_journal.electronic_issn
         pissn = classic_website_journal.print_issn
         if not eissn and not pissn:
@@ -93,7 +94,7 @@ def create_or_update_journal(
                     eissn = issn["issn"]
 
         if not eissn and not pissn:
-            raise ValueError(f"Missing ISSN for {journal_data}")
+            raise ValueError(f"Before migrating, use Title Manager or SciELO Manager to complete print ISSN and/or electronic ISSN for {classic_website_journal.title}")
 
         params = dict(
             issn_electronic=eissn,
