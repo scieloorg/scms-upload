@@ -886,9 +886,17 @@ class IdFileRecord(CommonControlField, Orderable):
                 if data == obj.data:
                     return obj
 
+            if item_type == "article":
+                # apaga paragraph porque data conterá paragraphs
+                try:
+                    cls.objects.filter(item_type="paragraph", item_pid=item_pid).delete()
+                except Exception as e:
+                    raise
             obj.updated_by = user
             obj.updated = datetime.utcnow()
             obj.data = data
+            # itens a seguir não serão usados porque podem ser obtidos 
+            # com a instanciação da classe classic_website.Document(data)
             obj.issue_folder = issue_folder
             obj.article_filename = article_filename
             obj.article_filetype = article_filetype
