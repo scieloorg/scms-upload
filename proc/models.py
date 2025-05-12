@@ -628,6 +628,8 @@ class BaseProc(CommonControlField):
             return registered
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
+            self.migration_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            self.save()
             if operation:
                 operation.finish(user, exc_traceback=exc_traceback, exception=e)
             else:
@@ -1320,7 +1322,7 @@ class IssueProc(BaseProc, ClusterableModel):
             if not article_proc:
                 raise Exception(f"Unable to create ArticleProc for {pid}")
 
-            article_proc.start(user, "create_or_update_article_proc")
+            event = article_proc.start(user, "create_or_update_article_proc")
             migrated_article = article_proc.migrated_data
             document = migrated_article.document
 
