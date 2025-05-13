@@ -77,25 +77,46 @@ def delete_migration_tasks():
             "task_migrate_document_files",
             "task_migrate_document_records",
             "migrate_and_publish",
-            "create_procs_from_pid_list"
         ]
     )
 
 
 def schedule_migration_subtasks(username):
     enabled = False
+    _schedule_task_check_article_availability(username, enabled)
     _schedule_migrate_and_publish_articles(username, enabled)
     _schedule_migrate_and_publish_issues(username, enabled)
     _schedule_migrate_and_publish_journals(username, enabled)
     # _schedule_migration_and_publication(username, enabled)
-    # _schedule_create_procs_from_pid_list(username, enabled)
-
+    _schedule_create_procs_from_pid_list(username, enabled)
 
 def schedule_publication_subtasks(username):
     _schedule_publish_articles(username)
     _schedule_publish_issues(username)
     _schedule_publish_journals(username)
 
+
+def _schedule_task_check_article_availability(username, enabled):
+    schedule_task(
+        task="publication.tasks.task_check_article_availability",
+        name="task_check_article_availability",
+        kwargs=dict(
+            username=username,
+            collection_acron=None,
+            issn_print=None,
+            issn_electronic=None,
+            publication_year=None,
+            article_pid_v3=None,
+            purpose=None,
+        ),
+        description=_("Check the article availability"),
+        priority=MIGRATION_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=MIGRATION_MINUTES,
+    )
 
 
 def _schedule_create_procs_from_pid_list(username, enabled):
