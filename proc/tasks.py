@@ -25,6 +25,7 @@ from publication.api.document import publish_article
 from publication.api.journal import publish_journal
 from publication.api.issue import publish_issue
 from publication.api.publication import get_api_data, get_api
+from publication.models import ArticleAvailability
 from tracker.models import UnexpectedEvent
 from tracker import choices as tracker_choices
 
@@ -721,17 +722,35 @@ def task_publish_article(
 ):
     try:
         user = _get_user(user_id, username)
+        article_proc = None
         article_proc = ArticleProc.objects.get(pk=article_proc_id)
-        article_proc.publish(
+        response = article_proc.publish(
             user,
             publish_article,
             website_kind=website_kind,
             api_data=api_data,
             force_update=force_update,
         )
+        if response.get("completed"):
+            obj = ArticleAvailability.create_or_update(
+                user,
+                article_proc.article,
+                published_by="MIGRATION",
+                publication_rule="MIGRATION",
+            )
+            for website in WebSiteConfiguration.objects.filter(
+                collection=article_proc.collection,
+                purpose=website_kind,
+                enabled=True,
+            ):
+                obj.create_or_update_urls(user, website.url)
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
+        if article_proc:
+            event = article_proc.start(user, "publish article / check availability")
+            event.finish(user, exc_traceback=exc_traceback, exception=e)
+            return
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
