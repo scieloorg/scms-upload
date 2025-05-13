@@ -393,6 +393,25 @@ class Article(ClusterableModel, CommonControlField):
     def get_zip_filename_and_content(self):
         return self.sps_pkg.get_zip_filename_and_content()
 
+    def get_urls(self, website_url):
+        journal_acron = self.journal.journal_acron
+        pid_v2 = self.pid_v2
+        pid_v3 = self.pid_v3
+
+        for item in self.htmls:
+            lang = item.get("lang")
+            if not lang:
+                continue
+            yield f"{website_url}/j/{journal_acron}/a/{pid_v3}/?lang={lang}"
+            yield f"{website_url}/scielo.php?script=sci_arttext&pid={pid_v2}&tlng={lang}"
+        
+        for item in self.pdfs:
+            lang = item.get("lang")
+            if not lang:
+                continue
+            yield f"{website_url}/j/{journal_acron}/a/{pid_v3}/?lang={lang}&format=pdf"
+            yield f"{website_url}/scielo.php?script=sci_pdf&pid={pid_v2}&tlng={lang}"
+
 
 class ArticleDOIWithLang(Orderable, DOIWithLang):
     doi_with_lang = ParentalKey(
