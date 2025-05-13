@@ -1112,7 +1112,7 @@ def get_bases_work_acron_id_file_records(user, source_path, classic_website, jou
                     exc_traceback=exc_traceback,
                 )
 
-        event.finish(user, completed=True, detail={"errors": errors})
+        event.finish(user, completed=True)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         if event:

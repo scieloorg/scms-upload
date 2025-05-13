@@ -849,6 +849,7 @@ class IdFileRecord(CommonControlField, Orderable):
         item_type,
         item_pid,
         data,
+        force_update=None
     ):
         if not user and not item_type and not parent and not item_pid:
             d = dict(
