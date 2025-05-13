@@ -17,6 +17,7 @@ from publication.api.issue import publish_issue
 from publication.api.journal import publish_journal
 from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
+from publication.models import ArticleAvailability
 from tracker.models import UnexpectedEvent
 
 from .models import Article, ScieloURLStatus
@@ -429,95 +430,110 @@ def task_publish_article(
 
 
 @celery_app.task(bind=True)
-def initiate_article_availability_check(
+def task_check_article_availability(
     self,
     username,
     user_id=None,
     issn_print=None,
     issn_electronic=None,
     publication_year=None,
-    updated=None,
     article_pid_v3=None,
     collection_acron=None,
-    purpose="PUBLIC",
+    purpose=None,
 ):
+
     if collection_acron:
         collection = Collection.objects.filter(acron=collection_acron)
     else:
         collection = Collection.objects.all()
 
-    query = Q()
-    if not updated:
-        if article_pid_v3:
-            query |= Q(pid_v3=article_pid_v3)
-        if issn_print:
-            query |= Q(journal__official_journal__issn_print=issn_print)
-        if issn_electronic:
-            query |= Q(journal__official_journal__issn_electronic=issn_electronic)
-        if publication_year:
-            query |= Q(issue__publication_year=publication_year)
+    journal_query = Q()
+    if collection:
+        journal_query |= Q(collection__in=collection)
+    if issn_print:
+        journal_query |= Q(journal__official_journal__issn_print=issn_print)
+    if issn_electronic:
+        journal_query |= Q(journal__official_journal__issn_electronic=issn_electronic)
+
+    article_query = Q()
+    if article_pid_v3:
+        article_query |= Q(pid_v3=article_pid_v3)
+    if publication_year:
+        article_query |= Q(issue__publication_year=publication_year)
 
     try:
-        for col in collection:
-            for journal_collection in col.journalcollection_set.all():
-                for article in journal_collection.journal.article_set.filter(query):
-                    for lang in article.article_langs:
-                        process_article_availability.apply_async(
-                            kwargs=dict(
-                                user_id=user_id,
-                                username=username,
-                                pid_v3=article.pid_v3,
-                                pid_v2=article.pid_v2,
-                                journal_acron=article.journal.journal_acron,
-                                lang=lang,
-                                domain=journal_collection.collection.websiteconfiguration_set.get(
-                                    enabled=True, purpose=purpose
-                                ).url,
-                            )
+        for journal_proc in JournalProc.objects.filter(journal_query, journal__isnull=False):
+            if not journal_proc.journal.journal_acron:
+                journal_proc.journal.journal_acron = journal_proc.acron
+                journal_proc.journal.save()
+            for article in Article.objects.filter(
+                article_query, journal=journal_proc.journal
+            ):
+                for item in WebSiteConfiguration.objects.filter(
+                    enabled=True, collection=journal_proc.collection
+                ):
+                    process_article_availability.apply_async(
+                        kwargs=dict(
+                            pid_v3=article.pid_v3,
+                            user_id=user_id,
+                            username=username,
+                            domain=item.url,
                         )
+                    )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "function": "publication.tasks.initiate_article_availability_check",
+                "function": "publication.tasks.task_check_article_availability",
             },
         )
 
 
 @celery_app.task(bind=True)
 def process_article_availability(
-    self, user_id, username, pid_v3, pid_v2, journal_acron, lang, domain
+    self, pid_v3, domain, user_id, username, timeout=None,
 ):
-    urls = [
-        f"{domain}/scielo.php?script=sci_arttext&pid={pid_v2}&lang={lang}&nrm=iso",
-        f"{domain}/j/{journal_acron}/a/{pid_v3}/?lang={lang}",
-        f"{domain}/scielo.php?script=sci_arttext&pid={pid_v2}&format=pdf&lng={lang}&nrm=iso",
-        f"{domain}/j/{journal_acron}/a/{pid_v3}/?format=pdf&lang={lang}",
-    ]
-
-    for url in urls:
-        fetch_data_and_register_result.apply_async(
-            kwargs=dict(
-                pid_v3=pid_v3,
-                url=url,
-                username=username,
-                user_id=user_id,
-            )
+    try:
+        user = _get_user(user_id=user_id, username=username)
+        article = Article.objects.get(pid_v3=pid_v3)
+        logging.info(f"{domain} {pid_v3}")
+        obj = ArticleAvailability.create_or_update(user, article)
+        obj.create_or_update_urls(user, website_url=domain, timeout=timeout)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "publication.tasks.process_article_availability",
+                "domain": domain,
+                "pid_v3": pid_v3,
+            },
         )
 
 
 @celery_app.task(bind=True)
-def retry_failed_scielo_urls(self, username, user_id=None):
-    for scielo_url_status in ScieloURLStatus.objects.filter(available=False):
-        fetch_data_and_register_result.apply_async(
-            kwargs=dict(
-                pid_v3=scielo_url_status.article_availability.article.pid_v3,
-                url=scielo_url_status.url,
-                username=username,
-                user_id=user_id,
-            )
+def retry_failed_scielo_urls(self, username=None, user_id=None, pid_v3=None, timeout=None):
+    try:
+        user = _get_user(user_id=user_id, username=username)
+        params = {}
+        params["available"] = False
+        if pid_v3:
+            params["article_availability__article__pid_v3"] = pid_v3
+
+        for scielo_url_status in ScieloURLStatus.objects.filter(**params):
+            scielo_url_status.update(user, timeout)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "publication.tasks.retry_failed_scielo_urls",
+                "pid_v3": pid_v3,
+            },
         )
 
 
@@ -526,37 +542,19 @@ def fetch_data_and_register_result(self, pid_v3, url, username, user_id):
     try:
         user = _get_user(user_id=user_id, username=username)
         article = Article.objects.get(pid_v3=pid_v3)
-
-        try:
-            response = fetch_data(url, timeout=2, verify=True)
-        except Exception as e:
-            ScieloURLStatus.create_or_update(
-                article=article,
-                url=url,
-                check_date=datetime.now(),
-                available=False,
-                user=user,
-            )
-        else:
-            try:
-                obj = ScieloURLStatus.get(article=article, url=url)
-                obj.available = True
-                obj.save()
-            except ScieloURLStatus.DoesNotExist:
-                ScieloURLStatus.create_or_update(
-                    article=article,
-                    url=url,
-                    check_date=datetime.now(),
-                    available=True,
-                    user=user,
-                )
+        ScieloURLStatus.create_or_update(
+            user=user,
+            article=article,
+            url=url,
+        )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "function": "publication.tasks.process_article_availability",
+                "function": "publication.tasks.fetch_data_and_register_result",
                 "url": url,
+                "pid_v3": pid_v3,
             },
         )
