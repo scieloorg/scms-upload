@@ -33,7 +33,6 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
     Modelo para armazenar o status de disponibilidade nos sites,
     tanto na nova versao, quanto na antiga, do scielo.br.
     """
-
     article = models.ForeignKey(
         Article,
         on_delete=models.SET_NULL,
@@ -56,6 +55,10 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         FieldPanel("published_by"),
         InlinePanel("scielo_url", label="URLs", classname="collapsible"),
     ]
+
+    class Meta:
+        verbose_name = _('Article availability')
+        verbose_name_plural = _('Article availability')
 
     def __str__(self):
         return str(self.article)
