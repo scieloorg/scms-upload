@@ -1311,6 +1311,8 @@ class IssueProc(BaseProc, ClusterableModel):
 
     def create_or_update_article_proc(self, user, pid, data, force_update):
         try:
+            detail = {}
+            params = {}
             article_proc = ArticleProc.register_classic_website_data(
                 user=user,
                 collection=self.collection,
