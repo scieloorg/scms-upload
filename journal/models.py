@@ -292,7 +292,7 @@ class Journal(CommonControlField, ClusterableModel):
     logo_url = models.URLField(null=True, blank=True)
     contact_name = models.CharField(max_length=128, null=True, blank=True)
     contact_address = models.CharField(
-        _("Address"), max_length=128, null=True, blank=True
+        _("Address"), max_length=250, null=True, blank=True
     )
     contact_location = models.ForeignKey(
         Location, on_delete=models.SET_NULL, null=True, blank=True
