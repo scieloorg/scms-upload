@@ -337,7 +337,7 @@ class MigratedFile(CommonControlField):
     original_path = models.CharField(_("Original Path"), max_length=200, null=True, blank=True)
 
     # pt_a01.pdf
-    original_name = models.CharField(_("Original name"), max_length=60, null=True, blank=True)
+    original_name = models.CharField(_("Original name"), max_length=100, null=True, blank=True)
 
     file_date = models.DateField(null=True, blank=True)
 
@@ -849,6 +849,7 @@ class IdFileRecord(CommonControlField, Orderable):
         item_type,
         item_pid,
         data,
+        force_update=None
     ):
         if not user and not item_type and not parent and not item_pid:
             d = dict(

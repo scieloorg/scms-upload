@@ -267,6 +267,7 @@ def task_publish_journal(
         journal_proc.publish(
             user,
             publish_journal,
+            content_type="journal",
             website_kind=website_kind,
             api_data=api_data,
             force_update=force_update,
@@ -482,6 +483,7 @@ def task_publish_issue(
         issue_proc.publish(
             user,
             publish_issue,
+            content_type="issue",
             website_kind=website_kind,
             api_data=api_data,
             force_update=force_update,
@@ -725,6 +727,7 @@ def task_publish_article(
         article_proc.publish(
             user,
             publish_article,
+            content_type="article",
             website_kind=website_kind,
             api_data=api_data,
             force_update=force_update,
@@ -749,12 +752,12 @@ def task_publish_article(
 def task_create_procs_from_pid_list(
     self, username, user_id=None, collection_acron=None, force_update=None
 ):
-    user = _get_user(user_id=None, username=username)
+    user = _get_user(user_id=user_id, username=username)
     try:
         for collection in _get_collections(collection_acron):
             task_create_collection_procs_from_pid_list.apply_async(
                 kwargs=dict(
-                    username=username,
+                    username=user.username,
                     collection_acron=collection.acron,
                     force_update=force_update,
                 )
