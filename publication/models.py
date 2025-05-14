@@ -126,10 +126,10 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
             )
         self.update_published_percentage()
 
-    def update_published_percentage(self, save):
+    def update_published_percentage(self):
         self.published_percentage = calculate_percentage(
-            self.article.scielo_url.filter(available=True).count(),
-            self.article.scielo_url.count()
+            self.scielo_url.filter(available=True).count(),
+            self.scielo_url.count()
         )
         self.save()
 
