@@ -103,8 +103,8 @@ class MinioConfiguration(CommonControlField):
 
 
 class FileLocation(CommonControlField):
-    basename = models.CharField(_("Basename"), max_length=64, null=True, blank=True)
-    uri = models.URLField(_("URI"), null=True, blank=True)
+    basename = models.CharField(_("Basename"), max_length=100, null=True, blank=True)
+    uri = models.URLField(_("URI"), null=True, blank=True, max_length=200)
 
     autocomplete_search_field = "uri"
 
