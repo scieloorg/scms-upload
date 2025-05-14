@@ -17,10 +17,10 @@ from publication.api.issue import publish_issue
 from publication.api.journal import publish_journal
 from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
-from publication.models import ArticleAvailability
+from publication.models import ArticleAvailability, ScieloURLStatus
 from tracker.models import UnexpectedEvent
 
-from .models import Article, ScieloURLStatus
+from .models import Article
 
 # FIXME
 # from upload.models import Package
@@ -442,26 +442,26 @@ def task_check_article_availability(
     purpose=None,
 ):
 
-    if collection_acron:
-        collection = Collection.objects.filter(acron=collection_acron)
-    else:
-        collection = Collection.objects.all()
-
-    journal_query = Q()
-    if collection:
-        journal_query |= Q(collection__in=collection)
-    if issn_print:
-        journal_query |= Q(journal__official_journal__issn_print=issn_print)
-    if issn_electronic:
-        journal_query |= Q(journal__official_journal__issn_electronic=issn_electronic)
-
-    article_query = Q()
-    if article_pid_v3:
-        article_query |= Q(pid_v3=article_pid_v3)
-    if publication_year:
-        article_query |= Q(issue__publication_year=publication_year)
-
     try:
+        if collection_acron:
+            collection = Collection.objects.filter(acron=collection_acron)
+        else:
+            collection = Collection.objects.all()
+
+        journal_query = Q()
+        if collection:
+            journal_query |= Q(collection__in=collection)
+        if issn_print:
+            journal_query |= Q(journal__official_journal__issn_print=issn_print)
+        if issn_electronic:
+            journal_query |= Q(journal__official_journal__issn_electronic=issn_electronic)
+
+        article_query = Q()
+        if article_pid_v3:
+            article_query |= Q(pid_v3=article_pid_v3)
+        if publication_year:
+            article_query |= Q(issue__publication_year=publication_year)
+
         for journal_proc in JournalProc.objects.filter(journal_query, journal__isnull=False):
             if not journal_proc.journal.journal_acron:
                 journal_proc.journal.journal_acron = journal_proc.acron
@@ -475,9 +475,9 @@ def task_check_article_availability(
                     process_article_availability.apply_async(
                         kwargs=dict(
                             pid_v3=article.pid_v3,
+                            domain=item.url,
                             user_id=user_id,
                             username=username,
-                            domain=item.url,
                         )
                     )
     except Exception as e:
@@ -498,7 +498,6 @@ def process_article_availability(
     try:
         user = _get_user(user_id=user_id, username=username)
         article = Article.objects.get(pid_v3=pid_v3)
-        logging.info(f"{domain} {pid_v3}")
         obj = ArticleAvailability.create_or_update(user, article)
         obj.create_or_update_urls(user, website_url=domain, timeout=timeout)
     except Exception as e:
