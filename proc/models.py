@@ -409,7 +409,7 @@ class BaseProc(CommonControlField):
         raise ValueError("BaseProc.get requires collection and pid")
 
     @classmethod
-    def get_or_create(cls, user, collection, pid):
+    def get_or_create(cls, user, collection, pid, **kwargs):
         if collection and pid:
             try:
                 return cls.get(collection, pid)
@@ -1003,6 +1003,19 @@ class IssueProc(BaseProc, ClusterableModel):
             ObjectList(panel_proc_result, heading=_("Events")),
         ]
     )
+
+    @staticmethod
+    def create_from_journal_proc_and_issue(user, journal_proc, issue):
+        issue_pid_suffix = issue.issue_pid_suffix
+        issue_proc = IssueProc.get_or_create(
+            user,
+            journal_proc.collection,
+            pid=f"{journal_proc.pid}{issue.publication_year}{issue_pid_suffix}",
+        )
+        issue_proc.issue = issue
+        issue_proc.journal_proc = journal_proc
+        issue_proc.save()
+        return issue_proc
 
     def set_status(self):
         if self.migration_status == tracker_choices.PROGRESS_STATUS_REPROC:
