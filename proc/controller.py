@@ -539,9 +539,7 @@ def create_or_update_journal_acron_id_file(
         )
 
 
-def migrate_issue(
-    user, issue_proc, force_update
-):
+def migrate_issue(user, issue_proc, force_update):
     try:
         event = None
         detail = None
@@ -603,7 +601,9 @@ def migrate_document_records(
     if publication_year:
         params["issue__publication_year"] = str(publication_year)
     if status:
-        params["docs_status__in"] = tracker_choices.get_valid_status(status, force_update)
+        params["docs_status__in"] = tracker_choices.get_valid_status(
+            status, force_update
+        )
 
     for issue_proc in IssueProc.objects.filter(**params):
         issue_proc.migrate_document_records(user, force_update)
@@ -628,7 +628,9 @@ def get_files_from_classic_website(
     if publication_year:
         params["issue__publication_year"] = str(publication_year)
     if status:
-        params["files_status__in"] = tracker_choices.get_valid_status(status, force_update)
+        params["files_status__in"] = tracker_choices.get_valid_status(
+            status, force_update
+        )
 
     for issue_proc in IssueProc.objects.filter(**params):
         issue_proc.get_files_from_classic_website(

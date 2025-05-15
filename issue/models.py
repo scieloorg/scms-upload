@@ -26,8 +26,7 @@ def _get_digits(value):
         return 0
 
 
-class IssueGetOrCreateError(Exception):
-    ...
+class IssueGetOrCreateError(Exception): ...
 
 
 class Issue(CommonControlField, IssuePublicationDate):

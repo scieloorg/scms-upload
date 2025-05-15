@@ -1244,14 +1244,14 @@ class IssueProc(BaseProc, ClusterableModel):
             errors = 0
             journal_data = self.journal_proc.migrated_data.data
             resumption = None if force_update else self.resumption_date
-            
+
             params = dict(
                 collection=self.journal_proc.collection,
                 issue_pid=self.pid,
-                resumption=resumption
+                resumption=resumption,
             )
             logging.info(f"Migrate documents {params}")
-            
+
             # registros novos ou atualizados
             id_file_records = IdFileRecord.document_records_to_migrate(**params)
             resumption_date = resumption
@@ -1275,8 +1275,12 @@ class IssueProc(BaseProc, ClusterableModel):
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     subevent = self.start(user, "migrate documet records / item")
                     subevent.finish(
-                        user, completed=False, detail=detail,
-                        exception=e, exc_traceback=exc_traceback)
+                        user,
+                        completed=False,
+                        detail=detail,
+                        exception=e,
+                        exc_traceback=exc_traceback,
+                    )
 
             self.resumption_date = resumption_date
             self.save()
@@ -1303,10 +1307,7 @@ class IssueProc(BaseProc, ClusterableModel):
             self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
             self.save()
             operation.finish(
-                user,
-                exc_traceback=exc_traceback,
-                exception=e,
-                detail=detail or params
+                user, exc_traceback=exc_traceback, exception=e, detail=detail or params
             )
 
     def create_or_update_article_proc(self, user, pid, data, force_update):
@@ -1340,20 +1341,13 @@ class IssueProc(BaseProc, ClusterableModel):
                 main_lang=document.original_language,
                 force_update=force_update,
             )
-            event.finish(
-                user,
-                completed=True,
-                detail=str(article_proc)
-            )
+            event.finish(user, completed=True, detail=str(article_proc))
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
             self.save()
             event.finish(
-                user,
-                exc_traceback=exc_traceback,
-                exception=e,
-                detail=detail or params
+                user, exc_traceback=exc_traceback, exception=e, detail=detail or params
             )
         return article_proc
 
