@@ -303,15 +303,11 @@ def fetch_and_create_issues(journal, pub_year, volume, suppl, number, user):
                         collection=journal_proc.collection, issue=issue
                     )
                 except IssueProc.DoesNotExist:
-                    issue_pid_suffix = str(issue.order).zfill(4)
-                    issue_proc = IssueProc.get_or_create(
+                    issue_proc = IssueProc.create_from_journal_proc_and_issue(
                         user,
-                        journal_proc.collection,
-                        pid=f"{journal_proc.pid}{issue.publication_year}{issue_pid_suffix}",
+                        journal_proc,
+                        issue,
                     )
-                    issue_proc.issue = issue
-                    issue_proc.journal_proc = journal_proc
-                    issue_proc.save()
 
 
 def create_or_update_migrated_journal(
@@ -539,9 +535,7 @@ def create_or_update_journal_acron_id_file(
         )
 
 
-def migrate_issue(
-    user, issue_proc, force_update
-):
+def migrate_issue(user, issue_proc, force_update):
     try:
         event = None
         detail = None
@@ -603,7 +597,9 @@ def migrate_document_records(
     if publication_year:
         params["issue__publication_year"] = str(publication_year)
     if status:
-        params["docs_status__in"] = tracker_choices.get_valid_status(status, force_update)
+        params["docs_status__in"] = tracker_choices.get_valid_status(
+            status, force_update
+        )
 
     for issue_proc in IssueProc.objects.filter(**params):
         issue_proc.migrate_document_records(user, force_update)
@@ -628,7 +624,9 @@ def get_files_from_classic_website(
     if publication_year:
         params["issue__publication_year"] = str(publication_year)
     if status:
-        params["files_status__in"] = tracker_choices.get_valid_status(status, force_update)
+        params["files_status__in"] = tracker_choices.get_valid_status(
+            status, force_update
+        )
 
     for issue_proc in IssueProc.objects.filter(**params):
         issue_proc.get_files_from_classic_website(

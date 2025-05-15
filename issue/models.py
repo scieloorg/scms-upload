@@ -26,8 +26,7 @@ def _get_digits(value):
         return 0
 
 
-class IssueGetOrCreateError(Exception):
-    ...
+class IssueGetOrCreateError(Exception): ...
 
 
 class Issue(CommonControlField, IssuePublicationDate):
@@ -163,9 +162,7 @@ class Issue(CommonControlField, IssuePublicationDate):
             obj.number = number
             obj.publication_year = publication_year
             obj.order = order or obj.generate_order()
-            obj.issue_pid_suffix = issue_pid_suffix or str(obj.generate_order()).zfill(
-                4
-            )
+            obj.issue_pid_suffix = issue_pid_suffix or obj.generate_issue_pid_suffix()
             obj.is_continuous_publishing_model = is_continuous_publishing_model
             obj.total_documents = total_documents
             obj.creator = user
@@ -211,9 +208,11 @@ class Issue(CommonControlField, IssuePublicationDate):
             obj.total_documents = total_documents or obj.total_documents
             obj.publication_year = publication_year or obj.publication_year
             obj.order = order or obj.order or obj.generate_order()
-            obj.issue_pid_suffix = issue_pid_suffix or obj.issue_pid_suffix
-            if not obj.issue_pid_suffix and obj.order:
-                obj.issue_pid_suffix = str(obj.order).zfill(4)
+            obj.issue_pid_suffix = (
+                issue_pid_suffix
+                or obj.issue_pid_suffix
+                or obj.generate_issue_pid_suffix()
+            )
             obj.updated_by = user
             obj.save()
             return obj
@@ -230,6 +229,9 @@ class Issue(CommonControlField, IssuePublicationDate):
                 order,
                 issue_pid_suffix,
             )
+
+    def generate_issue_pid_suffix(self):
+        return str(self.generate_order()).zfill(4)
 
     def generate_order(self, suppl_start=1000, spe_start=2000):
         x = 0
