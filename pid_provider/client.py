@@ -166,7 +166,11 @@ class PidProviderAPIClient:
         except Exception as e:
             previous_data = (self.pid_provider_api_get_token, username, password)
             self.reset()
-            current_data = (self.pid_provider_api_get_token, self.api_username, self.api_password)
+            current_data = (
+                self.pid_provider_api_get_token,
+                self.api_username,
+                self.api_password,
+            )
             if current_data != previous_data:
                 return self._get_token(
                     username=self.api_username,
@@ -274,9 +278,7 @@ class PidProviderAPIClient:
             try:
                 self._process_item_response(item, xml_with_pre, created)
             except AttributeError:
-                raise ValueError(
-                    f"Unexpected pid provider response: {response}"
-                )
+                raise ValueError(f"Unexpected pid provider response: {response}")
 
     def _process_item_response(self, item, xml_with_pre, created=None):
         logging.info(f"Pid Provider Response: {item}")
