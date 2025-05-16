@@ -21,6 +21,9 @@ LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
+class IncorrectPidV2RegisteredInCoreException(Exception): ...
+
+
 class PidProviderAPIClient:
     """
     Interface com o pid provider do Core
@@ -75,7 +78,9 @@ class PidProviderAPIClient:
                 if endpoint.enabled:
                     self._fix_pid_v2_url = endpoint.url
             except IndexError:
-                pass
+                self._fix_pid_v2_url = self.pid_provider_api_post_xml.replace(
+                    "/pid_provider", "/fix_pid_v2"
+                )
         return self._fix_pid_v2_url
 
     @property
@@ -129,7 +134,6 @@ class PidProviderAPIClient:
                 timeout=self.timeout,
             )
             response = self._prepare_and_post_xml(xml_with_pre, name, self.token)
-
             self._process_post_xml_response(response, xml_with_pre, created)
             try:
                 return response[0]
@@ -270,18 +274,33 @@ class PidProviderAPIClient:
             )
 
     def _process_post_xml_response(self, response, xml_with_pre, created=None):
-        logging.info(f"Pid Provider Post: {xml_with_pre.data}")
+        logging.info(
+            f"pid_provider.client._process_post_xml_response: xml_with_pre.data={xml_with_pre.data}"
+        )
         if not response:
             logging.info(f"Pid Provider Response: none")
             return
         for item in response:
             try:
+                self.is_pid_v2_correct_registered_in_core(
+                    xml_with_pre, item.get("xml_changed")
+                )
                 self._process_item_response(item, xml_with_pre, created)
             except AttributeError:
                 raise ValueError(f"Unexpected pid provider response: {response}")
 
+    def is_pid_v2_correct_registered_in_core(self, xml_with_pre, xml_changed):
+        if xml_changed:
+            if len(xml_changed) == 1 and xml_changed.get("pid_v2"):
+                raise IncorrectPidV2RegisteredInCoreException(
+                    f"incorrect in core: {xml_changed} x correct={xml_with_pre.data}"
+                )
+        return True
+
     def _process_item_response(self, item, xml_with_pre, created=None):
-        logging.info(f"Pid Provider Response: {item}")
+        logging.info(
+            f"pid_provider.client._process_item_response: xml_with_pre.data={xml_with_pre.data} | item: {item}"
+        )
 
         if not item.get("xml_changed"):
             # pids do xml_with_pre não mudaram
