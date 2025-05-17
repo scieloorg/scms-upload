@@ -916,3 +916,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
             d["content"] = fp.read()
         d["filename"] = self.sps_pkg_name + ".zip"
         return d
+
+    @property
+    def pub_date(self):
+        try:
+            return datetime.fromisoformat(self.xml_with_pre.article_publication_date)
+        except Exception as e:
+            logging.exception(e)
