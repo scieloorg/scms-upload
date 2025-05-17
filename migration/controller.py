@@ -53,6 +53,7 @@ def create_or_update_journal(
     """
     Create/update OfficialJournal, JournalProc e Journal
     """
+    params = {}
     try:
         journal_proc_event = journal_proc.start(
             user, "create_or_update_journal"
@@ -86,21 +87,7 @@ def create_or_update_journal(
             foundation_year=year,
         )
         if not eissn and not pissn:
-            issn = classic_website_journal.get_field_content(
-                "v935", subfields={"_": "issn"}, single=True, simple=True
-            )
-            issn_type = classic_website_journal.get_field_content(
-                "v035", subfields={"_": "issn_type"}, single=True, simple=True
-            )
-            if issn and issn_type:
-                if issn_type["issn_type"] == "PRINT":
-                    pissn = issn["issn"]
-                elif issn_type["issn_type"] == "ONLIN":
-                    eissn = issn["issn"]
-
-        if not eissn and not pissn:
             raise ValueError(f"Before migrating, use Title Manager or SciELO Manager to complete print ISSN and/or electronic ISSN for {classic_website_journal.title}")
-
 
         official_journal = OfficialJournal.create_or_update(user=user, **params)
         official_journal.add_related_journal(
@@ -416,6 +403,7 @@ def get_classic_website(collection_acron):
             cisis_path=None,
             title_path=config.title_path,
             issue_path=config.issue_path,
+            alternative_paths=config.alternative_htdocs_img_revistas_path,
         )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()

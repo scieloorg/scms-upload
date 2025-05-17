@@ -114,6 +114,7 @@ class ClassicWebsiteConfiguration(CommonControlField):
         blank=True,
         help_text=_("Path of a text file which contains all the article PIDs from artigo.mst"),
     )
+    alternative_htdocs_img_revistas_path = models.JSONField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.collection}"
