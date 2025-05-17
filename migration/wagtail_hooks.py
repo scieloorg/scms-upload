@@ -299,22 +299,19 @@ class IdFileRecordModelAdmin(ModelAdmin):
     list_display = (
         "item_pid",
         "item_type",
-        "issue_folder",
-        "article_filename",
-        "article_filetype",
+        "todo",
         "updated",
         "created",
     )
     list_filter = (
         "item_type",
-        "article_filetype",
+        "todo",
     )
     search_fields = (
         "item_pid",
-        "parent__journal__title",
+        "parent__journal_acron",
         "parent__collection__acron",
         "parent__collection__name",
-        "issue_folder",
     )
 
 

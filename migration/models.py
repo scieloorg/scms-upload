@@ -752,15 +752,16 @@ class IdFileRecord(CommonControlField, Orderable):
     data = models.JSONField()
     item_pid = models.CharField(_("PID"), max_length=23)
     item_type = models.CharField(_("Type"), max_length=10)
-    issue_folder = models.CharField(_("Issue folder"), max_length=30)
-    article_filename = models.CharField(
-        _("Filename"), max_length=40, null=True, blank=True
-    )
-    article_filetype = models.CharField(
-        _("File type"), max_length=4, null=True, blank=True
-    )
-    processing_date = models.CharField(max_length=8, null=True, blank=True)
-    deleted = models.BooleanField(default=False)
+    # issue_folder = models.CharField(_("Issue folder"), max_length=30)
+    # article_filename = models.CharField(
+    #     _("Filename"), max_length=40, null=True, blank=True
+    # )
+    # article_filetype = models.CharField(
+    #     _("File type"), max_length=4, null=True, blank=True
+    # )
+    # processing_date = models.CharField(max_length=8, null=True, blank=True)
+    # deleted = models.BooleanField(default=False)
+    todo = models.BooleanField(default=True)
 
     panels = [
         FieldPanel("item_pid", read_only=True),
@@ -805,6 +806,7 @@ class IdFileRecord(CommonControlField, Orderable):
         item_type,
         item_pid,
         data,
+        todo,
     ):
         if not user and not item_type and not parent and not item_pid:
             d = dict(
@@ -822,6 +824,7 @@ class IdFileRecord(CommonControlField, Orderable):
                 item_type=item_type,
                 item_pid=item_pid,
                 data=data,
+                todo=todo,
             )
             obj.save()
             return obj
@@ -850,7 +853,8 @@ class IdFileRecord(CommonControlField, Orderable):
         item_type,
         item_pid,
         data,
-        force_update=None
+        force_update=None,
+        todo=None,
     ):
         if not user and not item_type and not parent and not item_pid:
             d = dict(
@@ -866,16 +870,10 @@ class IdFileRecord(CommonControlField, Orderable):
             if not force_update:
                 if data == obj.data:
                     return obj
-
-            if item_type == "article":
-                # apaga paragraph porque data conterá paragraphs
-                try:
-                    cls.objects.filter(item_type="paragraph", item_pid=item_pid).delete()
-                except Exception as e:
-                    raise
             obj.updated_by = user
             obj.updated = datetime.utcnow()
             obj.data = data
+            obj.todo = todo
             obj.save()
             return obj
         except cls.DoesNotExist:
@@ -885,6 +883,7 @@ class IdFileRecord(CommonControlField, Orderable):
                 item_type,
                 item_pid,
                 data,
+                todo,
             )
 
     def get_record_data(self, journal_data=None, issue_data=None):
@@ -896,7 +895,6 @@ class IdFileRecord(CommonControlField, Orderable):
                     parent=self.parent,
                     item_pid=self.item_pid[1:-5],
                     item_type="issue",
-                    deleted__in=[False, None]
                 )
                 .first()
                 .data
@@ -908,7 +906,6 @@ class IdFileRecord(CommonControlField, Orderable):
                     parent=self.parent,
                     item_pid=self.item_pid,
                     item_type="paragraph",
-                    deleted__in=[False, None]
                 )
                 .first()
                 .data
@@ -919,19 +916,18 @@ class IdFileRecord(CommonControlField, Orderable):
         return {
             "data": data,
             "pid": self.item_pid,
-            "deleted": self.deleted,
+            "todo": self.todo,
         }
 
     @classmethod
-    def document_records_to_migrate(cls, collection, issue_pid, resumption):
+    def document_records_to_migrate(cls, collection, issue_pid, todo):
         params = {}
         if collection:
             params["parent__collection"] = collection
         if issue_pid:
             params["item_pid__startswith"] = f"S{issue_pid}"
-        if resumption:
-            params["updated__gt"] = resumption
-        params["deleted__in"] = [False, None]
+        if todo:
+            params["todo"] = todo
 
         logging.info(f"IdFileRecord.document_records_to_migrate {params}")
         return cls.objects.filter(item_type="article", **params)

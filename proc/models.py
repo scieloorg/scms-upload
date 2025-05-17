@@ -973,8 +973,6 @@ class IssueProc(BaseProc, ClusterableModel):
         choices=tracker_choices.PROGRESS_STATUS,
         default=tracker_choices.PROGRESS_STATUS_TODO,
     )
-    resumption_date = models.DateTimeField(null=True, blank=True)
-
     MigratedDataClass = MigratedIssue
     base_form_class = IssueProcAdminModelForm
     ProcResult = IssueProcResult
@@ -1237,10 +1235,6 @@ class IssueProc(BaseProc, ClusterableModel):
             operation = None
             detail = None
             params = None
-            doit = tracker_choices.allowed_to_run(self.docs_status, force_update)
-            if not doit:
-                # logging.info(f"Skip migrate_document_records {self.pid}")
-                return
 
             operation = self.start(user, "migrate_document_records")
 
@@ -1256,18 +1250,16 @@ class IssueProc(BaseProc, ClusterableModel):
             done = 0
             errors = 0
             journal_data = self.journal_proc.migrated_data.data
-            resumption = None if force_update else self.resumption_date
 
             params = dict(
                 collection=self.journal_proc.collection,
                 issue_pid=self.pid,
-                resumption=resumption,
+                todo=not force_update,
             )
             logging.info(f"Migrate documents {params}")
 
             # registros novos ou atualizados
             id_file_records = IdFileRecord.document_records_to_migrate(**params)
-            resumption_date = resumption
             for record in id_file_records:
                 try:
                     logging.info(f"migrate_document_records: {record.item_pid}")
@@ -1281,8 +1273,13 @@ class IssueProc(BaseProc, ClusterableModel):
                     article_proc = self.create_or_update_article_proc(
                         user, record.item_pid, data["data"], force_update
                     )
-                    resumption_date = max(record.updated, resumption_date)
-                    done += 1
+                    
+                    if article_proc:
+                        done += 1
+                        record.todo = False
+                        record.save()
+                    else:
+                        errors += 1
                 except Exception as e:
                     errors += 1
                     exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1294,9 +1291,6 @@ class IssueProc(BaseProc, ClusterableModel):
                         exception=e,
                         exc_traceback=exc_traceback,
                     )
-
-            self.resumption_date = resumption_date
-            self.save()
 
             got = id_file_records.count()
             detail = params

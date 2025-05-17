@@ -946,6 +946,7 @@ def register_acron_id_file_content(
                     journal_proc,
                 ):
                     item["force_update"] = force_update
+                    item["todo"] = True
                     rec = IdFileRecord.create_or_update(
                         user,
                         journal_id_file,
@@ -996,78 +997,6 @@ def register_acron_id_file_content(
         )
 
 
-def read_bases_work_acron_id_file(user, source_path, classic_website, journal_proc):
-    event = journal_proc.start(user, "read_bases_work_acron_id_file")
-
-    errors = []
-    data = {}
-    classic_ws_issue = None
-    classic_ws_doc = None
-    for item in get_doc_records(source_path):
-        issue_id = item.get("issue_id")
-        data["issue"] = item.get("issue_data")
- 
-        doc_id = item.get("doc_id")
-        data["article"] = item.get("doc_data")
-
-        if data["issue"] and issue_id:
-            try:
-                classic_ws_issue = classic_ws.Issue(data["issue"])
-
-                try:
-                    issue_folder = classic_ws_issue.issue_label
-                except Exception as e:
-                    issue_folder = ""
-                yield dict(
-                    item_type="issue",
-                    item_pid=issue_id,
-                    data=data["issue"],
-                    issue_folder=issue_folder,
-                    article_filename=None,
-                    processing_date=classic_ws_issue.isis_updated_date,
-                )
-            except Exception as e:
-                errors.append(f"{e} {issue_id} {data['issue']}")
-                continue
-
-        if not data["article"]:
-            continue
-
-        # instancia Document com os dados de issue e article
-        classic_ws_doc = classic_ws.Document(data)
-        if not classic_ws_doc.scielo_pid_v2:
-            # raise ValueError(f"{classic_ws_issue.pid} and {item_pid} do not match")
-            # detail = {"error": "unmatched issue_pid and item_pid"}
-            # detail.update(info)
-            # operation.finish(user, completed=False, detail=detail)
-            continue
-
-        # se houver bases-work/p/<pid>, obtém os registros de parágrafo
-        ign_pid, p_records = classic_website.get_p_records(doc_id)
-        p_records = list(p_records)
-        if p_records:
-            # adiciona registros p aos registros do artigo
-            # info["external_p_records_count"] = len(p_records)
-            yield dict(
-                item_type="paragraph",
-                item_pid=doc_id,
-                data=p_records,
-                issue_folder="",
-                processing_date=classic_ws_doc.processing_date,
-            )
-
-        yield dict(
-            item_type="article",
-            item_pid=doc_id,
-            data=data["article"],
-            issue_folder="",
-            article_filename=classic_ws_doc.filename_without_extension,
-            article_filetype=classic_ws_doc.file_type,
-            processing_date=classic_ws_doc.processing_date,
-        )
-    event.finish(user, completed=True, detail={"errors": errors})
-
-
 def get_bases_work_acron_id_file_records(user, source_path, classic_website, journal_proc):
     try:
         event = None
@@ -1077,12 +1006,10 @@ def get_bases_work_acron_id_file_records(user, source_path, classic_website, jou
                 issue_id = item.get("issue_id")
                 doc_id = item.get("doc_id")
                 if doc_id:
-                    # se houver bases-work/p/<pid>, obtém os registros de parágrafo
-                    ign_pid, p_records = classic_website.get_p_records(doc_id)
                     yield dict(
                         item_type="article",
                         item_pid=doc_id,
-                        data=item["doc_data"] + list(p_records),
+                        data=item["doc_data"],
                     )
 
                 elif issue_id:
@@ -1090,6 +1017,18 @@ def get_bases_work_acron_id_file_records(user, source_path, classic_website, jou
                         item_type="issue",
                         item_pid=issue_id,
                         data=item["issue_data"],
+                    )
+
+                # se houver bases-work/p/<pid>, obtém os registros de parágrafo
+                ign_pid, p_records = classic_website.get_p_records(doc_id)
+                p_records = list(p_records)
+                if p_records:
+                    # adiciona registros p aos registros do artigo
+                    # info["external_p_records_count"] = len(p_records)
+                    yield dict(
+                        item_type="paragraph",
+                        item_pid=doc_id,
+                        data=p_records,
                     )
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
