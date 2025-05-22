@@ -95,6 +95,9 @@ django_makemigrations: ## Run makemigrations from django container using $(compo
 django_migrate: ## Run migrate from django container using $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py migrate
 
+django_migrate_fresh_migrations: ## Run makemigrations and migrate from django container using $(compose)
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django bash -c 'python manage.py makemigrations && python manage.py migrate'
+
 django_makemessages: ## Run ./manage.py makemessages $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py makemessages --all
 
