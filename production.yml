@@ -1,8 +1,6 @@
-version: '3'
-
 services:
   django: &django
-    image: infrascielo/upload
+    image: infrascielo/upload:${SCMS_WEBAPP_VERSION}
     container_name: upload_production_django
     platform: linux/x86_64
     depends_on:
