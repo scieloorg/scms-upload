@@ -1018,7 +1018,8 @@ def get_bases_work_acron_id_file_records(user, source_path, classic_website, jou
                         item_pid=issue_id,
                         data=item["issue_data"],
                     )
-
+                if not doc_id:
+                    continue
                 # se houver bases-work/p/<pid>, obtém os registros de parágrafo
                 ign_pid, p_records = classic_website.get_p_records(doc_id)
                 p_records = list(p_records)
