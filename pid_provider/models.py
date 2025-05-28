@@ -26,16 +26,13 @@ LOGGER = logging.getLogger(__name__)
 LOGGER_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
-class XMLVersionXmlWithPreError(Exception):
-    ...
+class XMLVersionXmlWithPreError(Exception): ...
 
 
-class XMLVersionLatestError(Exception):
-    ...
+class XMLVersionLatestError(Exception): ...
 
 
-class XMLVersionGetError(Exception):
-    ...
+class XMLVersionGetError(Exception): ...
 
 
 def utcnow():
