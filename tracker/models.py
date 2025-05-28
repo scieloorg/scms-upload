@@ -50,6 +50,35 @@ def format_traceback(exc_traceback):
     return traceback.format_tb(exc_traceback)
 
 
+class BaseEvent(models.Model):
+    name = models.CharField(_("name"), max_length=200)
+    detail = models.JSONField(null=True, blank=True)
+    created = models.DateTimeField(verbose_name=_("Creation date"), auto_now_add=True)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def data(self):
+        return {
+            "name": self.name,
+            "detail": self.detail,
+            "created": self.created.isoformat(),
+        }
+
+    @classmethod
+    def create(
+        cls,
+        name=None,
+        detail=None,
+    ):
+        obj = cls()
+        obj.detail = detail
+        obj.name = name
+        obj.save()
+        return obj
+
+
 class UnexpectedEvent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created = models.DateTimeField(verbose_name=_("Creation date"), auto_now_add=True)

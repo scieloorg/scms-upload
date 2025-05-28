@@ -6,17 +6,17 @@ from unittest.mock import ANY, MagicMock, Mock, call, patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from lxml import etree
-from packtools.sps.pid_provider.xml_sps_adapter import PidProviderXMLAdapter
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
+from xmlsps.xml_sps_lib import XMLWithPre
 
 from pid_provider import exceptions, models
+from pid_provider.xml_sps_adapter import PidProviderXMLAdapter
 
 User = get_user_model()
 
 
 def _get_xml_adapter_from_file(path):
-    for item in XMLWithPre.create(path=path):
-        obj = PidProviderXMLAdapter(item)
+    for xml_with_pre in XMLWithPre.create(path=path):
+        obj = PidProviderXMLAdapter(xml_with_pre)
         return obj
 
 
@@ -57,29 +57,13 @@ def _get_xml_adapter_with_issue_data():
     xml_adapter.aop_pid = "12345678901234567890aop"
 
     xml_adapter.main_doi = "data-main_doi"
-    xml_adapter.main_toc_section = "data-main_toc_section"
     xml_adapter.elocation_id = "data-elocation_id"
-    return xml_adapter
-
-
-def _create_xml_adapter__aop():
-    xml_adapter = _get_xml_adapter()
-    xml_adapter.journal_issn_electronic = "data-issn-e"
-    xml_adapter.journal_issn_print = "data-issn-p"
-    xml_adapter.issue = None
-    xml_adapter.article_pub_year = "data-pub-year"
-    xml_adapter.v3 = "123456789012345678901v3"
-    xml_adapter.v2 = "123456789012345678901v2"
-    xml_adapter.aop_pid = "12345678901234567890aop"
-    xml_adapter.main_doi = "data-main_doi"
-    xml_adapter.main_toc_section = "data-main_toc_section"
     return xml_adapter
 
 
 class PidProviderXMLValidateQueryParamsTest(TestCase):
     def setUp(self):
         self.article_params = {
-            "z_article_titles_texts": "TITLES",
             "z_collab": "VALUE",
             "z_links": "Links",
             "z_partial_body": "Body",
@@ -221,7 +205,7 @@ class PidProviderXMLValidateQueryParamsTest(TestCase):
 
 
 @patch(
-    "packtools.sps.pid_provider.xml_sps_adapter.PidProviderXMLAdapter.query_list",
+    "pid_provider.xml_sps_adapter.PidProviderXMLAdapter.query_list",
     new_callable=mock.PropertyMock,
 )
 @patch(
@@ -366,7 +350,6 @@ class PidProviderXMLGetRegisteredTest(TestCase):
             "created": "2023-02-20T00:00:00",
             "updated": "2023-02-20T00:00:00",
             "record_status": "updated",
-            "synchronized": False,
         }
         self.assertDictEqual(expected, result)
 
@@ -412,6 +395,8 @@ class PidProviderXMLEvaluateRegistrationTest(TestCase):
         registered = Mock(spec=models.PidProviderXML)
         registered.is_aop = True
 
+        self.xml_adapter.is_aop = True
+
         result = models.PidProviderXML.evaluate_registration(
             self.xml_adapter, registered
         )
@@ -421,9 +406,7 @@ class PidProviderXMLEvaluateRegistrationTest(TestCase):
         registered = Mock(spec=models.PidProviderXML)
         registered.is_aop = True
 
-        self.xml_adapter = _get_xml_adapter_from_file(
-            "./pid_provider/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
-        )
+        self.xml_adapter.is_aop = False
 
         result = models.PidProviderXML.evaluate_registration(
             self.xml_adapter, registered
@@ -433,6 +416,8 @@ class PidProviderXMLEvaluateRegistrationTest(TestCase):
     def test_evaluate_registration_raises_error(self):
         registered = Mock(spec=models.PidProviderXML)
         registered.is_aop = False
+
+        self.xml_adapter.is_aop = True
 
         with self.assertRaises(exceptions.ForbiddenPidProviderXMLRegistrationError):
             result = models.PidProviderXML.evaluate_registration(
@@ -658,51 +643,98 @@ class PidProviderXMLAddPidV3Test(TestCase):
         self.assertEqual("xml456789012345678901v3", xml_adapter.v3)
 
 
-@patch(
-    "pid_provider.models.PidProviderXML.current_version",
-    new_callable=mock.PropertyMock,
-)
 class PidProviderXMLIsEqualToTest(TestCase):
-    def test_is_equal_to_returns_false(self, mock_last_version):
+    def test_is_equal_to_returns_false(self):
+        xml_adapter = _get_xml_adapter_from_file(
+            "./pid_provider/fixtures/article/ex-aop.xml"
+        )
         registered = models.PidProviderXML()
-
-        xml_adapter = _get_xml_adapter()
 
         result = registered.is_equal_to(xml_adapter)
         self.assertFalse(result)
 
-    def test_is_equal_to_returns_true(self, mock_last_version):
-        version = Mock(spec=models.XMLVersion)
-        version.finger_print = (
-            "fc676757308ad196fd4cebdbc6d7c1f135a68f6ed0c5d3af5f04075664ef6bb3"
-        )
 
-        mock_last_version.return_value = version
-
+class PidProviderXMLAddDataForRegularArticleTest(TestCase):
+    def setUp(self):
+        user = User()
         xml_adapter = _get_xml_adapter_from_file(
-            "./pid_provider/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+            "./pid_provider/fixtures/article/ex-aop.xml"
         )
-        print(xml_adapter.finger_print)
+        self.registered = models.PidProviderXML()
+        self.registered._add_data(xml_adapter, user)
 
-        registered = models.PidProviderXML()
-        result = registered.is_equal_to(xml_adapter)
-        self.assertTrue(result)
+    def test_v3(self):
+        self.assertEqual("yH6CLqxFJsQKrHj7zXkwL3G", self.registered.v3)
+
+    def test_v2(self):
+        self.assertEqual("S1413-41522020000400627", self.registered.v2)
+
+    def test_aop_pid(self):
+        self.assertEqual("S1413-41522020005000111", self.registered.aop_pid)
+
+    def test_main_doi(self):
+        self.assertEqual("10.1590/S1413-4152202020180029", self.registered.main_doi)
+
+    def test_fpage(self):
+        self.assertEqual("627", self.registered.fpage)
+
+    def test_fpage_seq(self):
+        self.assertEqual(None, self.registered.fpage_seq)
+
+    def test_lpage(self):
+        self.assertEqual("634", self.registered.lpage)
+
+    def test_elocation_id(self):
+        self.assertEqual(None, self.registered.elocation_id)
+
+    def test_article_pub_year(self):
+        self.assertEqual("2020", self.registered.article_pub_year)
+
+    def test_z_surnames(self):
+        self.assertEqual(
+            "544700df348a47fdd7c55713054e12663a0c530e60e7a166395a496f77de9d36",
+            self.registered.z_surnames,
+        )
+
+    def test_z_collab(self):
+        self.assertIsNone(self.registered.z_collab)
+
+    def test_z_links(self):
+        self.assertIsNone(self.registered.z_links)
+
+    def test_z_partial_body(self):
+        self.assertEqual(
+            "2e07675bfe91c65e1544ada450ff2e956fef9b492d30e997ebd47687e0f7afa2",
+            self.registered.z_partial_body,
+        )
 
 
 @patch(
     "pid_provider.models.utcnow",
     side_effect=[datetime(2020, 2, 2, 0, 0), datetime(2020, 2, 3, 0, 0)],
 )
+@patch("pid_provider.models.XMLVersion.save_file")
+@patch("pid_provider.models.XMLVersion.save")
+@patch("pid_provider.models.XMLIssue.save")
+@patch("pid_provider.models.XMLJournal.save")
+@patch("pid_provider.models.PidProviderXML.save")
 @patch("pid_provider.models.PidRequest.save")
 class PidProviderXMLRegisterTest(TestCase):
-    def test_register_register_bad_provide_and_returns_error(
+    def test_register_returns_error(
         self,
-        mock_pid_provide_save,
+        mock_pid_request_save,
+        mock_pid_provider_xml_save,
+        mock_xml_journal_save,
+        mock_xml_issue_save,
+        mock_xml_version_save,
+        mock_xml_version_save_file,
         mock_now,
     ):
         expected = {
             "result_type": "<class 'pid_provider.exceptions.NotEnoughParametersToGetDocumentRecordError'>",
-            "result_msg": "No attribute enough for disambiguations {'z_surnames': None, 'z_collab': None, 'main_doi': None, 'z_links': None, 'z_partial_body': None, 'pkg_name': None, 'elocation_id': None, 'journal__issn_print': None, 'journal__issn_electronic': None, 'article_pub_year': None, 'z_article_titles_texts': None}",
+            "result_message": "No attribute enough for disambiguations {'z_surnames': None, 'z_collab': None, 'main_doi': None, 'z_links': None, 'z_partial_body': None, 'pkg_name': None, 'elocation_id': None, 'journal__issn_print': None, 'journal__issn_electronic': None, 'article_pub_year': None}",
+            "origin": "filename.xml",
+            "xml": "<article/>",
         }
 
         user = User()
@@ -711,136 +743,62 @@ class PidProviderXMLRegisterTest(TestCase):
             xml_with_pre=xml_with_pre,
             filename="filename.xml",
             user=user,
-            is_published=False,
-            synchronized=None,
         )
+        print(result)
         self.assertEqual(expected["result_type"], result["result_type"])
         self.assertIsNotNone(result["result_msg"])
+        # self.assertEqual(expected["result_message"], result["result_msg"])
+        self.assertEqual(expected["origin"], result["origin"])
+        self.assertEqual(expected["xml"], result["detail"]["xml"])
+        mock_pid_provider_xml_save.assert_not_called()
+        mock_pid_request_save.assert_called_once_with()
 
-    @patch("pid_provider.models.PidProviderXML._is_registered_pid")
-    @patch("pid_provider.models.PidProviderXML.objects.get")
-    @patch("pid_provider.models.PidProviderXML.save")
-    @patch("pid_provider.models.SyncFailure.create")
-    @patch("pid_provider.models.XMLSPS.save")
-    @patch("pid_provider.models.XMLVersion.save")
-    @patch("pid_provider.models.XMLIssue.save")
-    @patch("pid_provider.models.XMLJournal.save")
-    def test_register_for_xml_zip_was_unable_to_get_pid_from_core(
+
+@patch(
+    "pid_provider.models.utcnow",
+    side_effect=[datetime(2020, 2, 2, 0, 0), datetime(2020, 2, 3, 0, 0)],
+)
+@patch("pid_provider.models.XMLSPS.save")
+@patch("pid_provider.models.XMLVersion.save_file")
+@patch("pid_provider.models.XMLVersion.save")
+@patch("pid_provider.models.XMLIssue.save")
+@patch("pid_provider.models.XMLJournal.save")
+@patch("pid_provider.models.PidProviderXML.save")
+@patch("pid_provider.models.PidRequest.save")
+class PidProviderXMLRegisterTest(TestCase):
+    def test_register_with_success(
         self,
+        mock_pid_request_save,
+        mock_pid_provider_xml_save,
         mock_xml_journal_save,
         mock_xml_issue_save,
         mock_xml_version_save,
+        mock_xml_version_save_file,
         mock_xml_sps_save,
-        mock_sync_failure_create,
-        mock_pid_provider_xml_save,
-        mock_pid_provider_xml_objects_get,
-        mock_is_registered_pid,
-        mock_pid_provider_bad_req_save,
         mock_now,
     ):
-        # instancia os dublês
-        mock_pid_provider_xml_objects_get.return_value = None
-        mock_sync_failure_create.return_value = models.SyncFailure()
-        mock_is_registered_pid.return_value = None
+        expected = {
+            "result_type": "<class 'pid_provider.exceptions.NotEnoughParametersToGetDocumentRecordError'>",
+            "result_message": "No attribute enough for disambiguations {'z_surnames': None, 'z_collab': None, 'main_doi': None, 'z_links': None, 'z_partial_body': None, 'pkg_name': None, 'elocation_id': None, 'journal__issn_print': None, 'journal__issn_electronic': None, 'article_pub_year': None}",
+            "origin": "filename.xml",
+            "xml": "<article/>",
+        }
 
-        items = XMLWithPre.create(
-            path="./pid_provider/fixtures/sub-article/2236-8906-hoehnea-49-e1082020.xml"
+        user = User()
+        xml_adapter = _get_xml_adapter_from_file(
+            "./pid_provider/fixtures/article/ex-aop.xml"
         )
-        items = list(items)
-        user = User.objects.first()
-
         result = models.PidProviderXML.register(
-            xml_with_pre=items[0],
-            filename="filename.xml",
+            xml_with_pre=xml_adapter.xml_with_pre,
+            filename="ex-aop.xml",
             user=user,
-            is_published=False,
-            synchronized=None,
-            error_type="error_type",
-            error_msg="error_msg",
-            traceback="traceback",
         )
-
-        result = list(result)
-        mock_sync_failure_create.assert_called_once_with(
-            "error_msg",
-            "error_type",
-            "traceback",
-            user,
-        )
-
-
-@patch("pid_provider.models.PidProviderXML.is_equal_to")
-@patch("pid_provider.models.PidProviderXML._query_document")
-class PidProviderGetRegistrationDemandTest(TestCase):
-    def test_check_registration_demand_requires_none(
-        self,
-        mock_query_document,
-        mock_is_equal_to,
-    ):
-        mock_is_equal_to.return_value = True
-        registered = MagicMock(models.PidProviderXML)
-        registered.synchronized = True
-        mock_query_document.return_value = registered
-        demand = models.PidProviderXML.check_registration_demand(ANY)
-
-        self.assertIsNotNone(demand["registered"])
-        self.assertFalse(demand["required_remote_registration"])
-        self.assertFalse(demand["required_local_registration"])
-
-    def test_check_registration_demand_local_and_remote_required_for_new_record(
-        self,
-        mock_query_document,
-        mock_is_equal_to,
-    ):
-        mock_is_equal_to.return_value = False
-        mock_query_document.return_value = None
-        demand = models.PidProviderXML.check_registration_demand(ANY)
-
-        self.assertDictEqual({}, demand["registered"])
-        self.assertTrue(demand["required_remote_registration"])
-        self.assertTrue(demand["required_local_registration"])
-
-    def test_check_registration_demand_error(
-        self,
-        mock_query_document,
-        mock_is_equal_to,
-    ):
-        mock_query_document.side_effect = (
-            exceptions.NotEnoughParametersToGetDocumentRecordError(
-                "NotEnoughParametersToGetDocumentRecordError"
-            )
-        )
-        demand = models.PidProviderXML.check_registration_demand(ANY)
-
-        self.assertIsNotNone(demand["error_type"])
-        self.assertIsNotNone(demand["error_msg"])
-
-    def test_check_registration_demand_local_and_remote_required_for_registered_record(
-        self,
-        mock_query_document,
-        mock_is_equal_to,
-    ):
-        mock_is_equal_to.return_value = True
-        registered = MagicMock(models.PidProviderXML)
-        registered.synchronized = False
-        mock_query_document.return_value = registered
-        demand = models.PidProviderXML.check_registration_demand(ANY)
-
-        self.assertIsNotNone(demand["registered"])
-        self.assertTrue(demand["required_remote_registration"])
-        self.assertTrue(demand["required_local_registration"])
-
-    def test_check_registration_demand_local_and_remote_required_for_updating_record(
-        self,
-        mock_query_document,
-        mock_is_equal_to,
-    ):
-        mock_is_equal_to.return_value = False
-        registered = MagicMock(models.PidProviderXML)
-        registered.synchronized = False
-        mock_query_document.return_value = registered
-        demand = models.PidProviderXML.check_registration_demand(ANY)
-
-        self.assertIsNotNone(demand["registered"])
-        self.assertTrue(demand["required_remote_registration"])
-        self.assertTrue(demand["required_local_registration"])
+        self.assertEqual("yH6CLqxFJsQKrHj7zXkwL3G", result["v3"])
+        self.assertEqual("S1413-41522020000400627", result["v2"])
+        self.assertEqual("S1413-41522020005000111", result["aop_pid"])
+        self.assertEqual("1809-4457-esa-25-04-627", result["pkg_name"])
+        self.assertEqual(False, result["xml_changed"])
+        self.assertEqual("created", result["record_status"])
+        self.assertIsNone(result["updated"])
+        self.assertIsNotNone(result["created"])
+        mock_pid_request_save.assert_not_called()
