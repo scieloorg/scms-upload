@@ -34,11 +34,13 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         null=True,
         unique=True,
     )
+    completed = models.BooleanField(default=False)
     published_by = models.CharField(
         _("published by"), max_length=30, null=True, blank=True)
     publication_rule = models.CharField(
         _("publication rule"), max_length=10, null=True, blank=True)
     panels = [
+        FieldPanel("completed", read_only=True),
         FieldPanel("publication_rule"),
         FieldPanel("published_by"),
         InlinePanel("scielo_url", label="URLs", classname="collapsible"),
@@ -102,19 +104,28 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
 
     def create_or_update_urls(self, user, website_url, timeout=None):
         for url in self.article.get_urls(website_url):
-            ScieloURLStatus.create_or_update(
+            item = ScieloURLStatus.create_or_update(
                 user=user,
                 article=self.article,
                 url=url,
                 timeout=timeout,
             )
+        self.check_is_completed()
 
-    def retry(self, user, website_url, timeout=None):
-        ScieloURLStatus.retry(
-            user=user,
-            article=self.article,
-            timeout=timeout,
-        )
+    def retry(self, user, timeout=None, force_update=None):
+        for scielo_url_status in self.scielo_url.all():
+            if not scielo_url_status.available or force_update:
+                scielo_url_status.update(
+                    user=user,
+                    timeout=timeout,
+                )
+        self.check_is_completed()
+
+    def check_is_completed(self):
+        completed = not self.scielo_url.filter(available=False).exists()
+        if self.completed != completed:
+            self.completed = completed
+            self.save()
 
 
 class ScieloURLStatus(CommonControlField, Orderable):
@@ -179,16 +190,6 @@ class ScieloURLStatus(CommonControlField, Orderable):
         self.available = check_url(self.url, timeout)
         self.updated_by = user
         self.save()
-
-    @classmethod
-    def retry(
-        cls,
-        user,
-        article,
-        timeout=None,
-    ):
-        for item in cls.objects.filter(available=False, article_availability__article=article):
-            cls.create_or_update(user, article, item.url, timeout)
 
 
 def upload_path_for_verification_files(instance, filename):

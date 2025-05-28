@@ -5,7 +5,10 @@ from django.db.models import Q
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from pid_provider.base_pid_provider import BasePidProvider
-from pid_provider.client import PidProviderAPIClient
+from pid_provider.client import (
+    PidProviderAPIClient,
+    IncorrectPidV2RegisteredInCoreException,
+)
 from pid_provider.models import FixPidV2, PidProviderXML
 from tracker.models import UnexpectedEvent
 
@@ -182,9 +185,29 @@ class PidRequester(BasePidProvider):
                     f"Unable to execute core registration for xml_with_pre without v3"
                 )
 
-            response = self.pid_provider_api.provide_pid(
-                xml_with_pre, xml_with_pre.filename, created=registered.get("created")
-            )
+            try:
+                response = self.pid_provider_api.provide_pid(
+                    xml_with_pre,
+                    xml_with_pre.filename,
+                    created=registered.get("created"),
+                )
+            except IncorrectPidV2RegisteredInCoreException as e:
+                # conserta valor de pid v2 no core
+                fix_pid_v2_response = self.pid_provider_api.fix_pid_v2(
+                    xml_with_pre.v3, xml_with_pre.v2
+                )
+                if not fix_pid_v2_response or not fix_pid_v2_response.get(
+                    "fixed_in_core"
+                ):
+                    raise IncorrectPidV2RegisteredInCoreException(
+                        f"Unable to fix pid v2 {e}: fix_pid_v2_response={fix_pid_v2_response}"
+                    )
+                # tenta novamente registrar pid no core
+                response = self.pid_provider_api.provide_pid(
+                    xml_with_pre,
+                    xml_with_pre.filename,
+                    created=registered.get("created"),
+                )
 
             response = response or {}
             registered.update(response)

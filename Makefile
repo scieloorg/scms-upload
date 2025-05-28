@@ -4,6 +4,13 @@ export SCMS_BUILD_DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 export SCMS_VCS_REF=$(strip $(shell git rev-parse --short HEAD))
 export SCMS_WEBAPP_VERSION=$(strip $(shell cat VERSION))
 
+# This check if docker compose version
+ifneq ($(shell docker compose version 2>/dev/null),)
+  DOCKER_COMPOSE=docker compose
+else
+  DOCKER_COMPOSE=docker-compose
+endif
+
 help: ## Show this help
 	@echo 'Usage: make [target] [argument] ...'
 	@echo ''
@@ -32,72 +39,82 @@ build_date: ## Show build date
 ############################################
 
 build:  ## Build app using $(compose)
-	@docker-compose -f $(compose) build
+	$(DOCKER_COMPOSE) -f $(compose) build
 
 build_no_cache:  ## Build app using $(compose) --no-cache
-	@docker-compose -f $(compose) build --no-cache
+	$(DOCKER_COMPOSE) -f $(compose) build --no-cache
 
 up:  ## Start app using $(compose)
-	@docker-compose -f $(compose) up -d
+	$(DOCKER_COMPOSE) -f $(compose) up -d
 
 logs: ## See all app logs using $(compose)
-	@docker-compose -f $(compose) logs -f
+	$(DOCKER_COMPOSE) -f $(compose) logs -f
 
 stop:  ## Stop all app using $(compose)
-	@docker-compose -f $(compose) stop
+	$(DOCKER_COMPOSE) -f $(compose) stop
 
 restart:
-	@docker-compose -f $(compose) restart
+	$(DOCKER_COMPOSE) -f $(compose) restart
 ps:  ## See all containers using $(compose)
-	@docker-compose -f $(compose) ps
+	$(DOCKER_COMPOSE) -f $(compose) ps
 
 rm:  ## Remove all containers using $(compose)
-	@docker-compose -f $(compose) rm -f
+	$(DOCKER_COMPOSE) -f $(compose) rm -f
 
 django_shell:  ## Open python terminal from django $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py shell
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py shell
 
 wagtail_sync: ## Wagtail sync Page fields (repeat every time you add a new language and to update the wagtailcore_page translations) $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py sync_page_translation_fields
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py sync_page_translation_fields
 
 wagtail_update_translation_field: ## Wagtail update translation fields, user this command first $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py update_translation_fields
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py update_translation_fields
 
 django_createsuperuser: ## Create a super user from django $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py createsuperuser
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py createsuperuser
 
 django_bash: ## Open a bash terminar from django container using $(compose)
-	@docker-compose -f $(compose) run --rm django bash
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django bash
 
 django_test: ## Run tests from django container using $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py test
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py test
 
 django_fast: ## Run tests fast from django container using $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py test --failfast
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py test --failfast
 
 django_makemigrations: ## Run makemigrations from django container using $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py makemigrations
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py makemigrations
 
 django_migrate: ## Run migrate from django container using $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py migrate
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py migrate
 
 django_makemessages: ## Run ./manage.py makemessages $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py makemessages --all
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py makemessages --all
 
 django_compilemessages: ## Run ./manage.py compilemessages $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py compilemessages 
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py compilemessages 
 
 django_dump_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py dumpdata auth --indent=2  --output=fixtures/auth.json
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py dumpdata auth --indent=2  --output=fixtures/auth.json
 
 django_load_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
-	@docker-compose -f $(compose) run --rm django python manage.py loaddata --database=default fixtures/auth.json
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py loaddata --database=default fixtures/auth.json
 
+dump_data: BACKUP_FILE = dump_`date +%d-%m-%Y"_"%H_%M_%S`.sql
 dump_data: ## Dump database into .sql $(compose)
-	docker exec -t upload_local_postgres pg_dumpall -c -U debug > dump_`date +%d-%m-%Y"_"%H_%M_%S`.sql
+	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'pg_dumpall -c -U $$POSTGRES_USER -f /backups/"$(BACKUP_FILE)"'
+	@echo "Database dump complete at $(BACKUP_FILE)"
 
+restore_data: RESTORE_FILE = $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 restore_data: ## Restore database into from latest.sql file $(compose)
-	cat backup/latest.sql | docker exec -i upload_local_postgres psql -U debug
+	@echo "Restoring Postgres data ..."
+	@if [ -z "$(RESTORE_FILE)" ]; then \
+		echo "File to restore not defined. Use: make restore_data compose=$(compose) <dump file name>.sql"; \
+		exit 1; \
+	fi; \
+	echo "Restoring data from $(RESTORE_FILE) ..."; \
+	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'psql -U $$POSTGRES_USER -f /backups/"$(RESTORE_FILE)" $$POSTGRES_DB';
+	@echo "Restore data from $(RESTORE_FILE) complete!"
 
 ############################################
 ## Atalhos Úteis                          ##
@@ -119,7 +136,7 @@ clean_project_images:  ## Remove all images with "upload" on name
 	@docker rmi -f $$(docker images --filter=reference='*upload*' -q)
 
 volume_down:  ## Remove all volume
-	@docker-compose -f $(compose) down -v
+	$(DOCKER_COMPOSE) -f $(compose) down -v
 
 clean_celery_logs:
 	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' scielo_core_local_celeryworker)

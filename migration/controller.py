@@ -53,48 +53,32 @@ def create_or_update_journal(
     """
     Create/update OfficialJournal, JournalProc e Journal
     """
-    if not tracker_choices.allowed_to_run(journal_proc.migration_status, force_update):
-        journal_proc_event = journal_proc.start(user, "create_or_update_journal")
+    params = {}
+    try:
+        journal_proc_event = journal_proc.start(
+            user, "create_or_update_journal"
+        )
+        collection = journal_proc.collection
+        journal_data = journal_proc.migrated_data.data
+
+        # obtém classic website journal
+        classic_website_journal = classic_ws.Journal(journal_data)
+
+        year, month, day = parse_yyyymmdd(classic_website_journal.first_year)
+    except Exception as e:
+        logging.exception(f"Exception: create_or_update_journal: 1: {e}")
+        exc_type, exc_value, exc_traceback = sys.exc_info()
         journal_proc_event.finish(
             user,
-            completed=True,
-            detail={
-                "skip": True,
-                "force_update": force_update,
-                "migration_status": journal_proc.migration_status,
-            },
+            completed=False,
+            exception=e,
+            exc_traceback=exc_traceback,
         )
-        return journal_proc.journal
+        raise e
 
-    journal_proc_event = journal_proc.start(
-        user, "create_or_update_journal"
-    )
-    collection = journal_proc.collection
-    journal_data = journal_proc.migrated_data.data
-
-    # obtém classic website journal
-    classic_website_journal = classic_ws.Journal(journal_data)
-
-    year, month, day = parse_yyyymmdd(classic_website_journal.first_year)
     try:
         eissn = classic_website_journal.electronic_issn
         pissn = classic_website_journal.print_issn
-        if not eissn and not pissn:
-            issn = classic_website_journal.get_field_content(
-                "v935", subfields={"_": "issn"}, single=True, simple=True
-            )
-            issn_type = classic_website_journal.get_field_content(
-                "v035", subfields={"_": "issn_type"}, single=True, simple=True
-            )
-            if issn and issn_type:
-                if issn_type["issn_type"] == "PRINT":
-                    pissn = issn["issn"]
-                elif issn_type["issn_type"] == "ONLIN":
-                    eissn = issn["issn"]
-
-        if not eissn and not pissn:
-            raise ValueError(f"Missing ISSN for {journal_data}")
-
         params = dict(
             issn_electronic=eissn,
             issn_print=pissn,
@@ -102,6 +86,8 @@ def create_or_update_journal(
             title_iso=classic_website_journal.title_iso,
             foundation_year=year,
         )
+        if not eissn and not pissn:
+            raise ValueError(f"Before migrating, use Title Manager or SciELO Manager to complete print ISSN and/or electronic ISSN for {classic_website_journal.title}")
         official_journal = OfficialJournal.create_or_update(user=user, **params)
         official_journal.add_related_journal(
             classic_website_journal.previous_title,
@@ -109,6 +95,7 @@ def create_or_update_journal(
         )
 
     except Exception as e:
+        logging.exception(f"Exception: create_or_update_journal: 2: {e}")
         exc_type, exc_value, exc_traceback = sys.exc_info()
         params["event"] = "OfficialJournal.create_or_update"
         journal_proc_event.finish(
@@ -148,6 +135,8 @@ def create_or_update_journal(
         journal.save()
 
     except Exception as e:
+        logging.info(len(journal.contact_address))
+        logging.exception(f"Exception: create_or_update_journal: 3: {e}")
         exc_type, exc_value, exc_traceback = sys.exc_info()
         params["event"] = "Journal.create_or_update"
         journal_proc_event.finish(
@@ -173,6 +162,7 @@ def create_or_update_journal(
                     Mission.create_or_update(user, journal, language, "\n".join(text))
                 )
     except Exception as e:
+        logging.exception(f"Exception: create_or_update_journal: 4: {e}")
         exc_type, exc_value, exc_traceback = sys.exc_info()
         journal_proc_event.finish(
             user,
@@ -187,6 +177,7 @@ def create_or_update_journal(
         for code in classic_website_journal.subject_areas:
             journal.subject.add(Subject.create_or_update(user, code))
     except Exception as e:
+        logging.exception(f"Exception: create_or_update_journal: 5: {e}")
         exc_type, exc_value, exc_traceback = sys.exc_info()
         journal_proc_event.finish(
             user,
@@ -211,6 +202,7 @@ def create_or_update_journal(
             journal.owner.add(Owner.create_or_update(user, journal, institution))
             journal.publisher.add(Publisher.create_or_update(user, journal, institution))
     except Exception as e:
+        logging.exception(f"Exception: create_or_update_journal: 6: {e}")
         exc_type, exc_value, exc_traceback = sys.exc_info()
         journal_proc_event.finish(
             user,
@@ -225,6 +217,7 @@ def create_or_update_journal(
         jc = JournalCollection.create_or_update(user, collection, journal)
         create_journal_history(user, jc, classic_website_journal)
     except Exception as e:
+        logging.exception(f"Exception: create_or_update_journal: 7: {e}")
         exc_type, exc_value, exc_traceback = sys.exc_info()
         journal_proc_event.finish(
             user,
@@ -251,6 +244,7 @@ def create_or_update_journal(
         journal_proc_event.finish(user, completed=True, detail=params)
 
     except Exception as e:
+        logging.exception(f"Exception: create_or_update_journal: 8: {e}")
         exc_type, exc_value, exc_traceback = sys.exc_info()
         params["event"] = "journal_proc.update"
         journal_proc_event.finish(
@@ -301,8 +295,6 @@ def create_or_update_issue(
     """
     Create/update Issue
     """
-    if not tracker_choices.allowed_to_run(issue_proc.migration_status, force_update):
-        return issue_proc.issue
     classic_website_issue = classic_ws.Issue(issue_proc.migrated_data.data)
 
     try:
@@ -378,9 +370,6 @@ def create_or_update_article(
     """
     Create/update Issue
     """
-    if not tracker_choices.allowed_to_run(article_proc.migration_status, force_update):
-        return article_proc.article
-
     article = Article.create_or_update(
         user,
         article_proc.sps_pkg,
@@ -413,6 +402,7 @@ def get_classic_website(collection_acron):
             cisis_path=None,
             title_path=config.title_path,
             issue_path=config.issue_path,
+            alternative_paths=config.alternative_htdocs_img_revistas_path,
         )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -947,13 +937,15 @@ def register_acron_id_file_content(
                 changed = 0
 
                 logging.info(f"Reading {source_path}")
-                for item in read_bases_work_acron_id_file(
+                # replaced for item in read_bases_work_acron_id_file(
+                for item in get_bases_work_acron_id_file_records(
                     user,
                     source_path,
                     classic_website,
                     journal_proc,
                 ):
                     item["force_update"] = force_update
+                    item["todo"] = True
                     rec = IdFileRecord.create_or_update(
                         user,
                         journal_id_file,
@@ -989,6 +981,12 @@ def register_acron_id_file_content(
             )
             return
         exc_type, exc_value, exc_traceback = sys.exc_info()
+        logging.error(f"journal_proc: {journal_proc} {type(e)} {e}")
+        if operation:
+            operation.finish(
+                user, completed=False, exception=e, exc_traceback=exc_traceback, detail=detail
+            )
+            return
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
@@ -1004,76 +1002,62 @@ def register_acron_id_file_content(
         )
 
 
-def read_bases_work_acron_id_file(user, source_path, classic_website, journal_proc):
-    event = journal_proc.start(user, "read_bases_work_acron_id_file")
 
-    errors = []
-    data = {}
-    classic_ws_issue = None
-    classic_ws_doc = None
-    for item in get_doc_records(source_path):
-        issue_id = item.get("issue_id")
-        data["issue"] = item.get("issue_data")
- 
-        doc_id = item.get("doc_id")
-        data["article"] = item.get("doc_data")
-
-        if data["issue"] and issue_id:
+def get_bases_work_acron_id_file_records(user, source_path, classic_website, journal_proc):
+    try:
+        event = None
+        event = journal_proc.start(user, "get_bases_work_acron_id_file_records")
+        for item in get_doc_records(source_path):
             try:
-                classic_ws_issue = classic_ws.Issue(data["issue"])
+                issue_id = item.get("issue_id")
+                doc_id = item.get("doc_id")
+                if doc_id:
+                    yield dict(
+                        item_type="article",
+                        item_pid=doc_id,
+                        data=item["doc_data"],
+                    )
 
-                try:
-                    issue_folder = classic_ws_issue.issue_label
-                except Exception as e:
-                    issue_folder = ""
-                yield dict(
-                    item_type="issue",
-                    item_pid=issue_id,
-                    data=data["issue"],
-                    issue_folder=issue_folder,
-                    article_filename=None,
-                    processing_date=classic_ws_issue.isis_updated_date,
-                )
+                elif issue_id:
+                    yield dict(
+                        item_type="issue",
+                        item_pid=issue_id,
+                        data=item["issue_data"],
+                    )
+
+                # se houver bases-work/p/<pid>, obtém os registros de parágrafo
+                ign_pid, p_records = classic_website.get_p_records(doc_id)
+                p_records = list(p_records)
+                if p_records:
+                    # adiciona registros p aos registros do artigo
+                    # info["external_p_records_count"] = len(p_records)
+                    yield dict(
+                        item_type="paragraph",
+                        item_pid=doc_id,
+                        data=p_records,
+                    )
             except Exception as e:
-                errors.append(f"{e} {issue_id} {data['issue']}")
-                continue
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                subevent = journal_proc.start(user, "get_bases_work_acron_id_file_records item")
+                subevent.finish(
+                    user,
+                    completed=False,
+                    detail=item,
+                    exception=e,
+                    exc_traceback=exc_traceback,
+                )
 
-        if not data["article"]:
-            continue
-
-        # instancia Document com os dados de issue e article
-        classic_ws_doc = classic_ws.Document(data)
-        if not classic_ws_doc.scielo_pid_v2:
-            # raise ValueError(f"{classic_ws_issue.pid} and {item_pid} do not match")
-            # detail = {"error": "unmatched issue_pid and item_pid"}
-            # detail.update(info)
-            # operation.finish(user, completed=False, detail=detail)
-            continue
-
-        # se houver bases-work/p/<pid>, obtém os registros de parágrafo
-        ign_pid, p_records = classic_website.get_p_records(doc_id)
-        p_records = list(p_records)
-        if p_records:
-            # adiciona registros p aos registros do artigo
-            # info["external_p_records_count"] = len(p_records)
-            yield dict(
-                item_type="paragraph",
-                item_pid=doc_id,
-                data=p_records,
-                issue_folder="",
-                processing_date=classic_ws_doc.processing_date,
+        event.finish(user, completed=True)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        if event:
+            event.finish(
+                user,
+                completed=False,
+                detail=None,
+                exception=e,
+                exc_traceback=exc_traceback,
             )
-
-        yield dict(
-            item_type="article",
-            item_pid=doc_id,
-            data=data["article"],
-            issue_folder="",
-            article_filename=classic_ws_doc.filename_without_extension,
-            article_filetype=classic_ws_doc.file_type,
-            processing_date=classic_ws_doc.processing_date,
-        )
-    event.finish(user, completed=True, detail={"errors": errors})
 
 
 def id_file_has_changes(user, collection, id_path, force_update):

@@ -16,12 +16,12 @@ from files_storage.minio import MinioStorage
 
 
 class MinioConfiguration(CommonControlField):
-    name = models.TextField(_("Name"), null=True, blank=False)
-    host = models.TextField(_("Host"), null=True, blank=True)
-    bucket_root = models.TextField(_("Bucket root"), null=True, blank=True)
-    bucket_app_subdir = models.TextField(_("Bucket app subdir"), null=True, blank=True)
-    access_key = models.TextField(_("Access key"), null=True, blank=True)
-    secret_key = models.TextField(_("Secret key"), null=True, blank=True)
+    name = models.CharField(_("Name"), max_length=32, null=True, blank=False)
+    host = models.CharField(_("Host"), max_length=64, null=True, blank=True)
+    bucket_root = models.CharField(_("Bucket root"), max_length=32, null=True, blank=True)
+    bucket_app_subdir = models.CharField(_("Bucket app subdir"), max_length=32, null=True, blank=True)
+    access_key = models.CharField(_("Access key"), max_length=32, null=True, blank=True)
+    secret_key = models.CharField(_("Secret key"), max_length=64, null=True, blank=True)
     # indicar como False para uso no desenvolvimento
     secure = models.BooleanField(_("Secure"), default=True)
 
@@ -103,8 +103,8 @@ class MinioConfiguration(CommonControlField):
 
 
 class FileLocation(CommonControlField):
-    basename = models.TextField(_("Basename"), null=True, blank=True)
-    uri = models.URLField(_("URI"), null=True, blank=True)
+    basename = models.CharField(_("Basename"), max_length=100, null=True, blank=True)
+    uri = models.URLField(_("URI"), null=True, blank=True, max_length=200)
 
     autocomplete_search_field = "uri"
 

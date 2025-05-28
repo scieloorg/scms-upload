@@ -409,13 +409,15 @@ class BaseProc(CommonControlField):
         raise ValueError("BaseProc.get requires collection and pid")
 
     @classmethod
-    def get_or_create(cls, user, collection, pid):
+    def get_or_create(cls, user, collection, pid, **kwargs):
         if collection and pid:
             try:
                 return cls.get(collection, pid)
             except cls.DoesNotExist:
                 return cls.create(user, collection, pid)
-        raise ValueError(f"{cls}.get_or_create requires collection ({collection}) and pid ({pid})")
+        raise ValueError(
+            f"{cls}.get_or_create requires collection ({collection}) and pid ({pid})"
+        )
 
     @classmethod
     def create(cls, user, collection, pid):
@@ -626,6 +628,8 @@ class BaseProc(CommonControlField):
             return registered
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
+            self.migration_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            self.save()
             if operation:
                 operation.finish(user, exc_traceback=exc_traceback, exception=e)
             else:
@@ -700,9 +704,8 @@ class BaseProc(CommonControlField):
             doit = tracker_choices.allowed_to_run(self.qa_ws_status, force_update)
         else:
             detail["public_ws_status"] = self.public_ws_status
-            if (
-                content_type == "article" and 
-                (not self.sps_pkg or not self.sps_pkg.registered_in_core)
+            if content_type == "article" and (
+                not self.sps_pkg or not self.sps_pkg.registered_in_core
             ):
                 detail["registered_in_core"] = self.sps_pkg.registered_in_core
                 doit = False
@@ -712,9 +715,7 @@ class BaseProc(CommonControlField):
                 )
 
         detail["doit"] = doit
-        operation = self.start(
-            user, f"publish {content_type} {self} on {website_kind}"
-        )
+        operation = self.start(user, f"publish {content_type} {self} on {website_kind}")
 
         if not doit:
             # logging.info(f"Skip publish on {website_kind} {self.pid}")
@@ -729,9 +730,7 @@ class BaseProc(CommonControlField):
             self.public_ws_status = tracker_choices.PROGRESS_STATUS_DOING
         self.save()
 
-        api_data = api_data or get_api_data(
-            self.collection, content_type, website_kind
-        )
+        api_data = api_data or get_api_data(self.collection, content_type, website_kind)
         if api_data.get("error"):
             response = api_data
         else:
@@ -814,7 +813,7 @@ class JournalProc(BaseProc, ClusterableModel):
     )
 
     acron = models.CharField(_("Acronym"), max_length=25, null=True, blank=True)
-    title = models.TextField(_("Title"), null=True, blank=True)
+    title = models.CharField(_("Title"), max_length=128, null=True, blank=True)
     availability_status = models.CharField(
         _("Availability Status"),
         max_length=10,
@@ -916,20 +915,16 @@ class JournalProc(BaseProc, ClusterableModel):
 
 
 ################################################
-class IssueGetOrCreateError(Exception):
-    ...
+class IssueGetOrCreateError(Exception): ...
 
 
-class IssueProcGetOrCreateError(Exception):
-    ...
+class IssueProcGetOrCreateError(Exception): ...
 
 
-class IssueEventCreateError(Exception):
-    ...
+class IssueEventCreateError(Exception): ...
 
 
-class IssueEventReportCreateError(Exception):
-    ...
+class IssueEventReportCreateError(Exception): ...
 
 
 def modified_date(file_path):
@@ -978,8 +973,6 @@ class IssueProc(BaseProc, ClusterableModel):
         choices=tracker_choices.PROGRESS_STATUS,
         default=tracker_choices.PROGRESS_STATUS_TODO,
     )
-    resumption_date = models.DateTimeField(null=True, blank=True)
-
     MigratedDataClass = MigratedIssue
     base_form_class = IssueProcAdminModelForm
     ProcResult = IssueProcResult
@@ -1238,105 +1231,107 @@ class IssueProc(BaseProc, ClusterableModel):
         )
 
     def migrate_document_records(self, user, force_update=None):
+        try:
+            operation = None
+            detail = None
+            params = None
 
-        doit = tracker_choices.allowed_to_run(self.docs_status, force_update)
-        if not doit:
-            # logging.info(f"Skip migrate_document_records {self.pid}")
-            return
-
-        self.docs_status = tracker_choices.PROGRESS_STATUS_DOING
-        self.save()
-
-        operation = self.start(user, "migrate_document_records")
-
-        if not self.journal_proc:
-            self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
-            self.save()
-            operation.finish(user, completed=False, detail={"journal_proc": None})
-            return
-
-        done = 0
-        journal_data = self.journal_proc.migrated_data.data
-
-        resumption = None if force_update else self.resumption_date
-        logging.info(f"Migrate documents from {resumption}")
-        # registros novos ou atualizados
-
-        IdFileRecord.add_issue_folder(self.pid, self.issue_folder)
-
-        params = dict(
-            collection=self.journal_proc.collection,
-            journal_acron=self.journal_proc.acron,
-            issue_folder=self.issue_folder,
-            resumption=resumption,
-        )
-        id_file_records = IdFileRecord.document_records_to_migrate(**params)
-
-        errors = []
-        for record in id_file_records:
-            try:
-                logging.info(f"migrate_document_records: {record.item_pid}")
-                data = record.get_record_data(journal_data, issue_data=self.migrated_data.data)
-                article_proc = self.create_or_update_article_proc(
-                    user, record.item_pid, data["data"], force_update
-                )
-                self.resumption_date = record.updated
+            operation = self.start(user, "migrate_document_records")
+            if not self.journal_proc:
+                self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
                 self.save()
-                done += 1
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                errors.append(
-                    {
-                        "pid": record.item_pid,
-                        "error_type": str(exc_type),
-                        "error_message": str(exc_value),
-                    }
-                )
-                UnexpectedEvent.create(
-                    e=e,
-                    exc_traceback=exc_traceback,
-                    detail={
-                        "task": "IssueProc.migrate_document_records",
-                        "user_id": user.id,
-                        "username": user.username,
-                        "collection": self.collection.acron,
-                        "item": record.item_pid,
-                        "force_update": force_update,
-                    },
-                )
-        got = id_file_records.count()
-        detail = params
-        detail.update(
-            {
-                "total issue documents": self.issue.total_documents,
-                "total records": got,
-                "total done": done,
-                "errors": errors,
-            }
-        )
-        completed = got == done
-        operation.finish(
-            user,
-            completed=completed,
-            detail=detail,
-        )
-        if completed:
-            self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
-        else:
+                operation.finish(user, completed=False, detail={"journal_proc": None})
+                return
+
+            self.docs_status = tracker_choices.PROGRESS_STATUS_DOING
+            self.save()
+
+            done = 0
+            errors = 0
+            journal_data = self.journal_proc.migrated_data.data
+
+            params = dict(
+                collection=self.journal_proc.collection,
+                issue_pid=self.pid,
+                todo=not force_update,
+            )
+            logging.info(f"Migrate documents {params}")
+
+            # registros novos ou atualizados
+            id_file_records = IdFileRecord.document_records_to_migrate(**params)
+            for record in id_file_records:
+                try:
+                    logging.info(f"migrate_document_records: {record.item_pid}")
+                    detail = dict(
+                        pid=record.item_pid,
+                    )
+                    data = record.get_record_data(
+                        journal_data, issue_data=self.migrated_data.data
+                    )
+                    detail["data"] = data
+                    article_proc = self.create_or_update_article_proc(
+                        user, record.item_pid, data["data"], force_update
+                    )
+                    
+                    if article_proc:
+                        done += 1
+                        record.todo = False
+                        record.save()
+                    else:
+                        errors += 1
+                except Exception as e:
+                    errors += 1
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    subevent = self.start(user, "migrate documet records / item")
+                    subevent.finish(
+                        user,
+                        completed=False,
+                        detail=detail,
+                        exception=e,
+                        exc_traceback=exc_traceback,
+                    )
+
+            got = id_file_records.count()
+            detail = params
+            detail.update(
+                {
+                    "total issue documents": self.issue.total_documents,
+                    "total records": got,
+                    "total done": done,
+                    "errors": errors,
+                }
+            )
+            completed = got == done
+            operation.finish(user, completed=completed, detail=detail)
+            if completed:
+                self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
+            else:
+                self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
+            self.save()
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
             self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
-        self.files_status = tracker_choices.PROGRESS_STATUS_TODO
-        self.save()
+            self.save()
+            operation.finish(
+                user, exc_traceback=exc_traceback, exception=e, detail=detail or params
+            )
 
     def create_or_update_article_proc(self, user, pid, data, force_update):
-        article_proc = ArticleProc.register_classic_website_data(
-            user=user,
-            collection=self.collection,
-            pid=pid,
-            data=data,
-            content_type="article",
-            force_update=force_update,
-        )
-        if article_proc:
+        try:
+            detail = {}
+            params = {}
+            article_proc = ArticleProc.register_classic_website_data(
+                user=user,
+                collection=self.collection,
+                pid=pid,
+                data=data,
+                content_type="article",
+                force_update=force_update,
+            )
+            if not article_proc:
+                raise Exception(f"Unable to create ArticleProc for {pid}")
+
+            event = article_proc.start(user, "create_or_update_article_proc")
             migrated_article = article_proc.migrated_data
             document = migrated_article.document
 
@@ -1344,15 +1339,6 @@ class IssueProc(BaseProc, ClusterableModel):
                 migrated_article.file_type = document.file_type
                 migrated_article.save()
 
-            # d = dict(
-            #     issue_proc=self,
-            #     pkg_name=document.filename_without_extension,
-            #     migration_status=tracker_choices.PROGRESS_STATUS_TODO,
-            #     user=user,
-            #     main_lang=document.original_language,
-            #     force_update=force_update,
-            # )
-            # logging.info(f"article_proc.... {d}")
             article_proc.update(
                 issue_proc=self,
                 pkg_name=document.filename_without_extension,
@@ -1360,6 +1346,14 @@ class IssueProc(BaseProc, ClusterableModel):
                 user=user,
                 main_lang=document.original_language,
                 force_update=force_update,
+            )
+            event.finish(user, completed=True, detail=str(article_proc))
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
+            self.save()
+            event.finish(
+                user, exc_traceback=exc_traceback, exception=e, detail=detail or params
             )
         return article_proc
 
@@ -1377,12 +1371,10 @@ class IssueProc(BaseProc, ClusterableModel):
         return f"{issn_id}{year}{issue_pid_suffix}"
 
 
-class ArticleEventCreateError(Exception):
-    ...
+class ArticleEventCreateError(Exception): ...
 
 
-class ArticleEventReportCreateError(Exception):
-    ...
+class ArticleEventReportCreateError(Exception): ...
 
 
 class ArticleProc(BaseProc, ClusterableModel):
@@ -1394,7 +1386,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     issue_proc = models.ForeignKey(
         IssueProc, on_delete=models.SET_NULL, null=True, blank=True
     )
-    pkg_name = models.TextField(_("Package name"), null=True, blank=True)
+    pkg_name = models.CharField(_("Package name"), max_length=50, null=True, blank=True)
     main_lang = models.CharField(
         _("Main lang"),
         max_length=2,
@@ -1672,7 +1664,10 @@ class ArticleProc(BaseProc, ClusterableModel):
                 | Q(sps_pkg_status=tracker_choices.PROGRESS_STATUS_PENDING)
                 | Q(sps_pkg_status=tracker_choices.PROGRESS_STATUS_BLOCKED)
             )
-        cls.objects.filter(q, **params,).update(
+        cls.objects.filter(
+            q,
+            **params,
+        ).update(
             sps_pkg_status=tracker_choices.PROGRESS_STATUS_TODO,
         )
         return cls.objects.filter(

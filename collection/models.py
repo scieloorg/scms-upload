@@ -29,8 +29,8 @@ class Collection(CommonControlField):
     def __str__(self):
         return self.acron
 
-    acron = models.TextField(_("Collection Acronym"), null=True, blank=True)
-    name = models.TextField(_("Collection Name"), null=True, blank=True)
+    acron = models.CharField(_("Collection Acronym"), max_length=16, null=True, blank=True)
+    name = models.CharField(_("Collection Name"), max_length=64, null=True, blank=True)
 
     base_form_class = CoreAdminModelForm
 
@@ -186,8 +186,8 @@ class Language(CommonControlField):
         code2
     """
 
-    name = models.TextField(_("Language Name"), blank=True, null=True)
-    code2 = models.TextField(_("Language code 2"), blank=True, null=True)
+    name = models.CharField(_("Language Name"), max_length=64, blank=True, null=True)
+    code2 = models.CharField(_("Language code 2"), max_length=5, blank=True, null=True)
 
     class Meta:
         verbose_name = _("Language")

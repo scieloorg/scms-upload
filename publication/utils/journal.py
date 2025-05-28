@@ -1,7 +1,9 @@
 import logging
 
 
-def build_journal(builder, journal, journal_id, journal_acron, journal_history, availability_status):
+def build_journal(
+    builder, journal, journal_id, journal_acron, journal_history, availability_status
+):
     official_journal = journal.official_journal
 
     builder.add_ids(journal_id)
