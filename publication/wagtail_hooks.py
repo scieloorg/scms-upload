@@ -14,6 +14,7 @@ class ArticleAvailabilitySiteViewSet(SnippetViewSet):
     )
     list_display = (
         "article",
+        "completed",
         "published_by",
         "publication_rule",
     )
@@ -23,6 +24,7 @@ class ArticleAvailabilitySiteViewSet(SnippetViewSet):
         "article__pid_v2",
     )
     list_filter = (
+        "completed",
         "published_by",
         "publication_rule",
     )

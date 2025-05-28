@@ -26,8 +26,7 @@ def _get_digits(value):
         return 0
 
 
-class IssueGetOrCreateError(Exception):
-    ...
+class IssueGetOrCreateError(Exception): ...
 
 
 class Issue(CommonControlField, IssuePublicationDate):
@@ -209,7 +208,11 @@ class Issue(CommonControlField, IssuePublicationDate):
             obj.total_documents = total_documents or obj.total_documents
             obj.publication_year = publication_year or obj.publication_year
             obj.order = order or obj.order or obj.generate_order()
-            obj.issue_pid_suffix = issue_pid_suffix or obj.issue_pid_suffix or obj.generate_issue_pid_suffix()
+            obj.issue_pid_suffix = (
+                issue_pid_suffix
+                or obj.issue_pid_suffix
+                or obj.generate_issue_pid_suffix()
+            )
             obj.updated_by = user
             obj.save()
             return obj
