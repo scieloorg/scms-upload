@@ -86,7 +86,6 @@ def create_or_update_journal(
             raise ValueError(
                 f"Before migrating, use Title Manager or SciELO Manager to complete print ISSN and/or electronic ISSN for {classic_website_journal.title}"
             )
-
         official_journal = OfficialJournal.create_or_update(user=user, **params)
         official_journal.add_related_journal(
             classic_website_journal.previous_title,
@@ -971,6 +970,10 @@ def register_acron_id_file_content(
                 user, completed=False, message=_(f"{source_path} has no changes")
             )
     except Exception as e:
+        logging.error(f"journal_proc: {journal_proc} {type(e)} {e}")
+        if operation:
+            operation.finish(user, completed=False, exception=e, detail=detail)
+            return
         exc_type, exc_value, exc_traceback = sys.exc_info()
         logging.error(f"journal_proc: {journal_proc} {type(e)} {e}")
         if operation:
@@ -1020,8 +1023,10 @@ def get_bases_work_acron_id_file_records(
                         item_pid=issue_id,
                         data=item["issue_data"],
                     )
+
                 if not doc_id:
                     continue
+
                 # se houver bases-work/p/<pid>, obtém os registros de parágrafo
                 ign_pid, p_records = classic_website.get_p_records(doc_id)
                 p_records = list(p_records)
