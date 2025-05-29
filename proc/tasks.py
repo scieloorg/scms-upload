@@ -19,6 +19,7 @@ from proc.controller import (
     create_or_update_journal_acron_id_file,
     get_files_from_classic_website,
     migrate_document_records,
+    fetch_and_create_journal,
 )
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
@@ -816,3 +817,29 @@ def task_create_collection_procs_from_pid_list(
                 "collection_acron": collection_acron,
             },
         )
+
+
+@celery_app.task(bind=True)
+def task_fetch_and_create_journal(
+    self, username, collection_acron,
+):
+    user = _get_user(user_id=None, username=username)
+    try:
+        fetch_and_create_journal(
+            user,
+            collection_acron=collection_acron,
+            issn_electronic=None,
+            issn_print=None,
+            force_update=None,
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "proc.tasks.task_fetch_and_create_journal",
+                "collection_acron": collection_acron,
+            },
+        )
+

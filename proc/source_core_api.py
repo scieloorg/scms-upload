@@ -86,7 +86,10 @@ def create_or_update_journal(
 
     try:
         fetch_and_create_journal(
-            user, journal_title, issn_electronic, issn_print, force_update
+            user,
+            issn_electronic=issn_electronic,
+            issn_print=issn_print,
+            force_update=force_update,
         )
     except FetchMultipleJournalsError as exc:
         raise exc
@@ -102,131 +105,40 @@ def create_or_update_journal(
 def fetch_and_create_journal(
     user,
     collection_acron=None,
-    journal_title=None,
     issn_electronic=None,
     issn_print=None,
     force_update=None,
 ):
     """
     Busca dados do journal na API Core e cria/atualiza as entidades correspondentes.
+    Agora com suporte a paginação para processar todos os resultados.
     """
+    # Conta os resultados primeiro para validação
+
     try:
-        params = {
-            "issn_print": issn_print,
-            "issn_electronic": issn_electronic,
-            "collection_acron": collection_acron,
-        }
-        params = {k: v for k, v in params.items() if v}
-        response = fetch_data(
-            url=settings.JOURNAL_API_URL,
-            params=params,
-            json=True,
-            timeout=CORE_TIMEOUT,
+        check_collection = False
+        results = fetch_journal_data_with_pagination(
+            collection_acron=collection_acron,
+            issn_electronic=issn_electronic,
+            issn_print=issn_print,
         )
-    except Exception as e:
-        raise FetchJournalDataException(
-            f"fetch_and_create_journal: {settings.JOURNAL_API_URL} {params} {e}"
-        )
+    except FetchJournalDataException:
+        if not collection_acron:
+            raise
 
-    if response["count"] > 1:
-        raise FetchMultipleJournalsError(
-            f"{settings.JOURNAL_API_URL} with {params} returned {response['count']} journals. Ask for support to solve this issue"
+        # api ainda não está aceitando o param collection_acron,
+        # consulta api com collection_acron=None e
+        # check_collection=True
+        check_collection = False
+        results = fetch_journal_data_with_pagination(
+            issn_electronic=issn_electronic,
+            issn_print=issn_print,
         )
 
-    for result in response.get("results") or []:
-        logging.info(f"fetch_and_create_journal {params}: {result}")
-
-        official = result["official"]
-        official_journal = OfficialJournal.create_or_update(
-            title=official["title"],
-            title_iso=official["iso_short_title"],
-            issn_print=official["issn_print"],
-            issn_electronic=official["issn_electronic"],
-            issnl=official["issnl"],
-            foundation_year=official.get("foundation_year"),
-            user=user,
+    for result in results:
+        process_journal_result(
+            user, result, check_collection, force_update
         )
-        official_journal.add_related_journal(
-            result.get("previous_journal_title"),
-            result.get("next_journal_title"),
-        )
-        journal = Journal.create_or_update(
-            user=user,
-            official_journal=official_journal,
-            title=result.get("title"),
-            short_title=result.get("short_title"),
-        )
-        journal.license_code = (result.get("journal_use_license") or {}).get(
-            "license_type"
-        )
-        journal.nlm_title = result.get("nlm_title")
-        journal.doi_prefix = result.get("doi_prefix")
-        journal.wos_areas = result["wos_areas"]
-        journal.logo_url = result["url_logo"]
-        journal.save()
-
-        for item in result.get("Subject") or []:
-            journal.subjects.add(Subject.create_or_update(user, item["value"]))
-
-        for item in result.get("publisher") or []:
-            institution = Institution.get_or_create(
-                inst_name=item["name"],
-                inst_acronym=None,
-                level_1=None,
-                level_2=None,
-                level_3=None,
-                location=None,
-                user=user,
-            )
-            journal.publisher.add(
-                Publisher.create_or_update(user, journal, institution)
-            )
-
-        for item in result.get("owner") or []:
-            institution = Institution.get_or_create(
-                inst_name=item["name"],
-                inst_acronym=None,
-                level_1=None,
-                level_2=None,
-                level_3=None,
-                location=None,
-                user=user,
-            )
-            journal.owner.add(Owner.create_or_update(user, journal, institution))
-
-        for item in result.get("scielo_journal") or []:
-            logging.info(f"fetch_and_create_journal {params}: scielo_journal {item}")
-            try:
-                collection = Collection.objects.get(acron=item["collection_acron"])
-            except Collection.DoesNotExist:
-                continue
-
-            journal_proc = JournalProc.get_or_create(
-                user, collection, item["issn_scielo"]
-            )
-            journal_proc.update(
-                user=user,
-                journal=journal,
-                acron=item["journal_acron"],
-                title=journal.title,
-                availability_status=item.get("availability_status") or "C",
-                migration_status=tracker_choices.PROGRESS_STATUS_DONE,
-                force_update=force_update,
-            )
-            journal.journal_acron = item.get("journal_acron")
-            journal_collection = JournalCollection.create_or_update(
-                user, collection, journal
-            )
-            for jh in item.get("journal_history") or []:
-                JournalHistory.create_or_update(
-                    user,
-                    journal_collection,
-                    jh["event_type"],
-                    jh["year"],
-                    jh["month"],
-                    jh["day"],
-                    jh["interruption_reason"],
-                )
 
 
 def fetch_journal_data_with_pagination(
@@ -259,19 +171,26 @@ def fetch_journal_data_with_pagination(
             raise FetchJournalDataException(
                 f"fetch_journal_data_with_pagination: {url} {params} {e}"
             )
-
-        # Yield cada resultado desta página
-        results = response.get("results", [])
-        yield from results
-        # Próxima URL (se existir)
-        url = response.get("next")
+        else:
+            # Próxima URL (se existir)
+            url = response.get("next")
+            yield from response.get("results") or []
 
 
-def process_journal_result(result, user, force_update=None):
+def process_journal_result(user, result, check_collection, force_update=None):
     """
     Processa um único resultado de journal da API e cria/atualiza as entidades correspondentes.
     """
     logging.info(f"process_journal_result: {result}")
+
+    if check_collection:
+        collections = []
+        for item in result.get("scielo_journal") or []:
+            collections.append(acron=item["collection_acron"])
+        if not collections:
+            return
+        if not Collection.objects.filter(acron__in=collections).exists():
+            return
 
     # Processa dados oficiais do journal
     official = result["official"]
