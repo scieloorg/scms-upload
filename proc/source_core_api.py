@@ -39,21 +39,25 @@ except Exception as e:
 # Exceções específicas da Core API
 class FetchMultipleJournalsError(ProcBaseException):
     """Erro quando a API retorna múltiplos journals para uma consulta específica."""
+
     pass
 
 
 class UnableToGetJournalDataFromCoreError(ProcBaseException):
     """Erro ao obter dados de journal da API Core."""
+
     pass
 
 
 class FetchJournalDataException(ProcBaseException):
     """Erro genérico ao buscar dados de journal da API."""
+
     pass
 
 
 class FetchIssueDataException(ProcBaseException):
     """Erro genérico ao buscar dados de issue da API."""
+
     pass
 
 
@@ -62,7 +66,7 @@ def create_or_update_journal(
 ):
     """
     Cria ou atualiza um journal baseado nos dados da API Core.
-    
+
     Esta função é chamada no fluxo de ingresso de conteúdo novo.
     Para migração, use migration.controller.create_or_update_journal.
     """
@@ -82,7 +86,7 @@ def create_or_update_journal(
 
     try:
         fetch_and_create_journal(
-            journal_title, issn_electronic, issn_print, user, force_update
+            user, journal_title, issn_electronic, issn_print, force_update
         )
     except FetchMultipleJournalsError as exc:
         raise exc
@@ -96,10 +100,11 @@ def create_or_update_journal(
 
 
 def fetch_and_create_journal(
-    journal_title,
-    issn_electronic,
-    issn_print,
     user,
+    collection_acron=None,
+    journal_title=None,
+    issn_electronic=None,
+    issn_print=None,
     force_update=None,
 ):
     """
@@ -109,6 +114,7 @@ def fetch_and_create_journal(
         params = {
             "issn_print": issn_print,
             "issn_electronic": issn_electronic,
+            "collection_acron": collection_acron,
         }
         params = {k: v for k, v in params.items() if v}
         response = fetch_data(
@@ -223,12 +229,156 @@ def fetch_and_create_journal(
                 )
 
 
+def fetch_journal_data_with_pagination(
+    collection_acron=None,
+    issn_electronic=None,
+    issn_print=None,
+):
+    """
+    Busca dados do journal na API Core com suporte a paginação.
+    Retorna um gerador que yield cada resultado individualmente.
+    """
+    # Parâmetros iniciais
+    params = {
+        "issn_print": issn_print,
+        "issn_electronic": issn_electronic,
+        "collection_acron": collection_acron,
+    }
+    params = {k: v for k, v in params.items() if v}
+
+    url = settings.JOURNAL_API_URL
+    while url:
+        try:
+            response = fetch_data(
+                url=url,
+                params=params,  # Params só na primeira requisição
+                json=True,
+                timeout=CORE_TIMEOUT,
+            )
+        except Exception as e:
+            raise FetchJournalDataException(
+                f"fetch_journal_data_with_pagination: {url} {params} {e}"
+            )
+
+        # Yield cada resultado desta página
+        results = response.get("results", [])
+        yield from results
+        # Próxima URL (se existir)
+        url = response.get("next")
+
+
+def process_journal_result(result, user, force_update=None):
+    """
+    Processa um único resultado de journal da API e cria/atualiza as entidades correspondentes.
+    """
+    logging.info(f"process_journal_result: {result}")
+
+    # Processa dados oficiais do journal
+    official = result["official"]
+    official_journal = OfficialJournal.create_or_update(
+        title=official["title"],
+        title_iso=official["iso_short_title"],
+        issn_print=official["issn_print"],
+        issn_electronic=official["issn_electronic"],
+        issnl=official["issnl"],
+        foundation_year=official.get("foundation_year"),
+        user=user,
+    )
+    official_journal.add_related_journal(
+        result.get("previous_journal_title"),
+        result.get("next_journal_title"),
+    )
+
+    # Cria/atualiza o journal
+    journal = Journal.create_or_update(
+        user=user,
+        official_journal=official_journal,
+        title=result.get("title"),
+        short_title=result.get("short_title"),
+    )
+
+    # Atualiza campos adicionais do journal
+    journal.license_code = (result.get("journal_use_license") or {}).get("license_type")
+    journal.nlm_title = result.get("nlm_title")
+    journal.doi_prefix = result.get("doi_prefix")
+    journal.wos_areas = result["wos_areas"]
+    journal.logo_url = result["url_logo"]
+    journal.save()
+
+    # Processa subjects
+    for item in result.get("Subject") or []:
+        journal.subjects.add(Subject.create_or_update(user, item["value"]))
+
+    # Processa publishers
+    for item in result.get("publisher") or []:
+        institution = Institution.get_or_create(
+            inst_name=item["name"],
+            inst_acronym=None,
+            level_1=None,
+            level_2=None,
+            level_3=None,
+            location=None,
+            user=user,
+        )
+        journal.publisher.add(Publisher.create_or_update(user, journal, institution))
+
+    # Processa owners
+    for item in result.get("owner") or []:
+        institution = Institution.get_or_create(
+            inst_name=item["name"],
+            inst_acronym=None,
+            level_1=None,
+            level_2=None,
+            level_3=None,
+            location=None,
+            user=user,
+        )
+        journal.owner.add(Owner.create_or_update(user, journal, institution))
+
+    # Processa dados específicos do SciELO
+    for item in result.get("scielo_journal") or []:
+        logging.info(f"process_journal_result: scielo_journal {item}")
+        try:
+            collection = Collection.objects.get(acron=item["collection_acron"])
+        except Collection.DoesNotExist:
+            continue
+
+        journal_proc = JournalProc.get_or_create(user, collection, item["issn_scielo"])
+        journal_proc.update(
+            user=user,
+            journal=journal,
+            acron=item["journal_acron"],
+            title=journal.title,
+            availability_status=item.get("availability_status") or "C",
+            migration_status=tracker_choices.PROGRESS_STATUS_DONE,
+            force_update=force_update,
+        )
+        journal.journal_acron = item.get("journal_acron")
+        journal_collection = JournalCollection.create_or_update(
+            user, collection, journal
+        )
+
+        # Processa histórico do journal
+        for jh in item.get("journal_history") or []:
+            JournalHistory.create_or_update(
+                user,
+                journal_collection,
+                jh["event_type"],
+                jh["year"],
+                jh["month"],
+                jh["day"],
+                jh["interruption_reason"],
+            )
+
+    return journal
+
+
 def create_or_update_issue(
     journal, pub_year, volume, suppl, number, user, force_update=None
 ):
     """
     Cria ou atualiza um issue baseado nos dados da API Core.
-    
+
     Esta função é chamada no fluxo de ingresso de conteúdo novo.
     Para migração, use migration.controller.create_or_update_issue.
     """
