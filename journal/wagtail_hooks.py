@@ -9,7 +9,8 @@ from wagtail.contrib.modeladmin.views import CreateView
 
 from config.menu import get_menu_order
 
-from .models import Journal, OfficialJournal
+from journal.models import Journal, OfficialJournal, JournalTOC
+from journal.views import JournalTOCCreateView, JournalTOCEditView
 
 
 class OfficialJournalCreateView(CreateView):
@@ -72,6 +73,32 @@ class JournalAdmin(ModelAdmin):
     )
 
 
+class JournalTOCAdmin(ModelAdmin):
+    model = JournalTOC
+    menu_label = _("Journal table of contents sections")
+    create_view_class = JournalTOCCreateView
+    edit_view_class = JournalTOCEditView
+    edit_view_enabled = True
+    menu_icon = "folder"
+    menu_order = get_menu_order("journal")
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+    inspect_view_enabled = True
+
+    list_per_page = 10
+    list_display = (
+        "title",
+        "journal_acron",
+    )
+    list_filter = ("subject",)
+    search_fields = (
+        "journal_acron",
+        "title",
+        "official_journal__issn_print",
+        "official_journal__issn_electronic",
+    )
+
+
 class JournalModelAdminGroup(ModelAdminGroup):
     menu_icon = "folder"
     menu_label = _("Journals")
@@ -80,6 +107,7 @@ class JournalModelAdminGroup(ModelAdminGroup):
         # OfficialJournalAdmin,
         JournalAdmin,
         # JournalProcAdmin,
+        JournalTOCAdmin,
     )
 
 

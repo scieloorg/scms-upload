@@ -1,3 +1,6 @@
+import logging
+
+
 def build_journal(
     builder, journal, journal_id, journal_acron, journal_history, availability_status
 ):
@@ -13,6 +16,7 @@ def build_journal(
         builder.add_mission(mission.language.code2, mission.text)
 
     for journal_history in journal_history.all():
+        logging.info(f"journal_history.event_type: {journal_history.event_type}")
         if journal_history.event_type == "ADMITTED":
             event_type = "current"
         elif journal_history.interruption_reason == "ceased":
@@ -36,7 +40,9 @@ def build_journal(
     current_status = "inprogress"
     if builder.data.get("status_history"):
         try:
-            current_status = sorted(builder.data["status_history"], key=lambda x: x['date'])[-1]["status"]
+            current_status = sorted(
+                builder.data["status_history"], key=lambda x: x["date"]
+            )[-1]["status"]
             if current_status not in ("inprogress", "current"):
                 current_status = "no-current"
         except (IndexError, KeyError):

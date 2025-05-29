@@ -5,13 +5,9 @@ import traceback
 import urllib
 
 from django.utils.translation import gettext_lazy as _
-from requests import HTTPError
-from requests.auth import HTTPBasicAuth
 
 from collection.models import WebSiteConfiguration
-from collection import choices as collection_choices
 from core.utils.requester import post_data
-from publication.api import exceptions
 
 
 def get_api(collection, content_type, website_kind=None):
@@ -39,7 +35,9 @@ def get_api_data(collection, content_type, website_kind=None):
     except WebSiteConfiguration.DoesNotExist:
         return {"error": f"Website does not exist: {collection} {website_kind}"}
     except Exception as e:
-        raise Exception(f"Unable to get api data for {content_type} {collection} {website_kind}: {type(e)} {e}")
+        raise Exception(
+            f"Unable to get api data for {content_type} {collection} {website_kind}: {type(e)} {e}"
+        )
     return api.data
 
 
