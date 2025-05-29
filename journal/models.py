@@ -21,13 +21,13 @@ from journal.exceptions import (
     MissionGetError,
     SubjectCreationOrUpdateError,
 )
-from journal.forms import OfficialJournalForm
+from journal.forms import OfficialJournalForm, JournalTOCForm
 from location.models import Location
 
 
 class JournalSection(TextModel, CommonControlField):
     parent = models.ForeignKey(
-        "Journal",
+        "JournalTOC",
         blank=True,
         null=True,
         on_delete=models.SET_NULL,
@@ -275,7 +275,6 @@ class Journal(CommonControlField, ClusterableModel):
         "OfficialJournal",
         null=True,
         blank=True,
-        related_name="+",
         on_delete=models.SET_NULL,
     )
     submission_online_url = models.URLField(
@@ -423,6 +422,13 @@ class Journal(CommonControlField, ClusterableModel):
                 .order_by("-created")
                 .first()
             )
+
+    @staticmethod
+    def get_similar_items(journal_title, issn_electronic, issn_print):
+        return Journal.objects.filter(
+            Q(official_journal__issn_electronic=issn_electronic)
+            | Q(official_journal__issn_print=issn_print)
+        )
 
     @classmethod
     def create(
@@ -1020,3 +1026,37 @@ class Subject(CommonControlField):
         obj.updated = user
         obj.save()
         return obj
+
+
+class JournalTOC(Journal, ClusterableModel):
+    panels = [
+        InlinePanel("j_sections", label=_("Journal sections")),
+    ]
+
+    # panels_identification = [
+    #     AutocompletePanel("official_journal"),
+    #     FieldPanel("short_title"),
+    #     FieldPanel("journal_acron")
+    # ]
+
+    # panels_owner = [
+    #     InlinePanel("owner", label=_("Owner"), classname="collapsed"),
+    # ]
+
+    # panels_publisher = [
+    #     InlinePanel("publisher", label=_("Publisher"), classname="collapsed"),
+    # ]
+
+    # panels_mission = [
+    #     InlinePanel("mission", label=_("Mission"), classname="collapsed"),
+    # ]
+
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(panels, heading=_("Journal sections")),
+        ]
+    )
+    base_form_class = JournalTOCForm
+
+    class Meta:
+        proxy = True
