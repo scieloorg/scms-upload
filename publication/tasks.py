@@ -462,7 +462,9 @@ def task_check_article_availability(
         article_query |= Q(issue__publication_year=publication_year)
 
     try:
-        for journal_proc in JournalProc.objects.filter(journal_query, journal__isnull=False):
+        for journal_proc in JournalProc.objects.filter(
+            journal_query, journal__isnull=False
+        ):
             if not journal_proc.journal.journal_acron:
                 journal_proc.journal.journal_acron = journal_proc.acron
                 journal_proc.journal.save()
@@ -493,7 +495,12 @@ def task_check_article_availability(
 
 @celery_app.task(bind=True)
 def process_article_availability(
-    self, pid_v3, domain, user_id, username, timeout=None,
+    self,
+    pid_v3,
+    domain,
+    user_id,
+    username,
+    timeout=None,
 ):
     try:
         user = _get_user(user_id=user_id, username=username)
@@ -515,7 +522,9 @@ def process_article_availability(
 
 
 @celery_app.task(bind=True)
-def retry_failed_scielo_urls(self, username=None, user_id=None, pid_v3=None, timeout=None):
+def retry_failed_scielo_urls(
+    self, username=None, user_id=None, pid_v3=None, timeout=None
+):
     try:
         user = _get_user(user_id=user_id, username=username)
         params = {}

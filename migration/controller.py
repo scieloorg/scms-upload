@@ -39,9 +39,7 @@ from .models import ClassicWebsiteConfiguration
 
 
 def get_classic_website_config(collection_acron):
-    return ClassicWebsiteConfiguration.objects.get(
-        collection__acron=collection_acron
-    )
+    return ClassicWebsiteConfiguration.objects.get(collection__acron=collection_acron)
 
 
 def create_or_update_journal(
@@ -55,9 +53,7 @@ def create_or_update_journal(
     """
     params = {}
     try:
-        journal_proc_event = journal_proc.start(
-            user, "create_or_update_journal"
-        )
+        journal_proc_event = journal_proc.start(user, "create_or_update_journal")
         collection = journal_proc.collection
         journal_data = journal_proc.migrated_data.data
 
@@ -87,7 +83,9 @@ def create_or_update_journal(
             foundation_year=year,
         )
         if not eissn and not pissn:
-            raise ValueError(f"Before migrating, use Title Manager or SciELO Manager to complete print ISSN and/or electronic ISSN for {classic_website_journal.title}")
+            raise ValueError(
+                f"Before migrating, use Title Manager or SciELO Manager to complete print ISSN and/or electronic ISSN for {classic_website_journal.title}"
+            )
 
         official_journal = OfficialJournal.create_or_update(user=user, **params)
         official_journal.add_related_journal(
@@ -201,7 +199,9 @@ def create_or_update_journal(
                 user=user,
             )
             journal.owner.add(Owner.create_or_update(user, journal, institution))
-            journal.publisher.add(Publisher.create_or_update(user, journal, institution))
+            journal.publisher.add(
+                Publisher.create_or_update(user, journal, institution)
+            )
     except Exception as e:
         logging.exception(f"Exception: create_or_update_journal: 6: {e}")
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -237,11 +237,7 @@ def create_or_update_journal(
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
             force_update=force_update,
         )
-        journal_proc.update(
-            user=user,
-            journal=journal,
-            **params
-        )
+        journal_proc.update(user=user, journal=journal, **params)
         journal_proc_event.finish(user, completed=True, detail=params)
 
     except Exception as e:
@@ -979,7 +975,11 @@ def register_acron_id_file_content(
         logging.error(f"journal_proc: {journal_proc} {type(e)} {e}")
         if operation:
             operation.finish(
-                user, completed=False, exception=e, exc_traceback=exc_traceback, detail=detail
+                user,
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
+                detail=detail,
             )
             return
         UnexpectedEvent.create(
@@ -997,7 +997,9 @@ def register_acron_id_file_content(
         )
 
 
-def get_bases_work_acron_id_file_records(user, source_path, classic_website, journal_proc):
+def get_bases_work_acron_id_file_records(
+    user, source_path, classic_website, journal_proc
+):
     try:
         event = None
         event = journal_proc.start(user, "get_bases_work_acron_id_file_records")
@@ -1033,7 +1035,9 @@ def get_bases_work_acron_id_file_records(user, source_path, classic_website, jou
                     )
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
-                subevent = journal_proc.start(user, "get_bases_work_acron_id_file_records item")
+                subevent = journal_proc.start(
+                    user, "get_bases_work_acron_id_file_records item"
+                )
                 subevent.finish(
                     user,
                     completed=False,
@@ -1054,7 +1058,6 @@ def get_bases_work_acron_id_file_records(user, source_path, classic_website, jou
                 exc_traceback=exc_traceback,
             )
 
-        
 
 def id_file_has_changes(user, collection, id_path, force_update):
     return MigratedFile.has_changes(user, collection, id_path, force_update)

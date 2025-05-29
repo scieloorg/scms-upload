@@ -36,7 +36,9 @@ def build_journal(
     current_status = "inprogress"
     if builder.data.get("status_history"):
         try:
-            current_status = sorted(builder.data["status_history"], key=lambda x: x['date'])[-1]["status"]
+            current_status = sorted(
+                builder.data["status_history"], key=lambda x: x["date"]
+            )[-1]["status"]
             if current_status not in ("inprogress", "current"):
                 current_status = "no-current"
         except (IndexError, KeyError):

@@ -39,7 +39,9 @@ def get_api_data(collection, content_type, website_kind=None):
     except WebSiteConfiguration.DoesNotExist:
         return {"error": f"Website does not exist: {collection} {website_kind}"}
     except Exception as e:
-        raise Exception(f"Unable to get api data for {content_type} {collection} {website_kind}: {type(e)} {e}")
+        raise Exception(
+            f"Unable to get api data for {content_type} {collection} {website_kind}: {type(e)} {e}"
+        )
     return api.data
 
 

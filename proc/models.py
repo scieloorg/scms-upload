@@ -1273,7 +1273,7 @@ class IssueProc(BaseProc, ClusterableModel):
                     article_proc = self.create_or_update_article_proc(
                         user, record.item_pid, data["data"], force_update
                     )
-                    
+
                     if article_proc:
                         done += 1
                         record.todo = False
