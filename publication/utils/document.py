@@ -1,6 +1,5 @@
 import logging
 
-from lxml import etree
 from packtools.sps.models.article_abstract import Abstract
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.article_contribs import ArticleContribs
@@ -9,7 +8,6 @@ from packtools.sps.models.article_ids import ArticleIds
 from packtools.sps.models.article_renditions import ArticleRenditions
 from packtools.sps.models.article_titles import ArticleTitles
 from packtools.sps.models.article_toc_sections import ArticleTocSections
-from packtools.sps.models.dates import ArticleDates
 from packtools.sps.models.front_articlemeta_issue import ArticleMetaIssue
 from packtools.sps.models.kwd_group import KwdGroup
 from packtools.sps.models.related_articles import RelatedItems
