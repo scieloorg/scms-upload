@@ -19,6 +19,7 @@ from proc.controller import (
     create_or_update_journal_acron_id_file,
     get_files_from_classic_website,
     migrate_document_records,
+    fetch_and_create_journal,
 )
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
@@ -133,6 +134,37 @@ def task_migrate_and_publish_journals(
             ):
                 # cria ou atualiza Journal e atualiza journal_proc
                 migrate_journal(user, journal_proc, force_update)
+
+                try:
+                    # atualiza Journal e atualiza journal_proc com dados do Core
+                    event = None
+                    event = journal_proc.start(user, "fetch_and_create_journal")
+                    fetch_and_create_journal(
+                        user,
+                        collection_acron=collection.acron,
+                        issn_electronic=journal_proc.issn_electronic,
+                        issn_print=journal_proc.issn_print,
+                        force_update=force_update,
+                    )
+                    event.finish(user, completed=True, detail=journal_proc.completeness)
+                except Exception as e:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+
+                    if event:
+                        event.finish(user, completed=False, exception=e, exc_traceback=exc_traceback)
+                    else:
+                        UnexpectedEvent.create(
+                            e=e,
+                            exc_traceback=exc_traceback,
+                            detail={
+                                "task": "proc.tasks.task_migrate_and_publish_journals",
+                                "user_id": user_id,
+                                "username": username,
+                                "collection_acron": collection_acron,
+                                "journal_acron": journal_acron,
+                                "force_update": force_update,
+                            },
+                        )
 
                 if not qa_api_data.get("error"):
                     task_publish_journal.apply_async(
@@ -813,6 +845,31 @@ def task_create_collection_procs_from_pid_list(
             exc_traceback=exc_traceback,
             detail={
                 "function": "proc.tasks.task_create_collection_procs_from_pid_list",
+                "collection_acron": collection_acron,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_fetch_and_create_journal(
+    self, username, collection_acron=None, issn_electronic=None, issn_print=None, force_update=None
+):
+    user = _get_user(user_id=None, username=username)
+    try:
+        fetch_and_create_journal(
+            user,
+            collection_acron=collection_acron,
+            issn_electronic=issn_electronic,
+            issn_print=issn_print,
+            force_update=force_update,
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "proc.tasks.task_fetch_and_create_journal",
                 "collection_acron": collection_acron,
             },
         )

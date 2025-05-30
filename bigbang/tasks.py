@@ -26,6 +26,7 @@ def task_start(
     tasks_scheduler.delete_migration_tasks()
     tasks_scheduler.schedule_publication_subtasks(username)
     tasks_scheduler.schedule_migration_subtasks(username)
+    tasks_scheduler.schedule_subtasks(username)
     # FIXME tasks_scheduler.schedule_task_synchronize_to_pid_provider(username, enabled=enable)
 
 

@@ -11,6 +11,17 @@ from .exceptions import PressReleaseInvalidURL
 User = get_user_model()
 
 
+def add_query_params(params, key, value):
+    if not value:
+        return
+
+    if isinstance(value, list):
+        params[f"{key}__in"] = value
+        return
+
+    params[key] = value
+
+
 class CommonControlField(models.Model):
     """
     Class with common control fields.

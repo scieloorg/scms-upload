@@ -913,6 +913,13 @@ class JournalProc(BaseProc, ClusterableModel):
                 acron=item.journal_acron,
             )
 
+    @property
+    def completeness(self):
+        return {
+            "is_completed": self.journal.is_completed,
+            "required_data_completed": self.journal.required_data_completed,
+        }
+
 
 ################################################
 class IssueGetOrCreateError(Exception): ...
