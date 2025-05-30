@@ -33,7 +33,7 @@ class JournalSection(TextModel, CommonControlField):
         on_delete=models.SET_NULL,
         related_name="j_sections",
     )
-    code = models.CharField(max_length=16, null=True, blank=True)
+    code = models.CharField(max_length=200, null=True, blank=True)
 
     class Meta:
         unique_together = [("parent", "language", "code", "text")]
@@ -305,9 +305,9 @@ class Journal(CommonControlField, ClusterableModel):
     nlm_title = models.CharField(max_length=100, null=True, blank=True)
     doi_prefix = models.CharField(max_length=16, null=True, blank=True)
     logo_url = models.URLField(null=True, blank=True)
-    contact_name = models.CharField(max_length=200, null=True, blank=True)
+    contact_name = models.CharField(max_length=300, null=True, blank=True)
     contact_address = models.CharField(
-        _("Address"), max_length=300, null=True, blank=True
+        _("Address"), max_length=600, null=True, blank=True
     )
     contact_location = models.ForeignKey(
         Location, on_delete=models.SET_NULL, null=True, blank=True
