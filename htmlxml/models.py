@@ -23,10 +23,125 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from migration.models import MigratedArticle
 from package.models import BasicXMLFile
+
 # from tracker.models import EventLogger
 from tracker import choices as tracker_choices
 
 from . import choices, exceptions
+
+
+def get_xpath_for_a_href_stats(href, text, journal_acron):
+    if href.startswith("#"):
+        return [f".//xref[text()='{text}']"]
+
+    if "@" in href or "@" in text:
+        return [f".//email[text()='{text}']"]
+
+    if ":" in href or ":" in text:
+        return [f".//ext-link[text()='{text}']"]
+
+    if "img/revistas" in href or f"/{journal_acron}/" in href:
+        name, ext = os.path.splitext(href)
+        if ".htm" not in ext:
+            return [
+                f".//xref[text()='{text}']",
+                f".//graphic[@xlink:href='{href}']",
+            ]
+    return [f".//ext-link[text()='{text}']"]
+
+
+def get_xpath_for_src_stats(element_tag, src, journal_acron):
+    """
+    Determina XPaths apropriados para análise de elementos src.
+
+    Args:
+        element_tag: Tag do elemento HTML (img, etc)
+        src: Valor do atributo src
+
+    Returns:
+        list: Lista de expressões XPath para buscar no XML
+    """
+    if ":" in href or ":" in src:
+        return [f".//ext-link[text()='{src}']"]
+
+    # if "img/revistas" in src or src.startswith("/pdf"):
+    if f"/{journal_acron}/" in href:
+        if element_tag == "img":
+            return [
+                f".//graphic[@xlink:href='{src}']",
+                f".//inline-graphic[@xlink:href='{src}']",
+            ]
+
+    return [f".//*[@xlink:href='{src}']"]
+
+
+def get_xpath_for_name_stats(name):
+    """
+    Determina XPaths apropriados para análise de elementos name.
+
+    Args:
+        name: Valor do atributo name
+
+    Returns:
+        list: Lista de expressões XPath para buscar no XML
+    """
+    if not name:
+        return []
+
+    if name.isalpha():
+        return [f".//*[@id='{name}']"]
+    if name.startswith("t") and name[-1].isdigit():
+        return [f".//table-wrap[@id='{name}']"]
+    if name.startswith("f") and name[-1].isdigit():
+        return [f".//fig[@id='{name}']"]
+    if name[-1].isdigit():
+        return [f".//*[@id='{name}']"]
+    return []
+
+
+def get_xml_nodes_to_string(xml, xpath):
+    for item in xml.xpath(xpath, namespaces={"xlink": "http://www.w3.org/1999/xlink"}):
+        yield xml_node_to_string(item)
+
+
+# Extrair de Html2xmlAnalysis
+def xml_node_to_string(node):
+    """Era Html2xmlAnalysis.tostring()"""
+    return etree.tostring(node, encoding="utf-8", pretty_print=True).decode("utf-8")
+
+
+def format_data_as_tabular(data_dict):
+    """Unifica _format_csv() e _format_txt() (eram idênticos)"""
+    for k, v in data_dict.items():
+        if k == "html_vs_xml":
+            for item in v:
+                yield f"{item['html']}\t{item['xml']}"
+        else:
+            yield f"{k}\t{v}"
+
+
+def format_html_numbers_section(data_dict):
+    """Era Html2xmlAnalysis._format_html_numbers()"""
+    yield "<div><div>"
+    for k, v in data_dict.items():
+        if k == "html_vs_xml":
+            continue
+        else:
+            yield (
+                f'<div class="row"><div class="col-sm">{k}</div>'
+                f'<div class="col-sm">{v}</div></div>'
+            )
+    yield "</div></div>"
+
+
+def format_html_match_section(data_dict):
+    """Era Html2xmlAnalysis._format_html_match()"""
+    yield "<div>"
+    for k, v in data_dict.items():
+        if k == "html_vs_xml":
+            for item in v:
+                yield from format_code(item)
+    yield "</div>"
 
 
 def format_code_(data):
@@ -174,7 +289,7 @@ class Html2xmlAnalysis(models.Model):
     article_type = models.CharField(null=True, blank=True, max_length=32)
 
     @property
-    def data(self):
+    def analysis_data(self):
         return dict(
             empty_body=self.empty_body,
             attention_demands=self.attention_demands,
@@ -222,33 +337,15 @@ class Html2xmlAnalysis(models.Model):
 
     @property
     def csv_report_content(self):
-        rows = "\n".join(self._format_csv())
-        return rows
-
-    def _format_csv(self):
-        for k, v in self.data.items():
-            if k == "html_vs_xml":
-                for item in v:
-                    yield f"{item['html']}\t{item['xml']}"
-            else:
-                yield f"{k}\t{v}"
+        return "\n".join(format_data_as_tabular(self.analysis_data))
 
     @property
     def txt_report_content(self):
-        rows = "\n".join(self._format_txt())
-        return rows
-
-    def _format_txt(self):
-        for k, v in self.data.items():
-            if k == "html_vs_xml":
-                for item in v:
-                    yield f"{item['html']}\t{item['xml']}"
-            else:
-                yield f"{k}\t{v}"
+        return "\n".join(format_data_as_tabular(self.analysis_data))
 
     def html_report_content(self, title):
-        rows = "\n".join(self._format_html_numbers()) + "\n".join(
-            self._format_html_match()
+        rows = "\n".join(format_html_numbers_section(self.analysis_data)) + "\n".join(
+            format_html_match_section(self.analysis_data)
         )
         return (
             f"""<html>"""
@@ -261,109 +358,53 @@ class Html2xmlAnalysis(models.Model):
             f"""<body><div class="container"><title>Report {title}</title><h1>Report {title}</h1>{rows}</div></body></html>"""
         )
 
-    def _format_html_numbers(self):
-        yield "<div><div>"
-        for k, v in self.data.items():
-            if k == "html_vs_xml":
-                continue
-            else:
-                yield (
-                    f'<div class="row"><div class="col-sm">{k}</div>'
-                    f'<div class="col-sm">{v}</div></div>'
-                )
-        yield "</div></div>"
-
-    def _format_html_match(self):
-        yield "<div>"
-        for k, v in self.data.items():
-            if k == "html_vs_xml":
-                for item in v:
-                    yield from format_code(item)
-        yield "</div>"
-
-    def tostring(self, node):
-        return etree.tostring(node, encoding="utf-8", pretty_print=True).decode("utf-8")
-
-    def get_a_href_stats(self, html, xml):
-        nodes = html.xpath(".//a[@href]")
-        for a in nodes:
-            data = {}
-            data["html"] = self.tostring(a)
-
-            xml_nodes = []
+    def get_a_href_stats(self, html, xml, journal_acron):
+        for a in html.xpath(".//a[@href]"):
             href = a.get("href")
-            if "img/revistas" in href:
-                name, ext = os.path.splitext(href)
-                if ".htm" not in ext:
-                    for item in xml.xpath(f".//xref[text()='{a.text}']"):
-                        xml_nodes.append(self.tostring(item))
+            text = a.text
+            xpaths = " | ".join(get_xpath_for_a_href_stats(href, text, journal_acron))
+            yield {
+                "html": xml_node_to_string(a),
+                "xml": (
+                    get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []
+                ),
+            }
 
-                    for item in xml.xpath(
-                        f".//graphic[@xlink:href='{href}']",
-                        namespaces={"xlink": "http://www.w3.org/1999/xlink"},
-                    ):
-                        xml_nodes.append(self.tostring(item))
-            elif href.startswith("#"):
-                for item in xml.xpath(f".//xref[text()='{a.text}']"):
-                    xml_nodes.append(self.tostring(item))
-            elif "@" in href or "@" in a.text:
-                for item in xml.xpath(f".//email[text()='{a.text}']"):
-                    xml_nodes.append(self.tostring(item))
-            else:
-                for item in xml.xpath(f".//ext-link[text()='{a.text}']"):
-                    xml_nodes.append(self.tostring(item))
-            data["xml"] = xml_nodes
-            yield data
-
-    def get_src_stats(self, html, xml):
+    def get_src_stats(self, html, xml, journal_acron):
+        """
+        Analisa elementos src usando função xpath dedicada.
+        """
         self.html_img_total = len(html.xpath(".//img[@src]"))
-        nodes = html.xpath(".//*[@src]")
-        for a in nodes:
-            data = {}
-            data["html"] = self.tostring(a)
-            xml_nodes = []
-            src = a.get("src")
-            if "img/revistas" in src or src.startswith("/pdf"):
-                if a.tag == "img":
-                    for item in xml.xpath(
-                        f".//graphic[@xlink:href='{src}'] | .//inline-graphic[@xlink:href='{src}']",
-                        namespaces={"xlink": "http://www.w3.org/1999/xlink"},
-                    ):
-                        xml_nodes.append(self.tostring(item))
-                else:
-                    for item in xml.xpath(
-                        f".//*[@xlink:href='{src}']",
-                        namespaces={"xlink": "http://www.w3.org/1999/xlink"},
-                    ):
-                        xml_nodes.append(self.tostring(item))
-            else:
-                for item in xml.xpath(f".//*[@xlink:href='{src}']"):
-                    xml_nodes.append(self.tostring(item))
-            data["xml"] = xml_nodes
-            yield data
+
+        for element in html.xpath(".//*[@src]"):
+            src = element.get("src", "")
+
+            # Usar função dedicada para determinar XPaths
+            xpaths = get_xpath_for_src_stats(element.tag, src, journal_acron)
+
+            yield {
+                "html": xml_node_to_string(element),
+                "xml": (
+                    get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []
+                ),
+            }
 
     def get_a_name_stats(self, html, xml):
+        """
+        Analisa elementos name usando função xpath dedicada.
+        """
         for node in html.xpath(".//a[@name]"):
-            data = {}
-            data["html"] = self.tostring(node)
-            xml_nodes = []
-            name = node.get("name")
-            if not name:
-                continue
-            if name.isalpha():
-                for item in xml.xpath(f".//*[@id='{name}']"):
-                    xml_nodes.append(self.tostring(item))
-            elif name[0] == "t" and name[-1].isdigit():
-                for item in xml.xpath(f".//table-wrap[@id='{name}']"):
-                    xml_nodes.append(self.tostring(item))
-            elif name[0] == "f" and name[-1].isdigit():
-                for item in xml.xpath(f".//fig[@id='{name}']"):
-                    xml_nodes.append(self.tostring(item))
-            elif name[-1].isdigit():
-                for item in xml.xpath(f".//*[@id='{name}']"):
-                    xml_nodes.append(self.tostring(item))
-            data["xml"] = xml_nodes
-            yield data
+            name = node.get("name", "")
+
+            # Usar função dedicada para determinar XPaths
+            xpaths = get_xpath_for_name_stats(name)
+
+            yield {
+                "html": xml_node_to_string(node),
+                "xml": (
+                    get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []
+                ),
+            }
 
     def get_html_stats(self, html):
         self.html_table_total = len(html.xpath(".//table"))
@@ -389,9 +430,9 @@ class Html2xmlAnalysis(models.Model):
             len(xml.xpath(".//sub-article[@article-type='translation']")) + 1
         )
 
-    def html_vs_xml(self, html, xml):
-        yield from self.get_a_href_stats(html, xml)
-        yield from self.get_src_stats(html, xml)
+    def html_vs_xml(self, html, xml, journal_acron):
+        yield from self.get_a_href_stats(html, xml, journal_acron)
+        yield from self.get_src_stats(html, xml, journal_acron)
         yield from self.get_a_name_stats(html, xml)
 
     def identify_attention_demands(self):
@@ -429,13 +470,13 @@ class Html2xmlAnalysis(models.Model):
         self.attention_demands += self.xml_supplmat_total
         self.attention_demands += self.html_table_total
 
-    def evaluate_xml(self, html, xml):
+    def evaluate_xml(self, html, xml, journal_acron):
         if html is None or xml is None:
             raise ValueError("Html2xmlAnalysis.evaluate_xml requires html and xml")
         self.article_type = xml.find(".").get("article-type")
-        self.get_html_stats(xml)
+        self.get_html_stats(html)
         self.get_xml_stats(xml)
-        self._html_vs_xml = list(self.html_vs_xml(html, xml))
+        self._html_vs_xml = list(self.html_vs_xml(html, xml, journal_acron))
         self.identify_attention_demands()
         self.save()
 
@@ -603,7 +644,10 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             )
             xml_content = self._generate_xml_from_html(user, article_proc, document)
 
-            detail = {"xml_content": bool(xml_content), "body_and_back": bool(body_and_back)}
+            detail = {
+                "xml_content": bool(xml_content),
+                "body_and_back": bool(body_and_back),
+            }
             completed = bool(xml_content and body_and_back)
             if completed:
                 self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -621,7 +665,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 detail=detail,
             )
             return xml_content
-            
+
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
 
@@ -636,7 +680,6 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 exc_traceback=exc_traceback,
                 detail=detail,
             )
-        
 
     @property
     def first_bb_file(self):
@@ -661,7 +704,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             for xml_with_pre in XMLWithPre.create(path=self.file.path):
                 xml = xml_with_pre.xmltree
 
-            self.evaluate_xml(html, xml)
+            self.evaluate_xml(html, xml, article_proc.issue_proc.journal_proc.acron)
             self.save_report(self.html_report_content(title=article_proc))
 
             if self.attention_demands == 0:
