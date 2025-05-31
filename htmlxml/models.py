@@ -23,6 +23,7 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from migration.models import MigratedArticle
 from package.models import BasicXMLFile
+
 # from tracker.models import EventLogger
 from tracker import choices as tracker_choices
 
@@ -301,16 +302,12 @@ class Html2xmlAnalysis(models.Model):
                 if ".htm" not in ext:
                     xpaths = [
                         f".//xref[text()='{a.text}']",
-                        f".//graphic[@xlink:href='{href}']"
+                        f".//graphic[@xlink:href='{href}']",
                     ]
             elif href.startswith("#"):
-                xpaths = [
-                    f".//xref[text()='{a.text}']"
-                ]
+                xpaths = [f".//xref[text()='{a.text}']"]
             elif "@" in href or "@" in a.text:
-                xpaths = [
-                    f".//email[text()='{a.text}']"
-                ]
+                xpaths = [f".//email[text()='{a.text}']"]
             else:
                 xpaths = [f".//ext-link[text()='{a.text}']"]
 
@@ -605,7 +602,10 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             )
             xml_content = self._generate_xml_from_html(user, article_proc, document)
 
-            detail = {"xml_content": bool(xml_content), "body_and_back": bool(body_and_back)}
+            detail = {
+                "xml_content": bool(xml_content),
+                "body_and_back": bool(body_and_back),
+            }
             completed = bool(xml_content and body_and_back)
             if completed:
                 self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -623,7 +623,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 detail=detail,
             )
             return xml_content
-            
+
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
 
@@ -638,7 +638,6 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 exc_traceback=exc_traceback,
                 detail=detail,
             )
-        
 
     @property
     def first_bb_file(self):
