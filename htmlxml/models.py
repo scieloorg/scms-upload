@@ -433,7 +433,7 @@ class Html2xmlAnalysis(models.Model):
         if html is None or xml is None:
             raise ValueError("Html2xmlAnalysis.evaluate_xml requires html and xml")
         self.article_type = xml.find(".").get("article-type")
-        self.get_html_stats(xml)
+        self.get_html_stats(html)
         self.get_xml_stats(xml)
         self._html_vs_xml = list(self.html_vs_xml(html, xml))
         self.identify_attention_demands()
