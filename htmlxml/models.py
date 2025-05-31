@@ -29,6 +29,46 @@ from tracker import choices as tracker_choices
 from . import choices, exceptions
 
 
+# Extrair de Html2xmlAnalysis
+def xml_node_to_string(node):
+    """Era Html2xmlAnalysis.tostring()"""
+    return etree.tostring(node, encoding="utf-8", pretty_print=True).decode("utf-8")
+
+
+def format_data_as_tabular(data_dict):
+    """Unifica _format_csv() e _format_txt() (eram idênticos)"""
+    for k, v in data_dict.items():
+        if k == "html_vs_xml":
+            for item in v:
+                yield f"{item['html']}\t{item['xml']}"
+        else:
+            yield f"{k}\t{v}"
+
+
+def format_html_numbers_section(data_dict):
+    """Era Html2xmlAnalysis._format_html_numbers()"""
+    yield "<div><div>"
+    for k, v in data_dict.items():
+        if k == "html_vs_xml":
+            continue
+        else:
+            yield (
+                f'<div class="row"><div class="col-sm">{k}</div>'
+                f'<div class="col-sm">{v}</div></div>'
+            )
+    yield "</div></div>"
+
+
+def format_html_match_section(data_dict):
+    """Era Html2xmlAnalysis._format_html_match()"""
+    yield "<div>"
+    for k, v in data_dict.items():
+        if k == "html_vs_xml":
+            for item in v:
+                yield from format_code(item)
+    yield "</div>"
+
+
 def format_code_(data):
     data = data.replace("&", "&amp;")
     data = data.replace("<", "&lt;")
