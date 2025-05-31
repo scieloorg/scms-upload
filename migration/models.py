@@ -460,17 +460,7 @@ class MigratedFile(CommonControlField):
 
     @classmethod
     def find(cls, collection, xlink_href, subdir):
-        original = xlink_href
-        path = xlink_href
-
-        if "/img/revistas/" in path and not path.startswith("/img/revistas/"):
-            path = path[path.find("/img/revistas") :]
-
-        if "/img/revistas/" not in path:
-            path = os.path.join("/img/revistas", subdir, path)
-
-        if ".." in path:
-            path = os.path.normpath(path)
+        path = MigratedFile.fix_asset_path(xlink_href, subdir)
 
         name, ext = os.path.splitext(path)
 
@@ -478,6 +468,22 @@ class MigratedFile(CommonControlField):
             Q(original_href=path) | Q(original_href__startswith=name + "."),
             collection=collection,
         )
+
+    @staticmethod
+    def fix_asset_path(path, subdir):
+        for pattern in ("/img/revistas/", "/img/fbpe/"):
+            if path.startswith(pattern):
+                return path
+
+        for pattern in ("img/revistas/", "img/fbpe/"):
+            if pattern in path:
+                # faz path começar com /img/revistas
+                return "/" + path[path.find(pattern) :]
+
+        path = os.path.join("/img/revistas", subdir, path)
+        if ".." in path:
+            path = os.path.normpath(path)
+        return path
 
     def get_original_href(self, original_path):
         try:
