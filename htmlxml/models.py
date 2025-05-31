@@ -214,7 +214,7 @@ class Html2xmlAnalysis(models.Model):
     article_type = models.CharField(null=True, blank=True, max_length=32)
 
     @property
-    def data(self):
+    def analysis_data(self):
         return dict(
             empty_body=self.empty_body,
             attention_demands=self.attention_demands,
@@ -262,15 +262,15 @@ class Html2xmlAnalysis(models.Model):
 
     @property
     def csv_report_content(self):
-        return "\n".join(format_data_as_tabular(self.data))
+        return "\n".join(format_data_as_tabular(self.analysis_data))
 
     @property
     def txt_report_content(self):
-        return "\n".join(format_data_as_tabular(self.data))
+        return "\n".join(format_data_as_tabular(self.analysis_data))
 
     def html_report_content(self, title):
-        rows = "\n".join(format_html_numbers_section(self.data)) + "\n".join(
-            format_html_match_section(self.data)
+        rows = "\n".join(format_html_numbers_section(self.analysis_data)) + "\n".join(
+            format_html_match_section(self.analysis_data)
         )
         return (
             f"""<html>"""
