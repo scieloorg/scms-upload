@@ -262,33 +262,15 @@ class Html2xmlAnalysis(models.Model):
 
     @property
     def csv_report_content(self):
-        rows = "\n".join(self._format_csv())
-        return rows
-
-    def _format_csv(self):
-        for k, v in self.data.items():
-            if k == "html_vs_xml":
-                for item in v:
-                    yield f"{item['html']}\t{item['xml']}"
-            else:
-                yield f"{k}\t{v}"
+        return "\n".join(format_data_as_tabular(self.data))
 
     @property
     def txt_report_content(self):
-        rows = "\n".join(self._format_txt())
-        return rows
-
-    def _format_txt(self):
-        for k, v in self.data.items():
-            if k == "html_vs_xml":
-                for item in v:
-                    yield f"{item['html']}\t{item['xml']}"
-            else:
-                yield f"{k}\t{v}"
+        return "\n".join(format_data_as_tabular(self.data))
 
     def html_report_content(self, title):
-        rows = "\n".join(self._format_html_numbers()) + "\n".join(
-            self._format_html_match()
+        rows = "\n".join(format_html_numbers_section(self.data)) + "\n".join(
+            format_html_match_section(self.data)
         )
         return (
             f"""<html>"""
@@ -301,34 +283,11 @@ class Html2xmlAnalysis(models.Model):
             f"""<body><div class="container"><title>Report {title}</title><h1>Report {title}</h1>{rows}</div></body></html>"""
         )
 
-    def _format_html_numbers(self):
-        yield "<div><div>"
-        for k, v in self.data.items():
-            if k == "html_vs_xml":
-                continue
-            else:
-                yield (
-                    f'<div class="row"><div class="col-sm">{k}</div>'
-                    f'<div class="col-sm">{v}</div></div>'
-                )
-        yield "</div></div>"
-
-    def _format_html_match(self):
-        yield "<div>"
-        for k, v in self.data.items():
-            if k == "html_vs_xml":
-                for item in v:
-                    yield from format_code(item)
-        yield "</div>"
-
-    def tostring(self, node):
-        return etree.tostring(node, encoding="utf-8", pretty_print=True).decode("utf-8")
-
     def get_a_href_stats(self, html, xml):
         nodes = html.xpath(".//a[@href]")
         for a in nodes:
             data = {}
-            data["html"] = self.tostring(a)
+            data["html"] = xml_node_to_string(a)
 
             xml_nodes = []
             href = a.get("href")
@@ -336,22 +295,22 @@ class Html2xmlAnalysis(models.Model):
                 name, ext = os.path.splitext(href)
                 if ".htm" not in ext:
                     for item in xml.xpath(f".//xref[text()='{a.text}']"):
-                        xml_nodes.append(self.tostring(item))
+                        xml_nodes.append(xml_node_to_string(item))
 
                     for item in xml.xpath(
                         f".//graphic[@xlink:href='{href}']",
                         namespaces={"xlink": "http://www.w3.org/1999/xlink"},
                     ):
-                        xml_nodes.append(self.tostring(item))
+                        xml_nodes.append(xml_node_to_string(item))
             elif href.startswith("#"):
                 for item in xml.xpath(f".//xref[text()='{a.text}']"):
-                    xml_nodes.append(self.tostring(item))
+                    xml_nodes.append(xml_node_to_string(item))
             elif "@" in href or "@" in a.text:
                 for item in xml.xpath(f".//email[text()='{a.text}']"):
-                    xml_nodes.append(self.tostring(item))
+                    xml_nodes.append(xml_node_to_string(item))
             else:
                 for item in xml.xpath(f".//ext-link[text()='{a.text}']"):
-                    xml_nodes.append(self.tostring(item))
+                    xml_nodes.append(xml_node_to_string(item))
             data["xml"] = xml_nodes
             yield data
 
@@ -360,7 +319,7 @@ class Html2xmlAnalysis(models.Model):
         nodes = html.xpath(".//*[@src]")
         for a in nodes:
             data = {}
-            data["html"] = self.tostring(a)
+            data["html"] = xml_node_to_string(a)
             xml_nodes = []
             src = a.get("src")
             if "img/revistas" in src or src.startswith("/pdf"):
@@ -369,39 +328,39 @@ class Html2xmlAnalysis(models.Model):
                         f".//graphic[@xlink:href='{src}'] | .//inline-graphic[@xlink:href='{src}']",
                         namespaces={"xlink": "http://www.w3.org/1999/xlink"},
                     ):
-                        xml_nodes.append(self.tostring(item))
+                        xml_nodes.append(xml_node_to_string(item))
                 else:
                     for item in xml.xpath(
                         f".//*[@xlink:href='{src}']",
                         namespaces={"xlink": "http://www.w3.org/1999/xlink"},
                     ):
-                        xml_nodes.append(self.tostring(item))
+                        xml_nodes.append(xml_node_to_string(item))
             else:
                 for item in xml.xpath(f".//*[@xlink:href='{src}']"):
-                    xml_nodes.append(self.tostring(item))
+                    xml_nodes.append(xml_node_to_string(item))
             data["xml"] = xml_nodes
             yield data
 
     def get_a_name_stats(self, html, xml):
         for node in html.xpath(".//a[@name]"):
             data = {}
-            data["html"] = self.tostring(node)
+            data["html"] = xml_node_to_string(node)
             xml_nodes = []
             name = node.get("name")
             if not name:
                 continue
             if name.isalpha():
                 for item in xml.xpath(f".//*[@id='{name}']"):
-                    xml_nodes.append(self.tostring(item))
+                    xml_nodes.append(xml_node_to_string(item))
             elif name[0] == "t" and name[-1].isdigit():
                 for item in xml.xpath(f".//table-wrap[@id='{name}']"):
-                    xml_nodes.append(self.tostring(item))
+                    xml_nodes.append(xml_node_to_string(item))
             elif name[0] == "f" and name[-1].isdigit():
                 for item in xml.xpath(f".//fig[@id='{name}']"):
-                    xml_nodes.append(self.tostring(item))
+                    xml_nodes.append(xml_node_to_string(item))
             elif name[-1].isdigit():
                 for item in xml.xpath(f".//*[@id='{name}']"):
-                    xml_nodes.append(self.tostring(item))
+                    xml_nodes.append(xml_node_to_string(item))
             data["xml"] = xml_nodes
             yield data
 
