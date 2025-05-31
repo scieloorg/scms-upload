@@ -30,6 +30,26 @@ from tracker import choices as tracker_choices
 from . import choices, exceptions
 
 
+def get_xpath_for_a_href_stats(href, text, journal_acron):
+    if href.startswith("#"):
+        return [f".//xref[text()='{text}']"]
+
+    if "@" in href or "@" in text:
+        return [f".//email[text()='{text}']"]
+
+    if ":" in href or ":" in text:
+        return [f".//ext-link[text()='{text}']"]
+
+    if "img/revistas" in href or f"/{journal_acron}/" in href:
+        name, ext = os.path.splitext(href)
+        if ".htm" not in ext:
+            return = [
+                f".//xref[text()='{text}']",
+                f".//graphic[@xlink:href='{href}']",
+            ]
+    return [f".//ext-link[text()='{text}']"]
+
+
 def get_xml_nodes_to_string(xml, xpath):
     for item in xml.xpath(xpath, namespaces={"xlink": "http://www.w3.org/1999/xlink"}):
         yield xml_node_to_string(item)
@@ -289,32 +309,17 @@ class Html2xmlAnalysis(models.Model):
             f"""<body><div class="container"><title>Report {title}</title><h1>Report {title}</h1>{rows}</div></body></html>"""
         )
 
-    def get_a_href_stats(self, html, xml):
+    def get_a_href_stats(self, html, xml, journal_acron):
         for a in html.xpath(".//a[@href]"):
-            data = {}
-            data["html"] = xml_node_to_string(a)
-
             href = a.get("href")
-            # get_xml_nodes_to_string(xml, xpath)
+            text = a.text
+            xpaths = " | ".join(get_xpath_for_a_href_stats(href, text, journal_acron))
+            yield {
+                "html": xml_node_to_string(a),
+                "xml": get_xml_nodes_to_string(xml, xpaths)
+            }
 
-            if "img/revistas" in href:
-                name, ext = os.path.splitext(href)
-                if ".htm" not in ext:
-                    xpaths = [
-                        f".//xref[text()='{a.text}']",
-                        f".//graphic[@xlink:href='{href}']",
-                    ]
-            elif href.startswith("#"):
-                xpaths = [f".//xref[text()='{a.text}']"]
-            elif "@" in href or "@" in a.text:
-                xpaths = [f".//email[text()='{a.text}']"]
-            else:
-                xpaths = [f".//ext-link[text()='{a.text}']"]
-
-            data["xml"] = get_xml_nodes_to_string(xml, " | ".join(xpaths))
-            yield data
-
-    def get_src_stats(self, html, xml):
+    def get_src_stats(self, html, xml, journal_acron):
         self.html_img_total = len(html.xpath(".//img[@src]"))
         nodes = html.xpath(".//*[@src]")
         for a in nodes:
@@ -341,7 +346,7 @@ class Html2xmlAnalysis(models.Model):
             data["xml"] = xml_nodes
             yield data
 
-    def get_a_name_stats(self, html, xml):
+    def get_a_name_stats(self, html, xml, journal_acron):
         for node in html.xpath(".//a[@name]"):
             data = {}
             data["html"] = xml_node_to_string(node)
@@ -388,10 +393,10 @@ class Html2xmlAnalysis(models.Model):
             len(xml.xpath(".//sub-article[@article-type='translation']")) + 1
         )
 
-    def html_vs_xml(self, html, xml):
-        yield from self.get_a_href_stats(html, xml)
-        yield from self.get_src_stats(html, xml)
-        yield from self.get_a_name_stats(html, xml)
+    def html_vs_xml(self, html, xml, journal_acron):
+        yield from self.get_a_href_stats(html, xml, journal_acron)
+        yield from self.get_src_stats(html, xml, journal_acron)
+        yield from self.get_a_name_stats(html, xml, journal_acron)
 
     def identify_attention_demands(self):
         self.attention_demands = 0
@@ -428,13 +433,13 @@ class Html2xmlAnalysis(models.Model):
         self.attention_demands += self.xml_supplmat_total
         self.attention_demands += self.html_table_total
 
-    def evaluate_xml(self, html, xml):
+    def evaluate_xml(self, html, xml, journal_acron):
         if html is None or xml is None:
             raise ValueError("Html2xmlAnalysis.evaluate_xml requires html and xml")
         self.article_type = xml.find(".").get("article-type")
         self.get_html_stats(html)
         self.get_xml_stats(xml)
-        self._html_vs_xml = list(self.html_vs_xml(html, xml))
+        self._html_vs_xml = list(self.html_vs_xml(html, xml, journal_acron))
         self.identify_attention_demands()
         self.save()
 
@@ -662,7 +667,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             for xml_with_pre in XMLWithPre.create(path=self.file.path):
                 xml = xml_with_pre.xmltree
 
-            self.evaluate_xml(html, xml)
+            self.evaluate_xml(html, xml, article_proc.issue_proc.journal_proc.acron)
             self.save_report(self.html_report_content(title=article_proc))
 
             if self.attention_demands == 0:
