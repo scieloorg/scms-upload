@@ -29,6 +29,11 @@ from tracker import choices as tracker_choices
 from . import choices, exceptions
 
 
+def get_xml_nodes_to_string(xml, xpath):
+    for item in xml.xpath(xpath, namespaces={"xlink": "http://www.w3.org/1999/xlink"}):
+        yield xml_node_to_string(item)
+
+
 # Extrair de Html2xmlAnalysis
 def xml_node_to_string(node):
     """Era Html2xmlAnalysis.tostring()"""
@@ -284,34 +289,32 @@ class Html2xmlAnalysis(models.Model):
         )
 
     def get_a_href_stats(self, html, xml):
-        nodes = html.xpath(".//a[@href]")
-        for a in nodes:
+        for a in html.xpath(".//a[@href]"):
             data = {}
             data["html"] = xml_node_to_string(a)
 
-            xml_nodes = []
             href = a.get("href")
+            # get_xml_nodes_to_string(xml, xpath)
+
             if "img/revistas" in href:
                 name, ext = os.path.splitext(href)
                 if ".htm" not in ext:
-                    for item in xml.xpath(f".//xref[text()='{a.text}']"):
-                        xml_nodes.append(xml_node_to_string(item))
-
-                    for item in xml.xpath(
-                        f".//graphic[@xlink:href='{href}']",
-                        namespaces={"xlink": "http://www.w3.org/1999/xlink"},
-                    ):
-                        xml_nodes.append(xml_node_to_string(item))
+                    xpaths = [
+                        f".//xref[text()='{a.text}']",
+                        f".//graphic[@xlink:href='{href}']"
+                    ]
             elif href.startswith("#"):
-                for item in xml.xpath(f".//xref[text()='{a.text}']"):
-                    xml_nodes.append(xml_node_to_string(item))
+                xpaths = [
+                    f".//xref[text()='{a.text}']"
+                ]
             elif "@" in href or "@" in a.text:
-                for item in xml.xpath(f".//email[text()='{a.text}']"):
-                    xml_nodes.append(xml_node_to_string(item))
+                xpaths = [
+                    f".//email[text()='{a.text}']"
+                ]
             else:
-                for item in xml.xpath(f".//ext-link[text()='{a.text}']"):
-                    xml_nodes.append(xml_node_to_string(item))
-            data["xml"] = xml_nodes
+                xpaths = [f".//ext-link[text()='{a.text}']"]
+
+            data["xml"] = get_xml_nodes_to_string(xml, " | ".join(xpaths))
             yield data
 
     def get_src_stats(self, html, xml):
