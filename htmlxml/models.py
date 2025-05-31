@@ -43,11 +43,60 @@ def get_xpath_for_a_href_stats(href, text, journal_acron):
     if "img/revistas" in href or f"/{journal_acron}/" in href:
         name, ext = os.path.splitext(href)
         if ".htm" not in ext:
-            return = [
+            return [
                 f".//xref[text()='{text}']",
                 f".//graphic[@xlink:href='{href}']",
             ]
     return [f".//ext-link[text()='{text}']"]
+
+
+def get_xpath_for_src_stats(element_tag, src, journal_acron):
+    """
+    Determina XPaths apropriados para análise de elementos src.
+
+    Args:
+        element_tag: Tag do elemento HTML (img, etc)
+        src: Valor do atributo src
+
+    Returns:
+        list: Lista de expressões XPath para buscar no XML
+    """
+    if ":" in href or ":" in src:
+        return [f".//ext-link[text()='{src}']"]
+
+    # if "img/revistas" in src or src.startswith("/pdf"):
+    if f"/{journal_acron}/" in href:
+        if element_tag == "img":
+            return [
+                f".//graphic[@xlink:href='{src}']",
+                f".//inline-graphic[@xlink:href='{src}']",
+            ]
+
+    return [f".//*[@xlink:href='{src}']"]
+
+
+def get_xpath_for_name_stats(name):
+    """
+    Determina XPaths apropriados para análise de elementos name.
+
+    Args:
+        name: Valor do atributo name
+
+    Returns:
+        list: Lista de expressões XPath para buscar no XML
+    """
+    if not name:
+        return []
+
+    if name.isalpha():
+        return [f".//*[@id='{name}']"]
+    if name.startswith("t") and name[-1].isdigit():
+        return [f".//table-wrap[@id='{name}']"]
+    if name.startswith("f") and name[-1].isdigit():
+        return [f".//fig[@id='{name}']"]
+    if name[-1].isdigit():
+        return [f".//*[@id='{name}']"]
+    return []
 
 
 def get_xml_nodes_to_string(xml, xpath):
@@ -316,58 +365,46 @@ class Html2xmlAnalysis(models.Model):
             xpaths = " | ".join(get_xpath_for_a_href_stats(href, text, journal_acron))
             yield {
                 "html": xml_node_to_string(a),
-                "xml": get_xml_nodes_to_string(xml, xpaths)
+                "xml": (
+                    get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []
+                ),
             }
 
     def get_src_stats(self, html, xml, journal_acron):
+        """
+        Analisa elementos src usando função xpath dedicada.
+        """
         self.html_img_total = len(html.xpath(".//img[@src]"))
-        nodes = html.xpath(".//*[@src]")
-        for a in nodes:
-            data = {}
-            data["html"] = xml_node_to_string(a)
-            xml_nodes = []
-            src = a.get("src")
-            if "img/revistas" in src or src.startswith("/pdf"):
-                if a.tag == "img":
-                    for item in xml.xpath(
-                        f".//graphic[@xlink:href='{src}'] | .//inline-graphic[@xlink:href='{src}']",
-                        namespaces={"xlink": "http://www.w3.org/1999/xlink"},
-                    ):
-                        xml_nodes.append(xml_node_to_string(item))
-                else:
-                    for item in xml.xpath(
-                        f".//*[@xlink:href='{src}']",
-                        namespaces={"xlink": "http://www.w3.org/1999/xlink"},
-                    ):
-                        xml_nodes.append(xml_node_to_string(item))
-            else:
-                for item in xml.xpath(f".//*[@xlink:href='{src}']"):
-                    xml_nodes.append(xml_node_to_string(item))
-            data["xml"] = xml_nodes
-            yield data
 
-    def get_a_name_stats(self, html, xml, journal_acron):
+        for element in html.xpath(".//*[@src]"):
+            src = element.get("src", "")
+
+            # Usar função dedicada para determinar XPaths
+            xpaths = get_xpath_for_src_stats(element.tag, src, journal_acron)
+
+            yield {
+                "html": xml_node_to_string(element),
+                "xml": (
+                    get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []
+                ),
+            }
+
+    def get_a_name_stats(self, html, xml):
+        """
+        Analisa elementos name usando função xpath dedicada.
+        """
         for node in html.xpath(".//a[@name]"):
-            data = {}
-            data["html"] = xml_node_to_string(node)
-            xml_nodes = []
-            name = node.get("name")
-            if not name:
-                continue
-            if name.isalpha():
-                for item in xml.xpath(f".//*[@id='{name}']"):
-                    xml_nodes.append(xml_node_to_string(item))
-            elif name[0] == "t" and name[-1].isdigit():
-                for item in xml.xpath(f".//table-wrap[@id='{name}']"):
-                    xml_nodes.append(xml_node_to_string(item))
-            elif name[0] == "f" and name[-1].isdigit():
-                for item in xml.xpath(f".//fig[@id='{name}']"):
-                    xml_nodes.append(xml_node_to_string(item))
-            elif name[-1].isdigit():
-                for item in xml.xpath(f".//*[@id='{name}']"):
-                    xml_nodes.append(xml_node_to_string(item))
-            data["xml"] = xml_nodes
-            yield data
+            name = node.get("name", "")
+
+            # Usar função dedicada para determinar XPaths
+            xpaths = get_xpath_for_name_stats(name)
+
+            yield {
+                "html": xml_node_to_string(node),
+                "xml": (
+                    get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []
+                ),
+            }
 
     def get_html_stats(self, html):
         self.html_table_total = len(html.xpath(".//table"))
@@ -396,7 +433,7 @@ class Html2xmlAnalysis(models.Model):
     def html_vs_xml(self, html, xml, journal_acron):
         yield from self.get_a_href_stats(html, xml, journal_acron)
         yield from self.get_src_stats(html, xml, journal_acron)
-        yield from self.get_a_name_stats(html, xml, journal_acron)
+        yield from self.get_a_name_stats(html, xml)
 
     def identify_attention_demands(self):
         self.attention_demands = 0
