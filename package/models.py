@@ -351,7 +351,7 @@ class PreviewArticlePage(Orderable):
 
 class SPSPkg(CommonControlField, ClusterableModel):
     pid_v3 = models.CharField(max_length=23, null=True, blank=True)
-    sps_pkg_name = models.CharField(_("SPS Name"), max_length=50, null=True, blank=True)
+    sps_pkg_name = models.CharField(_("SPS Name"), max_length=100, null=True, blank=True)
 
     # zip
     file = models.FileField(upload_to=pkg_directory_path, null=True, blank=True, max_length=150)

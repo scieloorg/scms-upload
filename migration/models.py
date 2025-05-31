@@ -349,7 +349,7 @@ class MigratedFile(CommonControlField):
         _("Component type"), max_length=16, null=True, blank=True
     )
     lang = models.CharField(_("Language"), max_length=2, null=True, blank=True)
-    pkg_name = models.CharField(_("Pkg name"), max_length=50, null=True, blank=True)
+    pkg_name = models.CharField(_("Pkg name"), max_length=100, null=True, blank=True)
     part = models.CharField(_("Part"), max_length=1, null=True, blank=True)
 
     autocomplete_search_field = "original_path"
