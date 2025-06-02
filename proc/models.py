@@ -1393,7 +1393,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     issue_proc = models.ForeignKey(
         IssueProc, on_delete=models.SET_NULL, null=True, blank=True
     )
-    pkg_name = models.CharField(_("Package name"), max_length=50, null=True, blank=True)
+    pkg_name = models.CharField(_("Package name"), max_length=100, null=True, blank=True)
     main_lang = models.CharField(
         _("Main lang"),
         max_length=2,

@@ -785,7 +785,7 @@ class PkgZipBuilder:
                     for asset in MigratedFile.find(
                         collection=issue_proc.collection,
                         xlink_href=xml_graphic.xlink_href,
-                        subdir=subdir,
+                        journal_acron=issue_proc.journal_proc.acron,
                     ):
                         found = True
                         self._build_sps_package_add_asset(
