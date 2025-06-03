@@ -9,6 +9,7 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 from minio import Minio
 from minio.error import S3Error
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -79,7 +80,7 @@ class MinioStorage:
         minio_access_key,
         minio_secret_key,
         bucket_root,
-        bucket_subdir,
+        location,
         minio_secure=True,
         minio_http_client=None,
     ):
@@ -125,7 +126,7 @@ class MinioStorage:
     def _create_bucket(self):
         try:
             # Make a bucket with the make_bucket API call.
-            self._client.make_bucket(self.bucket_root, location=self.bucket_subdir)
+            self._client.make_bucket(self.bucket_root, location=self.location)
         except Exception as e:
             raise MinioStorageCreateBucketError(
                 "Unable to create bucket %s %s %s" % (self.bucket_root, type(e), e)
