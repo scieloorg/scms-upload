@@ -21,13 +21,13 @@ from journal.exceptions import (
     MissionGetError,
     SubjectCreationOrUpdateError,
 )
-from journal.forms import OfficialJournalForm, JournalTOCForm
+from journal.forms import OfficialJournalForm
 from location.models import Location
 
 
 class JournalSection(TextModel, CommonControlField):
-    parent = models.ForeignKey(
-        "JournalTOC",
+    parent = ParentalKey(
+        "Journal",
         blank=True,
         null=True,
         on_delete=models.SET_NULL,
@@ -1082,37 +1082,3 @@ class Subject(CommonControlField):
         obj.updated = user
         obj.save()
         return obj
-
-
-class JournalTOC(Journal, ClusterableModel):
-    panels = [
-        InlinePanel("j_sections", label=_("Journal sections")),
-    ]
-
-    # panels_identification = [
-    #     AutocompletePanel("official_journal"),
-    #     FieldPanel("short_title"),
-    #     FieldPanel("journal_acron")
-    # ]
-
-    # panels_owner = [
-    #     InlinePanel("owner", label=_("Owner"), classname="collapsed"),
-    # ]
-
-    # panels_publisher = [
-    #     InlinePanel("publisher", label=_("Publisher"), classname="collapsed"),
-    # ]
-
-    # panels_mission = [
-    #     InlinePanel("mission", label=_("Mission"), classname="collapsed"),
-    # ]
-
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(panels, heading=_("Journal sections")),
-        ]
-    )
-    base_form_class = JournalTOCForm
-
-    class Meta:
-        proxy = True
