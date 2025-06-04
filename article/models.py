@@ -299,28 +299,11 @@ class Article(ClusterableModel, CommonControlField):
             logging.info(f"section: {item}")
             if not item.get("text"):
                 continue
-            try:
-                language = Language.get(code2=item.get("lang"))
-                section = JournalSection.objects.get(
-                    parent=self.journal,
-                    language=language,
-                    text=item.get("text"),
-                )
-            except JournalSection.MultipleObjectsReturned as e:
-                logging.info(f"duplicated {item}")
-                section = JournalSection.objects.filter(
-                    parent=self.journal,
-                    language=language,
-                    text=item.get("text"),
-                ).first()
-            except JournalSection.DoesNotExist:
-                section = JournalSection.create_or_update(
-                    user,
-                    parent=self.journal,
-                    language=language,
-                    text=item.get("text"),
-                    code=item.get("code"),
-                )
+            section = self.journal.get_section(
+                language=Language.get(code2=item.get("lang")),
+                text=item.get("text"),
+                code=item.get("code")
+            )
             self.sections.add(section)
             group = group or section.code or TocSection.create_group(self.issue)
             TocSection.create_or_update(user, toc, group, section)
