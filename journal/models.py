@@ -104,34 +104,6 @@ class JournalSection(TextModel, CommonControlField):
     def data(self):
         return {"language": self.language.code2, "code": self.code, "text": self.text}
 
-    @staticmethod
-    def sections(journal):
-        for item in JournalSection.objects.filter(parent=journal):
-            yield item.data
-
-    @staticmethod
-    def sections_by_code(journal):
-        items = {}
-        if JournalSection.objects.filter(parent=journal, code__isnull=False).exists():
-            for item in JournalSection.objects.filter(parent=journal):
-                items.setdefault(item.code, [])
-                items[item.code].append(item.data)
-        return items
-
-    @staticmethod
-    def section_titles_by_language(journal):
-        # expected_toc_sections : dict, such as:
-        #     {
-        #         "en": ["Health Sciences"],
-        #         "pt": ["Ciências da Saúde"]
-        #     }
-        d = {}
-        for item in JournalSection.objects.filter(parent=journal).iterator():
-            language = item.language.code2
-            d.setdefault(language, [])
-            d[language].append(item.text)
-        return d
-
 
 class OfficialJournal(CommonControlField):
     """
@@ -549,9 +521,88 @@ class Journal(CommonControlField, ClusterableModel):
             # na dúvida, retorna True
             return True
 
+    def add_section(self, user, language, code, text):
+        return JournalSection.create_or_update(
+            user,
+            self,
+            language=language,
+            code=code,
+            text=text,
+        )
+
+    def get_section(self, user, obj_lang, code, text):
+        """
+        Get or create a journal section using the related manager
+        """
+        try:
+            section = self.j_sections.get(
+                language=obj_lang,
+                text=text,
+            )
+        except JournalSection.MultipleObjectsReturned as e:
+            logging.info(f"duplicated section: {text}")
+            section = self.j_sections.filter(
+                language=obj_lang,
+                text=text,
+            ).first()
+        except JournalSection.DoesNotExist:
+            section = JournalSection.create_or_update(
+                user,
+                parent=self,
+                language=obj_lang,
+                text=text,
+                code=code,
+            )
+        return section
+
+    def get_sections_by_titles(self, titles):
+        """
+        Get sections filtered by titles and return as dict with language code as key
+        
+        Args:
+            titles: List of section titles to filter by
+            
+        Returns:
+            dict: {language_code: section_text}
+        """
+        items = {}
+        sections = self.j_sections.select_related('language').filter(text__in=titles)
+        for section in sections:
+            items[section.language.code2] = section.text
+        return items
+
     @property
     def toc_sections(self):
-        return JournalSection.section_titles_by_language(self)
+        """
+        Moved from JournalSection.section_titles_by_language()
+        Returns sections grouped by language code
+        """
+        d = {}
+        for section in self.j_sections.select_related('language').all():
+            language = section.language.code2
+            d.setdefault(language, [])
+            d[language].append(section.text)
+        return d
+
+    def sections(self):
+        """
+        Moved from JournalSection.sections()
+        Generator that yields section data
+        """
+        sections = self.j_sections.select_related('language').all()
+        for section in sections:
+            yield section.data
+
+    def sections_by_code(self):
+        """
+        Moved from JournalSection.sections_by_code()
+        Returns sections grouped by code
+        """
+        items = {}
+        for section in self.j_sections.select_related('language').filter(code__isnull=False):
+            items.setdefault(section.code, [])
+            items[section.code].append(section.data)
+        return items
 
     def is_indexed_at(self, database):
         # TODO
@@ -561,9 +612,13 @@ class Journal(CommonControlField, ClusterableModel):
     def publisher_names(self):
         # TODO verificar se é owner ou publisher ou ambos
         names = []
-        for item in self.owner.all():
+        # Otimização: usar select_related para evitar queries N+1
+        owners = self.owner.select_related('institution').all()
+        publishers = self.publisher.select_related('institution').all()
+        
+        for item in owners:
             names.append(item.institution.name)
-        for item in self.publisher.all():
+        for item in publishers:
             if item.institution.name not in names:
                 names.append(item.institution.name)
         return names
@@ -590,6 +645,7 @@ class Journal(CommonControlField, ClusterableModel):
             email=self.contact_email,
         )
         if self.contact_location:
+            # Otimização: usar select_related para carregar city, state, country
             cl = self.contact_location
             contact.update(
                 dict(
