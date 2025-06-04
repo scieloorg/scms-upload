@@ -399,11 +399,9 @@ class TocSection(CommonControlField, Orderable):
                     items[item.section.language.code2] = item.section.text
 
             if not items:
-                for item in JournalSection.objects.filter(
-                    parent=issue.journal, text__in=titles
-                ):
-                    items[item.language.code2] = item.text
-
+                items.update(
+                    issue.journal.get_sections_by_titles(titles)
+                )
         return items
 
     @staticmethod

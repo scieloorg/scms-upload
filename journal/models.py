@@ -21,13 +21,13 @@ from journal.exceptions import (
     MissionGetError,
     SubjectCreationOrUpdateError,
 )
-from journal.forms import OfficialJournalForm, JournalTOCForm
+from journal.forms import OfficialJournalForm
 from location.models import Location
 
 
 class JournalSection(TextModel, CommonControlField):
-    parent = models.ForeignKey(
-        "JournalTOC",
+    parent = ParentalKey(
+        "Journal",
         blank=True,
         null=True,
         on_delete=models.SET_NULL,
@@ -103,34 +103,6 @@ class JournalSection(TextModel, CommonControlField):
     @property
     def data(self):
         return {"language": self.language.code2, "code": self.code, "text": self.text}
-
-    @staticmethod
-    def sections(journal):
-        for item in JournalSection.objects.filter(parent=journal):
-            yield item.data
-
-    @staticmethod
-    def sections_by_code(journal):
-        items = {}
-        if JournalSection.objects.filter(parent=journal, code__isnull=False).exists():
-            for item in JournalSection.objects.filter(parent=journal):
-                items.setdefault(item.code, [])
-                items[item.code].append(item.data)
-        return items
-
-    @staticmethod
-    def section_titles_by_language(journal):
-        # expected_toc_sections : dict, such as:
-        #     {
-        #         "en": ["Health Sciences"],
-        #         "pt": ["Ciências da Saúde"]
-        #     }
-        d = {}
-        for item in JournalSection.objects.filter(parent=journal).iterator():
-            language = item.language.code2
-            d.setdefault(language, [])
-            d[language].append(item.text)
-        return d
 
 
 class OfficialJournal(CommonControlField):
@@ -549,9 +521,88 @@ class Journal(CommonControlField, ClusterableModel):
             # na dúvida, retorna True
             return True
 
+    def add_section(self, user, language, code, text):
+        return JournalSection.create_or_update(
+            user,
+            self,
+            language=language,
+            code=code,
+            text=text,
+        )
+
+    def get_section(self, user, obj_lang, code, text):
+        """
+        Get or create a journal section using the related manager
+        """
+        try:
+            section = self.j_sections.get(
+                language=obj_lang,
+                text=text,
+            )
+        except JournalSection.MultipleObjectsReturned as e:
+            logging.info(f"duplicated section: {text}")
+            section = self.j_sections.filter(
+                language=obj_lang,
+                text=text,
+            ).first()
+        except JournalSection.DoesNotExist:
+            section = JournalSection.create_or_update(
+                user,
+                parent=self,
+                language=obj_lang,
+                text=text,
+                code=code,
+            )
+        return section
+
+    def get_sections_by_titles(self, titles):
+        """
+        Get sections filtered by titles and return as dict with language code as key
+        
+        Args:
+            titles: List of section titles to filter by
+            
+        Returns:
+            dict: {language_code: section_text}
+        """
+        items = {}
+        sections = self.j_sections.select_related('language').filter(text__in=titles)
+        for section in sections:
+            items[section.language.code2] = section.text
+        return items
+
     @property
     def toc_sections(self):
-        return JournalSection.section_titles_by_language(self)
+        """
+        Moved from JournalSection.section_titles_by_language()
+        Returns sections grouped by language code
+        """
+        d = {}
+        for section in self.j_sections.select_related('language').all():
+            language = section.language.code2
+            d.setdefault(language, [])
+            d[language].append(section.text)
+        return d
+
+    def sections(self):
+        """
+        Moved from JournalSection.sections()
+        Generator that yields section data
+        """
+        sections = self.j_sections.select_related('language').all()
+        for section in sections:
+            yield section.data
+
+    def sections_by_code(self):
+        """
+        Moved from JournalSection.sections_by_code()
+        Returns sections grouped by code
+        """
+        items = {}
+        for section in self.j_sections.select_related('language').filter(code__isnull=False):
+            items.setdefault(section.code, [])
+            items[section.code].append(section.data)
+        return items
 
     def is_indexed_at(self, database):
         # TODO
@@ -561,9 +612,13 @@ class Journal(CommonControlField, ClusterableModel):
     def publisher_names(self):
         # TODO verificar se é owner ou publisher ou ambos
         names = []
-        for item in self.owner.all():
+        # Otimização: usar select_related para evitar queries N+1
+        owners = self.owner.select_related('institution').all()
+        publishers = self.publisher.select_related('institution').all()
+        
+        for item in owners:
             names.append(item.institution.name)
-        for item in self.publisher.all():
+        for item in publishers:
             if item.institution.name not in names:
                 names.append(item.institution.name)
         return names
@@ -590,6 +645,7 @@ class Journal(CommonControlField, ClusterableModel):
             email=self.contact_email,
         )
         if self.contact_location:
+            # Otimização: usar select_related para carregar city, state, country
             cl = self.contact_location
             contact.update(
                 dict(
@@ -1082,37 +1138,3 @@ class Subject(CommonControlField):
         obj.updated = user
         obj.save()
         return obj
-
-
-class JournalTOC(Journal, ClusterableModel):
-    panels = [
-        InlinePanel("j_sections", label=_("Journal sections")),
-    ]
-
-    # panels_identification = [
-    #     AutocompletePanel("official_journal"),
-    #     FieldPanel("short_title"),
-    #     FieldPanel("journal_acron")
-    # ]
-
-    # panels_owner = [
-    #     InlinePanel("owner", label=_("Owner"), classname="collapsed"),
-    # ]
-
-    # panels_publisher = [
-    #     InlinePanel("publisher", label=_("Publisher"), classname="collapsed"),
-    # ]
-
-    # panels_mission = [
-    #     InlinePanel("mission", label=_("Mission"), classname="collapsed"),
-    # ]
-
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(panels, heading=_("Journal sections")),
-        ]
-    )
-    base_form_class = JournalTOCForm
-
-    class Meta:
-        proxy = True
