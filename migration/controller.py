@@ -23,7 +23,6 @@ from journal.models import (
     Journal,
     JournalCollection,
     JournalHistory,
-    JournalSection,
     OfficialJournal,
     Owner,
     Publisher,
@@ -346,9 +345,8 @@ def create_or_update_issue(
                 languages[lang_code] = Language.get_or_create(
                     creator=user, code2=lang_code
                 )
-            sec = JournalSection.create_or_update(
+            sec = issue.journal.add_section(
                 user,
-                issue_proc.journal_proc.journal,
                 language=languages[lang_code],
                 code=section.get("code"),
                 text=section.get("text"),
