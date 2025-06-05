@@ -51,7 +51,7 @@ from proc import exceptions
 from proc.forms import ProcAdminModelForm, IssueProcAdminModelForm
 from publication.api.publication import get_api_data
 from tracker import choices as tracker_choices
-from tracker.models import UnexpectedEvent, format_traceback
+from tracker.models import Event, UnexpectedEvent, format_traceback
 
 
 class Operation(CommonControlField):
@@ -701,7 +701,7 @@ class BaseProc(CommonControlField):
         doit = False
         if website_kind == collection_choices.QA:
             detail["qa_ws_status"] = self.qa_ws_status
-            doit = True
+            doit = tracker_choices.allowed_to_run(self.qa_ws_status, force_update)
         else:
             detail["public_ws_status"] = self.public_ws_status
             if content_type == "article" and (
@@ -710,7 +710,9 @@ class BaseProc(CommonControlField):
                 detail["registered_in_core"] = self.sps_pkg.registered_in_core
                 doit = False
             else:
-                doit = True
+                doit = tracker_choices.allowed_to_run(
+                    self.public_ws_status, force_update
+                )
 
         detail["doit"] = doit
         operation = self.start(user, f"publish {content_type} {self} on {website_kind}")
@@ -1150,6 +1152,11 @@ class IssueProc(BaseProc, ClusterableModel):
         self, user, force_update, f_get_files_from_classic_website
     ):
         try:
+            doit = tracker_choices.allowed_to_run(self.files_status, force_update)
+            if not doit:
+                # logging.info(f"Skip get_files_from_classic_website {self.pid}")
+                return
+
             operation = self.start(user, "get_files_from_classic_website")
 
             self.files_status = tracker_choices.PROGRESS_STATUS_DOING
@@ -1512,6 +1519,11 @@ class ArticleProc(BaseProc, ClusterableModel):
     def get_xml(self, user, body_and_back_xml):
         try:
 
+            doit = tracker_choices.allowed_to_run(self.xml_status, body_and_back_xml)
+            if not doit:
+                # logging.info(f"Skip get_xml {self.pid}")
+                return self.xml_status == tracker_choices.PROGRESS_STATUS_DONE
+
             operation = self.start(user, "get xml")
 
             self.xml_status = tracker_choices.PROGRESS_STATUS_DOING
@@ -1716,6 +1728,13 @@ class ArticleProc(BaseProc, ClusterableModel):
         force_update=False,
     ):
         try:
+
+            force_update = force_update or body_and_back_xml or html_to_xml
+            doit = tracker_choices.allowed_to_run(self.sps_pkg_status, force_update)
+            if not doit:
+                # logging.info(f"Skip generate_sps_package {self.pid}")
+                return self.sps_pkg_status == tracker_choices.PROGRESS_STATUS_DONE
+
             operation = self.start(user, "generate_sps_package")
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
