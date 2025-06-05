@@ -108,7 +108,7 @@ class MinioStorage:
         self.minio_secure = minio_secure
         self.http_client = minio_http_client
         self._client_instance = None
-        self.bucket_subdir = bucket_subdir
+        self.location = location
 
     @property
     def _client(self):
