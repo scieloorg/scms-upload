@@ -23,7 +23,7 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from pid_provider import choices, exceptions
 from pid_provider.query_params import get_valid_query_parameters, get_xml_adapter_data
-from tracker.models import BaseEvent, UnexpectedEvent
+from tracker.models import UnexpectedEvent
 
 try:
     from django_prometheus.models import ExportModelOperationsMixin
