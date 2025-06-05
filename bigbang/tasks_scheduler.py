@@ -107,16 +107,16 @@ def schedule_subtasks(username):
     _schedule_fetch_and_create_journal(username, enabled)  # Nova tarefa adicionada
 
 
-def _schedule_check_article_availability(username, enabled):
+def _schedule_check_article_availability(username, enabled=False):
     """
     Agenda a tarefa de migrar os registros da base de dados TITLE
     Deixa a tarefa desabilitada
     """
     schedule_task(
-        task="proc.tasks.task_check_article_availability",
-        name="check_article_availability",
+        task="publication.tasks.task_check_article_availability",
+        name="task_check_article_availability",
         kwargs=dict(
-            username,
+            username=username,
             issn_print=None,
             issn_electronic=None,
             publication_year=None,
@@ -196,7 +196,8 @@ def _schedule_migrate_and_publish_journals(username, enabled):
             collection_acron=None,
             journal_acron=None,
             force_update=False,
-            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
+            status=[],
+            valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
         ),
         description=_("Migra e publica os periódicos"),
         priority=TITLE_DB_MIGRATION_PRIORITY,
@@ -222,7 +223,8 @@ def _schedule_migrate_and_publish_issues(username, enabled):
             journal_acron=None,
             publication_year=None,
             issue_folder=None,
-            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
+            status=[],
+            valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
         ),
         description=_("Migra e publica os fascículos"),
@@ -245,7 +247,8 @@ def _schedule_migrate_and_publish_articles(username, enabled):
             journal_acron=None,
             publication_year=None,
             issue_folder=None,
-            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
+            status=[],
+            valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
             force_import_acron_id_file=False,
             force_migrate_document_records=False,
