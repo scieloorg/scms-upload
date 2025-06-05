@@ -968,12 +968,7 @@ def register_acron_id_file_content(
                 user, completed=False, message=_(f"{source_path} has no changes")
             )
     except Exception as e:
-        logging.error(f"journal_proc: {journal_proc} {type(e)} {e}")
-        if operation:
-            operation.finish(user, completed=False, exception=e, detail=detail)
-            return
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        logging.error(f"journal_proc: {journal_proc} {type(e)} {e}")
         if operation:
             operation.finish(
                 user,
@@ -990,10 +985,7 @@ def register_acron_id_file_content(
                 "task": "migration.controller.register_acron_id_file_content",
                 "user_id": user.id,
                 "username": user.username,
-                "collection_acron": journal_proc.collection.acron,
-                "journal_acron": journal_proc.acron,
-                "pid": journal_proc.pid,
-                "metadata": journal_proc.migrated_data,
+                "journal_acron": str(journal_proc),
             },
         )
 
