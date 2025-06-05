@@ -101,6 +101,7 @@ def task_migrate_and_publish_journals(
     journal_acron=None,
     force_update=False,
     status=None,
+    valid_status=None,
     force_import_acron_id_file=False,
 ):
     try:
@@ -332,6 +333,7 @@ def task_migrate_and_publish_issues(
     publication_year=None,
     issue_folder=None,
     status=None,
+    valid_status=None,
     force_update=False,
     force_migrate_document_records=False,
 ):
@@ -548,6 +550,7 @@ def task_migrate_and_publish_articles(
     publication_year=None,
     issue_folder=None,
     status=None,
+    valid_status=None,
     force_update=False,
     force_import_acron_id_file=False,
     force_migrate_document_records=False,
@@ -756,8 +759,10 @@ def task_publish_article(
 ):
     try:
         user = _get_user(user_id, username)
+        detail = {"published": False, "available": False}
         article_proc = None
         article_proc = ArticleProc.objects.get(pk=article_proc_id)
+        event = article_proc.start(user, "publish article / check availability")
         response = article_proc.publish(
             user,
             publish_article,
@@ -766,6 +771,8 @@ def task_publish_article(
             api_data=api_data,
             force_update=force_update,
         )
+        detail["published"] = response.get("completed")
+        detail["available"] = False
         if response.get("completed"):
             obj = ArticleAvailability.create_or_update(
                 user,
@@ -778,12 +785,14 @@ def task_publish_article(
                 purpose=website_kind,
             ):
                 obj.create_or_update_urls(user, website.url)
-
+            
+            detail["available"] = obj.completed
+        event.finish(user, detail=detail, completed=True)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
+        logging.exception(e)
         if article_proc:
-            event = article_proc.start(user, "publish article / check availability")
-            event.finish(user, exc_traceback=exc_traceback, exception=e)
+            event.finish(user, exc_traceback=exc_traceback, exception=e, detail=detail)
             return
         UnexpectedEvent.create(
             e=e,
@@ -852,9 +861,9 @@ def task_create_collection_procs_from_pid_list(
 
 @celery_app.task(bind=True)
 def task_fetch_and_create_journal(
-    self, username, collection_acron=None, issn_electronic=None, issn_print=None, force_update=None
+    self, user_id, username, collection_acron=None, issn_electronic=None, issn_print=None, force_update=None
 ):
-    user = _get_user(user_id=None, username=username)
+    user = _get_user(user_id=user_id, username=username)
     try:
         fetch_and_create_journal(
             user,
