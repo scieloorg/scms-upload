@@ -322,6 +322,13 @@ class Journal(CommonControlField, ClusterableModel):
     )
 
     @property
+    def issue_count(self):
+        return self.issue_set.filter(
+            ~Q(number__contains=["spe", "ahead"]),
+            supplement__isnull=True,
+        ).count()
+
+    @property
     def is_completed(self):
         """
         Verifica se todos os campos de um objeto Journal estão preenchidos.
