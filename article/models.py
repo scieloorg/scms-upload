@@ -287,8 +287,6 @@ class Article(ClusterableModel, CommonControlField):
         items = xml_sections.article_section
         items.extend(xml_sections.sub_article_section)
 
-        logging.info(list(items))
-
         try:
             toc = TOC.objects.get(issue=self.issue)
         except TOC.DoesNotExist:
@@ -300,9 +298,10 @@ class Article(ClusterableModel, CommonControlField):
             if not item.get("text"):
                 continue
             section = self.journal.get_section(
-                language=Language.get(code2=item.get("lang")),
+                user,
+                obj_lang=Language.get(code2=item.get("lang")),
+                code=item.get("code"),
                 text=item.get("text"),
-                code=item.get("code")
             )
             self.sections.add(section)
             group = group or section.code or TocSection.create_group(self.issue)
