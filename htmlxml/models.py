@@ -61,11 +61,11 @@ def get_xpath_for_src_stats(element_tag, src, journal_acron):
     Returns:
         list: Lista de expressões XPath para buscar no XML
     """
-    if ":" in href or ":" in src:
+    if ":" in src:
         return [f".//ext-link[text()='{src}']"]
 
     # if "img/revistas" in src or src.startswith("/pdf"):
-    if f"/{journal_acron}/" in href:
+    if f"/{journal_acron}/" in src:
         if element_tag == "img":
             return [
                 f".//graphic[@xlink:href='{src}']",
@@ -366,7 +366,7 @@ class Html2xmlAnalysis(models.Model):
             yield {
                 "html": xml_node_to_string(a),
                 "xml": (
-                    get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []
+                    get_xml_nodes_to_string(xml, xpaths) if xpaths else []
                 ),
             }
 
