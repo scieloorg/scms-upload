@@ -5,6 +5,7 @@ import sys
 from datetime import datetime
 from tempfile import TemporaryDirectory
 
+from django import forms
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
 from django.db.models import Q, Count
@@ -72,7 +73,7 @@ class Operation(CommonControlField):
         FieldPanel("created", read_only=True),
         FieldPanel("updated", read_only=True),
         FieldPanel("completed", read_only=True),
-        FieldPanel("detail", read_only=True),
+        FieldPanel('detail', read_only=True)
     ]
 
     class Meta:
@@ -917,6 +918,14 @@ class JournalProc(BaseProc, ClusterableModel):
             "is_completed": self.journal.is_completed,
             "required_data_completed": self.journal.required_data_completed,
         }
+
+    @property
+    def issn_print(self):
+        return self.journal and self.journal.issn_print
+
+    @property
+    def issn_electronic(self):
+        return self.journal and self.journal.issn_electronic
 
 
 ################################################
