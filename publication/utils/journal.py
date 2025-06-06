@@ -5,7 +5,7 @@ def build_journal(
     builder, journal, journal_id, journal_acron, journal_history, availability_status
 ):
     official_journal = journal.official_journal
-
+    builder.add_issue_count(journal.issue_count)
     builder.add_ids(journal_id)
     builder.add_dates(journal.created, journal.updated)
     builder.add_acron(journal_acron)

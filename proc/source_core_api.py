@@ -287,7 +287,9 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
             force_update=force_update,
         )
-        journal.journal_acron = item.get("journal_acron")
+        if not journal.journal_acron:
+            journal.journal_acron = item.get("journal_acron")
+            journal.save()
         journal_collection = JournalCollection.create_or_update(
             user, collection, journal
         )

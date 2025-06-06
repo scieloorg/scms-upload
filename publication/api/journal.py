@@ -189,9 +189,9 @@ class JournalPayload:
         # Study Area
         self.data["subject_areas"] = subject_areas
 
-    # def add_issue_count(self, issue_count):
-    #     # Issue count
-    #     self.data["issue_count"] = issue_count
+    def add_issue_count(self, issue_count):
+        # Issue count
+        self.data["issue_count"] = issue_count
 
     def add_sponsor(self, sponsor):
         # Sponsors
