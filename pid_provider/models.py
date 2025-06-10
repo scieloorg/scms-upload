@@ -681,35 +681,48 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         auto_solve_pid_conflict=False,
     ):
         """
-        Evaluate the XML data and returns corresponding PID v3, v2, aop_pid
-
+        Registra documento XML no sistema de PIDs, retornando PIDs v3, v2 e aop_pid.
+        
         Parameters
         ----------
-        xml : XMLWithPre
+        xml_with_pre : XMLWithPre
+            Dados XML preprocessados
         filename : str
+            Nome do arquivo XML
         user : User
-
+            Usuário responsável pelo registro
+        origin_date : datetime, optional
+            Data de origem do documento
+        force_update : bool, optional
+            Força atualização mesmo sem alterações
+        is_published : bool, default False
+            Status de publicação
+        available_since : datetime, optional
+            Data de disponibilização
+        origin : str, optional
+            Origem do documento
+        registered_in_core : bool, optional
+            Se já registrado no sistema core
+        auto_solve_pid_conflict : bool, default False
+            Resolve conflitos de PID automaticamente
+            
         Returns
         -------
-            {
-                "v3": self.v3,
-                "v2": self.v2,
-                "aop_pid": self.aop_pid,
-                "xml_uri": self.xml_uri,
-                "article": self.article,
-                "created": self.created.isoformat(),
-                "updated": self.updated.isoformat(),
-                "xml_changed": boolean,
-                "record_status": created | updated | retrieved
-            }
-            or
-            {
-                "error_type": self.error_type,
-                "error_message": self.error_message,
-                "id": self.finger_print,
-                "filename": self.name,
-            }
-
+        dict
+            Sucesso: {"v3", "v2", "aop_pid", "xml_uri", "article", "created", 
+                     "updated", "xml_changed", "record_status"}
+            Erro: {"error_type", "error_message", "id", "filename"}
+            
+        Raises
+        ------
+        QueryDocumentMultipleObjectsReturnedError
+            Múltiplos documentos encontrados
+        RequiredPublicationYearErrorToGetPidProviderXMLError
+            Ano de publicação obrigatório ausente
+        RequiredISSNErrorToGetPidProviderXMLError
+            ISSN obrigatório ausente
+        NotEnoughParametersToGetPidProviderXMLError
+            Parâmetros insuficientes para identificar documento
         """
         try:
             input_data = None
