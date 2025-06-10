@@ -26,10 +26,44 @@ class BasePidProvider:
         auto_solve_pid_conflict=None,
     ):
         """
-        Fornece / Valida PID para o XML no formato de objeto de XMLWithPre
+        Fornece e valida PIDs para documento XML, retornando dados completos de registro.
+        
+        Parameters
+        ----------
+        xml_with_pre : XMLWithPre
+            Objeto XML preprocessado
+        name : str
+            Nome do arquivo/documento
+        user : User
+            Usuário responsável pela operação
+        origin_date : datetime, optional
+            Data de origem do documento
+        force_update : bool, optional
+            Força atualização mesmo sem alterações
+        is_published : bool, optional
+            Status de publicação
+        origin : str, optional
+            Origem do documento
+        registered_in_core : bool, optional
+            Se já registrado no sistema core
+        caller : str, optional
+            Identificador do sistema chamador
+        auto_solve_pid_conflict : bool, optional
+            Resolve conflitos de PID automaticamente
+            
+        Returns
+        -------
+        dict
+            Sucesso: {"v3", "v2", "aop_pid", "xml_uri", "article", "created", 
+                     "updated", "xml_changed", "record_status", "input_data", 
+                     "xml_adapter_data", "skip_update"*, "xml_with_pre", 
+                     "apply_xml_changes"*}
+            Erro: {"error_type", "error_message", "id", "filename", "error_msg", 
+                  "xml_with_pre"}
+            
+            * Chaves condicionais: skip_update (se atualização pulada), 
+              apply_xml_changes (se caller="core" e xml_changed=True)
         """
-        # Completa os valores ausentes de pid com recuperados ou com inéditos
-
         registered = PidProviderXML.register(
             xml_with_pre,
             name,
