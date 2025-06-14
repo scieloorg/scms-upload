@@ -107,9 +107,7 @@ def is_http_error_json_response(json, response):
         return
 
     try:
-        data = response.json()
-        if isinstance(data, dict):
-            return data
+        return response.json()
     except Exception as json_error:
         return
 
