@@ -559,18 +559,15 @@ def task_migrate_and_publish_articles(
     try:
         user = _get_user(user_id, username)
 
+        logging.info(status)
         status = tracker_choices.get_valid_status(status, force_update)
-        journal_query_by_status = (
-            Q(migration_status__in=status)
-            | Q(qa_ws_status__in=status)
-            | Q(public_ws_status__in=status)
-        )
+        logging.info(status)
         query_by_status = (
             Q(migration_status__in=status)
             | Q(xml_status__in=status)
             | Q(sps_pkg_status__in=status)
-            | Q(qa_ws_status__in=status)
-            | Q(public_ws_status__in=status)
+            # | Q(qa_ws_status__in=status)
+            # | Q(public_ws_status__in=status)
         )
 
         journal_filter = {}
@@ -593,7 +590,6 @@ def task_migrate_and_publish_articles(
             # cria ou atualiza JournalAcronIdFile e IdFileRecord
             create_or_update_journal_acron_id_file(
                 user,
-                journal_query_by_status,
                 collection,
                 journal_filter,
                 force_update=force_import_acron_id_file,
@@ -632,13 +628,58 @@ def task_migrate_and_publish_articles(
             )
 
             logging.info(f"articles to process: {items.count()}")
+            logging.info(status)
             logging.info(f"article_filter: {params}")
 
+            force_update = (
+                force_update or 
+                force_migrate_document_records or 
+                force_migrate_document_files or
+                force_import_acron_id_file
+            )
             for article_proc in items:
                 article = article_proc.migrate_article(user, force_update)
                 if not article:
                     continue
 
+                if not qa_api_data.get("error"):
+                    task_publish_article.apply_async(
+                        kwargs=dict(
+                            user_id=user_id,
+                            username=username,
+                            website_kind="QA",
+                            article_proc_id=article_proc.id,
+                            api_data=qa_api_data,
+                            force_update=force_update,
+                        )
+                    )
+                if not public_api_data.get("error"):
+                    task_publish_article.apply_async(
+                        kwargs=dict(
+                            user_id=user_id,
+                            username=username,
+                            website_kind="PUBLIC",
+                            article_proc_id=article_proc.id,
+                            api_data=public_api_data,
+                            force_update=force_update,
+                        )
+                    )
+
+            # publication
+            query_by_status = (
+                Q(qa_ws_status__in=status)
+                | Q(public_ws_status__in=status)
+            )
+            params["sps_pkg__pid_v3__isnull"] = False
+            items = ArticleProc.objects.filter(
+                query_by_status, collection=collection, **params
+            )
+
+            logging.info(f"articles to publish: {items.count()}")
+            logging.info(status)
+            logging.info(f"article_filter: {params}")
+
+            for article_proc in items:
                 if not qa_api_data.get("error"):
                     task_publish_article.apply_async(
                         kwargs=dict(
