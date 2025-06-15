@@ -93,20 +93,14 @@ class PreviewArticlePageFileSaveError(Exception):
     ...
 
 
-def update_zip_file(zip_xml_file_path, response, xml_with_pre):
-    try:
-        if not response.pop("xml_changed"):
-            return
-    except KeyError:
-        return
-
+def update_zip_file(zip_xml_file_path, filename, xml_with_pre):
     new_xml = xml_with_pre.tostring(pretty_print=True)
     with TemporaryDirectory() as targetdir:
         new_zip_path = os.path.join(targetdir, os.path.basename(zip_xml_file_path))
         with ZipFile(new_zip_path, "a", compression=ZIP_DEFLATED) as new_zfp:
             with ZipFile(zip_xml_file_path) as zfp:
                 for item in zfp.namelist():
-                    if item == response["filename"]:
+                    if item == filename:
                         new_zfp.writestr(item, new_xml)
                     else:
                         new_zfp.writestr(item, zfp.read(item))
@@ -503,6 +497,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
         try:
             operation = article_proc.start(user, "SPSPkg.create_or_update")
             obj = cls.add_pid_v3_to_zip(user, sps_pkg_zip_path, is_public, article_proc)
+            if not obj:
+                operation.finish(user, completed=False, detail=sps_pkg_zip_path)
+                return
+
             obj.origin = origin or obj.origin
             obj.is_public = is_public or obj.is_public
             obj.texts = texts
@@ -591,8 +589,15 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 is_published=is_public,
                 article_proc=article_proc,
             ):
-                logging.info(f"package response: {response}")
                 operation = article_proc.start(user, "request_pid_for_xml_zip")
+
+                if response.get("error_type"):
+                    operation.finish(
+                        user,
+                        completed=False,
+                        detail=response,
+                    )
+                    return
 
                 xml_with_pre = response.pop("xml_with_pre")
 
@@ -603,7 +608,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     registered_in_core=response.get("synchronized"),
                 )
 
-                update_zip_file(zip_xml_file_path, response, xml_with_pre)
+                if response.get("changed"):
+                    update_zip_file(zip_xml_file_path, response["filename"], xml_with_pre)
 
                 operation.finish(
                     user,

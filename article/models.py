@@ -62,7 +62,7 @@ class Article(ClusterableModel, CommonControlField):
         blank=True,
         null=True,
     )
-    position = models.PositiveSmallIntegerField(_("Position"), blank=True, null=True)
+    position = models.PositiveIntegerField(_("Position"), blank=True, null=True)
     first_publication_date = models.DateField(null=True, blank=True)
 
     # Page

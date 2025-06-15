@@ -242,13 +242,13 @@ def migrate_journal(
 
 
 def create_or_update_journal_acron_id_file(
-    user, query_by_status, collection, journal_filter, force_update=None
+    user, collection, journal_filter, force_update=None
 ):
     """
     Cria ou atualiza arquivos de ID baseados em acrônimos de journals.
     """
     for journal_proc in JournalProc.objects.filter(
-        query_by_status, collection=collection, **journal_filter
+        collection=collection, **journal_filter
     ):
         controller.register_acron_id_file_content(
             user,
@@ -315,6 +315,9 @@ def migrate_document_records(
     """
     Executa a migração de registros de documentos do site clássico.
     """
+    
+    IssueProc.set_items_to_process(collection_acron)
+
     params = {}
     if collection_acron:
         params["collection__acron"] = collection_acron
