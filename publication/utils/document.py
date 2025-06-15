@@ -43,8 +43,8 @@ def build_article(builder, article, journal_id, order, pub_date, is_public=True)
     builder.add_xml(xml=sps_pkg.xml_uri)
 
     metadata = article_xml.get_main_metadata()
-    for item in article_xml.get_htmls():
-        builder.add_html(language=item["language"], uri=item.get("uri"))
+    for item in sps_pkg.htmls:
+        builder.add_html(language=item["lang"], uri=item.get("url"))
     for item in sps_pkg.pdfs:
         # {"lang": item.lang, "url": item.uri, "legacy_uri": item.legacy_uri}
         lang = item.get("lang") or metadata.get("lang")

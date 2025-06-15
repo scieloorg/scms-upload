@@ -122,7 +122,10 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         self.check_is_completed()
 
     def check_is_completed(self):
-        completed = not self.scielo_url.filter(available=False).exists()
+        if self.scielo_url.count():
+            completed = not self.scielo_url.filter(available=False).exists()
+        else:
+            completed = False
         if self.completed != completed:
             self.completed = completed
             self.save()
