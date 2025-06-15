@@ -188,8 +188,8 @@ class PidRequester(BasePidProvider):
                 op.finish(user, completed=False, detail=response)
                 return response
 
-            registered["registered_in_core"] = True
-            registered["do_local_registration"] = True
+            response["registered_in_core"] = True
+            response["do_local_registration"] = True
 
             op.finish(
                 user,
@@ -223,10 +223,10 @@ class PidRequester(BasePidProvider):
                     origin=origin,
                     registered_in_core=registered.get("registered_in_core"),
                 )
-                registered["registered_in_upload"] = bool(resp.get("v3"))
-                registered["synchronized"] = registered.get(
+                resp["registered_in_upload"] = bool(resp.get("v3"))
+                resp["synchronized"] = registered.get(
                     "registered_in_core"
-                ) and registered.get("registered_in_upload")
+                ) and bool(resp.get("v3"))
                 registered.update(resp)
 
                 detail = resp

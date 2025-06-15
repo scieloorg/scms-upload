@@ -159,7 +159,6 @@ class PidProviderAPIClient:
                 timeout=self.timeout,
             )
             response = self._prepare_and_post_xml(xml_with_pre, name, self.token)
-            logging.info(f"RESPONSE: {response}")
             self._process_post_xml_response(response, xml_with_pre, created)
             try:
                 return response[0]
