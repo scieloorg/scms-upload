@@ -461,7 +461,7 @@ class IssueFolderImporter:
         )
 
         classic_issue_files = files_and_exceptions["files"]
-        exceptions = files_and_exceptions["exceptions"]
+        exceptions = files_and_exceptions.get("exceptions") or []
         # {"message": e.message, "type": str(type(e))}
 
         try:
