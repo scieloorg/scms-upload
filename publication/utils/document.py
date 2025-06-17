@@ -12,10 +12,8 @@ from packtools.sps.models.front_articlemeta_issue import ArticleMetaIssue
 from packtools.sps.models.kwd_group import KwdGroup
 from packtools.sps.models.related_articles import RelatedItems
 
-from publication.utils.issue import get_bundle_id
 
-
-def build_article(builder, article, journal_id, order, pub_date, is_public=True):
+def build_article(builder, article, bundle_id, order, pub_date, is_public=True):
     sps_pkg = article.sps_pkg
     xml_with_pre = sps_pkg.xml_with_pre
 
@@ -30,15 +28,7 @@ def build_article(builder, article, journal_id, order, pub_date, is_public=True)
     )
 
     builder.add_dates(article.created, article.updated)
-    builder.add_issue(
-        get_bundle_id(
-            issn_id=journal_id,
-            year=article.issue.publication_year,
-            volume=article.issue.volume,
-            number=article.issue.number,
-            supplement=article.issue.supplement,
-        )
-    )
+    builder.add_issue(bundle_id)
 
     builder.add_xml(xml=sps_pkg.xml_uri)
 

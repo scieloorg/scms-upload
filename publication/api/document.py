@@ -8,7 +8,7 @@ from publication.api.publication import PublicationAPI
 from publication.utils.document import build_article
 
 
-def publish_article(article_proc, api_data, journal_pid=None, is_public=True):
+def publish_article(article_proc, api_data, bundle_id=None, is_public=True):
     """
     {"failed": False, "id": article.id}
     {"failed": True, "error": str(ex)}
@@ -18,18 +18,19 @@ def publish_article(article_proc, api_data, journal_pid=None, is_public=True):
 
     try:
         # somente se article_proc é instancia de ArticleProc
-        journal_pid = article_proc.issue_proc.journal_proc.pid
+        bundle_id = article_proc.issue_proc.bundle_id
     except AttributeError:
-        if not journal_pid:
-            raise ValueError(
-                "publication.api.document.publish_article requires journal_pid"
-            )
+        bundle_id = None
+    if not bundle_id or len(bundle_id) <= 9:
+        raise ValueError(
+            "publication.api.document.publish_article requires bundle_id"
+        )
 
     order = article_proc.article.position
     # considerar a data de publicação contida no XML seja no QA ou no PUBLIC
     pub_date = article_proc.sps_pkg.pub_date
 
-    build_article(builder, article_proc.article, journal_pid, order, pub_date, is_public)
+    build_article(builder, article_proc.article, bundle_id, order, pub_date, is_public)
 
     api = PublicationAPI(**api_data)
     kwargs = dict(

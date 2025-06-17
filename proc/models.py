@@ -50,6 +50,7 @@ from package import choices as package_choices
 from package.models import SPSPkg
 from proc import exceptions
 from proc.forms import ProcAdminModelForm, IssueProcAdminModelForm
+from pid_provider.models import PidProviderXML
 from publication.api.publication import get_api_data
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
@@ -1421,8 +1422,27 @@ class IssueProc(BaseProc, ClusterableModel):
                 issn_id = journal_proc.pid
                 year = issue.publication_year
                 issue_pid_suffix = issue.issue_pid_suffix
-        return f"{issn_id}{year}{issue_pid_suffix}"
+            return f"{issn_id}{year}{issue_pid_suffix}"
 
+    @property
+    def bundle_id(self):
+        return "-".join([self.journal_proc.pid, self.issue.bundle_id_suffix])
+
+    def unlink_articles(self):
+        for article in Article.objects.filter(issue=self.issue).iterator():
+            delete = False
+            try:
+                ArticleProc.objects.get(sps_pkg=article.sps_pkg)
+            except ArticleProc.DoesNotExist:
+                article.delete()
+                continue
+            try:
+                PidProviderXML.objects.get(v3=article.pid_v3)
+            except PidProviderXML.DoesNotExist:
+                article.delete()
+            except PidProviderXML.MultipleObjectsReturned:
+                pass
+            
 
 class ArticleEventCreateError(Exception): ...
 
@@ -1843,10 +1863,11 @@ class ArticleProc(BaseProc, ClusterableModel):
     @property
     def article(self):
         try:
-            if self.sps_pkg.pid_v3:
-                return Article.objects.get(pid_v3=self.sps_pkg.pid_v3)
+            sps_pkg = self.sps_pkg
+            if sps_pkg:
+                return Article.objects.get(sps_pkg=sps_pkg)
         except (AttributeError, Article.DoesNotExist) as e:
-            logging.info(f"Not found ArticleProc.article: {self.sps_pkg} {e}")
+            logging.info(f"Not found ArticleProc.article: {sps_pkg} {e}")
 
     def migrate_article(self, user, force_update):
         body_and_back_xml = force_update
