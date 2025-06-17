@@ -11,11 +11,23 @@ def publish_issue(issue_proc, api_data):
     issue_id = issue_proc.pid
     journal_id = issue_proc.journal_proc.pid
 
+    issue_proc.unlink_articles()
+
     data = {}
     builder = IssuePayload(data)
-    build_issue(builder, journal_id, issue, issue_id)
+    build_issue(builder, issue_proc.bundle_id, issue, issue_id)
     api = PublicationAPI(**api_data)
-    return api.post_data(data, {"journal_id": journal_id})
+    response = api.post_data(data, {"journal_id": journal_id})
+
+    response = response or {}
+    api.post_data_url += "/sync"
+    issue_sync_payload = {
+        "issue_id": issue_proc.bundle_id,
+        "articles_id": issue.article_ids,
+    }
+    resp = api.post_data(issue_sync_payload)
+    response["issue_sync_response"] = resp
+    return response
 
 
 class IssuePayload:
