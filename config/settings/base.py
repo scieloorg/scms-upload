@@ -16,6 +16,9 @@ if READ_DOT_ENV_FILE:
     # OS environment variables take precedence over variables from .env
     env.read_env(str(ROOT_DIR / ".env"))
 
+with open(str(ROOT_DIR / "VERSION")) as fp:
+    VERSION = fp.read().strip()
+
 # GENERAL
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug
