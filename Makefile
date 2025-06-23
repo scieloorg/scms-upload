@@ -149,7 +149,7 @@ volume_down:  ## Remove all volume
 	$(DOCKER_COMPOSE) -f $(compose) down -v
 
 clean_celery_logs:
-	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' scielo_core_local_celeryworker)
+	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' upload_production_celeryworker)
 
 exclude_upload_production_django:  ## Exclude all productions containers
 	@if [ -n "$$(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'infrascielo/upload' | grep -v 'upload_production_postgres')" ]; then \
