@@ -10,7 +10,7 @@ flower==2.0.1  # https://github.com/mher/flower
 
 # Django
 # ------------------------------------------------------------------------------
-django==5.0.3
+django==5.0.8
 django-environ==0.11.2  # https://github.com/joke2k/django-environ
 django-model-utils==4.4.0  # https://github.com/jazzband/django-model-utils
 django-allauth==0.61.1  # https://github.com/pennersr/django-allauth
@@ -32,11 +32,11 @@ django_celery_results==2.5.1
 
 # Wagtail
 # ------------------------------------------------------------------------------
-wagtail==5.2.3  # https://github.com/wagtail/wagtail
+wagtail==6.2  # https://github.com/wagtail/wagtail
 
 # Wagtail Recaptcha
 # ------------------------------------------------------------------------------
-# django-recaptcha==3.0.0
+# django-recaptcha==4.0.0
 wagtail-django-recaptcha==2.1.1
 
 # Wagtail Menu
