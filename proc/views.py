@@ -1,7 +1,7 @@
 import logging
 
 from django.http import HttpResponseRedirect
-from wagtail.contrib.modeladmin.views import CreateView, EditView
+from wagtail_modeladmin.views import CreateView, EditView
 
 
 class ProcCreateView(CreateView):

@@ -3,7 +3,7 @@ import logging
 
 from django.http import HttpResponseRedirect, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from wagtail.contrib.modeladmin.views import CreateView, EditView, InspectView
+from wagtail_modeladmin.views import CreateView, EditView, InspectView
 
 from .models import Article, RelatedItem, RequestArticleChange, choices
 
