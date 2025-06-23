@@ -79,6 +79,7 @@ WAGTAIL = [
     "wagtail",
     "wagtail.locales",
     "wagtail.api.v2",
+    "wagtail.contrib.search_promotions",
     "wagtail.contrib.settings",
     "wagtail.contrib.styleguide",
     "modelcluster",
