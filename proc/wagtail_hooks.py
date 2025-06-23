@@ -1,12 +1,12 @@
 from django.urls import include, path
 from django.utils.translation import gettext as _
 from wagtail import hooks
-from wagtail.contrib.modeladmin.options import (
+from wagtail_modeladmin.options import (
     ModelAdmin,
     ModelAdminGroup,
     modeladmin_register,
 )
-from wagtail.contrib.modeladmin.views import InspectView
+from wagtail_modeladmin.views import InspectView
 
 from config.menu import get_menu_order
 from htmlxml.models import HTMLXML
