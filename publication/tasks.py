@@ -361,15 +361,17 @@ def task_publish_article(
     Tarefa que publica artigos ingressados pelo Upload
     """
     try:
-        logging.info(dict(
-            user_id=user_id,
-            username=username,
-            websites=websites,
-            article_proc_id=article_proc_id,
-            upload_package_id=upload_package_id,
-            publication_rule=publication_rule,
-        ))
-        
+        logging.info(
+            dict(
+                user_id=user_id,
+                username=username,
+                websites=websites,
+                article_proc_id=article_proc_id,
+                upload_package_id=upload_package_id,
+                publication_rule=publication_rule,
+            )
+        )
+
         user = _get_user(user_id, username)
         op_main = None
         manager = None
@@ -377,7 +379,7 @@ def task_publish_article(
 
         # Obter gerenciador e informações do artigo
         manager = controller.get_manager_info(article_proc_id, upload_package_id)
-        
+
         article = manager.article
         journal = article.journal
         issue = article.issue
@@ -387,23 +389,23 @@ def task_publish_article(
         elif manager.assignee:
             published_by = manager.assignee.username or manager.assignee.id
         elif manager.analyst:
-            published_by = manager.analyst.user.username or manager.analyst.user.id 
+            published_by = manager.analyst.user.username or manager.analyst.user.id
         elif manager.updated_by:
-            published_by = manager.updated_by.username or manager.updated_by.id 
+            published_by = manager.updated_by.username or manager.updated_by.id
         elif manager.creator:
-            published_by = manager.creator.username or manager.creator.id 
+            published_by = manager.creator.username or manager.creator.id
         # Iniciar operação principal
         op_main = manager.start(user, f"Publishing article to {', '.join(websites)}")
-        
+
         # Garantir que o JournalProc existe (pré-requisito comum)
         controller.ensure_journal_proc_exists(user, journal)
 
         # Garantir que o IssueProc existe (pré-requisito comum)
         controller.ensure_issue_proc_exists(user, issue)
-    
+
         responses = list(
-            controller.publish_article_collection_websites(
-                user, manager, websites))
+            controller.publish_article_collection_websites(user, manager, websites)
+        )
         op_main.finish(
             user,
             completed=bool(any([item["published"] for item in responses])),
@@ -439,10 +441,12 @@ def task_publish_article(
 
     try:
         # check availability
-        op_main = manager.start(user, f"Check article availability on {', '.join(websites)}")
+        op_main = manager.start(
+            user, f"Check article availability on {', '.join(websites)}"
+        )
         logging.info("ArticleAvailabilityArticleAvailabilityArticleAvailability")
         logging.info(responses)
-        logging.info(dict(publication_rule=publication_rule, published_by=published_by))           
+        logging.info(dict(publication_rule=publication_rule, published_by=published_by))
         if responses:
             obj = ArticleAvailability.create_or_update(
                 user,
@@ -529,7 +533,9 @@ def task_check_article_availability(
         article_query |= Q(issue__publication_year=publication_year)
 
     try:
-        for journal_proc in JournalProc.objects.filter(journal_query, journal__isnull=False):
+        for journal_proc in JournalProc.objects.filter(
+            journal_query, journal__isnull=False
+        ):
             if not journal_proc.journal.journal_acron:
                 journal_proc.journal.journal_acron = journal_proc.acron
                 journal_proc.journal.save()
@@ -560,7 +566,12 @@ def task_check_article_availability(
 
 @celery_app.task(bind=True)
 def process_article_availability(
-    self, pid_v3, domain, user_id, username, timeout=None,
+    self,
+    pid_v3,
+    domain,
+    user_id,
+    username,
+    timeout=None,
 ):
     try:
         user = _get_user(user_id=user_id, username=username)
@@ -582,7 +593,9 @@ def process_article_availability(
 
 
 @celery_app.task(bind=True)
-def retry_failed_scielo_urls(self, username=None, user_id=None, pid_v3=None, timeout=None):
+def retry_failed_scielo_urls(
+    self, username=None, user_id=None, pid_v3=None, timeout=None
+):
     try:
         user = _get_user(user_id=user_id, username=username)
         params = {}
@@ -660,7 +673,9 @@ def task_check_article_availability(
         article_query |= Q(issue__publication_year=publication_year)
 
     try:
-        for journal_proc in JournalProc.objects.filter(journal_query, journal__isnull=False):
+        for journal_proc in JournalProc.objects.filter(
+            journal_query, journal__isnull=False
+        ):
             if not journal_proc.journal.journal_acron:
                 journal_proc.journal.journal_acron = journal_proc.acron
                 journal_proc.journal.save()
@@ -691,7 +706,12 @@ def task_check_article_availability(
 
 @celery_app.task(bind=True)
 def process_article_availability(
-    self, pid_v3, domain, user_id, username, timeout=None,
+    self,
+    pid_v3,
+    domain,
+    user_id,
+    username,
+    timeout=None,
 ):
     try:
         user = _get_user(user_id=user_id, username=username)
@@ -713,7 +733,9 @@ def process_article_availability(
 
 
 @celery_app.task(bind=True)
-def retry_failed_scielo_urls(self, username=None, user_id=None, pid_v3=None, timeout=None):
+def retry_failed_scielo_urls(
+    self, username=None, user_id=None, pid_v3=None, timeout=None
+):
     try:
         user = _get_user(user_id=user_id, username=username)
         params = {}

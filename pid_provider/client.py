@@ -121,6 +121,31 @@ class PidProviderAPIClient:
                 raise exceptions.APIPidProviderConfigError(e)
         return self._api_password
 
+    def provide_pid_and_handle_incorrect_pid_v2(self, xml_with_pre, registered):
+        try:
+            return self.provide_pid(
+                xml_with_pre,
+                xml_with_pre.filename,
+                created=registered.get("created"),
+            )
+        except IncorrectPidV2RegisteredInCoreException as e:
+            # conserta valor de pid v2 no core
+            fix_pid_v2_response = self.fix_pid_v2(
+                xml_with_pre.v3, xml_with_pre.v2
+            )
+            if not fix_pid_v2_response or not fix_pid_v2_response.get(
+                "fixed_in_core"
+            ):
+                raise IncorrectPidV2RegisteredInCoreException(
+                    f"Unable to fix pid v2 {e}: fix_pid_v2_response={fix_pid_v2_response}"
+                )
+            # tenta novamente registrar pid no core
+            return self.provide_pid(
+                xml_with_pre,
+                xml_with_pre.filename,
+                created=registered.get("created"),
+            )
+
     def provide_pid(self, xml_with_pre, name, created=None):
         """
         name : str
@@ -138,7 +163,7 @@ class PidProviderAPIClient:
             try:
                 return response[0]
             except IndexError:
-                return
+                return {}
         except (
             exceptions.GetAPITokenError,
             exceptions.APIPidProviderPostError,
@@ -263,7 +288,6 @@ class PidProviderAPIClient:
                     verify=False,
                     json=True,
                 )
-            logging.exception(e)
             raise exceptions.APIPidProviderPostError(
                 _("Unable to get pid from pid provider {} {} {} {}").format(
                     self.pid_provider_api_post_xml,
@@ -274,11 +298,7 @@ class PidProviderAPIClient:
             )
 
     def _process_post_xml_response(self, response, xml_with_pre, created=None):
-        logging.info(
-            f"pid_provider.client._process_post_xml_response: xml_with_pre.data={xml_with_pre.data}"
-        )
         if not response:
-            logging.info(f"Pid Provider Response: none")
             return
         for item in response:
             try:
@@ -298,44 +318,20 @@ class PidProviderAPIClient:
         return True
 
     def _process_item_response(self, item, xml_with_pre, created=None):
-        logging.info(
-            f"pid_provider.client._process_item_response: xml_with_pre.data={xml_with_pre.data} | item: {item}"
-        )
-
         if not item.get("xml_changed"):
             # pids do xml_with_pre não mudaram
-            logging.info("No xml changes")
             return
-
-        try:
-            # atualiza xml_with_pre com valor do XML registrado no Core
-            if not item.get("apply_xml_changes"):
-                # exceto 'apply_xml_changes=True' ou
-                # exceto se o registro do Core foi criado posteriormente
-                if created and created < item["created"]:
-                    # não atualizar com os dados do Core
-                    logging.info(
-                        {
-                            "created_at_upload": created,
-                            "created_at_core": item["created"],
-                        }
-                    )
-                    return
-
-            for pid_type, pid_value in item["xml_changed"].items():
-                try:
-                    if pid_type == "pid_v3":
-                        xml_with_pre.v3 = pid_value
-                    elif pid_type == "pid_v2":
-                        xml_with_pre.v2 = pid_value
-                    elif pid_type == "aop_pid":
-                        xml_with_pre.aop_pid = pid_value
-                    logging.info("XML changed")
-                except Exception as e:
-                    pass
-            return
-        except KeyError:
-            pass
+        for pid_type, pid_value in item["xml_changed"].items():
+            if pid_type == "pid_v3":
+                xml_with_pre.v3 = pid_value
+                continue
+            if pid_type == "pid_v2":
+                xml_with_pre.v2 = pid_value
+                continue
+            if pid_type == "aop_pid":
+                xml_with_pre.aop_pid = pid_value
+                continue
+        return
 
     def fix_pid_v2(self, pid_v3, correct_pid_v2):
         """

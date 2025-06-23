@@ -262,6 +262,27 @@ class Issue(CommonControlField, IssuePublicationDate):
             number = _get_digits(number)
         return number or 1
 
+    @property
+    def bundle_id_suffix(self):
+        """
+        Gera Id utilizado na ferramenta de migração para cadastro do documentsbundle.
+        """
+        if self.number == "ahead":
+            return "aop"
+        _id = []
+        _id.append(self.publication_year)
+        if self.volume:
+            _id.append(f"v{self.volume}")
+        if self.number:
+            _id.append(f"n{self.number}")
+        if self.supplement:
+            _id.append(f"s{self.supplement}")
+        return "-".join(_id)
+
+    @property
+    def article_ids(self):
+        return [item.pid_v3 for item in self.article_set.all()]
+
 
 class TOC(CommonControlField, ClusterableModel):
     # Somente para issues cujos artigos não tem página numérica
@@ -399,11 +420,9 @@ class TocSection(CommonControlField, Orderable):
                     items[item.section.language.code2] = item.section.text
 
             if not items:
-                for item in JournalSection.objects.filter(
-                    parent=issue.journal, text__in=titles
-                ):
-                    items[item.language.code2] = item.text
-
+                items.update(
+                    issue.journal.get_sections_by_titles(titles)
+                )
         return items
 
     @staticmethod

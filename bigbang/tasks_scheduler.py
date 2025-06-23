@@ -39,6 +39,10 @@ ISSUE_PUBLICATION_MINUTES = MINUTES[10]
 ARTICLE_PUBLICATION_MINUTES = MINUTES[10]
 
 SINCHRONIZE_TO_PID_PROVIDER_MINUTES = MINUTES[10]
+# Adicione estas constantes no início do arquivo, após as outras constantes de prioridade:
+
+FETCH_AND_CREATE_JOURNAL_MINUTES = MINUTES[10]
+FETCH_AND_CREATE_JOURNAL_PRIORITY = 1
 
 TITLE_DB_MIGRATION_PRIORITY = 0
 ISSUE_DB_MIGRATION_PRIORITY = 0
@@ -98,16 +102,21 @@ def schedule_publication_subtasks(username):
     _schedule_publish_journals(username)
 
 
-def _schedule_check_article_availability(username, enabled):
+def schedule_subtasks(username):
+    enabled = False
+    _schedule_fetch_and_create_journal(username, enabled)  # Nova tarefa adicionada
+
+
+def _schedule_check_article_availability(username, enabled=False):
     """
     Agenda a tarefa de migrar os registros da base de dados TITLE
     Deixa a tarefa desabilitada
     """
     schedule_task(
-        task="proc.tasks.task_check_article_availability",
-        name="check_article_availability",
+        task="publication.tasks.task_check_article_availability",
+        name="task_check_article_availability",
         kwargs=dict(
-            username,
+            username=username,
             issn_print=None,
             issn_electronic=None,
             publication_year=None,
@@ -187,7 +196,8 @@ def _schedule_migrate_and_publish_journals(username, enabled):
             collection_acron=None,
             journal_acron=None,
             force_update=False,
-            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
+            status=[],
+            valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
         ),
         description=_("Migra e publica os periódicos"),
         priority=TITLE_DB_MIGRATION_PRIORITY,
@@ -213,7 +223,8 @@ def _schedule_migrate_and_publish_issues(username, enabled):
             journal_acron=None,
             publication_year=None,
             issue_folder=None,
-            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
+            status=[],
+            valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
         ),
         description=_("Migra e publica os fascículos"),
@@ -236,7 +247,8 @@ def _schedule_migrate_and_publish_articles(username, enabled):
             journal_acron=None,
             publication_year=None,
             issue_folder=None,
-            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
+            status=[],
+            valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
             force_import_acron_id_file=False,
             force_migrate_document_records=False,
@@ -340,4 +352,31 @@ def _schedule_publish_articles(username, enabled=False):
         day_of_week="*",
         hour="*",
         minute=ARTICLE_DB_MIGRATION_MINUTES,
+    )
+
+
+# Adicione esta função junto com as outras funções de agendamento:
+
+def _schedule_fetch_and_create_journal(username, enabled=False):
+    """
+    Agenda a tarefa de buscar e criar periódicos
+    Deixa a tarefa desabilitada por padrão
+    """
+    schedule_task(
+        task="proc.tasks.task_fetch_and_create_journal",
+        name="fetch_and_create_journal",
+        kwargs=dict(
+            username=username,
+            collection_acron=None,
+            issn_electronic=None,
+            issn_print=None,
+            force_update=None,
+        ),
+        description=_("Busca e cria periódicos"),
+        priority=FETCH_AND_CREATE_JOURNAL_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=FETCH_AND_CREATE_JOURNAL_MINUTES,
     )

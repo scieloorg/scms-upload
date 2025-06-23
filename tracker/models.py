@@ -50,6 +50,35 @@ def format_traceback(exc_traceback):
     return traceback.format_tb(exc_traceback)
 
 
+class BaseEvent(models.Model):
+    name = models.CharField(_("name"), max_length=200)
+    detail = models.JSONField(null=True, blank=True)
+    created = models.DateTimeField(verbose_name=_("Creation date"), auto_now_add=True)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def data(self):
+        return {
+            "name": self.name,
+            "detail": self.detail,
+            "created": self.created.isoformat(),
+        }
+
+    @classmethod
+    def create(
+        cls,
+        name=None,
+        detail=None,
+    ):
+        obj = cls()
+        obj.detail = detail
+        obj.name = name
+        obj.save()
+        return obj
+
+
 class UnexpectedEvent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created = models.DateTimeField(verbose_name=_("Creation date"), auto_now_add=True)
@@ -57,19 +86,38 @@ class UnexpectedEvent(models.Model):
     exception_msg = models.TextField(_("Exception Msg"), null=True, blank=True)
     traceback = models.JSONField(null=True, blank=True)
     detail = models.JSONField(null=True, blank=True)
+    item = models.CharField(
+        _("Item"),
+        max_length=256,
+        null=True,
+        blank=True,
+    )
+    action = models.CharField(
+        _("Action"),
+        max_length=256,
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         indexes = [
             models.Index(fields=["exception_type"]),
+            models.Index(fields=["item"]),
+            models.Index(fields=["action"]),
         ]
+        ordering = ["-created"]
 
     def __str__(self):
+        if self.item or self.action:
+            return f"{self.action} {self.item} {self.exception_msg}"
         return f"{self.exception_msg}"
 
     @property
     def data(self):
         return dict(
             created=self.created.isoformat(),
+            item=self.item,
+            action=self.action,
             exception_type=self.exception_type,
             exception_msg=self.exception_msg,
             traceback=json.dumps(self.traceback),
@@ -82,262 +130,31 @@ class UnexpectedEvent(models.Model):
         e=None,
         exception=None,
         exc_traceback=None,
+        item=None,
+        action=None,
         detail=None,
     ):
         try:
-            e = e or exception
-            logging.exception(e)
+            exception = exception or e
+            if exception:
+                logging.exception(exception)
 
             obj = cls()
-            obj.exception_msg = str(e)
-            obj.exception_type = str(type(e))
+            obj.item = item
+            obj.action = action
+            obj.exception_msg = str(exception)
+            obj.exception_type = str(type(exception))
             try:
                 json.dumps(detail)
                 obj.detail = detail
-            except Exception as json_e:
+            except Exception as e:
                 obj.detail = str(detail)
+
             if exc_traceback:
                 obj.traceback = traceback.format_tb(exc_traceback)
             obj.save()
             return obj
         except Exception as exc:
-            logging.exception(exc)
             raise UnexpectedEventCreateError(
-                f"Unable to create unexpected event ({e} {exc_traceback}). EXCEPTION {exc}"
+                f"Unable to create unexpected event ({exception} {exc_traceback}). EXCEPTION {exc}"
             )
-
-
-class Event(CommonControlField):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    message = models.TextField(_("Message"), null=True, blank=True)
-    message_type = models.CharField(
-        _("Message type"),
-        choices=choices.EVENT_MSG_TYPE,
-        max_length=16,
-        null=True,
-        blank=True,
-    )
-    detail = models.JSONField(null=True, blank=True)
-    unexpected_event = models.ForeignKey(
-        UnexpectedEvent, on_delete=models.SET_NULL, null=True, blank=True
-    )
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["message_type"]),
-        ]
-
-    @property
-    def data(self):
-        d = {}
-        d["created"] = self.created.isoformat()
-        d.update(
-            dict(
-                message=self.message, message_type=self.message_type, detail=self.detail
-            )
-        )
-        if self.unexpected_event:
-            d.update(self.unexpected_event.data)
-        return d
-
-    @classmethod
-    def create(
-        cls,
-        user=None,
-        message_type=None,
-        message=None,
-        e=None,
-        exc_traceback=None,
-        detail=None,
-    ):
-        try:
-            obj = cls()
-            obj.creator = user
-            obj.message = message
-            obj.message_type = str(message_type)
-
-            if detail:
-                try:
-                    json.dumps(detail)
-                    obj.detail = detail
-                except:
-                    obj.detail = str(detail)
-            obj.save()
-
-            if e:
-                obj.unexpected_event = UnexpectedEvent.create(
-                    e=e,
-                    exc_traceback=exc_traceback,
-                )
-                obj.save()
-            return obj
-        except Exception as exc:
-            data = dict(
-                message_type=message_type,
-                message=message,
-                e=e,
-                exc_traceback=exc_traceback,
-                detail=detail,
-            )
-            logging.exception(exc)
-            raise EventCreateError(
-                f"Unable to create Event ({message} {e}) Input {data}. EXCEPTION: {exc}"
-            )
-
-
-def tracker_file_directory_path(instance, filename):
-    # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
-
-    d = datetime.utcnow()
-    return f"tracker/{d.year}/{d.month}/{d.day}/{filename}"
-
-
-class EventReport(CommonControlField):
-    file = models.FileField(
-        upload_to=tracker_file_directory_path, null=True, blank=True
-    )
-
-    class Meta:
-        abstract = True
-
-    def save_file(self, events, ext=None):
-        if not events:
-            return
-        try:
-            ext = ".json"
-            content = json.dumps(list([item.data for item in events]))
-            name = datetime.utcnow().isoformat() + ext
-            self.file.save(name, ContentFile(content))
-            self.delete_events(events)
-        except Exception as e:
-            raise EventReportSaveFileError(
-                f"Unable to save EventReport.file ({name}). Exception: {e}"
-            )
-
-    def delete_events(self, events):
-        for item in events:
-            try:
-                item.unexpected_event.delete()
-            except:
-                pass
-            try:
-                item.delete()
-            except:
-                pass
-
-    @classmethod
-    def create(cls, user):
-        try:
-            obj = cls()
-            obj.creator = user
-            obj.save()
-        except Exception as e:
-            logging.exception(e)
-            raise EventReportCreateError(
-                f"Unable to create EventReport. Exception: {e}"
-            )
-
-
-# class EventLogger:
-
-#     def archive_report(self, user, ext=None):
-#         events = ProcEvent.objects.filter(proc_event_logger=self).iterator()
-#         try:
-#             obj = ProcEventReport.archive(user, events, ext)
-#             obj.proc_event_logger = self
-#             obj.save()
-#         except Exception as e:
-#             raise ArchiveProcEventReportError(
-#                 f"Unable to archive events {self}. Exception: {e}"
-#             )
-#         return obj
-
-#     def create_event(
-#         self,
-#         user,
-#         message_type,
-#         message=None,
-#         e=None,
-#         exc_traceback=None,
-#         detail=None,
-#     ):
-#         try:
-#             obj = ProcEvent.create(
-#                 creator=user,
-#                 message=message,
-#                 message_type=message_type,
-#                 detail=detail,
-#                 e=e,
-#                 exc_traceback=exc_traceback,
-#             )
-#             obj.proc_event_logger = self
-#             obj.save()
-#         except Exception as exc:
-#             raise ProcEventCreateError(
-#                 f"Unable to create ProcEvent ({proc_event_logger} {message} {e}). EXCEPTION: {exc}")
-#         return obj
-
-
-# class ProcEventReport(EventReport, Orderable):
-#     proc_event_logger = ParentalKey(
-#         EventLogger, on_delete=models.SET_NULL, related_name="proc_event_file",
-#         null=True, blank=True,
-#     )
-
-#     base_form_class = CoreAdminModelForm
-
-#     panels = [
-#         # FieldPanel("created"),
-#         FieldPanel("file"),
-#     ]
-
-#     # @classmethod
-#     # def archive_with_parent(cls, user, proc_event_logger, events, ext=None):
-#     #     obj = cls.archive(user, events, ext)
-#     #     obj.proc_event_logger = proc_event_logger
-#     #     obj.save()
-#     #     return obj
-
-
-# class ProcEvent(Event, Orderable):
-#     event_parent = ParentalKey(
-#         EventLogger, on_delete=models.SET_NULL, related_name="proc_event",
-#         null=True, blank=True,
-#     )
-
-#     base_form_class = CoreAdminModelForm
-
-#     panels = [
-#         # FieldPanel("created"),
-#         FieldPanel("message"),
-#         FieldPanel("message_type"),
-#         FieldPanel("detail"),
-#         FieldPanel("unexpected_event"),
-#     ]
-
-#     # @classmethod
-#     # def create_with_parent(
-#     #     cls,
-#     #     user,
-#     #     proc_event_logger,
-#     #     message_type,
-#     #     message=None,
-#     #     e=None,
-#     #     exc_traceback=None,
-#     #     detail=None,
-#     # ):
-#     #     try:
-#     #         obj = cls.create(
-#     #             creator=user,
-#     #             message=message,
-#     #             message_type=message_type,
-#     #             detail=detail,
-#     #             e=e,
-#     #             exc_traceback=exc_traceback,
-#     #         )
-#     #         obj.proc_event_logger = proc_event_logger
-#     #         obj.save()
-#     #     except Exception as exc:
-#     #         raise ProcEventCreateError(
-#     #             f"Unable to create Event ({proc_event_logger} {message} {e}). EXCEPTION: {exc}")
-#     #     return obj

@@ -5,12 +5,27 @@ from django.utils.translation import gettext_lazy as _
 from journal.models import JournalHistory
 from publication.api.publication import PublicationAPI
 from publication.utils.journal import build_journal
+from proc.source_core_api import fetch_and_create_journal
 
 
 def publish_journal(journal_proc, api_data):
+
     logging.info(f"publish_journal {journal_proc}")
 
     journal = journal_proc.journal
+
+    if not journal.required_data_completed:
+        try:
+            fetch_and_create_journal(
+                user=journal_proc.updated_by or journal_proc.creator,
+                collection_acron=journal_proc.collection.acron,
+                issn_electronic=journal.issn_print,
+                issn_print=journal.issn_electronic,
+                force_update=True,
+            )
+        except:
+            pass
+
     journal_pid = journal_proc.pid
     journal_acron = journal_proc.acron
     journal_history = JournalHistory.objects.filter(
@@ -174,9 +189,9 @@ class JournalPayload:
         # Study Area
         self.data["subject_areas"] = subject_areas
 
-    # def add_issue_count(self, issue_count):
-    #     # Issue count
-    #     self.data["issue_count"] = issue_count
+    def add_issue_count(self, issue_count):
+        # Issue count
+        self.data["issue_count"] = issue_count
 
     def add_sponsor(self, sponsor):
         # Sponsors
