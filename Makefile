@@ -61,6 +61,13 @@ ps:  ## See all containers using $(compose)
 rm:  ## Remove all containers using $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) rm -f
 
+pull_webapp: ## Pull Django image
+	@echo "Pulling scms-upload version $(SCMS_WEBAPP_VERSION) ..."
+	$(DOCKER_COMPOSE) -f $(compose) pull django
+
+down_webapp: ## Pull Django image
+	$(DOCKER_COMPOSE) -f $(compose) rm -s -f django flower celeryworker celerybeat
+
 django_shell:  ## Open python terminal from django $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py shell
 
@@ -87,6 +94,9 @@ django_makemigrations: ## Run makemigrations from django container using $(compo
 
 django_migrate: ## Run migrate from django container using $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py migrate
+
+django_migrate_fresh_migrations: ## Run makemigrations and migrate from django container using $(compose)
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django bash -c 'python manage.py makemigrations && python manage.py migrate'
 
 django_makemessages: ## Run ./manage.py makemessages $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py makemessages --all
@@ -139,7 +149,7 @@ volume_down:  ## Remove all volume
 	$(DOCKER_COMPOSE) -f $(compose) down -v
 
 clean_celery_logs:
-	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' scielo_core_local_celeryworker)
+	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' upload_production_celeryworker)
 
 exclude_upload_production_django:  ## Exclude all productions containers
 	@if [ -n "$$(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'infrascielo/upload' | grep -v 'upload_production_postgres')" ]; then \
@@ -150,3 +160,5 @@ exclude_upload_production_django:  ## Exclude all productions containers
 	fi
 
 update: stop rm exclude_upload_production_django build up
+
+update_webapp: pull_webapp down_webapp up

@@ -5,7 +5,7 @@ def build_journal(
     builder, journal, journal_id, journal_acron, journal_history, availability_status
 ):
     official_journal = journal.official_journal
-
+    builder.add_issue_count(journal.issue_count)
     builder.add_ids(journal_id)
     builder.add_dates(journal.created, journal.updated)
     builder.add_acron(journal_acron)
@@ -40,7 +40,9 @@ def build_journal(
     current_status = "inprogress"
     if builder.data.get("status_history"):
         try:
-            current_status = sorted(builder.data["status_history"], key=lambda x: x['date'])[-1]["status"]
+            current_status = sorted(
+                builder.data["status_history"], key=lambda x: x["date"]
+            )[-1]["status"]
             if current_status not in ("inprogress", "current"):
                 current_status = "no-current"
         except (IndexError, KeyError):

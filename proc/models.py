@@ -5,6 +5,7 @@ import sys
 from datetime import datetime
 from tempfile import TemporaryDirectory
 
+from django import forms
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
 from django.db.models import Q, Count
@@ -49,9 +50,10 @@ from package import choices as package_choices
 from package.models import SPSPkg
 from proc import exceptions
 from proc.forms import ProcAdminModelForm, IssueProcAdminModelForm
+from pid_provider.models import PidProviderXML
 from publication.api.publication import get_api_data
 from tracker import choices as tracker_choices
-from tracker.models import Event, UnexpectedEvent, format_traceback
+from tracker.models import UnexpectedEvent, format_traceback
 
 
 class Operation(CommonControlField):
@@ -72,7 +74,7 @@ class Operation(CommonControlField):
         FieldPanel("created", read_only=True),
         FieldPanel("updated", read_only=True),
         FieldPanel("completed", read_only=True),
-        FieldPanel("detail", read_only=True),
+        FieldPanel('detail', read_only=True)
     ]
 
     class Meta:
@@ -701,7 +703,7 @@ class BaseProc(CommonControlField):
         doit = False
         if website_kind == collection_choices.QA:
             detail["qa_ws_status"] = self.qa_ws_status
-            doit = tracker_choices.allowed_to_run(self.qa_ws_status, force_update)
+            doit = True
         else:
             detail["public_ws_status"] = self.public_ws_status
             if content_type == "article" and (
@@ -710,9 +712,7 @@ class BaseProc(CommonControlField):
                 detail["registered_in_core"] = self.sps_pkg.registered_in_core
                 doit = False
             else:
-                doit = tracker_choices.allowed_to_run(
-                    self.public_ws_status, force_update
-                )
+                doit = True
 
         detail["doit"] = doit
         operation = self.start(user, f"publish {content_type} {self} on {website_kind}")
@@ -913,6 +913,21 @@ class JournalProc(BaseProc, ClusterableModel):
                 acron=item.journal_acron,
             )
 
+    @property
+    def completeness(self):
+        return {
+            "is_completed": self.journal.is_completed,
+            "required_data_completed": self.journal.required_data_completed,
+        }
+
+    @property
+    def issn_print(self):
+        return self.journal and self.journal.issn_print
+
+    @property
+    def issn_electronic(self):
+        return self.journal and self.journal.issn_electronic
+
 
 ################################################
 class IssueGetOrCreateError(Exception): ...
@@ -1001,6 +1016,50 @@ class IssueProc(BaseProc, ClusterableModel):
             ObjectList(panel_proc_result, heading=_("Events")),
         ]
     )
+
+    @staticmethod
+    def set_items_to_process(collection_acron=None):
+        params = {}
+        if collection_acron:
+            params["collection__acron"] = collection_acron
+
+        issue_status = tracker_choices.PROGRESS_STATUS_RETRY + tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+        articles = ArticleProc.objects.filter(
+            Q(xml_status__in=issue_status) |
+            Q(sps_pkg_status__in=issue_status),
+            **params,
+        )
+        article_pids = [
+            item.pid
+            for item in articles
+        ]
+
+        q = IdFileRecord.objects.filter(item_type="article", todo=True).count()
+        logging.info(f"IdFileRecord.todo: {q}")
+
+        IdFileRecord.objects.filter(item_pid__contains=article_pids).update(todo=True)
+
+        q = IdFileRecord.objects.filter(item_type="article", todo=True).count()
+        logging.info(f"IdFileRecord.todo: {q}")
+        
+        for item in IdFileRecord.objects.filter(item_type="article", todo=False):
+            if not ArticleProc.objects.filter(pid=item.item_pid).exists():
+                item.todo = True
+                item.save()
+
+        q = IdFileRecord.objects.filter(item_type="article", todo=True).count()
+        logging.info(f"IdFileRecord.todo: {q}")
+
+        issue_pids = list(set([
+            item["item_pid"][1:18]
+            for item in IdFileRecord.objects.filter(item_type="article", todo=True).values("item_pid")
+        ]))
+        IssueProc.objects.filter(
+            pid__in=issue_pids,
+        ).update(
+            docs_status=tracker_choices.PROGRESS_STATUS_TODO,
+            files_status=tracker_choices.PROGRESS_STATUS_TODO,
+        )
 
     @staticmethod
     def create_from_journal_proc_and_issue(user, journal_proc, issue):
@@ -1145,11 +1204,6 @@ class IssueProc(BaseProc, ClusterableModel):
         self, user, force_update, f_get_files_from_classic_website
     ):
         try:
-            doit = tracker_choices.allowed_to_run(self.files_status, force_update)
-            if not doit:
-                # logging.info(f"Skip get_files_from_classic_website {self.pid}")
-                return
-
             operation = self.start(user, "get_files_from_classic_website")
 
             self.files_status = tracker_choices.PROGRESS_STATUS_DOING
@@ -1272,7 +1326,7 @@ class IssueProc(BaseProc, ClusterableModel):
                     article_proc = self.create_or_update_article_proc(
                         user, record.item_pid, data["data"], force_update
                     )
-                    
+
                     if article_proc:
                         done += 1
                         record.todo = False
@@ -1363,13 +1417,32 @@ class IssueProc(BaseProc, ClusterableModel):
         if issue_proc:
             return issue_proc.pid
         if journal:
-            journal_proc = JournalProc.objects.filter(journal=journal).first() 
+            journal_proc = JournalProc.objects.filter(journal=journal).first()
             if journal_proc:
                 issn_id = journal_proc.pid
                 year = issue.publication_year
                 issue_pid_suffix = issue.issue_pid_suffix
-        return f"{issn_id}{year}{issue_pid_suffix}"
+            return f"{issn_id}{year}{issue_pid_suffix}"
 
+    @property
+    def bundle_id(self):
+        return "-".join([self.journal_proc.pid, self.issue.bundle_id_suffix])
+
+    def unlink_articles(self):
+        for article in Article.objects.filter(issue=self.issue).iterator():
+            delete = False
+            try:
+                ArticleProc.objects.get(sps_pkg=article.sps_pkg)
+            except ArticleProc.DoesNotExist:
+                article.delete()
+                continue
+            try:
+                PidProviderXML.objects.get(v3=article.pid_v3)
+            except PidProviderXML.DoesNotExist:
+                article.delete()
+            except PidProviderXML.MultipleObjectsReturned:
+                pass
+            
 
 class ArticleEventCreateError(Exception): ...
 
@@ -1386,7 +1459,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     issue_proc = models.ForeignKey(
         IssueProc, on_delete=models.SET_NULL, null=True, blank=True
     )
-    pkg_name = models.CharField(_("Package name"), max_length=50, null=True, blank=True)
+    pkg_name = models.CharField(_("Package name"), max_length=100, null=True, blank=True)
     main_lang = models.CharField(
         _("Main lang"),
         max_length=2,
@@ -1511,11 +1584,6 @@ class ArticleProc(BaseProc, ClusterableModel):
 
     def get_xml(self, user, body_and_back_xml):
         try:
-
-            doit = tracker_choices.allowed_to_run(self.xml_status, body_and_back_xml)
-            if not doit:
-                # logging.info(f"Skip get_xml {self.pid}")
-                return self.xml_status == tracker_choices.PROGRESS_STATUS_DONE
 
             operation = self.start(user, "get xml")
 
@@ -1721,13 +1789,6 @@ class ArticleProc(BaseProc, ClusterableModel):
         force_update=False,
     ):
         try:
-
-            force_update = force_update or body_and_back_xml or html_to_xml
-            doit = tracker_choices.allowed_to_run(self.sps_pkg_status, force_update)
-            if not doit:
-                # logging.info(f"Skip generate_sps_package {self.pid}")
-                return self.sps_pkg_status == tracker_choices.PROGRESS_STATUS_DONE
-
             operation = self.start(user, "generate_sps_package")
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
@@ -1769,7 +1830,7 @@ class ArticleProc(BaseProc, ClusterableModel):
                 completed=completed,
                 detail=self.sps_pkg and self.sps_pkg.data,
             )
-            return completed
+            return bool(self.sps_pkg and self.sps_pkg.pid_v3)
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_BLOCKED
@@ -1786,10 +1847,13 @@ class ArticleProc(BaseProc, ClusterableModel):
             self.sps_pkg.fix_pid_v2(user, correct_pid_v2=self.migrated_data.pid)
 
     def update_sps_pkg_status(self):
-        if not self.sps_pkg or not self.sps_pkg.xml_with_pre:
-            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
+        if self.sps_pkg:
+            if self.sps_pkg.registered_in_core:
+                self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DONE
+            else:
+                self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
         else:
-            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DONE
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_BLOCKED
         self.save()
 
     @property
@@ -1799,10 +1863,11 @@ class ArticleProc(BaseProc, ClusterableModel):
     @property
     def article(self):
         try:
-            if self.sps_pkg.pid_v3:
-                return Article.objects.get(pid_v3=self.sps_pkg.pid_v3)
+            sps_pkg = self.sps_pkg
+            if sps_pkg:
+                return Article.objects.get(sps_pkg=sps_pkg)
         except (AttributeError, Article.DoesNotExist) as e:
-            logging.info(f"Not found ArticleProc.article: {self.sps_pkg} {e}")
+            logging.info(f"Not found ArticleProc.article: {sps_pkg} {e}")
 
     def migrate_article(self, user, force_update):
         body_and_back_xml = force_update
@@ -1810,11 +1875,12 @@ class ArticleProc(BaseProc, ClusterableModel):
         if not self.get_xml(user, body_and_back_xml):
             return None
 
-        self.generate_sps_package(
+        if not self.generate_sps_package(
             user,
             body_and_back_xml,
             html_to_xml,
-        )
+        ):
+            return None
 
         return self.create_or_update_item(user, force_update, create_or_update_article)
 

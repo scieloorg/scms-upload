@@ -1,12 +1,12 @@
 from django.urls import include, path
 from django.utils.translation import gettext as _
 from wagtail import hooks
-from wagtail.contrib.modeladmin.options import (
+from wagtail_modeladmin.options import (
     ModelAdmin,
     ModelAdminGroup,
     modeladmin_register,
 )
-from wagtail.contrib.modeladmin.views import InspectView
+from wagtail_modeladmin.views import InspectView
 
 from config.menu import get_menu_order
 from htmlxml.models import HTMLXML
@@ -14,23 +14,6 @@ from package.models import SPSPkg
 
 from .models import ArticleProc, IssueProc, JournalProc, ProcReport
 from proc.views import ProcCreateView, ProcEditView, CoreCreateView
-
-# class ProcCreateView(CreateView):
-#     def form_valid(self, form):
-#         self.object = form.save_all(self.request.user)
-#         return HttpResponseRedirect(self.get_success_url())
-
-
-# class ProcEditView(EditView):
-#     def form_valid(self, form):
-#         self.object = form.save_all(self.request.user)
-#         return HttpResponseRedirect(self.get_success_url())
-
-
-# class CoreCreateView(CreateView):
-#     def form_valid(self, form):
-#         self.object = form.save_all(self.request.user)
-#         return HttpResponseRedirect(self.get_success_url())
 
 
 class JournalProcModelAdmin(ModelAdmin):

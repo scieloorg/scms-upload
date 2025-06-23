@@ -7,10 +7,20 @@ from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from pid_provider.base_pid_provider import BasePidProvider
 from pid_provider.client import (
     PidProviderAPIClient,
-    IncorrectPidV2RegisteredInCoreException,
 )
 from pid_provider.models import FixPidV2, PidProviderXML
 from tracker.models import UnexpectedEvent
+
+
+def check_xml_changed(original, registered):
+    for pid_type in ("v3", "v2", "aop_pid"):
+        if original[pid_type] != registered.get(pid_type):
+            return True
+    return False
+
+
+class CorePidProviderUnabledException(Exception):
+    pass
 
 
 class PidRequester(BasePidProvider):
@@ -80,143 +90,153 @@ class PidRequester(BasePidProvider):
         """
         Recebe um xml_with_pre para solicitar o PID v3
         """
-        # identifica as mudanças no xml_with_pre
-        xml_changed = {}
-
-        main_op = article_proc.start(user, "request_pid_for_xml_with_pre")
+        original = {
+            "v3": xml_with_pre.v3,
+            "v2": xml_with_pre.v2,
+            "aop_pid": xml_with_pre.aop_pid,
+        }
         registered = PidRequester.get_registration_demand(
-            xml_with_pre, article_proc, user
+            user, article_proc, xml_with_pre
         )
-
         if registered.get("error_type"):
-            main_op.finish(user, completed=False, detail=registered)
             return registered
 
         # Solicita pid para Core
-        self.core_registration(xml_with_pre, registered, article_proc, user)
-        xml_changed = xml_changed or registered.get("xml_changed")
+        remote_response = self.remote_registration(
+            user, article_proc, xml_with_pre, registered)
+        if registered.get("error_type"):
+            return registered
 
         # Atualiza registro de Upload
-        if registered["do_upload_registration"] or xml_changed:
-            # Cria ou atualiza registro de PidProviderXML de Upload, se:
-            # - está registrado no upload mas o conteúdo mudou, atualiza
-            # - ou não está registrado no Upload, então cria
-            op = article_proc.start(user, ">>> upload registration")
+        local_response = self.local_registration(
+            user, article_proc, xml_with_pre, registered,
+            origin_date, force_update, is_published, origin,
+        )
+        if registered.get("error_type"):
+            return registered
 
-            resp = self.provide_pid_for_xml_with_pre(
-                xml_with_pre,
-                xml_with_pre.filename,
-                user,
-                origin_date=origin_date,
-                force_update=force_update,
-                is_published=is_published,
-                origin=origin,
-                registered_in_core=registered.get("registered_in_core"),
-            )
-            xml_changed = xml_changed or resp.get("xml_changed")
-            registered.update(resp)
-            registered["registered_in_upload"] = bool(resp.get("v3"))
-            op.finish(
-                user,
-                completed=registered["registered_in_upload"],
-                detail={"registered": registered, "response": resp},
-            )
-
-        registered["synchronized"] = registered.get(
-            "registered_in_core"
-        ) and registered.get("registered_in_upload")
-        registered["xml_changed"] = xml_changed
         registered["xml_with_pre"] = xml_with_pre
         registered["filename"] = name
-
-        detail = registered.copy()
-        detail["xml_with_pre"] = xml_with_pre.data
-        main_op.finish(user, completed=registered["synchronized"], detail=detail)
+        registered["changed"] = check_xml_changed(original, registered)
         return registered
 
     @staticmethod
-    def get_registration_demand(xml_with_pre, article_proc, user):
+    def get_registration_demand(user, article_proc, xml_with_pre):
         """
-        Obtém a indicação de demanda de registro no Upload e/ou Core
-
+        Obtém a indicação de demanda de registro no Upload e/ou Core.
+        
+        Parameters
+        ----------
+        xml_with_pre : XMLWithPre
+            Objeto contendo os dados XML a serem analisados
+        article_proc : ArticleProc
+            Processador de artigo para controle de operações
+        user : User
+            Usuário executando a operação
+        
         Returns
         -------
-        {"do_core_registration": boolean, "do_upload_registration": boolean}
-
+        dict
+            {"do_remote_registration": bool, "do_local_registration": bool, ...}
         """
+        # Inicia operação de logging para rastreamento
         op = article_proc.start(user, ">>> get registration demand")
-
+        
+        # Verifica se o XML já está registrado e obtém dados de comparação
         registered = PidProviderXML.is_registered(xml_with_pre)
+        
+        # Se houve erro na verificação, finaliza operação e retorna erro
         if registered.get("error_type"):
             op.finish(user, completed=False, detail=registered)
             return registered
-
+        
+        # Determina demanda de registro baseado na comparação
         if registered.get("is_equal"):
-            # xml recebido é igual ao registrado
-            registered["do_core_registration"] = not registered.get(
-                "registered_in_core"
-            )
-            registered["do_upload_registration"] = registered["do_core_registration"]
+            # XML recebido é igual ao registrado
+            # Só registra no Core se ainda não estiver registrado lá
+            registered["do_remote_registration"] = not registered.get("registered_in_core")
+            # Upload segue a mesma regra do Core quando XMLs são iguais
+            registered["do_local_registration"] = registered["do_remote_registration"]
         else:
-            # xml recebido é diferente ao registrado ou não está no upload
-            registered["do_core_registration"] = True
-            registered["do_upload_registration"] = True
-
+            # XML recebido é diferente do registrado ou não está no Upload
+            # Força registro em ambos os sistemas
+            registered["do_remote_registration"] = True
+            registered["do_local_registration"] = True
+        
         op.finish(user, completed=True, detail=registered)
-
         return registered
 
-    def core_registration(self, xml_with_pre, registered, article_proc, user):
+    def remote_registration(self, user, article_proc, xml_with_pre, registered):
         """
         Solicita PID v3 para o Core, se necessário
         """
-        if registered["do_core_registration"]:
+        op = article_proc.start(user, ">>> core registration")
 
-            registered["registered_in_core"] = False
+        if not registered["do_remote_registration"]:
+            op.finish(user, completed=True, detail=registered)
+            return {}
 
-            op = article_proc.start(user, ">>> core registration")
-
+        try:
             if not self.pid_provider_api.enabled:
-                op.finish(user, completed=False, detail={"core_pid_provider": "off"})
-                return registered
+                raise CorePidProviderUnabledException(
+                    "Core pid provider is not enabled. Complete core pid provider configuration to enable it")
 
-            if registered.get("v3") and not xml_with_pre.v3:
-                raise ValueError(
-                    f"Unable to execute core registration for xml_with_pre without v3"
-                )
+            response = self.pid_provider_api.provide_pid_and_handle_incorrect_pid_v2(
+                xml_with_pre, registered)
 
-            try:
-                response = self.pid_provider_api.provide_pid(
-                    xml_with_pre,
-                    xml_with_pre.filename,
-                    created=registered.get("created"),
-                )
-            except IncorrectPidV2RegisteredInCoreException as e:
-                # conserta valor de pid v2 no core
-                fix_pid_v2_response = self.pid_provider_api.fix_pid_v2(
-                    xml_with_pre.v3, xml_with_pre.v2
-                )
-                if not fix_pid_v2_response or not fix_pid_v2_response.get(
-                    "fixed_in_core"
-                ):
-                    raise IncorrectPidV2RegisteredInCoreException(
-                        f"Unable to fix pid v2 {e}: fix_pid_v2_response={fix_pid_v2_response}"
-                    )
-                # tenta novamente registrar pid no core
-                response = self.pid_provider_api.provide_pid(
-                    xml_with_pre,
-                    xml_with_pre.filename,
-                    created=registered.get("created"),
-                )
+            if response.get("error_type"):
+                op.finish(user, completed=False, detail=response)
+                return response
 
-            response = response or {}
-            registered.update(response)
-            registered["registered_in_core"] = bool(response.get("v3"))
+            response["registered_in_core"] = True
+            response["do_local_registration"] = True
+
             op.finish(
                 user,
-                completed=registered["registered_in_core"],
-                detail={"registered": registered, "response": response},
+                completed=True,
+                detail=response,
             )
+            registered.update(response)
+            return response
+        except Exception as exc:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            op.finish(user, completed=False, exception=exc, exc_traceback=exc_traceback)
+            return {"error_msg": str(exc), "error_type": str(type(exc))}
+                
+    def local_registration(self, user, article_proc, xml_with_pre, registered, origin_date, force_update, is_published, origin):
+        # Atualiza registro de Upload
+        try:
+            op = article_proc.start(user, ">>> local registration")
+            resp = {}
+            detail = registered
+            if registered["do_local_registration"]:
+                # Cria ou atualiza registro de PidProviderXML de Upload, se:
+                # - está registrado no upload mas o conteúdo mudou, atualiza
+                # - ou não está registrado no Upload, então cria
+                resp = self.provide_pid_for_xml_with_pre(
+                    xml_with_pre,
+                    xml_with_pre.filename,
+                    user,
+                    origin_date=origin_date,
+                    force_update=force_update,
+                    is_published=is_published,
+                    origin=origin,
+                    registered_in_core=registered.get("registered_in_core"),
+                )
+                resp["registered_in_upload"] = bool(resp.get("v3"))
+                resp["synchronized"] = registered.get(
+                    "registered_in_core"
+                ) and bool(resp.get("v3"))
+                registered.update(resp)
+
+                detail = resp
+                
+            op.finish(user, completed=True, detail=detail)
+            return resp
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            op.finish(user, completed=False, exception=e, exc_traceback=exc_traceback)
+            return {"error_msg": str(exc), "error_type": str(type(exc))}
 
     def fix_pid_v2(
         self,

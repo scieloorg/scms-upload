@@ -16,6 +16,9 @@ if READ_DOT_ENV_FILE:
     # OS environment variables take precedence over variables from .env
     env.read_env(str(ROOT_DIR / ".env"))
 
+with open(str(ROOT_DIR / "VERSION")) as fp:
+    VERSION = fp.read().strip()
+
 # GENERAL
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug
@@ -61,7 +64,7 @@ WAGTAIL = [
     "core.search",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
-    "wagtail.contrib.modeladmin",
+    "wagtail_modeladmin",
     "wagtail.contrib.simple_translation",
     "wagtail_localize",
     "wagtail_localize.modeladmin",
@@ -76,6 +79,7 @@ WAGTAIL = [
     "wagtail",
     "wagtail.locales",
     "wagtail.api.v2",
+    "wagtail.contrib.search_promotions",
     "wagtail.contrib.settings",
     "wagtail.contrib.styleguide",
     "modelcluster",

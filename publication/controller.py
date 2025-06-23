@@ -207,7 +207,7 @@ def publish_article_on_website(user, manager, issue_proc, website, api_data, qa_
         api_data=api_data,
         force_update=True,
         content_type="article",
-        journal_pid=journal_proc.pid
+        bundle_id=issue_proc.bundle_id,
     )
     return response.get("completed")
 

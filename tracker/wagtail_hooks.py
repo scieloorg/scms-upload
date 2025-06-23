@@ -1,11 +1,11 @@
 from django.http import HttpResponseRedirect
 from django.utils.translation import gettext as _
-from wagtail.contrib.modeladmin.options import (
+from wagtail_modeladmin.options import (
     ModelAdmin,
     ModelAdminGroup,
     modeladmin_register,
 )
-from wagtail.contrib.modeladmin.views import CreateView
+from wagtail_modeladmin.views import CreateView
 
 from config.menu import get_menu_order
 
@@ -20,20 +20,25 @@ class UnexpectedEventModelAdmin(ModelAdmin):
     menu_order = 200
     add_to_settings_menu = False
     exclude_from_explorer = False
+    list_per_page = 10
 
     list_display = (
+        "item",
+        "action",
         "exception_type",
         "exception_msg",
-        "traceback",
-        "detail",
         "created",
     )
-    list_filter = ("exception_type",)
+    list_filter = ("action", "exception_type", )
     search_fields = (
         "exception_msg",
         "detail",
+        "action",
+        "item",
     )
     inspect_view_fields = (
+        "action",
+        "item",
         "exception_type",
         "exception_msg",
         "traceback",

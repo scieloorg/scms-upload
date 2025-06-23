@@ -1,5 +1,5 @@
 from django.utils.translation import gettext as _
-from wagtail.contrib.modeladmin.helpers import ButtonHelper
+from wagtail_modeladmin.helpers import ButtonHelper
 
 from article.choices import AS_REQUIRE_ERRATUM, AS_REQUIRE_UPDATE
 

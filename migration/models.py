@@ -349,7 +349,7 @@ class MigratedFile(CommonControlField):
         _("Component type"), max_length=16, null=True, blank=True
     )
     lang = models.CharField(_("Language"), max_length=2, null=True, blank=True)
-    pkg_name = models.CharField(_("Pkg name"), max_length=50, null=True, blank=True)
+    pkg_name = models.CharField(_("Pkg name"), max_length=100, null=True, blank=True)
     part = models.CharField(_("Part"), max_length=1, null=True, blank=True)
 
     autocomplete_search_field = "original_path"
@@ -459,25 +459,33 @@ class MigratedFile(CommonControlField):
         return obj
 
     @classmethod
-    def find(cls, collection, xlink_href, subdir):
-        original = xlink_href
-        path = xlink_href
+    def find(cls, collection, xlink_href, journal_acron):
+        try:
+            dirname = os.path.dirname(xlink_href)
+            basename = os.path.basename(xlink_href)
+            name, ext = os.path.splitext(basename)
 
-        if "/img/revistas/" in path and not path.startswith("/img/revistas/"):
-            path = path[path.find("/img/revistas") :]
+            issue_folder = dirname.split("/")[-1]
+            issue_folder__name = os.path.join(issue_folder, name)
 
-        if "/img/revistas/" not in path:
-            path = os.path.join("/img/revistas", subdir, path)
-
-        if ".." in path:
-            path = os.path.normpath(path)
-
-        name, ext = os.path.splitext(path)
-
-        return cls.objects.filter(
-            Q(original_href=path) | Q(original_href__startswith=name + "."),
-            collection=collection,
-        )
+            return cls.objects.filter(
+                Q(original_href__contains=issue_folder__name + "."),
+                collection=collection,
+                original_href__contains=f"/{journal_acron}/",
+            )
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "task": "migrations.models.MigratedFile.find",
+                    "xlink_href": xlink_href,
+                    "journal_acron": journal_acron,
+                    "collection": str(collection),
+                },
+            )
+            return []
 
     def get_original_href(self, original_path):
         try:
