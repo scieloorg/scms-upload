@@ -23,13 +23,13 @@ class Researcher(ClusterableModel, CommonControlField):
     last_name = models.CharField(
         _("Last name"), max_length=128, blank=False, null=False
     )
-    suffix = models.CharField(_("Suffix"), max_length=128, blank=True, null=True)
-    orcid = models.TextField(_("ORCID"), blank=True, null=True)
-    lattes = models.TextField(_("Lattes"), blank=True, null=True)
+    suffix = models.CharField(_("Suffix"), max_length=20, blank=True, null=True)
+    orcid = models.CharField(_("ORCID"), max_length=40, blank=True, null=True)
+    lattes = models.CharField(_("Lattes"), max_length=40, blank=True, null=True)
     gender = models.CharField(_("Gender"), max_length=1, choices=choices.GENDER)
     gender_identification_status = models.CharField(
         _("Gender identification status"),
-        max_length=255,
+        max_length=10,
         choices=choices.GENDER_IDENTIFICATION_STATUS,
         null=False,
         blank=False,

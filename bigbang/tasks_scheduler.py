@@ -76,6 +76,8 @@ def delete_migration_tasks():
             "migrate_title_databases",
             "task_migrate_document_files",
             "task_migrate_document_records",
+            "migrate_and_publish",
+            "create_procs_from_pid_list"
         ]
     )
 
@@ -85,15 +87,42 @@ def schedule_migration_subtasks(username):
     _schedule_migrate_and_publish_articles(username, enabled)
     _schedule_migrate_and_publish_issues(username, enabled)
     _schedule_migrate_and_publish_journals(username, enabled)
-    _schedule_migration_and_publication(username, enabled)
-    _schedule_create_procs_from_pid_list(username, enabled)
+    # _schedule_migration_and_publication(username, enabled)
+    # _schedule_create_procs_from_pid_list(username, enabled)
 
 
 def schedule_publication_subtasks(username):
+    _schedule_check_article_availability(username)
     _schedule_publish_articles(username)
     _schedule_publish_issues(username)
     _schedule_publish_journals(username)
 
+
+def _schedule_check_article_availability(username, enabled):
+    """
+    Agenda a tarefa de migrar os registros da base de dados TITLE
+    Deixa a tarefa desabilitada
+    """
+    schedule_task(
+        task="proc.tasks.task_check_article_availability",
+        name="check_article_availability",
+        kwargs=dict(
+            username,
+            issn_print=None,
+            issn_electronic=None,
+            publication_year=None,
+            article_pid_v3=None,
+            collection_acron=None,
+            purpose=None,
+        ),
+        description=_("Check article availability"),
+        priority=MIGRATION_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=MIGRATION_MINUTES,
+    )
 
 
 def _schedule_create_procs_from_pid_list(username, enabled):
@@ -154,11 +183,11 @@ def _schedule_migrate_and_publish_journals(username, enabled):
         task="proc.tasks.task_migrate_and_publish_journals",
         name="migrate_and_publish_journals",
         kwargs=dict(
-            username=None,
+            username=username,
             collection_acron=None,
             journal_acron=None,
             force_update=False,
-            force_import_acron_id_file=False,
+            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
         ),
         description=_("Migra e publica os periódicos"),
         priority=TITLE_DB_MIGRATION_PRIORITY,
@@ -184,8 +213,8 @@ def _schedule_migrate_and_publish_issues(username, enabled):
             journal_acron=None,
             publication_year=None,
             issue_folder=None,
+            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
-            force_migrate_document_records=False,
         ),
         description=_("Migra e publica os fascículos"),
         priority=ISSUE_DB_MIGRATION_PRIORITY,
@@ -207,7 +236,11 @@ def _schedule_migrate_and_publish_articles(username, enabled):
             journal_acron=None,
             publication_year=None,
             issue_folder=None,
+            status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
+            force_import_acron_id_file=False,
+            force_migrate_document_records=False,
+            force_migrate_document_files=False,
         ),
         description=_("Migra e publica artigos"),
         priority=ARTICLE_DB_MIGRATION_PRIORITY,
