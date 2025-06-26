@@ -356,11 +356,18 @@ def task_publish_article(
     article_proc_id=None,
     upload_package_id=None,
     publication_rule=None,
+    force_journal_publication=None,
+    force_issue_publication=None,
 ):
     """
     Tarefa que publica artigos ingressados pelo Upload
     """
     try:
+        if not upload_package_id:
+            raise ValueError("task_publish_article requires Upload Package ID")
+        if article_proc_id:
+            raise NotImplementedError("publication.tasks.task_publish_article não foi implementada para ArticleProc")
+
         logging.info(
             dict(
                 user_id=user_id,
@@ -380,10 +387,6 @@ def task_publish_article(
         # Obter gerenciador e informações do artigo
         manager = controller.get_manager_info(article_proc_id, upload_package_id)
 
-        article = manager.article
-        journal = article.journal
-        issue = article.issue
-
         if len(websites) > 1:
             published_by = "SYSTEM"
         elif manager.assignee:
@@ -394,6 +397,11 @@ def task_publish_article(
             published_by = manager.updated_by.username or manager.updated_by.id
         elif manager.creator:
             published_by = manager.creator.username or manager.creator.id
+
+        article = manager.article
+        journal = article.journal
+        issue = article.issue
+
         # Iniciar operação principal
         op_main = manager.start(user, f"Publishing article to {', '.join(websites)}")
 
@@ -404,7 +412,7 @@ def task_publish_article(
         controller.ensure_issue_proc_exists(user, issue)
 
         responses = list(
-            controller.publish_article_collection_websites(user, manager, websites)
+            controller.publish_article_collection_websites(user, manager, websites, force_journal_publication, force_issue_publication)
         )
         op_main.finish(
             user,
@@ -484,7 +492,9 @@ def task_publish_article(
                 completed=False,
                 exception=e,
                 exc_traceback=exc_traceback,
-                websites=websites,
+                detail=dict(
+                    websites=websites,
+                )
             )
         else:
             UnexpectedEvent.create(
