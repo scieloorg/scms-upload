@@ -789,7 +789,7 @@ class Package(CommonControlField, ClusterableModel):
 
         return {"content": content, "filename": filename, "columns": fieldnames}
 
-    def process_qa_decision(self, user, task_publish_article=None):
+    def process_qa_decision(self, user, task_publish_article=None, force_journal_publication=None, force_issue_publication=None):
         # (PS_DEPUBLISHED, _("Depublish")),
         # (PS_PENDING_CORRECTION, _("Request correction")),
         # (PS_PENDING_QA_DECISION, _("Delegate quality review to other analyst")),
@@ -832,6 +832,8 @@ class Package(CommonControlField, ClusterableModel):
                     task_publish_article,
                     response.get("websites") or [],
                     self.upload_validator.publication_rule,
+                    force_journal_publication,
+                    force_issue_publication,
                 )
 
             elif self.qa_decision == choices.PS_DEPUBLISHED:
@@ -974,8 +976,8 @@ class Package(CommonControlField, ClusterableModel):
             )
             self.save()
 
-            if self.sps_pkg:
-                self.create_or_update_article(user, save=True)
+        if not self.article and self.sps_pkg:
+            self.create_or_update_article(user, save=True)
 
     def start(self, user, name):
         # self.save()
@@ -1193,7 +1195,7 @@ class Package(CommonControlField, ClusterableModel):
             if event:
                 event.finish(user, completed=False, exception=e, exc_traceback=exc_traceback, detail=sub_events)
 
-    def run_task_publish_article(self, user, task_publish_article, websites, publication_rule):
+    def run_task_publish_article(self, user, task_publish_article, websites, publication_rule, force_journal_publication, force_issue_publication):
         task_publish_article.apply_async(
             kwargs=dict(
                 user_id=user.id,
@@ -1202,6 +1204,8 @@ class Package(CommonControlField, ClusterableModel):
                 article_proc_id=None,
                 upload_package_id=self.id,
                 publication_rule=publication_rule,
+                force_journal_publication=force_journal_publication,
+                force_issue_publication=force_issue_publication,
             )
         )
         if"PUBLIC" in websites:
@@ -1234,15 +1238,17 @@ class QAPackage(Package):
         FieldPanel("status", read_only=True),
     ]
     panel_qa_decision = [
+        AutocompletePanel("analyst"),
         FieldPanel("qa_decision"),
         FieldPanel("qa_comment"),
-        AutocompletePanel("analyst"),
+        FieldPanel("force_journal_publication"),
+        FieldPanel("force_issue_publication"),
     ]
     panel_publication = [
         FieldPanel("order"),
-        AutocompletePanel("linked"),
+        AutocompletePanel("linked"),        
     ]
-    panel_decision = panel_numbers + panel_qa_decision + panel_publication
+    panel_decision = panel_qa_decision + panel_publication
 
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
@@ -1250,6 +1256,7 @@ class QAPackage(Package):
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_decision, heading=_("Decision")),
+            ObjectList(panel_numbers, heading=_("Status")),
             ObjectList(panel_event, heading=_("Events")),
         ]
     )
@@ -1276,8 +1283,11 @@ class ReadyToPublishPackage(Package):
         FieldPanel("analyst", read_only=True),
         FieldPanel("qa_decision"),
         FieldPanel("qa_comment"),
+        FieldPanel("force_journal_publication"),
+        FieldPanel("force_issue_publication"),
     ]
-    panel_data = QAPackage.panel_numbers + panel_publication_status + panel_qa_decision + QAPackage.panel_publication
+    panel_data = QAPackage.panel_numbers + panel_publication_status
+    panel_decision = panel_qa_decision + QAPackage.panel_publication
 
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
@@ -1285,6 +1295,7 @@ class ReadyToPublishPackage(Package):
 
     edit_handler = TabbedInterface(
         [
+            ObjectList(panel_decision, heading=_("Decision")),
             ObjectList(panel_data, heading=_("Status")),
             ObjectList(panel_event, heading=_("Events")),
         ]

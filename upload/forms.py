@@ -27,6 +27,18 @@ class UploadPackageForm(CoreAdminModelForm):
 
 
 class QAPackageForm(CoreAdminModelForm):
+    force_journal_publication = forms.BooleanField(
+        label=_("Força a publicação de journal"),
+        required=False,
+        help_text=_("Força a publicação de journal"),
+    )
+    
+    force_issue_publication = forms.BooleanField(
+        label=_("Força a publicação de issue"),
+        required=False,
+        help_text=_("Força a publicação de issue"),
+    )
+
     def clean(self):
         cleaned_data = super().clean()
         if cleaned_data:
@@ -63,6 +75,18 @@ class QAPackageForm(CoreAdminModelForm):
 
 
 class ReadyToPublishPackageForm(CoreAdminModelForm):
+    force_journal_publication = forms.BooleanField(
+        label=_("Força a publicação de journal"),
+        required=False,
+        help_text=_("Força a publicação de journal"),
+    )
+    
+    force_issue_publication = forms.BooleanField(
+        label=_("Força a publicação de issue"),
+        required=False,
+        help_text=_("Força a publicação de issue"),
+    )
+
     def clean(self):
         cleaned_data = super().clean()
         if cleaned_data:

@@ -80,7 +80,6 @@ class JournalModelAdminGroup(ModelAdminGroup):
         # OfficialJournalAdmin,
         JournalAdmin,
         # JournalProcAdmin,
-        JournalTOCAdmin,
     )
 
 
