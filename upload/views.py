@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
-from wagtail.contrib.modeladmin.views import CreateView, EditView, InspectView
+from wagtail_modeladmin.views import CreateView, EditView, InspectView
 
 from article.models import Article
 from issue.models import Issue
@@ -145,9 +145,10 @@ class QAPackageEditView(EditView):
             )
             return HttpResponseRedirect(self.get_success_url())
         package = form.save_all(self.request.user)
-
-        messages.success(self.request, _("Decision: {}").format(package.qa_decision))
-        package.process_qa_decision(self.request.user, task_publish_article)
+        force_journal_publication = form.cleaned_data.get("force_journal_publication")
+        force_issue_publication = form.cleaned_data.get("force_issue_publication")
+        messages.success(self.request, _("Decision: {} {} {}").format(package.qa_decision, force_journal_publication, force_issue_publication))
+        package.process_qa_decision(self.request.user, task_publish_article, force_journal_publication, force_issue_publication)
 
         return HttpResponseRedirect(self.get_success_url())
 
@@ -161,9 +162,10 @@ class ReadyToPublishPackageEditView(EditView):
             )
             return HttpResponseRedirect(self.get_success_url())
         package = form.save_all(self.request.user)
-
-        messages.success(self.request, _("Decision: {}").format(package.qa_decision))
-        package.process_qa_decision(self.request.user, task_publish_article)
+        force_journal_publication = form.cleaned_data.get("force_journal_publication")
+        force_issue_publication = form.cleaned_data.get("force_issue_publication")
+        messages.success(self.request, _("Decision: {} {} {}").format(package.qa_decision, force_journal_publication, force_issue_publication))
+        package.process_qa_decision(self.request.user, task_publish_article, force_journal_publication, force_issue_publication)
 
         return HttpResponseRedirect(self.get_success_url())
 

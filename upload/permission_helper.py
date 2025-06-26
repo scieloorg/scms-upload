@@ -1,4 +1,4 @@
-from wagtail.contrib.modeladmin.helpers import PermissionHelper
+from wagtail_modeladmin.helpers import PermissionHelper
 
 from team.models import has_permission, CollectionTeamMember
 
