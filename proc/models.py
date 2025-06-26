@@ -688,59 +688,85 @@ class BaseProc(CommonControlField):
         force_update=None,
         content_type=None,
     ):
-        website_kind = website_kind or collection_choices.QA
+        try:
+            website_kind = website_kind or collection_choices.QA
+            detail = {
+                "website_kind": website_kind,
+                "force_update": force_update,
+            }
+            resp = {}
+            operation = None
+            operation = self.start(user, f"publish {content_type} {self} on {website_kind}")
 
-        if not content_type:
-            try:
-                content_type = self.migrated_data.content_type
-            except AttributeError:
-                raise Exception("*Proc.publish requires content_type parameter")
+            if not content_type:
+                try:
+                    content_type = self.migrated_data.content_type
+                except AttributeError:
+                    raise Exception("*Proc.publish requires content_type parameter")
 
-        detail = {
-            "website_kind": website_kind,
-            "force_update": force_update,
-        }
-        doit = False
-        if website_kind == collection_choices.QA:
-            detail["qa_ws_status"] = self.qa_ws_status
-            doit = True
-        else:
-            detail["public_ws_status"] = self.public_ws_status
-            if content_type == "article" and (
-                not self.sps_pkg or not self.sps_pkg.registered_in_core
-            ):
-                detail["registered_in_core"] = self.sps_pkg.registered_in_core
-                doit = False
+            doit = force_update
+            if not force_update:
+                if website_kind == collection_choices.QA:
+                    detail["qa_ws_status"] = self.qa_ws_status
+                    doit = True
+                else:
+                    detail["public_ws_status"] = self.public_ws_status
+                    if content_type == "article" and (
+                        not self.sps_pkg or not self.sps_pkg.registered_in_core
+                    ):
+                        detail["registered_in_core"] = self.sps_pkg.registered_in_core
+                        doit = False
+                    else:
+                        doit = True
+
+            detail["doit"] = doit
+
+            if not doit:
+                # logging.info(f"Skip publish on {website_kind} {self.pid}")
+                operation.finish(user, completed=True, detail=detail)
+                resp.update(detail)
+                resp["completed"] = True
+                return resp
+
+            if website_kind == collection_choices.QA:
+                self.qa_ws_status = tracker_choices.PROGRESS_STATUS_DOING
+                self.public_ws_status = tracker_choices.PROGRESS_STATUS_TODO
             else:
-                doit = True
+                self.public_ws_status = tracker_choices.PROGRESS_STATUS_DOING
+            self.save()
 
-        detail["doit"] = doit
-        operation = self.start(user, f"publish {content_type} {self} on {website_kind}")
+            api_data = api_data or get_api_data(self.collection, content_type, website_kind)
+            logging.info(api_data)
+            if api_data.get("error"):
+                resp.update(api_data)
+            else:
+                response = callable_publish(self, api_data)
+                resp.update(response)
 
-        if not doit:
-            # logging.info(f"Skip publish on {website_kind} {self.pid}")
-            operation.finish(user, completed=True, detail=detail)
-            return
-
-        logging.info(f"publish {self} on {website_kind}")
-        if website_kind == collection_choices.QA:
-            self.qa_ws_status = tracker_choices.PROGRESS_STATUS_DOING
-            self.public_ws_status = tracker_choices.PROGRESS_STATUS_TODO
-        else:
-            self.public_ws_status = tracker_choices.PROGRESS_STATUS_DOING
-        self.save()
-
-        api_data = api_data or get_api_data(self.collection, content_type, website_kind)
-        if api_data.get("error"):
-            response = api_data
-        else:
-            response = callable_publish(self, api_data)
-        completed = bool(response.get("result") == "OK")
-        self.update_publication_stage(website_kind, completed)
-        detail.update(response)
-        operation.finish(user, completed=completed, detail=detail)
-        detail["completed"] = completed
-        return detail
+            completed = bool(response.get("result") == "OK")
+            self.update_publication_stage(website_kind, completed)
+            resp.update(detail)
+            operation.finish(user, completed=completed, detail=resp)
+            resp["completed"] = completed
+            return resp
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            if website_kind == collection_choices.QA:
+                self.qa_ws_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            else:
+                self.public_ws_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            self.save()
+            if operation:
+                operation.finish(
+                    user,
+                    exc_traceback=exc_traceback,
+                    exception=e,
+                    detail=result,
+                )
+            resp.update(detail)
+            resp["error_type"] = str(type(e))
+            resp["error_message"] = str(e)
+            return resp
 
     def update_publication_stage(self, website_kind, completed):
         """

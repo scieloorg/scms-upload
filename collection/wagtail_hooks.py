@@ -61,6 +61,7 @@ class WebSiteConfigurationModelAdmin(ModelAdmin):
     create_view_class = CoreCreateView
 
     list_display = (
+        "collection",
         "url",
         "purpose",
         "enabled",
@@ -72,7 +73,7 @@ class WebSiteConfigurationModelAdmin(ModelAdmin):
         "purpose",
         "enabled",
     )
-    search_fields = ("url",)
+    search_fields = ("url", "collection__acron", "collection__name")
 
 
 class MinioConfigurationModelAdmin(ModelAdmin):

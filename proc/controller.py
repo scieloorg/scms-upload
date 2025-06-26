@@ -2,6 +2,7 @@
 Facade para manter compatibilidade com o código existente.
 Este módulo importa todas as funções dos novos módulos especializados.
 """
+from proc.models import JournalProc, IssueProc
 
 # Imports da API Core
 from proc.source_core_api import (
