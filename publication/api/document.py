@@ -20,7 +20,7 @@ def publish_article(article_proc, api_data, bundle_id=None, is_public=True):
         # somente se article_proc é instancia de ArticleProc
         bundle_id = article_proc.issue_proc.bundle_id
     except AttributeError:
-        bundle_id = None
+        pass
     if not bundle_id or len(bundle_id) <= 9:
         raise ValueError(
             "publication.api.document.publish_article requires bundle_id"
