@@ -12,7 +12,6 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from proc.models import ArticleProc, IssueProc, JournalProc
-from publication import controller
 from publication.models import ArticleAvailability
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
@@ -21,11 +20,8 @@ from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
 from publication.models import ArticleAvailability, ScieloURLStatus
 from tracker.models import UnexpectedEvent
+from article.models import Article
 
-from .models import Article
-
-# FIXME
-# from upload.models import Package
 
 User = get_user_model()
 
@@ -345,169 +341,6 @@ def is_registered(url):
         return x.status_code == HTTPStatus.OK
     except Exception as e:
         return None
-
-
-@celery_app.task(bind=True)
-def task_publish_article(
-    self,
-    user_id,
-    username,
-    websites,
-    article_proc_id=None,
-    upload_package_id=None,
-    publication_rule=None,
-    force_journal_publication=None,
-    force_issue_publication=None,
-):
-    """
-    Tarefa que publica artigos ingressados pelo Upload
-    """
-    try:
-        if not upload_package_id:
-            raise ValueError("task_publish_article requires Upload Package ID")
-        if article_proc_id:
-            raise NotImplementedError("publication.tasks.task_publish_article não foi implementada para ArticleProc")
-
-        logging.info(
-            dict(
-                user_id=user_id,
-                username=username,
-                websites=websites,
-                article_proc_id=article_proc_id,
-                upload_package_id=upload_package_id,
-                publication_rule=publication_rule,
-            )
-        )
-
-        user = _get_user(user_id, username)
-        op_main = None
-        manager = None
-        responses = []
-
-        # Obter gerenciador e informações do artigo
-        manager = controller.get_manager_info(article_proc_id, upload_package_id)
-
-        if len(websites) > 1:
-            published_by = "SYSTEM"
-        elif manager.assignee:
-            published_by = manager.assignee.username or manager.assignee.id
-        elif manager.analyst:
-            published_by = manager.analyst.user.username or manager.analyst.user.id
-        elif manager.updated_by:
-            published_by = manager.updated_by.username or manager.updated_by.id
-        elif manager.creator:
-            published_by = manager.creator.username or manager.creator.id
-
-        article = manager.article
-        journal = article.journal
-        issue = article.issue
-
-        # Iniciar operação principal
-        op_main = manager.start(user, f"Publishing article to {', '.join(websites)}")
-
-        # Garantir que o JournalProc existe (pré-requisito comum)
-        controller.ensure_journal_proc_exists(user, journal)
-
-        # Garantir que o IssueProc existe (pré-requisito comum)
-        controller.ensure_issue_proc_exists(user, issue)
-
-        responses = list(
-            controller.publish_article_collection_websites(user, manager, websites, force_journal_publication, force_issue_publication)
-        )
-        op_main.finish(
-            user,
-            completed=bool(any([item["published"] for item in responses])),
-            exception=None,
-            message_type=None,
-            message=None,
-            exc_traceback=None,
-            detail=responses,
-        )
-
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        if op_main:
-            op_main.finish(
-                user,
-                completed=False,
-                exception=e,
-                exc_traceback=exc_traceback,
-                detail=None,
-            )
-        else:
-            UnexpectedEvent.create(
-                e=e,
-                exc_traceback=exc_traceback,
-                detail=dict(
-                    task="task_publish_article",
-                    item=str(manager),
-                    article_proc_id=article_proc_id,
-                    upload_package_id=upload_package_id,
-                    websites=websites,
-                ),
-            )
-
-    try:
-        # check availability
-        op_main = manager.start(
-            user, f"Check article availability on {', '.join(websites)}"
-        )
-        logging.info("ArticleAvailabilityArticleAvailabilityArticleAvailability")
-        logging.info(responses)
-        logging.info(dict(publication_rule=publication_rule, published_by=published_by))
-        if responses:
-            obj = ArticleAvailability.create_or_update(
-                user,
-                article,
-                published_by=published_by,
-                publication_rule=publication_rule,
-            )
-        for response in responses:
-            for website in WebSiteConfiguration.objects.filter(
-                collection__acron=response["collection"],
-                purpose__in=websites,
-                enabled=True,
-            ):
-                process_article_availability.apply_async(
-                    kwargs=dict(
-                        pid_v3=article.pid_v3,
-                        user_id=user_id,
-                        username=username,
-                        domain=website.url,
-                    )
-                )
-        op_main.finish(
-            user,
-            completed=True,
-            detail=dict(
-                pid_v3=article.pid_v3,
-                websites=websites,
-            ),
-        )
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        if op_main:
-            op_main.finish(
-                user,
-                completed=False,
-                exception=e,
-                exc_traceback=exc_traceback,
-                detail=dict(
-                    websites=websites,
-                )
-            )
-        else:
-            UnexpectedEvent.create(
-                e=e,
-                exc_traceback=exc_traceback,
-                detail=dict(
-                    task="task_publish_article",
-                    item=str(manager),
-                    article_proc_id=article_proc_id,
-                    upload_package_id=upload_package_id,
-                    websites=websites,
-                ),
-            )
 
 
 @celery_app.task(bind=True)

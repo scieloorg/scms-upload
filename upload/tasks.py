@@ -17,19 +17,57 @@ from collection import choices as collection_choices
 from config import celery_app
 from issue.models import Issue
 from journal.models import Journal
-from publication.tasks import task_publish_article
 from tracker.models import UnexpectedEvent
 from upload import choices
 from upload.controller import receive_package
+from upload import publication
 from upload.models import Package, ValidationReport, PackageZip, UploadValidator
 from upload.validation.rendition_validation import validate_rendition
 from upload.validation.html_validation import validate_webpage
 from upload.validation.xml_data_checker import XMLDataChecker
+from publication.tasks import task_check_article_availability
 
-from . import choices, controller, exceptions
-from .utils import file_utils, package_utils, xml_utils
+from upload import choices, controller, exceptions
+from upload.utils import file_utils, package_utils, xml_utils
 
 User = get_user_model()
+
+def _get_user(user_id, username):
+    try:
+        if user_id:
+            return User.objects.get(pk=user_id)
+        if username:
+            return User.objects.get(username=username)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "migration.tasks._get_user",
+                "user_id": user_id,
+                "username": username,
+            },
+        )
+
+
+def _get_collections(collection_acron):
+    try:
+        if collection_acron:
+            return Collection.objects.filter(acron=collection_acron).iterator()
+        else:
+            return Collection.objects.iterator()
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "migration.tasks._get_collections",
+                "collection_acron": collection_acron,
+            },
+        )
+
 
 
 # @celery_app.task(name="Validate article change")
@@ -542,3 +580,111 @@ def task_validate_webpages_content(package_id):
         )
     report.finish_validations()
     package.finish_reception(task_publish_article)
+
+
+@celery_app.task(bind=True)
+def task_publish_article(
+    self,
+    user_id,
+    username,
+    websites,
+    article_proc_id=None,
+    upload_package_id=None,
+    publication_rule=None,
+    force_journal_publication=None,
+    force_issue_publication=None,
+):
+    """
+    Tarefa que publica artigos ingressados pelo Upload
+    """
+    try:
+        if not upload_package_id:
+            raise ValueError("task_publish_article requires Upload Package ID")
+
+        logging.info(
+            dict(
+                user_id=user_id,
+                username=username,
+                websites=websites,
+                article_proc_id=article_proc_id,
+                upload_package_id=upload_package_id,
+                publication_rule=publication_rule,
+            )
+        )
+
+        user = _get_user(user_id, username)
+        article = None
+        op_main = None
+        responses = []
+
+        # Obter gerenciador e informações do artigo
+        manager = Package.objects.get(pk=upload_package_id)
+        logging.info(f"manager: {manager}")
+        logging.info(f"article: {manager.article}")
+
+        if len(websites) > 1:
+            published_by = "SYSTEM"
+        elif manager.assignee:
+            published_by = manager.assignee.username or manager.assignee.id
+        elif manager.analyst:
+            published_by = manager.analyst.user.username or manager.analyst.user.id
+        elif manager.updated_by:
+            published_by = manager.updated_by.username or manager.updated_by.id
+        elif manager.creator:
+            published_by = manager.creator.username or manager.creator.id
+
+        article = manager.article
+        journal = article.journal
+        issue = article.issue
+
+        # Iniciar operação principal
+        op_main = manager.start(user, f"Publishing article to {', '.join(websites)}")
+
+        # Garantir que o JournalProc existe (pré-requisito comum)
+        publication.ensure_journal_proc_exists(user, journal)
+
+        # Garantir que o IssueProc existe (pré-requisito comum)
+        publication.ensure_issue_proc_exists(user, issue)
+
+        responses = list(
+            publication.publish_article_collection_websites(user, manager, websites, force_journal_publication, force_issue_publication)
+        )
+        logging.info(f"responses: {responses}")
+        op_main.finish(
+            user,
+            completed=bool(any([item["published"] for item in responses])),
+            exception=None,
+            message_type=None,
+            message=None,
+            exc_traceback=None,
+            detail=responses,
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        if op_main:
+            op_main.finish(
+                user,
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
+                detail=None,
+            )
+        else:
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail=dict(
+                    task="task_publish_article",
+                    item=str(manager),
+                    article_proc_id=article_proc_id,
+                    upload_package_id=upload_package_id,
+                    websites=websites,
+                ),
+            )
+    else:
+        task_check_article_availability.apply_async(kwargs=dict(
+            username=user.username,
+            user_id=user.id,
+            article_pid_v3=article.pid_v3,
+        ))
+
