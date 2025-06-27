@@ -1456,12 +1456,6 @@ class IssueProc(BaseProc, ClusterableModel):
 
     def unlink_articles(self):
         for article in Article.objects.filter(issue=self.issue).iterator():
-            delete = False
-            try:
-                ArticleProc.objects.get(sps_pkg=article.sps_pkg)
-            except ArticleProc.DoesNotExist:
-                article.delete()
-                continue
             try:
                 PidProviderXML.objects.get(v3=article.pid_v3)
             except PidProviderXML.DoesNotExist:
