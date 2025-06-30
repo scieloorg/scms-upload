@@ -77,6 +77,10 @@ def ensure_published_journal(journal_proc, website, user, api_data, force_update
         force_update=True,
         content_type="journal"
     )
+    if not response or not response.get("completed"):
+        raise PublicationError(
+            f"Unable to publish {journal_proc} on {website.purpose}: {response}"
+        )
     return response
 
 
@@ -112,6 +116,10 @@ def ensure_published_issue(issue_proc, website, user, api_data, force_update=Non
         force_update=True,
         content_type="issue"
     )
+    if not response or not response.get("completed"):
+        raise PublicationError(
+            f"Unable to publish {issue_proc} on {website.purpose}: {response}"
+        )
     return response
 
 
@@ -119,50 +127,31 @@ def publish_article_collection_websites(user, manager, website_kinds, force_jour
     for issue_proc in IssueProc.objects.filter(
         issue=manager.article.issue,
     ):
-        if not manager.article.journal.journal_acron:
-            manager.article.journal.journal_acron = issue_proc.journal_proc.acron
-            manager.article.journal.save()
-        yield from publish_article_on_websites(
-            user, manager, issue_proc, website_kinds,
-            force_journal_publication, force_issue_publication,
-        )
+        journal = manager.article.journal
+        if not journal.journal_acron:
+            journal.journal_acron = issue_proc.journal_proc.acron
+            journal.save()
+
+        collection = issue_proc.collection
+        qa_published = None
+
+        if QA in website_kinds:
+            published_article = publish_article_on_website(user, manager, issue_proc, QA, force_journal_publication, force_issue_publication)
+            qa_published = published_article and published_article.get("completed")
+            yield {"collection": collection.acron, "website": QA, "published": published_article and published_article.get("completed")}
+        else:
+            try:
+                qa_website = WebSiteConfiguration.get(collection=collection, purpose=QA)
+                qa_published = check_article_is_published(manager.article, qa_website)
+            except WebSiteConfiguration.DoesNotExist as exc:
+                qa_published = None
+
+        if qa_published and PUBLIC in website_kinds:
+            published_article = publish_article_on_website(user, manager, issue_proc, PUBLIC, force_journal_publication, force_issue_publication)
+            yield {"collection": collection.acron, "website": PUBLIC, "published": published_article and published_article.get("completed")}
 
 
-def publish_article_on_websites(user, manager, issue_proc, website_kinds, force_journal_publication, force_issue_publication):
-    collection = issue_proc.collection
-    published_article = None
-    qa_published = None
-    article = manager.article
-    for website_kind in website_kinds:
-        try:
-            website = WebSiteConfiguration.get(
-                collection=collection,
-                purpose=website_kind,
-            )
-            api = PublicationAPI(
-                post_data_url=website.api_url_article,
-                get_token_url=website.api_get_token_url,
-                username=website.api_username,
-                password=website.api_password,
-                timeout=15,
-            )
-            api.get_token()
-            api_data = api.data
-        except WebSiteConfiguration.DoesNotExist as exc:
-            continue
-
-        published_article = publish_article_on_website(
-            user, manager, issue_proc, website, api_data, qa_published,
-            force_journal_publication, force_issue_publication,
-        )
-        if website_kind == QA:
-            qa_published = published_article
-        data = {"collection": collection.acron, "website": website_kind, "published": published_article}
-        logging.info(data)            
-        yield data
-
-
-def publish_article_on_website(user, manager, issue_proc, website, api_data, qa_published=None, force_journal_publication=None, force_issue_publication=None):
+def publish_article_on_website(user, manager, issue_proc, website_kind, force_journal_publication=None, force_issue_publication=None):
     """
     Publica um artigo verificando e garantindo as dependências (journal e issue)
     
@@ -180,37 +169,33 @@ def publish_article_on_website(user, manager, issue_proc, website, api_data, qa_
     Raises:
         PublicationError: Se ocorrer erro na publicação
     """
-    article = manager.article
     collection = issue_proc.collection
-    logging.info(f"publish_article_on_website: qa_published {qa_published}")
-    logging.info(f"publish_article_on_website: website.purpose {website.purpose}")
-    if website.purpose == PUBLIC and not qa_published:
-        try:
-            qa_website = WebSiteConfiguration.get(collection=collection, purpose=QA)
-            qa_published = check_article_is_published(article, qa_website)
-        except WebSiteConfiguration.DoesNotExist as exc:
-            # site QA inexistente, a ausencia do artigo em QA não impede publicação em PUBLIC
-            logging.exception(exc)
-            qa_published = True
-        if not qa_published:
-            return False
 
-    article = manager.article
+    logging.info(f"Publishing article on {collection} {website_kind}")
+    try:
+        website = WebSiteConfiguration.get(
+            collection=collection,
+            purpose=website_kind,
+        )
+        api = PublicationAPI(
+            post_data_url=website.api_url_article,
+            get_token_url=website.api_get_token_url,
+            username=website.api_username,
+            password=website.api_password,
+            timeout=15,
+        )
+        api.get_token()
+        api_data = api.data
+    except WebSiteConfiguration.DoesNotExist as exc:
+        return
+
     journal_proc = issue_proc.journal_proc
+
     api_data["post_data_url"] = website.api_url_journal
     response = ensure_published_journal(journal_proc, website, user, api_data, force_journal_publication)
-    if not response or not response.get("completed"):
-        raise PublicationError(
-            f"Unable to publish article {article}: {journal_proc} is not published on {website.purpose} {response}"
-        )
-
 
     api_data["post_data_url"] = website.api_url_issue
     response = ensure_published_issue(issue_proc, website, user, api_data, force_issue_publication)
-    if not response or not response.get("completed"):
-        raise PublicationError(
-            f"Unable to publish article {article}: {issue_proc} is not published on {website.purpose} {response}"
-        )
 
     api_data["post_data_url"] = website.api_url_article
     response = manager.publish(
@@ -223,34 +208,3 @@ def publish_article_on_website(user, manager, issue_proc, website, api_data, qa_
         bundle_id=issue_proc.bundle_id,
     )
     return response
-
-
-def get_manager_info(article_proc_id=None, upload_package_id=None):
-    """
-    Obtém o gerenciador e informações do artigo
-    
-    Args:
-        article_proc_id: ID do processo de artigo
-        upload_package_id: ID do pacote de upload
-        
-    Returns:
-        tuple: (manager, journal, issue, article)
-        
-    Raises:
-        ValueError: Se nenhum ID for fornecido
-    """
-    if upload_package_id:
-        from upload.models import Package
-        manager = Package.objects.get(pk=upload_package_id)
-        issue = manager.issue
-        journal = manager.journal
-        article = manager.article
-    elif article_proc_id:
-        manager = ArticleProc.objects.get(pk=article_proc_id)
-        issue = manager.issue_proc.issue
-        journal = manager.journal_proc.journal
-        article = manager.article
-    else:
-        raise ValueError("Either article_proc_id or upload_package_id must be provided")
-    
-    return manager

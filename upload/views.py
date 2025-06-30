@@ -8,9 +8,8 @@ from wagtail_modeladmin.views import CreateView, EditView, InspectView
 
 from article.models import Article
 from issue.models import Issue
-from publication.tasks import task_publish_article
 from upload.models import Package, choices
-from upload.tasks import task_receive_packages
+from upload.tasks import task_receive_packages, task_publish_article
 from upload.utils import file_utils
 from upload.utils import package_utils
 from upload.utils.package_utils import coerce_package_and_errors, render_html

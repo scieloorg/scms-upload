@@ -429,7 +429,6 @@ class Package(CommonControlField, ClusterableModel):
         try:
             obj = cls.get(name, pkg_zip)
             obj.updated_by = user
-
             obj.save_file(filename, file_content)
             return obj
         except cls.DoesNotExist:
@@ -577,6 +576,8 @@ class Package(CommonControlField, ClusterableModel):
                     task_publish_article,
                     response.get("websites") or [],
                     self.upload_validator.publication_rule,
+                    True,
+                    True,
                 )
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1030,31 +1031,39 @@ class Package(CommonControlField, ClusterableModel):
         api_data=None,
         force_update=None,
         content_type=None,
-        journal_pid=None
+        bundle_id=None,
     ):
         # manter a compatibilidade com ArticleProc
-        website_kind = website_kind or collection_choices.QA
-        detail = {
-            "website_kind": website_kind,
-            "force_update": force_update,
-        }
-        operation = self.start(
-            user, f"publish {content_type} {self} on {website_kind}"
-        )
-        if api_data.get("error"):
-            response = api_data
-        else:
-            response = callable_publish(
-                self, api_data,
-                journal_pid=journal_pid,
-                is_public=True,
+        try:
+            website_kind = website_kind or collection_choices.QA
+            detail = {
+                "website_kind": website_kind,
+                "force_update": force_update,
+            }
+            response = {}
+            response.update(detail)
+            operation = self.start(
+                user, f"Package.publish on {website_kind}"
             )
-        completed = bool(response.get("result") == "OK")
-        self.update_publication_stage(website_kind, completed)
-        detail.update(response)
-        operation.finish(user, completed=completed, detail=detail)
-        detail["completed"] = completed
-        return detail
+            if api_data.get("error"):
+                response = api_data
+            else:
+                response = callable_publish(
+                    self, api_data,
+                    bundle_id=bundle_id,
+                    is_public=True,
+                )
+            completed = bool(response.get("result") == "OK")
+            self.update_publication_stage(website_kind, completed)            
+            response.update(detail)
+            operation.finish(user, completed=completed, detail=response)
+            response["completed"] = completed
+            return response
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            if operation:
+                operation.finish(user, completed=False, exception=e, exc_traceback=exc_traceback, detail=response)
+            return {"error_type": str(type(e)), "error_message": str(e)}
 
     # def update_status(self):
     #     if self.status == choices.PS_READY_TO_PREVIEW:
@@ -1228,7 +1237,9 @@ class QAPackage(Package):
     QA can approve or reject
 
     """
-
+    panel_id = [
+        AutocompletePanel("article", read_only=False),
+    ]
     panel_numbers = [
         FieldPanel("critical_errors", read_only=True),
         FieldPanel("xml_errors_percentage", read_only=True),
@@ -1237,25 +1248,22 @@ class QAPackage(Package):
         FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
         FieldPanel("status", read_only=True),
     ]
-    panel_qa_decision = [
+    panel_decision = [
         AutocompletePanel("analyst"),
         FieldPanel("qa_decision"),
         FieldPanel("qa_comment"),
         FieldPanel("force_journal_publication"),
         FieldPanel("force_issue_publication"),
-    ]
-    panel_publication = [
         FieldPanel("order"),
         AutocompletePanel("linked"),        
     ]
-    panel_decision = panel_qa_decision + panel_publication
-
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
     ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_decision, heading=_("Decision")),
+            ObjectList(panel_id, heading=_("Article")),
             ObjectList(panel_numbers, heading=_("Status")),
             ObjectList(panel_event, heading=_("Events")),
         ]
@@ -1273,33 +1281,46 @@ class ReadyToPublishPackage(Package):
     Package ready to publish
     """
 
+    panel_id = [
+        AutocompletePanel("article", read_only=False),
+    ]
+    panel_numbers = [
+        FieldPanel("critical_errors", read_only=True),
+        FieldPanel("xml_errors_percentage", read_only=True),
+        FieldPanel("xml_warnings_percentage", read_only=True),
+        FieldPanel("contested_xml_errors_percentage", read_only=True),
+        FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
+        FieldPanel("status", read_only=True),
+    ]
+    panel_decision = [
+        AutocompletePanel("analyst"),
+        FieldPanel("qa_decision"),
+        FieldPanel("qa_comment"),
+        FieldPanel("force_journal_publication"),
+        FieldPanel("force_issue_publication"),
+        FieldPanel("order"),
+        AutocompletePanel("linked"),        
+    ]
+    panel_event = [
+        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
+    ]
+
     panel_publication_status = [
         FieldPanel("qa_ws_status", read_only=True),
         FieldPanel("qa_ws_pubdate", read_only=True),
         FieldPanel("public_ws_status", read_only=True),
         FieldPanel("public_ws_pubdate", read_only=True),
     ]
-    panel_qa_decision = [
-        FieldPanel("analyst", read_only=True),
-        FieldPanel("qa_decision"),
-        FieldPanel("qa_comment"),
-        FieldPanel("force_journal_publication"),
-        FieldPanel("force_issue_publication"),
-    ]
-    panel_data = QAPackage.panel_numbers + panel_publication_status
-    panel_decision = panel_qa_decision + QAPackage.panel_publication
-
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
-    ]
-
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_decision, heading=_("Decision")),
-            ObjectList(panel_data, heading=_("Status")),
+            ObjectList(panel_id, heading=_("Article")),
+            ObjectList(panel_publication_status, heading=_("Publication Status")),
+            ObjectList(panel_numbers, heading=_("Status")),
             ObjectList(panel_event, heading=_("Events")),
         ]
     )
+
     base_form_class = ReadyToPublishPackageForm
 
     class Meta:
