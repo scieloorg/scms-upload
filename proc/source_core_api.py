@@ -212,11 +212,11 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
     # Processa dados oficiais do journal
     official = result["official"]
     official_journal = OfficialJournal.create_or_update(
-        title=official["title"],
-        title_iso=official["iso_short_title"],
-        issn_print=official["issn_print"],
-        issn_electronic=official["issn_electronic"],
-        issnl=official["issnl"],
+        title=official.get("title"),
+        title_iso=official.get("iso_short_title"),
+        issn_print=official.get("issn_print"),
+        issn_electronic=official.get("issn_electronic"),
+        issnl=official.get("issnl"),
         foundation_year=official.get("foundation_year"),
         user=user,
     )
