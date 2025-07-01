@@ -5,18 +5,10 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("publication", "0004_alter_articleavailability_options_and_more"),
+        ("publication", "0004_articleavailability_publication_rule_and_more"),
     ]
 
     operations = [
-        migrations.AlterModelOptions(
-            name="articleavailability",
-            options={},
-        ),
-        migrations.RemoveField(
-            model_name="articleavailability",
-            name="published_percentage",
-        ),
         migrations.AddField(
             model_name="articleavailability",
             name="completed",
