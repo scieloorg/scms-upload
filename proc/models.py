@@ -1333,8 +1333,9 @@ class IssueProc(BaseProc, ClusterableModel):
             params = dict(
                 collection=self.journal_proc.collection,
                 issue_pid=self.pid,
-                todo=not force_update,
             )
+            if not force_update:
+                params["todo"] = True
             logging.info(f"Migrate documents {params}")
 
             # registros novos ou atualizados

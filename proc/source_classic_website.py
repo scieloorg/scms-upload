@@ -316,7 +316,7 @@ def migrate_document_records(
     Executa a migração de registros de documentos do site clássico.
     """
     
-    IssueProc.set_items_to_process(collection_acron)
+    # IssueProc.set_items_to_process(collection_acron)
 
     params = {}
     if collection_acron:
