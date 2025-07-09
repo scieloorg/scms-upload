@@ -938,14 +938,14 @@ class IdFileRecord(CommonControlField, Orderable):
         }
 
     @classmethod
-    def document_records_to_migrate(cls, collection, issue_pid, todo):
+    def document_records_to_migrate(cls, collection, issue_pid, force_update):
         params = {}
         if collection:
             params["parent__collection"] = collection
         if issue_pid:
             params["item_pid__startswith"] = f"S{issue_pid}"
-        if todo:
-            params["todo"] = todo
+        if not force_update:
+            params["todo"] = True
 
         logging.info(f"IdFileRecord.document_records_to_migrate {params}")
         return cls.objects.filter(item_type="article", **params)

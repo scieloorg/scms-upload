@@ -1048,55 +1048,6 @@ class IssueProc(BaseProc, ClusterableModel):
     )
 
     @staticmethod
-    def set_items_to_process(collection_acron=None):
-        params = {}
-        if collection_acron:
-            params["collection__acron"] = collection_acron
-
-        issue_status = (
-            tracker_choices.PROGRESS_STATUS_RETRY
-            + tracker_choices.PROGRESS_STATUS_REGULAR_TODO
-        )
-        articles = ArticleProc.objects.filter(
-            Q(xml_status__in=issue_status) | Q(sps_pkg_status__in=issue_status),
-            **params,
-        )
-        article_pids = [item.pid for item in articles]
-
-        q = IdFileRecord.objects.filter(item_type="article", todo=True).count()
-        logging.info(f"IdFileRecord.todo: {q}")
-
-        IdFileRecord.objects.filter(item_pid__contains=article_pids).update(todo=True)
-
-        q = IdFileRecord.objects.filter(item_type="article", todo=True).count()
-        logging.info(f"IdFileRecord.todo: {q}")
-
-        for item in IdFileRecord.objects.filter(item_type="article", todo=False):
-            if not ArticleProc.objects.filter(pid=item.item_pid).exists():
-                item.todo = True
-                item.save()
-
-        q = IdFileRecord.objects.filter(item_type="article", todo=True).count()
-        logging.info(f"IdFileRecord.todo: {q}")
-
-        issue_pids = list(
-            set(
-                [
-                    item["item_pid"][1:18]
-                    for item in IdFileRecord.objects.filter(
-                        item_type="article", todo=True
-                    ).values("item_pid")
-                ]
-            )
-        )
-        IssueProc.objects.filter(
-            pid__in=issue_pids,
-        ).update(
-            docs_status=tracker_choices.PROGRESS_STATUS_TODO,
-            files_status=tracker_choices.PROGRESS_STATUS_TODO,
-        )
-
-    @staticmethod
     def create_from_journal_proc_and_issue(user, journal_proc, issue):
         issue_pid_suffix = issue.issue_pid_suffix
         issue_proc = IssueProc.get_or_create(
@@ -1318,6 +1269,55 @@ class IssueProc(BaseProc, ClusterableModel):
         return self.issue_files.filter(
             Q(original_name=basename) | Q(original_name__startswith=name + ".")
         )
+
+    @staticmethod
+    def migrate_pending_document_records(
+        user,
+        collection_acron,
+        journal_acron=None,
+        issue_folder=None,
+        publication_year=None,
+    ):
+
+        id_file_record_params = {}
+        if journal_acron:
+            id_file_record_params["parent__journal_acron"] = journal_acron
+        if publication_year:
+            id_file_record_params["item_pid__contains"] = publication_year
+
+        issue_pids = set()
+        for item in IdFileRecord.objects.filter(
+            parent__collection__acron=collection_acron,
+            item_type="article",
+            todo=True,
+            **id_file_record_params,
+        ):
+            issue_pids.add(item.item_pid[1:-5])
+
+        if not issue_pids:
+            return
+
+        logging.info(
+            f"IssueProc.migrate_pending_document_records - issue_pids: {len(issue_pids)}"
+        )
+        params = {}
+        if issue_folder:
+            params["issue_folder"] = issue_folder
+
+        issue_procs = IssueProc.objects.filter(
+            collection__acron=collection_acron,
+            pid__in=issue_pids,
+            **params,
+        )
+        if not issue_procs.exists():
+            return
+
+        logging.info(
+            f"IssueProc.migrate_pending_document_records - issue_procs: {issue_procs.count()}"
+        )
+        for item in issue_procs:
+            item.migrate_document_records(user, force_update=True)
+        issue_procs.update(files_status=tracker_choices.PROGRESS_STATUS_TODO)
 
     def migrate_document_records(self, user, force_update=None):
         try:

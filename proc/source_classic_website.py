@@ -315,9 +315,6 @@ def migrate_document_records(
     """
     Executa a migração de registros de documentos do site clássico.
     """
-
-    # IssueProc.set_items_to_process(collection_acron)
-
     params = {}
     if collection_acron:
         params["collection__acron"] = collection_acron
@@ -334,6 +331,14 @@ def migrate_document_records(
 
     for issue_proc in IssueProc.objects.filter(**params):
         issue_proc.migrate_document_records(user, force_update)
+
+    IssueProc.migrate_pending_document_records(
+        user,
+        collection_acron,
+        journal_acron,
+        issue_folder,
+        publication_year,
+    )
 
 
 def get_files_from_classic_website(
