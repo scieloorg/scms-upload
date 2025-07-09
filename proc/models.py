@@ -1322,57 +1322,40 @@ class IssueProc(BaseProc, ClusterableModel):
     def migrate_document_records(self, user, force_update=None):
         try:
             operation = None
-            detail = None
-            params = None
-
             operation = self.start(user, "migrate_document_records")
             if not self.journal_proc:
-                self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
-                self.save()
-                operation.finish(user, completed=False, detail={"journal_proc": None})
-                return
+                raise ValueError(f"IssueProc ({self}) has no journal_proc")
 
-            self.docs_status = tracker_choices.PROGRESS_STATUS_DOING
-            self.save()
-
-            done = 0
-            errors = 0
+            detail = None
             journal_data = self.journal_proc.migrated_data.data
+            issue_data = self.migrated_data.data
 
-            params = dict(
+            failed_pids = set()
+            id_file_records = IdFileRecord.document_records_to_migrate(
                 collection=self.journal_proc.collection,
                 issue_pid=self.pid,
+                force_update=force_update,
             )
-            if not force_update:
-                params["todo"] = True
-            logging.info(f"Migrate documents {params}")
-
-            # registros novos ou atualizados
-            id_file_records = IdFileRecord.document_records_to_migrate(**params)
             for record in id_file_records:
                 try:
                     logging.info(f"migrate_document_records: {record.item_pid}")
-                    detail = dict(
-                        pid=record.item_pid,
-                    )
+                    data = None
                     data = record.get_record_data(
-                        journal_data, issue_data=self.migrated_data.data
+                        journal_data, issue_data,
                     )
-                    detail["data"] = data
                     article_proc = self.create_or_update_article_proc(
                         user, record.item_pid, data["data"], force_update
                     )
-
-                    if article_proc:
-                        done += 1
-                        record.todo = False
-                        record.save()
-                    else:
-                        errors += 1
+                    if not article_proc:
+                        failed_pids.add(record.item_pid)
                 except Exception as e:
-                    errors += 1
+                    failed_pids.add(record.item_pid)
+                    detail = {
+                        "pid": record.item_pid,
+                        "data": data,
+                    }
                     exc_type, exc_value, exc_traceback = sys.exc_info()
-                    subevent = self.start(user, "migrate documet records / item")
+                    subevent = self.start(user, "migrate document records / item")
                     subevent.finish(
                         user,
                         completed=False,
@@ -1381,70 +1364,56 @@ class IssueProc(BaseProc, ClusterableModel):
                         exc_traceback=exc_traceback,
                     )
 
-            got = id_file_records.count()
-            detail = params
-            detail.update(
-                {
-                    "total issue documents": self.issue.total_documents,
-                    "total records": got,
-                    "total done": done,
-                    "errors": errors,
-                }
-            )
-            completed = got == done
-            operation.finish(user, completed=completed, detail=detail)
-            if completed:
-                self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
+            detail = {
+                "total issue documents": self.issue.total_documents,
+                "total records": id_file_records.count(),
+                "total errors": len(failed_pids),
+            }
+        
+            if failed_pids:
+                self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             else:
-                self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
+                self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
             self.save()
+            operation.finish(user, completed=not failed_pids, detail=detail)
+            if id_file_records.count():
+                id_file_records.exclude(item_pid__in=failed_pids).update(todo=False)
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
+            self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
-            operation.finish(
-                user, exc_traceback=exc_traceback, exception=e, detail=detail or params
-            )
+            if operation:
+                operation.finish(
+                    user, exc_traceback=exc_traceback, exception=e, detail=detail
+                )
 
     def create_or_update_article_proc(self, user, pid, data, force_update):
-        try:
-            detail = {}
-            params = {}
-            article_proc = ArticleProc.register_classic_website_data(
-                user=user,
-                collection=self.collection,
-                pid=pid,
-                data=data,
-                content_type="article",
-                force_update=force_update,
-            )
-            if not article_proc:
-                raise Exception(f"Unable to create ArticleProc for {pid}")
+        article_proc = ArticleProc.register_classic_website_data(
+            user=user,
+            collection=self.collection,
+            pid=pid,
+            data=data,
+            content_type="article",
+            force_update=force_update,
+        )
+        if not article_proc:
+            raise ArticleProc.DoesNotExist(f"Unable to create ArticleProc for {pid}")
 
-            event = article_proc.start(user, "create_or_update_article_proc")
-            migrated_article = article_proc.migrated_data
-            document = migrated_article.document
+        migrated_article = article_proc.migrated_data
+        document = migrated_article.document
 
-            if not migrated_article.file_type:
-                migrated_article.file_type = document.file_type
-                migrated_article.save()
+        if not migrated_article.file_type:
+            migrated_article.file_type = document.file_type
+            migrated_article.save()
 
-            article_proc.update(
-                issue_proc=self,
-                pkg_name=document.filename_without_extension,
-                migration_status=tracker_choices.PROGRESS_STATUS_TODO,
-                user=user,
-                main_lang=document.original_language,
-                force_update=force_update,
-            )
-            event.finish(user, completed=True, detail=str(article_proc))
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            self.docs_status = tracker_choices.PROGRESS_STATUS_REPROC
-            self.save()
-            event.finish(
-                user, exc_traceback=exc_traceback, exception=e, detail=detail or params
-            )
+        article_proc.update(
+            issue_proc=self,
+            pkg_name=document.filename_without_extension,
+            migration_status=tracker_choices.PROGRESS_STATUS_TODO,
+            user=user,
+            main_lang=document.original_language,
+            force_update=force_update,
+        )
         return article_proc
 
     @staticmethod
