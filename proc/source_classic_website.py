@@ -311,6 +311,7 @@ def migrate_document_records(
     publication_year=None,
     status=None,
     force_update=None,
+    skip_migrate_pending_document_records=None,
 ):
     """
     Executa a migração de registros de documentos do site clássico.
@@ -334,6 +335,9 @@ def migrate_document_records(
         "journal_proc__migrated_data"
     ).filter(**params):
         issue_proc.migrate_document_records(user, force_update)
+
+    if skip_migrate_pending_document_records:
+        return
 
     IssueProc.migrate_pending_document_records(
         user,
