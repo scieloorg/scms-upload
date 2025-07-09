@@ -29,7 +29,7 @@ def create_or_update_migrated_journal(
     if not has_changes:
         logging.info(f"skip reading {classic_website.classic_website_paths.title_path}")
         return
-    
+
     for (
         scielo_issn,
         journal_data,
@@ -81,7 +81,7 @@ def create_or_update_migrated_issue(
     if not has_changes:
         logging.info(f"skip reading {classic_website.classic_website_paths.issue_path}")
         return
-    
+
     for (
         pid,
         issue_data,
@@ -145,7 +145,7 @@ def create_collection_procs_from_pid_list(
             pid = pid.strip() or ""
             if not len(pid) == 23:
                 continue
-            
+
             # Registra PID do artigo
             ArticleProc.register_pid(
                 user,
@@ -153,7 +153,7 @@ def create_collection_procs_from_pid_list(
                 pid,
                 force_update=False,
             )
-            
+
             # Extrai e registra PID do issue
             issue_pid = pid[1:-5]
             if issue_pid not in issue_pids:
@@ -315,7 +315,7 @@ def migrate_document_records(
     """
     Executa a migração de registros de documentos do site clássico.
     """
-    
+
     # IssueProc.set_items_to_process(collection_acron)
 
     params = {}

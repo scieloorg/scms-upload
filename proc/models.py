@@ -74,7 +74,7 @@ class Operation(CommonControlField):
         FieldPanel("created", read_only=True),
         FieldPanel("updated", read_only=True),
         FieldPanel("completed", read_only=True),
-        FieldPanel('detail', read_only=True)
+        FieldPanel("detail", read_only=True),
     ]
 
     class Meta:
@@ -696,7 +696,9 @@ class BaseProc(CommonControlField):
             }
             resp = {}
             operation = None
-            operation = self.start(user, f"publish {content_type} {self} on {website_kind}")
+            operation = self.start(
+                user, f"publish {content_type} {self} on {website_kind}"
+            )
 
             if not content_type:
                 try:
@@ -735,7 +737,9 @@ class BaseProc(CommonControlField):
                 self.public_ws_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
-            api_data = api_data or get_api_data(self.collection, content_type, website_kind)
+            api_data = api_data or get_api_data(
+                self.collection, content_type, website_kind
+            )
             logging.info(api_data)
             if api_data.get("error"):
                 resp.update(api_data)
@@ -1049,16 +1053,15 @@ class IssueProc(BaseProc, ClusterableModel):
         if collection_acron:
             params["collection__acron"] = collection_acron
 
-        issue_status = tracker_choices.PROGRESS_STATUS_RETRY + tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+        issue_status = (
+            tracker_choices.PROGRESS_STATUS_RETRY
+            + tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+        )
         articles = ArticleProc.objects.filter(
-            Q(xml_status__in=issue_status) |
-            Q(sps_pkg_status__in=issue_status),
+            Q(xml_status__in=issue_status) | Q(sps_pkg_status__in=issue_status),
             **params,
         )
-        article_pids = [
-            item.pid
-            for item in articles
-        ]
+        article_pids = [item.pid for item in articles]
 
         q = IdFileRecord.objects.filter(item_type="article", todo=True).count()
         logging.info(f"IdFileRecord.todo: {q}")
@@ -1067,7 +1070,7 @@ class IssueProc(BaseProc, ClusterableModel):
 
         q = IdFileRecord.objects.filter(item_type="article", todo=True).count()
         logging.info(f"IdFileRecord.todo: {q}")
-        
+
         for item in IdFileRecord.objects.filter(item_type="article", todo=False):
             if not ArticleProc.objects.filter(pid=item.item_pid).exists():
                 item.todo = True
@@ -1076,10 +1079,16 @@ class IssueProc(BaseProc, ClusterableModel):
         q = IdFileRecord.objects.filter(item_type="article", todo=True).count()
         logging.info(f"IdFileRecord.todo: {q}")
 
-        issue_pids = list(set([
-            item["item_pid"][1:18]
-            for item in IdFileRecord.objects.filter(item_type="article", todo=True).values("item_pid")
-        ]))
+        issue_pids = list(
+            set(
+                [
+                    item["item_pid"][1:18]
+                    for item in IdFileRecord.objects.filter(
+                        item_type="article", todo=True
+                    ).values("item_pid")
+                ]
+            )
+        )
         IssueProc.objects.filter(
             pid__in=issue_pids,
         ).update(
@@ -1463,7 +1472,7 @@ class IssueProc(BaseProc, ClusterableModel):
                 article.delete()
             except PidProviderXML.MultipleObjectsReturned:
                 pass
-            
+
 
 class ArticleEventCreateError(Exception): ...
 
@@ -1480,7 +1489,9 @@ class ArticleProc(BaseProc, ClusterableModel):
     issue_proc = models.ForeignKey(
         IssueProc, on_delete=models.SET_NULL, null=True, blank=True
     )
-    pkg_name = models.CharField(_("Package name"), max_length=100, null=True, blank=True)
+    pkg_name = models.CharField(
+        _("Package name"), max_length=100, null=True, blank=True
+    )
     main_lang = models.CharField(
         _("Main lang"),
         max_length=2,
