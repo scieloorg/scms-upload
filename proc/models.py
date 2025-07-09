@@ -1061,21 +1061,32 @@ class IssueProc(BaseProc, ClusterableModel):
         return issue_proc
 
     def set_status(self):
+        # Propaga status para QA e Public WS
         if self.migration_status == tracker_choices.PROGRESS_STATUS_REPROC:
             self.qa_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
 
         if self.qa_ws_status == tracker_choices.PROGRESS_STATUS_REPROC:
             self.public_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
 
+        # Otimiza a atualização de ArticleProc para docs_status
         if self.docs_status == tracker_choices.PROGRESS_STATUS_REPROC:
-            for item in ArticleProc.objects.filter(issue_proc=self):
-                item.migration_status = tracker_choices.PROGRESS_STATUS_REPROC
-                item.set_status()
+            # Atualiza diretamente os artigos relacionados em massa
+            ArticleProc.objects.filter(issue_proc=self).update(
+                migration_status=tracker_choices.PROGRESS_STATUS_REPROC,
+                qa_ws_status=tracker_choices.PROGRESS_STATUS_REPROC,  # Propaga status de doc para migration e qa
+                public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC, # Propaga status de doc para public
+            )
 
+        # Otimiza a atualização de ArticleProc para files_status
         if self.files_status == tracker_choices.PROGRESS_STATUS_REPROC:
-            for item in ArticleProc.objects.filter(issue_proc=self):
-                item.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
-                item.set_status()
+            # Atualiza diretamente os artigos relacionados em massa
+            ArticleProc.objects.filter(issue_proc=self).update(
+                xml_status=tracker_choices.PROGRESS_STATUS_REPROC,
+                sps_pkg_status=tracker_choices.PROGRESS_STATUS_REPROC, # Propaga status de xml para sps_pkg
+                migration_status=tracker_choices.PROGRESS_STATUS_REPROC, # Propaga status de sps_pkg para migration
+                qa_ws_status=tracker_choices.PROGRESS_STATUS_REPROC,  # Propaga status de migration para qa
+                public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC, # Propaga status de qa para public
+            )
 
         self.save()
 
@@ -1304,7 +1315,10 @@ class IssueProc(BaseProc, ClusterableModel):
         if issue_folder:
             params["issue_folder"] = issue_folder
 
-        issue_procs = IssueProc.objects.filter(
+        issue_procs = IssueProc.objects.select_related(
+            "collection", "journal_proc", "issue", "migrated_data",
+            "journal_proc__migrated_data"
+        ).filter(
             collection__acron=collection_acron,
             pid__in=issue_pids,
             **params,

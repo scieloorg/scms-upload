@@ -329,7 +329,10 @@ def migrate_document_records(
             status, force_update
         )
 
-    for issue_proc in IssueProc.objects.filter(**params):
+    for issue_proc in IssueProc.objects.select_related(
+        "collection", "journal_proc", "issue", "migrated_data",
+        "journal_proc__migrated_data"
+    ).filter(**params):
         issue_proc.migrate_document_records(user, force_update)
 
     IssueProc.migrate_pending_document_records(
