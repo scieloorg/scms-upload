@@ -26,16 +26,13 @@ def now():
     return datetime.utcnow().isoformat().replace(":", "-").replace(".", "-")
 
 
-class MigratedFileCreateOrUpdateError(Exception):
-    ...
+class MigratedFileCreateOrUpdateError(Exception): ...
 
 
-class MigratedDocumentHTMLForbiddenError(Exception):
-    ...
+class MigratedDocumentHTMLForbiddenError(Exception): ...
 
 
-class MigrationError(Exception):
-    ...
+class MigrationError(Exception): ...
 
 
 def modified_date(file_path):
@@ -112,7 +109,9 @@ class ClassicWebsiteConfiguration(CommonControlField):
         max_length=255,
         null=True,
         blank=True,
-        help_text=_("Path of a text file which contains all the article PIDs from artigo.mst"),
+        help_text=_(
+            "Path of a text file which contains all the article PIDs from artigo.mst"
+        ),
     )
     alternative_htdocs_img_revistas_path = models.JSONField(null=True, blank=True)
 
@@ -311,6 +310,7 @@ def extract_relative_path(full_path):
             return str(Path(*parts[i:]))
     return None
 
+
 def migrated_files_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
 
@@ -320,7 +320,7 @@ def migrated_files_directory_path(instance, filename):
         path = instance.source_path
 
     path_relative = extract_relative_path(path)
-    
+
     try:
         return f"classic_website/{instance.collection.acron}/{path_relative}"
     except (AttributeError, TypeError) as e:
@@ -335,15 +335,21 @@ class MigratedFile(CommonControlField):
         upload_to=migrated_files_directory_path, null=True, blank=True
     )
     # bases/pdf/acron/volnum/pt_a01.pdf
-    original_path = models.CharField(_("Original Path"), max_length=200, null=True, blank=True)
+    original_path = models.CharField(
+        _("Original Path"), max_length=200, null=True, blank=True
+    )
 
     # pt_a01.pdf
-    original_name = models.CharField(_("Original name"), max_length=100, null=True, blank=True)
+    original_name = models.CharField(
+        _("Original name"), max_length=100, null=True, blank=True
+    )
 
     file_date = models.DateField(null=True, blank=True)
 
     # /pdf/acron/volnum/pt_a01.pdf
-    original_href = models.CharField(_("Original href"), max_length=150, null=True, blank=True)
+    original_href = models.CharField(
+        _("Original href"), max_length=150, null=True, blank=True
+    )
 
     component_type = models.CharField(
         _("Component type"), max_length=16, null=True, blank=True
@@ -384,7 +390,9 @@ class MigratedFile(CommonControlField):
         if not force_update:
             try:
                 file_date = modified_date(file_path)
-                if cls.objects.filter(collection=collection, original_path=file_path, file_date=file_date).exists():
+                if cls.objects.filter(
+                    collection=collection, original_path=file_path, file_date=file_date
+                ).exists():
                     return False
             except cls.DoesNotExist:
                 pass
@@ -634,7 +642,9 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         if not force_update:
             try:
                 file_size = JournalAcronIdFile.get_file_size(file_path)
-                if cls.objects.filter(collection=collection, source_path=file_path, file_size=file_size).exists():
+                if cls.objects.filter(
+                    collection=collection, source_path=file_path, file_size=file_size
+                ).exists():
                     return False
             except cls.DoesNotExist:
                 pass
@@ -851,7 +861,7 @@ class IdFileRecord(CommonControlField, Orderable):
                     "item_pid": item_pid,
                     "data": data,
                 },
-            )            
+            )
 
     @classmethod
     def create_or_update(
@@ -928,14 +938,14 @@ class IdFileRecord(CommonControlField, Orderable):
         }
 
     @classmethod
-    def document_records_to_migrate(cls, collection, issue_pid, todo):
+    def document_records_to_migrate(cls, collection, issue_pid, force_update):
         params = {}
         if collection:
             params["parent__collection"] = collection
         if issue_pid:
             params["item_pid__startswith"] = f"S{issue_pid}"
-        if todo:
-            params["todo"] = todo
+        if not force_update:
+            params["todo"] = True
 
         logging.info(f"IdFileRecord.document_records_to_migrate {params}")
         return cls.objects.filter(item_type="article", **params)

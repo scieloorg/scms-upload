@@ -555,6 +555,7 @@ def task_migrate_and_publish_articles(
     force_import_acron_id_file=False,
     force_migrate_document_records=False,
     force_migrate_document_files=False,
+    skip_migrate_pending_document_records=False,
 ):
     try:
         user = _get_user(user_id, username)
@@ -606,6 +607,7 @@ def task_migrate_and_publish_articles(
                 publication_year=publication_year,
                 status=status,
                 force_update=force_migrate_document_records,
+                skip_migrate_pending_document_records=skip_migrate_pending_document_records,
             )
 
             # le IssueProc selecionados e gera ArticleProc
