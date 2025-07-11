@@ -740,7 +740,6 @@ class BaseProc(CommonControlField):
             api_data = api_data or get_api_data(
                 self.collection, content_type, website_kind
             )
-            logging.info(api_data)
             if api_data.get("error"):
                 resp.update(api_data)
             else:
@@ -1447,14 +1446,12 @@ class IssueProc(BaseProc, ClusterableModel):
     def bundle_id(self):
         return "-".join([self.journal_proc.pid, self.issue.bundle_id_suffix])
 
-    def unlink_articles(self):
-        for article in Article.objects.filter(issue=self.issue).iterator():
-            try:
-                PidProviderXML.objects.get(v3=article.pid_v3)
-            except PidProviderXML.DoesNotExist:
-                article.delete()
-            except PidProviderXML.MultipleObjectsReturned:
-                pass
+    def delete_unlink_articles(self, user=None):
+        return Article.delete_unlink_articles(
+            user or self.updated_by or self.creator,
+            self.journal_proc.journal,
+            self.issue,
+        )
 
 
 class ArticleEventCreateError(Exception): ...
