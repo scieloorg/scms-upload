@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
+from article.models import Article
 from collection.choices import QA, PUBLIC
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
