@@ -211,10 +211,7 @@ class Article(ClusterableModel, CommonControlField):
             journal=journal,
             **params,
         )
-        for item in (
-            qs
-            .only("id", "pid_v3", "updated_by", "pp_xml")
-        ):
+        for item in qs.only("id", "pid_v3", "updated_by", "pp_xml"):
             try:
                 item.pp_xml = PidProviderXML.objects.get(v3=item.pid_v3)
                 item.updated_by = user

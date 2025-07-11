@@ -153,7 +153,12 @@ def task_migrate_and_publish_journals(
                     exc_type, exc_value, exc_traceback = sys.exc_info()
 
                     if event:
-                        event.finish(user, completed=False, exception=e, exc_traceback=exc_traceback)
+                        event.finish(
+                            user,
+                            completed=False,
+                            exception=e,
+                            exc_traceback=exc_traceback,
+                        )
                     else:
                         UnexpectedEvent.create(
                             e=e,
@@ -635,10 +640,10 @@ def task_migrate_and_publish_articles(
             logging.info(f"article_filter: {params}")
 
             force_update = (
-                force_update or 
-                force_migrate_document_records or 
-                force_migrate_document_files or
-                force_import_acron_id_file
+                force_update
+                or force_migrate_document_records
+                or force_migrate_document_files
+                or force_import_acron_id_file
             )
             for article_proc in items:
                 article = article_proc.migrate_article(user, force_update)
@@ -669,9 +674,8 @@ def task_migrate_and_publish_articles(
                     )
 
             # publication
-            query_by_status = (
-                Q(qa_ws_status__in=status)
-                | Q(public_ws_status__in=status)
+            query_by_status = Q(qa_ws_status__in=status) | Q(
+                public_ws_status__in=status
             )
             params["sps_pkg__pid_v3__isnull"] = False
             items = ArticleProc.objects.filter(
@@ -829,7 +833,7 @@ def task_publish_article(
                 purpose=website_kind,
             ):
                 obj.create_or_update_urls(user, website.url)
-            
+
             detail["available"] = obj.completed
         event.finish(user, detail=detail, completed=True)
     except Exception as e:
@@ -905,7 +909,13 @@ def task_create_collection_procs_from_pid_list(
 
 @celery_app.task(bind=True)
 def task_fetch_and_create_journal(
-    self, user_id, username, collection_acron=None, issn_electronic=None, issn_print=None, force_update=None
+    self,
+    user_id,
+    username,
+    collection_acron=None,
+    issn_electronic=None,
+    issn_print=None,
+    force_update=None,
 ):
     user = _get_user(user_id=user_id, username=username)
     try:
