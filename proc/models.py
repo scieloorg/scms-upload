@@ -740,7 +740,6 @@ class BaseProc(CommonControlField):
             api_data = api_data or get_api_data(
                 self.collection, content_type, website_kind
             )
-            logging.info(api_data)
             if api_data.get("error"):
                 resp.update(api_data)
             else:
@@ -1074,7 +1073,7 @@ class IssueProc(BaseProc, ClusterableModel):
             ArticleProc.objects.filter(issue_proc=self).update(
                 migration_status=tracker_choices.PROGRESS_STATUS_REPROC,
                 qa_ws_status=tracker_choices.PROGRESS_STATUS_REPROC,  # Propaga status de doc para migration e qa
-                public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC, # Propaga status de doc para public
+                public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC,  # Propaga status de doc para public
             )
 
         # Otimiza a atualização de ArticleProc para files_status
@@ -1082,10 +1081,10 @@ class IssueProc(BaseProc, ClusterableModel):
             # Atualiza diretamente os artigos relacionados em massa
             ArticleProc.objects.filter(issue_proc=self).update(
                 xml_status=tracker_choices.PROGRESS_STATUS_REPROC,
-                sps_pkg_status=tracker_choices.PROGRESS_STATUS_REPROC, # Propaga status de xml para sps_pkg
-                migration_status=tracker_choices.PROGRESS_STATUS_REPROC, # Propaga status de sps_pkg para migration
+                sps_pkg_status=tracker_choices.PROGRESS_STATUS_REPROC,  # Propaga status de xml para sps_pkg
+                migration_status=tracker_choices.PROGRESS_STATUS_REPROC,  # Propaga status de sps_pkg para migration
                 qa_ws_status=tracker_choices.PROGRESS_STATUS_REPROC,  # Propaga status de migration para qa
-                public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC, # Propaga status de qa para public
+                public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC,  # Propaga status de qa para public
             )
 
         self.save()
@@ -1316,8 +1315,11 @@ class IssueProc(BaseProc, ClusterableModel):
             params["issue_folder"] = issue_folder
 
         issue_procs = IssueProc.objects.select_related(
-            "collection", "journal_proc", "issue", "migrated_data",
-            "journal_proc__migrated_data"
+            "collection",
+            "journal_proc",
+            "issue",
+            "migrated_data",
+            "journal_proc__migrated_data",
         ).filter(
             collection__acron=collection_acron,
             pid__in=issue_pids,
@@ -1355,7 +1357,8 @@ class IssueProc(BaseProc, ClusterableModel):
                     logging.info(f"migrate_document_records: {record.item_pid}")
                     data = None
                     data = record.get_record_data(
-                        journal_data, issue_data,
+                        journal_data,
+                        issue_data,
                     )
                     article_proc = self.create_or_update_article_proc(
                         user, record.item_pid, data["data"], force_update
@@ -1383,7 +1386,7 @@ class IssueProc(BaseProc, ClusterableModel):
                 "total records": id_file_records.count(),
                 "total errors": len(failed_pids),
             }
-        
+
             if failed_pids:
                 self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             else:
@@ -1447,14 +1450,12 @@ class IssueProc(BaseProc, ClusterableModel):
     def bundle_id(self):
         return "-".join([self.journal_proc.pid, self.issue.bundle_id_suffix])
 
-    def unlink_articles(self):
-        for article in Article.objects.filter(issue=self.issue).iterator():
-            try:
-                PidProviderXML.objects.get(v3=article.pid_v3)
-            except PidProviderXML.DoesNotExist:
-                article.delete()
-            except PidProviderXML.MultipleObjectsReturned:
-                pass
+    def delete_unlink_articles(self, user=None):
+        return Article.delete_unlink_articles(
+            user or self.updated_by or self.creator,
+            self.journal_proc.journal,
+            self.issue,
+        )
 
 
 class ArticleEventCreateError(Exception): ...
