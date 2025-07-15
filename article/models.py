@@ -1,9 +1,10 @@
+import sys
 import logging
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError, models
-from django.db.models import Q
+from django.db import IntegrityError, models, transaction
+from django.db.models import Q, Count
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -23,6 +24,7 @@ from doi.models import DOIWithLang
 from issue.models import TOC, Issue, TocSection
 from journal.models import Journal, JournalSection, OfficialJournal
 from package.models import SPSPkg
+from pid_provider.models import PidProviderXML
 from researcher.models import Researcher
 
 from . import choices
@@ -38,6 +40,12 @@ class Article(ClusterableModel, CommonControlField):
     pois os dados devem ser obtidos do XML
     """
 
+    pp_xml = models.ForeignKey(
+        PidProviderXML,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
     sps_pkg = models.ForeignKey(
         SPSPkg, blank=True, null=True, on_delete=models.SET_NULL
     )
@@ -182,6 +190,86 @@ class Article(ClusterableModel, CommonControlField):
         return list(langs)
 
     @classmethod
+    def delete_unlink_articles(cls, user, journal, issue=None):
+        result = {}
+        result.update(cls.delete_by_pp_xml_status(user, journal, issue))
+        result.update(cls.delete_by_duplicated_pkg_name(user, journal, issue))
+        if result:
+            logging.info(f"result: {result}")
+        return result
+
+    @classmethod
+    def delete_by_pp_xml_status(cls, user, journal, issue=None):
+        params = {}
+        if issue:
+            params["issue"] = issue
+
+        to_update = []
+        to_delete = []
+        qs = cls.objects.filter(
+            pp_xml__isnull=True,
+            journal=journal,
+            **params,
+        )
+        for item in qs.only("id", "pid_v3", "updated_by", "pp_xml"):
+            try:
+                item.pp_xml = PidProviderXML.objects.get(v3=item.pid_v3)
+                item.updated_by = user
+                to_update.append(item)
+            except PidProviderXML.DoesNotExist:
+                to_delete.append(item.id)  # Adiciona à lista
+            except Exception as e:
+                logging.exception(e)
+            logging.info(f"{to_update}")
+            logging.info(f"{to_delete}")
+
+        if not to_delete and not to_update:
+            return {}
+
+        # Processa os itens acumulados para atualização (pp_xml)
+        if to_update:
+            cls.objects.bulk_update(to_update, ["pp_xml", "updated_by"])
+        # Processa os IDs acumulados para deleção (sem pp_xml)
+        if to_delete:
+            # Usa a lista diretamente no id__in
+            deleted_info = cls.objects.filter(id__in=to_delete).delete()
+        return {"updated": len(to_update), "deleted": len(to_delete)}
+
+    @classmethod
+    def delete_by_duplicated_pkg_name(cls, user, journal, issue=None):
+        params = {}
+        if issue:
+            params["issue"] = issue
+
+        qs = cls.objects.filter(**params)
+        duplicated_pkg_names = (
+            qs.values("sps_pkg__sps_pkg_name")
+            .annotate(total=Count("id"))
+            .filter(total__gt=1)
+            .values_list("sps_pkg__sps_pkg_name", flat=True)
+        )
+        logging.info(f"duplicated_pkg_names: {params} {len(duplicated_pkg_names)}")
+        if not duplicated_pkg_names:
+            return {}
+
+        # Para cada nome duplicado, mantém apenas o registro mais recente
+        to_keep = []
+        for pkg_name in duplicated_pkg_names:
+            # Pega todos os registros com esse nome, ordena por ID (ou data)
+            keep = (
+                qs.filter(sps_pkg__sps_pkg_name=pkg_name)
+                .order_by("-updated")  # ou '-created_at' se tiver campo de data
+                .values_list("id", flat=True)[0]
+            )
+            # Adiciona todos exceto o primeiro (mais recente) para deletar
+            logging.info(f"keep: {keep}")
+            to_keep.append(keep)
+        logging.info(f"to_keep: {to_keep}")
+        # Deleta os registros duplicados
+        deleted_count = qs.exclude(id__in=to_keep).delete()
+        return {"deleted": deleted_count[0]}
+
+    @classmethod
     def get(cls, pid_v3):
         if pid_v3:
             return cls.objects.get(pid_v3=pid_v3)
@@ -219,11 +307,23 @@ class Article(ClusterableModel, CommonControlField):
         obj.add_pages()
         obj.add_position(position, xml_with_pre.fpage)
         obj.add_article_publication_date()
+        obj.add_pp_xml()
         obj.save()
 
         obj.add_sections(user)
         obj.add_article_titles(user)
         return obj
+
+    def add_pp_xml(self, save=False):
+        if not self.pp_xml:
+            try:
+                self.pp_xml = PidProviderXML.objects.get(v3=self.pid_v3)
+            except PidProviderXML.DoesNotExist:
+                pass
+            else:
+                if save:
+                    self.save()
+                return self
 
     def add_related_item(self, target_doi, target_article_type):
         self.save()
@@ -271,7 +371,9 @@ class Article(ClusterableModel, CommonControlField):
                     user,
                     parent=self,
                     text=title.get("html_text"),
-                    language=Language.get(code2=title.get("language") or title.get("lang")),
+                    language=Language.get(
+                        code2=title.get("language") or title.get("lang")
+                    ),
                 )
                 self.title_with_lang.add(obj)
             except Exception as e:
@@ -356,7 +458,10 @@ class Article(ClusterableModel, CommonControlField):
                 self.status = choices.AS_REQUIRE_ERRATUM
                 self.save()
                 return
-            elif self.status not in (choices.AS_REQUIRE_UPDATE, choices.AS_REQUIRE_ERRATUM):
+            elif self.status not in (
+                choices.AS_REQUIRE_UPDATE,
+                choices.AS_REQUIRE_ERRATUM,
+            ):
                 self.status = choices.AS_REQUIRE_UPDATE
                 self.save()
                 return
@@ -386,7 +491,7 @@ class Article(ClusterableModel, CommonControlField):
                 continue
             yield f"{website_url}/j/{journal_acron}/a/{pid_v3}/?lang={lang}"
             yield f"{website_url}/scielo.php?script=sci_arttext&pid={pid_v2}&tlng={lang}"
-        
+
         for item in self.pdfs:
             lang = item.get("lang")
             if not lang:
@@ -410,6 +515,7 @@ class ArticleTitle(HTMLTextModel, CommonControlField):
         FieldPanel("text", read_only=True),
         FieldPanel("language", read_only=True),
     ]
+
 
 class RelatedItem(CommonControlField):
     item_type = models.CharField(
@@ -480,7 +586,9 @@ class PublicationEvent:
         blank=True,
         related_name="publication_events",
     )
-    website = models.ForeignKey(WebSiteConfiguration, null=True, blank=True, on_delete=models.SET_NULL)
+    website = models.ForeignKey(
+        WebSiteConfiguration, null=True, blank=True, on_delete=models.SET_NULL
+    )
     creator = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
     created = models.DateTimeField(verbose_name=_("Creation date"), auto_now_add=True)
     is_public = models.BooleanField(default=False)
@@ -501,7 +609,11 @@ class PublicationEvent:
 
     @property
     def data(self):
-        return {"website": self.website, "is_public": self.is_public, "created": self.created.isoformat()}
+        return {
+            "website": self.website,
+            "is_public": self.is_public,
+            "created": self.created.isoformat(),
+        }
 
     @classmethod
     def create(cls, article, website, is_public, user=None):
@@ -515,9 +627,17 @@ class PublicationEvent:
                 obj.save()
                 return obj
             except IntegrityError:
-                return cls.objects.get(article=article, website=website, created=obj.created)
-        raise ValueError(f"PublicationEvent.create missing params {dict(article=article, website=website)}")
+                return cls.objects.get(
+                    article=article, website=website, created=obj.created
+                )
+        raise ValueError(
+            f"PublicationEvent.create missing params {dict(article=article, website=website)}"
+        )
 
     @staticmethod
     def get_current(article, website):
-        return PublicationEvent.objects.filter(article=article, website=website).order_by("-created").first()
+        return (
+            PublicationEvent.objects.filter(article=article, website=website)
+            .order_by("-created")
+            .first()
+        )
