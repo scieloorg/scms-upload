@@ -955,6 +955,7 @@ class Package(CommonControlField, ClusterableModel):
             # self.xml_file_changed(xml_with_pre, set_pub_date)
             xml_file_changed
             or not self.sps_pkg
+            or not self.sps_pkg.registered_in_core
             or not self.sps_pkg.valid_components
         ):
 

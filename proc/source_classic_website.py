@@ -29,7 +29,7 @@ def create_or_update_migrated_journal(
     if not has_changes:
         logging.info(f"skip reading {classic_website.classic_website_paths.title_path}")
         return
-    
+
     for (
         scielo_issn,
         journal_data,
@@ -81,7 +81,7 @@ def create_or_update_migrated_issue(
     if not has_changes:
         logging.info(f"skip reading {classic_website.classic_website_paths.issue_path}")
         return
-    
+
     for (
         pid,
         issue_data,
@@ -145,7 +145,7 @@ def create_collection_procs_from_pid_list(
             pid = pid.strip() or ""
             if not len(pid) == 23:
                 continue
-            
+
             # Registra PID do artigo
             ArticleProc.register_pid(
                 user,
@@ -153,7 +153,7 @@ def create_collection_procs_from_pid_list(
                 pid,
                 force_update=False,
             )
-            
+
             # Extrai e registra PID do issue
             issue_pid = pid[1:-5]
             if issue_pid not in issue_pids:
@@ -311,13 +311,11 @@ def migrate_document_records(
     publication_year=None,
     status=None,
     force_update=None,
+    skip_migrate_pending_document_records=None,
 ):
     """
     Executa a migração de registros de documentos do site clássico.
     """
-    
-    IssueProc.set_items_to_process(collection_acron)
-
     params = {}
     if collection_acron:
         params["collection__acron"] = collection_acron
@@ -332,8 +330,22 @@ def migrate_document_records(
             status, force_update
         )
 
-    for issue_proc in IssueProc.objects.filter(**params):
+    for issue_proc in IssueProc.objects.select_related(
+        "collection", "journal_proc", "issue", "migrated_data",
+        "journal_proc__migrated_data"
+    ).filter(**params):
         issue_proc.migrate_document_records(user, force_update)
+
+    if skip_migrate_pending_document_records:
+        return
+
+    IssueProc.migrate_pending_document_records(
+        user,
+        collection_acron,
+        journal_acron,
+        issue_folder,
+        publication_year,
+    )
 
 
 def get_files_from_classic_website(
