@@ -253,6 +253,7 @@ def _schedule_migrate_and_publish_articles(username, enabled):
             force_import_acron_id_file=False,
             force_migrate_document_records=False,
             force_migrate_document_files=False,
+            skip_migrate_pending_document_records=False,
         ),
         description=_("Migra e publica artigos"),
         priority=ARTICLE_DB_MIGRATION_PRIORITY,
