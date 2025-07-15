@@ -605,7 +605,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     user=user,
                     pid_v3=response["v3"],
                     sps_pkg_name=response["pkg_name"],
-                    registered_in_core=response.get("synchronized"),
+                    registered_in_core=response.get("registered_in_core"),
                 )
 
                 if response.get("changed"):
