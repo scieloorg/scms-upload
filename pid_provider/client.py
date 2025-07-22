@@ -37,7 +37,7 @@ class PidProviderAPIClient:
         api_username=None,
         api_password=None,
     ):
-        self.timeout = timeout or 15
+        self._timeout = timeout or 120
         self._pid_provider_api_post_xml = pid_provider_api_post_xml
         self._pid_provider_api_get_token = pid_provider_api_get_token
         self._api_username = api_username
@@ -82,6 +82,15 @@ class PidProviderAPIClient:
                     "/pid_provider", "/fix_pid_v2"
                 )
         return self._fix_pid_v2_url
+
+    @property
+    def timeout(self):
+        if self._timeout is None:
+            try:
+                self._timeout = self.config.timeout
+            except AttributeError as e:
+                raise exceptions.APIPidProviderConfigError(e)
+        return self._timeout
 
     @property
     def pid_provider_api_post_xml(self):
