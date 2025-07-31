@@ -158,3 +158,62 @@ class UnexpectedEvent(models.Model):
             raise UnexpectedEventCreateError(
                 f"Unable to create unexpected event ({exception} {exc_traceback}). EXCEPTION {exc}"
             )
+
+
+class TaskTracker(BaseEvent):
+    updated = models.DateTimeField(verbose_name=_("Last update date"), auto_now=True)
+    status = models.CharField(
+        _("status"),
+        choices=choices.TASK_TRACK_STATUS,
+        max_length=11,
+        null=True,
+        blank=True,
+        default=choices.TASK_TRACK_STATUS_STARTED,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["status"]),
+        ]
+        ordering = ["-updated"]
+
+    def finish(
+        self,
+        completed=False,
+        exception=None,
+        message_type=None,
+        message=None,
+        exc_traceback=None,
+        detail=None,
+    ):
+        logging.info("finish()")
+        detail = detail or {}
+        if exception:
+            logging.exception(exception)
+            detail["exception_message"] = str(exception)
+            detail["exception_type"] = str(type(exception))
+        if exc_traceback:
+            detail["traceback"] = str(format_traceback(exc_traceback))
+        if message_type:
+            detail["message_type"] = message_type
+        if message:
+            detail["message"] = message
+
+        logging.info(detail)
+
+        try:
+            json.dumps(detail)
+        except Exception as exc_detail:
+            detail = str(detail)
+
+        if detail:
+            self.detail = detail
+        if completed:
+            status = choices.TASK_TRACK_STATUS_FINISHED
+        else:
+            status = choices.TASK_TRACK_STATUS_INTERRUPTED
+        self.status = status
+        logging.info(f"completed: {completed}")
+        logging.info(detail)        
+        self.save()
