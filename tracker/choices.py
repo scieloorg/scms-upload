@@ -1,5 +1,16 @@
 from django.utils.translation import gettext_lazy as _
 
+
+TASK_TRACK_STATUS_STARTED = "started"
+TASK_TRACK_STATUS_INTERRUPTED = "interrupted"
+TASK_TRACK_STATUS_FINISHED = "finished"
+
+TASK_TRACK_STATUS = (
+    (TASK_TRACK_STATUS_STARTED, _("started")),
+    (TASK_TRACK_STATUS_INTERRUPTED, _("interrupted")),
+    (TASK_TRACK_STATUS_FINISHED, _("finished")),
+)
+
 ERROR = "ERROR"
 EXCEPTION = "EXCEPTION"
 INFO = "INFO"
