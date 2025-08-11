@@ -159,7 +159,19 @@ LOGGING = {
             "level": "DEBUG",
             "class": "logging.StreamHandler",
             "formatter": "verbose",
-        }
+        },
+        "profiling": {
+            "level": "WARNING",
+            "class": "logging.FileHandler",
+            "filename": "profiling.log",
+        },
+    },
+    "loggers": {
+        "profiling": {
+            "handlers": ["profiling"],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
     "root": {"level": "INFO", "handlers": ["console"]},
 }
