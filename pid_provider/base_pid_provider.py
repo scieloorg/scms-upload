@@ -227,7 +227,7 @@ class BasePidProvider:
                 "updated": self.updated.isoformat(),
             }
         """
-        return PidProviderXML.is_registered(xml_with_pre)
+        return PidProviderXML.is_registered(xml_with_pre, origin)
 
     @classmethod
     def is_registered_xml_uri(cls, xml_uri):
