@@ -37,98 +37,47 @@ class PidProviderAPIClient:
         api_username=None,
         api_password=None,
     ):
-        self._timeout = timeout or 120
-        self._pid_provider_api_post_xml = pid_provider_api_post_xml
-        self._pid_provider_api_get_token = pid_provider_api_get_token
-        self._api_username = api_username
-        self._api_password = api_password
-        self.token = None
+        self.pid_provider_api_post_xml = pid_provider_api_post_xml
+        self.pid_provider_api_get_token = pid_provider_api_get_token
+        self.api_username = api_username
+        self.api_password = api_password
+        self.timeout = timeout or 120
+        if not pid_provider_api_post_xml:
+            self.set_config()
 
     @property
     def enabled(self):
         try:
-            return bool(self.config.api_username and self.config.api_password)
+            self.set_config()
+            return bool(self.api_username and self.api_password)
         except (AttributeError, ValueError, TypeError):
             return False
 
-    def reset(self):
-        self._pid_provider_api_post_xml = None
-        self._pid_provider_api_get_token = None
-        self._api_username = None
-        self._api_password = None
-        self.token = None
-        self._config = PidProviderConfig.get_or_create()
-
-    @property
-    def config(self):
-        if not hasattr(self, "_config") or not self._config:
-            try:
-                self._config = PidProviderConfig.get_or_create()
-            except Exception as e:
-                logging.exception(f"PidProviderConfig.get_or_create {e}")
-                self._config = None
-        return self._config
+    def set_config(self):
+        try:
+            config = PidProviderConfig.get_or_create()
+            self.pid_provider_api_post_xml = config.pid_provider_api_post_xml
+            self.pid_provider_api_get_token = config.pid_provider_api_get_token
+            self.api_username = config.api_username
+            self.api_password = config.api_password
+            self.timeout = config.timeout or 120
+        except PidProviderConfig.DoesNotExist:
+            self.pid_provider_api_post_xml = None
+            self.pid_provider_api_get_token = None
+            self.api_username = None
+            self.api_password = None
+            self.timeout = 120
 
     @property
     def fix_pid_v2_url(self):
         if not hasattr(self, "_fix_pid_v2_url") or not self._fix_pid_v2_url:
             try:
-                self._fix_pid_v2_url = None
-                endpoint = self.config.endpoint.filter(name="fix-pid-v2")[0]
-                if endpoint.enabled:
-                    self._fix_pid_v2_url = endpoint.url
-            except IndexError:
                 self._fix_pid_v2_url = self.pid_provider_api_post_xml.replace(
                     "/pid_provider", "/fix_pid_v2"
                 )
+            except AttributeError:
+                self._fix_pid_v2_url = None
         return self._fix_pid_v2_url
-
-    @property
-    def timeout(self):
-        if self._timeout is None:
-            try:
-                self._timeout = self.config.timeout
-            except AttributeError as e:
-                raise exceptions.APIPidProviderConfigError(e)
-        return self._timeout
-
-    @property
-    def pid_provider_api_post_xml(self):
-        if self._pid_provider_api_post_xml is None:
-            try:
-                self._pid_provider_api_post_xml = self.config.pid_provider_api_post_xml
-            except AttributeError as e:
-                raise exceptions.APIPidProviderConfigError(e)
-        return self._pid_provider_api_post_xml
-
-    @property
-    def pid_provider_api_get_token(self):
-        if self._pid_provider_api_get_token is None:
-            try:
-                self._pid_provider_api_get_token = (
-                    self.config.pid_provider_api_get_token
-                )
-            except AttributeError as e:
-                raise exceptions.APIPidProviderConfigError(e)
-        return self._pid_provider_api_get_token
-
-    @property
-    def api_username(self):
-        if self._api_username is None:
-            try:
-                self._api_username = self.config.api_username
-            except AttributeError as e:
-                raise exceptions.APIPidProviderConfigError(e)
-        return self._api_username
-
-    @property
-    def api_password(self):
-        if self._api_password is None:
-            try:
-                self._api_password = self.config.api_password
-            except AttributeError as e:
-                raise exceptions.APIPidProviderConfigError(e)
-        return self._api_password
 
     def provide_pid_and_handle_incorrect_pid_v2(self, xml_with_pre, registered):
         try:
