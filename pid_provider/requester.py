@@ -31,7 +31,6 @@ class PidRequester(BasePidProvider):
 
     def __init__(self):
         self.pid_provider_api = PidProviderAPIClient()
-        self.pid_provider_api.set_config()
 
     def request_pid_for_xml_zip(
         self,
