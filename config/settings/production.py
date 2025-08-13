@@ -152,7 +152,10 @@ LOGGING = {
         "verbose": {
             "format": "%(levelname)s %(asctime)s %(module)s "
             "%(process)d %(thread)d %(message)s"
-        }
+        },
+        "simple": {
+            "format": '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        },
     },
     "handlers": {
         "console": {
@@ -163,7 +166,7 @@ LOGGING = {
         "profiling_file": {
             "level": "DEBUG",
             "class": "logging.handlers.TimedRotatingFileHandler",
-            "filename": ROOT_DIR / "logs" / "profiling-prod.log",
+            "filename": APPS_DIR / "media" / "profiling-prod.log",
             "when": "midnight",
             "interval": 1,
             "backupCount": 30,  # Mantém 30 dias
