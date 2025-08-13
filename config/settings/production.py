@@ -160,16 +160,21 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
-        "profiling": {
-            "level": "WARNING",
-            "class": "logging.FileHandler",
-            "filename": "profiling.log",
+        "profiling_file": {
+            "level": "DEBUG",
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": ROOT_DIR / "logs" / "profiling-prod.log",
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 30,  # Mantém 30 dias
+            "formatter": "simple",
+            "encoding": "utf-8",
         },
     },
     "loggers": {
-        "profiling": {
-            "handlers": ["profiling"],
-            "level": "WARNING",
+        "profiling": {  # <-- Logger usado pelo decorador
+            "handlers": ["profiling_file"],
+            "level": "DEBUG",
             "propagate": False,
         },
     },
