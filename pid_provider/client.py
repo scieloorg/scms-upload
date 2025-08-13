@@ -37,98 +37,46 @@ class PidProviderAPIClient:
         api_username=None,
         api_password=None,
     ):
-        self._timeout = timeout or 120
-        self._pid_provider_api_post_xml = pid_provider_api_post_xml
-        self._pid_provider_api_get_token = pid_provider_api_get_token
-        self._api_username = api_username
-        self._api_password = api_password
         self.token = None
+        self.pid_provider_api_post_xml = pid_provider_api_post_xml
+        self.pid_provider_api_get_token = pid_provider_api_get_token
+        self.api_username = api_username
+        self.api_password = api_password
+        self.timeout = timeout or 120
 
     @property
     def enabled(self):
         try:
-            return bool(self.config.api_username and self.config.api_password)
+            self.set_config()
+            return bool(self.api_username and self.api_password)
         except (AttributeError, ValueError, TypeError):
             return False
 
-    def reset(self):
-        self._pid_provider_api_post_xml = None
-        self._pid_provider_api_get_token = None
-        self._api_username = None
-        self._api_password = None
-        self.token = None
-        self._config = PidProviderConfig.get_or_create()
-
-    @property
-    def config(self):
-        if not hasattr(self, "_config") or not self._config:
-            try:
-                self._config = PidProviderConfig.get_or_create()
-            except Exception as e:
-                logging.exception(f"PidProviderConfig.get_or_create {e}")
-                self._config = None
-        return self._config
+    def set_config(self):
+        try:
+            config = PidProviderConfig.get_or_create()
+            self.pid_provider_api_post_xml = config.pid_provider_api_post_xml
+            self.pid_provider_api_get_token = config.pid_provider_api_get_token
+            self.api_username = config.api_username
+            self.api_password = config.api_password
+            self.timeout = config.timeout or 120
+        except PidProviderConfig.DoesNotExist:
+            self.pid_provider_api_post_xml = None
+            self.pid_provider_api_get_token = None
+            self.api_username = None
+            self.api_password = None
+            self.timeout = 120
 
     @property
     def fix_pid_v2_url(self):
         if not hasattr(self, "_fix_pid_v2_url") or not self._fix_pid_v2_url:
             try:
-                self._fix_pid_v2_url = None
-                endpoint = self.config.endpoint.filter(name="fix-pid-v2")[0]
-                if endpoint.enabled:
-                    self._fix_pid_v2_url = endpoint.url
-            except IndexError:
                 self._fix_pid_v2_url = self.pid_provider_api_post_xml.replace(
                     "/pid_provider", "/fix_pid_v2"
                 )
+            except AttributeError:
+                self._fix_pid_v2_url = None
         return self._fix_pid_v2_url
-
-    @property
-    def timeout(self):
-        if self._timeout is None:
-            try:
-                self._timeout = self.config.timeout
-            except AttributeError as e:
-                raise exceptions.APIPidProviderConfigError(e)
-        return self._timeout
-
-    @property
-    def pid_provider_api_post_xml(self):
-        if self._pid_provider_api_post_xml is None:
-            try:
-                self._pid_provider_api_post_xml = self.config.pid_provider_api_post_xml
-            except AttributeError as e:
-                raise exceptions.APIPidProviderConfigError(e)
-        return self._pid_provider_api_post_xml
-
-    @property
-    def pid_provider_api_get_token(self):
-        if self._pid_provider_api_get_token is None:
-            try:
-                self._pid_provider_api_get_token = (
-                    self.config.pid_provider_api_get_token
-                )
-            except AttributeError as e:
-                raise exceptions.APIPidProviderConfigError(e)
-        return self._pid_provider_api_get_token
-
-    @property
-    def api_username(self):
-        if self._api_username is None:
-            try:
-                self._api_username = self.config.api_username
-            except AttributeError as e:
-                raise exceptions.APIPidProviderConfigError(e)
-        return self._api_username
-
-    @property
-    def api_password(self):
-        if self._api_password is None:
-            try:
-                self._api_password = self.config.api_password
-            except AttributeError as e:
-                raise exceptions.APIPidProviderConfigError(e)
-        return self._api_password
 
     def provide_pid_and_handle_incorrect_pid_v2(self, xml_with_pre, registered):
         try:
@@ -161,23 +109,15 @@ class PidProviderAPIClient:
             nome do arquivo xml
         """
         try:
-
             self.token = self.token or self._get_token(
                 username=self.api_username,
                 password=self.api_password,
                 timeout=self.timeout,
             )
             response = self._prepare_and_post_xml(xml_with_pre, name, self.token)
-            self._process_post_xml_response(response, xml_with_pre, created)
-            try:
-                return response[0]
-            except IndexError:
-                return {}
-        except (
-            exceptions.GetAPITokenError,
-            exceptions.APIPidProviderPostError,
-            exceptions.APIPidProviderConfigError,
-        ) as e:
+            self._process_post_xml_response(response[0], xml_with_pre, created)
+            return response[0]
+        except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             return {
                 "error_msg": str(e),
@@ -193,6 +133,7 @@ class PidProviderAPIClient:
             --data 'username=x&password=x'
         """
         try:
+            resp = None
             resp = post_data(
                 self.pid_provider_api_get_token,
                 data={"username": username, "password": password},
@@ -202,28 +143,13 @@ class PidProviderAPIClient:
             )
             return resp["access"]
         except Exception as e:
-            previous_data = (self.pid_provider_api_get_token, username, password)
-            self.reset()
-            current_data = (
-                self.pid_provider_api_get_token,
-                self.api_username,
-                self.api_password,
-            )
-            if current_data != previous_data:
-                return self._get_token(
-                    username=self.api_username,
-                    password=self.api_password,
-                    timeout=self.timeout,
-                )
-
-            # TODO tratar as exceções
-            logging.exception(e)
             raise exceptions.GetAPITokenError(
-                _("Unable to get api token {} {} {} {}").format(
+                _("Unable to get api token {} {} {} {} {}").format(
                     self.pid_provider_api_get_token,
                     self.api_username,
                     type(e),
                     e,
+                    resp,
                 )
             )
 
@@ -239,19 +165,20 @@ class PidProviderAPIClient:
             create_xml_zip_file(
                 zip_xml_file_path, xml_with_pre.tostring(pretty_print=True)
             )
-            try:
-                response = self._post_xml(zip_xml_file_path, self.token, self.timeout)
-                if isinstance(response, list):
-                    return response
-            except Exception as e:
-                logging.exception(e)
+            response = self._post_xml(zip_xml_file_path, self.token, self.timeout)
+            if isinstance(response, list):
+                return response
 
-            self.token = self._get_token(
-                username=self.api_username,
-                password=self.api_password,
-                timeout=self.timeout,
-            )
-            return self._post_xml(zip_xml_file_path, self.token, self.timeout)
+            try:
+                if response["code"] == "token_not_valid":
+                    self.token = self._get_token(
+                        username=self.api_username,
+                        password=self.api_password,
+                        timeout=self.timeout,
+                    )
+                    return self._post_xml(zip_xml_file_path, self.token, self.timeout)
+            except TypeError:
+                return None
 
     def _post_xml(self, zip_xml_file_path, token, timeout):
         """
@@ -264,31 +191,19 @@ class PidProviderAPIClient:
         try:
             basename = os.path.basename(zip_xml_file_path)
 
-            files = {
-                "file": (
-                    basename,
-                    open(zip_xml_file_path, "rb"),
-                    "application/zip",
-                )
-            }
-            header = {
-                "Authorization": "Bearer " + token,
-                "content-type": "multi-part/form-data",
-                "Content-Disposition": "attachment; filename=%s" % basename,
-            }
-            return post_data(
-                self.pid_provider_api_post_xml,
-                files=files,
-                headers=header,
-                timeout=timeout,
-                verify=False,
-                json=True,
-            )
-        except Exception as e:
-            previous_data = self.pid_provider_api_post_xml
-            self.reset()
-            current_data = self.pid_provider_api_post_xml
-            if current_data != previous_data:
+            with open(zip_xml_file_path, "rb") as fp:
+                files = {
+                    "file": (
+                        basename,
+                        fp,
+                        "application/zip",
+                    )
+                }
+                header = {
+                    "Authorization": "Bearer " + token,
+                    "content-type": "multi-part/form-data",
+                    "Content-Disposition": "attachment; filename=%s" % basename,
+                }
                 return post_data(
                     self.pid_provider_api_post_xml,
                     files=files,
@@ -297,6 +212,7 @@ class PidProviderAPIClient:
                     verify=False,
                     json=True,
                 )
+        except Exception as e:
             raise exceptions.APIPidProviderPostError(
                 _("Unable to get pid from pid provider {} {} {} {}").format(
                     self.pid_provider_api_post_xml,
@@ -309,14 +225,13 @@ class PidProviderAPIClient:
     def _process_post_xml_response(self, response, xml_with_pre, created=None):
         if not response:
             return
-        for item in response:
-            try:
-                self.is_pid_v2_correct_registered_in_core(
-                    xml_with_pre, item.get("xml_changed")
-                )
-                self._process_item_response(item, xml_with_pre, created)
-            except AttributeError:
-                raise ValueError(f"Unexpected pid provider response: {response}")
+        try:
+            self.is_pid_v2_correct_registered_in_core(
+                xml_with_pre, response.get("xml_changed")
+            )
+            self._process_item_response(response, xml_with_pre, created)
+        except AttributeError:
+            raise ValueError(f"Unexpected pid provider response: {response}")
 
     def is_pid_v2_correct_registered_in_core(self, xml_with_pre, xml_changed):
         if xml_changed:
