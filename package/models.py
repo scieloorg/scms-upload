@@ -36,6 +36,7 @@ from package import choices
 from pid_provider.requester import PidRequester
 from tracker.models import UnexpectedEvent
 
+
 pid_provider_app = PidRequester()
 
 
@@ -579,12 +580,30 @@ class SPSPkg(CommonControlField, ClusterableModel):
         Solicita PID versão 3
 
         """
+        xml = None
+        with TemporaryDirectory() as targetdir:
+            xml_zip_path = os.path.join(targetdir, os.path.basename(zip_xml_file_path))
+            with ZipFile(zip_xml_file_path) as zipf_source:
+                for item in zipf_source.namelist():
+                    if item.endswith(".xml"):
+                        xml = item
+                        with ZipFile(xml_zip_path, "w", compression=ZIP_DEFLATED) as zipf_destination:
+                            zipf_destination.writestr(item, zipf_source.read(item))
+                        break
+            if xml:
+                return cls._add_pid_v3_to_zip(user, zip_xml_file_path, is_public, article_proc, xml_zip_path)
+
+    @classmethod
+    def _add_pid_v3_to_zip(cls, user, zip_xml_file_path, is_public, article_proc, xml_zip_path):
+        """
+        Solicita PID versão 3
+
+        """
         try:
             response = None
             operation = None
-
             for response in pid_provider_app.request_pid_for_xml_zip(
-                zip_xml_file_path,
+                xml_zip_path,
                 user,
                 is_published=is_public,
                 article_proc=article_proc,
