@@ -18,7 +18,7 @@ from packtools.sps.models.article_authors import Authors
 from packtools.sps.models.article_renditions import ArticleRenditions
 from packtools.sps.models.article_titles import ArticleTitles
 from packtools.sps.models.journal_meta import ISSN
-from packtools.sps.models.package import PackageName
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from .file_utils import (
     create_file_for_xml_etree,
@@ -45,6 +45,8 @@ CSS_ARTICLE = "/static/css/article-styles.css"
 
 def generate_xml_canonical(xml_uri):
     # Obtém conteúdo do XML
+    for xml_with_pre in XMLWithPre.create(uri=xml_uri):
+        pass
     xml_content = get_xml_content_from_uri(xml_uri)
     xml_etree = get_etree_from_xml_content(xml_content)
     aa = ArticleAssets(xml_etree)
@@ -53,7 +55,7 @@ def generate_xml_canonical(xml_uri):
     assets_uris_and_names = []
 
     # Obtém nome do pacote
-    package_name = PackageName(xml_etree).name
+    package_name = xml_with_pre.sps_pkg_name
 
     # Gera dicionário de substituição de nomes de assets e lista de uris e nomes novos
     for i in aa.article_assets:
@@ -85,10 +87,6 @@ def get_renditions_uris_and_names(doc):
             }
         )
     return renditions_uris_and_names
-
-
-def get_package_name(xmltree):
-    return PackageName(xmltree).name
 
 
 def create_package_file_from_site_doc(doc):
