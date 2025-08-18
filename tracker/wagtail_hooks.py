@@ -9,7 +9,7 @@ from wagtail_modeladmin.views import CreateView
 
 from config.menu import get_menu_order
 
-from .models import UnexpectedEvent
+from .models import UnexpectedEvent, TaskTracker
 
 
 class UnexpectedEventModelAdmin(ModelAdmin):
@@ -47,13 +47,35 @@ class UnexpectedEventModelAdmin(ModelAdmin):
     )
 
 
-class UnexpectedEventModelAdminGroup(ModelAdminGroup):
+class TaskTrackerModelAdmin(ModelAdmin):
+    model = TaskTracker
+    inspect_view_enabled = True
+    menu_label = _("Event tracker")
     menu_icon = "folder"
-    menu_label = _("Unexpected errors")
+    menu_order = 200
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+    list_per_page = 10
+
+    list_display = (
+        "name",
+        "status",
+        "created",
+        "updated",
+    )
+    list_filter = ("status", "name", )
+    search_fields = (
+        "name",
+    )
+
+
+class TrackerModelAdminGroup(ModelAdminGroup):
+    menu_icon = "folder"
+    menu_label = _("Event Monitoring")
     # menu_order = get_menu_order("journal")
     menu_order = 200
-    items = (UnexpectedEventModelAdmin,)
+    items = (TaskTrackerModelAdmin, UnexpectedEventModelAdmin, )
     menu_order = get_menu_order("unexpected-error")
 
 
-modeladmin_register(UnexpectedEventModelAdminGroup)
+modeladmin_register(TrackerModelAdminGroup)

@@ -69,3 +69,4 @@ CELERY_TASK_EAGER_PROPAGATES = True
 
 JOURNAL_API_URL = f"http://{ALLOWED_HOSTS[-1]}:8009/api/v1/journal"
 ISSUE_API_URL = f"http://{ALLOWED_HOSTS[-1]}:8009/api/v1/issue"
+

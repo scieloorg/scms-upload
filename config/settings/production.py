@@ -20,7 +20,8 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost:8000"])
 # ------------------------------------------------------------------------------
 DATABASES["default"] = env.db("DATABASE_URL")  # noqa F405
 DATABASES["default"]["ATOMIC_REQUESTS"] = True  # noqa F405
-DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)  # noqa F405
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=0) or env.int("DJANGO_CONN_MAX_AGE", default=60)  # noqa F405
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = env.bool('DJANGO_CONN_HEALTH_CHECKS', True)
 
 # CACHES
 # ------------------------------------------------------------------------------
@@ -152,14 +153,34 @@ LOGGING = {
         "verbose": {
             "format": "%(levelname)s %(asctime)s %(module)s "
             "%(process)d %(thread)d %(message)s"
-        }
+        },
+        "simple": {
+            "format": '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        },
     },
     "handlers": {
         "console": {
             "level": "DEBUG",
             "class": "logging.StreamHandler",
             "formatter": "verbose",
-        }
+        },
+        "profiling_file": {
+            "level": "DEBUG",
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": APPS_DIR / "media" / "profiling-prod.log",
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 30,  # Mantém 30 dias
+            "formatter": "simple",
+            "encoding": "utf-8",
+        },
+    },
+    "loggers": {
+        "profiling": {  # <-- Logger usado pelo decorador
+            "handlers": ["profiling_file"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
     },
     "root": {"level": "INFO", "handlers": ["console"]},
 }
