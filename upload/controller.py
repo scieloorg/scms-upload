@@ -5,7 +5,7 @@ import traceback
 
 from django.db.models import Q
 from django.utils.translation import gettext as _
-from packtools.sps.models.article_dates import ArticleDates
+from packtools.sps.models.dates import ArticleDates
 from packtools.sps.models.front_articlemeta_issue import ArticleMetaIssue
 from packtools.sps.models.journal_meta import ISSN, Title
 from packtools.sps.pid_provider.xml_sps_lib import GetXMLItemsError, XMLWithPre
