@@ -181,8 +181,11 @@ class PidRequester(BasePidProvider):
                 raise CorePidProviderUnabledException(
                     "Core pid provider is not enabled. Complete core pid provider configuration to enable it")
 
+            logging.info(f"Remote registration: xml_with_pre {xml_with_pre.data}")
+            logging.info(f"Remote registration: registered {registered}")
             response = self.pid_provider_api.provide_pid_and_handle_incorrect_pid_v2(
                 xml_with_pre, registered)
+            logging.info(f"Remote registration: response {response}")
 
             if response.get("error_type"):
                 op.finish(user, completed=False, detail=response)
