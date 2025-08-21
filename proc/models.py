@@ -1199,33 +1199,38 @@ class IssueProc(BaseProc, ClusterableModel):
     def get_files_from_classic_website(
         self, user, force_update, f_get_files_from_classic_website
     ):
+        failures = []
+        migrated = []
         try:
             operation = self.start(user, "get_files_from_classic_website")
 
             self.files_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
-            result = None
-            result = f_get_files_from_classic_website(user, self, force_update)
-
-            migrated = result.pop("migrated") or []
-
-            result["migrated"] = []
-            for item in migrated:
-                self.issue_files.add(item)
-                result["migrated"].append({"file": item.original_path})
+            for item in f_get_files_from_classic_website(user, self, force_update):
+                try:
+                    migrated.append(item.original_name)
+                    self.issue_files.add(item)
+                except AttributeError:
+                    try:
+                        if item.get("error"):
+                            failures.append(item)
+                            continue
+                    except AttributeError:
+                        continue
 
             self.files_status = (
                 tracker_choices.PROGRESS_STATUS_PENDING
-                if result["failures"]
+                if failures
                 else tracker_choices.PROGRESS_STATUS_DONE
             )
             self.save()
+
             operation.finish(
                 user,
                 completed=(self.files_status == tracker_choices.PROGRESS_STATUS_DONE),
                 message="Files",
-                detail=result,
+                detail={"failures": len(failures), "migrated": migrated},
             )
 
         except Exception as e:
@@ -1236,8 +1241,26 @@ class IssueProc(BaseProc, ClusterableModel):
                 user,
                 exc_traceback=exc_traceback,
                 exception=e,
-                detail=result,
+                detail={"migrated": len(migrated), "failures": len(failures)},
             )
+
+        if failures:
+            try:
+                operation = self.start(user, "get_files_from_classic_website - failures")
+                operation.finish(
+                    user,
+                    completed=False,
+                    message="Files",
+                    detail=failures,
+                )
+            except Exception as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                operation.finish(
+                    user,
+                    completed=False,
+                    message="Files",
+                    detail={"failures": len(failures)},
+                )
 
     @classmethod
     def docs_to_migrate(cls, collection, journal_acron, publication_year, force_update):
