@@ -163,11 +163,7 @@ class PackageZip(CommonControlField):
                 yield {
                     "xml_name": key,
                     "package": Package.create_or_update(
-                        user,
-                        key,
-                        self,
-                        key + ".zip",
-                        item["content"]
+                        user, key, self, key + ".zip", item["content"]
                     ),
                 }
 
@@ -250,6 +246,7 @@ class Package(CommonControlField, ClusterableModel):
     assignee = models.ForeignKey(User, blank=True, null=True, on_delete=models.SET_NULL)
     expiration_date = models.DateField(_("Expiration date"), null=True, blank=True)
     numbers = models.JSONField(null=True, default=dict)
+    blocking_errors = models.PositiveSmallIntegerField(default=0)
     critical_errors = models.PositiveSmallIntegerField(default=0)
     xml_errors_percentage = models.DecimalField(
         verbose_name=_("Error percentual"),
@@ -373,6 +370,7 @@ class Package(CommonControlField, ClusterableModel):
             models.Index(
                 fields=["main_doi"],
             ),
+            models.Index(fields=["blocking_errors"]),
         ]
 
     @staticmethod
@@ -527,9 +525,7 @@ class Package(CommonControlField, ClusterableModel):
             return False
         return True
 
-    def finish_reception(
-        self, task_publish_article=None, blocking_error_status=None
-    ):
+    def finish_reception(self, task_publish_article=None, blocking_error_status=None):
         """
         1. Verifica se as validações que executaram em paralelo, finalizaram
         2. Calcula os números de problemas do pacote
@@ -550,10 +546,13 @@ class Package(CommonControlField, ClusterableModel):
 
     def process_system_decision(self, task_publish_article):
         is_ready_to_preview = False
-        
-        if self.status in (choices.PS_READY_TO_PREVIEW, choices.PS_VALIDATED_WITH_ERRORS):
+
+        if self.status in (
+            choices.PS_READY_TO_PREVIEW,
+            choices.PS_VALIDATED_WITH_ERRORS,
+        ):
             is_ready_to_preview = True
-  
+
         if task_publish_article and is_ready_to_preview:
             try:
                 user = self.updated_by or self.creator
@@ -566,10 +565,15 @@ class Package(CommonControlField, ClusterableModel):
                 is_ready_to_publish = self.is_ready_to_publish
                 detail = {"is_ready_to_publish": is_ready_to_publish}
 
-                response = self.prepare_to_publish(user, qa=is_ready_to_preview, public=is_ready_to_publish)
+                response = self.prepare_to_publish(
+                    user, qa=is_ready_to_preview, public=is_ready_to_publish
+                )
                 detail.update(response or {})
-
                 event.finish(user, completed=True, detail=detail)
+
+                self.update_status_and_add_comments(
+                    user, response.get("result"), response.get("new_status")
+                )
 
                 self.run_task_publish_article(
                     user,
@@ -591,7 +595,10 @@ class Package(CommonControlField, ClusterableModel):
 
     @property
     def is_ready_to_publish(self):
-        if self.linked and self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists():
+        if (
+            self.linked
+            and self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists()
+        ):
             return False
         if self.qa_decision == choices.PS_READY_TO_PUBLISH:
             return True
@@ -611,11 +618,21 @@ class Package(CommonControlField, ClusterableModel):
             + xml_numbers["total"]
             + pkg_numbers["total"]
         )
-        self.critical_errors = pkg_numbers["total_critical"] + xml_numbers["total_critical"]
-        self.xml_errors_percentage = calculate_percentage(xml_numbers["total_error"], total_validations)
-        self.xml_warnings_percentage = calculate_percentage(xml_numbers["total_warning"], total_validations)
-        self.contested_xml_errors_percentage = calculate_percentage(xml_numbers["total_not-to-fix"], xml_numbers["total"])
-        self.declared_impossible_to_fix_percentage = calculate_percentage(xml_numbers["total_unable-to-fix"], xml_numbers["total"])
+        self.critical_errors = (
+            pkg_numbers["total_critical"] + xml_numbers["total_critical"]
+        )
+        self.xml_errors_percentage = calculate_percentage(
+            xml_numbers["total_error"], total_validations
+        )
+        self.xml_warnings_percentage = calculate_percentage(
+            xml_numbers["total_warning"], total_validations
+        )
+        self.contested_xml_errors_percentage = calculate_percentage(
+            xml_numbers["total_not-to-fix"], xml_numbers["total"]
+        )
+        self.declared_impossible_to_fix_percentage = calculate_percentage(
+            xml_numbers["total_unable-to-fix"], xml_numbers["total"]
+        )
         self.numbers = {
             "total_blocking": pkg_numbers["total_blocking"],
             "total_validations": total_validations,
@@ -625,18 +642,18 @@ class Package(CommonControlField, ClusterableModel):
             "total_xml_issues": xml_numbers["total"],
             "total_pkg_issues": pkg_numbers["total"],
         }
+        self.blocking_errors = pkg_numbers["total_blocking"]
         self.save()
 
     @property
     def upload_validator(self):
-        if not hasattr(self, '_upload_validator') or not self._upload_validor:
+        if not hasattr(self, "_upload_validator") or not self._upload_validor:
             self._upload_validor = UploadValidator.get()
         return self._upload_validor
 
     def evaluate_validation_numbers(self, blocking_error_status):
         self.status = self.upload_validator.get_pos_validation_status(
-            self,
-            blocking_error_status=blocking_error_status
+            self, blocking_error_status=blocking_error_status
         )
         self.save()
 
@@ -790,31 +807,42 @@ class Package(CommonControlField, ClusterableModel):
 
         return {"content": content, "filename": filename, "columns": fieldnames}
 
-    def process_qa_decision(self, user, task_publish_article=None, force_journal_publication=None, force_issue_publication=None):
+    def process_qa_decision(
+        self,
+        user,
+        task_publish_article=None,
+        force_journal_publication=None,
+        force_issue_publication=None,
+    ):
         # (PS_DEPUBLISHED, _("Depublish")),
         # (PS_PENDING_CORRECTION, _("Request correction")),
         # (PS_PENDING_QA_DECISION, _("Delegate quality review to other analyst")),
         # (PS_READY_TO_PREVIEW, _("Publish on QA website")),
         # (PS_READY_TO_PUBLISH, _("Publish on public website")),
 
+        qa_decision = self.qa_decision
         try:
             operation = self.start(user, "process_qa_decision")
             detail = {
                 "decision": self.qa_decision,
             }
             logging.info(f"process_qa_decision: {self.qa_decision}")
-            result = {}
-            new_status = None
-            
+
+            if not self.blocking_errors and self.numbers and self.numbers.get("blocking_errors"):
+                # corrige valor de self.blocking_errors para pacotes anteriores a criação do campo
+                self.blocking_errors = self.numbers.get("blocking_errors")
+                self.save()
+
             if self.qa_decision in (
-                choices.PS_PENDING_QA_DECISION, choices.PS_PENDING_CORRECTION
+                choices.PS_PENDING_QA_DECISION,
+                choices.PS_PENDING_CORRECTION,
             ):
-                new_status = self.qa_decision
-                self.register_qa_decision(user, result, new_status)
+                self.update_status_and_add_comments(user, {}, self.qa_decision)
                 operation.finish(user, completed=True, detail=detail)
 
             elif self.qa_decision in (
-                choices.PS_READY_TO_PREVIEW, choices.PS_READY_TO_PUBLISH,
+                choices.PS_READY_TO_PREVIEW,
+                choices.PS_READY_TO_PUBLISH,
             ):
                 qa = self.qa_decision == choices.PS_READY_TO_PREVIEW
                 public = self.is_ready_to_publish
@@ -822,10 +850,11 @@ class Package(CommonControlField, ClusterableModel):
                 # é desejável que qa e public sejam publicados simultaneamente
                 # exceto se há impedimento de em tornar público
                 response = self.prepare_to_publish(user, qa, public)
-            
+                self.update_status_and_add_comments(
+                    user, result.get("result"), result.get("new_status")
+                )
+
                 detail.update(response or {})
-                new_status = response.get("new_status")
-                self.register_qa_decision(user, response.get("result"), new_status)
                 operation.finish(user, completed=True, detail=detail)
 
                 self.run_task_publish_article(
@@ -851,50 +880,76 @@ class Package(CommonControlField, ClusterableModel):
                 exc_traceback=exc_traceback,
                 detail=detail,
             )
+        if qa_decision == self.qa_decision:
+            return True
+        return False
 
-    def analyze_sps_package(self):
+    def analyze_sps_package(self, qa, public, xml_changed):
         result = {"blocking_errors": [], "errors": [], "warnings": []}
 
         if not self.article:
-            result["blocking_errors"].append(
-                _("Article was not created")
-            )
+            result["blocking_errors"].append(_("Article was not created"))
         if self.sps_pkg:
             if not self.sps_pkg.valid_components:
                 for component in self.sps_pkg.components.filter(uri=None):
-                    result["errors"].append(_("{} is not published on MinIO").format(component.basename))
+                    result["errors"].append(
+                        _("{} is not published on MinIO").format(component.basename)
+                    )
             if not self.sps_pkg.valid_texts:
-                result["warnings"].append(_("Total of XML, PDF, HTML do not match {}").format(self.sps_pkg.texts))
+                result["warnings"].append(
+                    _("Total of XML, PDF, HTML do not match {}").format(
+                        self.sps_pkg.texts
+                    )
+                )
         else:
-            result["blocking_errors"].append(
-                _("SPS Package was not created")
-            )
-           
-        return result
+            result["blocking_errors"].append(_("SPS Package was not created"))
 
-    def register_qa_decision(self, user, result, new_status=None):
+        if result.get("blocking_errors"):
+            return {
+                "websites": [],
+                "result": result,
+                "new_status": choices.PS_PENDING_CORRECTION,
+            }
+
+        new_status = None
+        websites = []
+        if qa or xml_changed:
+            websites.append("QA")
+            new_status = choices.PS_READY_TO_PREVIEW
+        if public:
+            if self.sps_pkg.registered_in_core:
+                websites.append("PUBLIC")
+                new_status = choices.PS_READY_TO_PUBLISH
+            else:
+                # blocking_errors somente para public
+                result["blocking_errors"].append(
+                    _("SPS package requires PID provider registration")
+                )
+        return {
+            "websites": websites,
+            "result": result,
+            "new_status": new_status,
+        }
+
+    def update_status_and_add_comments(self, user, result, new_status=None):
+        save = False
         comments = []
         if result:
-            if self.qa_comment:
-                comments = [self.qa_comment]
             for k in ("blocking_errors", "errors", "warnings"):
                 comments.extend(result.get(k) or [])
-            if result.get("request_correction"):
-                self.qa_decision = choices.PS_PENDING_CORRECTION
-                self.assignee = self.creator
 
-        if new_status:
+        if new_status and new_status != self.status:
             self.status = new_status
-            self.qa_decision = new_status
+            save = True
 
-        text = "\n".join(set(str(item) for item in comments if item))
-        new_comments = self.qa_comment != text
-        if new_status or new_comments or result.get("request_correction"):
-            if new_comments:
-                self.qa_comment = text
+        if comments:
+            self.qa_comment += "\n".join(comments)
+            save = True
+
+        if save:
             self.save()
 
-        if new_comments:
+        if comments:
             self.register_qa_comment_as_error(user)
 
     def xml_file_changed_pub_date(self, xml_with_pre):
@@ -934,7 +989,7 @@ class Package(CommonControlField, ClusterableModel):
         number não necessariamente tem que ser o order ou fpage
         no entanto, para tentar ser mais próximo ao legado,
         tenta usar order ou fpage
-        """        
+        """
         issue_pid = IssueProc.get_issue_pid(self.issue, self.journal)
         try:
             number = str(int(self.order))
@@ -1043,19 +1098,18 @@ class Package(CommonControlField, ClusterableModel):
             }
             response = {}
             response.update(detail)
-            operation = self.start(
-                user, f"Package.publish on {website_kind}"
-            )
+            operation = self.start(user, f"Package.publish on {website_kind}")
             if api_data.get("error"):
                 response = api_data
             else:
                 response = callable_publish(
-                    self, api_data,
+                    self,
+                    api_data,
                     bundle_id=bundle_id,
                     is_public=True,
                 )
             completed = bool(response.get("result") == "OK")
-            self.update_publication_stage(website_kind, completed)            
+            self.update_publication_stage(website_kind, completed)
             response.update(detail)
             operation.finish(user, completed=completed, detail=response)
             response["completed"] = completed
@@ -1063,7 +1117,13 @@ class Package(CommonControlField, ClusterableModel):
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             if operation:
-                operation.finish(user, completed=False, exception=e, exc_traceback=exc_traceback, detail=response)
+                operation.finish(
+                    user,
+                    completed=False,
+                    exception=e,
+                    exc_traceback=exc_traceback,
+                    detail=response,
+                )
             return {"error_type": str(type(e)), "error_message": str(e)}
 
     # def update_status(self):
@@ -1144,37 +1204,25 @@ class Package(CommonControlField, ClusterableModel):
             event = None
             event = self.start(user, "prepare to publish")
 
-            new_status = None
-            websites = []
             xml_with_pre = self.xml_with_pre
 
             xml_changed = self.check_xml_changed(user, xml_with_pre, public)
             self.prepare_sps_package(user, xml_with_pre, xml_changed)
-            result = self.analyze_sps_package()
+            result = self.analyze_sps_package(qa, public, xml_changed)
 
-            if not result.get("blocking_errors"):
-                if qa or xml_changed:
-                    websites.append("QA")
-                    new_status = choices.PS_READY_TO_PREVIEW
-                if public:
-                    if self.sps_pkg.registered_in_core:
-                        websites.append("PUBLIC")
-                        new_status = choices.PS_READY_TO_PUBLISH
-                    else:
-                        # blocking_errors somente para public
-                        result["blocking_errors"].append(
-                            _("SPS package requires PID provider registration")
-                        )
-
-            detail.update(
-                {"websites": websites, "result": result, "new_status": new_status}
-            )
+            detail.update(result)
             event.finish(user, completed=True, detail=detail)
             return detail
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             if event:
-                event.finish(user, completed=False, exception=e, exc_traceback=exc_traceback, detail=detail)
+                event.finish(
+                    user,
+                    completed=False,
+                    exception=e,
+                    exc_traceback=exc_traceback,
+                    detail=detail,
+                )
 
     def check_xml_changed(self, user, xml_with_pre, public):
         try:
@@ -1192,20 +1240,45 @@ class Package(CommonControlField, ClusterableModel):
                 # quando o upload há falha de conexão com pid provider central,
                 # o pid provider local sempre cria um pid v3
                 # para não impedir a publicação em QA
-                if xml_with_pre.v3 and self.sps_pkg and not self.sps_pkg.registered_in_core:
+                if (
+                    xml_with_pre.v3
+                    and self.sps_pkg
+                    and not self.sps_pkg.registered_in_core
+                ):
                     xml_changed = True
-                    sub_events.append(f"xml pid v3: {xml_with_pre.v3}, core registration required")
+                    sub_events.append(
+                        f"xml pid v3: {xml_with_pre.v3}, core registration required"
+                    )
                 if self.xml_file_changed_pub_date(xml_with_pre):
                     xml_changed = True
-                    sub_events.append(f"xml pub-date changed: {xml_with_pre.article_publication_date}")
+                    sub_events.append(
+                        f"xml pub-date changed: {xml_with_pre.article_publication_date}"
+                    )
             event.finish(user, completed=True, detail=sub_events)
             return xml_changed
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             if event:
-                event.finish(user, completed=False, exception=e, exc_traceback=exc_traceback, detail=sub_events)
+                event.finish(
+                    user,
+                    completed=False,
+                    exception=e,
+                    exc_traceback=exc_traceback,
+                    detail=sub_events,
+                )
 
-    def run_task_publish_article(self, user, task_publish_article, websites, publication_rule, force_journal_publication, force_issue_publication):
+    def run_task_publish_article(
+        self,
+        user,
+        task_publish_article,
+        websites,
+        publication_rule,
+        force_journal_publication,
+        force_issue_publication,
+    ):
+        if not websites:
+            return
+
         task_publish_article.apply_async(
             kwargs=dict(
                 user_id=user.id,
@@ -1218,7 +1291,7 @@ class Package(CommonControlField, ClusterableModel):
                 force_issue_publication=force_issue_publication,
             )
         )
-        if"PUBLIC" in websites:
+        if "PUBLIC" in websites:
             for item in self.linked.all():
                 task_publish_article.apply_async(
                     kwargs=dict(
@@ -1238,6 +1311,7 @@ class QAPackage(Package):
     QA can approve or reject
 
     """
+
     panel_id = [
         AutocompletePanel("article", read_only=False),
     ]
@@ -1256,7 +1330,7 @@ class QAPackage(Package):
         FieldPanel("force_journal_publication"),
         FieldPanel("force_issue_publication"),
         FieldPanel("order"),
-        AutocompletePanel("linked"),        
+        AutocompletePanel("linked"),
     ]
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
@@ -1300,7 +1374,7 @@ class ReadyToPublishPackage(Package):
         FieldPanel("force_journal_publication"),
         FieldPanel("force_issue_publication"),
         FieldPanel("order"),
-        AutocompletePanel("linked"),        
+        AutocompletePanel("linked"),
     ]
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
@@ -1358,12 +1432,7 @@ class BaseValidationResult(CommonControlField):
         FieldPanel("data", read_only=True),
     ]
 
-    cols = (
-        "status",
-        "subject",
-        "message",
-        "data"
-    )
+    cols = ("status", "subject", "message", "data")
     # autocomplete_search_field = "subject"
 
     # def autocomplete_label(self):
@@ -1614,9 +1683,13 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
 
         total = 0
         items = _get_numbers()
-        items.update({"total_to-fix": 0, "total_not-to-fix": 0, "total_unable-to-fix": 0})
+        items.update(
+            {"total_to-fix": 0, "total_not-to-fix": 0, "total_unable-to-fix": 0}
+        )
         for item in (
-            cls.objects.filter(**params).values("status", "reaction").annotate(total=Count("id"))
+            cls.objects.filter(**params)
+            .values("status", "reaction")
+            .annotate(total=Count("id"))
         ):
             items["total_" + item["status"].lower()] += item["total"]
             items["total_" + item["reaction"]] += item["total"]
@@ -1625,6 +1698,7 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
         items["total"] = total
         logging.info(f"XMLError.get_numbers : {items}")
         return items
+
 
 class BaseValidationReport(CommonControlField):
     title = models.CharField(_("Title"), null=True, blank=True, max_length=128)
@@ -1958,7 +2032,7 @@ class UploadValidator(CommonControlField):
         FieldPanel("max_impossible_to_fix_percentage"),
         FieldPanel("decision_for_critical_errors"),
         FieldPanel("publication_rule"),
-        FieldPanel("validation_params")
+        FieldPanel("validation_params"),
     ]
     base_form_class = UploadValidatorForm
 
@@ -2029,7 +2103,9 @@ class UploadValidator(CommonControlField):
         )
         if package.is_error_review_finished:
             # avalia os números de erros, deduzindo os falsos positivos
-            if not self.check_impossible_to_fix_percentage(package.declared_impossible_to_fix_percentage):
+            if not self.check_impossible_to_fix_percentage(
+                package.declared_impossible_to_fix_percentage
+            ):
                 return False
             if not self.check_xml_errors_percentage(package.xml_errors_percentage):
                 return False
@@ -2060,7 +2136,9 @@ class UploadValidator(CommonControlField):
             # pacote sem erros identificados no XML, pode seguir
             return choices.PS_READY_TO_PREVIEW
 
-        logging.info(f"UploadValidator.get_pos_validation_status: {self.publication_rule}")
+        logging.info(
+            f"UploadValidator.get_pos_validation_status: {self.publication_rule}"
+        )
         # algum erro identificado
         if self.publication_rule == choices.STRICT_AUTO_PUBLICATION:
             # não importa o nível de criticidade, solicita correção
