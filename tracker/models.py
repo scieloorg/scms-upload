@@ -187,7 +187,6 @@ class TaskTracker(BaseEvent):
         exc_traceback=None,
         detail=None,
     ):
-        logging.info("finish()")
         detail = detail or {}
         if exception:
             logging.exception(exception)
@@ -199,9 +198,6 @@ class TaskTracker(BaseEvent):
             detail["message_type"] = message_type
         if message:
             detail["message"] = message
-
-        logging.info(detail)
-
         try:
             json.dumps(detail)
         except Exception as exc_detail:
@@ -214,6 +210,4 @@ class TaskTracker(BaseEvent):
         else:
             status = choices.TASK_TRACK_STATUS_INTERRUPTED
         self.status = status
-        logging.info(f"completed: {completed}")
-        logging.info(detail)        
         self.save()

@@ -454,61 +454,61 @@ class IssueFolderImporter:
         journal_acron = issue_proc.journal_proc.acron
 
         failures = []
-        migrated = []
-        files_and_exceptions = classic_website.get_issue_files_and_exceptions(
+        files_and_exceptions = classic_website.get_issue_folder_content(
             journal_acron,
             issue_proc.issue_folder,
         )
 
-        classic_issue_files = files_and_exceptions["files"]
-        exceptions = files_and_exceptions.get("exceptions") or []
-        # {"message": e.message, "type": str(type(e))}
-
         try:
-            for file in classic_issue_files:
+            # html antes das referencias
+            # html após das referencias
+            parts = {
+                "before": "1",
+                "after":  "2",
+            }
+            for file in files_and_exceptions:
                 # {"type": "pdf", "key": name, "path": path, "name": basename, "lang": lang}
                 # {"type": "xml", "key": name, "path": path, "name": basename, }
                 # {"type": "html", "key": name, "path": path, "name": basename, "lang": lang, "part": label}
                 # {"type": "asset", "path": item, "name": os.path.basename(item)}
                 try:
+                    if not file:
+                        continue
+                    if file.get("error"):
+                        yield file
+                        continue
+
                     component_type = IssueFolderImporter.check_component_type(file)
-
                     part = file.get("part")
-                    if part == "before":
-                        # html antes das referencias
-                        part = "1"
-                    elif part == "after":
-                        # html após das referencias
-                        part = "2"
-
-                    migrated_file = MigratedFile.create_or_update(
+                    
+                    yield MigratedFile.create_or_update(
                         user=self.user,
                         collection=collection,
-                        original_path=IssueFolderImporter._get_classic_website_rel_path(
-                            file["path"]
-                        ),
+                        original_path=file["relative_path"],
                         source_path=file["path"],
                         component_type=component_type,
                         lang=file.get("lang"),
-                        part=part,
+                        part=part and parts.get(part),
                         pkg_name=file.get("key"),
                         force_update=self.force_update,
+                        content=file.get("content"),
+                        file_datetime_iso=file.get("modified_date"),
+                        basename=file.get("name"),
                     )
-                    migrated.append(migrated_file)
+                    
                 except Exception as e:
-                    failures.append(
-                        {"file": file, "message": str(e), "type": str(type(e))}
+                    yield (
+                        {"error": str(e), "type": str(type(e)), "file": file}
                     )
         except Exception as e:
-            failures.append(
+            yield (
                 {
                     "files from": f"{journal_acron} {issue_proc.issue_folder}",
-                    "message": str(e),
+                    "error": str(e),
                     "type": str(type(e)),
                 }
             )
-        return {"migrated": migrated, "failures": failures, "exceptions": exceptions}
-
+                
 
 def get_article_records_from_classic_website(
     user,
