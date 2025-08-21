@@ -344,7 +344,7 @@ class MigratedFile(CommonControlField):
         _("Original name"), max_length=100, null=True, blank=True
     )
 
-    file_date = models.DateField(null=True, blank=True)
+    file_date = models.DateTimeField(null=True, blank=True)
 
     # /pdf/acron/volnum/pt_a01.pdf
     original_href = models.CharField(
@@ -412,8 +412,11 @@ class MigratedFile(CommonControlField):
         cls,
         collection=None,
         original_path=None,
+        file_date=None,
     ):
         if collection and original_path:
+            if file_date:
+                return cls.objects.get(collection=collection, original_path=original_path, file_date=file_date)
             return cls.objects.get(collection=collection, original_path=original_path)
         raise ValueError("MigratedFile.get requires collection and original_path")
 
@@ -429,18 +432,22 @@ class MigratedFile(CommonControlField):
         part=None,
         pkg_name=None,
         force_update=None,
+        content=None,
+        file_datetime_iso=None,
+        basename=None,
     ):
         if not source_path and not collection and not original_path:
             raise ValueError(
                 "MigratedFile.create_or_update requires source_path, collection, original_path"
             )
 
-        basename = os.path.basename(source_path)
-        file_date = modified_date(source_path)
+        if file_datetime_iso:
+            file_date = datetime.fromisoformat(file_datetime_iso)
+        else:
+            file_date = modified_date(source_path)
 
         try:
             obj = cls.get(collection, original_path)
-
             if not force_update and obj.is_up_to_date(file_date):
                 return obj
 
@@ -449,21 +456,68 @@ class MigratedFile(CommonControlField):
             obj = cls()
             obj.collection = collection
             obj.original_path = original_path
-            obj.original_name = basename
             obj.original_href = obj.get_original_href(original_path)
             obj.creator = user
 
-        obj.pkg_name = pkg_name or obj.pkg_name
-        obj.lang = lang or obj.lang
-        obj.part = part or obj.part
-        obj.component_type = component_type or obj.component_type
+            if not basename:
+                basename = os.path.basename(source_path)
+            obj.original_name = basename
+
+        obj.pkg_name = pkg_name
+        obj.lang = lang
+        obj.part = part
+        obj.component_type = component_type
         obj.file_date = file_date
 
-        with open(source_path, "rb") as fp:
-            content = fp.read()
-        obj.save_file(basename, content, bool(original_path))
-        obj.save()
+        if not content:
+            try:
+                with open(source_path, "rb") as fp:
+                    content = fp.read()
+            except Exception as e:
+                logging.info(f"MigratedFile.create_or_update - {source_path} - readfile")
+                logging.exception(e)
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                UnexpectedEvent.create(
+                    e=e,
+                    exc_traceback=exc_traceback,
+                    detail={
+                        "function": "MigratedFile.create_or_update - readfile",
+                        "collection": str(collection),
+                    },
+                )
+                raise e
 
+        try:
+            obj.save_file(obj.original_name, content or "")
+        except Exception as e:
+            logging.info(f"MigratedFile.create_or_update - {source_path} - save_file")
+            logging.exception(e)
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "function": "MigratedFile.create_or_update - save_file",
+                    "collection": str(collection),
+                },
+            )
+            raise e
+
+        try:
+            obj.save()
+        except Exception as e:
+            logging.info(f"MigratedFile.create_or_update - {source_path} - save")
+            logging.exception(e)
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "function": "MigratedFile.create_or_update - save",
+                    "collection": str(collection),
+                },
+            )
+            raise e
         return obj
 
     @classmethod
@@ -501,9 +555,9 @@ class MigratedFile(CommonControlField):
         except:
             pass
 
-    def save_file(self, name, content, delete=False):
+    def save_file(self, name, content, save=False):
         try:
-            self.file.delete(save=True)
+            self.file.delete(save=save)
         except Exception as e:
             pass
         self.file.save(name, ContentFile(content))
@@ -705,16 +759,16 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
 
             with open(source_path, "rb") as fp:
                 basename = os.path.basename(source_path)
-                obj.save_file(basename, fp.read(), True)
+                obj.save_file(basename, fp.read())
                 obj.save()
 
             return obj
         except IntegrityError:
             return cls.get(collection, source_path)
 
-    def save_file(self, name, content, delete=False):
+    def save_file(self, name, content, save=False):
         try:
-            self.file.delete(save=True)
+            self.file.delete(save=save)
         except Exception as e:
             pass
         self.file.save(name, ContentFile(content))
@@ -745,7 +799,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
 
             with open(source_path, "rb") as fp:
                 basename = os.path.basename(source_path)
-                obj.save_file(basename, fp.read(), True)
+                obj.save_file(basename, fp.read())
             obj.save()
             return obj
         except cls.DoesNotExist:
