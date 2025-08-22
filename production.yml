@@ -1,17 +1,21 @@
+x-django-function: &django-function
+  image: infrascielo/upload:${SCMS_WEBAPP_VERSION:-v2.10.4}
+  restart: unless-stopped
+  platform: linux/x86_64
+  depends_on:
+    - postgres
+    - redis
+  env_file:
+    - ./.envs/.production/.django
+    - ./.envs/.production/.postgres
+  volumes:
+    - ../scielo/www:/scielo_www
+    - upload_media:/app/core/media
+
 services:
-  django: &django
-    image: infrascielo/upload:${SCMS_WEBAPP_VERSION}
+  django:
+    <<: *django-function
     container_name: upload_production_django
-    platform: linux/x86_64
-    depends_on:
-      - postgres
-      - redis
-    env_file:
-      - ./.envs/.production/.django
-      - ./.envs/.production/.postgres
-    volumes:
-      - ../scielo/www:/scielo_www
-      - upload_media:/app/core/media
     ports:
       - "8000:8000"
     command: /start
@@ -43,22 +47,23 @@ services:
     container_name: upload_production_redis
 
   celeryworker:
-    <<: *django
+    <<: *django-function
     container_name: upload_production_celeryworker
     command: /start-celeryworker
     ports: []
 
   celerybeat:
-    <<: *django
+    <<: *django-function
     container_name: upload_production_celerybeat
     command: /start-celerybeat
     ports: []
 
   flower:
-    <<: *django
+    <<: *django-function
     container_name: upload_production_flower
     command: /start-flower
-    ports: []
+    ports:
+      - "5555:5555"
 
 
 volumes:
