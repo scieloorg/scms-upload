@@ -7,7 +7,6 @@ from collection.models import WebSiteConfiguration
 from collection.choices import PUBLIC, QA
 from core.utils.requester import fetch_data
 from proc.models import ArticleProc, IssueProc, JournalProc
-from proc.controller import ensure_journal_proc_exists, ensure_issue_proc_exists
 from proc.source_core_api import create_or_update_journal, create_or_update_issue
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
@@ -125,34 +124,14 @@ def ensure_published_issue(issue_proc, website, user, api_data, force_update=Non
 
 
 def publish_article_collection_websites(user, manager, website_kinds, force_journal_publication, force_issue_publication):
-    journal = manager.article.journal
-    if not journal.journal_acron:
-        journal.journal_acron = issue_proc.journal_proc.acron
-        journal.save()
-
-    if force_journal_publication:
-        journal = create_or_update_journal(
-            journal.title,
-            journal.official_journal.issn_electronic,
-            journal.official_journal.issn_print,
-            user,
-            force_update=force_journal_publication,
-        )
-
-    if force_issue_publication and manager.article.issue:
-        issue = create_or_update_issue(
-            journal,
-            manager.article.issue.publication_year,
-            manager.article.issue.volume,
-            manager.article.issue.supplement,
-            manager.article.issue.number,
-            user,
-            force_update=force_issue_publication,
-        )
-
+    journal = manager.journal
     for issue_proc in IssueProc.objects.filter(
         issue=manager.article.issue,
     ):
+        if journal.missing_fields:
+            event = issue_proc.journal_proc.start(user, "Missing journal data")
+            event.finish(user, detail={"journal_missing_fields": journal.missing_fields})
+
         collection = issue_proc.collection
         qa_published = None
 
