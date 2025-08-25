@@ -14,7 +14,7 @@ def publish_journal(journal_proc, api_data):
 
     journal = journal_proc.journal
 
-    if not journal.required_data_completed:
+    if journal.missing_fields:
         try:
             fetch_and_create_journal(
                 user=journal_proc.updated_by or journal_proc.creator,
@@ -46,7 +46,8 @@ def publish_journal(journal_proc, api_data):
     )
 
     api = PublicationAPI(**api_data)
-    return api.post_data(payload)
+    response = api.post_data(payload)
+    return response
 
 
 class JournalPayload:
