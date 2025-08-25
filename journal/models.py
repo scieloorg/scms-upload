@@ -528,6 +528,14 @@ class Journal(CommonControlField, ClusterableModel):
             # na dúvida, retorna True
             return True
 
+    def add_mission(self, user, lang_code, text):
+        return Mission.create_or_update(
+            user,
+            self,
+            language=Language.get(code2=lang_code),
+            mission_text=text,
+        )
+
     def add_section(self, user, language, code, text):
         return JournalSection.create_or_update(
             user,
@@ -666,6 +674,61 @@ class Journal(CommonControlField, ClusterableModel):
     @property
     def subject_areas(self):
         return [item.value for item in self.subject.all()]
+
+    @property
+    def missing_fields(self):
+        """
+        Verifica campos não preenchidos no Journal e retorna um relatório detalhado.
+        """
+        fields = {
+            'title': _('Journal Title'),
+            'short_title': _('Short Title'),
+            'journal_acron': _('Journal Acronym'),
+            'official_journal': _('Official Journal'),
+            'contact_name': _('Contact Name'),
+            'contact_address': _('Contact Address'),
+            'contact_location': _('Contact Location'),
+            'submission_online_url': _('Submission Online URL'),
+            'logo_url': _('Logo URL'),
+            'license_code': _('License Code'),
+            'wos_areas': _('WoS Areas'),
+        }
+        missing = []
+        for field, description in fields.items():
+            value = getattr(self, field, None)
+            if not value or (isinstance(value, str) and not value.strip()):
+                missing.append(description)
+        
+        # Verificar official_journal
+        if self.official_journal:
+            if not self.official_journal.issn_electronic:
+                missing.append(_('Electronic ISSN'))
+            if not self.official_journal.issn_print:
+                missing.append(_('Print ISSN'))
+            if not self.official_journal.title_iso:
+                missing.append(_('ISO Title'))
+        
+        # Verificar mission
+        if not self.mission.exists():
+            missing.append(_('mission'))
+        
+        # Verificar sponsor
+        if not self.sponsor.exists():
+            missing.append(_('sponsor'))
+        
+        # Verificar owner
+        if not self.owner.exists():
+            missing.append(_('owner'))
+        
+        # Verificar publisher
+        if not self.publisher.exists():
+            missing.append(_('publisher'))
+        
+        # Verificar subject
+        if not self.subject.exists():
+            missing.append(_('study area'))
+        
+        return missing
 
 
 class JournalEmail(Orderable):
