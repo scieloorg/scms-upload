@@ -371,38 +371,7 @@ class Journal(CommonControlField, ClusterableModel):
         Retorna True se todos os campos estiverem preenchidos, False caso contrário.
         """
         # Verificar todos os campos CharField
-        if (
-            not self.short_title
-            or not self.title
-            or not self.journal_acron
-            or not self.submission_online_url
-            or not self.license_code
-            or not self.logo_url
-            or not self.contact_name
-            or not self.contact_address
-        ):
-            return False
-
-        # Verificar campos de relacionamento ForeignKey
-        if not self.contact_location:
-            return False
-
-        if not self.official_journal:
-            return False
-
-        if not self.official_journal.required_data_completed:
-            return False
-
-        # Verificar campo ManyToManyField
-        if not self.subject.exists():
-            return False
-
-        # Verificar campo JSONField
-        if not self.wos_areas:
-            return False
-
-        # Se passou por todas as verificações, todos os campos estão preenchidos
-        return True
+        return not self.missing_fields
 
     @property
     def issn_print(self):
