@@ -171,7 +171,7 @@ def fetch_journal_data_with_pagination(
     params = {
         "issn_print": issn_print,
         "issn_electronic": issn_electronic,
-        "collection_acron": collection_acron,
+        "collection": collection_acron,
     }
     params = {k: v for k, v in params.items() if v}
 
@@ -232,7 +232,7 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
         short_title=result.get("short_title"),
     )
     journal.contact_address = result.get("contact_address")
-    journal.contat_name = (result.get("publisher") or {}).get("name")
+    journal.contat_name = result.get("contact_name")
     # Atualiza campos adicionais do journal
     journal.license_code = (result.get("journal_use_license") or {}).get("license_type")
     journal.nlm_title = result.get("nlm_title")
