@@ -14,7 +14,7 @@ def publish_journal(journal_proc, api_data):
 
     journal = journal_proc.journal
 
-    if journal.missing_fields:
+    if not journal.core_synchronized:
         try:
             fetch_and_create_journal(
                 user=journal_proc.updated_by or journal_proc.creator,
