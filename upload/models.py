@@ -4,6 +4,7 @@ import sys
 import csv
 import logging
 import os
+import zlib
 from datetime import date, datetime, timedelta
 from random import randint
 from tempfile import TemporaryDirectory
@@ -41,7 +42,9 @@ from core.models import CommonControlField
 from issue.models import Issue
 from package import choices as package_choices
 from package.models import SPSPkg
+from pid_provider.models import PidProviderXML
 from proc.models import IssueProc, JournalProc, Operation
+from proc.source_core_api import create_or_update_issue
 from team.models import CollectionTeamMember
 from upload import choices
 from upload.forms import (
@@ -569,11 +572,11 @@ class Package(CommonControlField, ClusterableModel):
                     user, qa=is_ready_to_preview, public=is_ready_to_publish
                 )
                 detail.update(response or {})
-                event.finish(user, completed=True, detail=detail)
 
                 self.update_status_and_add_comments(
                     user, response.get("result"), response.get("new_status")
                 )
+                event.finish(user, completed=True, detail=detail)
 
                 self.run_task_publish_article(
                     user,
@@ -585,13 +588,14 @@ class Package(CommonControlField, ClusterableModel):
                 )
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
-                event.finish(
-                    user,
-                    completed=False,
-                    exception=e,
-                    exc_traceback=exc_traceback,
-                    detail=detail,
-                )
+                if event:
+                    event.finish(
+                        user,
+                        completed=False,
+                        exception=e,
+                        exc_traceback=exc_traceback,
+                        detail=detail,
+                    )
 
     @property
     def is_ready_to_publish(self):
@@ -749,6 +753,11 @@ class Package(CommonControlField, ClusterableModel):
             self.save()
             return True
 
+        if self.blocking_errors or (self.numbers or {}).get("blocking_errors"):
+            self.status = choices.PS_PENDING_CORRECTION
+            self.save()
+            return True
+
         # terminada ou não a revisão de erros...
         if self.is_acceptable_package:
             # pode finalizar, se a quantidade de erros é tolerável
@@ -828,7 +837,7 @@ class Package(CommonControlField, ClusterableModel):
             }
             logging.info(f"process_qa_decision: {self.qa_decision}")
 
-            if not self.blocking_errors and self.numbers and self.numbers.get("blocking_errors"):
+            if not self.blocking_errors and (self.numbers or {}).get("blocking_errors"):
                 # corrige valor de self.blocking_errors para pacotes anteriores a criação do campo
                 self.blocking_errors = self.numbers.get("blocking_errors")
                 self.save()
@@ -851,7 +860,7 @@ class Package(CommonControlField, ClusterableModel):
                 # exceto se há impedimento de em tornar público
                 response = self.prepare_to_publish(user, qa, public)
                 self.update_status_and_add_comments(
-                    user, result.get("result"), result.get("new_status")
+                    user, response.get("result"), response.get("new_status")
                 )
 
                 detail.update(response or {})
@@ -885,31 +894,37 @@ class Package(CommonControlField, ClusterableModel):
         return False
 
     def analyze_sps_package(self, qa, public, xml_changed):
-        result = {"blocking_errors": [], "errors": [], "warnings": []}
+        blocking_errors = []
+        for item in PkgValidationResult.objects.filter(
+            report__package=self, status=choices.VALIDATION_RESULT_BLOCKING
+        ).iterator():
+            blocking_errors.append(item.message)
 
-        if not self.article:
-            result["blocking_errors"].append(_("Article was not created"))
-        if self.sps_pkg:
-            if not self.sps_pkg.valid_components:
-                for component in self.sps_pkg.components.filter(uri=None):
-                    result["errors"].append(
-                        _("{} is not published on MinIO").format(component.basename)
-                    )
-            if not self.sps_pkg.valid_texts:
-                result["warnings"].append(
-                    _("Total of XML, PDF, HTML do not match {}").format(
-                        self.sps_pkg.texts
-                    )
-                )
-        else:
-            result["blocking_errors"].append(_("SPS Package was not created"))
+        if not self.sps_pkg:
+            blocking_errors.append(_("SPS Package was not created"))
 
-        if result.get("blocking_errors"):
+        elif not self.article:
+            blocking_errors.append(_("Article was not created"))
+
+        if blocking_errors:
             return {
                 "websites": [],
-                "result": result,
+                "result": {"blocking_errors": blocking_errors},
                 "new_status": choices.PS_PENDING_CORRECTION,
             }
+
+        result = {"blocking_errors": [], "errors": [], "warnings": []}
+        if not self.sps_pkg.valid_components:
+            for component in self.sps_pkg.components.filter(uri=None):
+                result["errors"].append(
+                    _("{} is not published on MinIO").format(component.basename)
+                )
+        if not self.sps_pkg.valid_texts:
+            result["warnings"].append(
+                _("Total of XML, PDF, HTML do not match {}").format(
+                    self.sps_pkg.texts
+                )
+            )
 
         new_status = None
         websites = []
@@ -943,6 +958,8 @@ class Package(CommonControlField, ClusterableModel):
             save = True
 
         if comments:
+            if not self.qa_comment:
+                self.qa_comment = ""
             self.qa_comment += "\n".join(comments)
             save = True
 
@@ -976,29 +993,38 @@ class Package(CommonControlField, ClusterableModel):
             }
             return True
 
-    def xml_file_changed_pid_v2(self, xml_with_pre):
+    def xml_file_changed_pid_v2(self, user, xml_with_pre):
         if not xml_with_pre.v2:
             if self.article and self.article.pid_v2:
                 xml_with_pre.v2 = self.article.pid_v2
             else:
-                xml_with_pre.v2 = self.generate_pid_v2()
-            return True
+                xml_with_pre.v2 = self.generate_pid_v2(user, xml_with_pre)
 
-    def generate_pid_v2(self):
-        """
-        number não necessariamente tem que ser o order ou fpage
-        no entanto, para tentar ser mais próximo ao legado,
-        tenta usar order ou fpage
-        """
-        issue_pid = IssueProc.get_issue_pid(self.issue, self.journal)
+    def generate_pid_v2(self, user, xml_with_pre):
         try:
-            number = str(int(self.order))
-            if len(number) > 5:
-                raise ValueError("Invalid length")
-        except (ValueError, TypeError):
-            number = str(randint(0, 100000))
-        number = number[:5].zfill(5)
-        return f"S{issue_pid}{number}"
+            detail = None
+            pid_v2_gen = None
+            event = self.start(user, "generate_pid_v2")
+            pid_v2_gen = PidV2Generator(xml_with_pre)
+            xml_with_pre.v2 = pid_v2_gen.generate(user, self.journal, self.issue)
+            detail = {"pid_v2": xml_with_pre.v2, "log": pid_v2_gen.log}
+            event.finish(
+                user,
+                completed=True,
+                detail=detail,
+            )
+            return True
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            event.finish(
+                user,
+                completed=False,
+                detail=detail or pid_v2_gen and pid_v2_gen.log,
+                exception=e,
+                exc_traceback=exc_traceback,
+            )
+            raise
+            return True
 
     def prepare_sps_package(self, user, xml_with_pre, xml_file_changed):
         # Aplica-se também para um pacote de atualização de um conteúdo anteriormente migrado
@@ -1223,6 +1249,7 @@ class Package(CommonControlField, ClusterableModel):
                     exc_traceback=exc_traceback,
                     detail=detail,
                 )
+            raise
 
     def check_xml_changed(self, user, xml_with_pre, public):
         try:
@@ -1232,7 +1259,7 @@ class Package(CommonControlField, ClusterableModel):
 
             event = self.start(user, "check_xml_changed")
 
-            if self.xml_file_changed_pid_v2(xml_with_pre):
+            if self.xml_file_changed_pid_v2(user, xml_with_pre):
                 sub_events.append(f"changed xml pid v2: {xml_with_pre.v2}")
                 xml_changed = True
 
@@ -1266,6 +1293,7 @@ class Package(CommonControlField, ClusterableModel):
                     exc_traceback=exc_traceback,
                     detail=sub_events,
                 )
+            raise
 
     def run_task_publish_article(
         self,
@@ -2097,6 +2125,8 @@ class UploadValidator(CommonControlField):
         """
         if not package.is_validation_finished:
             return False
+        if package.blocking_errors or package.numbers.get("blocking_errors"):
+            return False
 
         logging.info(
             f"UploadValidator.is_acceptable_package - review finished: {package.is_error_review_finished}"
@@ -2157,3 +2187,204 @@ class ArchivedPackage(Package):
 
     class Meta:
         proxy = True
+
+
+class PidReservation(models.Model):
+    pkg_name = models.CharField(
+        _("Package name"), max_length=100, null=True, blank=True
+    )
+    pid_v2 = models.CharField(_("PID v2"), max_length=24, null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("Pid Reservation")
+        verbose_name_plural = _("Pid Reservations")
+        indexes = [
+            models.Index(
+                fields=[
+                    "pkg_name",
+                ]
+            ),
+            models.Index(
+                fields=[
+                    "pid_v2",
+                ]
+            ),
+        ]
+
+    @classmethod
+    def get(cls, pid_v2=None, pkg_name=None):
+        params = {}
+        if pid_v2:
+            params["pid_v2"] = pid_v2
+        if pkg_name:
+            params["pkg_name"] = pkg_name
+        if not params:
+            raise ValueError("PidReservation.is_reserved requires params")    
+        return cls.objects.get(**params)
+
+    @classmethod
+    def create(cls, pid_v2=None, pkg_name=None):
+        try:
+            obj = cls()
+            obj.pid_v2 = pid_v2
+            obj.pkg_name = pkg_name
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(pid_v2, pkg_name)
+
+    @classmethod
+    def create_or_update(cls, pid_v2=None, pkg_name=None):
+        try:
+            return cls.get(pid_v2, pkg_name)
+        except cls.DoesNotExist:
+            return cls.create(pid_v2, pkg_name)
+
+
+class PidV2Generator:
+    def __init__(self, xml_with_pre):
+        self.xml_with_pre = xml_with_pre
+        self.issue_pid = None
+        self.log = None
+    
+    def generate(self, user, journal, issue):
+        self.log = []
+        logging.info("PidV2Generator.generate PidProviderXML")
+        registered = PidProviderXML.is_registered(self.xml_with_pre)
+        if registered and registered.get("v2"):
+            self.log.append(_("Setting package.pid_v2 from PidProviderXML"))
+            return registered.get("v2")            
+
+        logging.info("PidV2Generator.generate PidReservation")
+        try:
+            return PidReservation.get(pkg_name=self.xml_with_pre.sps_pkg_name).pid_v2
+        except PidReservation.DoesNotExist:
+            pass
+        
+        logging.info("PidV2Generator.generate IssueProc")
+
+        self.issue_pid = self.get_issue_pid(user, journal, issue)
+        if not self.issue_pid:
+            self.log.append(_("Unable to set package.pid_v2 because issue ({}) is not registered").format(self.issue))
+            raise ValueError("Package.generate_pid_v2: Missing issue_pid")
+
+        logging.info("PidV2Generator.generate generate_pid_v2_from_metadata")
+        pid_v2 = self.generate_pid_v2_from_metadata()
+        # if not pid_v2:
+        #     logging.info("PidV2Generator.generate get_random_pid_v2")
+        #     pid_v2 = self.get_random_pid_v2()
+
+        if not pid_v2:
+            raise ValueError(f"Unable to get pid v2 for {self.xml_with_pre.sps_pkg_name}")
+
+        logging.info("PidV2Generator.generate reserve_pid_v2")
+        self.reserve_pid_v2(pid_v2)
+        if registered:
+            logging.info("PidV2Generator.generate update_pid_provider_v2")
+            self.update_pid_provider_v2(registered.get("v3"), pid_v2)
+
+        return pid_v2
+
+    def reserve_pid_v2(self, pid_v2):
+        try:
+            PidReservation.create(pid_v2=pid_v2, pkg_name=self.xml_with_pre.sps_pkg_name)
+        except Exception as exc:
+            self.log.append(_("Unable to reserve pid_v2 {} for {}").format(pid_v2, self.xml_with_pre.sps_pkg_name))
+
+    def update_pid_provider_v2(self, pid_v3, pid_v2):
+        try:
+            PidProviderXML.objects.filter(v3=pid_v3).update(v2=pid_v2)
+        except Exception as exc:
+            self.log.append(_("Unable to update pid_provider ({}) with {}").format(pid_v3, pid_v2))
+
+    @staticmethod
+    def string_to_5_digits(input_string):
+        return (zlib.crc32(input_string.encode()) & 0xffffffff) % 100000
+        
+    def generate_pid_v2_from_source(self, source):
+        logging.info(f"PidV2Generator.generate generate_pid_v2_from_source {source}")
+        if not source:
+            return None
+        
+        suffix = PidV2Generator.string_to_5_digits(source)
+        pid_v2 = f"S{self.issue_pid}{suffix:05d}"  # Garante 5 dígitos com zeros à esquerda
+        logging.info(f"PidV2Generator.generate generate_pid_v2_from_source pid_v2: {pid_v2}")
+        
+        if PidV2Generator.is_free(pid_v2):
+
+            logging.info(f"PidV2Generator.generate generate_pid_v2_from_source VALID: {pid_v2}")
+            return pid_v2
+        
+        return None
+    
+    def generate_pid_v2_from_metadata(self):
+        sources = (
+            ("fpage", self.xml_with_pre.fpage), 
+            ("elocation_id", self.xml_with_pre.elocation_id), 
+            ("main_doi", self.xml_with_pre.main_doi), 
+            ("finger_print", self.xml_with_pre.finger_print),
+        )
+
+        for name, source in sources:
+            if not source:
+                continue
+            logging.info(f"PidV2Generator.generate generate_pid_v2_from_metadata {name}")
+            pid_v2 = self.generate_pid_v2_from_source(source)
+            if pid_v2:
+                self.log.append(_("Setting v2 ({}) from {}").format(pid_v2, name))
+                return pid_v2        
+        return None
+    
+    def get_random_pid_v2(self):
+        total = 100000
+        values = PidProviderXML.objects.filter(v2__startswith=self.issue_pid).values_list("v2", flat=True)
+        excluded = set(values)
+
+        values = PidReservation.objects.filter(pid_v2__startswith=self.issue_pid).values_list("pid_v2", flat=True)
+        excluded.update(values)
+
+        logging.info(f"PidV2Generator.get_random_pid_v2 excluded: {excluded}")
+
+        max_items = total - len(excluded)
+        for item in range(max_items):
+            logging.info(f"PidV2Generator.get_random_pid_v2 {item}/{max_items}")
+            suffix = randint(1, 99999)
+            pid_v2 = f"S{self.issue_pid}{suffix:05d}"
+            while pid_v2 in excluded:
+                suffix = randint(1, 99999)
+                pid_v2 = f"S{self.issue_pid}{suffix:05d}"
+
+            excluded.add(pid_v2)
+            logging.info(f"PidV2Generator.get_random_pid_v2 {pid_v2}")
+            if PidV2Generator.is_free(pid_v2):
+                self.log.append(_("Setting v2 ({}) from random {}").format(pid_v2, item))
+                return pid_v2
+
+    @staticmethod
+    def is_free(pid_v2):
+        logging.info(f"PidV2Generator.is_free?")
+        if PidProviderXML._is_registered_pid(v2=pid_v2):
+            logging.info(f"PidV2Generator.is_free False PidProviderXML ")
+            return False
+        try:
+            PidReservation.get(pid_v2=pid_v2)
+            logging.info(f"PidV2Generator.is_free False PidReservation ")
+        except PidReservation.DoesNotExist:
+            logging.info(f"PidV2Generator.is_free True PidReservation.DoesNotExist ")
+            return True
+        except Exception as exc:
+            logging.exception(exc)
+        return False
+
+    def get_issue_pid(self, user, journal, issue):
+        if not issue:
+            issue = create_or_update_issue(
+                journal=journal,
+                pub_year=self.xml_with_pre.pub_year,
+                volume=self.xml_with_pre.volume,
+                suppl=self.xml_with_pre.suppl,
+                number=self.xml_with_pre.number,
+                user=user,
+                force_update=True,
+            )
+        return IssueProc.get_issue_pid(issue)
