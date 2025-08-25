@@ -79,7 +79,6 @@ def create_or_update_journal(
             | Q(journal__official_journal__issn_print=issn_print)
         ).exists()
     )
-
     if not force_update:
         try:
             return Journal.get_registered(journal_title, issn_electronic, issn_print)
@@ -232,18 +231,24 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
         title=result.get("title"),
         short_title=result.get("short_title"),
     )
-
+    journal.contact_address = result.get("contact_address")
+    journal.contat_name = (result.get("publisher") or {}).get("name")
     # Atualiza campos adicionais do journal
     journal.license_code = (result.get("journal_use_license") or {}).get("license_type")
     journal.nlm_title = result.get("nlm_title")
     journal.doi_prefix = result.get("doi_prefix")
     journal.wos_areas = result["wos_areas"]
     journal.logo_url = result["url_logo"]
+    journal.submission_online_url = result.get("submission_online_url")
+    journal.doi_prefix = result.get("doi_prefix")
     journal.save()
 
+    if not journal.journal_email.count():
+        for item in result.get("email"):
+            journal.add_email(item)
     # Processa subjects
-    for item in result.get("Subject") or []:
-        journal.subjects.add(Subject.create_or_update(user, item["value"]))
+    for item in result.get("subject") or []:
+        journal.subject.add(Subject.create_or_update(user, item["value"]))
 
     # Processa publishers
     for item in result.get("publisher") or []:
@@ -270,6 +275,22 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
             user=user,
         )
         journal.owner.add(Owner.create_or_update(user, journal, institution))
+
+    for item in result.get("sponsor") or []:
+        institution = Institution.get_or_create(
+            inst_name=item["name"],
+            inst_acronym=None,
+            level_1=None,
+            level_2=None,
+            level_3=None,
+            location=None,
+            user=user,
+        )
+        journal.sponsor.add(Sponsor.create_or_update(user, journal, institution))
+
+    for item in result.get("mission"):
+        journal.add_mission(user, item["language"], item["rich_text"])
+
     # Processa dados específicos do SciELO
     for item in result.get("scielo_journal") or []:
         try:
