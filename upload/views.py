@@ -9,7 +9,7 @@ from wagtail_modeladmin.views import CreateView, EditView, InspectView
 from article.models import Article
 from issue.models import Issue
 from upload.models import Package, choices
-from upload.tasks import task_receive_packages, task_publish_article
+from upload.tasks import task_receive_packages, task_publish_article, task_complete_journal_data, task_complete_issue_data
 from upload.utils import file_utils
 from upload.utils import package_utils
 from upload.utils.package_utils import coerce_package_and_errors, render_html
@@ -162,9 +162,23 @@ class PackageDecisionMixin:
             return HttpResponseRedirect(self.get_success_url())
         
         package = form.save_all(self.request.user)
+
+        user = self.request.user
         force_journal_publication = form.cleaned_data.get("force_journal_publication")
+        if force_journal_publication and package.journal:
+            task_complete_journal_data.delay(
+                user_id=user.id,
+                username=user.username,
+                journal_id=package.journal.id,
+            )
         force_issue_publication = form.cleaned_data.get("force_issue_publication")
-        
+        if force_issue_publication and package.issue:
+            task_complete_issue_data.delay(
+                user_id=user.id,
+                username=user.username,
+                issue_id=package.issue.id,
+            )
+
         if self.process_decision(
             package,
             self.request.user,
