@@ -155,13 +155,14 @@ def task_migrate_and_publish_journals(
                     # atualiza Journal e atualiza journal_proc com dados do Core
                     event = None
                     event = journal_proc.start(user, "fetch_and_create_journal")
-                    fetch_and_create_journal(
-                        user,
-                        collection_acron=collection.acron,
-                        issn_electronic=journal_proc.issn_electronic,
-                        issn_print=journal_proc.issn_print,
-                        force_update=force_update,
-                    )
+                    if not journal_proc.journal.core_synchronized:
+                        fetch_and_create_journal(
+                            user,
+                            collection_acron=collection.acron,
+                            issn_electronic=journal_proc.issn_electronic,
+                            issn_print=journal_proc.issn_print,
+                            force_update=force_update,
+                        )
                     event.finish(user, completed=True, detail=journal_proc.completeness)
                 except Exception as e:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
