@@ -1457,17 +1457,8 @@ class IssueProc(BaseProc, ClusterableModel):
         return article_proc
 
     @staticmethod
-    def get_issue_pid(issue, journal):
-        issue_proc = IssueProc.objects.filter(issue=issue).first()
-        if issue_proc:
-            return issue_proc.pid
-        if journal:
-            journal_proc = JournalProc.objects.filter(journal=journal).first()
-            if journal_proc:
-                issn_id = journal_proc.pid
-                year = issue.publication_year
-                issue_pid_suffix = issue.issue_pid_suffix
-            return f"{issn_id}{year}{issue_pid_suffix}"
+    def get_issue_pid(issue):
+        return IssueProc.objects.filter(issue=issue).first().pid
 
     @property
     def bundle_id(self):
