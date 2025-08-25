@@ -15,6 +15,7 @@ from journal.models import (
     Institution,
     Publisher,
     Owner,
+    Sponsor,
     JournalCollection,
     JournalHistory,
 )
@@ -231,6 +232,7 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
         title=result.get("title"),
         short_title=result.get("short_title"),
     )
+    journal.core_synchronized = False
     journal.contact_address = result.get("contact_address")
     journal.contat_name = result.get("contact_name")
     # Atualiza campos adicionais do journal
@@ -311,7 +313,7 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
         )
         if not journal.journal_acron:
             journal.journal_acron = item.get("journal_acron")
-            journal.save()
+
         journal_collection = JournalCollection.create_or_update(
             user, collection, journal
         )
@@ -327,6 +329,8 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
                 jh["day"],
                 jh["interruption_reason"],
             )
+    journal.core_synchronized = True
+    journal.save()
     return journal
 
 
