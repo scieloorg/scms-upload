@@ -945,8 +945,7 @@ class JournalProc(BaseProc, ClusterableModel):
     @property
     def completeness(self):
         return {
-            "is_completed": self.journal.is_completed,
-            "required_data_completed": self.journal.required_data_completed,
+            "core_synchronized": self.journal.core_synchronized,
             "missing_fields": self.journal.missing_fields,
         }
 
