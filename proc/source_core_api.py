@@ -15,6 +15,7 @@ from journal.models import (
     Institution,
     Publisher,
     Owner,
+    Sponsor,
     JournalCollection,
     JournalHistory,
 )
@@ -79,7 +80,6 @@ def create_or_update_journal(
             | Q(journal__official_journal__issn_print=issn_print)
         ).exists()
     )
-
     if not force_update:
         try:
             return Journal.get_registered(journal_title, issn_electronic, issn_print)
@@ -172,7 +172,7 @@ def fetch_journal_data_with_pagination(
     params = {
         "issn_print": issn_print,
         "issn_electronic": issn_electronic,
-        "collection_acron": collection_acron,
+        "collection": collection_acron,
     }
     params = {k: v for k, v in params.items() if v}
 
@@ -232,18 +232,26 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
         title=result.get("title"),
         short_title=result.get("short_title"),
     )
-
+    journal.core_synchronized = False
+    journal.contact_address = result.get("contact_address")
+    journal.contat_name = result.get("contact_name")
     # Atualiza campos adicionais do journal
     journal.license_code = (result.get("journal_use_license") or {}).get("license_type")
     journal.nlm_title = result.get("nlm_title")
     journal.doi_prefix = result.get("doi_prefix")
     journal.wos_areas = result["wos_areas"]
     journal.logo_url = result["url_logo"]
+    journal.submission_online_url = result.get("submission_online_url")
+    journal.doi_prefix = result.get("doi_prefix")
     journal.save()
 
+    journal.journal_email.all().delete()
+    for item in result.get("email"):
+        journal.add_email(item)
+
     # Processa subjects
-    for item in result.get("Subject") or []:
-        journal.subjects.add(Subject.create_or_update(user, item["value"]))
+    for item in result.get("subject") or []:
+        journal.subject.add(Subject.create_or_update(user, item["value"]))
 
     # Processa publishers
     for item in result.get("publisher") or []:
@@ -270,6 +278,30 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
             user=user,
         )
         journal.owner.add(Owner.create_or_update(user, journal, institution))
+
+    for item in result.get("sponsor") or []:
+        institution = Institution.get_or_create(
+            inst_name=item["name"],
+            inst_acronym=None,
+            level_1=None,
+            level_2=None,
+            level_3=None,
+            location=None,
+            user=user,
+        )
+        journal.sponsor.add(Sponsor.create_or_update(user, journal, institution))
+
+    no_lang = []
+    for item in result.get("mission"):
+        if not item["language"]:
+            no_lang.append(item["rich_text"])
+            continue
+        if no_lang:
+            item["rich_text"] = "\n".join(no_lang) + "\n" + item["rich_text"]
+
+        journal.add_mission(user, item["language"], item["rich_text"])
+        no_lang = []
+
     # Processa dados específicos do SciELO
     for item in result.get("scielo_journal") or []:
         try:
@@ -289,7 +321,7 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
         )
         if not journal.journal_acron:
             journal.journal_acron = item.get("journal_acron")
-            journal.save()
+
         journal_collection = JournalCollection.create_or_update(
             user, collection, journal
         )
@@ -305,6 +337,8 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
                 jh["day"],
                 jh["interruption_reason"],
             )
+    journal.core_synchronized = True
+    journal.save()
     return journal
 
 
