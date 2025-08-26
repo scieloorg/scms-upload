@@ -1360,12 +1360,12 @@ class IssueProc(BaseProc, ClusterableModel):
 
     def migrate_document_records(self, user, force_update=None):
         try:
+            detail = None
             operation = None
             operation = self.start(user, "migrate_document_records")
             if not self.journal_proc:
                 raise ValueError(f"IssueProc ({self}) has no journal_proc")
 
-            detail = None
             journal_data = self.journal_proc.migrated_data.data
             issue_data = self.migrated_data.data
 
