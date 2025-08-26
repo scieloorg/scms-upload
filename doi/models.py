@@ -5,11 +5,14 @@ from wagtail.admin.panels import FieldPanel
 from core.models import CommonControlField
 
 from .forms import DOIWithLangForm
+from collection.models import Language
 
 
 class DOIWithLang(CommonControlField):
-    doi = models.TextField(_("DOI"), blank=False, null=False)
-    lang = models.CharField(_("Language"), max_length=64, blank=False, null=False)
+    doi = models.CharField(_("DOI"), max_length=256, blank=False, null=False)
+    lang = models.ForeignKey(
+        Language, null=True, blank=True, on_delete=models.SET_NULL
+    )
 
     panels = [
         FieldPanel("doi"),
@@ -17,7 +20,7 @@ class DOIWithLang(CommonControlField):
     ]
 
     def __str__(self):
-        return f"{self.lang.upper()}: {self.doi}"
+        return f"{self.lang}: {self.doi}"
 
     base_form_class = DOIWithLangForm
 
