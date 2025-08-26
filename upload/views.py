@@ -146,8 +146,18 @@ class QAPackageEditView(EditView):
         package = form.save_all(self.request.user)
         force_journal_publication = form.cleaned_data.get("force_journal_publication")
         force_issue_publication = form.cleaned_data.get("force_issue_publication")
-        messages.success(self.request, _("Decision: {} {} {}").format(package.qa_decision, force_journal_publication, force_issue_publication))
-        package.process_qa_decision(self.request.user, task_publish_article, force_journal_publication, force_issue_publication)
+        messages.success(
+            self.request,
+            _("Decision: {} {} {}").format(
+                package.qa_decision, force_journal_publication, force_issue_publication
+            ),
+        )
+        package.process_qa_decision(
+            self.request.user,
+            task_publish_article,
+            force_journal_publication,
+            force_issue_publication,
+        )
 
         return HttpResponseRedirect(self.get_success_url())
 
@@ -163,8 +173,18 @@ class ReadyToPublishPackageEditView(EditView):
         package = form.save_all(self.request.user)
         force_journal_publication = form.cleaned_data.get("force_journal_publication")
         force_issue_publication = form.cleaned_data.get("force_issue_publication")
-        messages.success(self.request, _("Decision: {} {} {}").format(package.qa_decision, force_journal_publication, force_issue_publication))
-        package.process_qa_decision(self.request.user, task_publish_article, force_journal_publication, force_issue_publication)
+        messages.success(
+            self.request,
+            _("Decision: {} {} {}").format(
+                package.qa_decision, force_journal_publication, force_issue_publication
+            ),
+        )
+        package.process_qa_decision(
+            self.request.user,
+            task_publish_article,
+            force_journal_publication,
+            force_issue_publication,
+        )
 
         return HttpResponseRedirect(self.get_success_url())
 
@@ -311,5 +331,10 @@ def archive_package(request):
             package.save()
             messages.success(request, _("Package was archived."))
         else:
-            messages.warning(request, _("Unable to archive package which status = {}.").format(package.status))
+            messages.warning(
+                request,
+                _("Unable to archive package which status = {}.").format(
+                    package.status
+                ),
+            )
     return redirect(f"/admin/upload/package/")

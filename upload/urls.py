@@ -1,6 +1,13 @@
 from django.urls import path
 
-from .views import assign, download_errors, display_xml, finish_deposit, preview_document, archive_package
+from .views import (
+    assign,
+    download_errors,
+    display_xml,
+    finish_deposit,
+    preview_document,
+    archive_package,
+)
 
 app_name = "upload"
 
@@ -10,5 +17,5 @@ urlpatterns = [
     path("finish", view=finish_deposit, name="finish_deposit"),
     path("download-errors", view=download_errors, name="download_errors"),
     path("xml", view=display_xml, name="display_xml"),
-    path("archive", view=archive_package, name="archive_package")
+    path("archive", view=archive_package, name="archive_package"),
 ]

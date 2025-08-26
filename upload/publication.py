@@ -21,6 +21,7 @@ User = get_user_model()
 
 class PublicationError(Exception):
     """Erro durante o processo de publicação"""
+
     pass
 
 
@@ -65,7 +66,9 @@ def ensure_published_journal(journal_proc, website, user, api_data, force_update
 
     try:
         if not force_update:
-            journal_url = f"{website.url}/scielo.php?pid={journal_proc.pid}&script=sci_serial"
+            journal_url = (
+                f"{website.url}/scielo.php?pid={journal_proc.pid}&script=sci_serial"
+            )
             return bool(fetch_data(journal_url))
     except Exception as e:
         pass
@@ -76,7 +79,7 @@ def ensure_published_journal(journal_proc, website, user, api_data, force_update
         website_kind=website.purpose,
         api_data=api_data,
         force_update=True,
-        content_type="journal"
+        content_type="journal",
     )
     if not response or not response.get("completed"):
         raise PublicationError(
@@ -104,7 +107,9 @@ def ensure_published_issue(issue_proc, website, user, api_data, force_update=Non
     """
     try:
         if not force_update:
-            issue_url = f"{website.url}/scielo.php?pid={issue_proc.pid}&script=sci_issuetoc"
+            issue_url = (
+                f"{website.url}/scielo.php?pid={issue_proc.pid}&script=sci_issuetoc"
+            )
             return bool(fetch_data(issue_url))
     except Exception as e:
         pass
@@ -115,7 +120,7 @@ def ensure_published_issue(issue_proc, website, user, api_data, force_update=Non
         website_kind=website.purpose,
         api_data=api_data,
         force_update=True,
-        content_type="issue"
+        content_type="issue",
     )
     if not response or not response.get("completed"):
         raise PublicationError(
@@ -124,7 +129,9 @@ def ensure_published_issue(issue_proc, website, user, api_data, force_update=Non
     return response
 
 
-def publish_article_collection_websites(user, manager, website_kinds, force_journal_publication, force_issue_publication):
+def publish_article_collection_websites(
+    user, manager, website_kinds, force_journal_publication, force_issue_publication
+):
     journal = manager.article.journal
     if not journal.journal_acron:
         journal.journal_acron = issue_proc.journal_proc.acron
@@ -157,9 +164,20 @@ def publish_article_collection_websites(user, manager, website_kinds, force_jour
         qa_published = None
 
         if QA in website_kinds:
-            published_article = publish_article_on_website(user, manager, issue_proc, QA, force_journal_publication, force_issue_publication)
+            published_article = publish_article_on_website(
+                user,
+                manager,
+                issue_proc,
+                QA,
+                force_journal_publication,
+                force_issue_publication,
+            )
             qa_published = published_article and published_article.get("completed")
-            yield {"collection": collection.acron, "website": QA, "published": published_article and published_article.get("completed")}
+            yield {
+                "collection": collection.acron,
+                "website": QA,
+                "published": published_article and published_article.get("completed"),
+            }
         else:
             try:
                 qa_website = WebSiteConfiguration.get(collection=collection, purpose=QA)
@@ -168,14 +186,32 @@ def publish_article_collection_websites(user, manager, website_kinds, force_jour
                 qa_published = None
 
         if qa_published and PUBLIC in website_kinds:
-            published_article = publish_article_on_website(user, manager, issue_proc, PUBLIC, force_journal_publication, force_issue_publication)
-            yield {"collection": collection.acron, "website": PUBLIC, "published": published_article and published_article.get("completed")}
+            published_article = publish_article_on_website(
+                user,
+                manager,
+                issue_proc,
+                PUBLIC,
+                force_journal_publication,
+                force_issue_publication,
+            )
+            yield {
+                "collection": collection.acron,
+                "website": PUBLIC,
+                "published": published_article and published_article.get("completed"),
+            }
 
 
-def publish_article_on_website(user, manager, issue_proc, website_kind, force_journal_publication=None, force_issue_publication=None):
+def publish_article_on_website(
+    user,
+    manager,
+    issue_proc,
+    website_kind,
+    force_journal_publication=None,
+    force_issue_publication=None,
+):
     """
     Publica um artigo verificando e garantindo as dependências (journal e issue)
-    
+
     Args:
         manager: O gerenciador da operação
         journal_proc: O processador do journal
@@ -183,10 +219,10 @@ def publish_article_on_website(user, manager, issue_proc, website_kind, force_jo
         website: A configuração do website
         user: O usuário que executa a operação
         api_data: Os dados da API para publicação
-        
+
     Returns:
         dict: Resultado da publicação com detalhes e histórico
-        
+
     Raises:
         PublicationError: Se ocorrer erro na publicação
     """
@@ -213,10 +249,14 @@ def publish_article_on_website(user, manager, issue_proc, website_kind, force_jo
     journal_proc = issue_proc.journal_proc
 
     api_data["post_data_url"] = website.api_url_journal
-    response = ensure_published_journal(journal_proc, website, user, api_data, force_journal_publication)
+    response = ensure_published_journal(
+        journal_proc, website, user, api_data, force_journal_publication
+    )
 
     api_data["post_data_url"] = website.api_url_issue
-    response = ensure_published_issue(issue_proc, website, user, api_data, force_issue_publication)
+    response = ensure_published_issue(
+        issue_proc, website, user, api_data, force_issue_publication
+    )
 
     api_data["post_data_url"] = website.api_url_article
     response = manager.publish(
