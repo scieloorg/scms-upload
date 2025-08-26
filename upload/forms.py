@@ -22,8 +22,7 @@ class PackageZipForm(CoreAdminModelForm):
         return pkg_zip
 
 
-class UploadPackageForm(CoreAdminModelForm):
-    ...
+class UploadPackageForm(CoreAdminModelForm): ...
 
 
 class QAPackageForm(CoreAdminModelForm):
@@ -32,7 +31,7 @@ class QAPackageForm(CoreAdminModelForm):
         required=False,
         help_text=_("Força a publicação de journal"),
     )
-    
+
     force_issue_publication = forms.BooleanField(
         label=_("Força a publicação de issue"),
         required=False,
@@ -47,9 +46,7 @@ class QAPackageForm(CoreAdminModelForm):
             if qa_decision == choices.PS_PENDING_QA_DECISION and not analyst:
                 self.add_error(
                     "analyst",
-                    _(
-                        "Choose the analyst who will decide about the package"
-                    ),
+                    _("Choose the analyst who will decide about the package"),
                 )
 
             if not qa_decision:
@@ -64,8 +61,14 @@ class QAPackageForm(CoreAdminModelForm):
         qa_package = super().save_all(user)
 
         if qa_package.qa_decision != choices.PS_PENDING_QA_DECISION:
-            if not qa_package.analyst or qa_package.analyst and qa_package.analyst.user != user:
-                qa_package.analyst = CollectionTeamMember.objects.filter(user=user).first()
+            if (
+                not qa_package.analyst
+                or qa_package.analyst
+                and qa_package.analyst.user != user
+            ):
+                qa_package.analyst = CollectionTeamMember.objects.filter(
+                    user=user
+                ).first()
 
         if qa_package.analyst:
             qa_package.assignee = qa_package.analyst.user
@@ -80,7 +83,7 @@ class ReadyToPublishPackageForm(CoreAdminModelForm):
         required=False,
         help_text=_("Força a publicação de journal"),
     )
-    
+
     force_issue_publication = forms.BooleanField(
         label=_("Força a publicação de issue"),
         required=False,
@@ -95,9 +98,7 @@ class ReadyToPublishPackageForm(CoreAdminModelForm):
             if qa_decision == choices.PS_PENDING_CORRECTION and not qa_comment.strip():
                 self.add_error(
                     "qa_comment",
-                    _(
-                        "Justify your decision about the package"
-                    ),
+                    _("Justify your decision about the package"),
                 )
             # manter simples, versão sem possibilidade de agendamento
             # scheduled_release_date = cleaned_data.get("scheduled_release_date")

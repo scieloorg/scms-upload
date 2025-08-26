@@ -62,7 +62,7 @@ class JournalAdmin(ModelAdmin):
     add_to_settings_menu = False
     exclude_from_explorer = False
 
-    list_display = ("title", "journal_acron", "issn_electronic", "issn_print", "required_data_completed", "updated")
+    list_display = ("title", "journal_acron", "core_synchronized", "updated")
     search_fields = (
         "official_journal__issn_electronic",
         "official_journal__issn_print",
@@ -70,6 +70,7 @@ class JournalAdmin(ModelAdmin):
         "title",
         "journal_acron",
     )
+    list_filter = ("core_synchronized", )
 
 
 class JournalModelAdminGroup(ModelAdminGroup):

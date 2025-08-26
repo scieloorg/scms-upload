@@ -99,7 +99,9 @@ def receive_package(user, package):
                 )
                 # falhou, retorna response
                 report.finish_validations()
-                package.finish_reception(blocking_error_status=response.get("package_status"))
+                package.finish_reception(
+                    blocking_error_status=response.get("package_status")
+                )
                 return response
 
             if package.article:
@@ -214,9 +216,9 @@ def _check_package_is_expected(response, package, sps_pkg_name):
 
     if previous_package and previous_package.status in choices.PS_WIP:
         raise UnexpectedPackageError(
-            _("Not allowed to accept new package. There is a previous package which status={}. Search it and change the status to '{}'").format(
-                previous_package.status, choices.PS_PENDING_CORRECTION
-            )
+            _(
+                "Not allowed to accept new package. There is a previous package which status={}. Search it and change the status to '{}'"
+            ).format(previous_package.status, choices.PS_PENDING_CORRECTION)
         )
 
     if article:
@@ -228,9 +230,9 @@ def _check_package_is_expected(response, package, sps_pkg_name):
             response["package_category"] = choices.PC_UPDATE
 
             raise UnexpectedPackageError(
-                _("Not allowed to accept new package. There is a previous package which status={}. Search it and change the status to '{}'").format(
-                    article.status, choices.PS_PENDING_CORRECTION
-                )
+                _(
+                    "Not allowed to accept new package. There is a previous package which status={}. Search it and change the status to '{}'"
+                ).format(article.status, choices.PS_PENDING_CORRECTION)
             )
     else:
         response["package_category"] = choices.PC_NEW_DOCUMENT
@@ -243,9 +245,9 @@ def _archive_pending_correction_package(response, name):
         params["article"] = response.get("article")
     else:
         params["name"] = name
-    Package.objects.filter(
-        **params, status=choices.PS_PENDING_CORRECTION
-    ).update(status=choices.PS_ARCHIVED)
+    Package.objects.filter(**params, status=choices.PS_PENDING_CORRECTION).update(
+        status=choices.PS_ARCHIVED
+    )
 
 
 def _check_journal(response, xmltree, user):

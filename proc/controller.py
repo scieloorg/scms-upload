@@ -86,23 +86,22 @@ def ensure_journal_proc_exists(user, journal):
         JournalProc.DoesNotExist: Se não foi possível criar JournalProc
     """
     # Verificar se já existe
-    journal_procs = JournalProc.objects.filter(journal=journal, acron__isnull=False)
-    if journal_procs.exists():
-        return journal_procs.first()
+    if journal.missing_fields or not JournalProc.objects.filter(journal=journal, acron__isnull=False).exists():
+        # Não existe, criar um novo
+        create_or_update_journal(
+            journal_title=journal.title,
+            issn_electronic=journal.official_journal.issn_electronic,
+            issn_print=journal.official_journal.issn_print,
+            user=user,
+            force_update=True,
+        )
 
-    # Não existe, criar um novo
-    create_or_update_journal(
-        journal_title=journal.title,
-        issn_electronic=journal.official_journal.issn_electronic,
-        issn_print=journal.official_journal.issn_print,
-        user=user,
-        force_update=True,
-    )
-
-    # Verificar se foi criado
-    journal_procs = JournalProc.objects.filter(journal=journal)
-    if journal_procs.exists():
-        return journal_procs.first()
+    journal_proc = JournalProc.objects.filter(journal=journal, acron__isnull=False).first()
+    if journal_proc:
+        if not journal.journal_acron:
+            journal.journal_acron = journal_proc.acron
+            journal.save()
+        return True
 
     raise JournalProc.DoesNotExist(f"JournalProc does not exist: {journal}")
 
@@ -122,9 +121,8 @@ def ensure_issue_proc_exists(user, issue):
         IssuePrerequisiteError: Se não foi possível criar IssueProc
     """
     # Verificar se o IssueProc já existe
-    issue_procs = IssueProc.objects.filter(issue=issue)
-    if issue_procs.exists():
-        return issue_procs.first()
+    if IssueProc.objects.filter(issue=issue).exists():
+        return True
 
     # Não existe, criar um novo
     create_or_update_issue(
@@ -138,8 +136,7 @@ def ensure_issue_proc_exists(user, issue):
     )
 
     # Verificar se foi criado
-    issue_procs = IssueProc.objects.filter(issue=issue)
-    if issue_procs.exists():
-        return issue_procs.first()
+    if IssueProc.objects.filter(issue=issue).exists():
+        return True
 
     raise IssueProc.DoesNotExist(f"IssueProc does not exist: {issue}")

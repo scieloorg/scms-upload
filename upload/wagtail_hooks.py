@@ -61,9 +61,7 @@ class PackageZipAdmin(ModelAdmin):
         "creator",
         "updated",
     )
-    list_filter = (
-        "creator",
-    )
+    list_filter = ("creator",)
     search_fields = (
         "name",
         "file",
@@ -263,9 +261,15 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
         ]
         if self.permission_helper.user_is_analyst_team_member(request.user, None):
             params = {}
-            return super().get_queryset(request).filter(
-                Q(assignee__isnull=True) | Q(assignee=request.user),
-                status__in=status, **params)
+            return (
+                super()
+                .get_queryset(request)
+                .filter(
+                    Q(assignee__isnull=True) | Q(assignee=request.user),
+                    status__in=status,
+                    **params
+                )
+            )
         else:
             params = {"creator": request.user}
 
@@ -407,7 +411,7 @@ class XMLErrorAdmin(ModelAdmin):
     def get_queryset(self, request):
         if not self.permission_helper.user_can_use_upload_module(request.user, None):
             return super().get_queryset(request).none()
-        
+
         if self.permission_helper.user_is_analyst_team_member(request.user, None):
             return super().get_queryset(request)
 
@@ -657,7 +661,11 @@ class ArchivedPackageAdmin(ModelAdmin):
         if not self.permission_helper.user_is_analyst_team_member(request.user, None):
             params = {"creator": request.user}
 
-        return super().get_queryset(request).filter(~Q(status__in=choices.PS_WIP), **params)
+        return (
+            super()
+            .get_queryset(request)
+            .filter(~Q(status__in=choices.PS_WIP), **params)
+        )
 
 
 class UploadModelAdminGroup(ModelAdminGroup):
@@ -690,6 +698,7 @@ class UploadReportsModelAdminGroup(ModelAdminGroup):
         UploadValidatorAdmin,
     )
     menu_order = get_menu_order("upload-error")
+
 
 modeladmin_register(UploadReportsModelAdminGroup)
 

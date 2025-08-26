@@ -32,6 +32,7 @@ from upload.utils import file_utils, package_utils, xml_utils
 
 User = get_user_model()
 
+
 def _get_user(user_id, username):
     try:
         if user_id:
@@ -67,7 +68,6 @@ def _get_collections(collection_acron):
                 "collection_acron": collection_acron,
             },
         )
-
 
 
 # @celery_app.task(name="Validate article change")
@@ -266,9 +266,7 @@ def task_validate_renditions_content(package_id, xml_path):
                 validation_result = report.add_validation_result(
                     status=choices.VALIDATION_RESULT_FAILURE,
                     message=result["message"],
-                    data={
-                        "filename": rendition["name"],
-                        "lang": rendition["lang"]},
+                    data={"filename": rendition["name"], "lang": rendition["lang"]},
                     subject=rendition["name"],
                 )
 
@@ -287,9 +285,7 @@ def task_validate_renditions_content(package_id, xml_path):
 
 
 @celery_app.task(bind=True, priority=0)
-def task_receive_packages(
-    self, user_id, pkg_zip_id
-):
+def task_receive_packages(self, user_id, pkg_zip_id):
     logging.info(f"user_id: {user_id}")
     logging.info(f"pkg_zip_id: {pkg_zip_id}")
     user = User.objects.get(pk=user_id)
@@ -310,9 +306,7 @@ def task_receive_packages(
 
 
 @celery_app.task(bind=True, priority=0)
-def task_receive_package(
-    self, user_id, pkg_id
-):
+def task_receive_package(self, user_id, pkg_id):
     logging.info(f"user_id: {user_id}")
     logging.info(f"pkg_id: {pkg_id}")
     user = User.objects.get(pk=user_id)
@@ -472,7 +466,7 @@ def task_validate_xml_structure(
                     status=choices.VALIDATION_RESULT_SUCCESS,
                     message=_("No error found"),
                     data=str(summary),
-                    subject=_("XML Style")
+                    subject=_("XML Style"),
                 )
         except Exception as exc:
             logging.exception(f"{exc}: {summary}")
@@ -480,7 +474,7 @@ def task_validate_xml_structure(
                 status=choices.VALIDATION_RESULT_CRITICAL,
                 message=str(exc),
                 data=str(summary),
-                subject=_("XML Style")
+                subject=_("XML Style"),
             )
 
         report.finish_validations()
@@ -501,7 +495,9 @@ def task_validate_xml_content(
 ):
     try:
         logging.info("\ntask_validate_xml_content")
-        logging.info((file_path, xml_path, package_id, journal_id, issue_id, article_id))
+        logging.info(
+            (file_path, xml_path, package_id, journal_id, issue_id, article_id)
+        )
         operation = None
         package = Package.objects.get(pk=package_id)
         operation = package.start(package.creator, "xml_data_checker")
@@ -530,7 +526,12 @@ def task_validate_xml_content(
         logging.exception(e)
         exc_type, exc_value, exc_traceback = sys.exc_info()
         if operation:
-            operation.finish(package.creator, completed=False, exception=e, exc_traceback=exc_traceback)
+            operation.finish(
+                package.creator,
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
+            )
             return
 
         UnexpectedEvent.create(
@@ -562,9 +563,7 @@ def task_validate_webpages_content(package_id):
                 validation_result = report.add_validation_result(
                     status=choices.VALIDATION_RESULT_FAILURE,
                     message=result["message"],
-                    data={
-                        "filename": webpage["name"],
-                        "lang": webpage["lang"]},
+                    data={"filename": webpage["name"], "lang": webpage["lang"]},
                     subject=webpage["name"],
                 )
 
@@ -647,7 +646,13 @@ def task_publish_article(
         publication.ensure_issue_proc_exists(user, issue)
 
         responses = list(
-            publication.publish_article_collection_websites(user, manager, websites, force_journal_publication, force_issue_publication)
+            publication.publish_article_collection_websites(
+                user,
+                manager,
+                websites,
+                force_journal_publication,
+                force_issue_publication,
+            )
         )
         logging.info(f"responses: {responses}")
         op_main.finish(
@@ -682,9 +687,10 @@ def task_publish_article(
                 ),
             )
     else:
-        task_check_article_availability.apply_async(kwargs=dict(
-            username=user.username,
-            user_id=user.id,
-            article_pid_v3=article.pid_v3,
-        ))
-
+        task_check_article_availability.apply_async(
+            kwargs=dict(
+                username=user.username,
+                user_id=user.id,
+                article_pid_v3=article.pid_v3,
+            )
+        )

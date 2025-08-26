@@ -945,8 +945,8 @@ class JournalProc(BaseProc, ClusterableModel):
     @property
     def completeness(self):
         return {
-            "is_completed": self.journal.is_completed,
-            "required_data_completed": self.journal.required_data_completed,
+            "core_synchronized": self.journal.core_synchronized,
+            "missing_fields": self.journal.missing_fields,
         }
 
     @property
@@ -1360,12 +1360,12 @@ class IssueProc(BaseProc, ClusterableModel):
 
     def migrate_document_records(self, user, force_update=None):
         try:
+            detail = None
             operation = None
             operation = self.start(user, "migrate_document_records")
             if not self.journal_proc:
                 raise ValueError(f"IssueProc ({self}) has no journal_proc")
 
-            detail = None
             journal_data = self.journal_proc.migrated_data.data
             issue_data = self.migrated_data.data
 
@@ -1457,17 +1457,8 @@ class IssueProc(BaseProc, ClusterableModel):
         return article_proc
 
     @staticmethod
-    def get_issue_pid(issue, journal):
-        issue_proc = IssueProc.objects.filter(issue=issue).first()
-        if issue_proc:
-            return issue_proc.pid
-        if journal:
-            journal_proc = JournalProc.objects.filter(journal=journal).first()
-            if journal_proc:
-                issn_id = journal_proc.pid
-                year = issue.publication_year
-                issue_pid_suffix = issue.issue_pid_suffix
-            return f"{issn_id}{year}{issue_pid_suffix}"
+    def get_issue_pid(issue):
+        return IssueProc.objects.filter(issue=issue).first().pid
 
     @property
     def bundle_id(self):

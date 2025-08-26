@@ -16,7 +16,7 @@ class UploadPermissionHelper(PermissionHelper):
 
     def user_can_use_upload_module(self, user, obj):
         return has_permission(user)
-        
+
     def user_can_access_all_packages(self, user, obj):
         return self.user_has_specific_permission(user, ACCESS_ALL_PACKAGES)
 

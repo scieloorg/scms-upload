@@ -60,35 +60,39 @@ class UploadButtonHelper(ButtonHelper):
         )
         if obj.status in status:
             text = label or _("Accept / Reject the package or delegate it")
-            btns.append({
-                "url": reverse("upload:assign") + "?package_id=%s" % str(obj.id),
-                "label": text,
-                "classname": self.finalise_classname(classnames),
-                "title": text,
-            })
+            btns.append(
+                {
+                    "url": reverse("upload:assign") + "?package_id=%s" % str(obj.id),
+                    "label": text,
+                    "classname": self.finalise_classname(classnames),
+                    "title": text,
+                }
+            )
 
     def add_finish_deposit_button(self, btns, obj, classnames, url_name):
-        status = (
-            choices.PS_VALIDATED_WITH_ERRORS,
-        )
+        status = (choices.PS_VALIDATED_WITH_ERRORS,)
         if obj.status in status and url_name == "upload_package_modeladmin_inspect":
             text = _("Finish deposit")
-            btns.append({
-                "url": reverse("upload:finish_deposit") + "?package_id=%s" % str(obj.id),
-                "label": text,
-                "classname": self.finalise_classname(classnames),
-                "title": text,
-            })
+            btns.append(
+                {
+                    "url": reverse("upload:finish_deposit")
+                    + "?package_id=%s" % str(obj.id),
+                    "label": text,
+                    "classname": self.finalise_classname(classnames),
+                    "title": text,
+                }
+            )
 
     def add_archive_button(self, btns, obj, classnames, label=None):
-        status = (
-            choices.PS_UNEXPECTED,
-        )
+        status = (choices.PS_UNEXPECTED,)
         if obj.status in status:
             text = label or _("Archive")
-            btns.append({
-                "url": reverse("upload:archive_package") + "?package_id=%s" % str(obj.id),
-                "label": text,
-                "classname": self.finalise_classname(classnames),
-                "title": text,
-            })
+            btns.append(
+                {
+                    "url": reverse("upload:archive_package")
+                    + "?package_id=%s" % str(obj.id),
+                    "label": text,
+                    "classname": self.finalise_classname(classnames),
+                    "title": text,
+                }
+            )
