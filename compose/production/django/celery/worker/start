@@ -5,4 +5,4 @@ set -o pipefail
 set -o nounset
 
 
-exec celery -A config.celery_app worker -l INFO
+exec celery -A config.celery_app worker -l INFO --concurrency=1 --max-tasks-per-child=1 --max-memory-per-child=200000

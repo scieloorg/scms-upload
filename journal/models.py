@@ -10,7 +10,7 @@ from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInte
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
-from collection.models import Collection
+from collection.models import Collection, Language
 from core.choices import MONTHS
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField, HTMLTextModel, TextModel
@@ -158,39 +158,6 @@ class OfficialJournal(CommonControlField):
         return self.title or self.issn_electronic or self.issn_print or ""
 
     @property
-    def is_completed(self):
-        """
-        Verifica se todos os campos do OfficialJournal estão preenchidos.
-        Retorna True se todos os campos estiverem preenchidos, False caso contrário.
-        """
-        # Verificar todos os campos CharField
-        if (
-            not self.title
-            or not self.title_iso
-            or not self.foundation_year
-            or not (self.issn_print or self.issn_electronic)
-        ):
-            return False
-        # Se passou por todas as verificações, todos os campos estão preenchidos
-        return True
-
-    @property
-    def required_data_completed(self):
-        """
-        Verifica se todos os campos do OfficialJournal estão preenchidos.
-        Retorna True se todos os campos estiverem preenchidos, False caso contrário.
-        """
-        # Verificar todos os campos CharField
-        if (
-            not self.title
-            or not self.title_iso
-            or not (self.issn_print or self.issn_electronic)
-        ):
-            return False
-        # Se passou por todas as verificações, todos os campos estão preenchidos
-        return True
-
-    @property
     def data(self):
         d = {
             "official_journal__title": self.title,
@@ -285,6 +252,7 @@ class Journal(CommonControlField, ClusterableModel):
         Location, on_delete=models.SET_NULL, null=True, blank=True
     )
     wos_areas = models.JSONField(null=True, blank=True)
+    core_synchronized = models.BooleanField(default=False)
 
     def __unicode__(self):
         return self.title or self.short_title or str(self.official_journal)
@@ -298,6 +266,7 @@ class Journal(CommonControlField, ClusterableModel):
         AutocompletePanel("official_journal"),
         FieldPanel("short_title"),
         FieldPanel("journal_acron"),
+        FieldPanel("core_synchronized"),
     ]
 
     panels_owner = [
@@ -327,82 +296,6 @@ class Journal(CommonControlField, ClusterableModel):
             ~Q(number__contains=["spe", "ahead"]),
             supplement__isnull=True,
         ).count()
-
-    @property
-    def is_completed(self):
-        """
-        Verifica se todos os campos de um objeto Journal estão preenchidos.
-        Retorna True se todos os campos estiverem preenchidos, False caso contrário.
-        """
-        # Verificar campos CharField, URLField
-        if (
-            not self.short_title
-            or not self.title
-            or not self.journal_acron
-            or not self.submission_online_url
-            or not self.license_code
-            or not self.nlm_title
-            or not self.doi_prefix
-            or not self.logo_url
-            or not self.contact_name
-            or not self.contact_address
-        ):
-            return False
-
-        # Verificar campos de relacionamento ForeignKey
-        if not self.official_journal or not self.contact_location:
-            return False
-
-        # Verificar campo ManyToManyField
-        if not self.subject.exists():
-            return False
-
-        # Verificar campo JSONField
-        if not self.wos_areas:
-            return False
-
-        # Se passou por todas as verificações, todos os campos estão preenchidos
-        return True
-
-    @property
-    def required_data_completed(self):
-        """
-        Verifica se todos os campos obrigatórios do Journal estão preenchidos.
-        Retorna True se todos os campos estiverem preenchidos, False caso contrário.
-        """
-        # Verificar todos os campos CharField
-        if (
-            not self.short_title
-            or not self.title
-            or not self.journal_acron
-            or not self.submission_online_url
-            or not self.license_code
-            or not self.logo_url
-            or not self.contact_name
-            or not self.contact_address
-        ):
-            return False
-
-        # Verificar campos de relacionamento ForeignKey
-        if not self.contact_location:
-            return False
-
-        if not self.official_journal:
-            return False
-
-        if not self.official_journal.required_data_completed:
-            return False
-
-        # Verificar campo ManyToManyField
-        if not self.subject.exists():
-            return False
-
-        # Verificar campo JSONField
-        if not self.wos_areas:
-            return False
-
-        # Se passou por todas as verificações, todos os campos estão preenchidos
-        return True
 
     @property
     def issn_print(self):
@@ -527,6 +420,14 @@ class Journal(CommonControlField, ClusterableModel):
         except AttributeError:
             # na dúvida, retorna True
             return True
+
+    def add_mission(self, user, lang_code, text):
+        return Mission.create_or_update(
+            user,
+            self,
+            language=Language.get(code2=lang_code),
+            mission_text=text,
+        )
 
     def add_section(self, user, language, code, text):
         return JournalSection.create_or_update(
@@ -666,6 +567,61 @@ class Journal(CommonControlField, ClusterableModel):
     @property
     def subject_areas(self):
         return [item.value for item in self.subject.all()]
+
+    @property
+    def missing_fields(self):
+        """
+        Verifica campos não preenchidos no Journal e retorna um relatório detalhado.
+        """
+        fields = {
+            'title': _('Journal Title'),
+            'short_title': _('Short Title'),
+            'journal_acron': _('Journal Acronym'),
+            'official_journal': _('Official Journal'),
+            'contact_name': _('Contact Name'),
+            'contact_address': _('Contact Address'),
+            'contact_location': _('Contact Location'),
+            'submission_online_url': _('Submission Online URL'),
+            'logo_url': _('Logo URL'),
+            'license_code': _('License Code'),
+            'wos_areas': _('WoS Areas'),
+        }
+        missing = []
+        for field, description in fields.items():
+            value = getattr(self, field, None)
+            if not value or (isinstance(value, str) and not value.strip()):
+                missing.append(description)
+        
+        # Verificar official_journal
+        if self.official_journal:
+            if not self.official_journal.issn_electronic:
+                missing.append(_('Electronic ISSN'))
+            if not self.official_journal.issn_print:
+                missing.append(_('Print ISSN'))
+            if not self.official_journal.title_iso:
+                missing.append(_('ISO Title'))
+        
+        # Verificar mission
+        if not self.mission.exists():
+            missing.append(_('mission'))
+        
+        # Verificar sponsor
+        if not self.sponsor.exists():
+            missing.append(_('sponsor'))
+        
+        # Verificar owner
+        if not self.owner.exists():
+            missing.append(_('owner'))
+        
+        # Verificar publisher
+        if not self.publisher.exists():
+            missing.append(_('publisher'))
+        
+        # Verificar subject
+        if not self.subject.exists():
+            missing.append(_('study area'))
+        
+        return missing
 
 
 class JournalEmail(Orderable):
@@ -1104,7 +1060,7 @@ class JournalHistory(CommonControlField):
 
 
 class Subject(CommonControlField):
-    code = models.CharField(max_length=30, null=True, blank=True)
+    code = models.CharField(max_length=36, null=True, blank=True)
     value = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
