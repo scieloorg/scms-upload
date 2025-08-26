@@ -291,8 +291,16 @@ def process_journal_result(user, result, block_unregistered_collection, force_up
         )
         journal.sponsor.add(Sponsor.create_or_update(user, journal, institution))
 
+    no_lang = []
     for item in result.get("mission"):
+        if not item["language"]:
+            no_lang.append(item["rich_text"])
+            continue
+        if no_lang:
+            item["rich_text"] = "\n".join(no_lang) + "\n" + item["rich_text"]
+
         journal.add_mission(user, item["language"], item["rich_text"])
+        no_lang = []
 
     # Processa dados específicos do SciELO
     for item in result.get("scielo_journal") or []:
