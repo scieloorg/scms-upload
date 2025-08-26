@@ -312,7 +312,15 @@ class Article(ClusterableModel, CommonControlField):
 
         obj.add_sections(user)
         obj.add_article_titles(user)
+        obj.add_doi_with_lang(user, xml_with_pre.article_doi_with_lang)
         return obj
+
+    def add_doi_with_lang(self, user, article_doi_with_lang):
+        for item in article_doi_with_lang:
+            try:
+                ArticleDOIWithLang.get_or_create(user, self, item["value"], item["lang"])
+            except Exception as e:
+                logging.exception(e)
 
     def add_pp_xml(self, save=False):
         if not self.pp_xml:
@@ -501,9 +509,81 @@ class Article(ClusterableModel, CommonControlField):
 
 
 class ArticleDOIWithLang(Orderable, DOIWithLang):
-    doi_with_lang = ParentalKey(
+    article = ParentalKey(
         "Article", on_delete=models.CASCADE, related_name="doi_with_lang"
     )
+    
+    class Meta:
+        verbose_name = _("Article DOI with Language")
+        verbose_name_plural = _("Article DOIs with Language")
+    
+    def __unicode__(self):
+        return f"{self.lang}: {self.doi}"
+    
+    def __str__(self):
+        return f"{self.lang}: {self.doi}"
+    
+    @classmethod
+    def get(cls, article=None, doi=None, lang=None):
+        if lang and isinstance(lang, str):
+            lang = Language.get(code2=lang)
+
+        if article and doi and lang:
+            try:
+                return cls.objects.get(
+                    article=article,
+                    doi__iexact=doi,
+                    lang=lang
+                )
+            except cls.MultipleObjectsReturned:
+                return cls.objects.filter(
+                    article=article,
+                    doi__iexact=doi,
+                    lang=lang
+                ).first()
+
+        params = {}
+        if lang:
+            params["lang"] = lang
+        if article:
+            params["article"] = article
+        if doi:
+            params["doi"] = doi
+        if params:
+            return cls.objects.filter(**params)
+        raise ValueError(
+            f"ArticleDOIWithLang.get missing params {dict(article=article, doi=doi, lang=lang)}"
+        )
+    
+    @classmethod
+    def create(cls, user, article=None, doi=None, lang=None):
+        if lang and isinstance(lang, str):
+            lang = Language.get(code2=lang)
+        if article and doi and lang:
+            try:
+                obj = cls()
+                obj.article = article
+                obj.doi = doi
+                obj.lang = lang
+                obj.creator = user
+                obj.save()
+                return obj
+            except IntegrityError:
+                return cls.get(article, doi, lang)
+        raise ValueError(
+            f"ArticleDOIWithLang.create missing params {dict(article=article, doi=doi, lang=lang)}"
+        )
+    
+    @classmethod
+    def get_or_create(cls, user, article=None, doi=None, lang=None):
+        if article and doi and lang:
+            # cria ou obtém
+            try:
+                return cls.get(article, doi, lang)
+            except cls.DoesNotExist:
+                return cls.create(user, article, doi, lang)
+        # só obtém
+        return cls.get(article, doi, lang)
 
 
 class ArticleTitle(HTMLTextModel, CommonControlField):
