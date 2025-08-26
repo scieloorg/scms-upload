@@ -9,7 +9,12 @@ from wagtail_modeladmin.views import CreateView, EditView, InspectView
 from article.models import Article
 from issue.models import Issue
 from upload.models import Package, choices
-from upload.tasks import task_receive_packages, task_publish_article
+from upload.tasks import (
+    task_receive_packages,
+    task_publish_article,
+    task_complete_journal_data,
+    task_complete_issue_data,
+)
 from upload.utils import file_utils
 from upload.utils import package_utils
 from upload.utils.package_utils import coerce_package_and_errors, render_html
@@ -135,58 +140,69 @@ class XMLErrorReportEditView(XMLInfoReportEditView):
         return f"/admin/upload/package/inspect/{report.package.id}/?#xer{report.id}"
 
 
-class QAPackageEditView(EditView):
+class PackageDecisionMixin:
+    """Mixin configurável para processar decisões de publicação de pacotes"""
+
+    # Atributos que podem ser sobrescritos nas classes filhas
+    success_message = _("The decision was executed as planned")
+    error_message = _("There was an impediment to executing the decision.")
+    permission_error_message = _("Operation not available")
+
+    def get_task_function(self):
+        """Pode ser sobrescrito se diferentes views usarem tasks diferentes"""
+        return task_publish_article
+
+    def process_decision(self, package, user, force_journal, force_issue):
+        """Pode ser sobrescrito para customizar o processamento"""
+        return package.process_qa_decision(
+            user, self.get_task_function(), force_journal, force_issue
+        )
+
     def form_valid(self, form):
         if not has_permission(self.request.user):
-            messages.error(
-                self.request,
-                _("Operation not available"),
-            )
+            messages.error(self.request, self.permission_error_message)
             return HttpResponseRedirect(self.get_success_url())
+
         package = form.save_all(self.request.user)
+
+        user = self.request.user
         force_journal_publication = form.cleaned_data.get("force_journal_publication")
+        if force_journal_publication and package.journal:
+            task_complete_journal_data.delay(
+                user_id=user.id,
+                username=user.username,
+                journal_id=package.journal.id,
+            )
         force_issue_publication = form.cleaned_data.get("force_issue_publication")
-        messages.success(
-            self.request,
-            _("Decision: {} {} {}").format(
-                package.qa_decision, force_journal_publication, force_issue_publication
-            ),
-        )
-        package.process_qa_decision(
+        if force_issue_publication and package.issue:
+            task_complete_issue_data.delay(
+                user_id=user.id,
+                username=user.username,
+                issue_id=package.issue.id,
+            )
+
+        if self.process_decision(
+            package,
             self.request.user,
-            task_publish_article,
             force_journal_publication,
             force_issue_publication,
-        )
-
-        return HttpResponseRedirect(self.get_success_url())
-
-
-class ReadyToPublishPackageEditView(EditView):
-    def form_valid(self, form):
-        if not has_permission(self.request.user):
-            messages.error(
-                self.request,
-                _("Operation not available"),
-            )
+        ):
+            messages.success(self.request, self.success_message)
             return HttpResponseRedirect(self.get_success_url())
-        package = form.save_all(self.request.user)
-        force_journal_publication = form.cleaned_data.get("force_journal_publication")
-        force_issue_publication = form.cleaned_data.get("force_issue_publication")
-        messages.success(
-            self.request,
-            _("Decision: {} {} {}").format(
-                package.qa_decision, force_journal_publication, force_issue_publication
-            ),
-        )
-        package.process_qa_decision(
-            self.request.user,
-            task_publish_article,
-            force_journal_publication,
-            force_issue_publication,
-        )
+        else:
+            messages.error(self.request, self.error_message)
+            return self.form_invalid(form)
 
-        return HttpResponseRedirect(self.get_success_url())
+
+class QAPackageEditView(PackageDecisionMixin, EditView):
+    # Usando as mensagens padrão
+    pass
+
+
+class ReadyToPublishPackageEditView(PackageDecisionMixin, EditView):
+    # Exemplo de customização de mensagens
+    success_message = _("Article successfully published")
+    error_message = _("Failed to publish the article. Please try again.")
 
 
 class UploadValidatorEditView(EditView):
