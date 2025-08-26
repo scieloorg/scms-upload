@@ -278,14 +278,12 @@ def _check_journal(response, xmltree, user):
                 }
             )
         if similar_journals:
-            similar_journals = _("Expected journal data: {}. ").format(similar_journals)
+            similar_journals = _("Registered journals: {}. ").format(similar_journals)
         else:
-            similar_journals = _(
-                "No journal with similar data is registered in the system"
-            )
+            similar_journals = _("Found no registered journal. ")
         raise PackageDataError(
             _(
-                "Journal data in XML: {}. {}Check and fix the journal data in XML"
+                "Journal in XML must be a registered journal. Journal in XML: {}. {}. Register the journal on core.scielo.org"
             ).format(data, similar_journals)
         )
 
@@ -338,13 +336,13 @@ def _check_issue(response, xmltree, user):
                 }
             )
         if issues:
-            issues = _("Expected issue data: {}. ").format(issues)
+            issues = _("Registered issues: {}. ").format(issues)
         else:
-            issues = _("No issue with similar data is registered in the system")
+            issues = _("{} has no registered issues").format(response["journal"])
         raise PackageDataError(
-            _("Issue data in XML: {}. {}Check and fix the issue data in XML").format(
-                data, issues
-            )
+            _(
+                "Issue in XML must be a registered issue. Issue in XML {}. {}. Register the issue on core.scielo.org"
+            ).format(data, issues)
         )
 
 

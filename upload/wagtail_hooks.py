@@ -98,7 +98,6 @@ class PackageAdmin(ModelAdmin):
 
     list_display = (
         "__str__",
-        "critical_errors",
         "xml_errors_percentage",
         "category",
         "status",
@@ -107,7 +106,8 @@ class PackageAdmin(ModelAdmin):
         "expiration_date",
     )
     list_filter = (
-        "creator",
+        "blocking_errors",
+        "critical_errors",
         "category",
         "status",
     )
@@ -259,8 +259,10 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
             choices.PS_PENDING_CORRECTION,
             choices.PS_PENDING_QA_DECISION,
         ]
+        params = {
+            "blocking_errors": 0,
+        }
         if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            params = {}
             return (
                 super()
                 .get_queryset(request)
@@ -271,7 +273,7 @@ class QualityAnalysisPackageAdmin(ModelAdmin):
                 )
             )
         else:
-            params = {"creator": request.user}
+            params["creator"] = request.user
 
         return super().get_queryset(request).filter(status__in=status, **params)
 
@@ -330,11 +332,13 @@ class ReadyToPublishPackageAdmin(ModelAdmin):
             choices.PS_PUBLISHED,
             # choices.PS_SCHEDULED_PUBLICATION,
         ]
+        params = {
+            "blocking_errors": 0,
+        }
         if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            params = {}
             return super().get_queryset(request).filter(status__in=status, **params)
         else:
-            params = {"creator": request.user}
+            params["creator"] = request.user
 
         return super().get_queryset(request).filter(status__in=status, **params)
 

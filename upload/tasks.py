@@ -17,6 +17,7 @@ from collection import choices as collection_choices
 from config import celery_app
 from issue.models import Issue
 from journal.models import Journal
+from proc.controller import ensure_journal_proc_exists, ensure_issue_proc_exists
 from tracker.models import UnexpectedEvent
 from upload import choices
 from upload.controller import receive_package
@@ -639,11 +640,8 @@ def task_publish_article(
         # Iniciar operação principal
         op_main = manager.start(user, f"Publishing article to {', '.join(websites)}")
 
-        # Garantir que o JournalProc existe (pré-requisito comum)
-        publication.ensure_journal_proc_exists(user, journal)
-
-        # Garantir que o IssueProc existe (pré-requisito comum)
-        publication.ensure_issue_proc_exists(user, issue)
+        ensure_journal_proc_exists(user, journal)
+        ensure_issue_proc_exists(user, issue)
 
         responses = list(
             publication.publish_article_collection_websites(
@@ -693,4 +691,56 @@ def task_publish_article(
                 user_id=user.id,
                 article_pid_v3=article.pid_v3,
             )
+        )
+
+
+@celery_app.task(bind=True)
+def task_complete_journal_data(
+    self,
+    user_id,
+    username,
+    journal_id=None,
+):
+    """
+    Tarefa que publica artigos ingressados pelo Upload
+    """
+    try:
+        user = _get_user(user_id, username)
+        ensure_journal_proc_exists(user, Journal.objects.get(pk=journal_id))
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail=dict(
+                task="task_complete_journal_data",
+                item="journal",
+                journal_id=journal_id,
+            ),
+        )
+
+
+@celery_app.task(bind=True)
+def task_complete_issue_data(
+    self,
+    user_id,
+    username,
+    issue_id=None,
+):
+    """
+    Tarefa que publica artigos ingressados pelo Upload
+    """
+    try:
+        user = _get_user(user_id, username)
+        ensure_issue_proc_exists(user, Issue.objects.get(pk=issue_id))
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail=dict(
+                task="task_complete_issue_data",
+                item="issue",
+                issue_id=issue_id,
+            ),
         )
