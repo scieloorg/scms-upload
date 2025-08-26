@@ -996,13 +996,14 @@ class Package(CommonControlField, ClusterableModel):
             if self.article and self.article.pid_v2:
                 xml_with_pre.v2 = self.article.pid_v2
             else:
-                xml_with_pre.v2 = self.generate_pid_v2(user, xml_with_pre)
+                self.add_pid_v2(user, xml_with_pre)
+            return True
 
-    def generate_pid_v2(self, user, xml_with_pre):
+    def add_pid_v2(self, user, xml_with_pre):
         try:
             detail = None
             pid_v2_gen = None
-            event = self.start(user, "generate_pid_v2")
+            event = self.start(user, "add_pid_v2")
             pid_v2_gen = PidV2Generator(xml_with_pre)
             xml_with_pre.v2 = pid_v2_gen.generate(user, self.journal, self.issue)
             detail = {"pid_v2": xml_with_pre.v2, "log": pid_v2_gen.log}
@@ -1022,7 +1023,6 @@ class Package(CommonControlField, ClusterableModel):
                 exc_traceback=exc_traceback,
             )
             raise
-            return True
 
     def prepare_sps_package(self, user, xml_with_pre, xml_file_changed):
         # Aplica-se também para um pacote de atualização de um conteúdo anteriormente migrado
