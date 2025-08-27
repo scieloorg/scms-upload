@@ -3,7 +3,7 @@
 # ========================================
 pytz==2023.3.post1  # https://github.com/stub42/pytz
 python-dateutil==2.9.0.post0  # https://github.com/dateutil/dateutil
-tenancy==8.2.3  # https://pypi.org/project/tenacity/
+tenacity==8.2.3  # https://pypi.org/project/tenacity/
 psutil==6.0.0  # System monitoring
 
 # ========================================
@@ -27,12 +27,12 @@ hiredis==3.0.0  # https://github.com/redis/hiredis-py
 # ========================================
 # Django Core
 # ========================================
-django==5.0.9  # Latest security patch
+django==5.2.3  # Latest security patch - UPGRADE de 5.0.9
 django-environ==0.11.2  # https://github.com/joke2k/django-environ
 django-model-utils==4.5.1  # https://github.com/jazzband/django-model-utils
-django-allauth==0.63.6  # https://github.com/pennersr/django-allauth
-django-crispy-forms==2.3  # https://github.com/django-crispy-forms/django-crispy-forms
-crispy-bootstrap5==2024.2  # https://github.com/django-crispy-forms/crispy-bootstrap5
+django-allauth==65.10.0  # https://github.com/pennersr/django-allauth - UPGRADE de 0.63.6
+django-crispy-forms==2.4  # https://github.com/django-crispy-forms/django-crispy-forms - UPGRADE de 2.3
+crispy-bootstrap5==2025.6  # https://github.com/django-crispy-forms/crispy-bootstrap5 - UPGRADE de 2024.2
 django-compressor==4.5.1  # https://github.com/django-compressor/django-compressor
 django-redis==5.4.0  # https://github.com/jazzband/django-redis
 
@@ -45,46 +45,46 @@ djangorestframework-simplejwt==5.3.1
 # ========================================
 # Celery & Task Queue
 # ========================================
-celery==5.3.6  # https://github.com/celery/celery
-django-celery-beat==2.6.0  # https://github.com/celery/django-celery-beat
-django-celery-results==2.5.1
+celery==5.5.3  # https://github.com/celery/celery - UPGRADE de 5.3.6
+django-celery-beat==2.8.1  # https://github.com/celery/django-celery-beat - UPGRADE de 2.6.0
+django-celery-results==2.6.0  # UPGRADE de 2.5.1
 flower==2.0.1  # https://github.com/mher/flower
 
 # ========================================
 # Wagtail CMS
 # ========================================
-wagtail==6.2.1  # https://github.com/wagtail/wagtail
+wagtail==6.4.2  # https://github.com/wagtail/wagtail - UPGRADE de 6.2.1
 wagtail-django-recaptcha==2.1.1
 wagtailmenus==3.1.9
-wagtail-localize==1.9.0  # Updated
+wagtail-localize==1.12.2  # UPGRADE de 1.9.0
 wagtail-modeladmin==2.0.0
-wagtail-autocomplete==0.11.0
+wagtail-autocomplete==0.12.0  # UPGRADE de 0.11.0
 
 # ========================================
 # Database & Storage
 # ========================================
 mongoengine==0.28.2
-minio==7.2.8  # Updated
+minio==7.2.8  # Mantendo versão maior
 
 # ========================================
 # XML Processing & Data Parsing
 # ========================================
-lxml==5.3.0  # https://github.com/lxml/lxml
+lxml==5.3.0  # https://github.com/lxml/lxml - Mantendo versão maior
 feedparser==6.0.11
 langdetect==1.0.9
 
 # ========================================
 # HTTP & Networking
 # ========================================
-aiohttp==3.10.5  # Async HTTP client
-urllib3==2.2.3
-requests>=2.32.3  # Updated
-tornado>=6.4.1  # Pinned by Snyk
+aiohttp==3.10.5  # Async HTTP client - Mantendo versão maior
+urllib3==2.2.3  # Mantendo versão maior
+requests>=2.32.3  # Mantendo versão maior
+tornado>=6.4.1  # Pinned by Snyk - Mantendo versão maior
 
 # ========================================
 # Localization
 # ========================================
-iso639-lang==2.4.0  # Updated
+iso639-lang==2.6.3  # Mantendo versão maior
 
 # ========================================
 # SciELO Specific Packages
@@ -94,3 +94,20 @@ iso639-lang==2.4.0  # Updated
 -e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
 -e git+https://github.com/scieloorg/opac_schema.git@v2.66#egg=opac_schema
 -e git+https://github.com/scieloorg/scielo_migration.git@1.8.10#egg=scielo_classic_website
+
+# ========================================
+# Development & Testing
+# ========================================
+freezegun==1.5.1  # https://pypi.org/project/freezegun/
+django-silk==5.3.2  # NOVA ADIÇÃO
+
+# ========================================
+# Excel Processing
+# ========================================
+xlwt==1.3.0  # NOVA ADIÇÃO
+xmltodict==0.13.0  # https://github.com/martinblech/xmltodict.git - NOVA ADIÇÃO
+
+# ========================================
+# Two Factor Authentication
+# ========================================
+wagtail-2fa-new==1.8.0  # https://pypi.org/project/wagtail-2fa-new/ - NOVA ADIÇÃO
