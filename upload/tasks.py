@@ -2,7 +2,7 @@ import json
 
 from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from packtools.sps import exceptions as sps_exceptions
 from packtools.sps.models import package as sps_package
 from packtools.sps.utils import file_utils as sps_file_utils

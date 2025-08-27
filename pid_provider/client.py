@@ -4,7 +4,7 @@ import sys
 import traceback
 from tempfile import TemporaryDirectory
 
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from packtools.sps.pid_provider.xml_sps_lib import (
     XMLWithPre,
     create_xml_zip_file,
