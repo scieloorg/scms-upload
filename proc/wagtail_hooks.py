@@ -1,5 +1,5 @@
 from django.urls import include, path
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail_modeladmin.options import (
     ModelAdmin,

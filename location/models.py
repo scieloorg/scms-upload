@@ -1,6 +1,6 @@
 from django.db import IntegrityError, models
 from django.db.models import Q
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 from core.models import CommonControlField
 from location.forms import CityForm, CountryForm, LocationForm, StateForm

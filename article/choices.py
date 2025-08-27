@@ -1,4 +1,4 @@
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 # Model RequestArticleChange, Field change_type
 RCT_UPDATE = "update"

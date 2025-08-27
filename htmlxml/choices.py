@@ -1,4 +1,4 @@
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 HTML2XML_QA_AUTO_APPROVED = "AUTO_APPROVED"
 HTML2XML_QA_APPROVED = "APPROVED"
