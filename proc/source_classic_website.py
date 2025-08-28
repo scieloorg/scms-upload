@@ -331,8 +331,11 @@ def migrate_document_records(
         )
 
     for issue_proc in IssueProc.objects.select_related(
-        "collection", "journal_proc", "issue", "migrated_data",
-        "journal_proc__migrated_data"
+        "collection",
+        "journal_proc",
+        "issue",
+        "migrated_data",
+        "journal_proc__migrated_data",
     ).filter(**params):
         issue_proc.migrate_document_records(user, force_update)
 

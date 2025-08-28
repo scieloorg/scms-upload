@@ -1246,7 +1246,9 @@ class IssueProc(BaseProc, ClusterableModel):
 
         if failures:
             try:
-                operation = self.start(user, "get_files_from_classic_website - failures")
+                operation = self.start(
+                    user, "get_files_from_classic_website - failures"
+                )
                 operation.finish(
                     user,
                     completed=False,

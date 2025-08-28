@@ -10,10 +10,7 @@ from collection.choices import QA, PUBLIC
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from migration import controller
-from proc.article_publication_controller import (
-    log_event,
-    schedule_article_publication
-)
+from proc.article_publication_controller import log_event, schedule_article_publication
 from proc.controller import (
     create_or_update_migrated_issue,
     create_or_update_migrated_journal,
@@ -111,7 +108,7 @@ def task_migrate_and_publish_journals(
 ):
     try:
         user = _get_user(user_id, username)
-        
+
         task_params = {
             "task": "proc.tasks.task_migrate_and_publish_journals",
             "user_id": user_id,
@@ -323,7 +320,8 @@ def task_publish_journal(
         exc_type, exc_value, exc_traceback = sys.exc_info()
         try:
             event.finish(
-                user, completed=False, exception=e, exc_traceback=exc_traceback)
+                user, completed=False, exception=e, exc_traceback=exc_traceback
+            )
         except Exception as ignored_exception:
             UnexpectedEvent.create(
                 e=e,
@@ -582,7 +580,7 @@ def task_migrate_and_publish_articles(
 ):
     # Lista plana para armazenar todos os eventos
     execution_log = []
-    
+
     # Estatísticas separadas
     statistics = {
         "total_collections": 0,
@@ -592,7 +590,7 @@ def task_migrate_and_publish_articles(
         "articles_published_qa": 0,
         "articles_published_public": 0,
     }
-    
+
     try:
         user = _get_user(user_id, username)
         task_params = {
@@ -608,15 +606,21 @@ def task_migrate_and_publish_articles(
             "force_import_acron_id_file": force_import_acron_id_file,
             "force_migrate_document_records": force_migrate_document_records,
             "force_migrate_document_files": force_migrate_document_files,
-            "skip_migrate_pending_document_records": skip_migrate_pending_document_records
+            "skip_migrate_pending_document_records": skip_migrate_pending_document_records,
         }
         task_tracker = TaskTracker.create(
             name="proc.tasks.task_migrate_and_publish_articles",
             detail=task_params,
         )
-        
-        log_event(execution_log, "info", "initialization", "Task initialized with parameters", params=task_params)
-        
+
+        log_event(
+            execution_log,
+            "info",
+            "initialization",
+            "Task initialized with parameters",
+            params=task_params,
+        )
+
         status = tracker_choices.get_valid_status(status, force_update)
         query_by_status = (
             Q(migration_status__in=status)
@@ -638,19 +642,21 @@ def task_migrate_and_publish_articles(
 
         collections = list(_get_collections(collection_acron))
         statistics["total_collections"] = len(collections)
-        
+
         for collection in collections:
-            collection_name = collection.acron if hasattr(collection, 'acron') else str(collection)
-            
+            collection_name = (
+                collection.acron if hasattr(collection, "acron") else str(collection)
+            )
+
             # Step 1: Create or update journal acron id file
             log_event(
                 execution_log,
                 "info",
                 "create_journal_acron_id_file",
                 "Starting journal acron id file creation/update",
-                collection=collection_name
+                collection=collection_name,
             )
-            
+
             create_or_update_journal_acron_id_file(
                 user,
                 collection,
@@ -664,9 +670,9 @@ def task_migrate_and_publish_articles(
                 "info",
                 "migrate_document_records",
                 "Starting document records migration",
-                collection=collection_name
+                collection=collection_name,
             )
-            
+
             migrate_document_records(
                 user,
                 collection_acron=collection_acron,
@@ -684,9 +690,9 @@ def task_migrate_and_publish_articles(
                 "info",
                 "get_files_from_classic_website",
                 "Starting file retrieval from classic website",
-                collection=collection_name
+                collection=collection_name,
             )
-            
+
             get_files_from_classic_website(
                 user,
                 collection_acron=collection_acron,
@@ -699,7 +705,7 @@ def task_migrate_and_publish_articles(
 
             qa_api_data = get_api_data(collection, "article", QA)
             public_api_data = get_api_data(collection, "article", PUBLIC)
-            
+
             # Log API data status
             if qa_api_data.get("error"):
                 log_event(
@@ -709,9 +715,9 @@ def task_migrate_and_publish_articles(
                     f"QA API error for collection {collection_name}",
                     api="QA",
                     collection=collection_name,
-                    error=qa_api_data.get("error")
+                    error=qa_api_data.get("error"),
                 )
-            
+
             if public_api_data.get("error"):
                 log_event(
                     execution_log,
@@ -720,24 +726,24 @@ def task_migrate_and_publish_articles(
                     f"PUBLIC API error for collection {collection_name}",
                     api="PUBLIC",
                     collection=collection_name,
-                    error=public_api_data.get("error")
+                    error=public_api_data.get("error"),
                 )
 
             # Process articles for migration
             items = ArticleProc.objects.filter(
                 query_by_status, collection=collection, **params
             )
-            
+
             articles_count = items.count()
             statistics["total_articles_processed"] += articles_count
-            
+
             log_event(
                 execution_log,
                 "info",
                 "articles_migration",
                 f"Found {articles_count} articles to process for migration",
                 collection=collection_name,
-                count=articles_count
+                count=articles_count,
             )
 
             force_update = (
@@ -746,11 +752,11 @@ def task_migrate_and_publish_articles(
                 or force_migrate_document_files
                 or force_import_acron_id_file
             )
-            
+
             articles_migrated = 0
             qa_published = 0
             public_published = 0
-            
+
             for article_proc in items:
                 article = article_proc.migrate_article(user, force_update)
                 if not article:
@@ -760,10 +766,10 @@ def task_migrate_and_publish_articles(
                         "migration_failed",
                         f"Failed to migrate article {article_proc.id}",
                         article_proc_id=article_proc.id,
-                        collection=collection_name
+                        collection=collection_name,
                     )
                     continue
-                
+
                 articles_migrated += 1
                 statistics["total_articles_migrated"] += 1
 
@@ -775,13 +781,13 @@ def task_migrate_and_publish_articles(
                     username,
                     qa_api_data,
                     public_api_data,
-                    force_update
+                    force_update,
                 )
-                
+
                 if scheduled["qa"]:
                     qa_published += 1
                     statistics["articles_published_qa"] += 1
-                
+
                 if scheduled["public"]:
                     public_published += 1
                     statistics["articles_published_public"] += 1
@@ -797,7 +803,7 @@ def task_migrate_and_publish_articles(
 
             articles_to_publish = items.count()
             statistics["total_articles_to_publish"] += articles_to_publish
-            
+
             log_event(
                 execution_log,
                 "info",
@@ -806,7 +812,7 @@ def task_migrate_and_publish_articles(
                 collection=collection_name,
                 count=articles_to_publish,
                 status_filter=status,
-                article_filter=params
+                article_filter=params,
             )
 
             for article_proc in items:
@@ -817,9 +823,9 @@ def task_migrate_and_publish_articles(
                     username,
                     qa_api_data,
                     public_api_data,
-                    force_update
+                    force_update,
                 )
-            
+
             # Add collection summary
             log_event(
                 execution_log,
@@ -831,29 +837,25 @@ def task_migrate_and_publish_articles(
                 articles_migrated=articles_migrated,
                 articles_to_publish=articles_to_publish,
                 qa_published=qa_published,
-                public_published=public_published
+                public_published=public_published,
             )
-        
+
         # Final summary
         log_event(
             execution_log,
             "info",
             "task_completed",
             "Task completed successfully",
-            **statistics
+            **statistics,
         )
-        
+
         task_tracker.finish(
-            completed=True, 
-            detail={
-                "log": execution_log,
-                "statistics": statistics
-            }
+            completed=True, detail={"log": execution_log, "statistics": statistics}
         )
-        
+
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        
+
         log_event(
             execution_log,
             "error",
@@ -861,17 +863,14 @@ def task_migrate_and_publish_articles(
             f"Task failed with error: {str(e)}",
             error=str(e),
             exc_type=str(exc_type),
-            exc_value=str(exc_value)
+            exc_value=str(exc_value),
         )
-        
+
         task_tracker.finish(
             completed=False,
             exception=e,
             exc_traceback=exc_traceback,
-            detail={
-                "log": execution_log,
-                "statistics": statistics
-            }
+            detail={"log": execution_log, "statistics": statistics},
         )
 
 
