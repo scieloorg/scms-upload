@@ -1339,13 +1339,7 @@ class IssueProc(BaseProc, ClusterableModel):
         if issue_folder:
             params["issue_folder"] = issue_folder
 
-        issue_procs = IssueProc.objects.select_related(
-            "collection",
-            "journal_proc",
-            "issue",
-            "migrated_data",
-            "journal_proc__migrated_data",
-        ).filter(
+        issue_procs = IssueProc.objects.filter(
             collection__acron=collection_acron,
             pid__in=issue_pids,
             **params,
