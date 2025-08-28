@@ -1,3 +1,4 @@
+import sys
 from datetime import datetime
 
 
@@ -76,3 +77,91 @@ def schedule_article_publication(
         scheduled["public"] = True
 
     return scheduled
+
+
+def migrate_collection_articles(user, collection_acron, items, force_update):
+    statistics = {
+        "total_articles_to_process": 0,
+        "total_articles_migrated": 0,
+    }
+    execution_log = []
+    articles_count = items.count()
+    statistics["total_articles_to_process"] = articles_count
+
+    log_event(
+        execution_log,
+        "info",
+        "articles_migration",
+        f"Found {articles_count} articles to migrate",
+        collection=collection_acron,
+        count=articles_count,
+    )
+    articles_migrated = 0
+    for article_proc in items:
+        try:
+            article = article_proc.migrate_article(user, force_update)
+            if article:
+                articles_migrated += 1
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            event = article_proc.start(user, "Migrate article error")
+            event.finish(
+                user,
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
+            )
+
+    statistics["total_articles_migrated"] = articles_migrated
+    return statistics, execution_log
+
+
+def publish_collection_articles(user, collection_acron, items, task_publish_article, qa_api_data, public_api_data, force_update):
+    execution_log = []
+    qa_scheduled = 0
+    public_scheduled = 0
+    processed = 0
+    articles_count = items.count()
+    log_event(
+        execution_log,
+        "info",
+        "articles_publication",
+        f"Found {articles_count} articles to publish",
+        collection=collection_acron,
+        count=articles_count,
+    )
+
+    for article_proc in items:
+        try:
+            processed += 1
+            response = schedule_article_publication(
+                task_publish_article,
+                article_proc.id,
+                user.id,
+                user.username,
+                qa_api_data,
+                public_api_data,
+                force_update,
+            )
+            if response["qa"]:
+                qa_scheduled += 1
+
+            if response["public"]:
+                public_scheduled += 1
+
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            event = article_proc.start(user, "Schedule article publication error")
+            event.finish(
+                user,
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
+            )
+
+    statistics = {}
+    statistics["total_articles_to_publish"] = articles_count
+    statistics["processed"] = processed
+    statistics["total_qa_scheduled"] = qa_scheduled
+    statistics["total_publich_scheduled"] = public_scheduled
+    return statistics, execution_log
