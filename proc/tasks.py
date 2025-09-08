@@ -620,6 +620,7 @@ def task_migrate_and_publish_articles(
                 collection_acron=collection.acron,
                 journal_acron=journal_acron,
                 publication_year=publication_year,
+                issue_folder=issue_folder,
                 status=status,
                 force_update=force_update,
                 force_import_acron_id_file=force_import_acron_id_file,
@@ -665,6 +666,7 @@ def task_migrate_and_publish_collection_articles(
 
     try:
         user = _get_user(user_id, username)
+        detail = {}
         task_params = {
             "task": "proc.tasks.task_migrate_and_publish_collection_articles",
             "user_id": user_id,

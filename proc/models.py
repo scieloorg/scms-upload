@@ -1632,13 +1632,17 @@ class ArticleProc(BaseProc, ClusterableModel):
                     n_references=len(classic_ws_doc.citations or []),
                     record_types="|".join(classic_ws_doc.record_types or []),
                 )
-                htmlxml.html_to_xml(user, self, body_and_back_xml)
+                result = htmlxml.html_to_xml(user, self, body_and_back_xml)
                 htmlxml.generate_report(user, self)
                 detail.update(htmlxml.data)
 
             xml = get_migrated_xml_with_pre(self)
             if xml:
-                self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
+                if result.get("exceptions"):
+                    self.xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+                    detail["xml_exceptions"] = result.get("exceptions")
+                else:
+                    self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
                 detail.update(xml.data)
             else:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
@@ -1787,7 +1791,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         return self.issue_proc.issue_files.filter(
             component_type="html",
             pkg_name=self.pkg_name,
-        )
+        ).order_by("-updated")
 
     @property
     def translations(self):
@@ -1801,8 +1805,12 @@ class ArticleProc(BaseProc, ClusterableModel):
         xhtmls = {}
         items = self.translation_files
         for item in items.iterator():
-            hc = HTMLContent(item.text)
+            if not item.text:
+                continue
             lang = item.lang
+            if lang in xhtmls.keys():
+                continue
+            hc = HTMLContent(item.text)
             xhtmls.setdefault(lang, {})
             xhtmls[lang][part[item.part]] = hc.content
         return xhtmls

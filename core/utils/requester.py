@@ -134,7 +134,6 @@ def fetch_data(url, params=None, headers=None, json=False, timeout=2, verify=Tru
     """
 
     try:
-        logger.info("Fetching the URL: %s %s" % (url, params))
         response = requests.get(
             url, params=params, headers=headers, timeout=timeout, verify=verify
         )
@@ -146,16 +145,15 @@ def fetch_data(url, params=None, headers=None, json=False, timeout=2, verify=Tru
         requests.exceptions.MissingSchema,
         requests.exceptions.InvalidURL,
     ) as exc:
+        logger.error("Erro not retryable: %s, %s" % (url, exc))
         raise NonRetryableError(exc) from exc
     try:
         response.raise_for_status()
     except requests.HTTPError as exc:
         if 400 <= exc.response.status_code < 500:
+            logger.error("Erro not retryable: %s, %s" % (url, exc))
             raise NonRetryableError(exc) from exc
         elif 500 <= exc.response.status_code < 600:
-            logger.error(
-                "Erro fetching the content: %s, retry..., erro: %s" % (url, exc)
-            )
             raise RetryableError(exc) from exc
         else:
             raise

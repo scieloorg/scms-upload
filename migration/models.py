@@ -38,9 +38,9 @@ class MigrationError(Exception): ...
 def modified_date(file_path):
     try:
         s = os.stat(file_path)
-        return datetime.fromtimestamp(s.st_mtime)
+        return datetime.fromtimestamp(s.st_mtime).isoformat()
     except Exception as e:
-        return datetime.utcnow()
+        return datetime.utcnow().isoformat()
 
 
 class ClassicWebsiteConfiguration(CommonControlField):
@@ -304,25 +304,22 @@ class MigratedData(CommonControlField):
 
 
 def extract_relative_path(full_path):
-    parts = Path(full_path).parts
-    for i, part in enumerate(parts):
-        if part in ["htdocs", "bases", "bases-work"]:
-            return str(Path(*parts[i:]))
-    return None
+    for part in ["htdocs", "bases-work", "bases"]:
+        if part in full_path:
+            return full_path[full_path.find(part):]
+    return full_path
 
 
 def migrated_files_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
 
     try:
-        path = instance.original_path
+        path_relative = instance.original_path
     except (AttributeError, TypeError) as e:
-        path = instance.source_path
-
-    path_relative = extract_relative_path(path)
+        path_relative = extract_relative_path(instance.source_path)
 
     try:
-        return f"classic_website/{instance.collection.acron}/{path_relative}"
+        return f"classic_website/{instance.collection.acron}/{path_relative or filename}"
     except (AttributeError, TypeError) as e:
         return f"classic_website/{filename}"
 
@@ -344,13 +341,13 @@ class MigratedFile(CommonControlField):
         _("Original name"), max_length=100, null=True, blank=True
     )
 
-    file_date = models.DateTimeField(null=True, blank=True)
+    # 2025-09-02T19:35:35.829144 - dat
+    file_datetime_iso = models.CharField(max_length=26, null=True, blank=True)
 
     # /pdf/acron/volnum/pt_a01.pdf
     original_href = models.CharField(
         _("Original href"), max_length=150, null=True, blank=True
     )
-
     component_type = models.CharField(
         _("Component type"), max_length=16, null=True, blank=True
     )
@@ -368,7 +365,7 @@ class MigratedFile(CommonControlField):
 
     panels = [
         FieldPanel("file"),
-        FieldPanel("file_date", read_only=True),
+        FieldPanel("file_datetime_iso", read_only=True),
         FieldPanel("original_path", read_only=True),
         FieldPanel("original_href", read_only=True),
         FieldPanel("original_name", read_only=True),
@@ -389,9 +386,9 @@ class MigratedFile(CommonControlField):
     def has_changes(cls, user, collection, file_path, force_update):
         if not force_update:
             try:
-                file_date = modified_date(file_path)
+                file_datetime_iso = modified_date(file_path)
                 if cls.objects.filter(
-                    collection=collection, original_path=file_path, file_date=file_date
+                    collection=collection, original_path=file_path, file_datetime_iso=file_datetime_iso
                 ).exists():
                     return False
             except cls.DoesNotExist:
@@ -412,11 +409,11 @@ class MigratedFile(CommonControlField):
         cls,
         collection=None,
         original_path=None,
-        file_date=None,
+        file_datetime_iso=None,
     ):
         if collection and original_path:
-            if file_date:
-                return cls.objects.get(collection=collection, original_path=original_path, file_date=file_date)
+            if file_datetime_iso:
+                return cls.objects.get(collection=collection, original_path=original_path, file_datetime_iso=file_datetime_iso)
             return cls.objects.get(collection=collection, original_path=original_path)
         raise ValueError("MigratedFile.get requires collection and original_path")
 
@@ -441,14 +438,12 @@ class MigratedFile(CommonControlField):
                 "MigratedFile.create_or_update requires source_path, collection, original_path"
             )
 
-        if file_datetime_iso:
-            file_date = datetime.fromisoformat(file_datetime_iso)
-        else:
-            file_date = modified_date(source_path)
+        if not file_datetime_iso:
+            file_datetime_iso = modified_date(source_path)
 
         try:
             obj = cls.get(collection, original_path)
-            if not force_update and obj.is_up_to_date(file_date):
+            if not force_update and obj.is_up_to_date(file_datetime_iso):
                 return obj
 
             obj.updated_by = user
@@ -467,7 +462,7 @@ class MigratedFile(CommonControlField):
         obj.lang = lang
         obj.part = part
         obj.component_type = component_type
-        obj.file_date = file_date
+        obj.file_datetime_iso = file_datetime_iso
 
         if not content:
             try:
@@ -523,17 +518,18 @@ class MigratedFile(CommonControlField):
     @classmethod
     def find(cls, collection, xlink_href, journal_acron):
         try:
-            dirname = os.path.dirname(xlink_href)
+            # dirname = os.path.dirname(xlink_href)
             basename = os.path.basename(xlink_href)
             name, ext = os.path.splitext(basename)
 
-            issue_folder = dirname.split("/")[-1]
-            issue_folder__name = os.path.join(issue_folder, name)
+            # issue_folder = dirname.split("/")[-1]
+            # issue_folder__name = os.path.join(issue_folder, name)
 
             return cls.objects.filter(
-                Q(original_href__contains=issue_folder__name + "."),
+                # Q(original_href__contains=issue_folder__name + "."),
                 collection=collection,
                 original_href__contains=f"/{journal_acron}/",
+                original_name__contains=name+".",
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -562,8 +558,8 @@ class MigratedFile(CommonControlField):
             pass
         self.file.save(name, ContentFile(content))
 
-    def is_up_to_date(self, file_date):
-        return bool(self.file_date and self.file_date == file_date)
+    def is_up_to_date(self, file_datetime_iso):
+        return bool(self.file_datetime_iso and self.file_datetime_iso == file_datetime_iso)
 
     @property
     def text(self):

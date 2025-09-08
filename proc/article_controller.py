@@ -1,3 +1,4 @@
+import logging
 import sys
 from datetime import datetime
 
@@ -97,6 +98,7 @@ def migrate_collection_articles(user, collection_acron, items, force_update):
     )
     articles_migrated = 0
     for article_proc in items.iterator():
+        logging.info((str(article_proc), str(article_proc.issue_proc)))
         try:
             article = article_proc.migrate_article(user, force_update)
             if article:
