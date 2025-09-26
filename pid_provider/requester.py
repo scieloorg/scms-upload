@@ -236,7 +236,7 @@ class PidRequester(BasePidProvider):
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             op.finish(user, completed=False, exception=e, exc_traceback=exc_traceback)
-            return {"error_msg": str(exc), "error_type": str(type(exc))}
+            return {"error_msg": str(e), "error_type": str(type(e))}
 
     def fix_pid_v2(
         self,

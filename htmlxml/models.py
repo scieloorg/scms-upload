@@ -636,7 +636,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             self.save()
 
             detail = {}
-            document = Document(article_proc.migrated_data.data)
+            document = Document(article_proc.migrated_data.data)            
             document._translated_html_by_lang = article_proc.translations
 
             body_and_back = self._generate_xml_body_and_back(
@@ -649,7 +649,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 "body_and_back": bool(body_and_back),
             }
             completed = bool(xml_content and body_and_back)
-            if completed:
+            if completed and not document.exceptions:
                 self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
             else:
                 self.html2xml_status = tracker_choices.PROGRESS_STATUS_PENDING
@@ -664,7 +664,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 exc_traceback=None,
                 detail=detail,
             )
-            return xml_content
+            return {"xml": xml_content, "exceptions": document.exceptions}
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -773,7 +773,12 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             xml_file = article_proc.pkg_name + ".xml"
             self.save_file(xml_file, xml_content)
             detail["xml"] = xml_file
-            operation.finish(user, bool(xml_content), detail=detail)
+            if document.exceptions:
+                detail["xml_exceptions"] = document.exceptions
+                completed = False
+            else:
+                completed = True
+            operation.finish(user, completed, detail=detail)
             return xml_content
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()

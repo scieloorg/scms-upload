@@ -2,6 +2,7 @@
 Facade para manter compatibilidade com o código existente.
 Este módulo importa todas as funções dos novos módulos especializados.
 """
+
 from proc.models import JournalProc, IssueProc
 
 # Imports da API Core
@@ -86,7 +87,10 @@ def ensure_journal_proc_exists(user, journal):
         JournalProc.DoesNotExist: Se não foi possível criar JournalProc
     """
     # Verificar se já existe
-    if journal.missing_fields or not JournalProc.objects.filter(journal=journal, acron__isnull=False).exists():
+    if (
+        journal.missing_fields
+        or not JournalProc.objects.filter(journal=journal, acron__isnull=False).exists()
+    ):
         # Não existe, criar um novo
         create_or_update_journal(
             journal_title=journal.title,
@@ -96,7 +100,9 @@ def ensure_journal_proc_exists(user, journal):
             force_update=True,
         )
 
-    journal_proc = JournalProc.objects.filter(journal=journal, acron__isnull=False).first()
+    journal_proc = JournalProc.objects.filter(
+        journal=journal, acron__isnull=False
+    ).first()
     if journal_proc:
         if not journal.journal_acron:
             journal.journal_acron = journal_proc.acron

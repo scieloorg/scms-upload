@@ -154,9 +154,9 @@ def fetch_and_create_journal(
                     "issn_electronic": issn_electronic,
                     "issn_print": issn_print,
                     "force_update": force_update,
-                    "data": result
+                    "data": result,
                 },
-            )    
+            )
 
 
 def fetch_journal_data_with_pagination(
@@ -195,7 +195,9 @@ def fetch_journal_data_with_pagination(
             yield from response.get("results") or []
 
 
-def process_journal_result(user, result, block_unregistered_collection, force_update=None):
+def process_journal_result(
+    user, result, block_unregistered_collection, force_update=None
+):
     """
     Processa um único resultado de journal da API e cria/atualiza as entidades correspondentes.
     """
