@@ -1,19 +1,22 @@
 # profiling_tools.py - Versão expandida com suporte a métodos e properties
 
-import time
 import functools
-import psutil
 import logging
-from django.db import connection
+import time
+
+import psutil
 from django.conf import settings
+from django.db import connection
 
 # Ativa/desativa profiling via settings
-PROFILING_ENABLED = getattr(settings, 'PROFILING_ENABLED', False)
-PROFILING_LOG_ALL = getattr(settings, 'PROFILING_LOG_ALL', False)
-PROFILING_LOG_SLOW_REQUESTS = getattr(settings, 'PROFILING_LOG_SLOW_REQUESTS', 0.4)  # segundos
-PROFILING_LOG_HIGH_MEMORY = getattr(settings, 'PROFILING_LOG_HIGH_MEMORY', 40)  # MB
+PROFILING_ENABLED = getattr(settings, "PROFILING_ENABLED", False)
+PROFILING_LOG_ALL = getattr(settings, "PROFILING_LOG_ALL", False)
+PROFILING_LOG_SLOW_REQUESTS = getattr(
+    settings, "PROFILING_LOG_SLOW_REQUESTS", 0.4
+)  # segundos
+PROFILING_LOG_HIGH_MEMORY = getattr(settings, "PROFILING_LOG_HIGH_MEMORY", 40)  # MB
 
-profiling_logger = logging.getLogger('profiling')
+profiling_logger = logging.getLogger("profiling")
 profiling_logger.warning(f"PROFILING_ENABLED={PROFILING_ENABLED}")
 profiling_logger.warning(f"PROFILING_LOG_ALL={PROFILING_LOG_ALL}")
 profiling_logger.warning(f"PROFILING_LOG_SLOW_REQUESTS={PROFILING_LOG_SLOW_REQUESTS}")
@@ -27,7 +30,7 @@ def profile_endpoint(func):
     """
     if not PROFILING_ENABLED:
         return func
-    
+
     @functools.wraps(func)
     def wrapper(self, request, *args, **kwargs):
         # Dados iniciais
@@ -35,16 +38,16 @@ def profile_endpoint(func):
         start_time = time.time()
         start_memory = process.memory_info().rss / 1024 / 1024  # MB
         start_queries = len(connection.queries)
-        
+
         try:
             # Executa função original
             response = func(self, request, *args, **kwargs)
-            
+
             # Coleta métricas finais
             end_time = time.time()
             end_memory = process.memory_info().rss / 1024 / 1024
             end_queries = len(connection.queries)
-            
+
             # Calcula diferenças
             duration = end_time - start_time
             memory_used = end_memory - start_memory
@@ -58,18 +61,20 @@ def profile_endpoint(func):
                 f"queries: {queries_count} | "
                 f"user: {getattr(request.user, 'username', 'anonymous')}"
             )
-            
+
             #  Log apenas se for relevante
-            if (duration > PROFILING_LOG_SLOW_REQUESTS) or (memory_used > PROFILING_LOG_HIGH_MEMORY):
+            if (duration > PROFILING_LOG_SLOW_REQUESTS) or (
+                memory_used > PROFILING_LOG_HIGH_MEMORY
+            ):
                 profiling_logger.warning(f"Slow {msg}")
                 # Se muito lento, log das queries mais demoradas
                 if duration > PROFILING_LOG_SLOW_REQUESTS * 2:
                     slow_queries = sorted(
                         connection.queries[start_queries:end_queries],
-                        key=lambda x: float(x.get('time', 0)),
-                        reverse=True
+                        key=lambda x: float(x.get("time", 0)),
+                        reverse=True,
                     )[:3]
-                    
+
                     for i, query in enumerate(slow_queries, 1):
                         profiling_logger.warning(
                             f"  Slow query #{i}: {query['time']}s - {query['sql'][:100]}..."
@@ -78,14 +83,14 @@ def profile_endpoint(func):
                 profiling_logger.warning(msg)
 
             # Adiciona headers opcionais
-            if hasattr(response, 'headers'):
-                response['X-Response-Time'] = f"{duration:.3f}"
+            if hasattr(response, "headers"):
+                response["X-Response-Time"] = f"{duration:.3f}"
                 if settings.DEBUG:
-                    response['X-DB-Queries'] = str(queries_count)
-                    response['X-Memory-Used'] = f"{memory_used:.1f}"
-            
+                    response["X-DB-Queries"] = str(queries_count)
+                    response["X-Memory-Used"] = f"{memory_used:.1f}"
+
             return response
-            
+
         except Exception as e:
             # Log erro mas não interfere
             duration = time.time() - start_time
@@ -94,7 +99,7 @@ def profile_endpoint(func):
                 f"duration: {duration:.2f}s | error: {str(e)}"
             )
             raise
-    
+
     return wrapper
 
 
@@ -104,43 +109,45 @@ def profile_classmethod(func):
     """
     if not PROFILING_ENABLED:
         return func
-    
+
     @functools.wraps(func)
     def wrapper(cls, *args, **kwargs):
         # Extrai informações específicas para PidProviderXML.register
         method_info = {
-            'class': cls.__name__,
-            'method': func.__name__,
-            'user': 'unknown',
-            'filename': 'unknown'
+            "class": cls.__name__,
+            "method": func.__name__,
+            "user": "unknown",
+            "filename": "unknown",
         }
-        
+
         # Tenta extrair user e filename dos argumentos conhecidos
         # Para register(cls, xml_with_pre, filename, user, ...)
         if len(args) >= 3:
-            if hasattr(args[2], 'username'):  # user
-                method_info['user'] = args[2].username
+            if hasattr(args[2], "username"):  # user
+                method_info["user"] = args[2].username
             if len(args) >= 2 and isinstance(args[1], str):  # filename
-                method_info['filename'] = args[1]
-        
+                method_info["filename"] = args[1]
+
         # Verifica kwargs também
-        method_info['user'] = getattr(kwargs.get('user'), 'username', method_info['user'])
-        method_info['filename'] = kwargs.get('filename', method_info['filename'])
-        
+        method_info["user"] = getattr(
+            kwargs.get("user"), "username", method_info["user"]
+        )
+        method_info["filename"] = kwargs.get("filename", method_info["filename"])
+
         # Profiling
         process = psutil.Process()
         start_time = time.time()
         start_memory = process.memory_info().rss / 1024 / 1024
         start_queries = len(connection.queries)
-        
+
         try:
             result = func(cls, *args, **kwargs)
-            
+
             # Métricas
             duration = time.time() - start_time
             memory_used = process.memory_info().rss / 1024 / 1024 - start_memory
             queries_count = len(connection.queries) - start_queries
-            
+
             # Log
             msg = (
                 f"classmethod | "
@@ -151,12 +158,14 @@ def profile_classmethod(func):
                 f"user: {method_info['user']} | "
                 f"file: {method_info['filename']}"
             )
-            if (duration > PROFILING_LOG_SLOW_REQUESTS) or (memory_used > PROFILING_LOG_HIGH_MEMORY):
+            if (duration > PROFILING_LOG_SLOW_REQUESTS) or (
+                memory_used > PROFILING_LOG_HIGH_MEMORY
+            ):
                 profiling_logger.warning(f"Slow {msg}")
             elif PROFILING_LOG_ALL:
-                profiling_logger.warning(msg)            
+                profiling_logger.warning(msg)
             return result
-            
+
         except Exception as e:
             duration = time.time() - start_time
             profiling_logger.error(
@@ -167,7 +176,7 @@ def profile_classmethod(func):
                 f"user: {method_info['user']}"
             )
             raise
-    
+
     return wrapper
 
 
@@ -178,30 +187,30 @@ def profile_method(func):
     """
     if not PROFILING_ENABLED:
         return func
-    
+
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
         # Informações do método
         method_info = {
-            'class': self.__class__.__name__,
-            'method': func.__name__,
-            'instance_id': getattr(self, 'id', getattr(self, 'pk', 'no_id'))
+            "class": self.__class__.__name__,
+            "method": func.__name__,
+            "instance_id": getattr(self, "id", getattr(self, "pk", "no_id")),
         }
-        
+
         # Profiling
         process = psutil.Process()
         start_time = time.time()
         start_memory = process.memory_info().rss / 1024 / 1024
         start_queries = len(connection.queries)
-        
+
         try:
             result = func(self, *args, **kwargs)
-            
+
             # Métricas
             duration = time.time() - start_time
             memory_used = process.memory_info().rss / 1024 / 1024 - start_memory
             queries_count = len(connection.queries) - start_queries
-            
+
             # Log
             msg = (
                 f"method | "
@@ -211,27 +220,31 @@ def profile_method(func):
                 f"memory: +{memory_used:.1f}MB | "
                 f"queries: {queries_count}"
             )
-            
-            if (duration > PROFILING_LOG_SLOW_REQUESTS) or (memory_used > PROFILING_LOG_HIGH_MEMORY):
+
+            if (duration > PROFILING_LOG_SLOW_REQUESTS) or (
+                memory_used > PROFILING_LOG_HIGH_MEMORY
+            ):
                 profiling_logger.warning(f"Slow {msg}")
-                
+
                 # Log queries lentas se muito devagar
                 if duration > PROFILING_LOG_SLOW_REQUESTS * 2 and queries_count > 0:
                     slow_queries = sorted(
-                        connection.queries[start_queries:start_queries + queries_count],
-                        key=lambda x: float(x.get('time', 0)),
-                        reverse=True
+                        connection.queries[
+                            start_queries : start_queries + queries_count
+                        ],
+                        key=lambda x: float(x.get("time", 0)),
+                        reverse=True,
                     )[:3]
-                    
+
                     for i, query in enumerate(slow_queries, 1):
                         profiling_logger.warning(
                             f"  Query #{i}: {query['time']}s - {query['sql'][:100]}..."
                         )
             elif PROFILING_LOG_ALL:
                 profiling_logger.info(msg)
-                
+
             return result
-            
+
         except Exception as e:
             duration = time.time() - start_time
             profiling_logger.error(
@@ -241,14 +254,14 @@ def profile_method(func):
                 f"error: {str(e)}"
             )
             raise
-    
+
     return wrapper
 
 
 def profile_property(func):
     """
     Decorador para @property
-    Uso: 
+    Uso:
         @property
         @profile_property
         def my_property(self):
@@ -256,29 +269,31 @@ def profile_property(func):
     """
     if not PROFILING_ENABLED:
         return func
-    
+
     @functools.wraps(func)
     def wrapper(self):
         # Informações da property
         prop_info = {
-            'class': self.__class__.__name__,
-            'property': func.__name__,
-            'instance_id': getattr(self, 'id', getattr(self, 'pk', 'no_id'))
+            "class": self.__class__.__name__,
+            "property": func.__name__,
+            "instance_id": getattr(self, "id", getattr(self, "pk", "no_id")),
         }
-        
+
         # Profiling leve para properties (sem psutil a cada chamada)
         start_time = time.time()
         start_queries = len(connection.queries)
-        
+
         try:
             result = func(self)
-            
+
             # Métricas
             duration = time.time() - start_time
             queries_count = len(connection.queries) - start_queries
-            
+
             # Log apenas se lento (properties devem ser rápidas)
-            if duration > PROFILING_LOG_SLOW_REQUESTS / 2:  # Threshold menor para properties
+            if (
+                duration > PROFILING_LOG_SLOW_REQUESTS / 2
+            ):  # Threshold menor para properties
                 msg = (
                     f"property | "
                     f"{prop_info['class']}.{prop_info['property']} | "
@@ -292,9 +307,9 @@ def profile_property(func):
                     f"property | {prop_info['class']}.{prop_info['property']} | "
                     f"duration: {duration:.3f}s"
                 )
-                
+
             return result
-            
+
         except Exception as e:
             duration = time.time() - start_time
             profiling_logger.error(
@@ -304,7 +319,7 @@ def profile_property(func):
                 f"error: {str(e)}"
             )
             raise
-    
+
     return wrapper
 
 
@@ -313,7 +328,7 @@ def profile_cached_property(func):
     Decorador para @cached_property do Django
     Uso:
         from django.utils.functional import cached_property
-        
+
         @cached_property
         @profile_cached_property
         def expensive_calculation(self):
@@ -321,34 +336,34 @@ def profile_cached_property(func):
     """
     if not PROFILING_ENABLED:
         return func
-    
+
     @functools.wraps(func)
     def wrapper(self):
         # Verifica se já está em cache
-        cache_attr = f'_{func.__name__}'
+        cache_attr = f"_{func.__name__}"
         is_cached = hasattr(self, cache_attr)
-        
+
         prop_info = {
-            'class': self.__class__.__name__,
-            'property': func.__name__,
-            'instance_id': getattr(self, 'id', getattr(self, 'pk', 'no_id')),
-            'cached': is_cached
+            "class": self.__class__.__name__,
+            "property": func.__name__,
+            "instance_id": getattr(self, "id", getattr(self, "pk", "no_id")),
+            "cached": is_cached,
         }
-        
+
         if is_cached and not PROFILING_LOG_ALL:
             # Se já está em cache e não estamos logando tudo, retorna direto
             return func(self)
-        
+
         start_time = time.time()
         start_queries = len(connection.queries) if not is_cached else 0
-        
+
         try:
             result = func(self)
-            
+
             if not is_cached:  # Log apenas no primeiro cálculo
                 duration = time.time() - start_time
                 queries_count = len(connection.queries) - start_queries
-                
+
                 msg = (
                     f"cached_property (first call) | "
                     f"{prop_info['class']}.{prop_info['property']} | "
@@ -356,14 +371,14 @@ def profile_cached_property(func):
                     f"duration: {duration:.3f}s | "
                     f"queries: {queries_count}"
                 )
-                
+
                 if duration > PROFILING_LOG_SLOW_REQUESTS:
                     profiling_logger.warning(f"Slow {msg}")
                 elif PROFILING_LOG_ALL:
                     profiling_logger.info(msg)
-                    
+
             return result
-            
+
         except Exception as e:
             duration = time.time() - start_time
             profiling_logger.error(
@@ -373,7 +388,7 @@ def profile_cached_property(func):
                 f"error: {str(e)}"
             )
             raise
-    
+
     return wrapper
 
 
@@ -387,50 +402,52 @@ def profile_function(func):
     """
     if not PROFILING_ENABLED:
         return func
-    
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         # Informações da função
         func_info = {
-            'function': func.__name__,
-            'module': func.__module__,
-            'args_count': len(args),
-            'kwargs_count': len(kwargs)
+            "function": func.__name__,
+            "module": func.__module__,
+            "args_count": len(args),
+            "kwargs_count": len(kwargs),
         }
-        
+
         # Tenta extrair informações úteis dos argumentos
         # Por exemplo, se o primeiro arg for um Model Django
-        if args and hasattr(args[0], '__class__'):
+        if args and hasattr(args[0], "__class__"):
             arg_class = args[0].__class__.__name__
-            if hasattr(args[0], 'pk') or hasattr(args[0], 'id'):
-                func_info['first_arg'] = f"{arg_class}(id={getattr(args[0], 'pk', getattr(args[0], 'id', 'unknown'))})"
+            if hasattr(args[0], "pk") or hasattr(args[0], "id"):
+                func_info["first_arg"] = (
+                    f"{arg_class}(id={getattr(args[0], 'pk', getattr(args[0], 'id', 'unknown'))})"
+                )
             else:
-                func_info['first_arg'] = arg_class
-        
+                func_info["first_arg"] = arg_class
+
         process = psutil.Process()
         start_time = time.time()
         start_memory = process.memory_info().rss / 1024 / 1024
         start_queries = len(connection.queries)
-        
+
         try:
             result = func(*args, **kwargs)
-            
+
             # Métricas
             duration = time.time() - start_time
             memory_used = process.memory_info().rss / 1024 / 1024 - start_memory
             queries_count = len(connection.queries) - start_queries
-            
+
             # Informações adicionais sobre o resultado
             result_info = ""
             if result is not None:
-                if hasattr(result, '__len__'):
+                if hasattr(result, "__len__"):
                     result_info = f" | result_len: {len(result)}"
-                elif hasattr(result, 'count'):
+                elif hasattr(result, "count"):
                     try:
                         result_info = f" | result_count: {result.count()}"
                     except:
                         pass
-            
+
             msg = (
                 f"function | "
                 f"{func_info['module']}.{func_info['function']} | "
@@ -440,31 +457,37 @@ def profile_function(func):
                 f"queries: {queries_count}"
                 f"{result_info}"
             )
-            
+
             # Adiciona info do primeiro argumento se disponível
-            if 'first_arg' in func_info:
-                msg = msg.replace(" | args:", f" | first_arg: {func_info['first_arg']} | args:")
-            
-            if (duration > PROFILING_LOG_SLOW_REQUESTS) or (memory_used > PROFILING_LOG_HIGH_MEMORY):
+            if "first_arg" in func_info:
+                msg = msg.replace(
+                    " | args:", f" | first_arg: {func_info['first_arg']} | args:"
+                )
+
+            if (duration > PROFILING_LOG_SLOW_REQUESTS) or (
+                memory_used > PROFILING_LOG_HIGH_MEMORY
+            ):
                 profiling_logger.warning(f"Slow {msg}")
-                
+
                 # Log queries lentas
                 if duration > PROFILING_LOG_SLOW_REQUESTS * 2 and queries_count > 0:
                     slow_queries = sorted(
-                        connection.queries[start_queries:start_queries + queries_count],
-                        key=lambda x: float(x.get('time', 0)),
-                        reverse=True
+                        connection.queries[
+                            start_queries : start_queries + queries_count
+                        ],
+                        key=lambda x: float(x.get("time", 0)),
+                        reverse=True,
                     )[:3]
-                    
+
                     for i, query in enumerate(slow_queries, 1):
                         profiling_logger.warning(
                             f"  Query #{i}: {query['time']}s - {query['sql'][:100]}..."
                         )
             elif PROFILING_LOG_ALL:
                 profiling_logger.info(msg)
-                
+
             return result
-            
+
         except Exception as e:
             duration = time.time() - start_time
             profiling_logger.error(
@@ -474,7 +497,7 @@ def profile_function(func):
                 f"error: {str(e)}"
             )
             raise
-    
+
     return wrapper
 
 
@@ -490,27 +513,24 @@ def profile_staticmethod(func):
     """
     if not PROFILING_ENABLED:
         return func
-    
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         # Para staticmethod, não temos self/cls
-        method_info = {
-            'function': func.__name__,
-            'module': func.__module__
-        }
-        
+        method_info = {"function": func.__name__, "module": func.__module__}
+
         process = psutil.Process()
         start_time = time.time()
         start_memory = process.memory_info().rss / 1024 / 1024
         start_queries = len(connection.queries)
-        
+
         try:
             result = func(*args, **kwargs)
-            
+
             duration = time.time() - start_time
             memory_used = process.memory_info().rss / 1024 / 1024 - start_memory
             queries_count = len(connection.queries) - start_queries
-            
+
             msg = (
                 f"staticmethod | "
                 f"{method_info['module']}.{method_info['function']} | "
@@ -518,14 +538,16 @@ def profile_staticmethod(func):
                 f"memory: +{memory_used:.1f}MB | "
                 f"queries: {queries_count}"
             )
-            
-            if (duration > PROFILING_LOG_SLOW_REQUESTS) or (memory_used > PROFILING_LOG_HIGH_MEMORY):
+
+            if (duration > PROFILING_LOG_SLOW_REQUESTS) or (
+                memory_used > PROFILING_LOG_HIGH_MEMORY
+            ):
                 profiling_logger.warning(f"Slow {msg}")
             elif PROFILING_LOG_ALL:
                 profiling_logger.info(msg)
-                
+
             return result
-            
+
         except Exception as e:
             duration = time.time() - start_time
             profiling_logger.error(
@@ -535,7 +557,7 @@ def profile_staticmethod(func):
                 f"error: {str(e)}"
             )
             raise
-    
+
     return wrapper
 
 
@@ -545,33 +567,34 @@ class LightweightProfilingMiddleware:
     Middleware minimalista de profiling
     Monitora TODAS as requisições automaticamente
     """
+
     def __init__(self, get_response):
         self.get_response = get_response
         self.process = psutil.Process()
-        
+
     def __call__(self, request):
         if not PROFILING_ENABLED:
             return self.get_response(request)
-        
+
         # Pula arquivos estáticos
-        if request.path.startswith('/static/') or request.path.startswith('/media/'):
+        if request.path.startswith("/static/") or request.path.startswith("/media/"):
             return self.get_response(request)
-        
+
         start_time = time.time()
         start_memory = self.process.memory_info().rss / 1024 / 1024
-        
+
         response = self.get_response(request)
-        
+
         duration = time.time() - start_time
         memory_delta = self.process.memory_info().rss / 1024 / 1024 - start_memory
-        
+
         # Log apenas requisições problemáticas
         if duration > PROFILING_LOG_SLOW_REQUESTS:
             profiling_logger.warning(
                 f"Slow: {request.method} {request.path} - "
                 f"{duration:.2f}s - {memory_delta:+.1f}MB"
             )
-        
+
         return response
 
 

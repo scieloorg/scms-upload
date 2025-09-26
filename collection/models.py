@@ -14,8 +14,7 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 
 
-class LanguageGetOrCreateError(Exception):
-    ...
+class LanguageGetOrCreateError(Exception): ...
 
 
 class Collection(CommonControlField):
@@ -29,7 +28,9 @@ class Collection(CommonControlField):
     def __str__(self):
         return self.acron
 
-    acron = models.CharField(_("Collection Acronym"), max_length=16, null=True, blank=True)
+    acron = models.CharField(
+        _("Collection Acronym"), max_length=16, null=True, blank=True
+    )
     name = models.CharField(_("Collection Name"), max_length=64, null=True, blank=True)
 
     base_form_class = CoreAdminModelForm

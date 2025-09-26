@@ -420,9 +420,7 @@ class TocSection(CommonControlField, Orderable):
                     items[item.section.language.code2] = item.section.text
 
             if not items:
-                items.update(
-                    issue.journal.get_sections_by_titles(titles)
-                )
+                items.update(issue.journal.get_sections_by_titles(titles))
         return items
 
     @staticmethod

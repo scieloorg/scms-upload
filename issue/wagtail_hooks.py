@@ -4,8 +4,9 @@ from wagtail_modeladmin.options import (
     ModelAdminGroup,
     modeladmin_register,
 )
-from issue.views import IssueCreateView, TOCEditView
+
 from config.menu import get_menu_order
+from issue.views import IssueCreateView, TOCEditView
 
 from .models import TOC, Issue
 

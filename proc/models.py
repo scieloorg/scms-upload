@@ -8,11 +8,10 @@ from tempfile import TemporaryDirectory
 from django import forms
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
-from django.db.models import Q, Count
+from django.db.models import Count, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
-from scielo_classic_website.htmlbody.html_body import HTMLContent
 from wagtail.admin.panels import (
     FieldPanel,
     InlinePanel,
@@ -38,8 +37,8 @@ from migration.controller import (
     get_migrated_xml_with_pre,
 )
 from migration.models import (
-    JournalAcronIdFile,
     IdFileRecord,
+    JournalAcronIdFile,
     MigratedArticle,
     MigratedData,
     MigratedFile,
@@ -48,10 +47,11 @@ from migration.models import (
 )
 from package import choices as package_choices
 from package.models import SPSPkg
-from proc import exceptions
-from proc.forms import ProcAdminModelForm, IssueProcAdminModelForm
 from pid_provider.models import PidProviderXML
+from proc import exceptions
+from proc.forms import IssueProcAdminModelForm, ProcAdminModelForm
 from publication.api.publication import get_api_data
+from scielo_classic_website.htmlbody.html_body import HTMLContent
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 
@@ -1246,7 +1246,9 @@ class IssueProc(BaseProc, ClusterableModel):
 
         if failures:
             try:
-                operation = self.start(user, "get_files_from_classic_website - failures")
+                operation = self.start(
+                    user, "get_files_from_classic_website - failures"
+                )
                 operation.finish(
                     user,
                     completed=False,

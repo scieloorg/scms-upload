@@ -10,8 +10,6 @@ from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
-from scielo_classic_website import classic_ws
-from scielo_classic_website.iid2json.id2json3 import get_doc_records
 
 from article.models import Article
 from collection.models import Language
@@ -23,14 +21,16 @@ from journal.models import (
     Journal,
     JournalCollection,
     JournalHistory,
+    Mission,
     OfficialJournal,
     Owner,
     Publisher,
     Subject,
-    Mission,
 )
 from location.models import Location
 from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile
+from scielo_classic_website import classic_ws
+from scielo_classic_website.iid2json.id2json3 import get_doc_records
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 
@@ -464,7 +464,7 @@ class IssueFolderImporter:
             # html após das referencias
             parts = {
                 "before": "1",
-                "after":  "2",
+                "after": "2",
             }
             for file in files_and_exceptions:
                 # {"type": "pdf", "key": name, "path": path, "name": basename, "lang": lang}
@@ -480,7 +480,7 @@ class IssueFolderImporter:
 
                     component_type = IssueFolderImporter.check_component_type(file)
                     part = file.get("part")
-                    
+
                     yield MigratedFile.create_or_update(
                         user=self.user,
                         collection=collection,
@@ -495,11 +495,9 @@ class IssueFolderImporter:
                         file_datetime_iso=file.get("modified_date"),
                         basename=file.get("name"),
                     )
-                    
+
                 except Exception as e:
-                    yield (
-                        {"error": str(e), "type": str(type(e)), "file": file}
-                    )
+                    yield ({"error": str(e), "type": str(type(e)), "file": file})
         except Exception as e:
             yield (
                 {
@@ -508,7 +506,7 @@ class IssueFolderImporter:
                     "type": str(type(e)),
                 }
             )
-                
+
 
 def get_article_records_from_classic_website(
     user,

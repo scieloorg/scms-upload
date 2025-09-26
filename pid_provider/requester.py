@@ -103,14 +103,21 @@ class PidRequester(BasePidProvider):
 
         # Solicita pid para Core
         remote_response = self.remote_registration(
-            user, article_proc, xml_with_pre, registered)
+            user, article_proc, xml_with_pre, registered
+        )
         if registered.get("error_type"):
             return registered
 
         # Atualiza registro de Upload
         local_response = self.local_registration(
-            user, article_proc, xml_with_pre, registered,
-            origin_date, force_update, is_published, origin,
+            user,
+            article_proc,
+            xml_with_pre,
+            registered,
+            origin_date,
+            force_update,
+            is_published,
+            origin,
         )
         if registered.get("error_type"):
             return registered
@@ -124,7 +131,7 @@ class PidRequester(BasePidProvider):
     def get_registration_demand(user, article_proc, xml_with_pre):
         """
         Obtém a indicação de demanda de registro no Upload e/ou Core.
-        
+
         Parameters
         ----------
         xml_with_pre : XMLWithPre
@@ -133,7 +140,7 @@ class PidRequester(BasePidProvider):
             Processador de artigo para controle de operações
         user : User
             Usuário executando a operação
-        
+
         Returns
         -------
         dict
@@ -141,20 +148,22 @@ class PidRequester(BasePidProvider):
         """
         # Inicia operação de logging para rastreamento
         op = article_proc.start(user, ">>> get registration demand")
-        
+
         # Verifica se o XML já está registrado e obtém dados de comparação
         registered = PidProviderXML.is_registered(xml_with_pre)
-        
+
         # Se houve erro na verificação, finaliza operação e retorna erro
         if registered.get("error_type"):
             op.finish(user, completed=False, detail=registered)
             return registered
-        
+
         # Determina demanda de registro baseado na comparação
         if registered.get("is_equal"):
             # XML recebido é igual ao registrado
             # Só registra no Core se ainda não estiver registrado lá
-            registered["do_remote_registration"] = not registered.get("registered_in_core")
+            registered["do_remote_registration"] = not registered.get(
+                "registered_in_core"
+            )
             # Upload segue a mesma regra do Core quando XMLs são iguais
             registered["do_local_registration"] = registered["do_remote_registration"]
         else:
@@ -162,7 +171,7 @@ class PidRequester(BasePidProvider):
             # Força registro em ambos os sistemas
             registered["do_remote_registration"] = True
             registered["do_local_registration"] = True
-        
+
         op.finish(user, completed=True, detail=registered)
         return registered
 
@@ -179,10 +188,12 @@ class PidRequester(BasePidProvider):
         try:
             if not self.pid_provider_api.enabled:
                 raise CorePidProviderUnabledException(
-                    "Core pid provider is not enabled. Complete core pid provider configuration to enable it")
+                    "Core pid provider is not enabled. Complete core pid provider configuration to enable it"
+                )
 
             response = self.pid_provider_api.provide_pid_and_handle_incorrect_pid_v2(
-                xml_with_pre, registered)
+                xml_with_pre, registered
+            )
 
             if response.get("error_type"):
                 op.finish(user, completed=False, detail=response)
@@ -202,8 +213,18 @@ class PidRequester(BasePidProvider):
             exc_type, exc_value, exc_traceback = sys.exc_info()
             op.finish(user, completed=False, exception=exc, exc_traceback=exc_traceback)
             return {"error_msg": str(exc), "error_type": str(type(exc))}
-                
-    def local_registration(self, user, article_proc, xml_with_pre, registered, origin_date, force_update, is_published, origin):
+
+    def local_registration(
+        self,
+        user,
+        article_proc,
+        xml_with_pre,
+        registered,
+        origin_date,
+        force_update,
+        is_published,
+        origin,
+    ):
         # Atualiza registro de Upload
         try:
             op = article_proc.start(user, ">>> local registration")
@@ -224,13 +245,13 @@ class PidRequester(BasePidProvider):
                     registered_in_core=registered.get("registered_in_core"),
                 )
                 resp["registered_in_upload"] = bool(resp.get("v3"))
-                resp["synchronized"] = registered.get(
-                    "registered_in_core"
-                ) and bool(resp.get("v3"))
+                resp["synchronized"] = registered.get("registered_in_core") and bool(
+                    resp.get("v3")
+                )
                 registered.update(resp)
 
                 detail = resp
-                
+
             op.finish(user, completed=True, detail=detail)
             return resp
         except Exception as e:

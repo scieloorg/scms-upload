@@ -225,9 +225,9 @@ class ValidationResultAdminInspectView(InspectView):
             data = self.instance.data.copy()
         except AttributeError:
             data = {}
-        data[
-            "package_url"
-        ] = f"/admin/upload/package/inspect/{self.instance.package.id}"
+        data["package_url"] = (
+            f"/admin/upload/package/inspect/{self.instance.package.id}"
+        )
         return super().get_context_data(**data)
 
 

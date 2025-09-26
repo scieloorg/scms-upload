@@ -61,9 +61,7 @@ class State(CommonControlField):
     """
 
     name = models.TextField(_("State Name"), blank=True, null=True)
-    acronym = models.CharField(
-        _("State Acronym"), blank=True, null=True, max_length=8
-    )
+    acronym = models.CharField(_("State Acronym"), blank=True, null=True, max_length=8)
 
     class Meta:
         verbose_name = _("State")
@@ -83,7 +81,9 @@ class State(CommonControlField):
                 return cls.objects.get(name__iexact=name, acronym=acronym)
             except cls.MultipleObjectsReturned:
                 return cls.objects.filter(name__iexact=name, acronym=acronym).first()
-        raise ValueError(f"State.get missing params {dict(name__iexact=name, acronym=acronym)}")
+        raise ValueError(
+            f"State.get missing params {dict(name__iexact=name, acronym=acronym)}"
+        )
 
     @staticmethod
     def add(data, value):
@@ -115,7 +115,9 @@ class State(CommonControlField):
                 return obj
             except IntegrityError:
                 return cls.get(name, acronym)
-        raise ValueError(f"State.create missing params {dict(name__iexact=name, acronym=acronym)}")
+        raise ValueError(
+            f"State.create missing params {dict(name__iexact=name, acronym=acronym)}"
+        )
 
     @classmethod
     def get_or_create(cls, user, name=None, acronym=None):
@@ -169,7 +171,9 @@ class Country(CommonControlField):
                 return cls.objects.get(name__iexact=name, acronym=acronym)
             except cls.MultipleObjectsReturned:
                 return cls.objects.filter(name__iexact=name, acronym=acronym).first()
-        raise ValueError(f"Country.get missing params {dict(name__iexact=name, acronym=acronym)}")
+        raise ValueError(
+            f"Country.get missing params {dict(name__iexact=name, acronym=acronym)}"
+        )
 
     @classmethod
     def create(cls, user, name=None, acronym=None):
@@ -183,7 +187,9 @@ class Country(CommonControlField):
                 return obj
             except IntegrityError:
                 return cls.get(name, acronym)
-        raise ValueError(f"Country.create missing params {dict(name__iexact=name, acronym=acronym)}")
+        raise ValueError(
+            f"Country.create missing params {dict(name__iexact=name, acronym=acronym)}"
+        )
 
     @classmethod
     def get_or_create(cls, user, name=None, acronym=None):
@@ -253,17 +259,32 @@ class Location(CommonControlField):
             return cls.get(country=country, state=state, city=city)
 
     @classmethod
-    def create_or_update(cls, user, country=None, country_name=None, country_acronym=None, state=None, state_name=None, state_acronym=None, city=None, city_name=None):
+    def create_or_update(
+        cls,
+        user,
+        country=None,
+        country_name=None,
+        country_acronym=None,
+        state=None,
+        state_name=None,
+        state_acronym=None,
+        city=None,
+        city_name=None,
+    ):
 
         if not country:
             try:
-                country = Country.get_or_create(user=user, name=country_name, acronym=country_acronym)
+                country = Country.get_or_create(
+                    user=user, name=country_name, acronym=country_acronym
+                )
             except ValueError:
                 country = None
 
         if not state:
             try:
-                state = State.get_or_create(user=user, name=state_name, acronym=state_acronym)
+                state = State.get_or_create(
+                    user=user, name=state_name, acronym=state_acronym
+                )
             except ValueError:
                 state = None
 

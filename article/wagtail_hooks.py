@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.contrib import messages
-
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
@@ -9,6 +8,7 @@ from wagtail_modeladmin.options import (
     ModelAdminGroup,
     modeladmin_register,
 )
+
 from article.views import (
     ArticleAdminInspectView,
     ArticleCreateView,

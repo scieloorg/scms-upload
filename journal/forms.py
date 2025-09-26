@@ -1,4 +1,5 @@
 from wagtail.admin.forms import WagtailAdminModelForm
+
 from core.forms import CoreAdminModelForm
 
 

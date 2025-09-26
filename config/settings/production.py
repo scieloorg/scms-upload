@@ -20,8 +20,10 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost:8000"])
 # ------------------------------------------------------------------------------
 DATABASES["default"] = env.db("DATABASE_URL")  # noqa F405
 DATABASES["default"]["ATOMIC_REQUESTS"] = True  # noqa F405
-DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=0) or env.int("DJANGO_CONN_MAX_AGE", default=60)  # noqa F405
-DATABASES["default"]["CONN_HEALTH_CHECKS"] = env.bool('DJANGO_CONN_HEALTH_CHECKS', True)
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=0) or env.int(
+    "DJANGO_CONN_MAX_AGE", default=60
+)  # noqa F405
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = env.bool("DJANGO_CONN_HEALTH_CHECKS", True)
 
 # CACHES
 # ------------------------------------------------------------------------------
@@ -64,7 +66,7 @@ if SECURE_ENABLED:
     SECURE_HSTS_PRELOAD = env.bool("DJANGO_SECURE_HSTS_PRELOAD", default=True)
     # https://docs.djangoproject.com/en/dev/ref/middleware/#x-content-type-options-nosniff
     SECURE_CONTENT_TYPE_NOSNIFF = env.bool(
-       "DJANGO_SECURE_CONTENT_TYPE_NOSNIFF", default=True
+        "DJANGO_SECURE_CONTENT_TYPE_NOSNIFF", default=True
     )
 
 # STATIC
@@ -154,9 +156,7 @@ LOGGING = {
             "format": "%(levelname)s %(asctime)s %(module)s "
             "%(process)d %(thread)d %(message)s"
         },
-        "simple": {
-            "format": '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        },
+        "simple": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"},
     },
     "handlers": {
         "console": {

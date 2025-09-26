@@ -83,7 +83,9 @@ class Institution(CommonControlField, ClusterableModel):
 
     @classmethod
     def get(cls, inst_name=None, inst_acronym=None, location=None):
-        return cls.objects.get(name__iexact=inst_name, acronym=inst_acronym, location=location)
+        return cls.objects.get(
+            name__iexact=inst_name, acronym=inst_acronym, location=location
+        )
 
     @classmethod
     def create(
@@ -110,9 +112,7 @@ class Institution(CommonControlField, ClusterableModel):
             institution.save()
             return institution
         except IntegrityError:
-            return cls.get(
-                inst_name, inst_acronym, location
-            )
+            return cls.get(inst_name, inst_acronym, location)
 
     @classmethod
     def get_or_create(
@@ -133,7 +133,9 @@ class Institution(CommonControlField, ClusterableModel):
             )
         except cls.MultipleObjectsReturned:
             cls.objects.filter(
-                inst_name__iexact=inst_name, inst_acronym=inst_acronym, location=location
+                inst_name__iexact=inst_name,
+                inst_acronym=inst_acronym,
+                location=location,
             ).delete()
             return cls.create(
                 user,

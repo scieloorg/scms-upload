@@ -466,15 +466,15 @@ class Journal(CommonControlField, ClusterableModel):
     def get_sections_by_titles(self, titles):
         """
         Get sections filtered by titles and return as dict with language code as key
-        
+
         Args:
             titles: List of section titles to filter by
-            
+
         Returns:
             dict: {language_code: section_text}
         """
         items = {}
-        sections = self.j_sections.select_related('language').filter(text__in=titles)
+        sections = self.j_sections.select_related("language").filter(text__in=titles)
         for section in sections:
             items[section.language.code2] = section.text
         return items
@@ -486,7 +486,7 @@ class Journal(CommonControlField, ClusterableModel):
         Returns sections grouped by language code
         """
         d = {}
-        for section in self.j_sections.select_related('language').all():
+        for section in self.j_sections.select_related("language").all():
             language = section.language.code2
             d.setdefault(language, [])
             d[language].append(section.text)
@@ -497,7 +497,7 @@ class Journal(CommonControlField, ClusterableModel):
         Moved from JournalSection.sections()
         Generator that yields section data
         """
-        sections = self.j_sections.select_related('language').all()
+        sections = self.j_sections.select_related("language").all()
         for section in sections:
             yield section.data
 
@@ -507,7 +507,9 @@ class Journal(CommonControlField, ClusterableModel):
         Returns sections grouped by code
         """
         items = {}
-        for section in self.j_sections.select_related('language').filter(code__isnull=False):
+        for section in self.j_sections.select_related("language").filter(
+            code__isnull=False
+        ):
             items.setdefault(section.code, [])
             items[section.code].append(section.data)
         return items
@@ -521,9 +523,9 @@ class Journal(CommonControlField, ClusterableModel):
         # TODO verificar se é owner ou publisher ou ambos
         names = []
         # Otimização: usar select_related para evitar queries N+1
-        owners = self.owner.select_related('institution').all()
-        publishers = self.publisher.select_related('institution').all()
-        
+        owners = self.owner.select_related("institution").all()
+        publishers = self.publisher.select_related("institution").all()
+
         for item in owners:
             names.append(item.institution.name)
         for item in publishers:
@@ -574,53 +576,53 @@ class Journal(CommonControlField, ClusterableModel):
         Verifica campos não preenchidos no Journal e retorna um relatório detalhado.
         """
         fields = {
-            'title': _('Journal Title'),
-            'short_title': _('Short Title'),
-            'journal_acron': _('Journal Acronym'),
-            'official_journal': _('Official Journal'),
-            'contact_name': _('Contact Name'),
-            'contact_address': _('Contact Address'),
-            'contact_location': _('Contact Location'),
-            'submission_online_url': _('Submission Online URL'),
-            'logo_url': _('Logo URL'),
-            'license_code': _('License Code'),
-            'wos_areas': _('WoS Areas'),
+            "title": _("Journal Title"),
+            "short_title": _("Short Title"),
+            "journal_acron": _("Journal Acronym"),
+            "official_journal": _("Official Journal"),
+            "contact_name": _("Contact Name"),
+            "contact_address": _("Contact Address"),
+            "contact_location": _("Contact Location"),
+            "submission_online_url": _("Submission Online URL"),
+            "logo_url": _("Logo URL"),
+            "license_code": _("License Code"),
+            "wos_areas": _("WoS Areas"),
         }
         missing = []
         for field, description in fields.items():
             value = getattr(self, field, None)
             if not value or (isinstance(value, str) and not value.strip()):
                 missing.append(description)
-        
+
         # Verificar official_journal
         if self.official_journal:
             if not self.official_journal.issn_electronic:
-                missing.append(_('Electronic ISSN'))
+                missing.append(_("Electronic ISSN"))
             if not self.official_journal.issn_print:
-                missing.append(_('Print ISSN'))
+                missing.append(_("Print ISSN"))
             if not self.official_journal.title_iso:
-                missing.append(_('ISO Title'))
-        
+                missing.append(_("ISO Title"))
+
         # Verificar mission
         if not self.mission.exists():
-            missing.append(_('mission'))
-        
+            missing.append(_("mission"))
+
         # Verificar sponsor
         if not self.sponsor.exists():
-            missing.append(_('sponsor'))
-        
+            missing.append(_("sponsor"))
+
         # Verificar owner
         if not self.owner.exists():
-            missing.append(_('owner'))
-        
+            missing.append(_("owner"))
+
         # Verificar publisher
         if not self.publisher.exists():
-            missing.append(_('publisher'))
-        
+            missing.append(_("publisher"))
+
         # Verificar subject
         if not self.subject.exists():
-            missing.append(_('study area'))
-        
+            missing.append(_("study area"))
+
         return missing
 
 

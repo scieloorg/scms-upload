@@ -11,7 +11,6 @@ from core.models import CommonControlField
 from files_storage import exceptions
 from files_storage.minio import MinioStorage
 
-
 COUNTRY_REGION = (
     ("Brasil", "sa-east-1"),
     ("México", "us-west-1"),
@@ -32,11 +31,21 @@ COUNTRY_REGION = (
     ("West Indies", "us-east-1"),
 )
 
+
 class MinioConfiguration(CommonControlField):
     name = models.CharField(_("Name"), max_length=32, null=True, blank=False)
     host = models.CharField(_("Host"), max_length=64, null=True, blank=True)
-    bucket_root = models.CharField(_("Bucket root"), max_length=32, null=True, blank=True)
-    location = models.CharField(_("Location"), max_length=16, null=True, blank=True, choices=COUNTRY_REGION, default="sa-east-1")
+    bucket_root = models.CharField(
+        _("Bucket root"), max_length=32, null=True, blank=True
+    )
+    location = models.CharField(
+        _("Location"),
+        max_length=16,
+        null=True,
+        blank=True,
+        choices=COUNTRY_REGION,
+        default="sa-east-1",
+    )
     access_key = models.CharField(_("Access key"), max_length=32, null=True, blank=True)
     secret_key = models.CharField(_("Secret key"), max_length=64, null=True, blank=True)
     # indicar como False para uso no desenvolvimento

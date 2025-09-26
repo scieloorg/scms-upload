@@ -72,7 +72,10 @@ def post_data(
         params = _add_param(params, "data", data)
         response = requests.post(url, **params)
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
-        logger.error("Erro posting data (timeout=%s): %s, retry..., erro: %s" % (timeout, url, exc))
+        logger.error(
+            "Erro posting data (timeout=%s): %s, retry..., erro: %s"
+            % (timeout, url, exc)
+        )
         raise RetryableError(exc) from exc
     except (
         requests.exceptions.InvalidSchema,
