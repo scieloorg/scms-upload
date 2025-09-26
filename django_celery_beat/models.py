@@ -1,27 +1,26 @@
 """Database models."""
-try:
-    from zoneinfo import available_timezones
-except ImportError:
-    from backports.zoneinfo import available_timezones
-
 from datetime import timedelta
 
 import timezone_field
 from celery import current_app, schedules
-from cron_descriptor import (
-    FormatException,
-    MissingFieldException,
-    WrongArgumentException,
-    get_description,
-)
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned, ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import signals
 from django.utils.translation import gettext_lazy as _
+from wagtail.admin.panels import (
+    FieldPanel,
+    HelpPanel,
+    MultiFieldPanel,
+    ObjectList,
+    PageChooserPanel,
+    TabbedInterface,
+)
 
-from . import querysets, validators
+from . import managers, validators
 from .clockedschedule import clocked
+from .forms import PeriodicTaskForm
 from .tzcrontab import TzAwareCrontab
 from .utils import make_aware, now
 
@@ -66,25 +65,30 @@ def cronexp(field):
 
 
 def crontab_schedule_celery_timezone():
-    """Return timezone string from Django settings ``CELERY_TIMEZONE`` variable.
+    """Return timezone string from Django settings `CELERY_TIMEZONE` variable.
 
-    If is not defined or is not a valid timezone, return ``"UTC"`` instead.
-    """  # noqa: E501
+    If is not defined or is not a valid timezone, return `"UTC"` instead.
+    """
     try:
         CELERY_TIMEZONE = getattr(settings, "%s_TIMEZONE" % current_app.namespace)
     except AttributeError:
         return "UTC"
-    if CELERY_TIMEZONE in available_timezones():
-        return CELERY_TIMEZONE
+
+    # evita `AttributeError: type object 'TimeZoneField' has no attribute 'default_choices'`
     return "UTC"
+    return (
+        CELERY_TIMEZONE
+        if CELERY_TIMEZONE
+        in [choice[0].zone for choice in timezone_field.TimeZoneField.default_choices]
+        else "UTC"
+    )
 
 
 class SolarSchedule(models.Model):
     """Schedule following astronomical patterns.
 
     Example: to run every sunrise in New York City:
-
-    >>> event='sunrise', latitude=40.7128, longitude=74.0060
+    event='sunrise', latitude=40.7128, longitude=74.0060
     """
 
     event = models.CharField(
@@ -138,7 +142,7 @@ class SolarSchedule(models.Model):
             return cls(**spec)
 
     def __str__(self):
-        return "{} ({}, {})".format(
+        return "{0} ({1}, {2})".format(
             self.get_event_display(), self.latitude, self.longitude
         )
 
@@ -146,9 +150,8 @@ class SolarSchedule(models.Model):
 class IntervalSchedule(models.Model):
     """Schedule executing on a regular interval.
 
-    Example: execute every 2 days:
-
-    >>> every=2, period=DAYS
+    Example: execute every 2 days
+    every=2, period=DAYS
     """
 
     DAYS = DAYS
@@ -232,7 +235,7 @@ class ClockedSchedule(models.Model):
         ordering = ["clocked_time"]
 
     def __str__(self):
-        return f"{make_aware(self.clocked_time)}"
+        return "{}".format(self.clocked_time)
 
     @property
     def schedule(self):
@@ -253,10 +256,9 @@ class ClockedSchedule(models.Model):
 class CrontabSchedule(models.Model):
     """Timezone Aware Crontab-like schedule.
 
-    Example:  Run every hour at 0 minutes for days of month 10-15:
-
-    >>> minute="0", hour="*", day_of_week="*",
-    ... day_of_month="10-15", month_of_year="*"
+    Example:  Run every hour at 0 minutes for days of month 10-15
+    minute="0", hour="*", day_of_week="*",
+    day_of_month="10-15", month_of_year="*"
     """
 
     #
@@ -285,8 +287,7 @@ class CrontabSchedule(models.Model):
         default="*",
         verbose_name=_("Day(s) Of The Week"),
         help_text=_(
-            'Cron Days Of The Week to Run. Use "*" for "all", Sunday '
-            'is 0 or 7, Monday is 1. (Example: "0,5")'
+            'Cron Days Of The Week to Run. Use "*" for "all". ' '(Example: "0,5")'
         ),
         validators=[validators.day_of_week_validator],
     )
@@ -304,15 +305,13 @@ class CrontabSchedule(models.Model):
         default="*",
         verbose_name=_("Month(s) Of The Year"),
         help_text=_(
-            'Cron Months (1-12) Of The Year to Run. Use "*" for "all". '
-            '(Example: "1,12")'
+            'Cron Months Of The Year to Run. Use "*" for "all". ' '(Example: "0,6")'
         ),
         validators=[validators.month_of_year_validator],
     )
 
     timezone = timezone_field.TimeZoneField(
         default=crontab_schedule_celery_timezone,
-        use_pytz=False,
         verbose_name=_("Cron Timezone"),
         help_text=_("Timezone to Run the Cron Schedule on. Default is UTC."),
     )
@@ -331,23 +330,8 @@ class CrontabSchedule(models.Model):
             "timezone",
         ]
 
-    @property
-    def human_readable(self):
-        cron_expression = "{} {} {} {} {}".format(
-            cronexp(self.minute),
-            cronexp(self.hour),
-            cronexp(self.day_of_month),
-            cronexp(self.month_of_year),
-            cronexp(self.day_of_week),
-        )
-        try:
-            human_readable = get_description(cron_expression)
-        except (MissingFieldException, FormatException, WrongArgumentException):
-            return f"{cron_expression} {str(self.timezone)}"
-        return f"{human_readable} {str(self.timezone)}"
-
     def __str__(self):
-        return "{} {} {} {} {} (m/h/dM/MY/d) {}".format(
+        return "{0} {1} {2} {3} {4} (m/h/dM/MY/d) {5}".format(
             cronexp(self.minute),
             cronexp(self.hour),
             cronexp(self.day_of_month),
@@ -397,14 +381,16 @@ class CrontabSchedule(models.Model):
 class PeriodicTasks(models.Model):
     """Helper table for tracking updates to periodic tasks.
 
-    This stores a single row with ``ident=1``. ``last_update`` is updated via
-    signals whenever anything changes in the :class:`~.PeriodicTask` model.
+    This stores a single row with ident=1.  last_update is updated
+    via django signals whenever anything is changed in the PeriodicTask model.
     Basically this acts like a DB data audit trigger.
     Doing this so we also track deletions, and not just insert/update.
     """
 
     ident = models.SmallIntegerField(default=1, primary_key=True, unique=True)
     last_update = models.DateTimeField(null=False)
+
+    objects = managers.ExtendedManager()
 
     @classmethod
     def changed(cls, instance, **kwargs):
@@ -425,6 +411,8 @@ class PeriodicTasks(models.Model):
 
 class PeriodicTask(models.Model):
     """Model representing a periodic task."""
+
+    base_form_class = PeriodicTaskForm
 
     name = models.CharField(
         max_length=200,
@@ -618,7 +606,35 @@ class PeriodicTask(models.Model):
         help_text=_("Detailed description about the details of this Periodic Task"),
     )
 
-    objects = querysets.PeriodicTaskQuerySet.as_manager()
+    content_panels = [
+        HelpPanel(
+            _("Essa é a área de configuração de execução de tarefas assíncronas.")
+        ),
+        FieldPanel("name"),
+        FieldPanel("regtask"),
+        FieldPanel("task"),
+        FieldPanel("description"),
+        FieldPanel("args"),
+        FieldPanel("kwargs"),
+        FieldPanel("priority"),
+        FieldPanel("one_off"),
+        FieldPanel("enabled"),
+    ]
+    scheduler_panels = [
+        FieldPanel("interval"),
+        FieldPanel("crontab"),
+        FieldPanel("solar"),
+        FieldPanel("clocked"),
+    ]
+
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(content_panels, heading=_("Content")),
+            ObjectList(scheduler_panels, heading=_("Scheduler")),
+        ]
+    )
+
+    objects = managers.PeriodicTaskManager()
     no_changes = False
 
     class Meta:
@@ -660,11 +676,6 @@ class PeriodicTask(models.Model):
         self._clean_expires()
         self.validate_unique()
         super().save(*args, **kwargs)
-        PeriodicTasks.changed(self)
-
-    def delete(self, *args, **kwargs):
-        super().delete(*args, **kwargs)
-        PeriodicTasks.changed(self)
 
     def _clean_expires(self):
         if self.expire_seconds is not None and self.expires:
@@ -689,16 +700,24 @@ class PeriodicTask(models.Model):
         return fmt.format(self)
 
     @property
-    def scheduler(self):
-        if self.interval:
-            return self.interval
-        if self.crontab:
-            return self.crontab
-        if self.solar:
-            return self.solar
-        if self.clocked:
-            return self.clocked
-
-    @property
     def schedule(self):
-        return self.scheduler.schedule
+        if self.interval:
+            return self.interval.schedule
+        if self.crontab:
+            return self.crontab.schedule
+        if self.solar:
+            return self.solar.schedule
+        if self.clocked:
+            return self.clocked.schedule
+
+
+signals.pre_delete.connect(PeriodicTasks.changed, sender=PeriodicTask)
+signals.pre_save.connect(PeriodicTasks.changed, sender=PeriodicTask)
+signals.pre_delete.connect(PeriodicTasks.update_changed, sender=IntervalSchedule)
+signals.post_save.connect(PeriodicTasks.update_changed, sender=IntervalSchedule)
+signals.post_delete.connect(PeriodicTasks.update_changed, sender=CrontabSchedule)
+signals.post_save.connect(PeriodicTasks.update_changed, sender=CrontabSchedule)
+signals.post_delete.connect(PeriodicTasks.update_changed, sender=SolarSchedule)
+signals.post_save.connect(PeriodicTasks.update_changed, sender=SolarSchedule)
+signals.post_delete.connect(PeriodicTasks.update_changed, sender=ClockedSchedule)
+signals.post_save.connect(PeriodicTasks.update_changed, sender=ClockedSchedule)

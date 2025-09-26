@@ -746,7 +746,7 @@ class BaseProc(CommonControlField):
                 response = callable_publish(self, api_data)
                 resp.update(response)
 
-            completed = bool(response.get("result") == "OK")
+            completed = bool(resp.get("result") == "OK")
             self.update_publication_stage(website_kind, completed)
             resp.update(detail)
             operation.finish(user, completed=completed, detail=resp)
@@ -764,7 +764,7 @@ class BaseProc(CommonControlField):
                     user,
                     exc_traceback=exc_traceback,
                     exception=e,
-                    detail=result,
+                    detail=resp,
                 )
             resp.update(detail)
             resp["error_type"] = str(type(e))

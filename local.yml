@@ -1,4 +1,4 @@
-version: '3'
+#version: '3'
 
 services:
   django: &django
@@ -10,17 +10,18 @@ services:
     depends_on:
       - redis
       - postgres
-      - mailhog
+      # - mailhog
       # - pgbouncer
     # links:
     #   # - pgbouncer
     volumes:
       - .:/app:z
+      - ../data/media:/app/core/media
     env_file:
       - ./.envs/.local/.django
       - ./.envs/.local/.postgres
     ports:
-      - "8007:8000"
+      - "8006:8000"
     command: /start
 
   # pgbouncer:
@@ -66,7 +67,7 @@ services:
     image: adminer
     container_name: upload_local_adminer
     ports:
-        - "8087:8080"
+        - "8086:8080"
 
   # docs:
   #   image: upload_local_docs
@@ -84,17 +85,20 @@ services:
   #     - "9000:9000"
   #   command: /start-docs
 
-  mailhog:
-    image: mailhog/mailhog:v1.0.0
-    container_name: upload_local_mailhog
-    ports:
-      - "8027:8025"
+  # mailhog:
+  #   image: mailhog/mailhog:v1.0.0
+  #   container_name: upload_local_mailhog
+  #   ports:
+  #     - "8027:8025"
 
   redis:
     image: redis:6
     container_name: upload_local_redis
     ports:
       - "6377:6379"
+    volumes:
+      - .:/app:z
+      - ../data:/app/redis
 
   celeryworker:
     <<: *django
@@ -103,7 +107,7 @@ services:
     depends_on:
       - redis
       - postgres
-      - mailhog
+      # - mailhog
     ports: []
     command: /start-celeryworker
 
@@ -114,7 +118,7 @@ services:
     depends_on:
       - redis
       - postgres
-      - mailhog
+      # - mailhog
     ports: []
     command: /start-celerybeat
 

@@ -85,21 +85,12 @@ class ModelEntry(ScheduleEntry):
             self.options["expires"] = getattr(model, "expires_")
 
         self.options["headers"] = loads(model.headers or "{}")
-        self.options["periodic_task_name"] = model.name
 
         self.total_run_count = model.total_run_count
         self.model = model
 
         if not model.last_run_at:
             model.last_run_at = self._default_now()
-            # if last_run_at is not set and
-            # model.start_time last_run_at should be in way past.
-            # This will trigger the job to run at start_time
-            # and avoid the heap block.
-            if self.model.start_time:
-                model.last_run_at = model.last_run_at - datetime.timedelta(
-                    days=365 * 30
-                )
 
         self.last_run_at = model.last_run_at
 
@@ -141,8 +132,12 @@ class ModelEntry(ScheduleEntry):
         return self.schedule.is_due(last_run_at_in_tz)
 
     def _default_now(self):
+        # The PyTZ datetime must be localised for the Django-Celery-Beat
+        # scheduler to work. Keep in mind that timezone arithmatic
+        # with a localized timezone may be inaccurate.
         if getattr(settings, "DJANGO_CELERY_BEAT_TZ_AWARE", True):
-            now = datetime.datetime.now(self.app.timezone)
+            now = self.app.now()
+            now = now.tzinfo.localize(now.replace(tzinfo=None))
         else:
             # this ends up getting passed to maybe_make_aware, which expects
             # all naive datetime objects to be in utc time.
@@ -174,30 +169,28 @@ class ModelEntry(ScheduleEntry):
                 model_schedule = model_type.from_schedule(schedule)
                 model_schedule.save()
                 return model_schedule, model_field
-        raise ValueError(f"Cannot convert schedule type {schedule!r} to model")
+        raise ValueError("Cannot convert schedule type {0!r} to model".format(schedule))
 
     @classmethod
     def from_entry(cls, name, app=None, **entry):
-        obj, created = PeriodicTask._default_manager.update_or_create(
-            name=name,
-            defaults=cls._unpack_fields(**entry),
+        return cls(
+            PeriodicTask._default_manager.update_or_create(
+                name=name,
+                defaults=cls._unpack_fields(**entry),
+            ),
+            app=app,
         )
-        return cls(obj, app=app)
 
     @classmethod
     def _unpack_fields(
         cls, schedule, args=None, kwargs=None, relative=None, options=None, **entry
     ):
-        entry_schedules = {
-            model_field: None for _, _, model_field in cls.model_schedules
-        }
         model_schedule, model_field = cls.to_model_schedule(schedule)
-        entry_schedules[model_field] = model_schedule
         entry.update(
-            entry_schedules,
+            {model_field: model_schedule},
             args=dumps(args or []),
             kwargs=dumps(kwargs or {}),
-            **cls._unpack_options(**options or {}),
+            **cls._unpack_options(**options or {})
         )
         return entry
 
@@ -210,7 +203,7 @@ class ModelEntry(ScheduleEntry):
         priority=None,
         headers=None,
         expire_seconds=None,
-        **kwargs,
+        **kwargs
     ):
         return {
             "queue": queue,
@@ -222,7 +215,7 @@ class ModelEntry(ScheduleEntry):
         }
 
     def __repr__(self):
-        return "<ModelEntry: {} {}(*{}, **{}) {}>".format(
+        return "<ModelEntry: {0} {1}(*{2}, **{3}) {4}>".format(
             safe_str(self.name),
             self.task,
             safe_repr(self.args),
@@ -317,9 +310,9 @@ class DatabaseScheduler(Scheduler):
             while self._dirty:
                 name = self._dirty.pop()
                 try:
-                    self._schedule[name].save()
+                    self.schedule[name].save()
                     _tried.add(name)
-                except (KeyError, TypeError, ObjectDoesNotExist):
+                except (KeyError, ObjectDoesNotExist):
                     _failed.add(name)
         except DatabaseError as exc:
             logger.exception("Database error while sync: %r", exc)

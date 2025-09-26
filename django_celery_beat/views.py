@@ -1,5 +1,4 @@
 import json
-import logging
 
 from celery import current_app
 from django.shortcuts import get_object_or_404, redirect
@@ -17,14 +16,10 @@ def task_run(request):
     task_id = int(request.GET.get("task_id", None))
 
     p_task = get_object_or_404(models.PeriodicTask, pk=task_id)
-    logging.info(p_task.task)
-    logging.info(p_task.name)
 
     current_app.loader.import_default_modules()
 
-    task = current_app.tasks.get(p_task.name)
-    if not task:
-        task = current_app.tasks.get(p_task.task)
+    task = current_app.tasks.get(p_task.task)
 
     kwargs = json.loads(p_task.kwargs)
     kwargs["user_id"] = request.user.id

@@ -466,6 +466,19 @@ def task_publish_issues(
             params["issue_folder"] = str(issue_folder)
         if publication_year:
             params["issue__publication_year"] = str(publication_year)
+        
+        task_params = {
+            "task": "proc.tasks.task_publish_issues",
+            "collection_acron": collection_acron,
+            "journal_acron": journal_acron,
+            "issue_folder": issue_folder,
+            "publication_year": publication_year,
+            "force_update": force_update,
+        }
+        task_tracker = TaskTracker.create(
+            name="proc.tasks.task_publish_issues",
+            detail=task_params,
+        )
         for collection in _get_collections(collection_acron):
             for website_kind in (QA, PUBLIC):
 

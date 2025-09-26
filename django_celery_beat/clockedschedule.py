@@ -28,7 +28,7 @@ class clocked(schedules.BaseSchedule):
         return schedules.schedstate(is_due=False, next=remaining_s)
 
     def __repr__(self):
-        return f"<clocked: {self.clocked_time}>"
+        return "<clocked: {}>".format(self.clocked_time)
 
     def __eq__(self, other):
         if isinstance(other, clocked):
