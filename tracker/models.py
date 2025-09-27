@@ -43,10 +43,14 @@ def format_traceback(exc_traceback):
     return traceback.format_tb(exc_traceback)
 
 
+class EventSaveError(Exception): ...
+
+
 class BaseEvent(models.Model):
     name = models.CharField(_("name"), max_length=200)
     detail = models.JSONField(null=True, blank=True)
     created = models.DateTimeField(verbose_name=_("Creation date"), auto_now_add=True)
+    completed = models.BooleanField(default=False)
 
     class Meta:
         abstract = True
@@ -70,6 +74,22 @@ class BaseEvent(models.Model):
         obj.name = name
         obj.save()
         return obj
+
+    def finish(self, completed, detail=None, errors=None, exceptions=None):
+        try:
+            self.completed = completed
+            detail = detail or {}
+            if errors:
+                detail["errors"] = errors
+            if exceptions:
+                detail["exceptions"] = exceptions
+                self.completed = False
+            self.detail = detail
+            self.save()
+        except Exception as e:
+            logging.exception(f"Error finishing Event: {e}")
+            raise EventSaveError(f"Unable to create event: {e}")
+
 
 
 class UnexpectedEvent(models.Model):
