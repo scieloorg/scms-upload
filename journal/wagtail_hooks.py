@@ -8,7 +8,6 @@ from wagtail_modeladmin.options import (
 from wagtail_modeladmin.views import CreateView
 
 from config.menu import get_menu_order
-
 from journal.models import Journal, OfficialJournal
 
 
@@ -70,7 +69,7 @@ class JournalAdmin(ModelAdmin):
         "title",
         "journal_acron",
     )
-    list_filter = ("core_synchronized", )
+    list_filter = ("core_synchronized",)
 
 
 class JournalModelAdminGroup(ModelAdminGroup):

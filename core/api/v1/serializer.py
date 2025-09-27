@@ -6,4 +6,4 @@ from core.models import PressRelease
 class PressReleaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = PressRelease
-        fields = '__all__'
+        fields = "__all__"

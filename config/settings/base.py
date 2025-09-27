@@ -1,10 +1,13 @@
 """
 Base settings to build other settings files upon.
 """
+
 from pathlib import Path
 
 import environ
 from django.utils.translation import gettext_lazy as _
+
+WAGTAILADMIN_SHOW_COUNT = True
 
 ROOT_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
 # core/
@@ -308,9 +311,7 @@ LOGGING = {
             "format": "%(levelname)s %(asctime)s %(module)s "
             "%(process)d %(thread)d %(message)s"
         },
-        "simple": {
-            "format": '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        },
+        "simple": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"},
     },
     "handlers": {
         "console": {
@@ -322,8 +323,8 @@ LOGGING = {
             "level": "DEBUG",
             "class": "logging.handlers.TimedRotatingFileHandler",
             "filename": ROOT_DIR / "logs" / "profiling.log",
-            "when": "H",         # Rotaciona a cada hora
-            "interval": 1,       # A cada 1 hora
+            "when": "H",  # Rotaciona a cada hora
+            "interval": 1,  # A cada 1 hora
             "backupCount": 168,  # Mantém 168 horas (7 dias)
             "formatter": "simple",
             "encoding": "utf-8",
@@ -416,7 +417,9 @@ NOCAPTCHA = True
 RECAPTCHA_PUBLIC_KEY = env.str("RECAPTCHA_PUBLIC_KEY", default="")
 RECAPTCHA_PRIVATE_KEY = env.str("RECAPTCHA_PRIVATE_KEY", default="")
 
-PROFILING_ENABLED = env.bool('DJANGO_PROFILING_ENABLED', default=False)
-PROFILING_LOG_SLOW_REQUESTS = env.float('DJANGO_PROFILING_LOG_SLOW_REQUESTS', default=0.2)
-PROFILING_LOG_HIGH_MEMORY = env.int('DJANGO_PROFILING_LOG_HIGH_MEMORY', default=20)
-PROFILING_LOG_ALL = env.bool('DJANGO_PROFILING_LOG_ALL', default=True)
+PROFILING_ENABLED = env.bool("DJANGO_PROFILING_ENABLED", default=False)
+PROFILING_LOG_SLOW_REQUESTS = env.float(
+    "DJANGO_PROFILING_LOG_SLOW_REQUESTS", default=0.2
+)
+PROFILING_LOG_HIGH_MEMORY = env.int("DJANGO_PROFILING_LOG_HIGH_MEMORY", default=20)
+PROFILING_LOG_ALL = env.bool("DJANGO_PROFILING_LOG_ALL", default=True)

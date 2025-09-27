@@ -13,8 +13,6 @@ from packtools.sps.pid_provider.xml_sps_lib import (
     XMLWithPre,
     split_processing_instruction_doctype_declaration_and_xml,
 )
-from scielo_classic_website.classic_ws import Document
-from scielo_classic_website.models.document import GenerateBodyAndBackFromHTMLError
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
@@ -23,6 +21,8 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from migration.models import MigratedArticle
 from package.models import BasicXMLFile
+from scielo_classic_website.classic_ws import Document
+from scielo_classic_website.models.document import GenerateBodyAndBackFromHTMLError
 
 # from tracker.models import EventLogger
 from tracker import choices as tracker_choices
@@ -365,9 +365,7 @@ class Html2xmlAnalysis(models.Model):
             xpaths = " | ".join(get_xpath_for_a_href_stats(href, text, journal_acron))
             yield {
                 "html": xml_node_to_string(a),
-                "xml": (
-                    get_xml_nodes_to_string(xml, xpaths) if xpaths else []
-                ),
+                "xml": (get_xml_nodes_to_string(xml, xpaths) if xpaths else []),
             }
 
     def get_src_stats(self, html, xml, journal_acron):

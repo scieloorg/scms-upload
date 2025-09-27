@@ -1,16 +1,17 @@
 import logging
 from datetime import datetime
 
-from article.models import Article
-from collection.models import Collection
-from core.models import CommonControlField
-from core.utils.requester import fetch_data, NonRetryableError
 from django.db import IntegrityError, models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.models import Orderable
+
+from article.models import Article
+from collection.models import Collection
+from core.models import CommonControlField
+from core.utils.requester import NonRetryableError, fetch_data
 
 
 def check_url(url, timeout=None):
@@ -36,9 +37,11 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
     )
     completed = models.BooleanField(default=False)
     published_by = models.CharField(
-        _("published by"), max_length=30, null=True, blank=True)
+        _("published by"), max_length=30, null=True, blank=True
+    )
     publication_rule = models.CharField(
-        _("publication rule"), max_length=10, null=True, blank=True)
+        _("publication rule"), max_length=10, null=True, blank=True
+    )
     panels = [
         FieldPanel("completed", read_only=True),
         FieldPanel("publication_rule"),
@@ -85,7 +88,7 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         published_by=None,
         publication_rule=None,
         website_url=None,
-        timeout=None
+        timeout=None,
     ):
         try:
             obj = cls.get(article=article)
@@ -182,12 +185,7 @@ class ScieloURLStatus(CommonControlField, Orderable):
             obj.update(user, timeout)
             return obj
         except cls.DoesNotExist:
-            return cls.create(
-                article=article,
-                url=url,
-                user=user,
-                timeout=timeout or 2
-            )
+            return cls.create(article=article, url=url, user=user, timeout=timeout or 2)
 
     def update(self, user, timeout=None):
         self.available = check_url(self.url, timeout)

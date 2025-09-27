@@ -41,7 +41,9 @@ class User(AbstractUser):
 
     @property
     def fullname(self):
-        return " ".join([name.strip() for name in [self.first_name, self.last_name] if name.strip()])
+        return " ".join(
+            [name.strip() for name in [self.first_name, self.last_name] if name.strip()]
+        )
 
     @property
     def group_names(self):

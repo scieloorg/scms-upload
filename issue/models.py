@@ -233,33 +233,28 @@ class Issue(CommonControlField, IssuePublicationDate):
     def generate_issue_pid_suffix(self):
         return str(self.generate_order()).zfill(4)
 
-    def generate_order(self, suppl_start=1000, spe_start=2000):
-        x = 0
-        if self.supplement is not None:
-            x = suppl_start
-            try:
-                suppl = int(self.supplement)
-            except (ValueError, TypeError):
-                suppl = _get_digits(self.supplement)
-            return x + suppl
+    def generate_order_supplement(self, suppl_start=1000):
+        suppl_val = _get_digits(self.supplement)
+        return suppl_start + suppl_val
 
-        number = self.number
-        if not number:
+    def generate_order_number(self, spe_start=2000):
+        parts = self.number.split("spe")[-1]
+        spe_val = _get_digits(parts)
+        return spe_start + spe_val
+
+    def generate_order(self, suppl_start=1000, spe_start=2000):
+        if self.supplement is not None:
+            return self.generate_order_supplement(suppl_start)
+
+        if not self.number:
             return 1
 
-        spe = None
-        if "spe" in number:
-            x = spe_start
-            parts = number.split("spe")
-            spe = int(parts[-1] or 0)
-            return x + spe
-        elif number == "ahead":
+        if "spe" in self.number:
+            return self.generate_order_number(spe_start)
+        if self.number == "ahead":
             return 9999
 
-        try:
-            number = int(number)
-        except (ValueError, TypeError):
-            number = _get_digits(number)
+        number = _get_digits(self.number)
         return number or 1
 
     @property
@@ -420,9 +415,7 @@ class TocSection(CommonControlField, Orderable):
                     items[item.section.language.code2] = item.section.text
 
             if not items:
-                items.update(
-                    issue.journal.get_sections_by_titles(titles)
-                )
+                items.update(issue.journal.get_sections_by_titles(titles))
         return items
 
     @staticmethod

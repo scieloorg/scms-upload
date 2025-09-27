@@ -1,10 +1,10 @@
-import sys
 import logging
+import sys
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, models, transaction
-from django.db.models import Q, Count
+from django.db.models import Count, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -318,7 +318,9 @@ class Article(ClusterableModel, CommonControlField):
     def add_doi_with_lang(self, user, article_doi_with_lang):
         for item in article_doi_with_lang:
             try:
-                ArticleDOIWithLang.get_or_create(user, self, item["value"], item["lang"])
+                ArticleDOIWithLang.get_or_create(
+                    user, self, item["value"], item["lang"]
+                )
             except Exception as e:
                 logging.exception(e)
 
@@ -512,17 +514,17 @@ class ArticleDOIWithLang(Orderable, DOIWithLang):
     article = ParentalKey(
         "Article", on_delete=models.CASCADE, related_name="doi_with_lang"
     )
-    
+
     class Meta:
         verbose_name = _("Article DOI with Language")
         verbose_name_plural = _("Article DOIs with Language")
-    
+
     def __unicode__(self):
         return f"{self.lang}: {self.doi}"
-    
+
     def __str__(self):
         return f"{self.lang}: {self.doi}"
-    
+
     @classmethod
     def get(cls, article=None, doi=None, lang=None):
         if lang and isinstance(lang, str):
@@ -530,16 +532,10 @@ class ArticleDOIWithLang(Orderable, DOIWithLang):
 
         if article and doi and lang:
             try:
-                return cls.objects.get(
-                    article=article,
-                    doi__iexact=doi,
-                    lang=lang
-                )
+                return cls.objects.get(article=article, doi__iexact=doi, lang=lang)
             except cls.MultipleObjectsReturned:
                 return cls.objects.filter(
-                    article=article,
-                    doi__iexact=doi,
-                    lang=lang
+                    article=article, doi__iexact=doi, lang=lang
                 ).first()
 
         params = {}
@@ -554,7 +550,7 @@ class ArticleDOIWithLang(Orderable, DOIWithLang):
         raise ValueError(
             f"ArticleDOIWithLang.get missing params {dict(article=article, doi=doi, lang=lang)}"
         )
-    
+
     @classmethod
     def create(cls, user, article=None, doi=None, lang=None):
         if lang and isinstance(lang, str):
@@ -573,7 +569,7 @@ class ArticleDOIWithLang(Orderable, DOIWithLang):
         raise ValueError(
             f"ArticleDOIWithLang.create missing params {dict(article=article, doi=doi, lang=lang)}"
         )
-    
+
     @classmethod
     def get_or_create(cls, user, article=None, doi=None, lang=None):
         if article and doi and lang:

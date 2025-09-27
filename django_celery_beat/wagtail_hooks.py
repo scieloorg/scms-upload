@@ -7,12 +7,9 @@ from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from kombu.utils.json import loads
 from wagtail import hooks
-from wagtail_modeladmin.options import (
-    ModelAdmin,
-    ModelAdminGroup,
-    modeladmin_register,
-)
+from wagtail_modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 
+from config.menu import get_menu_order
 from django_celery_beat.models import (
     ClockedSchedule,
     CrontabSchedule,
@@ -35,17 +32,17 @@ class PeriodicTaskAdmin(ModelAdmin):
     celery_app = current_app
     date_hierarchy = "start_time"
     list_display = (
-        "__str__",
-        "enabled",
-        "interval",
-        "start_time",
+        "name",
+        "task",
+        "description",
+        "kwargs",
         "last_run_at",
-        "one_off",
     )
     list_filter = [
         "enabled",
         "one_off",
-        # "task",
+        "interval",
+        "start_time",
     ]
     actions = ("enable_tasks", "disable_tasks", "toggle_tasks", "run_tasks")
     search_fields = ("name",)
@@ -132,15 +129,17 @@ class PeriodicTaskAdmin(ModelAdmin):
             return
 
         task_ids = [
-            task.apply_async(
-                args=args,
-                kwargs=kwargs,
-                queue=queue,
-                periodic_task_name=periodic_task_name,
-            )
-            if queue and len(queue)
-            else task.apply_async(
-                args=args, kwargs=kwargs, periodic_task_name=periodic_task_name
+            (
+                task.apply_async(
+                    args=args,
+                    kwargs=kwargs,
+                    queue=queue,
+                    periodic_task_name=periodic_task_name,
+                )
+                if queue and len(queue)
+                else task.apply_async(
+                    args=args, kwargs=kwargs, periodic_task_name=periodic_task_name
+                )
             )
             for task, args, kwargs, queue, periodic_task_name in tasks
         ]
@@ -191,7 +190,7 @@ class SolarScheduleAdmin(ModelAdmin):
 class TasksModelsAdminGroup(ModelAdminGroup):
     menu_label = _("Tasks")
     menu_icon = "cogs"
-    menu_order = 1000
+    menu_order = get_menu_order("django_celery_beat")
     items = (
         PeriodicTaskAdmin,
         CrontabScheduleAdmin,

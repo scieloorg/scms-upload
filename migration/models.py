@@ -2,23 +2,24 @@ import logging
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
 
 from django.core.files.base import ContentFile
-from django.db import IntegrityError, models, DataError
+from django.db import DataError, IntegrityError, models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
-from scielo_classic_website import classic_ws
 from wagtail.admin.panels import FieldPanel
 from wagtail.models import Orderable
-from pathlib import Path
 
 from collection.models import Collection
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
+from scielo_classic_website import classic_ws
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
+
 from . import exceptions
 
 
@@ -416,7 +417,11 @@ class MigratedFile(CommonControlField):
     ):
         if collection and original_path:
             if file_date:
-                return cls.objects.get(collection=collection, original_path=original_path, file_date=file_date)
+                return cls.objects.get(
+                    collection=collection,
+                    original_path=original_path,
+                    file_date=file_date,
+                )
             return cls.objects.get(collection=collection, original_path=original_path)
         raise ValueError("MigratedFile.get requires collection and original_path")
 
@@ -474,7 +479,9 @@ class MigratedFile(CommonControlField):
                 with open(source_path, "rb") as fp:
                     content = fp.read()
             except Exception as e:
-                logging.info(f"MigratedFile.create_or_update - {source_path} - readfile")
+                logging.info(
+                    f"MigratedFile.create_or_update - {source_path} - readfile"
+                )
                 logging.exception(e)
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 UnexpectedEvent.create(

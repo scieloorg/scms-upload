@@ -10,12 +10,10 @@ from packtools.lib import file_utils as packtools_file_utils
 from packtools.sps.libs.reqs import requests_get_content
 
 
-class PackageWithoutXMLFileError(Exception):
-    ...
+class PackageWithoutXMLFileError(Exception): ...
 
 
-class BadPackageFileError(Exception):
-    ...
+class BadPackageFileError(Exception): ...
 
 
 def get_file_absolute_path(path):

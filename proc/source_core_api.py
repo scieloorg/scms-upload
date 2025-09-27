@@ -4,29 +4,29 @@ Módulo responsável pela busca e processamento de dados da API Core externa.
 
 import logging
 import sys
+
 from django.conf import settings
 from django.db.models import Q
 
+from collection.models import Collection
 from core.utils.requester import fetch_data
+from issue.models import Issue
 from journal.models import (
-    Journal,
-    OfficialJournal,
-    Subject,
     Institution,
-    Publisher,
-    Owner,
-    Sponsor,
+    Journal,
     JournalCollection,
     JournalHistory,
+    OfficialJournal,
+    Owner,
+    Publisher,
+    Sponsor,
+    Subject,
 )
-from issue.models import Issue
-from collection.models import Collection
-from proc.models import IssueProc, JournalProc
 from pid_provider.models import PidProviderConfig
+from proc.exceptions import ProcBaseException
+from proc.models import IssueProc, JournalProc
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
-from proc.exceptions import ProcBaseException
-
 
 # Constantes específicas da Core API
 try:
@@ -154,9 +154,9 @@ def fetch_and_create_journal(
                     "issn_electronic": issn_electronic,
                     "issn_print": issn_print,
                     "force_update": force_update,
-                    "data": result
+                    "data": result,
                 },
-            )    
+            )
 
 
 def fetch_journal_data_with_pagination(
@@ -195,7 +195,9 @@ def fetch_journal_data_with_pagination(
             yield from response.get("results") or []
 
 
-def process_journal_result(user, result, block_unregistered_collection, force_update=None):
+def process_journal_result(
+    user, result, block_unregistered_collection, force_update=None
+):
     """
     Processa um único resultado de journal da API e cria/atualiza as entidades correspondentes.
     """

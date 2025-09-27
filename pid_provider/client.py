@@ -87,12 +87,8 @@ class PidProviderAPIClient:
             )
         except IncorrectPidV2RegisteredInCoreException as e:
             # conserta valor de pid v2 no core
-            fix_pid_v2_response = self.fix_pid_v2(
-                xml_with_pre.v3, xml_with_pre.v2
-            )
-            if not fix_pid_v2_response or not fix_pid_v2_response.get(
-                "fixed_in_core"
-            ):
+            fix_pid_v2_response = self.fix_pid_v2(xml_with_pre.v3, xml_with_pre.v2)
+            if not fix_pid_v2_response or not fix_pid_v2_response.get("fixed_in_core"):
                 raise IncorrectPidV2RegisteredInCoreException(
                     f"Unable to fix pid v2 {e}: fix_pid_v2_response={fix_pid_v2_response}"
                 )
