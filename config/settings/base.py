@@ -7,6 +7,8 @@ from pathlib import Path
 import environ
 from django.utils.translation import gettext_lazy as _
 
+WAGTAILADMIN_SHOW_COUNT = True
+
 ROOT_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
 # core/
 APPS_DIR = ROOT_DIR / "core"
