@@ -5,9 +5,7 @@ from django.db.models import Q
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from pid_provider.base_pid_provider import BasePidProvider
-from pid_provider.client import (
-    PidProviderAPIClient,
-)
+from pid_provider.client import PidProviderAPIClient
 from pid_provider.models import FixPidV2, PidProviderXML
 from tracker.models import UnexpectedEvent
 
@@ -257,7 +255,7 @@ class PidRequester(BasePidProvider):
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             op.finish(user, completed=False, exception=e, exc_traceback=exc_traceback)
-            return {"error_msg": str(exc), "error_type": str(type(exc))}
+            return {"error_msg": str(e), "error_type": str(type(e))}
 
     def fix_pid_v2(
         self,
