@@ -608,6 +608,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 is_published=is_public,
                 article_proc=article_proc,
             ):
+                logging.info(response)
                 operation = article_proc.start(user, "request_pid_for_xml_zip")
 
                 if response.get("error_type"):
