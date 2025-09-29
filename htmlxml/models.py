@@ -13,8 +13,6 @@ from packtools.sps.pid_provider.xml_sps_lib import (
     XMLWithPre,
     split_processing_instruction_doctype_declaration_and_xml,
 )
-from scielo_classic_website.classic_ws import Document
-from scielo_classic_website.models.document import GenerateBodyAndBackFromHTMLError
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
@@ -23,31 +21,65 @@ from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from migration.models import MigratedArticle
 from package.models import BasicXMLFile
-
+from scielo_classic_website.classic_ws import Document
+from scielo_classic_website.models.document import GenerateBodyAndBackFromHTMLError
 # from tracker.models import EventLogger
 from tracker import choices as tracker_choices
 
 from . import choices, exceptions
 
 
-def get_xpath_for_a_href_stats(href, text, journal_acron):
+def escape_xpath_string(text):
+    """Escapa texto para uso seguro em XPath."""
+    if not text:
+        return ""
+    if "'" in text and '"' in text:
+        parts = text.split("'")
+        return "concat('" + "', \"'\", '".join(parts) + "')"
+    return f'"{text}"' if "'" in text else f"'{text}'"
+
+
+def get_xpath_for_a_href_stats(a, journal_acron):
+    """Gera XPaths possíveis para elementos XML resultantes da conversão de <a href>."""
+    href = (a.get("href") or "").strip()
+    if not href:
+        return []
+    
+    text = "".join(a.xpath(".//text()"))
+    
+    # Links internos
     if href.startswith("#"):
-        return [f".//xref[text()='{text}']"]
-
+        rid = href[1:]
+        xpaths = [f".//xref[@rid='{rid}']"]
+        if text:
+            xpaths.append(f".//xref[text()='{text}']")
+        return xpaths
+    
+    # Emails
     if "@" in href or "@" in text:
-        return [f".//email[text()='{text}']"]
-
-    if ":" in href or ":" in text:
-        return [f".//ext-link[text()='{text}']"]
-
-    if "img/revistas" in href or f"/{journal_acron}/" in href:
-        name, ext = os.path.splitext(href)
-        if ".htm" not in ext:
-            return [
-                f".//xref[text()='{text}']",
-                f".//graphic[@xlink:href='{href}']",
-            ]
-    return [f".//ext-link[text()='{text}']"]
+        email = href[7:] if href.startswith("mailto:") else href
+        xpaths = [f".//email[text()={escape_xpath_string(email)}]"]
+        if text and text != email:
+            xpaths.append(f".//email[text()='{text}']")
+        return xpaths
+    
+    # Imagens e recursos gráficos
+    _, ext = os.path.splitext(href.lower())
+    is_image = (ext in {'.jpg', '.jpeg', '.png', '.gif', '.svg', '.tif', '.tiff'} or
+                "img/revistas" in href or f"/{journal_acron}/" in href)
+    
+    if is_image:
+        xpaths = [f".//graphic[@xlink:href='{href}']"]
+        if text:
+            xpaths.append(f".//xref[text()='{text}']")
+        return xpaths
+    
+    # Links externos (URLs completas)
+    xpaths = []
+    if text:
+        xpaths.append(f".//ext-link[text()='{text}']")
+    xpaths.append(f".//ext-link[@xlink:href='{href}']")
+    return xpaths
 
 
 def get_xpath_for_src_stats(element_tag, src, journal_acron):
@@ -360,14 +392,10 @@ class Html2xmlAnalysis(models.Model):
 
     def get_a_href_stats(self, html, xml, journal_acron):
         for a in html.xpath(".//a[@href]"):
-            href = a.get("href")
-            text = a.text
-            xpaths = " | ".join(get_xpath_for_a_href_stats(href, text, journal_acron))
+            xpaths = get_xpath_for_a_href_stats(a, journal_acron)
             yield {
                 "html": xml_node_to_string(a),
-                "xml": (
-                    get_xml_nodes_to_string(xml, xpaths) if xpaths else []
-                ),
+                "xml": (get_xml_nodes_to_string(xml, xpaths) if xpaths else []),
             }
 
     def get_src_stats(self, html, xml, journal_acron):
@@ -649,7 +677,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 "body_and_back": bool(body_and_back),
             }
             completed = bool(xml_content and body_and_back)
-            if completed:
+            if completed and not document.exceptions:
                 self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
             else:
                 self.html2xml_status = tracker_choices.PROGRESS_STATUS_PENDING
@@ -664,7 +692,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 exc_traceback=None,
                 detail=detail,
             )
-            return xml_content
+            return {"xml": xml_content, "exceptions": document.exceptions}
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -773,7 +801,12 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             xml_file = article_proc.pkg_name + ".xml"
             self.save_file(xml_file, xml_content)
             detail["xml"] = xml_file
-            operation.finish(user, bool(xml_content), detail=detail)
+            if document.exceptions:
+                detail["xml_exceptions"] = document.exceptions
+                completed = False
+            else:
+                completed = True
+            operation.finish(user, completed, detail=detail)
             return xml_content
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()

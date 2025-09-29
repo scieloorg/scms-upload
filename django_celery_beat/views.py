@@ -3,7 +3,7 @@ import logging
 
 from celery import current_app
 from django.shortcuts import get_object_or_404, redirect
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from wagtail.admin import messages
 
 from django_celery_beat import models

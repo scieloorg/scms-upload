@@ -10,8 +10,6 @@ from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
-from scielo_classic_website import classic_ws
-from scielo_classic_website.iid2json.id2json3 import get_doc_records
 
 from article.models import Article
 from collection.models import Language
@@ -23,14 +21,16 @@ from journal.models import (
     Journal,
     JournalCollection,
     JournalHistory,
+    Mission,
     OfficialJournal,
     Owner,
     Publisher,
     Subject,
-    Mission,
 )
 from location.models import Location
 from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile
+from scielo_classic_website import classic_ws
+from scielo_classic_website.iid2json.id2json3 import get_doc_records
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 
@@ -460,11 +460,14 @@ class IssueFolderImporter:
         )
 
         try:
+            issue_proc.issue_files.all().delete()
+
+            # TODO atualiza ArticleProc xml_status
             # html antes das referencias
             # html após das referencias
             parts = {
                 "before": "1",
-                "after":  "2",
+                "after": "2",
             }
             for file in files_and_exceptions:
                 # {"type": "pdf", "key": name, "path": path, "name": basename, "lang": lang}
@@ -480,7 +483,7 @@ class IssueFolderImporter:
 
                     component_type = IssueFolderImporter.check_component_type(file)
                     part = file.get("part")
-                    
+
                     yield MigratedFile.create_or_update(
                         user=self.user,
                         collection=collection,
@@ -495,12 +498,12 @@ class IssueFolderImporter:
                         file_datetime_iso=file.get("modified_date"),
                         basename=file.get("name"),
                     )
-                    
+
                 except Exception as e:
-                    yield (
-                        {"error": str(e), "type": str(type(e)), "file": file}
-                    )
+                    logging.exception(e)
+                    yield ({"error": str(e), "type": str(type(e)), "file": file})
         except Exception as e:
+            logging.exception(e)
             yield (
                 {
                     "files from": f"{journal_acron} {issue_proc.issue_folder}",
@@ -508,7 +511,7 @@ class IssueFolderImporter:
                     "type": str(type(e)),
                 }
             )
-                
+
 
 def get_article_records_from_classic_website(
     user,
@@ -716,16 +719,16 @@ class PkgZipBuilder:
             if item.get("lang"):
                 xml_langs.append(item.get("lang"))
 
-        pdf_langs = []
+        pdf_langs = set()
 
         for rendition in renditions:
             try:
                 if rendition.lang:
                     sps_filename = f"{self.sps_pkg_name}-{rendition.lang}.pdf"
-                    pdf_langs.append(rendition.lang)
+                    pdf_langs.add(rendition.lang)
                 else:
                     sps_filename = f"{self.sps_pkg_name}.pdf"
-                    pdf_langs.append(xml_langs[0])
+                    pdf_langs.add(xml_langs[0])
 
                 zf.write(rendition.file.path, arcname=sps_filename)
 
@@ -739,7 +742,7 @@ class PkgZipBuilder:
                 self.components[rendition.original_name] = {
                     "failures": format_traceback(exc_traceback),
                 }
-        html_langs = list(translations.keys())
+        html_langs = list(set(translations.keys()))
         try:
             if main_paragraphs_lang:
                 html_langs.append(main_paragraphs_lang)
@@ -748,7 +751,7 @@ class PkgZipBuilder:
 
         return {
             "xml_langs": xml_langs,
-            "pdf_langs": pdf_langs,
+            "pdf_langs": list(pdf_langs),
             "html_langs": html_langs,
         }
 
@@ -794,6 +797,9 @@ class PkgZipBuilder:
                         )
 
                 if not found:
+                    logging.exception(
+                        f"build_sps_package not found {xml_graphic.xlink_href}"
+                    )
                     self.components[xml_graphic.xlink_href] = {
                         "failures": "Not found",
                     }
@@ -803,6 +809,7 @@ class PkgZipBuilder:
                 self.components[xml_graphic.xlink_href] = {
                     "failures": format_traceback(exc_traceback),
                 }
+        logging.info(replacements.items())
         xml_assets.replace_names(replacements)
 
     def _build_sps_package_add_asset(
@@ -813,6 +820,10 @@ class PkgZipBuilder:
         replacements,
     ):
         try:
+            if xml_graphic.xlink_href in replacements.keys():
+                # já foi inserido
+                return
+
             # obtém o nome do arquivo no padrão sps
             sps_filename = xml_graphic.name_canonical(self.sps_pkg_name)
 

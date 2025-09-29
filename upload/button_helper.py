@@ -1,7 +1,8 @@
+# button_helper.py - ATUALIZADO
 from django.urls import reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
+# Mudança: wagtail.contrib.modeladmin -> wagtail_modeladmin
 from wagtail_modeladmin.helpers import ButtonHelper
-
 from . import choices
 
 
@@ -22,35 +23,35 @@ class UploadButtonHelper(ButtonHelper):
         ph = self.permission_helper
         usr = self.request.user
         url_name = self.request.resolver_match.url_name
-
         print(f"urlname: {url_name}")
-
         analyst_team_member = ph.user_is_analyst_team_member(usr, obj)
-
+        
         exclude = ["delete"]
         if not analyst_team_member:
             exclude.append("edit")
+            
         if url_name.endswith("_modeladmin_inspect"):
             exclude.append("inspect")
-
+            
         btns = super().get_buttons_for_obj(
             obj, exclude, classnames_add, classnames_exclude
         )
-
+        
         if not obj.is_validation_finished:
             return btns
-
+            
         classnames = []
         if url_name.endswith("_modeladmin_inspect"):
             classnames.extend(ButtonHelper.inspect_button_classnames)
         if url_name.endswith("_modeladmin_index"):
             classnames.extend(UploadButtonHelper.index_button_classnames)
-
+            
         self.add_finish_deposit_button(btns, obj, classnames, url_name)
-
+        
         if analyst_team_member:
             self.add_assign_button(btns, obj, classnames)
             self.add_archive_button(btns, obj, classnames)
+            
         return btns
 
     def add_assign_button(self, btns, obj, classnames, label=None):

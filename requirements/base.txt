@@ -1,96 +1,113 @@
+# ========================================
+# Base Dependencies
+# ========================================
 pytz==2023.3.post1  # https://github.com/stub42/pytz
-Pillow==10.2.0  # https://github.com/python-pillow/Pillow
+python-dateutil==2.9.0.post0  # https://github.com/dateutil/dateutil
+tenacity==8.2.3  # https://pypi.org/project/tenacity/
+psutil==6.0.0  # System monitoring
+
+# ========================================
+# Security & Authentication
+# ========================================
 argon2-cffi==23.1.0  # https://github.com/hynek/argon2_cffi
-whitenoise==6.6.0  # https://github.com/evansd/whitenoise
-redis==5.0.1  # https://github.com/redis/redis-py
-hiredis==2.2.3  # https://github.com/redis/hiredis-py
-# celery==5.2.7  # pyup: < 6.0  # https://github.com/celery/celery
-celery==5.3.6  # pyup: < 6.0  # https://github.com/celery/celery
+certifi>=2024.2.2  # SSL certificates
+
+# ========================================
+# Image Processing
+# ========================================
+Pillow==10.4.0  # https://github.com/python-pillow/Pillow
+
+# ========================================
+# Web Server & Caching
+# ========================================
+whitenoise==6.7.0  # https://github.com/evansd/whitenoise
+redis==5.0.8  # https://github.com/redis/redis-py
+hiredis==3.0.0  # https://github.com/redis/hiredis-py
+
+# ========================================
+# Django Core
+# ========================================
+django==5.2.3  # Latest security patch - UPGRADE de 5.0.9
+django-environ==0.11.2  # https://github.com/joke2k/django-environ
+django-model-utils==4.5.1  # https://github.com/jazzband/django-model-utils
+django-allauth==65.10.0  # https://github.com/pennersr/django-allauth - UPGRADE de 0.63.6
+django-crispy-forms==2.4  # https://github.com/django-crispy-forms/django-crispy-forms - UPGRADE de 2.3
+crispy-bootstrap5==2025.6  # https://github.com/django-crispy-forms/crispy-bootstrap5 - UPGRADE de 2024.2
+django-compressor==4.5.1  # https://github.com/django-compressor/django-compressor
+django-redis==5.4.0  # https://github.com/jazzband/django-redis
+
+# ========================================
+# Django REST Framework
+# ========================================
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+
+# ========================================
+# Celery & Task Queue
+# ========================================
+celery==5.5.3  # https://github.com/celery/celery - UPGRADE de 5.3.6
+django-celery-beat==2.8.1  # https://github.com/celery/django-celery-beat - UPGRADE de 2.6.0
+django-celery-results==2.6.0  # UPGRADE de 2.5.1
 flower==2.0.1  # https://github.com/mher/flower
 
-# Django
-# ------------------------------------------------------------------------------
-django==5.0.8
-django-environ==0.11.2  # https://github.com/joke2k/django-environ
-django-model-utils==4.4.0  # https://github.com/jazzband/django-model-utils
-django-allauth==0.61.1  # https://github.com/pennersr/django-allauth
-django-crispy-forms==2.1  # https://github.com/django-crispy-forms/django-crispy-forms
-crispy-bootstrap5==2024.2 # https://github.com/django-crispy-forms/crispy-bootstrap5
-django-compressor==4.4  # https://github.com/django-compressor/django-compressor
-django-redis==5.4.0  # https://github.com/jazzband/django-redis4
-
-# Django REST
-djangorestframework==3.15.2
-djangorestframework-simplejwt==5.3.1  # https://django-rest-framework-simplejwt.readthedocs.io/en/latest/
-
-
-# Django celery
-# ------------------------------------------------------------------------------
-django-celery-beat==2.6.0  # https://github.com/celery/django-celery-beat
-django_celery_results==2.5.1
-
-
-# Wagtail
-# ------------------------------------------------------------------------------
-wagtail==6.2  # https://github.com/wagtail/wagtail
-
-# Wagtail Recaptcha
-# ------------------------------------------------------------------------------
-# django-recaptcha==4.0.0
+# ========================================
+# Wagtail CMS
+# ========================================
+wagtail==6.4.2  # https://github.com/wagtail/wagtail - UPGRADE de 6.2.1
 wagtail-django-recaptcha==2.1.1
-
-# Wagtail Menu
-# ------------------------------------------------------------------------------
 wagtailmenus==3.1.9
-
-# Wagtail Localize
-# ------------------------------------------------------------------------------
-wagtail-localize==1.8.2
-
-#Wagtail Admin
-# ------------------------------------------------------------------------------
+wagtail-localize==1.12.2  # UPGRADE de 1.9.0
 wagtail-modeladmin==2.0.0
+wagtail-autocomplete==0.12.0  # UPGRADE de 0.11.0
 
-# Wagtail-Autocomplete
-# https://github.com/wagtail/wagtail-autocomplete
-# ------------------------------------------------------------------------------
-wagtail-autocomplete==0.11.0
-
-# DSM Minio
-# ------------------------------------------------------------------------------
-minio==7.2.5
-
-# Upload
-# ------------------------------------------------------------------------------
-lxml==4.9.4 # https://github.com/lxml/lxml
-# packtools dependence
-langdetect==1.0.9 
-#-e git+https://github.com/scieloorg/packtools.git@master#egg=packtools
--e git+https://github.com/scieloorg/packtools.git@4.11.18#egg=packtools
--e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
-
-# DSM Publication
-# ------------------------------------------------------------------------------
--e git+https://github.com/scieloorg/opac_schema.git@v2.66#egg=opac_schema
+# ========================================
+# Database & Storage
+# ========================================
 mongoengine==0.28.2
-aiohttp==3.9.1
-# DSM Migration
-# ------------------------------------------------------------------------------
--e git+https://github.com/scieloorg/scielo_migration.git@1.8.10#egg=scielo_classic_website
-python-dateutil==2.8.2
-tornado>=6.3.2 # not directly required, pinned by Snyk to avoid a vulnerability
+minio==7.2.8  # Mantendo versão maior
 
-# Tenacity
-# ------------------------------------------------------------------------------
-tenacity==8.2.3  # https://pypi.org/project/tenacity/
-urllib3==2.2.2
-
-# iso639-langs
-# ------------------------------------------------------------------------------
-iso639-lang==2.2.3
+# ========================================
+# XML Processing & Data Parsing
+# ========================================
+lxml==5.3.0  # https://github.com/lxml/lxml - Mantendo versão maior
 feedparser==6.0.11
-requests>=2.32.2 # not directly required, pinned by Snyk to avoid a vulnerability
-certifi>=2023.7.22 # not directly required, pinned by Snyk to avoid a vulnerability
+langdetect==1.0.9
 
-# profiling
-psutil==5.9.8  # Para profiling
+# ========================================
+# HTTP & Networking
+# ========================================
+aiohttp==3.10.5  # Async HTTP client - Mantendo versão maior
+urllib3==2.2.3  # Mantendo versão maior
+requests>=2.32.3  # Mantendo versão maior
+tornado>=6.4.1  # Pinned by Snyk - Mantendo versão maior
+
+# ========================================
+# Localization
+# ========================================
+iso639-lang==2.6.3  # Mantendo versão maior
+
+# ========================================
+# SciELO Specific Packages
+# ========================================
+# Using specific versions for stability
+-e git+https://github.com/scieloorg/packtools.git@4.12.3#egg=packtools
+-e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
+-e git+https://github.com/scieloorg/opac_schema.git@v2.66#egg=opac_schema
+-e git+https://github.com/scieloorg/scielo_migration.git@1.9.3#egg=scielo_classic_website
+
+# ========================================
+# Development & Testing
+# ========================================
+freezegun==1.5.1  # https://pypi.org/project/freezegun/
+django-silk==5.3.2  # NOVA ADIÇÃO
+
+# ========================================
+# Excel Processing
+# ========================================
+xlwt==1.3.0  # NOVA ADIÇÃO
+xmltodict==0.13.0  # https://github.com/martinblech/xmltodict.git - NOVA ADIÇÃO
+
+# ========================================
+# Two Factor Authentication
+# ========================================
+wagtail-2fa-new==1.8.0  # https://pypi.org/project/wagtail-2fa-new/ - NOVA ADIÇÃO

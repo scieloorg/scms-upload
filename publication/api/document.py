@@ -1,5 +1,5 @@
-import logging
 import json
+import logging
 from datetime import datetime
 
 from django.utils.translation import gettext_lazy as _
@@ -22,9 +22,7 @@ def publish_article(article_proc, api_data, bundle_id=None, is_public=True):
     except AttributeError:
         pass
     if not bundle_id or len(bundle_id) <= 9:
-        raise ValueError(
-            "publication.api.document.publish_article requires bundle_id"
-        )
+        raise ValueError("publication.api.document.publish_article requires bundle_id")
 
     order = article_proc.article.position
     # considerar a data de publicação contida no XML seja no QA ou no PUBLIC
@@ -207,7 +205,7 @@ class ArticlePayload:
             _related_article["ref_id"] = ref_id
             _related_article["related_type"] = related_type
             self.data["related_articles"].append(_related_article)
-  
+
     def add_xml(self, xml):
         self.data["xml"] = xml
 

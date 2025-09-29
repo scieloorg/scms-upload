@@ -4,7 +4,7 @@ Módulo responsável pela publicação de conteúdo nos websites.
 
 import logging
 
-from proc.models import IssueProc, JournalProc, ArticleProc
+from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.issue import publish_issue
 from publication.api.journal import publish_journal
 from publication.api.publication import get_api_data
@@ -23,7 +23,7 @@ def publish_journals(
 ):
     """
     Publica journals no website especificado.
-    
+
     Args:
         user: Usuário executando a operação
         website_kind: Tipo de website (ex: 'public', 'preview')
@@ -48,7 +48,7 @@ def publish_journals(
         ),
     )
     logging.info(f"publish_journals {params}")
-    
+
     api_data = get_api_data(collection, "journal", website_kind)
 
     if api_data.get("error"):
@@ -62,7 +62,7 @@ def publish_journals(
             params=journal_filter,
         )
         logging.info(f"publish_journals: {items.count()}")
-        
+
         for journal_proc in items:
             response = journal_proc.publish(
                 user,
@@ -94,7 +94,7 @@ def publish_issues(
 ):
     """
     Publica issues de um journal específico no website.
-    
+
     Args:
         user: Usuário executando a operação
         website_kind: Tipo de website
@@ -117,7 +117,7 @@ def publish_issues(
         ),
     )
     logging.info(f"publish_issues {params}")
-    
+
     api_data = get_api_data(collection, "issue", website_kind)
 
     if api_data.get("error"):
@@ -132,7 +132,7 @@ def publish_issues(
             params=issue_filter,
         )
         logging.info(f"publish_issues: {items.count()}")
-        
+
         for issue_proc in items:
             response = issue_proc.publish(
                 user,
@@ -156,7 +156,7 @@ def publish_articles(
 ):
     """
     Publica artigos de um issue específico no website.
-    
+
     Args:
         user: Usuário executando a operação
         website_kind: Tipo de website
@@ -175,7 +175,7 @@ def publish_articles(
         ),
     )
     logging.info(f"publish_articles {params}")
-    
+
     api_data = get_api_data(collection, "article", website_kind)
     if api_data.get("error"):
         logging.error(api_data)
@@ -188,7 +188,7 @@ def publish_articles(
             params={"issue_proc": issue_proc},
         )
         logging.info(f"publish_articles: {items.count()}")
-        
+
         for article_proc in items:
             task_publish_article.apply_async(
                 kwargs=dict(

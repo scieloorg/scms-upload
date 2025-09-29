@@ -1,8 +1,8 @@
 import logging
 
-from django.utils.translation import gettext as _
 from django.contrib import messages
 from django.http import HttpResponseRedirect
+from django.utils.translation import gettext_lazy as _
 from wagtail_modeladmin.views import CreateView, InspectView
 
 

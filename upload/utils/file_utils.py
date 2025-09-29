@@ -4,18 +4,16 @@ import zipfile
 from tempfile import NamedTemporaryFile
 
 from django.core.files.storage import FileSystemStorage
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from lxml import etree
 from packtools.lib import file_utils as packtools_file_utils
 from packtools.sps.libs.reqs import requests_get_content
 
 
-class PackageWithoutXMLFileError(Exception):
-    ...
+class PackageWithoutXMLFileError(Exception): ...
 
 
-class BadPackageFileError(Exception):
-    ...
+class BadPackageFileError(Exception): ...
 
 
 def get_file_absolute_path(path):
