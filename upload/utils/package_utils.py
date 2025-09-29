@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory, mkdtemp
 from time import sleep
 from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from lxml import etree
 from packtools import SPPackage
 from packtools.domain import HTMLGenerator

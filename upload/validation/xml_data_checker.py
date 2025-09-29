@@ -1,7 +1,7 @@
 import sys
 import logging
 
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from packtools.sps.validation import xml_validator as packtools_xml_data_checker
 from upload.models import (
     XMLError,
