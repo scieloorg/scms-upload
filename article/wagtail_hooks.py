@@ -1,5 +1,7 @@
+from django.conf import settings
+from django.contrib import messages
 from django.urls import include, path
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail_modeladmin.options import (
     ModelAdmin,
@@ -26,7 +28,7 @@ from .permission_helper import ArticlePermissionHelper
 
 class ArticleModelAdmin(ModelAdmin):
     model = Article
-    menu_label = _("Articles")
+    menu_label = _("Tasks")
     create_view_class = ArticleCreateView
     button_helper_class = ArticleButtonHelper
     permission_helper_class = ArticlePermissionHelper

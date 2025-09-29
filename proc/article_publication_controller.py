@@ -4,7 +4,7 @@ from datetime import datetime
 def log_event(execution_log, level, event_type, message, **extra_data):
     """
     Adiciona um evento ao log de execução
-    
+
     Args:
         execution_log: Lista onde o evento será adicionado
         level: Nível do log (info, warning, error)
@@ -16,7 +16,7 @@ def log_event(execution_log, level, event_type, message, **extra_data):
         "timestamp": datetime.now().isoformat(),
         "level": level,
         "type": event_type,
-        "message": message
+        "message": message,
     }
     if extra_data:
         event.update(extra_data)
@@ -30,11 +30,11 @@ def schedule_article_publication(
     username,
     qa_api_data,
     public_api_data,
-    force_update
+    force_update,
 ):
     """
     Agenda a publicação de um artigo nos websites QA e PUBLIC
-    
+
     Args:
         task_publish_article: A task celery para publicação
         article_proc_id: ID do ArticleProc
@@ -43,15 +43,12 @@ def schedule_article_publication(
         qa_api_data: Dados da API QA
         public_api_data: Dados da API PUBLIC
         force_update: Flag para forçar atualização
-        
+
     Returns:
         dict: Status de agendamento {"qa": bool, "public": bool}
     """
-    scheduled = {
-        "qa": False,
-        "public": False
-    }
-    
+    scheduled = {"qa": False, "public": False}
+
     if not qa_api_data.get("error"):
         task_publish_article.apply_async(
             kwargs=dict(
@@ -64,7 +61,7 @@ def schedule_article_publication(
             )
         )
         scheduled["qa"] = True
-    
+
     if not public_api_data.get("error"):
         task_publish_article.apply_async(
             kwargs=dict(
@@ -77,5 +74,5 @@ def schedule_article_publication(
             )
         )
         scheduled["public"] = True
-    
+
     return scheduled

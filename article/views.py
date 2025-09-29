@@ -1,7 +1,7 @@
 # Create your views here.
 import logging
 
-from django.http import HttpResponseRedirect, Http404, HttpResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from wagtail_modeladmin.views import CreateView, EditView, InspectView
 

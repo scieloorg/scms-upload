@@ -3,16 +3,17 @@ import logging
 import sys
 from datetime import datetime
 
+from django.contrib.auth import get_user_model
+from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
+
+from article.models import Article
 from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from core.models import PressRelease
 from core.utils.requester import fetch_data
-from django.contrib.auth import get_user_model
-from django.db.models import Q
-from django.utils.translation import gettext_lazy as _
 from proc.models import ArticleProc, IssueProc, JournalProc
-from publication.models import ArticleAvailability
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
 from publication.api.journal import publish_journal
@@ -20,8 +21,6 @@ from publication.api.pressrelease import publish_pressrelease
 from publication.api.publication import PublicationAPI
 from publication.models import ArticleAvailability, ScieloURLStatus
 from tracker.models import UnexpectedEvent
-from article.models import Article
-
 
 User = get_user_model()
 
@@ -331,16 +330,6 @@ def task_publish_item_inline(
                 model_name=model_name,
             ),
         )
-
-
-def is_registered(url):
-    try:
-        logging.info(url)
-        x = requests.get(url, timeout=30)
-        logging.info(x.status_code)
-        return x.status_code == HTTPStatus.OK
-    except Exception as e:
-        return None
 
 
 @celery_app.task(bind=True)

@@ -3,7 +3,7 @@ import logging
 from django.contrib import messages
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from wagtail_modeladmin.views import CreateView, EditView, InspectView
 
 from article.models import Article

@@ -37,9 +37,11 @@ class FormPage(WagtailCaptchaEmailForm):
                     return JsonResponse(
                         {
                             "alert": "success",
-                            "message": self.thank_you_text
-                            if self.thank_you_text
-                            else "Formulário enviado com sucesso!",
+                            "message": (
+                                self.thank_you_text
+                                if self.thank_you_text
+                                else "Formulário enviado com sucesso!"
+                            ),
                         }
                     )
                 else:

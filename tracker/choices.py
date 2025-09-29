@@ -1,6 +1,5 @@
 from django.utils.translation import gettext_lazy as _
 
-
 TASK_TRACK_STATUS_STARTED = "started"
 TASK_TRACK_STATUS_INTERRUPTED = "interrupted"
 TASK_TRACK_STATUS_FINISHED = "finished"
@@ -64,7 +63,7 @@ VALID_STATUS = PROGRESS_STATUS_FORCE_UPDATE + [PROGRESS_STATUS_DOING]
 
 
 def get_valid_status(status, force_update):
-    if status: 
+    if status:
         if isinstance(status, str):
             status = [status]
         if isinstance(status, list):
@@ -77,4 +76,8 @@ def get_valid_status(status, force_update):
 def allowed_to_run(status, force_update):
     if force_update and status == PROGRESS_STATUS_DOING:
         return True
-    return force_update and status in PROGRESS_STATUS_FORCE_UPDATE or status in PROGRESS_STATUS_REGULAR_TODO
+    return (
+        force_update
+        and status in PROGRESS_STATUS_FORCE_UPDATE
+        or status in PROGRESS_STATUS_REGULAR_TODO
+    )

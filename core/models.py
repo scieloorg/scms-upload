@@ -1,9 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, models
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
-
 
 from . import choices
 from .exceptions import PressReleaseInvalidURL

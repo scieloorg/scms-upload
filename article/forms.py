@@ -1,7 +1,7 @@
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
-from core.forms import CoreAdminModelForm
 from article import choices
+from core.forms import CoreAdminModelForm
 
 
 class ArticleForm(CoreAdminModelForm):

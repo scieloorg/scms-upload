@@ -1,22 +1,24 @@
 from unittest.mock import PropertyMock, call, patch
 
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase
+
 from article.models import Article, ArticleDOIWithLang
 from collection.models import Collection, WebSiteConfiguration
 from core.users.models import User
 from core.utils.requester import NonRetryableError, RetryableError
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
 from issue.models import Issue
 from journal.models import Journal, JournalCollection, OfficialJournal
 from proc.models import JournalProc
 
-from .models import (ArticleAvailability,
-                     ScieloURLStatus)
-from .tasks import (fetch_data_and_register_result,
-                    initiate_article_availability_check,
-                    process_article_availability,
-                    process_file_to_check_migrated_articles,
-                    retry_failed_scielo_urls)
+from .models import ArticleAvailability, ScieloURLStatus
+from .tasks import (
+    fetch_data_and_register_result,
+    initiate_article_availability_check,
+    process_article_availability,
+    process_file_to_check_migrated_articles,
+    retry_failed_scielo_urls,
+)
 
 
 class ArticleAvailabilityTest(TestCase):
@@ -201,7 +203,7 @@ class ArticleAvailabilityTest(TestCase):
 
         self.assertEqual(ScieloURLStatus.objects.filter(available=False).count(), 2)
         self.assertEqual(ScieloURLStatus.objects.filter(available=True).count(), 2)
-                
+
         self.assertEqual(scielo_url_status_first.available, False)
         self.assertEqual(scielo_url_status_last.available, False)
         self.assertEqual(

@@ -1,8 +1,9 @@
 import logging
 
 from django.urls import include, path
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
+
 from wagtail import hooks
 from wagtail_modeladmin.options import (
     ModelAdmin,
@@ -76,7 +77,6 @@ class PackageZipAdmin(ModelAdmin):
         params = {}
         if not self.permission_helper.user_is_analyst_team_member(request.user, None):
             params = {"creator": request.user}
-
         return super().get_queryset(request).filter(**params)
 
 

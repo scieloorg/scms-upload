@@ -6,7 +6,7 @@ import sys
 from celery.result import AsyncResult
 from django.db.models import Q
 from django.contrib.auth import get_user_model
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from packtools.sps.validation.xml_structure import StructureValidator
 from packtools.utils import SPPackage

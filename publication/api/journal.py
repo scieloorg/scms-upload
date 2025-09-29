@@ -3,9 +3,9 @@ import logging
 from django.utils.translation import gettext_lazy as _
 
 from journal.models import JournalHistory
+from proc.source_core_api import fetch_and_create_journal
 from publication.api.publication import PublicationAPI
 from publication.utils.journal import build_journal
-from proc.source_core_api import fetch_and_create_journal
 
 
 def publish_journal(journal_proc, api_data):

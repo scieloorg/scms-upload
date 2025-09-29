@@ -1,5 +1,5 @@
 from django.urls import include, path
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail_modeladmin.options import (
     ModelAdmin,
@@ -11,9 +11,9 @@ from wagtail_modeladmin.views import InspectView
 from config.menu import get_menu_order
 from htmlxml.models import HTMLXML
 from package.models import SPSPkg
+from proc.views import CoreCreateView, ProcCreateView, ProcEditView
 
 from .models import ArticleProc, IssueProc, JournalProc, ProcReport
-from proc.views import ProcCreateView, ProcEditView, CoreCreateView
 
 
 class JournalProcModelAdmin(ModelAdmin):

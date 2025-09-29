@@ -27,7 +27,6 @@ urlpatterns = [
     # Wagtail Admin
     path(settings.WAGTAIL_ADMIN_URL, include(wagtailadmin_urls)),
     re_path(r"^documents/", include(wagtaildocs_urls)),
-
     # API V1 endpoint to custom models
     path("api/v1/", include("config.api_router")),
     # Your stuff: custom urls includes go here
