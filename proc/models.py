@@ -746,7 +746,7 @@ class BaseProc(CommonControlField):
                 response = callable_publish(self, api_data)
                 resp.update(response)
 
-            completed = bool(response.get("result") == "OK")
+            completed = bool(resp.get("result") == "OK")
             self.update_publication_stage(website_kind, completed)
             resp.update(detail)
             operation.finish(user, completed=completed, detail=resp)
@@ -764,7 +764,7 @@ class BaseProc(CommonControlField):
                     user,
                     exc_traceback=exc_traceback,
                     exception=e,
-                    detail=result,
+                    detail=resp,
                 )
             resp.update(detail)
             resp["error_type"] = str(type(e))
@@ -1339,13 +1339,7 @@ class IssueProc(BaseProc, ClusterableModel):
         if issue_folder:
             params["issue_folder"] = issue_folder
 
-        issue_procs = IssueProc.objects.select_related(
-            "collection",
-            "journal_proc",
-            "issue",
-            "migrated_data",
-            "journal_proc__migrated_data",
-        ).filter(
+        issue_procs = IssueProc.objects.filter(
             collection__acron=collection_acron,
             pid__in=issue_pids,
             **params,
@@ -1638,13 +1632,17 @@ class ArticleProc(BaseProc, ClusterableModel):
                     n_references=len(classic_ws_doc.citations or []),
                     record_types="|".join(classic_ws_doc.record_types or []),
                 )
-                htmlxml.html_to_xml(user, self, body_and_back_xml)
+                result = htmlxml.html_to_xml(user, self, body_and_back_xml)
                 htmlxml.generate_report(user, self)
                 detail.update(htmlxml.data)
 
             xml = get_migrated_xml_with_pre(self)
             if xml:
-                self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
+                if result.get("exceptions"):
+                    self.xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+                    detail["xml_exceptions"] = result.get("exceptions")
+                else:
+                    self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
                 detail.update(xml.data)
             else:
                 self.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
@@ -1793,7 +1791,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         return self.issue_proc.issue_files.filter(
             component_type="html",
             pkg_name=self.pkg_name,
-        )
+        ).order_by("-updated")
 
     @property
     def translations(self):
@@ -1807,8 +1805,12 @@ class ArticleProc(BaseProc, ClusterableModel):
         xhtmls = {}
         items = self.translation_files
         for item in items.iterator():
-            hc = HTMLContent(item.text)
+            if not item.text:
+                continue
             lang = item.lang
+            if lang in xhtmls.keys():
+                continue
+            hc = HTMLContent(item.text)
             xhtmls.setdefault(lang, {})
             xhtmls[lang][part[item.part]] = hc.content
         return xhtmls
