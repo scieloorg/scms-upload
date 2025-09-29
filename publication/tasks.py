@@ -332,16 +332,6 @@ def task_publish_item_inline(
         )
 
 
-def is_registered(url):
-    try:
-        logging.info(url)
-        x = requests.get(url, timeout=30)
-        logging.info(x.status_code)
-        return x.status_code == HTTPStatus.OK
-    except Exception as e:
-        return None
-
-
 @celery_app.task(bind=True)
 def task_check_article_availability(
     self,

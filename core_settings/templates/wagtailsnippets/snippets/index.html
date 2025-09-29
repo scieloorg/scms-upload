@@ -1,0 +1,19 @@
+{% extends "wagtailsnippets/snippets/index.html" %}
+{% load wagtailadmin_tags i18n static %}
+
+{% block main_header %}
+    {{ block.super }}
+
+    {% if page_obj %}
+        {# Injeta um holder com o total correto #}
+            <span id="snippet-total-count" data-total="{{page_obj.paginator.count}}"></span>
+    {% endif %}
+    
+    
+{% endblock %}
+
+{% block extra_js %}
+    {{ block.super }}
+    <script src="{% static 'admin/js/inject_listing_total_breadcrumb.js' %}"></script>
+    <script src="{% static 'admin/js/move_import_form_and_upload_csv.js' %}"></script>
+{% endblock %}
