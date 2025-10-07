@@ -37,6 +37,7 @@ class JournalProcModelAdmin(ModelAdmin):
         "updated",
     )
     list_filter = (
+        "collection",
         "availability_status",
         "migration_status",
         "qa_ws_status",
@@ -73,6 +74,7 @@ class IssueProcModelAdmin(ModelAdmin):
         "created",
     )
     list_filter = (
+        "collection",
         "migration_status",
         "docs_status",
         "files_status",
@@ -190,6 +192,7 @@ class ArticleProcModelAdmin(ModelAdmin):
         "created",
     )
     list_filter = (
+        "collection",
         "migration_status",
         "xml_status",
         "sps_pkg_status",
