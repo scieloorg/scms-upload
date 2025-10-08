@@ -2,12 +2,8 @@ from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
-from wagtail_modeladmin.options import (
-    ModelAdmin,
-    ModelAdminGroup,
-    modeladmin_register,
-)
-from wagtail_modeladmin.views import CreateView
+from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
+from wagtail.snippets.models import register_snippet
 
 from config.menu import get_menu_order
 from migration.models import (
@@ -20,97 +16,51 @@ from migration.models import (
     MigratedJournal,
 )
 
-# class MigrationFailureAdmin(ModelAdmin):
-#     model = MigrationFailure
-#     inspect_view_enabled = True
-#     menu_label = _("Migration Failures")
-#     menu_icon = "folder"
-#     menu_order = 200
-#     add_to_settings_menu = False
-#     exclude_from_explorer = False
 
-#     list_display = (
-#         "action_name",
-#         "migrated_item_name",
-#         "migrated_item_id",
-#         "message",
-#         "updated",
-#     )
-#     list_filter = (
-#         "action_name",
-#         "migrated_item_name",
-#         "exception_type",
-#     )
-#     search_fields = (
-#         "action_name",
-#         "migrated_item_id",
-#         "message",
-#         "exception_msg",
-#     )
-#     inspect_view_fields = (
-#         "action_name",
-#         "migrated_item_name",
-#         "migrated_item_id",
-#         "exception_type",
-#         "exception_msg",
-#         "updated",
-#     )
-
-
-class CoreCreateView(CreateView):
-    def form_valid(self, form):
-        self.object = form.save_all(self.request.user)
-        return HttpResponseRedirect(self.get_success_url())
-
-
-class ClassicWebsiteConfigurationModelAdmin(ModelAdmin):
+class ClassicWebsiteConfigurationViewSet(SnippetViewSet):
     model = ClassicWebsiteConfiguration
     menu_label = _("Classic Website Configuration")
     menu_icon = "doc-full"
     menu_order = 100
     add_to_settings_menu = False
-    exclude_from_explorer = False
-    inspect_view_enabled = False
-
-    create_view_class = CoreCreateView
-
-    list_display = (
+    
+    list_display = [
         "collection",
         "created",
         "updated",
         "updated_by",
-    )
-    list_filter = ("collection__acron",)
-    search_fields = ("collection__acron",)
+    ]
+    list_filter = [
+        "collection",
+    ]
+    search_fields = ["collection__acron", "collection__name"]
 
 
-class MigratedDataModelAdmin(ModelAdmin):
+class MigratedDataViewSet(SnippetViewSet):
     model = MigratedData
     menu_label = _("Migrated Data")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
-    exclude_from_explorer = True
     inspect_view_enabled = True
-
+    
     list_per_page = 10
-    create_view_class = CoreCreateView
-
-    list_display = (
-        "collection",
+    list_display = [
         "pid",
+        "collection",
         "content_type",
         "migration_status",
         "isis_updated_date",
         "updated",
         "created",
-    )
-    list_filter = (
+    ]
+    list_filter = [
         "migration_status",
         "content_type",
-    )
-    search_fields = ("pid", "collection__acron", "collection__name")
-    inspect_view_fields = (
+        "collection",
+    ]
+    search_fields = ["pid", "collection__acron", "collection__name"]
+    inspect_view_fields = [
         "updated",
         "created",
         "content_type",
@@ -118,221 +68,186 @@ class MigratedDataModelAdmin(ModelAdmin):
         "isis_created_date",
         "isis_updated_date",
         "data",
-    )
+    ]
 
 
-class MigratedArticleModelAdmin(ModelAdmin):
+class MigratedArticleViewSet(SnippetViewSet):
     model = MigratedArticle
     menu_label = _("Migrated Article")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
-    exclude_from_explorer = True
     inspect_view_enabled = True
-
+    
     list_per_page = 10
-    create_view_class = CoreCreateView
-
-    list_display = (
-        "collection",
+    list_display = [
         "pid",
+        "collection",
         "migration_status",
         "file_type",
         "isis_updated_date",
         "updated",
         "created",
-    )
-    list_filter = (
+    ]
+    list_filter = [
         "file_type",
         "migration_status",
-    )
-    search_fields = ("pid", "collection__acron", "collection__name")
-    inspect_view_fields = (
+        "collection",
+    ]
+    search_fields = ["pid", "collection__acron", "collection__name"]
+    inspect_view_fields = [
         "updated",
         "created",
         "migration_status",
         "isis_created_date",
         "isis_updated_date",
         "data",
-    )
+    ]
 
 
-class MigratedJournalModelAdmin(ModelAdmin):
+class MigratedJournalViewSet(SnippetViewSet):
     model = MigratedJournal
     menu_label = _("Migrated Journal")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
-    exclude_from_explorer = True
     inspect_view_enabled = True
-
+    
     list_per_page = 10
-    create_view_class = CoreCreateView
-
-    list_display = (
-        "collection",
+    list_display = [
         "pid",
+        "collection",
         "migration_status",
         "isis_updated_date",
         "updated",
         "created",
-    )
-    list_filter = ("migration_status",)
-    search_fields = ("pid", "collection__acron", "collection__name")
-    inspect_view_fields = (
+    ]
+    list_filter = [
+        "migration_status",
+        "collection",
+    ]
+    search_fields = ["pid", "collection__acron", "collection__name"]
+    inspect_view_fields = [
         "updated",
         "created",
         "migration_status",
         "isis_created_date",
         "isis_updated_date",
         "data",
-    )
+    ]
 
 
-class MigratedIssueModelAdmin(ModelAdmin):
+class MigratedIssueViewSet(SnippetViewSet):
     model = MigratedIssue
     menu_label = _("Migrated Issue")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
-    exclude_from_explorer = True
     inspect_view_enabled = True
-
+    
     list_per_page = 10
-    create_view_class = CoreCreateView
-
-    list_display = (
-        "collection",
+    list_display = [
         "pid",
+        "collection",
         "migration_status",
         "isis_updated_date",
         "updated",
         "created",
-    )
-    list_filter = ("migration_status",)
-    search_fields = ("pid", "collection__acron", "collection__name")
-    inspect_view_fields = (
+    ]
+    list_filter = [
+        "migration_status",
+        "collection",
+    ]
+    search_fields = ["pid", "collection__acron", "collection__name"]
+    inspect_view_fields = [
         "updated",
         "created",
         "migration_status",
         "isis_created_date",
         "isis_updated_date",
         "data",
-    )
+    ]
 
 
-class MigratedFileModelAdmin(ModelAdmin):
+class MigratedFileViewSet(SnippetViewSet):
     model = MigratedFile
     menu_label = _("Migrated files")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
-    exclude_from_explorer = True
     inspect_view_enabled = True
-
+    
     list_per_page = 10
-    create_view_class = CoreCreateView
-
-    list_display = (
-        "collection",
+    list_display = [
         "original_path",
+        "collection",
         "created",
         "updated",
-    )
-    search_fields = ("original_path",)
-    inspect_view_fields = (
+    ]
+    list_filter = [
+        "collection",
+    ]
+    search_fields = [
+        "original_path",
+        "collection__acron",
+        "collection__name",
+    ]
+    inspect_view_fields = [
         "collection",
         "original_path",
         "file",
         "created",
         "updated",
-    )
+    ]
 
 
-# class BodyAndBackFileModelAdmin(ModelAdmin):
-#     model = article_BodyAndBackFile
-#     menu_label = _("Body and back")
-#     menu_icon = "doc-full"
-#     menu_order = 300
-#     add_to_settings_menu = False
-#     exclude_from_explorer = True
-#     inspect_view_enabled = True
-
-#     list_per_page = 10
-#     create_view_class = CoreCreateView
-
-#     list_display = (
-#         "migrated_document_html",
-#         "pkg_name",
-#         "version",
-#         "created",
-#         "updated",
-#     )
-#     list_filter = ("version",)
-#     search_fields = (
-#         "collection__acron",
-#         "collection__name",
-#         "migrated_document_html__migrated_issue__issue_proc__journal_proc__acron",
-#         "migrated_document_html__migrated_issue__issue_proc__issue__publication_year",
-#         "migrated_document_html__migrated_issue__issue_proc__issue_folder",
-#         "pkg_name",
-#     )
-#     inspect_view_fields = (
-#         "collection",
-#         "migrated_document_html",
-#         "pkg_name",
-#         "version",
-#         "file",
-#     )
-
-
-class IdFileRecordModelAdmin(ModelAdmin):
+class IdFileRecordViewSet(SnippetViewSet):
     model = IdFileRecord
     menu_label = _("Article id file")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
-    exclude_from_explorer = True
-    inspect_view_enabled = False
-
+    
     list_per_page = 10
-    list_display = (
+    list_display = [
         "item_pid",
         "item_type",
+        "parent__journal_acron",
         "todo",
         "updated",
         "created",
-    )
-    list_filter = (
+    ]
+    list_filter = [
         "item_type",
         "todo",
-    )
-    search_fields = (
+        "parent__collection",
+        "parent__journal_acron",
+    ]
+    search_fields = [
         "item_pid",
         "parent__journal_acron",
         "parent__collection__acron",
         "parent__collection__name",
-    )
+    ]
 
 
-class MigrationModelAdmin(ModelAdminGroup):
-    menu_icon = "folder"
+class MigrationViewSetGroup(SnippetViewSetGroup):
     menu_label = _("Migration")
+    menu_icon = "folder-open-inverse"
     menu_order = get_menu_order("migration")
-
     items = (
-        ClassicWebsiteConfigurationModelAdmin,
-        # MigrationFailureAdmin,
-        MigratedDataModelAdmin,
-        MigratedJournalModelAdmin,
-        MigratedIssueModelAdmin,
-        IdFileRecordModelAdmin,
-        MigratedArticleModelAdmin,
-        MigratedFileModelAdmin,
+        ClassicWebsiteConfigurationViewSet,
+        MigratedDataViewSet,
+        MigratedJournalViewSet,
+        MigratedIssueViewSet,
+        MigratedArticleViewSet,
+        MigratedFileViewSet,
+        IdFileRecordViewSet,    
     )
 
 
-modeladmin_register(MigrationModelAdmin)
+# Registra o grupo de snippets
+register_snippet(MigrationViewSetGroup)
 
 
 @hooks.register("register_admin_urls")
