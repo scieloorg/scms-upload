@@ -24,8 +24,7 @@ class OfficialJournalViewSet(SnippetViewSet):
         "issn_print",
         "issn_electronic",
         "issnl",
-        UpdatedAtColumn(),
-        "created",
+        "updated",
     ]
     list_filter = ["foundation_year"]
     search_fields = [
@@ -37,46 +36,6 @@ class OfficialJournalViewSet(SnippetViewSet):
     ]
     list_per_page = 10
     inspect_view_enabled = True
-    
-    # Panels para o formulário de edição
-    panels = [
-        MultiFieldPanel([
-            FieldPanel("title"),
-            FieldPanel("title_iso"),
-        ], heading=_("Title Information")),
-        MultiFieldPanel([
-            FieldPanel("issn_print"),
-            FieldPanel("issn_electronic"),
-            FieldPanel("issnl"),
-        ], heading=_("ISSN Information")),
-        FieldPanel("foundation_year"),
-    ]
-    
-    def get_form_class(self, request, action):
-        """Override para customizar o formulário se necessário"""
-        form_class = super().get_form_class(request, action)
-        
-        # Se você tinha um método save_all no formulário anterior,
-        # você pode customizar o form aqui
-        if action in ['create', 'edit']:
-            class CustomForm(form_class):
-                def save(self, commit=True):
-                    instance = super().save(commit=False)
-                    # Adicione aqui a lógica do save_all se necessário
-                    # Por exemplo, associar o usuário
-                    if not instance.pk:  # Se é uma criação
-                        instance.created_by = self.request.user
-                    instance.updated_by = self.request.user
-                    if commit:
-                        instance.save()
-                        self.save_m2m()
-                    return instance
-            
-            # Passa o request para o form
-            CustomForm.request = request
-            return CustomForm
-        
-        return form_class
 
 
 class JournalViewSet(SnippetViewSet):
@@ -101,15 +60,7 @@ class JournalViewSet(SnippetViewSet):
         "journal_acron",
     ]
     list_filter = ["core_synchronized"]
-    
-    # Panels para o formulário
-    panels = [
-        FieldPanel("official_journal"),
-        FieldPanel("title"),
-        FieldPanel("journal_acron"),
-        FieldPanel("core_synchronized"),
-    ]
-    
+
 
 # Grupo de ViewSets
 class JournalViewSetGroup(SnippetViewSetGroup):
