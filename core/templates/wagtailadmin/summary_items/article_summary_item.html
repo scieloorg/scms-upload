@@ -1,8 +1,8 @@
 {% load i18n wagtailadmin_tags %}
 
 <li>
-    {% icon name="doc-full" %}
-    <a href="{% url 'article_article_modeladmin_index' %}">
+    {% icon name="folder-inverse" %}
+    <a href="{% url 'wagtailsnippets_article_article:list' %}">
         {% blocktrans trimmed count counter=total_article with total_article|intcomma as total %}
             <span>{{ total_article }}</span> Article
         {% plural %}
