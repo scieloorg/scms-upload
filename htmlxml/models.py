@@ -395,7 +395,7 @@ class Html2xmlAnalysis(models.Model):
             xpaths = get_xpath_for_a_href_stats(a, journal_acron)
             yield {
                 "html": xml_node_to_string(a),
-                "xml": (get_xml_nodes_to_string(xml, xpaths) if xpaths else []),
+                "xml": (get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []),
             }
 
     def get_src_stats(self, html, xml, journal_acron):

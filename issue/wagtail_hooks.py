@@ -1,6 +1,5 @@
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
-from wagtail.admin.ui.tables import UpdatedAtColumn
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 from wagtail import hooks
@@ -29,7 +28,7 @@ class IssueSnippetViewSet(SnippetViewSet):
         "volume",
         "number",
         "supplement",
-        UpdatedAtColumn(),
+        "updated",
     ]
     
     list_filter = ["publication_year", "journal"]
