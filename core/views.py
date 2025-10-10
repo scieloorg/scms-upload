@@ -1,5 +1,3 @@
-import logging
-
 from django.http import HttpResponseRedirect
 
 from django.utils.translation import gettext_lazy as _
@@ -21,7 +19,6 @@ class CommonControlFieldViewSet(SnippetViewSet):
 
     class UserTrackingCreateView(CreateView):
         def save_instance(self):
-            logging.info(f"User: {self.request.user}")
             instance = self.form.save(commit=False)
             if not instance.pk:
                 instance.creator = self.request.user
@@ -29,18 +26,15 @@ class CommonControlFieldViewSet(SnippetViewSet):
             instance.save()
             if hasattr(self.form, "save_m2m"):
                 self.form.save_m2m()
-            # self.log_action('wagtail.create')
             return instance
 
     class UserTrackingEditView(EditView):
         def save_instance(self):
-            logging.info(f"User: {self.request.user}")
             instance = self.form.save(commit=False)
             instance.updated_by = self.request.user
             instance.save()
             if hasattr(self.form, "save_m2m"):
                 self.form.save_m2m()
-            # self.log_action('wagtail.edit')
             return instance
 
     # Define as views customizadas
