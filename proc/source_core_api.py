@@ -238,7 +238,7 @@ def process_journal_result(
     journal.contact_address = result.get("contact_address")
     journal.contat_name = result.get("contact_name")
     # Atualiza campos adicionais do journal
-    journal.license_code = (result.get("journal_use_license") or {}).get("license_type")
+    journal.license_code = result.get("journal_use_license")
     journal.nlm_title = result.get("nlm_title")
     journal.doi_prefix = result.get("doi_prefix")
     journal.wos_areas = result["wos_areas"]
