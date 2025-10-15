@@ -137,7 +137,6 @@ def fetch_and_create_journal(
         )
 
     for result in results:
-        logging.info(result)
         try:
             process_journal_result(
                 user, result, block_unregistered_collection, force_update
