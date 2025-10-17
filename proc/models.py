@@ -1622,7 +1622,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             detail = {}
             detail["file_type"] = self.migrated_data.file_type
-
+            result = {}
             if self.migrated_data.file_type == "html":
                 migrated_data = self.migrated_data
                 classic_ws_doc = migrated_data.document
