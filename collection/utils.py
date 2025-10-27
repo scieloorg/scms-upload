@@ -45,7 +45,7 @@ def detect_language(text):
         return ""
 
 
-def get_valid_language_code(code2, text_to_detect_language):
+def get_valid_language_code(code2, text_to_detect_language=None):
     valid = language_iso(code2)
     if valid:
         return valid
