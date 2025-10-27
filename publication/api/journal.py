@@ -185,10 +185,10 @@ class JournalPayload:
 
     def add_thematic_scopes(self, subject_categories, subject_areas):
         # Subject Categories
-        self.data["subject_categories"] = subject_categories
+        self.data["subject_categories"] = [item for item in subject_categories if item]
 
         # Study Area
-        self.data["subject_areas"] = subject_areas
+        self.data["subject_areas"] = [item for item in subject_areas if item]
 
     def add_issue_count(self, issue_count):
         # Issue count
