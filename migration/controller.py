@@ -337,19 +337,22 @@ def create_or_update_issue(
         issue_section = None
         for section in sections:
             lang_code = section.get("language")
-
+            text = section.get("text")
             # reduz consulta em banco de dados
             try:
                 language = languages[lang_code]
             except KeyError:
-                languages[lang_code] = Language.get_or_create(
-                    creator=user, code2=lang_code
+                language = Language.get_or_create(
+                    creator=user, 
+                    code2=lang_code, 
+                    text_to_detect_language=text,
                 )
+                languages[lang_code] = language
             sec = issue.journal.add_section(
                 user,
-                language=languages[lang_code],
+                language=language,
                 code=section.get("code"),
-                text=section.get("text"),
+                text=text,
             )
             TocSection.create_or_update(user, toc, section.get("code"), sec)
     return issue
@@ -611,7 +614,8 @@ class DocumentRecordsImporter:
                 self.issue_proc.migrated_data.data
             )
 
-        records = deepcopy(self.journal_issue_and_doc_data)
+        records = {}
+        records.update(self.journal_issue_and_doc_data)
         records["article"] = doc_records
         return records
 
