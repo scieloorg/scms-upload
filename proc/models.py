@@ -12,6 +12,7 @@ from django.db.models import Count, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from wagtail.admin.panels import (
     FieldPanel,
     InlinePanel,
@@ -1474,6 +1475,11 @@ class ArticleEventCreateError(Exception): ...
 class ArticleEventReportCreateError(Exception): ...
 
 
+def proc_directory_path(instance, filename):
+    name, ext = os.path.splitext(filename)
+    return os.path.join("proc", *name.split("-"), filename)
+
+
 class ArticleProc(BaseProc, ClusterableModel):
     # Armazena os IDs dos artigos no contexto de cada coleção
     # serve para conseguir recuperar artigos pelo ID do site clássico
@@ -1515,6 +1521,11 @@ class ArticleProc(BaseProc, ClusterableModel):
         default=tracker_choices.PROGRESS_STATUS_TODO,
         blank=True,
         null=True,
+    )
+    processed_xml = models.FileField(
+        upload_to=proc_directory_path,
+        null=True,
+        blank=True
     )
 
     base_form_class = ProcAdminModelForm
@@ -1620,33 +1631,15 @@ class ArticleProc(BaseProc, ClusterableModel):
                 self.migrated_data.file_type = self.migrated_data.document.file_type
                 self.migrated_data.save()
 
+            result = {}
             detail = {}
             detail["file_type"] = self.migrated_data.file_type
-            result = {}
             if self.migrated_data.file_type == "html":
-                migrated_data = self.migrated_data
-                classic_ws_doc = migrated_data.document
-                htmlxml = HTMLXML.create_or_update(
-                    user=user,
-                    migrated_article=migrated_data,
-                    n_references=len(classic_ws_doc.citations or []),
-                    record_types="|".join(classic_ws_doc.record_types or []),
-                )
-                result = htmlxml.html_to_xml(user, self, body_and_back_xml)
-                htmlxml.generate_report(user, self)
-                detail.update(htmlxml.data)
-
-            xml = get_migrated_xml_with_pre(self)
-            if xml:
-                if result.get("exceptions"):
-                    self.xml_status = tracker_choices.PROGRESS_STATUS_PENDING
-                    detail["xml_exceptions"] = result.get("exceptions")
-                else:
-                    self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
-                detail.update(xml.data)
+                xml_file_path = self.get_xml_from_html(user, body_and_back_xml, result, detail)
             else:
-                self.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
-            self.save()
+                xml_file_path = self.get_xml_from_native(user, result, detail)
+            
+            self.save_processed_xml(xml_file_path, result.get("exceptions"), detail)
 
             completed = self.xml_status == tracker_choices.PROGRESS_STATUS_DONE
             operation.finish(user, completed=completed, detail=detail)
@@ -1661,6 +1654,62 @@ class ArticleProc(BaseProc, ClusterableModel):
                 exception=e,
             )
             return self.xml_status == tracker_choices.PROGRESS_STATUS_TODO
+
+    def get_xml_from_native(self, user, result, detail):
+        xml_with_pre = get_migrated_xml_with_pre(self.migrated_xml.file.path)
+
+    
+    def get_xml_from_html(self, user, body_and_back_xml, result, detail):
+        migrated_data = self.migrated_data
+        classic_ws_doc = migrated_data.document
+        htmlxml = HTMLXML.create_or_update(
+            user=user,
+            migrated_article=migrated_data,
+            n_references=len(classic_ws_doc.citations or []),
+            record_types="|".join(classic_ws_doc.record_types or []),
+        )
+        response = htmlxml.html_to_xml(user, self, body_and_back_xml)
+        result.update(response)
+        try:
+            htmlxml.generate_report(user, self)
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            logging.exception(e)
+            result["exceptions"] = result.get("exceptions") or []
+            result["exceptions"].append(f"{str(e)} {str(type(e))}")
+        detail.update(htmlxml.data)
+        detail["xml_exceptions"] = result.get("exceptions") or []
+        return htmlxml.file.path
+
+    def save_processed_xml(self, xml_file_path, exceptions, detail):
+        try:
+            for item in XMLWithPre.create(path=xml_file_path):
+                if self.pid and item.v2 != self.pid:
+                    # corrige ou adiciona pid v2 no XML nativo ou obtido do html
+                    # usando o valor do pid v2 do site clássico
+                    item.v2 = self.pid
+
+                order = str(int(self.pid[-5:]))
+                if not item.order or str(int(item.order)) != order:
+                    # corrige ou adiciona other pid no XML nativo ou obtido do html
+                    # usando o valor do "order" do site clássico
+                    item.order = order
+
+                detail.update(item.data)
+                self.processed_xml.save(item.sps_pkg_name+".xml", ContentFile(item.to_string()), save=False)
+                if exceptions:
+                    self.xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+                else:
+                    self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
+                self.save()
+        except Exception as e:
+            self.xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            self.save()
+            raise XMLVersionXmlWithPreError(
+                _("Unable to get xml with pre from migrated article {}: {} {}").format(
+                    xml_file_path, type(e), e
+                )
+            )
 
     @classmethod
     def get_queryset_to_process(cls, STATUS):
