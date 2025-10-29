@@ -131,9 +131,15 @@ def get_xpath_for_name_stats(name):
     return []
 
 
-def get_xml_nodes_to_string(xml, xpath):
+def get_xml_nodes_to_string(xml, xpaths):
+    if not xpaths:
+        return ""
+
+    xpath = "|".join(xpaths)
+    items = []
     for item in xml.xpath(xpath, namespaces={"xlink": "http://www.w3.org/1999/xlink"}):
-        yield xml_node_to_string(item)
+        items.append(xml_node_to_string(item))
+    return "\n".join(items)
 
 
 # Extrair de Html2xmlAnalysis
@@ -395,7 +401,7 @@ class Html2xmlAnalysis(models.Model):
             xpaths = get_xpath_for_a_href_stats(a, journal_acron)
             yield {
                 "html": xml_node_to_string(a),
-                "xml": (get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []),
+                "xml": get_xml_nodes_to_string(xml, xpaths),
             }
 
     def get_src_stats(self, html, xml, journal_acron):
@@ -412,9 +418,7 @@ class Html2xmlAnalysis(models.Model):
 
             yield {
                 "html": xml_node_to_string(element),
-                "xml": (
-                    get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []
-                ),
+                "xml": get_xml_nodes_to_string(xml, xpaths),
             }
 
     def get_a_name_stats(self, html, xml):
@@ -429,9 +433,7 @@ class Html2xmlAnalysis(models.Model):
 
             yield {
                 "html": xml_node_to_string(node),
-                "xml": (
-                    get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []
-                ),
+                "xml": get_xml_nodes_to_string(xml, xpaths),
             }
 
     def get_html_stats(self, html):
