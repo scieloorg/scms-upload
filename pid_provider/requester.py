@@ -292,7 +292,7 @@ class PidRequester(BasePidProvider):
 
         if not item_to_fix.fixed_in_upload:
             # atualiza v2 em pid_provider_xml
-            response = pid_provider_xml.fix_pid_v2(user, correct_pid_v2)
+            response = PidProviderXML.fix_pid_v2(user, pid_v3, correct_pid_v2)
             fixed["fixed_in_upload"] = response.get("v2") == correct_pid_v2
 
         if not item_to_fix.fixed_in_core:
