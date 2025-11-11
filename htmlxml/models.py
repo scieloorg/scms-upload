@@ -321,7 +321,7 @@ class Html2xmlAnalysis(models.Model):
                 - 'statistics': lista de dicionários com label/value para estatísticas
                 - 'html_vs_xml': dados de comparação HTML vs XML
         """
-        statistics = [
+        return [
             {
                 'label': _('Body vazio'),
                 'value': _('Sim') if self.empty_body else _('Não')
@@ -436,7 +436,7 @@ class Html2xmlAnalysis(models.Model):
                 <h1>Report {}</h1>
                 <div class="card mt-3">
                     <div class="card-header">
-                        <h3>{_('Estatísticas de Conversão HTML para XML')}</h3>
+                        <h3>{}</h3>
                     </div>
                     <div class="card-body">
                         {}
@@ -444,15 +444,20 @@ class Html2xmlAnalysis(models.Model):
                 </div>
                 <div class="card mt-3">
                     <div class="card-header">
-                        <h3>{_('Trocas de HTML para XML')}</h3>
+                        <h3>{}</h3>
                     </div>
                     <div class="card-body">
                         {}
                     </div>
                 </div>
             </div>
-            </body></html>"""
-        ).format(title, "".join(stats), "".join(changes))
+            </body></html>""".format(
+                title,
+                _('Estatísticas de Conversão HTML para XML'),
+                "".join(stats),
+                _('Trocas de HTML para XML'),
+                "".join(changes),
+            )
 
     def get_a_href_stats(self, html, xml, journal_acron):
         for a in html.xpath(".//a[@href]"):
@@ -768,19 +773,12 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             )
 
     @property
-    def first_bb_file(self):
-        try:
-            item = list(self.bb_file.all())[1]
-        except Exception as e:
-            logging.exception(e)
-            return None
-        else:
-            try:
-                for xml_with_pre in XMLWithPre.create(path=item.file.path):
-                    return xml_with_pre.xmltree
-            except Exception as e:
-                logging.exception(e)
-                return None
+    def initial_html_tree(self):
+        # o bb_file[0] contém o HTML original dentro de CDATA então não cria uma árvore de elementos
+        # o bb_file[1] contém HTML original estruturado em body, back, ref-list
+        item = list(self.bb_file.all())[1]
+        for xml_with_pre in XMLWithPre.create(path=item.file.path):
+            return xml_with_pre.xmltree
     
     def generate_report(self, user, article_proc):
         try:
@@ -788,7 +786,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             op = article_proc.start(user, "html_to_xml: generate report")
             for xml_with_pre in XMLWithPre.create(path=self.file.path):
                 xml = xml_with_pre.xmltree
-            html = self.first_bb_file
+            html = self.initial_html_tree
             self.evaluate_xml(html, xml, article_proc.issue_proc.journal_proc.acron)
             self.save_report(self.html_report_content(title=article_proc))
 
@@ -829,7 +827,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
 
             translations = document._translated_html_by_lang
             detail = {}
-            detail.update(list(translations.keys()))
+            detail["translation languages"] = list(translations.keys())
 
             document.generate_body_and_back_from_html(translations)
 
