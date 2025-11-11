@@ -93,7 +93,7 @@ iso639-lang==2.6.3  # Mantendo versão maior
 -e git+https://github.com/scieloorg/packtools.git@4.12.11#egg=packtools
 -e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
 -e git+https://github.com/scieloorg/opac_schema.git@v2.66#egg=opac_schema
--e git+https://github.com/scieloorg/scielo_migration.git@1.9.10#egg=scielo_classic_website
+-e git+https://github.com/scieloorg/scielo_migration.git@1.9.11#egg=scielo_classic_website
 
 # ========================================
 # Development & Testing
