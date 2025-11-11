@@ -780,9 +780,11 @@ def task_migrate_and_publish_collection_articles(
         )
 
         # Process articles for migration
+        logging.info(f"ArticleProc filter params: {params} {status}")
         items = ArticleProc.objects.filter(
             query_by_status, collection=collection, **params
         )
+        logging.info(f"Articles to process: {items.count()}")
         force_update = (
             force_update
             or force_migrate_document_records
@@ -810,6 +812,8 @@ def task_migrate_and_publish_collection_articles(
             sps_pkg__pid_v3__isnull=False,
             **params,
         )
+        logging.info(f"ArticleProc (PUBLICATION) filter params: {params} {status}")
+        logging.info(f"Articles to publish: {items.count()}")
         stats, logs = publish_collection_articles(
             user,
             collection_acron,
