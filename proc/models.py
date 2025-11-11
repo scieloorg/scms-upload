@@ -1511,9 +1511,11 @@ class ArticleProc(BaseProc, ClusterableModel):
         null=True,
     )
     processed_xml = models.FileField(
+        _("Processed XML"),
         upload_to=proc_directory_path,
         null=True,
-        blank=True
+        blank=True,
+        help_text=_("Native XML + modifications or converted XML from HTML"),
     )
 
     base_form_class = ProcAdminModelForm
@@ -1521,6 +1523,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
     panel_files = [
         FieldPanel("pkg_name", read_only=True),
+        FieldPanel("processed_xml"),
         AutocompletePanel("sps_pkg", read_only=True),
     ]
     panel_status = [
