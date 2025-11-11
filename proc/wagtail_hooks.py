@@ -230,9 +230,9 @@ class ProcessViewSetGroup(SnippetViewSetGroup):
     items = (
         JournalProcViewSet,
         IssueProcViewSet,
-        HTMLXMLViewSet,
-        SPSPkgViewSet,
         ArticleProcViewSet,
+        SPSPkgViewSet,
+        HTMLXMLViewSet,
         ProcReportViewSet,
     )
 
