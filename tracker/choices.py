@@ -67,12 +67,12 @@ def get_valid_status(status, force_update):
     if status:
         if isinstance(status, str):
             status_list += [status]
-        if isinstance(status, list):
+        elif isinstance(status, list):
             status_list += status
     if force_update:
         status_list += PROGRESS_STATUS_FORCE_UPDATE
-        status_list = list(set(status_list) & set(VALID_STATUS)) or list(VALID_STATUS)
-        return status_list
+    if status_list:
+        return list(set(status_list) & set(VALID_STATUS)) or list(VALID_STATUS)
     return PROGRESS_STATUS_REGULAR_TODO
 
 
