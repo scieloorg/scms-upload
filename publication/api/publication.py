@@ -35,9 +35,8 @@ def get_api_data(collection, content_type, website_kind=None):
     except WebSiteConfiguration.DoesNotExist:
         return {"error": f"Website does not exist: {collection} {website_kind}"}
     except Exception as e:
-        raise Exception(
-            f"Unable to get api data for {content_type} {collection} {website_kind}: {type(e)} {e}"
-        )
+        logging.exception(e)
+        return {"error": f"Unable to get API data for {content_type} {collection} {website_kind}: {type(e)} {e}"}
     return api.data
 
 
@@ -111,8 +110,7 @@ class PublicationAPI:
 
     def get_token(self):
         """
-        curl -X POST 127.0.0.1:8000/api/v1/auth \
-            --data 'username=x&password=x'
+        curl --request POST http://0.0.0.0:8000/api/v1/auth -u "useremail:password"
         """
         if not self.get_token_url:
             return
