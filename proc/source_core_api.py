@@ -192,6 +192,7 @@ def fetch_journal_data_with_pagination(
         else:
             # Próxima URL (se existir)
             url = response.get("next")
+            params = {}
             yield from response.get("results") or []
 
 
@@ -203,9 +204,9 @@ def process_journal_result(
     """
 
     if block_unregistered_collection:
-        collections = []
+        collections = set()
         for item in result.get("scielo_journal") or []:
-            collections.append(item["collection_acron"])
+            collections.add(item["collection_acron"])
         if not collections:
             return
         if not Collection.objects.filter(acron__in=collections).exists():
