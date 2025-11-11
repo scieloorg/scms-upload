@@ -458,6 +458,7 @@ class Html2xmlAnalysis(models.Model):
                 _('Trocas de HTML para XML'),
                 "".join(changes),
             )
+        )
 
     def get_a_href_stats(self, html, xml, journal_acron):
         for a in html.xpath(".//a[@href]"):
