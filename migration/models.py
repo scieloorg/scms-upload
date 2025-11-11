@@ -424,7 +424,7 @@ class MigratedFile(CommonControlField):
                     file_datetime_iso=file_datetime_iso,
                 )
             return cls.objects.get(collection=collection, original_path=original_path)
-        raise ValueError("MigratedFile.get requires collection and original_path")
+        raise ValueError(f"MigratedFile.get requires collection {collection} and original_path {original_path}")
 
     @classmethod
     def create_or_update(
@@ -444,7 +444,7 @@ class MigratedFile(CommonControlField):
     ):
         if not source_path and not collection and not original_path:
             raise ValueError(
-                "MigratedFile.create_or_update requires source_path, collection, original_path"
+                f"MigratedFile.create_or_update requires source_path ({source_path}), collection ({collection}), original_path ({original_path})"
             )
 
         if not file_datetime_iso:
@@ -529,18 +529,17 @@ class MigratedFile(CommonControlField):
     @classmethod
     def find(cls, collection, xlink_href, journal_acron):
         try:
-            # dirname = os.path.dirname(xlink_href)
+            dirname = os.path.dirname(xlink_href)
             basename = os.path.basename(xlink_href)
             name, ext = os.path.splitext(basename)
-
-            # issue_folder = dirname.split("/")[-1]
-            # issue_folder__name = os.path.join(issue_folder, name)
-
-            return cls.objects.filter(
-                # Q(original_href__contains=issue_folder__name + "."),
-                collection=collection,
-                original_href__contains=f"/{journal_acron}/",
-                original_name__contains=name + ".",
+            qs = cls.objects.filter(collection=collection, original_href__contains=f"/{journal_acron}/")
+            try:
+                issue_folder = dirname.split("/")[-1]
+                qs = qs.filter(original_href__contains=f"/{issue_folder}/")
+            except IndexError:
+                issue_folder = None
+            return qs.filter(
+                original_href__contains=name + ".",
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -982,7 +981,7 @@ class IdFileRecord(CommonControlField, Orderable):
             )
         data["issue"] = issue_data
         try:
-            p_records = (
+            data["paragraph"] = (
                 IdFileRecord.objects.filter(
                     parent=self.parent,
                     item_pid=self.item_pid,
@@ -992,8 +991,8 @@ class IdFileRecord(CommonControlField, Orderable):
                 .data
             )
         except AttributeError:
-            p_records = []
-        data["article"] = self.data + list(p_records)
+            pass
+        data["article"] = self.data
         return {
             "data": data,
             "pid": self.item_pid,

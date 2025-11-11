@@ -247,9 +247,16 @@ def create_or_update_journal_acron_id_file(
     """
     Cria ou atualiza arquivos de ID baseados em acrônimos de journals.
     """
-    for journal_proc in JournalProc.objects.filter(
-        collection=collection, **journal_filter
-    ):
+    items = JournalProc.objects.select_related(
+        "collection",
+        "journal",
+    ).filter(
+        collection=collection,
+        **journal_filter,
+    )
+    logging.info(f"create_or_update_journal_acron_id_file - JournalProc params: collection={collection.acron}, journal_filter={journal_filter} - {items.count()} items found")
+    for journal_proc in items:
+        logging.info(f"create_or_update_journal_acron_id_file - JournalProc {journal_proc}")
         controller.register_acron_id_file_content(
             user,
             journal_proc,
@@ -330,25 +337,26 @@ def migrate_document_records(
             status, force_update
         )
 
+    logging.info(f"migrate_document_records - IssueProc params: {params}")
     for issue_proc in IssueProc.objects.select_related(
         "collection",
         "journal_proc",
         "issue",
-        "migrated_data",
-        "journal_proc__migrated_data",
     ).filter(**params):
+        logging.info(f"migrate_document_records - IssueProc {issue_proc}")
         issue_proc.migrate_document_records(user, force_update)
+        ArticleProc.mark_for_reprocessing(issue_proc)
 
-    if skip_migrate_pending_document_records:
-        return
+    # if skip_migrate_pending_document_records:
+    #     return
 
-    IssueProc.migrate_pending_document_records(
-        user,
-        collection_acron,
-        journal_acron,
-        issue_folder,
-        publication_year,
-    )
+    # IssueProc.migrate_pending_document_records(
+    #     user,
+    #     collection_acron,
+    #     journal_acron,
+    #     issue_folder,
+    #     publication_year,
+    # )
 
 
 def get_files_from_classic_website(
@@ -376,8 +384,15 @@ def get_files_from_classic_website(
         params["files_status__in"] = tracker_choices.get_valid_status(
             status, force_update
         )
-
-    for issue_proc in IssueProc.objects.filter(**params):
+    items = IssueProc.objects.select_related(
+        "collection",
+        "journal_proc",
+        "issue",
+    ).filter(**params)
+    logging.info(f"get_files_from_classic_website - IssueProc params: {params} - {items.count()} items found")
+    for issue_proc in items:
+        logging.info(f"get_files_from_classic_website - IssueProc {issue_proc}")
         issue_proc.get_files_from_classic_website(
-            user, force_update, controller.import_one_issue_files
+            user, force_update, controller.migrate_issue_files
         )
+        ArticleProc.mark_for_reprocessing(issue_proc)

@@ -2,7 +2,7 @@ import logging
 import os
 import sys
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.db.models import Q
@@ -413,107 +413,76 @@ def get_classic_website(collection_acron):
         )
 
 
-def import_one_issue_files(user, issue_proc, force_update):
-    importer = IssueFolderImporter(user, force_update)
-    return importer.import_issue_files(issue_proc)
+def check_component_type(file):
+    if file["type"] == "pdf":
+        check = file["name"]
+        try:
+            check = check.replace(file["lang"] + "_", "")
+        except (KeyError, TypeError):
+            pass
+        try:
+            check = check.replace(file["key"], "")
+        except (KeyError, TypeError):
+            pass
+        if check == ".pdf":
+            return "rendition"
+        return "supplmat"
+    return file["type"]
 
 
-class IssueFolderImporter:
-    def __init__(self, user, force_update):
-        self.force_update = force_update
-        self.user = user
-
-    @staticmethod
-    def _get_classic_website_rel_path(file_path):
-        if "htdocs" in file_path:
-            return file_path[file_path.find("htdocs") :]
-        if "bases" in file_path:
-            return file_path[file_path.find("bases") :]
-
-    @staticmethod
-    def check_component_type(file):
-        if file["type"] == "pdf":
-            check = file["name"]
-            try:
-                check = check.replace(file["lang"] + "_", "")
-            except (KeyError, TypeError):
-                pass
-            try:
-                check = check.replace(file["key"], "")
-            except (KeyError, TypeError):
-                pass
-            if check == ".pdf":
-                return "rendition"
-            return "supplmat"
-        return file["type"]
-
-    def import_issue_files(self, issue_proc):
-        """
-        Migra os arquivos do fascículo (pdf, img, xml ou html)
-        """
-
-        collection = issue_proc.collection
+def migrate_issue_files(user, collection, journal_acron, issue_folder, force_update):
+    try:
+        exceptions = []
+        migrated_ids = []
+        PARTS = {
+            "before": "1",
+            "after": "2",
+        }
         classic_website = get_classic_website(collection.acron)
-        journal_acron = issue_proc.journal_proc.acron
-
-        failures = []
         files_and_exceptions = classic_website.get_issue_folder_content(
             journal_acron,
-            issue_proc.issue_folder,
+            issue_folder,
         )
+        for file in files_and_exceptions:
+            try:
+                if not file:
+                    continue
+                if file.get("error"):
+                    exceptions.append(file)
+                    continue
 
-        try:
-            issue_proc.issue_files.all().delete()
+                component_type = check_component_type(file)
+                part = file.get("part")
 
-            # TODO atualiza ArticleProc xml_status
-            # html antes das referencias
-            # html após das referencias
-            parts = {
-                "before": "1",
-                "after": "2",
-            }
-            for file in files_and_exceptions:
-                # {"type": "pdf", "key": name, "path": path, "name": basename, "lang": lang}
-                # {"type": "xml", "key": name, "path": path, "name": basename, }
-                # {"type": "html", "key": name, "path": path, "name": basename, "lang": lang, "part": label}
-                # {"type": "asset", "path": item, "name": os.path.basename(item)}
-                try:
-                    if not file:
-                        continue
-                    if file.get("error"):
-                        yield file
-                        continue
-
-                    component_type = IssueFolderImporter.check_component_type(file)
-                    part = file.get("part")
-
-                    yield MigratedFile.create_or_update(
-                        user=self.user,
+                migrated_ids.append(
+                    MigratedFile.create_or_update(
+                        user=user,
                         collection=collection,
                         original_path=file["relative_path"],
                         source_path=file["path"],
                         component_type=component_type,
                         lang=file.get("lang"),
-                        part=part and parts.get(part),
+                        part=part and PARTS.get(part),
                         pkg_name=file.get("key"),
-                        force_update=self.force_update,
+                        force_update=force_update,
                         content=file.get("content"),
                         file_datetime_iso=file.get("modified_date"),
                         basename=file.get("name"),
-                    )
+                    ).id
+                )
 
-                except Exception as e:
-                    logging.exception(e)
-                    yield ({"error": str(e), "type": str(type(e)), "file": file})
-        except Exception as e:
-            logging.exception(e)
-            yield (
-                {
-                    "files from": f"{journal_acron} {issue_proc.issue_folder}",
-                    "error": str(e),
-                    "type": str(type(e)),
-                }
-            )
+            except Exception as e:
+                exceptions.append({"error": str(e), "type": str(type(e)), "file": file})
+
+    except Exception as e:
+        exceptions.append(
+            {
+                "files from": f"{journal_acron} {issue_folder}",
+                "error": str(e),
+                "type": str(type(e)),
+            }
+        )
+    return {"exceptions": exceptions, "migrated": migrated_ids}
 
 
 def get_article_records_from_classic_website(
@@ -923,65 +892,80 @@ def register_acron_id_file_content(
         )
         if not os.path.isfile(source_path):
             operation.finish(
-                user, completed=False, message=_(f"{source_path} does not exist")
+                user, completed=True, message=_(f"{source_path} does not exist")
             )
-        elif JournalAcronIdFile.has_changes(
+            logging.warning(f"{source_path} does not exist")
+            return
+        
+        if not JournalAcronIdFile.has_changes(
             user, collection, journal_acron, source_path, force_update
         ):
-            start = datetime.utcnow().isoformat()
-            journal_id_file = JournalAcronIdFile.create_or_update(
-                user=user,
-                collection=collection,
-                journal_acron=journal_acron,
-                source_path=source_path,
-                force_update=force_update,
-            )
-
-            completed = True
-            total = journal_id_file.id_file_records.filter().count()
-            detail = {"total": total}
-            if force_update or start < journal_id_file.updated.isoformat():
-                completed = False
-                done = 0
-                changed = 0
-
-                logging.info(f"Reading {source_path}")
-                # replaced for item in read_bases_work_acron_id_file(
-                for item in get_bases_work_acron_id_file_records(
-                    user,
-                    source_path,
-                    classic_website,
-                    journal_proc,
-                ):
-                    item["force_update"] = force_update
-                    item["todo"] = True
-                    rec = IdFileRecord.create_or_update(
-                        user,
-                        journal_id_file,
-                        **item,
-                    )
-                    if force_update or start < rec.updated.isoformat():
-                        changed += 1
-                    done += 1
-                completed = total == done
-
-                detail.update(
-                    {
-                        "force_update": force_update,
-                        "done": done,
-                        "changed": changed,
-                        "updated": journal_id_file.updated.isoformat(),
-                    }
-                )
             operation.finish(
+                user, completed=True, message=_(f"{source_path} has no changes")
+            )
+            logging.warning(f"{source_path} has no changes")
+            return
+        
+        start = datetime.now(timezone.utc).isoformat()
+        journal_id_file = JournalAcronIdFile.create_or_update(
+            user=user,
+            collection=collection,
+            journal_acron=journal_acron,
+            source_path=source_path,
+            force_update=force_update,
+        )
+        completed = True
+        qs = journal_id_file.id_file_records
+        total = qs.count()
+        todo_before = qs.filter(todo=True).count()
+        updated = journal_id_file.updated.isoformat()
+        detail = {
+            "total": total,
+            "todo_before": todo_before,
+            "start": start,
+            "updated": updated,
+            "force_update": force_update,
+        }
+        if force_update or start < updated:
+            completed = False
+            done = 0
+            changed = 0
+
+            logging.info(f"Reading {source_path}")
+            # replaced for item in read_bases_work_acron_id_file(
+            for item in get_bases_work_acron_id_file_records(
                 user,
-                completed=completed,
-                detail=detail,
+                source_path,
+                classic_website,
+                journal_proc,
+            ):
+                item["force_update"] = force_update
+                item["todo"] = True
+                rec = IdFileRecord.create_or_update(
+                    user,
+                    journal_id_file,
+                    **item,
+                )
+                if force_update or start < (rec.updated or rec.created).isoformat():
+                    changed += 1
+                done += 1
+            completed = total == done
+
+            detail.update(
+                {
+                    "done": done,
+                    "changed": changed,
+                    "todo_after": journal_id_file.id_file_records.filter(todo=True).count(),
+                }
             )
-        else:
-            operation.finish(
-                user, completed=False, message=_(f"{source_path} has no changes")
-            )
+            logging.info(f"Finished reading {source_path}: {detail}")
+        operation.finish(
+            user,
+            completed=completed,
+            detail=detail,
+        )
+        
+            
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         if operation:
