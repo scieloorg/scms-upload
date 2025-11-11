@@ -151,17 +151,16 @@ def xml_node_to_string(node):
     return etree.tostring(node, encoding="utf-8", pretty_print=True).decode("utf-8")
 
 
-def format_html_numbers_section(data_dict):
+def format_html_numbers_section(statistics_list):
     """Era Html2xmlAnalysis._format_html_numbers()"""
     yield "<div><div>"
-    for k, v in data_dict.items():
-        if k == "html_vs_xml":
-            continue
-        else:
-            yield (
-                f'<div class="row"><div class="col-sm">{k}</div>'
-                f'<div class="col-sm">{v}</div></div>'
-            )
+    for item in statistics_list:
+        label = item.get('label', '')
+        value = item.get('value', '')
+        yield (
+            f'<div class="row"><div class="col-sm">{label}</div>'
+            f'<div class="col-sm">{value}</div></div>'
+        )
     yield "</div></div>"
 
 
@@ -314,24 +313,76 @@ class Html2xmlAnalysis(models.Model):
 
     @cached_property
     def analysis_data(self):
-        return {
-            "empty_body": self.empty_body,
-            "attention_demands": self.attention_demands,
-            "html_img_total": self.html_img_total,
-            "html_table_total": self.html_table_total,
-            "xml_supplmat_total": self.xml_supplmat_total,
-            "xml_media_total": self.xml_media_total,
-            "xml_fig_total": self.xml_fig_total,
-            "xml_table_wrap_total": self.xml_table_wrap_total,
-            "xml_eq_total": self.xml_eq_total,
-            "xml_graphic_total": self.xml_graphic_total,
-            "xml_inline_graphic_total": self.xml_inline_graphic_total,
-            "xml_ref_elem_citation_total": self.xml_ref_elem_citation_total,
-            "xml_ref_mixed_citation_total": self.xml_ref_mixed_citation_total,
-            "xml_text_lang_total": self.xml_text_lang_total,
-            "article_type": self.article_type,
-            "html_vs_xml": self._html_vs_xml,
-        }
+        """
+        Retorna dados de análise como lista de dicionários com labels traduzíveis
+        
+        Returns:
+            dict com duas chaves:
+                - 'statistics': lista de dicionários com label/value para estatísticas
+                - 'html_vs_xml': dados de comparação HTML vs XML
+        """
+        statistics = [
+            {
+                'label': _('Body vazio'),
+                'value': _('Sim') if self.empty_body else _('Não')
+            },
+            {
+                'label': _('Pontos de atenção'),
+                'value': self.attention_demands or 0
+            },
+            {
+                'label': _('Tipo de artigo'),
+                'value': self.article_type or _('Não identificado')
+            },
+            {
+                'label': _('Tabelas no HTML'),
+                'value': self.html_table_total or 0
+            },
+            {
+                'label': _('Imagens no HTML'),
+                'value': self.html_img_total or 0
+            },
+            {
+                'label': _('Material suplementar no XML'),
+                'value': self.xml_supplmat_total or 0
+            },
+            {
+                'label': _('Elementos de mídia no XML'),
+                'value': self.xml_media_total or 0
+            },
+            {
+                'label': _('Figuras no XML'),
+                'value': self.xml_fig_total or 0
+            },
+            {
+                'label': _('Tabelas no XML'),
+                'value': self.xml_table_wrap_total or 0
+            },
+            {
+                'label': _('Equações no XML'),
+                'value': self.xml_eq_total or 0
+            },
+            {
+                'label': _('Gráficos no XML'),
+                'value': self.xml_graphic_total or 0
+            },
+            {
+                'label': _('Gráficos inline no XML'),
+                'value': self.xml_inline_graphic_total or 0
+            },
+            {
+                'label': _('Citações estruturadas (element-citation)'),
+                'value': self.xml_ref_elem_citation_total or 0
+            },
+            {
+                'label': _('Citações mistas (mixed-citation)'),
+                'value': self.xml_ref_mixed_citation_total or 0
+            },
+            {
+                'label': _('Idiomas do texto no XML'),
+                'value': self.xml_text_lang_total or 0
+            }
+        ]
 
     panels = [
         FieldPanel("comment"),
@@ -360,23 +411,48 @@ class Html2xmlAnalysis(models.Model):
         ]
 
     def html_report_content(self, title):
-        analysis_result = self.analysis_data
-        try:
-            html_vs_xml = analysis_result.pop("html_vs_xml", [])
-        except KeyError:
-            html_vs_xml = []
-        rows = "\n".join(format_html_numbers_section(analysis_result))
-        rows += "\n".join(format_html_match_section(html_vs_xml))
+        """
+        Gera o conteúdo HTML do relatório
+        
+        Args:
+            title: Título do relatório
+            
+        Returns:
+            str: HTML completo do relatório
+        """
+        stats = format_html_numbers_section(self.analysis_data or [])
+        changes = format_html_match_section(self._html_vs_xml or [])      
         return (
-            f"""<html>"""
+            """<html>"""
             """<head>
-              <title>Report</title>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-              <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>            </head>"""
-            f"""<body><div class="container"><title>Report {title}</title><h1>Report {title}</h1>{rows}</div></body></html>"""
-        )
+            <title>Report</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+            </head>"""
+            """<body>
+            <div class="container">
+                <h1>Report {}</h1>
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3>{_('Estatísticas de Conversão HTML para XML')}</h3>
+                    </div>
+                    <div class="card-body">
+                        {}
+                    </div>
+                </div>
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3>{_('Trocas de HTML para XML')}</h3>
+                    </div>
+                    <div class="card-body">
+                        {}
+                    </div>
+                </div>
+            </div>
+            </body></html>"""
+        ).format(title, "".join(stats), "".join(changes))
 
     def get_a_href_stats(self, html, xml, journal_acron):
         for a in html.xpath(".//a[@href]"):
