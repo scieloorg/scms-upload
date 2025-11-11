@@ -1722,7 +1722,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             except Exception as e:
                 logging.exception(e)
             self.processed_xml.save(
-                xml_with_pre.sps_pkg_name+".xml",
+                xml_with_pre.sps_pkg_name + ".xml",
                 ContentFile(xml_with_pre.tostring()),
                 save=True,
             )
