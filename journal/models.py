@@ -110,7 +110,7 @@ class OfficialJournal(CommonControlField):
     Class that represent the Official Journal
     """
 
-    title = models.CharField(_("Official Title"), max_length=128, null=True, blank=True)
+    title = models.CharField(_("Official Title"), max_length=200, null=True, blank=True)
     title_iso = models.CharField(_("ISO Title"), max_length=100, null=True, blank=True)
     foundation_year = models.CharField(
         _("Foundation Year"), max_length=4, null=True, blank=True
@@ -222,7 +222,7 @@ class Journal(CommonControlField, ClusterableModel):
     short_title = models.CharField(
         _("Short Title"), max_length=100, null=True, blank=True
     )
-    title = models.CharField(_("Title"), max_length=128, null=True, blank=True)
+    title = models.CharField(_("Title"), max_length=200, null=True, blank=True)
     journal_acron = models.CharField(
         _("Journal Acronym"), max_length=16, null=True, blank=True
     )
