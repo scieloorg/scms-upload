@@ -1,6 +1,6 @@
 import logging
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, models, transaction
@@ -71,8 +71,12 @@ class Article(ClusterableModel, CommonControlField):
         null=True,
     )
     position = models.PositiveIntegerField(_("Position"), blank=True, null=True)
+    
+    # futuramente substituir first_publication_date por first_pubdate_iso
     first_publication_date = models.DateField(null=True, blank=True)
-
+    first_pubdate_iso = models.CharField(
+        _("First publication date ISO"), max_length=10, blank=True, null=True
+    )
     # Page
     elocation_id = models.CharField(
         _("Elocation ID"), max_length=64, blank=True, null=True
@@ -104,7 +108,7 @@ class Article(ClusterableModel, CommonControlField):
         heading="Article details", classname="collapsible"
     )
     panel_article_details.children = [
-        FieldPanel("first_publication_date", read_only=True),
+        FieldPanel("first_pubdate_iso", read_only=True),
         FieldPanel("article_type", read_only=True),
         FieldPanel("status", read_only=True),
         InlinePanel(relation_name="title_with_lang", label="Title with Language"),
@@ -126,7 +130,7 @@ class Article(ClusterableModel, CommonControlField):
             models.Index(fields=["pid_v3"]),
             models.Index(fields=["status"]),
         ]
-        ordering = ["position", "fpage", "-first_publication_date"]
+        ordering = ["position", "fpage", "-first_pubdate_iso"]
 
         permissions = (
             (MAKE_ARTICLE_CHANGE, _("Can make article change")),
@@ -160,11 +164,23 @@ class Article(ClusterableModel, CommonControlField):
 
     @property
     def is_public(self):
+        pubdate = self.get_first_pubdate()
         return bool(
-            self.first_publication_date
-            and self.first_publication_date.isoformat()[:10]
-            <= datetime.utcnow().isoformat()[:10]
+            pubdate
+            and pubdate
+            <= datetime.now(timezone.utc).isoformat()[:10]
         )
+    
+    def get_first_pubdate(self):
+        if self.first_pubdate_iso:
+            return self.first_pubdate_iso
+        try:
+            value = self.first_publication_date.isoformat()[:10]
+            self.first_pubdate_iso = value
+            self.save()
+            return value
+        except (TypeError, AttributeError):
+            return None
 
     @property
     def data(self):
@@ -422,7 +438,9 @@ class Article(ClusterableModel, CommonControlField):
     def add_article_publication_date(self):
         if self.sps_pkg.is_public:
             # atualiza somente se o artigo é considerado público
-            self.first_publication_date = self.sps_pkg.pub_date
+            value = self.sps_pkg.pub_date
+            self.first_pubdate_iso = value
+            self.first_publication_date = datetime.fromisoformat(value)
             self.save()
 
     def add_position(self, position=None, fpage=None):
