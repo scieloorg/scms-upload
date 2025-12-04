@@ -1628,12 +1628,13 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             self.xml_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
-
+            complete_pub_date = None
             if not self.migrated_data.file_type:
                 self.migrated_data.file_type = self.migrated_data.document.file_type
                 self.migrated_data.save()
             detail["file_type"] = self.migrated_data.file_type
             if self.migrated_data.file_type == "html":
+                complete_pub_date = self.migrated_data.document.get_complete_article_publication_date()
                 xml_file_path = self.get_xml_from_html(user, detail)
                 xml_with_pre = None
             else:
@@ -1643,6 +1644,7 @@ class ArticleProc(BaseProc, ClusterableModel):
                 xml_with_pre,
                 xml_file_path,
                 detail,
+                complete_pub_date,
             )
             completed = self.xml_status == tracker_choices.PROGRESS_STATUS_DONE
             operation.finish(user, completed=completed, detail=detail)
@@ -1659,13 +1661,13 @@ class ArticleProc(BaseProc, ClusterableModel):
             return self.xml_status == tracker_choices.PROGRESS_STATUS_TODO
 
     def get_xml_from_native(self, detail):
-        xml_with_pre = list(XMLWithPre.create(path=self.migrated_xml.file.path))[0]
         try:
+            xml_with_pre = list(XMLWithPre.create(path=self.migrated_xml.file.path))[0]
             detail["fix_inline_graphic_in_caption"] = fix_inline_graphic_in_caption(xml_with_pre.xmltree)
+            return xml_with_pre
         except Exception as e:
             detail["fix_inline_graphic_in_caption"] = {"exception": traceback.format_exc()}
-        self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
-        return xml_with_pre
+            raise
     
     def get_xml_from_html(self, user, detail):
         migrated_data = self.migrated_data
@@ -1697,7 +1699,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         except Exception as e:
             return None
 
-    def save_processed_xml(self, xml_with_pre, xml_file_path, detail):
+    def save_processed_xml(self, xml_with_pre, xml_file_path, detail, complete_pub_date):
         try:
             if not xml_with_pre and xml_file_path:
                 xml_with_pre = list(XMLWithPre.create(path=xml_file_path))[0]
@@ -1716,22 +1718,29 @@ class ArticleProc(BaseProc, ClusterableModel):
                 # usando o valor do "order" do site clássico
                 xml_with_pre.order = order
 
+            try:
+                current_article_date = xml_with_pre.article_publication_date
+            except Exception as e:
+                current_article_date = None
+                pass
+            complete_pub_date = complete_pub_date or xml_with_pre.get_complete_publication_date()
+            if complete_pub_date != current_article_date:
+                xml_with_pre.article_publication_date = complete_pub_date
+
             detail.update(xml_with_pre.data)
             try:
                 os.unlink(self.processed_xml.path)
             except Exception as e:
-                logging.exception(e)
+                pass
             self.processed_xml.save(
                 xml_with_pre.sps_pkg_name + ".xml",
                 ContentFile(xml_with_pre.tostring()),
-                save=True,
+                save=False,
             )
         except Exception as e:
-            self.xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
-            self.save()
             raise XMLVersionXmlWithPreError(
                 _("Unable to get xml with pre from migrated article {}: {} {}").format(
-                    xml_file_path, type(e), e
+                    xml_file_path or xml_with_pre.sps_pkg_name + ".xml", type(e), e
                 )
             )
 

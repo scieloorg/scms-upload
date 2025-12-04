@@ -44,7 +44,7 @@ class ArticleSnippetViewSet(SnippetViewSet):
         "display_sections",
         "fpage",
         "position",
-        "first_publication_date",
+        "first_pubdate_iso",
         "created",
         "updated",
         # "updated_by",

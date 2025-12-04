@@ -100,11 +100,8 @@ class ArticlePayload:
     def add_document_type(self, document_type):
         self.data["type"] = document_type
 
-    def add_publication_date(self, year=None, month=None, day=None):
-        if year and month and day:
-            self.data["publication_date"] = "-".join([year, month, day])
-        else:
-            self.data["publication_date"] = datetime.now().isoformat()[:10]
+    def add_publication_date(self, pub_date):
+        self.data["publication_date"] = pub_date
 
     def add_in_issue(
         self, order, fpage=None, fpage_seq=None, lpage=None, elocation=None
