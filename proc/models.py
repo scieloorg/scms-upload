@@ -1633,7 +1633,7 @@ class ArticleProc(BaseProc, ClusterableModel):
                 self.migrated_data.file_type = self.migrated_data.document.file_type
                 self.migrated_data.save()
             detail["file_type"] = self.migrated_data.file_type
-            if self.migrated_data.file_type == "html":
+            if detail["file_type"] == "html":
                 complete_pub_date = self.migrated_data.document.get_complete_article_publication_date()
                 xml_file_path = self.get_xml_from_html(user, detail)
                 xml_with_pre = None
@@ -1646,6 +1646,9 @@ class ArticleProc(BaseProc, ClusterableModel):
                 detail,
                 complete_pub_date,
             )
+            self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
+            self.save()
+
             completed = self.xml_status == tracker_choices.PROGRESS_STATUS_DONE
             operation.finish(user, completed=completed, detail=detail)
             return completed
@@ -1687,18 +1690,23 @@ class ArticleProc(BaseProc, ClusterableModel):
     
     @property
     def xml_with_pre(self):
-        if self.processed_xml and self.processed_xml.path and os.path.isfile(self.processed_xml.path):
-            path = self.processed_xml.path
-        else:
-            try:
-                path = HTMLXML.get(migrated_article=self.migrated_data).file.path
-            except HTMLXML.DoesNotExist:
-                path = self.migrated_xml.file.path
         try:
+            path = self.processed_xml.path
+        except (AttributeError, TypeError):
+            path = None
+            if not path or not os.path.isfile(path):
+                try:
+                    path = HTMLXML.get(migrated_article=self.migrated_data).file.path
+                except HTMLXML.DoesNotExist:
+                    path = self.migrated_xml.file.path
+            if not path or not os.path.isfile(path):
+                raise FileNotFoundError(f"XML file not found for {self}")
             return list(XMLWithPre.create(path=path))[0]
         except Exception as e:
-            return None
-
+            raise XMLVersionXmlWithPreError(
+                _("Unable to get xml_with_pre for {}: {}").format(self, e)
+            )
+            
     def save_processed_xml(self, xml_with_pre, xml_file_path, detail, complete_pub_date):
         try:
             if not xml_with_pre and xml_file_path:
@@ -1866,7 +1874,16 @@ class ArticleProc(BaseProc, ClusterableModel):
         for item in self.issue_proc.issue_files.filter(
             pkg_name=self.pkg_name, component_type="xml"
         ).iterator():
+            if not item.file:
+                continue
+            if not item.file.path:
+                continue
+            if not os.path.isfile(item.file.path):
+                continue
             return item
+        raise MigratedFile.DoesNotExist(
+            _("No migrated XML file found for {} ({})").format(self.pkg_name, self.issue_proc)
+        )
 
     @property
     def translation_files(self):
