@@ -440,7 +440,7 @@ class Article(ClusterableModel, CommonControlField):
             # atualiza somente se o artigo é considerado público
             value = self.sps_pkg.pub_date
             self.first_pubdate_iso = value
-            self.first_publication_date = datetime.fromisoformat(value)
+            self.first_publication_date = datetime.fromisoformat(value).date()
             self.save()
 
     def add_position(self, position=None, fpage=None):
