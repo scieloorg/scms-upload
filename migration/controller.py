@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import traceback
 from copy import deepcopy
 from datetime import datetime, timezone
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -36,6 +37,9 @@ from tracker.models import UnexpectedEvent, format_traceback
 
 from .models import ClassicWebsiteConfiguration
 
+
+class NoDocumentRecordsToMigrate(Exception):
+    pass
 
 def get_classic_website_config(collection_acron):
     return ClassicWebsiteConfiguration.objects.get(collection__acron=collection_acron)
@@ -118,7 +122,8 @@ def create_or_update_journal(
         journal.license_code = classic_website_journal.permissions
         journal.nlm_title = classic_website_journal.title_nlm
         journal.doi_prefix = None
-        journal.contact_name = "; ".join(classic_website_journal.raw_publisher_names)
+        raw_names = classic_website_journal.raw_publisher_names or []
+        journal.contact_name = "; ".join([str(name) for name in raw_names if name])
         journal.contact_location = Location.create_or_update(
             user=user,
             city_name=classic_website_journal.publisher_city,
@@ -132,7 +137,11 @@ def create_or_update_journal(
         journal.save()
 
     except Exception as e:
-        logging.info(len(journal.contact_address))
+        try:
+            if journal and hasattr(journal, 'contact_address') and journal.contact_address:
+                logging.info(len(journal.contact_address))
+        except:
+            pass
         logging.exception(f"Exception: create_or_update_journal: 3: {e}")
         exc_type, exc_value, exc_traceback = sys.exc_info()
         params["event"] = "Journal.create_or_update"
@@ -186,7 +195,7 @@ def create_or_update_journal(
         raise e
 
     try:
-        for publisher_name in classic_website_journal.raw_publisher_names:
+        for publisher_name in (classic_website_journal.raw_publisher_names or []):
             institution = Institution.get_or_create(
                 inst_name=publisher_name,
                 inst_acronym=None,
@@ -388,8 +397,11 @@ def get_classic_website(collection_acron):
         config = ClassicWebsiteConfiguration.objects.get(
             collection__acron=collection_acron
         )
+        bases_path = ""
+        if config.bases_work_path:
+            bases_path = os.path.join(os.path.dirname(config.bases_work_path), "bases")
         return classic_ws.ClassicWebsite(
-            bases_path=os.path.join(os.path.dirname(config.bases_work_path), "bases"),
+            bases_path=bases_path,
             bases_work_path=config.bases_work_path,
             bases_translation_path=config.bases_translation_path,
             bases_pdf_path=config.bases_pdf_path,
@@ -431,14 +443,21 @@ def check_component_type(file):
 
 
 def migrate_issue_files(user, collection, journal_acron, issue_folder, force_update):
+    exceptions = []
+    migrated_ids = []
     try:
-        exceptions = []
-        migrated_ids = []
         PARTS = {
             "before": "1",
             "after": "2",
         }
         classic_website = get_classic_website(collection.acron)
+        if not classic_website:
+            exceptions.append({
+                "error": f"Classic website not found for collection {collection.acron}",
+                "type": "ValueError"
+            })
+            return {"exceptions": exceptions, "migrated": migrated_ids}
+        
         files_and_exceptions = classic_website.get_issue_folder_content(
             journal_acron,
             issue_folder,
@@ -484,160 +503,6 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
         )
     return {"exceptions": exceptions, "migrated": migrated_ids}
 
-
-def get_article_records_from_classic_website(
-    user,
-    issue_proc,
-    ArticleProcClass,
-    force_update=False,
-):
-    """
-    Cria registros ArticleProc com dados obtidos de base de dados ISIS
-    de artigos
-    """
-    importer = DocumentRecordsImporter(user, issue_proc, ArticleProcClass, force_update)
-    return importer.import_documents_records()
-
-
-class DocumentRecordsImporter:
-    def __init__(self, user, issue_proc, ArticleProcClass, force_update=False):
-        self.user = user
-        self.force_update = force_update
-
-        self.issue_proc = issue_proc
-        self.issue_folder = issue_proc.issue_folder
-        self.issue_pid = issue_proc.pid
-        self.collection = issue_proc.collection
-
-        self.classic_website = get_classic_website(self.collection.acron)
-
-        j = issue_proc.journal_proc
-        self.journal_issue_and_doc_data = {"title": j.migrated_data.data}
-        self.journal_acron = j.acron
-        self.ArticleProcClass = ArticleProcClass
-
-    def import_documents_records(self):
-        migrated = []
-        failures = []
-        for doc_id, doc_records in self.classic_website.get_documents_pids_and_records(
-            self.journal_acron,
-            self.issue_folder,
-            self.issue_pid,
-        ):
-            try:
-
-                if len(doc_records) == 1:
-                    # é possível que em source_file_path exista registro tipo i
-                    self.journal_issue_and_doc_data["issue"] = doc_records[0]
-                    continue
-
-                article_proc = self.import_document_records(doc_id, doc_records)
-                migrated.append(
-                    {
-                        "pid": article_proc.pid,
-                        "pkg_name": article_proc.pkg_name,
-                        "records": list(
-                            article_proc.migrated_data.document.document_records.stats
-                        ),
-                    }
-                )
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                failures.append(
-                    {
-                        "doc_id": doc_id,
-                        "exc_traceback": format_traceback(exc_traceback),
-                    }
-                )
-
-        return {"migrated": migrated, "failures": failures}
-
-    def import_document_records(self, doc_id, doc_records):
-        # une os dados de journal, issue e docs
-        records = self.merge_journal_issue_and_docs_records(doc_records)
-
-        # instancia Document com os dados de journal, issue e docs
-        classic_ws_doc = classic_ws.Document(records)
-
-        # verifica se pid do documento pertence ao issue,
-        # levanta exceção caso não seja
-        pid = self.get_valid_pid(classic_ws_doc)
-
-        if classic_ws_doc.scielo_pid_v2 != pid:
-            classic_ws_doc.scielo_pid_v2 = pid
-
-        # obtém os registros de parágrafo
-        pid_, p_records = self.classic_website.get_p_records(pid)
-        p_records = list(p_records or [])
-        if p_records:
-            records["article"].extend(p_records)
-            # instancia novamente Document com os dados de journal, issue e docs
-            classic_ws_doc = classic_ws.Document(records)
-
-        # cria o registro de migração
-        return self.create_scielo_data_record_and_article_proc(classic_ws_doc, records)
-
-    def merge_journal_issue_and_docs_records(self, doc_records):
-        if not self.journal_issue_and_doc_data.get("issue"):
-            self.journal_issue_and_doc_data["issue"] = (
-                self.issue_proc.migrated_data.data
-            )
-
-        records = {}
-        records.update(self.journal_issue_and_doc_data)
-        records["article"] = doc_records
-        return records
-
-    def get_valid_pid(self, classic_ws_doc):
-        pid = classic_ws_doc.scielo_pid_v2 or (
-            "S" + self.issue_pid + classic_ws_doc.order.zfill(5)
-        )
-        if len(pid) != 23:
-            info = {
-                "classic_ws_doc.scielo_pid_v2": classic_ws_doc.scielo_pid_v2,
-                "order": classic_ws_doc.order,
-                "issue_pid": self.issue_pid,
-            }
-            raise ValueError(
-                f"Expected 23-characters pid. Found {pid} ({len(pid)}) {info}"
-            )
-
-        if self.issue_pid not in pid:
-            raise ValueError(
-                f"Article data {pid} does not belong to "
-                f"{self.issue_proc} {self.issue_pid}"
-            )
-        return pid
-
-    def create_scielo_data_record_and_article_proc(self, classic_ws_doc, records):
-        article_proc = self.ArticleProcClass.register_classic_website_data(
-            user=self.user,
-            collection=self.collection,
-            pid=classic_ws_doc.scielo_pid_v2,
-            data=records,
-            content_type="article",
-            force_update=self.force_update,
-        )
-
-        if article_proc.migration_status != tracker_choices.PROGRESS_STATUS_TODO:
-            return article_proc
-
-        article_proc.update(
-            issue_proc=self.issue_proc,
-            pkg_name=classic_ws_doc.filename_without_extension,
-            migration_status=tracker_choices.PROGRESS_STATUS_TODO,
-            user=self.user,
-            main_lang=classic_ws_doc.original_language,
-            force_update=self.force_update,
-        )
-        if classic_ws_doc.file_type == "html":
-            HTMLXML.create_or_update(
-                user=self.user,
-                migrated_article=article_proc.migrated_data,
-                n_references=len(classic_ws_doc.citations or []),
-                record_types="|".join(classic_ws_doc.record_types or []),
-            )
-        return article_proc
 
 
 class PkgZipBuilder:
@@ -875,38 +740,29 @@ def register_acron_id_file_content(
     """
     Para um dado JournalAcronIdFile, criar itens em IdFileRecord
     """
+    detail = {}
     try:
-        # Importa os registros de documentos
-        operation = None
-        detail = {}
-        operation = journal_proc.start(user, "register_acron_id_file_content")
-        journal = journal_proc.journal
+        detail["force_update"] = force_update
         collection = journal_proc.collection
         journal_acron = journal_proc.acron
+        collection_acron = collection.acron
 
-        classic_website = get_classic_website(collection.acron)
+        classic_website = get_classic_website(collection_acron)
         source_path = os.path.join(
             classic_website.classic_website_paths.bases_work_path,
             journal_acron,
             journal_acron + ".id",
         )
+        detail["source_path"] = source_path
         if not os.path.isfile(source_path):
-            operation.finish(
-                user, completed=True, message=_(f"{source_path} does not exist")
-            )
-            logging.warning(f"{source_path} does not exist")
-            return
+            raise FileNotFoundError(f"{source_path} does not exist")
         
         if not JournalAcronIdFile.has_changes(
             user, collection, journal_acron, source_path, force_update
         ):
-            operation.finish(
-                user, completed=True, message=_(f"{source_path} has no changes")
-            )
-            logging.warning(f"{source_path} has no changes")
-            return
+            raise NoDocumentRecordsToMigrate(f"{source_path} has no changes")
         
-        start = datetime.now(timezone.utc).isoformat()
+        initial_datetime = datetime.now(timezone.utc).isoformat()
         journal_id_file = JournalAcronIdFile.create_or_update(
             user=user,
             collection=collection,
@@ -914,79 +770,51 @@ def register_acron_id_file_content(
             source_path=source_path,
             force_update=force_update,
         )
-        completed = True
-        qs = journal_id_file.id_file_records
-        total = qs.count()
-        todo_before = qs.filter(todo=True).count()
-        updated = journal_id_file.updated.isoformat()
-        detail = {
-            "total": total,
-            "todo_before": todo_before,
-            "start": start,
-            "updated": updated,
-            "force_update": force_update,
-        }
-        if force_update or start < updated:
-            completed = False
-            done = 0
-            changed = 0
-
-            logging.info(f"Reading {source_path}")
-            # replaced for item in read_bases_work_acron_id_file(
-            for item in get_bases_work_acron_id_file_records(
-                user,
-                source_path,
-                classic_website,
-                journal_proc,
-            ):
-                item["force_update"] = force_update
-                item["todo"] = True
-                rec = IdFileRecord.create_or_update(
-                    user,
-                    journal_id_file,
-                    **item,
-                )
-                if force_update or start < (rec.updated or rec.created).isoformat():
-                    changed += 1
-                done += 1
-            completed = total == done
-
-            detail.update(
-                {
-                    "done": done,
-                    "changed": changed,
-                    "todo_after": journal_id_file.id_file_records.filter(todo=True).count(),
-                }
-            )
-            logging.info(f"Finished reading {source_path}: {detail}")
-        operation.finish(
-            user,
-            completed=completed,
-            detail=detail,
-        )
         
-            
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        if operation:
-            operation.finish(
+        final_datetime = journal_id_file.updated.isoformat()
+        has_changes = initial_datetime < final_datetime
+        detail["initial_datetime"] = initial_datetime
+        detail["final_datetime"] = final_datetime
+        if not has_changes and not force_update:
+            raise NoDocumentRecordsToMigrate(f"{source_path} has no records to migrate")
+
+        qs = journal_id_file.id_file_records.filter(item_type="article")
+        total_document_records = qs.count()
+        total_document_records_to_migrate = qs.filter(todo=True).count()
+        
+        detail["total_document_records_before"] = total_document_records
+        detail["total_document_records_to_migrate_before"] = total_document_records_to_migrate
+
+        for item in get_bases_work_acron_id_file_records(
+            user,
+            source_path,
+            classic_website,
+            journal_proc,
+        ):
+            item["force_update"] = force_update
+            item["todo"] = True
+            IdFileRecord.create_or_update(
                 user,
-                completed=False,
-                exception=e,
-                exc_traceback=exc_traceback,
-                detail=detail,
+                journal_id_file,
+                **item,
             )
-            return
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "migration.controller.register_acron_id_file_content",
-                "user_id": user.id,
-                "username": user.username,
-                "journal_acron": str(journal_proc),
-            },
-        )
+        qs = journal_id_file.id_file_records.filter(item_type="article")
+        total_document_records = qs.count()
+        article_pids_to_migrate = list(qs.filter(todo=True).values_list("item_pid", flat=True).distinct())
+        
+        detail["total_document_records_after"] = total_document_records
+        detail["total_document_records_to_migrate_after"] = len(article_pids_to_migrate)
+        detail["total_document_records_changed"] = journal_id_file.id_file_records.filter(
+            updated__gte=initial_datetime,
+        ).count()
+        detail["article_pids_to_migrate"] = article_pids_to_migrate
+        return detail
+    except NoDocumentRecordsToMigrate as e:
+        detail["message"] = str(e)
+        return detail
+    except Exception as e:
+        detail["traceback"] = traceback.format_exc()
+        return detail
 
 
 def get_bases_work_acron_id_file_records(

@@ -59,6 +59,9 @@ from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 
 
+class NoDocumentRecordsToMigrateError(Exception):
+    ...
+
 class Operation(CommonControlField):
 
     name = models.CharField(
@@ -209,7 +212,8 @@ class ProcReport(CommonControlField):
     ]
 
     def __str__(self):
-        return f"{self.collection.acron} {self.pid} {self.task_name} {self.report_date}"
+        collection_acron = self.collection.acron if self.collection else "Unknown"
+        return f"{collection_acron} {self.pid} {self.task_name} {self.report_date}"
 
     class Meta:
         ordering = ["-created"]
@@ -309,10 +313,13 @@ class ProcReport(CommonControlField):
 
     @property
     def directory_path(self):
+        if not self.pid:
+            return ""
         pid = self.pid
         if len(self.pid) == 23:
             pid = self.pid[1:]
-        paths = [self.collection.acron, pid[:9], pid[9:13], pid[13:17], pid[17:]]
+        collection_acron = self.collection.acron if self.collection else ""
+        paths = [collection_acron, pid[:9], pid[9:13], pid[13:17], pid[17:]]
         paths = [path for path in paths if path]
         return os.path.join(*paths)
 
@@ -882,14 +889,16 @@ class JournalProc(BaseProc, ClusterableModel):
         ]
 
     def __unicode__(self):
+        collection_name = self.collection.name if self.collection else "Unknown"
         if self.acron:
-            return f"{self.acron} ({self.collection.name})"
-        return f"{self.pid} ({self.collection.name})"
+            return f"{self.acron} ({collection_name})"
+        return f"{self.pid} ({collection_name})"
 
     def __str__(self):
+        collection_name = self.collection.name if self.collection else "Unknown"
         if self.acron:
-            return f"{self.acron} ({self.collection.name})"
-        return f"{self.pid} ({self.collection.name})"
+            return f"{self.acron} ({collection_name})"
+        return f"{self.pid} ({collection_name})"
 
     @staticmethod
     def autocomplete_custom_queryset_filter(search_term):
@@ -1294,73 +1303,54 @@ class IssueProc(BaseProc, ClusterableModel):
             Q(original_name=basename) | Q(original_name__startswith=name + ".")
         )
 
-    @staticmethod
-    def migrate_pending_document_records(
-        user,
-        collection_acron,
-        journal_acron=None,
-        issue_folder=None,
-        publication_year=None,
-    ):
+    @classmethod
+    def get_id_and_pid_list_to_process(cls, journal_proc, issue_folder, publication_year, issue_pids, status, events):
+        events.append("Identify filter: status")
+        q = Q(docs_status__in=status) | Q(files_status__in=status)
+        if issue_pids:
+            q |= Q(pid__in=issue_pids)
 
-        id_file_record_params = {}
-        if journal_acron:
-            id_file_record_params["parent__journal_acron"] = journal_acron
-        if publication_year:
-            id_file_record_params["item_pid__contains"] = publication_year
-
-        issue_pids = set()
-        for item in IdFileRecord.objects.filter(
-            parent__collection__acron=collection_acron,
-            item_type="article",
-            todo=True,
-            **id_file_record_params,
-        ):
-            issue_pids.add(item.item_pid[1:-5])
-
-        if not issue_pids:
-            return
-
-        logging.info(
-            f"IssueProc.migrate_pending_document_records - IdFileRecord {id_file_record_params}: {len(issue_pids)}"
-        )
-        params = {}
+        events.append("Identify filter: issue_folder / publication_year")
+        issue_filter = {}
         if issue_folder:
-            params["issue_folder"] = issue_folder
-
-        issue_procs = IssueProc.objects.filter(
-            collection__acron=collection_acron,
-            pid__in=issue_pids,
-            **params,
-        )
-        if not issue_procs.exists():
-            return
-
-        logging.info(
-            f"IssueProc.migrate_pending_document_records - IssueProc {params}: {issue_procs.count()}"
-        )
-        for item in issue_procs:
-            item.migrate_document_records(user, force_update=True)
-        issue_procs.update(files_status=tracker_choices.PROGRESS_STATUS_TODO)
+            issue_filter["issue_folder"] = issue_folder
+        if publication_year:
+            issue_filter["issue__publication_year"] = publication_year
+        
+        events.append("Select journal issues to process")
+        return cls.objects.filter(q, journal_proc=journal_proc, **issue_filter).values("id", "pid")
 
     def migrate_document_records(self, user, force_update=None):
         try:
-            detail = None
+            exception = None
+            exc_traceback = None
+            detail = {}
             operation = None
             operation = self.start(user, "migrate_document_records")
             if not self.journal_proc:
                 raise ValueError(f"IssueProc ({self}) has no journal_proc")
 
-            journal_data = self.journal_proc.migrated_data.data
-            issue_data = self.migrated_data.data
-
-            failed_pids = set()
+            expected_total_articles = IdFileRecord.document_records_to_migrate(
+                collection=self.collection,
+                issue_pid=self.pid,
+                force_update=True,  # todos os registros encontrados em acron.id no momento
+            ).count()
+            detail["expected_total_articles"] = expected_total_articles
             id_file_records = IdFileRecord.document_records_to_migrate(
-                collection=self.journal_proc.collection,
+                collection=self.collection,
                 issue_pid=self.pid,
                 force_update=force_update,
             )
-            logging.info(f"migrate_document_records: {self} - {id_file_records.count()} records to process")
+            detail["total_documents_to_migrate"] = id_file_records.count()
+            if detail["total_documents_to_migrate"] == 0:
+                raise NoDocumentRecordsToMigrateError("No document records to migrate")
+
+            detail["total_migrated_articles_before"] = ArticleProc.objects.filter(
+                issue_proc=self
+            ).count()
+            journal_data = self.journal_proc.migrated_data.data
+            issue_data = self.migrated_data.data
+            exceptions = {}
             for record in id_file_records:
                 try:
                     data = None
@@ -1372,45 +1362,52 @@ class IssueProc(BaseProc, ClusterableModel):
                         user, record.item_pid, data["data"], force_update
                     )
                     if not article_proc:
-                        failed_pids.add(record.item_pid)
+                        raise ValueError(f"Unable to create ArticleProc for PID {record.item_pid}")
                 except Exception as e:
-                    failed_pids.add(record.item_pid)
-                    detail = {
-                        "pid": record.item_pid,
-                        "data": data,
-                    }
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    subevent = self.start(user, "migrate document records / item")
-                    subevent.finish(
-                        user,
-                        completed=False,
-                        detail=detail,
-                        exception=e,
-                        exc_traceback=exc_traceback,
-                    )
+                    exceptions[record.item_pid] = traceback.format_exc()
 
-            detail = {
-                "total issue documents": self.issue.total_documents,
-                "total records": id_file_records.count(),
-                "total errors": len(failed_pids),
-            }
-            logging.info(detail)
-            if failed_pids:
-                self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
-            else:
-                self.docs_status = tracker_choices.PROGRESS_STATUS_DONE
-            self.save()
-            operation.finish(user, completed=not failed_pids, detail=detail)
-            if id_file_records.count():
-                id_file_records.exclude(item_pid__in=failed_pids).update(todo=False)
+            detail["exceptions"] = exceptions
+            detail["total failed"] = len(exceptions)
+            detail["total done"] = detail["total_documents_to_migrate"] - detail["total failed"]
+            id_file_records.exclude(item_pid__in=list(exceptions.keys())).update(todo=False)
+
+            new_status = self.get_new_docs_status(expected_total_articles)
+        except NoDocumentRecordsToMigrateError as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            new_status = self.get_new_docs_status(expected_total_articles)
+
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            self.docs_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+            exception = e
+            new_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+        if new_status != self.docs_status:
+            self.docs_status = new_status
             self.save()
-            if operation:
-                operation.finish(
-                    user, exc_traceback=exc_traceback, exception=e, detail=detail
-                )
+        if operation:
+            operation.finish(
+                user,
+                completed=self.docs_status == tracker_choices.PROGRESS_STATUS_DONE,
+                exc_traceback=exc_traceback,
+                exception=exception,
+                detail=detail
+            )
+
+    def get_new_docs_status(self, expected_total_articles=None, total_migrated_articles=None):
+        if expected_total_articles is None:
+            expected_total_articles = IdFileRecord.document_records_to_migrate(
+                collection=self.collection,
+                issue_pid=self.pid,
+                force_update=True,  # todos os registros encontrados em acron.id no momento
+            ).count()
+        if total_migrated_articles is None:
+            total_migrated_articles = ArticleProc.objects.filter(issue_proc=self).count()
+        if expected_total_articles == 0:
+            return tracker_choices.PROGRESS_STATUS_BLOCKED
+        if total_migrated_articles == 0:
+            return tracker_choices.PROGRESS_STATUS_TODO
+        if total_migrated_articles == expected_total_articles:
+            return tracker_choices.PROGRESS_STATUS_DONE
+        return tracker_choices.PROGRESS_STATUS_PENDING
 
     def create_or_update_article_proc(self, user, pid, data, force_update):
         article_proc = ArticleProc.register_classic_website_data(
@@ -1443,10 +1440,15 @@ class IssueProc(BaseProc, ClusterableModel):
 
     @staticmethod
     def get_issue_pid(issue):
-        return IssueProc.objects.filter(issue=issue).first().pid
+        issue_proc = IssueProc.objects.filter(issue=issue).first()
+        return issue_proc.pid if issue_proc else None
 
     @property
     def bundle_id(self):
+        if not self.journal_proc or not self.journal_proc.pid:
+            return ""
+        if not self.issue or not self.issue.bundle_id_suffix:
+            return ""
         return "-".join([self.journal_proc.pid, self.issue.bundle_id_suffix])
 
     def delete_unlink_articles(self, user=None):
@@ -1558,8 +1560,11 @@ class ArticleProc(BaseProc, ClusterableModel):
         ]
 
     @classmethod
-    def mark_for_reprocessing(cls, issue_proc):
-        cls.objects.filter(issue_proc=issue_proc).update(
+    def mark_for_reprocessing(cls, issue_proc, article_pids=None):
+        params = {"issue_proc": issue_proc}
+        if article_pids:
+            params["pid__in"] = article_pids
+        cls.objects.filter(**params).update(
             xml_status=tracker_choices.PROGRESS_STATUS_REPROC,
             sps_pkg_status=tracker_choices.PROGRESS_STATUS_REPROC,
             migration_status=tracker_choices.PROGRESS_STATUS_REPROC,
