@@ -5,14 +5,13 @@ Módulo responsável pela busca e processamento de dados da API Core externa.
 import logging
 import sys
 
-from django.conf import settings
-from django.db.models import Q
-
 from collection.models import Collection
 from core.utils.requester import fetch_data
+from django.conf import settings
+from django.db.models import Q
+from institution.models import Institution
 from issue.models import Issue
 from journal.models import (
-    Institution,
     Journal,
     JournalCollection,
     JournalHistory,
