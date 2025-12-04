@@ -1,20 +1,15 @@
 import logging
 from datetime import datetime
 
-from django.db import IntegrityError, models
-from django.db.models import Q
-from django.utils.translation import gettext_lazy as _
-from modelcluster.fields import ParentalKey
-from modelcluster.models import ClusterableModel
-from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
-from wagtail.models import Orderable
-from wagtailautocomplete.edit_handlers import AutocompletePanel
-
 from collection.models import Collection, Language
 from core.choices import MONTHS
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField, HTMLTextModel, TextModel
-from institution.models import Institution, InstitutionHistory
+from django.db import IntegrityError, models
+from django.db.models import Q
+from django.utils.html import strip_tags
+from django.utils.translation import gettext_lazy as _
+from institution.models import InstitutionHistory
 from journal import choices
 from journal.exceptions import (
     MissionCreateOrUpdateError,
@@ -23,6 +18,11 @@ from journal.exceptions import (
 )
 from journal.forms import OfficialJournalForm
 from location.models import Location
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
+from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
+from wagtail.models import Orderable
+from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 
 class JournalSection(TextModel, CommonControlField):
@@ -843,6 +843,12 @@ class Mission(CommonControlField, HTMLTextModel):
             return cls.create(user, journal, language, mission_text)
         except cls.DoesNotExist:
             return cls.create(user, journal, language, mission_text)
+
+    @property
+    def content_plain_text(self):
+        if self.text:
+            return strip_tags(self.text)
+        return None
 
 
 class JournalCollection(CommonControlField, ClusterableModel):

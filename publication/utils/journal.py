@@ -13,7 +13,7 @@ def build_journal(
     builder.add_contact(**journal.contact)
 
     for mission in journal.mission.all():
-        builder.add_mission(mission.language.code2, mission.text)
+        builder.add_mission(mission.language.code2, mission.content_plain_text)
 
     for journal_history in journal_history.all():
         logging.info(f"journal_history.event_type: {journal_history.event_type}")
