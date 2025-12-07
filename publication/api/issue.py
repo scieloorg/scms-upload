@@ -27,15 +27,20 @@ def sync_issue(issue_proc, api_data):
     issue = issue_proc.issue
 
     response = {}
-    response["unlinked"] = issue_proc.delete_unlink_articles()
 
-    api = PublicationAPI(**api_data)
-    api.post_data_url += "/sync"
-    issue_sync_payload = {
-        "issue_id": issue_proc.bundle_id,
-        "articles_id": issue.article_ids,
-    }
-    response["issue_sync"] = api.post_data(issue_sync_payload)
+    try:
+        api = PublicationAPI(**api_data)
+        api.post_data_url += "/sync"
+        issue_sync_payload = {
+            "issue_id": issue_proc.bundle_id,
+            "articles_id": issue.article_ids,
+        }
+        response["issue_sync"] = api.post_data(issue_sync_payload)
+    except Exception as e:
+        logging.error(
+            _("Error syncing issue %s: %s"), issue_proc.bundle_id, str(e)
+        )
+        response["issue_sync_error"] = str(e)
     return response
 
 
