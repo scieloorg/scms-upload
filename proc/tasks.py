@@ -1095,7 +1095,7 @@ def task_fetch_and_create_journal(
 ###############################
 
 @celery_app.task(bind=True)
-def task_exclude_article_repetion(self, username=None, user_id=None, collection_acron_list=None, journal_acron_list=None, issue_folder=None):
+def task_exclude_article_repetition(self, username=None, user_id=None, collection_acron_list=None, journal_acron_list=None, issue_folder=None):
     try:
         user = _get_user(user_id=user_id, username=username)
         kwargs = {}
@@ -1117,7 +1117,7 @@ def task_exclude_article_repetion(self, username=None, user_id=None, collection_
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "function": "proc.tasks.task_exclude_article_repetion",
+                "function": "proc.tasks.task_exclude_article_repetition",
             },
         )
 
@@ -1192,7 +1192,7 @@ def task_exclude_article_repetition_from_issue(self, issue_proc_id, username=Non
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         try:
-            tracker.finish(
+            task_tracker.finish(
                 completed=False,
                 exception=e,
                 exc_traceback=exc_traceback,
