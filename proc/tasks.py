@@ -1,5 +1,6 @@
 import logging
 import sys
+import traceback
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -29,7 +30,7 @@ from proc.controller import (
 )
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
-from publication.api.issue import publish_issue
+from publication.api.issue import publish_issue, sync_issue
 from publication.api.journal import publish_journal
 from publication.api.publication import get_api, get_api_data
 from publication.models import ArticleAvailability
@@ -45,6 +46,7 @@ def _get_user(user_id, username):
             return User.objects.get(pk=user_id)
         if username:
             return User.objects.get(username=username)
+        return None
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -56,6 +58,7 @@ def _get_user(user_id, username):
                 "username": username,
             },
         )
+        return None
 
 
 def _get_collections(collection_acron):
@@ -74,6 +77,7 @@ def _get_collections(collection_acron):
                 "collection_acron": collection_acron,
             },
         )
+        return []
 
 
 ############################################
@@ -1087,3 +1091,119 @@ def task_fetch_and_create_journal(
             exception=e,
             exc_traceback=exc_traceback,
         )
+
+###############################
+
+@celery_app.task(bind=True)
+def task_exclude_article_repetion(self, username=None, user_id=None, collection_acron_list=None, journal_acron_list=None, issue_folder=None):
+    try:
+        user = _get_user(user_id=user_id, username=username)
+        kwargs = {}
+        if collection_acron_list:
+            kwargs["collection__acron__in"] = collection_acron_list
+        if journal_acron_list:
+            kwargs["journal_proc__acron__in"] = journal_acron_list
+        if issue_folder:
+            kwargs["issue_folder__contains"] = issue_folder
+        for issue_proc in IssueProc.objects.filter(**kwargs):
+            task_exclude_article_repetition_from_issue.delay(
+                issue_proc_id=issue_proc.id,
+                username=username,
+                user_id=user_id,
+            )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "function": "proc.tasks.task_exclude_article_repetion",
+            },
+        )
+
+@celery_app.task(bind=True)
+def task_exclude_article_repetition_from_issue(self, issue_proc_id, username=None, user_id=None, timeout=None):
+    try:
+        user = _get_user(user_id=user_id, username=username)
+        detail = {"issue_proc_id": issue_proc_id}
+        task_tracker = TaskTracker.create(
+            name="task_exclude_article_repetition_from_issue",
+            detail=detail,
+        )
+        issue_proc = IssueProc.objects.select_related("collection").get(id=issue_proc_id)
+        detail["issue_proc"] = str(issue_proc)
+        collection = issue_proc.collection
+
+        queryset = Article.objects.filter(issue=issue_proc.issue)
+        detail["total_articles_in_issue"] = queryset.count()
+
+        repeated_pkg_names = Article.repeated_items("sps_pkg__sps_pkg_name", queryset)
+        detail["repeated_pkg_names"] = list(repeated_pkg_names)
+
+        event_list = []
+        exceptions = []
+        for repeated_pkg_name in repeated_pkg_names:
+            try:
+                events = Article.exclude_repetitions(user, repeated_pkg_name, timeout)
+                event_list.extend(events)
+            except Exception as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                exceptions.append(
+                    {
+                        "repeated_pkg_name": repeated_pkg_name,
+                        "traceback": traceback.format_exc(),
+                    }
+                )
+        detail["events"] = event_list
+        detail["exceptions"] = exceptions
+
+        try:
+            event_list.append("Syncing issue in QA website")
+            qa_api_data = get_api_data(collection, "issue", QA)
+            sync_issue(issue_proc, qa_api_data)
+            event_list.append("Issue synced in QA website")
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            exceptions.append(
+                {
+                    "website": "QA",
+                    "traceback": traceback.format_exc(),
+                }
+            )
+
+        try:
+            event_list.append("Syncing issue in PUBLIC website")
+            public_api_data = get_api_data(collection, "issue", PUBLIC)
+            sync_issue(issue_proc, public_api_data)
+            event_list.append("Issue synced in PUBLIC website")
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            exceptions.append(
+                {
+                    "website": "PUBLIC",
+                    "traceback": traceback.format_exc(),
+                }
+            )
+        detail["events"] = event_list
+        detail["exceptions"] = exceptions
+        completed = bool(not detail["exceptions"])
+
+        task_tracker.finish(completed=completed, detail=detail)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        try:
+            tracker.finish(
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
+                detail=detail,
+            )
+        except Exception:
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "function": "proc.tasks.task_exclude_article_repetition_from_issue",
+                    "issue_proc_id": issue_proc_id,
+                },
+            )
