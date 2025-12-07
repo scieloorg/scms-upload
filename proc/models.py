@@ -6,7 +6,6 @@ import traceback
 from datetime import datetime
 from tempfile import TemporaryDirectory
 
-from django import forms
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
 from django.db.models import Count, Q
@@ -18,7 +17,6 @@ from packtools.sps.utils.xml_fixer import fix_inline_graphic_in_caption
 from wagtail.admin.panels import (
     FieldPanel,
     InlinePanel,
-    MultiFieldPanel,
     ObjectList,
     TabbedInterface,
 )
@@ -37,20 +35,17 @@ from migration.controller import (
     PkgZipBuilder,
     XMLVersionXmlWithPreError,
     create_or_update_article,
-    get_migrated_xml_with_pre,
 )
 from migration.models import (
     IdFileRecord,
     JournalAcronIdFile,
     MigratedArticle,
-    MigratedData,
     MigratedFile,
     MigratedIssue,
     MigratedJournal,
 )
 from package import choices as package_choices
 from package.models import SPSPkg
-from pid_provider.models import PidProviderXML
 from proc import exceptions
 from proc.forms import IssueProcAdminModelForm, ProcAdminModelForm
 from publication.api.publication import get_api_data
@@ -1449,12 +1444,6 @@ class IssueProc(BaseProc, ClusterableModel):
     def bundle_id(self):
         return "-".join([self.journal_proc.pid, self.issue.bundle_id_suffix])
 
-    def delete_unlink_articles(self, user=None):
-        return Article.delete_unlink_articles(
-            user or self.updated_by or self.creator,
-            self.journal_proc.journal,
-            self.issue,
-        )
 
 
 class ArticleEventCreateError(Exception): ...

@@ -72,6 +72,7 @@ class BaseEvent(models.Model):
         obj = cls()
         obj.detail = detail
         obj.name = name
+        obj.completed = False
         obj.save()
         return obj
 
@@ -193,7 +194,7 @@ class TaskTracker(BaseEvent):
 
     def finish(
         self,
-        completed=False,
+        completed=True,
         exception=None,
         message_type=None,
         message=None,
@@ -205,8 +206,10 @@ class TaskTracker(BaseEvent):
             logging.exception(exception)
             detail["exception_message"] = str(exception)
             detail["exception_type"] = str(type(exception))
+            completed = False
         if exc_traceback:
             detail["traceback"] = str(format_traceback(exc_traceback))
+            completed = False
         if message_type:
             detail["message_type"] = message_type
         if message:
@@ -222,5 +225,6 @@ class TaskTracker(BaseEvent):
             status = choices.TASK_TRACK_STATUS_FINISHED
         else:
             status = choices.TASK_TRACK_STATUS_INTERRUPTED
+        self.completed = completed
         self.status = status
         self.save()
