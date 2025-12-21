@@ -58,6 +58,10 @@ class Collection(CommonControlField):
             collection.creator = user
             collection.save()
             return collection
+    
+    def get_website_config(self, purpose, content_type):
+        ws = WebSiteConfiguration.get(collection=self, purpose=purpose)
+        return ws.get_data(content_type=content_type)
 
 
 class WebSiteConfiguration(CommonControlField, ClusterableModel):
@@ -113,6 +117,21 @@ class WebSiteConfiguration(CommonControlField, ClusterableModel):
         FieldPanel("enabled"),
         InlinePanel("endpoint", label=_("EndPoints"), classname="collapsed"),
     ]
+
+    def get_data(self, content_type=None):
+        data = {
+            "enabled": self.enabled,
+            "get_token_url": self.api_get_token_url,
+            "username": self.api_username,
+            "password": self.api_password
+        }
+        if content_type == "journal":
+            data["post_data_url"] = self.api_url_journal
+        elif content_type == "issue":
+            data["post_data_url"] = self.api_url_issue
+        elif content_type == "article":
+            data["post_data_url"] = self.api_url_article
+        return data
 
     @classmethod
     def get(cls, url=None, collection=None, purpose=None):
