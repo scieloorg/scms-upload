@@ -2,6 +2,7 @@ import logging
 import mimetypes
 import os
 import sys
+import glob
 from io import BytesIO
 from shutil import copyfile
 from datetime import datetime
@@ -31,6 +32,7 @@ from collection import choices as collection_choices
 from collection.models import Language
 from core.models import CommonControlField
 from core.utils.requester import fetch_data
+from core.utils.file_utils import delete_files
 from files_storage.models import FileLocation, MinioConfiguration
 from package import choices
 from pid_provider.requester import PidRequester
@@ -148,12 +150,13 @@ class BasicXMLFile(models.Model):
                     self.file.path, type(e), e
                 )
             )
-
-    def save_file(self, name, content):
-        try:
-            self.file.delete(save=True)
-        except Exception as e:
-            logging.exception(f"Unable to delete {self.file.path} {e} {type(e)}")
+        
+    def save_file(self, name, content, delete_existing=False):
+        if delete_existing:
+            try:
+                delete_files(self.file.path)
+            except Exception as e:
+                pass
         try:
             self.file.save(name, ContentFile(content))
         except Exception as e:
@@ -276,74 +279,6 @@ class SPSPkgComponent(FileLocation, Orderable):
             )
 
 
-class PreviewArticlePage(Orderable):
-    # herdados de FileLocation
-    # - basename = models.TextField(_("Basename"), null=True, blank=True)
-    # - uri = models.URLField(_("URI"), null=True, blank=True)
-    sps_pkg = ParentalKey("SPSPkg", related_name="article_page")
-    lang = models.ForeignKey(Language, null=True, blank=True, on_delete=models.SET_NULL)
-    file = models.FileField(
-        upload_to=preview_page_directory_path, null=True, blank=True
-    )
-
-    panels = [
-        FieldPanel("lang"),
-        FieldPanel("file"),
-    ]
-
-    def autocomplete_label(self):
-        return f"{self.sps_pkg} {self.lang}"
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["lang"]),
-        ]
-
-    @classmethod
-    def get(cls, sps_pkg=None, lang=None):
-        if lang and sps_pkg:
-            return cls.objects.get(sps_pkg=sps_pkg, lang=lang)
-        raise ValueError("SPSPkgComponent.get requires sps_pkg and lang")
-
-    @classmethod
-    def create_or_update(
-        cls,
-        user,
-        sps_pkg,
-        lang,
-        content,
-    ):
-        try:
-            obj = cls.objects.get(sps_pkg=sps_pkg, lang=lang)
-            obj.updated_by = user
-        except cls.DoesNotExist:
-            obj = cls()
-            obj.creator = user
-            obj.sps_pkg = sps_pkg
-            obj.lang = lang
-
-        try:
-            obj.save_file(sps_pkg.sps_pkg_name + "-" + lang.code2 + ".html", content)
-            obj.save()
-            return obj
-        except Exception as e:
-            raise SPSPkgComponentCreateOrUpdateError(
-                f"Unable to create or update componentfile: {e} {str(type(e))}"
-            )
-
-    def save_file(self, name, content):
-        try:
-            self.file.delete(save=True)
-        except Exception as e:
-            logging.exception(f"Unable to delete {self.file.path} {e} {type(e)}")
-        try:
-            self.file.save(name, ContentFile(content))
-        except Exception as e:
-            raise PreviewArticlePageFileSaveError(
-                f"Unable to save {name}. Exception: {e}"
-            )
-
-
 class SPSPkg(CommonControlField, ClusterableModel):
     pid_v3 = models.CharField(max_length=23, null=True, blank=True)
     sps_pkg_name = models.CharField(_("SPS Name"), max_length=100, null=True, blank=True)
@@ -382,7 +317,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
     panel_files = [
         FieldPanel("xml_uri"),
         FieldPanel("file"),
-        InlinePanel("article_page", label=_("Article Page")),
         InlinePanel("components", label=_("Package component")),
     ]
 
@@ -474,6 +408,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
     def _get_or_create(cls, user, pid_v3, sps_pkg_name, registered_in_core):
         try:
             obj = cls.objects.get(pid_v3=pid_v3)
+            obj.updated_by = user
+        except cls.MultipleObjectsReturned:
+            obj = cls.objects.filter(pid_v3=pid_v3, sps_pkg_name=sps_pkg_name).order_by("-updated").first()
             obj.updated_by = user
         except cls.DoesNotExist:
             obj = cls()
@@ -607,17 +544,11 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 user,
                 is_published=is_public,
                 article_proc=article_proc,
-            ):
-                logging.info(response)
+            ):  
                 operation = article_proc.start(user, "request_pid_for_xml_zip")
 
                 if response.get("error_type"):
-                    operation.finish(
-                        user,
-                        completed=False,
-                        detail=response,
-                    )
-                    return
+                    raise Exception(_("Unable to register pid"))
 
                 xml_with_pre = response.pop("xml_with_pre")
 
@@ -673,7 +604,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
     def save_file(self, name, content):
         try:
-            self.file.delete(save=True)
+            delete_files(self.file.path)
         except Exception as e:
             logging.exception(f"Unable to delete {self.file.path} {e} {type(e)}")
         try:
@@ -946,6 +877,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
     @property
     def pub_date(self):
         try:
-            return datetime.fromisoformat(self.xml_with_pre.article_publication_date)
+            xml_with_pre = self.xml_with_pre
+            return xml_with_pre.article_publication_date
         except Exception as e:
-            logging.exception(e)
+            return xml_with_pre.get_complete_publication_date()
