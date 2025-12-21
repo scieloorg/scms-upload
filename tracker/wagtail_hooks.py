@@ -1,88 +1,103 @@
-from django.http import HttpResponseRedirect
+from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
-from wagtail_modeladmin.options import (
-    ModelAdmin,
-    ModelAdminGroup,
-    modeladmin_register,
-)
-from wagtail_modeladmin.views import CreateView
+from wagtail import hooks
+from wagtail.snippets.models import register_snippet
+from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
+from wagtail.admin.ui.tables import UpdatedAtColumn
+from tracker.models import UnexpectedEvent, TaskTracker
 
-from config.menu import get_menu_order
-
-from .models import TaskTracker, UnexpectedEvent
-
-
-class UnexpectedEventModelAdmin(ModelAdmin):
+ 
+class UnexpectedEventViewSet(SnippetViewSet):
     model = UnexpectedEvent
-    inspect_view_enabled = True
+    menu_icon = 'warning'
     menu_label = _("Unexpected Events")
-    menu_icon = "folder"
     menu_order = 200
     add_to_settings_menu = False
-    exclude_from_explorer = False
     list_per_page = 10
-
-    list_display = (
-        "item",
-        "action",
-        "exception_type",
-        "exception_msg",
-        "created",
-    )
-    list_filter = (
-        "action",
-        "exception_type",
-    )
-    search_fields = (
-        "exception_msg",
-        "detail",
-        "action",
-        "item",
-    )
-    inspect_view_fields = (
-        "action",
-        "item",
-        "exception_type",
-        "exception_msg",
-        "traceback",
-        "detail",
-        "created",
-    )
-
-
-class TaskTrackerModelAdmin(ModelAdmin):
-    model = TaskTracker
+    
+    list_display = [
+        'item',
+        'action', 
+        'exception_type',
+        'exception_msg',
+        'created',
+    ]
+    
+    list_filter = [
+        'action',
+        'exception_type',
+        'created',
+    ]
+    
+    search_fields = [
+        'exception_msg',
+        'detail',
+        'action',
+        'item',
+    ]
+    
+    # Campos para a view de inspeção (read-only)
     inspect_view_enabled = True
-    menu_label = _("Event tracker")
-    menu_icon = "folder"
+    inspect_view_fields = [
+        'action',
+        'item',
+        'exception_type',
+        'exception_msg',
+        'traceback',
+        'detail',
+        'created',
+    ]
+
+
+class TaskTrackerViewSet(SnippetViewSet):
+    model = TaskTracker
+    menu_icon = 'tasks'
+    menu_label = _("Event Tracker")
     menu_order = 200
     add_to_settings_menu = False
-    exclude_from_explorer = False
     list_per_page = 10
+    
+    list_display = [
+        'name',
+        'item',
+        "total_to_process",
+        "total_processed",
+        'status',
+        'created',
+        UpdatedAtColumn(),  # Coluna especial para 'updated'
+    ]
+    
+    list_filter = [
+        'status',
+        'name',
+        'created',
+        'updated',
+    ]
+    
+    search_fields = ['name', 'item']
+    
+    # View de inspeção
+    inspect_view_enabled = True
+    inspect_view_fields = [
+        'name',
+        'item', 
+        'status',
+        'created',
+        'updated',
+    ]
 
-    list_display = (
-        "name",
-        "status",
-        "created",
-        "updated",
-    )
-    list_filter = (
-        "status",
-        "name",
-    )
-    search_fields = ("name",)
 
-
-class TrackerModelAdminGroup(ModelAdminGroup):
-    menu_icon = "folder"
+class TrackerViewSetGroup(SnippetViewSetGroup):
+    """
+    Grupo de ViewSets para Event Monitoring
+    """
+    items = [
+        TaskTrackerViewSet,
+        UnexpectedEventViewSet,
+    ]
+    menu_icon = 'folder'
     menu_label = _("Event Monitoring")
-    # menu_order = get_menu_order("journal")
-    menu_order = 200
-    items = (
-        TaskTrackerModelAdmin,
-        UnexpectedEventModelAdmin,
-    )
-    menu_order = get_menu_order("unexpected-error")
+    menu_order = 1  # ou use get_menu_order("unexpected-error")
 
 
-modeladmin_register(TrackerModelAdminGroup)
+register_snippet(TrackerViewSetGroup)
