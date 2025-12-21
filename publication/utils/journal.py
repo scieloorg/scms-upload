@@ -47,10 +47,8 @@ def build_journal(
             current_status = sorted(
                 builder.data["status_history"], key=lambda x: x["date"]
             )[-1]["status"]
-            if current_status not in ("inprogress", "current"):
-                current_status = "no-current"
         except (IndexError, KeyError):
-            pass
+            current_status = "inprogress"
     builder.data["current_status"] = current_status
 
     builder.add_journal_issns(
