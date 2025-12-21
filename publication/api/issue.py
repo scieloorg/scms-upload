@@ -27,9 +27,11 @@ def sync_issue(issue_proc, api_data):
     issue = issue_proc.issue
 
     response = {}
-
+    
     try:
         api = PublicationAPI(**api_data)
+        if not api.post_data_url:
+            return {}
         api.post_data_url += "/sync"
         issue_sync_payload = {
             "issue_id": issue_proc.bundle_id,
