@@ -10,34 +10,23 @@ from collection.models import WebSiteConfiguration
 from core.utils.requester import post_data
 
 
-def get_api(collection, content_type, website_kind=None):
-    website = WebSiteConfiguration.get(
-        collection=collection,
+def get_api(collection, content_type, website_kind):
+    api_data = collection.get_website_config(
         purpose=website_kind,
+        content_type=content_type,
     )
-
-    API_URLS = {
-        "journal": website.api_url_journal,
-        "issue": website.api_url_issue,
-        "article": website.api_url_article,
-    }
-    return PublicationAPI(
-        post_data_url=API_URLS.get(content_type),
-        get_token_url=website.api_get_token_url,
-        username=website.api_username,
-        password=website.api_password,
-    )
+    if api_data.get("enabled"):
+        return PublicationAPI(**api_data).data
+    return {"error": f"Website {collection} {website_kind} is not enabled ({api_data})"}
 
 
 def get_api_data(collection, content_type, website_kind=None):
     try:
-        api = get_api(collection, content_type, website_kind)
+        return get_api(collection, content_type, website_kind)
     except WebSiteConfiguration.DoesNotExist:
         return {"error": f"Website does not exist: {collection} {website_kind}"}
     except Exception as e:
-        logging.exception(e)
         return {"error": f"Unable to get API data for {content_type} {collection} {website_kind}: {type(e)} {e}"}
-    return api.data
 
 
 class PublicationAPI:
@@ -53,6 +42,7 @@ class PublicationAPI:
         password=None,
         timeout=None,
         token=None,
+        enabled=None
     ):
         self.timeout = timeout or 15
         self.post_data_url = post_data_url
@@ -60,7 +50,8 @@ class PublicationAPI:
         self.username = username
         self.password = password
         self.token = token
-        if not token:
+        self.enabled = enabled
+        if not token and enabled:
             self.get_token()
 
     @property
@@ -71,6 +62,7 @@ class PublicationAPI:
             username=self.username,
             password=self.password,
             token=self.token,
+            enabled=self.enabled,
         )
 
     def post_data(self, payload, kwargs=None):
@@ -80,6 +72,8 @@ class PublicationAPI:
         # logging.info(f"payload={payload}")
         response = None
         try:
+            if not self.enabled:
+                raise ValueError(_("Website enabled is False ({})").format(self.post_data_url))
             if not self.token:
                 self.get_token()
             response = self._post_data(payload, self.token, kwargs)
@@ -155,4 +149,24 @@ class PublicationAPI:
             timeout=self.timeout,
             verify=False,
             json=True,
+        )
+
+
+class JournalPublicationAPI(PublicationAPI):
+    def __init__(
+        self,
+        post_data_url=None,
+        get_token_url=None,
+        username=None,
+        password=None,
+        timeout=None,
+        token=None,
+    ):
+        super().__init__(
+            post_data_url,
+            get_token_url,
+            username,
+            password,
+            timeout,
+            token,
         )
