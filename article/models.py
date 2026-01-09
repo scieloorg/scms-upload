@@ -94,7 +94,7 @@ class Article(ClusterableModel, CommonControlField):
         heading="Article identifiers", classname="collapsible"
     )
     panel_article_ids.children = [
-        # FieldPanel("pid_v2"),
+        FieldPanel("pid_v2", read_only=True),
         FieldPanel("pid_v3", read_only=True),
         # FieldPanel("aop_pid"),
     ]
@@ -308,13 +308,22 @@ class Article(ClusterableModel, CommonControlField):
         self.title_with_lang.all().delete()
         for title in titles:
             try:
+                language_code2 = title.get("language") or title.get("lang")
+                if not language_code2:
+                    raise ValueError(f"Missing language for article title: {title}")
+                if not title.get("html_text"):
+                    raise ValueError(f"Missing text for article title: {title}")
+                
+                obj_lang = Language.get_or_create(
+                    code2=language_code2,
+                    creator=user,
+                    text_to_detect_language=title.get("html_text"),
+                )
                 obj = ArticleTitle.create_or_update(
                     user,
                     parent=self,
                     text=title.get("html_text"),
-                    language=Language.get(
-                        code2=title.get("language") or title.get("lang")
-                    ),
+                    language=obj_lang,
                 )
                 self.title_with_lang.add(obj)
             except Exception as e:
@@ -337,12 +346,16 @@ class Article(ClusterableModel, CommonControlField):
 
         group = None
         for item in items:
-            logging.info(f"section: {item}")
-            if not item.get("text"):
+            if not item.get("text") or not item.get("lang"):
                 continue
+            obj_lang = Language.get_or_create(
+                code2=item.get("lang"),
+                creator=user,
+                text_to_detect_language=item.get("text"),
+            )
             section = self.journal.get_section(
                 user,
-                obj_lang=Language.get(code2=item.get("lang")),
+                obj_lang=obj_lang,
                 code=item.get("code"),
                 text=item.get("text"),
             )
@@ -443,20 +456,14 @@ class Article(ClusterableModel, CommonControlField):
             yield f"{website_url}/scielo.php?script=sci_pdf&pid={pid_v2}&tlng={lang}"
     
     @classmethod
-    def repeated_items(cls, field_name, queryset=None):
-        field_name = field_name or "pkg_name"
-        if field_name == "pkg_name":
-            field_name = "sps_pkg__sps_pkg_name"
-        expected_fields = ("pid_v3", "pid_v2", "sps_pkg__sps_pkg_name")
-        if field_name not in expected_fields:
-            raise ValueError(f"field_name must be one of: {expected_fields}")
+    def repeated_items(cls, queryset=None):
         if not queryset:
             queryset = cls.objects.all()
         return list((
-            queryset.values(field_name)
+            queryset.values("sps_pkg__sps_pkg_name", "pid_v2")
             .annotate(total=Count("id"))
             .filter(total__gt=1)
-            .values_list(field_name, flat=True)
+            .values_list("sps_pkg__sps_pkg_name", "pid_v2")
         ).distinct())
 
     @classmethod
@@ -490,7 +497,10 @@ class Article(ClusterableModel, CommonControlField):
         events = []
         repeated_items = cls.objects.filter(sps_pkg__sps_pkg_name=repeated_pkg_name)
         for item in repeated_items:
-            item.availability_status.retry(user, timeout, force_update=True)
+            try:
+                item.availability_status.first().retry(user, timeout, force_update=True)
+            except Exception:
+                pass
         events.append(f"Package name '{repeated_pkg_name}' has {repeated_items.count()} articles to evaluate")
         item_to_keep_id = cls.chose_item_to_keep(repeated_items)
         pp_xml_id_to_delete = []
@@ -511,7 +521,10 @@ class Article(ClusterableModel, CommonControlField):
         result = {}
         for item in queryset.order_by("-updated"):
             valid = item.is_valid_record()
-            published = item.availability_status.completed
+            try:
+                published = item.availability_status.first().completed
+            except AttributeError:
+                published = False
             result.setdefault((published, valid), []).append(item)
         status = (
             (True, True),

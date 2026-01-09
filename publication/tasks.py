@@ -107,7 +107,6 @@ def task_publish_model_inline(
     website = WebSiteConfiguration.get(
         collection=collection,
         purpose=website_kind,
-        enabled=True,
     )
     for ws in website.endpoint.all().filter(name="pressrelease"):
         SciELOModel = SCIELO_MODELS.get(ws.name)
@@ -117,6 +116,7 @@ def task_publish_model_inline(
             get_token_url=website.api_get_token_url,
             username=website.api_username,
             password=website.api_password,
+            enabled=website.enabled,
         )
         api.get_token()
 

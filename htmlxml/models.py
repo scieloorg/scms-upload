@@ -267,7 +267,7 @@ class BodyAndBackFile(BasicXMLFile, Orderable):
             obj.save()
         try:
             # cria / atualiza arquivo
-            obj.save_file(pkg_name + ".xml", file_content)
+            obj.save_file(pkg_name + ".xml", file_content, True)
             obj.save()
             return obj
         except Exception as e:
@@ -837,6 +837,9 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
 
             exceptions.extend(document.exceptions)
             done = len(exceptions) == 0
+            
+            for item in self.bb_file.all():
+                item.delete()
 
             for i, xml_body_and_back in enumerate(document.xml_body_and_back, start=1):
                 BodyAndBackFile.create_or_update(
@@ -885,7 +888,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             detail = {}
             operation = article_proc.start(user, "html_to_xml: merge front + body + back")
             detail["xml"] = article_proc.pkg_name + ".xml"
-            self.save_file(detail["xml"], document.generate_full_xml(None).decode("utf-8"))
+            self.save_file(detail["xml"], document.generate_full_xml(None).decode("utf-8"), True)
             detail["xml_exceptions"] = document.exceptions
             completed = len(document.exceptions) == 0
             operation.finish(user, completed, detail=detail)
