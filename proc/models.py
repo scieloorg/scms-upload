@@ -80,7 +80,7 @@ class Operation(CommonControlField):
 
     class Meta:
         # isso faz com que em InlinePanel mostre do mais recente para o mais antigo
-        ordering = ["-created"]
+        ordering = ["-updated"]
         indexes = [
             models.Index(fields=["name"]),
         ]
@@ -1290,13 +1290,21 @@ class IssueProc(BaseProc, ClusterableModel):
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
             **params,
         )
-
+    
     def find_asset(self, basename, name=None):
         if not name:
             name, ext = os.path.splitext(basename)
         # procura a "imagem" no contexto do "issue"
-        return self.issue_files.filter(
+        items = self.issue_files.filter(
             Q(original_name=basename) | Q(original_name__startswith=name + ".")
+        )
+        if items.exists():
+            return items
+        # procura a "imagem" no contexto do "journal"
+        return MigratedFile.find(
+            collection=self.collection,
+            journal_acron=self.journal_proc.acron,
+            name=name,  
         )
 
     @classmethod
@@ -1579,18 +1587,19 @@ class ArticleProc(BaseProc, ClusterableModel):
             public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC,
         )
 
-    def set_status(self):
-        if self.xml_status == tracker_choices.PROGRESS_STATUS_REPROC:
-            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
+    def set_status(self, new_status=None):
+        new_status = new_status or tracker_choices.PROGRESS_STATUS_REPROC
+        if self.xml_status == new_status:
+            self.sps_pkg_status = new_status
 
-        if self.sps_pkg_status == tracker_choices.PROGRESS_STATUS_REPROC:
-            self.migration_status = tracker_choices.PROGRESS_STATUS_REPROC
+        if self.sps_pkg_status == new_status:
+            self.migration_status = new_status
 
-        if self.migration_status == tracker_choices.PROGRESS_STATUS_REPROC:
-            self.qa_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
+        if self.migration_status == new_status:
+            self.qa_ws_status = new_status
 
-        if self.qa_ws_status == tracker_choices.PROGRESS_STATUS_REPROC:
-            self.public_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
+        if self.qa_ws_status == new_status:
+            self.public_ws_status = new_status
 
         self.save()
 
@@ -1632,14 +1641,17 @@ class ArticleProc(BaseProc, ClusterableModel):
                 )
             )
 
-    def get_xml(self, user, force_update=None):
+    def get_xml(self, user):
         try:
-            result = {}
             detail = {}
             operation = self.start(user, "get xml")
 
             self.xml_status = tracker_choices.PROGRESS_STATUS_DOING
-            self.save()
+            try:
+                os.unlink(self.processed_xml.file.path)
+                self.save()
+            except Exception:
+                pass
 
             migrated_data = self.migrated_data
             document = migrated_data.document
@@ -1708,14 +1720,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     @property
     def xml_with_pre(self):
         try:
-            try:
-                path = self.processed_xml.path
-            except (AttributeError, TypeError):
-                try:
-                    path = HTMLXML.get(migrated_article=self.migrated_data).file.path
-                except HTMLXML.DoesNotExist:
-                    path = self.migrated_xml.file.path
-            return list(XMLWithPre.create(path=path))[0]
+            return list(XMLWithPre.create(path=self.processed_xml.path))[0]
         except Exception as e:
             raise XMLVersionXmlWithPreError(
                 _("Unable to get xml_with_pre for {}: {}").format(self, e)
@@ -1933,9 +1938,6 @@ class ArticleProc(BaseProc, ClusterableModel):
     def generate_sps_package(
         self,
         user,
-        body_and_back_xml=False,
-        html_to_xml=False,
-        force_update=False,
     ):
         try:
             operation = self.start(user, "generate_sps_package")
@@ -2025,18 +2027,13 @@ class ArticleProc(BaseProc, ClusterableModel):
             logging.info(f"Not found ArticleProc.article: {sps_pkg} {e}")
 
     def migrate_article(self, user, force_update):
-        body_and_back_xml = force_update
-        html_to_xml = force_update
-        if not self.get_xml(user, body_and_back_xml):
+        if force_update:
+            self.xml_status = tracker_choices.PROGRESS_STATUS_TODO
+            self.set_status(tracker_choices.PROGRESS_STATUS_TODO)
+        if not self.get_xml(user):
             return None
-
-        if not self.generate_sps_package(
-            user,
-            body_and_back_xml,
-            html_to_xml,
-        ):
+        if not self.generate_sps_package(user):
             return None
-
         return self.create_or_update_item(user, force_update, create_or_update_article)
 
     def synchronize(self, user):
