@@ -683,7 +683,7 @@ def task_publish_issues(
 
                     except Exception as e:
                         exc_type, exc_value, exc_traceback = sys.exc_info()
-                        task_exec.add_exception(traceback.format_exec())
+                        task_exec.add_exception(traceback.format_exc())
                     task_exec.total_processed += 1
                 task_exec.finish()
     except Exception as e:
