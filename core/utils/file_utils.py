@@ -1,5 +1,6 @@
 import os
 import glob
+import logging
 
 
 def delete_files(file_path):
@@ -17,10 +18,11 @@ def delete_files(file_path):
     try:
         suffix = basename.split("_")[-1]
         pattern = file_path.split(suffix)[0][:-1] + "*"
+        logging.info(f"deleting files with pattern: {pattern}")
         for path in glob.glob(pattern):
             try:
                 os.unlink(path)
             except Exception as e:
-                pass
+                logging.exception(e)
     except Exception as e:
-        pass
+        logging.exception(e)
