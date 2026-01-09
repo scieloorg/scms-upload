@@ -37,8 +37,6 @@ class NothingToProcess(Exception):
 
 class TaskExecution:
     def __init__(self, name, item, params):
-        self.name = name
-        self.item = item
         self.params = params
         self.task_tracker = TaskTracker.create(
             name=name,
@@ -50,6 +48,15 @@ class TaskExecution:
         self.total_to_process = 0
         self.total_processed = 0
 
+    @property
+    def item(self):
+        return self.task_tracker.item
+    
+    @item.setter
+    def item(self, value):
+        self.task_tracker.item = value
+        self.task_tracker.save()
+    
     def add_exception(self, exception):
         self.exceptions.append({"type": str(type(exception)), "message": str(exception)})
 
@@ -1367,15 +1374,17 @@ def task_exclude_article_repetition_from_issue(self, issue_proc_id, qa_api_data=
         "qa_api_data": bool(qa_api_data),
         "public_api_data": bool(public_api_data),
     }
+    issue_proc_id_ = str(issue_proc_id)
     task_exec = TaskExecution(
         name="task_exclude_article_repetition_from_issue",
-        item=f"{issue_proc_id}",
+        item=issue_proc_id_,
         params=task_params,
     )
     try:
         user = _get_user(user_id=user_id, username=username)
         issue_proc = IssueProc.objects.select_related("collection").get(id=issue_proc_id)
         task_exec.item = str(issue_proc)
+        issue_proc_id_ = str(issue_proc)
         collection = issue_proc.collection
 
         queryset = Article.objects.filter(issue=issue_proc.issue)
@@ -1437,7 +1446,7 @@ def task_exclude_article_repetition_from_issue(self, issue_proc_id, qa_api_data=
             )
         except Exception:
             UnexpectedEvent.create(
-                item=str(issue_proc),
+                item=issue_proc_id_,
                 action="proc.tasks.task_exclude_article_repetition_from_issue",
                 e=e,
                 exc_traceback=exc_traceback,
