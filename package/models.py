@@ -162,6 +162,13 @@ class BasicXMLFile(models.Model):
         except Exception as e:
             raise BasicXMLFileSaveError(f"Unable to save {name}. Exception: {e}")
 
+    def delete(self, using=None, keep_parents=False):
+        try:
+            delete_files(self.file.path)
+        except Exception as e:
+            logging.exception(f"Error deleting file {self.file.path}: {e}")
+        super().delete(using=using, keep_parents=keep_parents)
+
     @property
     def text(self):
         with open(self.file.path, "r") as fp:
