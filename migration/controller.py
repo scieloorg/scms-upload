@@ -504,7 +504,6 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
     return {"exceptions": exceptions, "migrated": migrated_ids}
 
 
-
 class PkgZipBuilder:
     def __init__(self, xml_with_pre):
         self.xml_with_pre = xml_with_pre
@@ -596,51 +595,40 @@ class PkgZipBuilder:
 
     def _build_sps_package_add_assets(self, zf, issue_proc):
         self.replacements = {}
-        subdir = os.path.join(
-            issue_proc.journal_proc.acron,
-            issue_proc.issue_folder,
-        )
+        not_found = []
         xml_assets = ArticleAssets(self.xml_with_pre.xmltree)
         for xml_graphic in xml_assets.items:
             try:
                 if self.replacements.get(xml_graphic.xlink_href):
                     continue
-
                 basename = os.path.basename(xml_graphic.xlink_href)
-                name, ext = os.path.splitext(basename)
+                name, ext = os.path.splitext(basename)                
+                items = issue_proc.find_asset(basename, name)
 
-                found = False
+                if not items.exists():
+                    not_found.append(xml_graphic.xlink_href)
+                    continue
 
-                # procura a "imagem" no contexto do "issue"
-                for asset in issue_proc.find_asset(basename, name):
-                    found = True
-                    self._build_sps_package_add_asset(
-                        zf,
-                        asset,
-                        xml_graphic,
-                        self.replacements,
-                    )
-                if not found:
-                    # procura a "imagem" no contexto da coleção
-                    for asset in MigratedFile.find(
-                        collection=issue_proc.collection,
-                        xlink_href=xml_graphic.xlink_href,
-                        journal_acron=issue_proc.journal_proc.acron,
-                    ):
-                        found = True
-                        self._build_sps_package_add_asset(
-                            zf,
-                            asset,
-                            xml_graphic,
-                            self.replacements,
-                        )
+                component_type = (
+                    "supplementary-material"
+                    if xml_graphic.is_supplementary_material
+                    else "asset"
+                )
 
-                if not found:
-                    logging.exception(
-                        f"build_sps_package not found {xml_graphic.xlink_href}"
-                    )
-                    self.components[xml_graphic.xlink_href] = {
-                        "failures": "Not found",
+                for asset in items:
+                    # obtém o nome do arquivo no padrão sps
+                    sps_filename = xml_graphic.name_canonical(self.sps_pkg_name).lower()
+
+                    # indica a troca de href original para o padrão SPS
+                    self.replacements[xml_graphic.xlink_href] = sps_filename
+
+                    # adiciona arquivo ao zip
+                    zf.write(asset.file.path, arcname=sps_filename)
+
+                    self.components[sps_filename] = {
+                        "xml_elem_id": xml_graphic.id,
+                        "legacy_uri": asset.original_href,
+                        "component_type": component_type,
                     }
 
             except Exception as e:
@@ -648,44 +636,12 @@ class PkgZipBuilder:
                 self.components[xml_graphic.xlink_href] = {
                     "failures": format_traceback(exc_traceback),
                 }
+
         xml_assets.replace_names(self.replacements)
-
-    def _build_sps_package_add_asset(
-        self,
-        zf,
-        asset,
-        xml_graphic,
-        replacements,
-    ):
-        try:
-            if xml_graphic.xlink_href in replacements.keys():
-                # já foi inserido
-                return
-
-            # obtém o nome do arquivo no padrão sps
-            sps_filename = xml_graphic.name_canonical(self.sps_pkg_name)
-
-            # indica a troca de href original para o padrão SPS
-            replacements[xml_graphic.xlink_href] = sps_filename
-
-            # adiciona arquivo ao zip
-            zf.write(asset.file.path, arcname=sps_filename)
-
-            component_type = (
-                "supplementary-material"
-                if xml_graphic.is_supplementary_material
-                else "asset"
-            )
-            self.components[sps_filename] = {
-                "xml_elem_id": xml_graphic.id,
-                "legacy_uri": asset.original_href,
-                "component_type": component_type,
-            }
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            self.components[xml_graphic.xlink_href] = {
-                "failures": format_traceback(exc_traceback),
-            }
+        if not_found:
+            logging.exception(f"build_sps_package not found {not_found}")
+        for item in not_found:
+            self.components[item] = {"failures": "Not found"}
 
     def _build_sps_package_add_xml(self, zf):
         try:
