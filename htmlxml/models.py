@@ -839,10 +839,6 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             done = len(exceptions) == 0
             
             for item in self.bb_file.all():
-                try:
-                    os.unlink(item.file.path)
-                except Exception:
-                    pass
                 item.delete()
 
             for i, xml_body_and_back in enumerate(document.xml_body_and_back, start=1):
