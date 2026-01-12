@@ -1396,7 +1396,7 @@ def task_exclude_article_repetition_from_issue(self, issue_proc_id, qa_api_data=
             task_exec.add_number(f"repeated_by_{field_name}", len(repeated_items))
             for repeated_value in repeated_items:
                 try:
-                    events = Article.exclude_repetitions(user, field_name, repeated_value, timeout=None)
+                    events = Article.exclude_repetitions(user, field_name, repeated_value, timeout=timeout)
                     task_exec.add_event(events)
                 except Exception as e:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
