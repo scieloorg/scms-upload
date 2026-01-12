@@ -483,6 +483,7 @@ def task_migrate_and_publish_issues(
     try:
         user = _get_user(user_id, username)
         for collection in _get_collections(collection_acron):
+            task_params["collection_acron"] = collection.acron
             task_migrate_and_publish_issues_by_collection.delay(**task_params)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
