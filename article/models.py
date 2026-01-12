@@ -456,14 +456,14 @@ class Article(ClusterableModel, CommonControlField):
             yield f"{website_url}/scielo.php?script=sci_pdf&pid={pid_v2}&tlng={lang}"
     
     @classmethod
-    def repeated_items(cls, queryset=None):
+    def get_repeated_items(cls, field_name, queryset=None):
         if not queryset:
             queryset = cls.objects.all()
         return list((
-            queryset.values("sps_pkg__sps_pkg_name", "pid_v2")
+            queryset.values(field_name)
             .annotate(total=Count("id"))
             .filter(total__gt=1)
-            .values_list("sps_pkg__sps_pkg_name", "pid_v2")
+            .values_list(field_name)
         ).distinct())
 
     @classmethod
@@ -491,29 +491,32 @@ class Article(ClusterableModel, CommonControlField):
                     self.pp_xml.proc_status = PPXML_STATUS_INVALID
                     self.pp_xml.save()
             return False
-    
+
     @classmethod
-    def exclude_repetitions(cls, user, repeated_pkg_name, timeout=None):
+    def exclude_repetitions(cls, user, field_name, field_value, timeout=None):
         events = []
-        repeated_items = cls.objects.filter(sps_pkg__sps_pkg_name=repeated_pkg_name)
-        for item in repeated_items:
-            try:
-                item.availability_status.first().retry(user, timeout, force_update=True)
-            except Exception:
-                pass
-        events.append(f"Package name '{repeated_pkg_name}' has {repeated_items.count()} articles to evaluate")
+        repeated_items = cls.objects.filter(**{field_name: field_value})
+        cls.updated_availability_status(user, timeout, repeated_items)
+        events.append(f"{field_name}='{field_value}': {repeated_items.count()} articles")
+        
         item_to_keep_id = cls.chose_item_to_keep(repeated_items)
+        items_to_delete = repeated_items.exclude(id=item_to_keep_id)
+        items_to_delete.delete()
+        events.append(f"Deleted Article: {len(items_to_delete)}")
+
         pp_xml_id_to_delete = []
         sps_pkg_id_to_delete = []
-        for item_to_delete in repeated_items.exclude(id=item_to_keep_id):
+        for item_to_delete in items_to_delete:
             if item_to_delete.sps_pkg:
                 sps_pkg_id_to_delete.append(item_to_delete.sps_pkg.id)
             if item_to_delete.pp_xml:
                 pp_xml_id_to_delete.append(item_to_delete.pp_xml.id)
-        repeated_items.exclude(id=item_to_keep_id).delete()
+        
         SPSPkg.objects.filter(id__in=sps_pkg_id_to_delete).delete()
+        events.append(f"Deleted SPSPkg: {len(sps_pkg_id_to_delete)}")
+        
         PidProviderXML.objects.filter(id__in=pp_xml_id_to_delete).delete()
-        events.append(f"Deleted {len(sps_pkg_id_to_delete)} SPSPkg and {len(pp_xml_id_to_delete)} PidProviderXML for package name '{repeated_pkg_name}'")
+        events.append(f"Deleted PidProviderXML: {len(pp_xml_id_to_delete)}")
         return events
 
     @classmethod
@@ -536,6 +539,19 @@ class Article(ClusterableModel, CommonControlField):
             items = result.get(key) or []
             if len(items) >= 1:
                 return items[0].id
+
+    @classmethod
+    def updated_availability_status(cls, user, timeout=None, repeated_items=None, filters=None):
+        if not repeated_items:
+            if filters:
+                repeated_items = cls.objects.filter(**filters)
+            else:
+                repeated_items = cls.objects.all()
+        for item in repeated_items:
+            try:
+                item.availability_status.first().retry(user, timeout, force_update=True)
+            except Exception:
+                pass
 
 
 class ArticleDOIWithLang(Orderable, DOIWithLang):
