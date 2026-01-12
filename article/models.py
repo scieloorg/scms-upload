@@ -463,7 +463,7 @@ class Article(ClusterableModel, CommonControlField):
             queryset.values(field_name)
             .annotate(total=Count("id"))
             .filter(total__gt=1)
-            .values_list(field_name)
+            .values_list(field_name, flat=True)
         ).distinct())
 
     @classmethod
@@ -496,13 +496,24 @@ class Article(ClusterableModel, CommonControlField):
     def exclude_repetitions(cls, user, field_name, field_value, timeout=None):
         events = []
         repeated_items = cls.objects.filter(**{field_name: field_value})
-        cls.updated_availability_status(user, timeout, repeated_items)
+        cls.update_availability_status(user, timeout, repeated_items)
         events.append(f"{field_name}='{field_value}': {repeated_items.count()} articles")
+
+        if not repeated_items.exists():
+            return events
         
-        item_to_keep_id = cls.chose_item_to_keep(repeated_items)
-        items_to_delete = repeated_items.exclude(id=item_to_keep_id)
-        items_to_delete.delete()
-        events.append(f"Deleted Article: {len(items_to_delete)}")
+        item_to_keep_id = cls.choose_item_to_keep(repeated_items)
+
+        if item_to_keep_id:
+            events.append(f"Item to keep: Article ID {item_to_keep_id}")
+            items_to_delete = repeated_items.exclude(id__in=item_to_keep_id)
+        else:
+            items_to_delete = repeated_items
+        
+        total = len(items_to_delete)
+        if items_to_delete.count():
+            items_to_delete.delete()
+        events.append(f"Deleted Article: {total}")
 
         pp_xml_id_to_delete = []
         sps_pkg_id_to_delete = []
@@ -512,15 +523,19 @@ class Article(ClusterableModel, CommonControlField):
             if item_to_delete.pp_xml:
                 pp_xml_id_to_delete.append(item_to_delete.pp_xml.id)
         
-        SPSPkg.objects.filter(id__in=sps_pkg_id_to_delete).delete()
-        events.append(f"Deleted SPSPkg: {len(sps_pkg_id_to_delete)}")
+        total = len(sps_pkg_id_to_delete)
+        if total:
+            SPSPkg.objects.filter(id__in=sps_pkg_id_to_delete).delete()
+        events.append(f"Deleted SPSPkg: {total}")
         
-        PidProviderXML.objects.filter(id__in=pp_xml_id_to_delete).delete()
-        events.append(f"Deleted PidProviderXML: {len(pp_xml_id_to_delete)}")
+        total = len(pp_xml_id_to_delete)
+        if total:
+            PidProviderXML.objects.filter(id__in=pp_xml_id_to_delete).delete()
+        events.append(f"Deleted PidProviderXML: {total}")
         return events
 
     @classmethod
-    def chose_item_to_keep(cls, queryset):
+    def choose_item_to_keep(cls, queryset):
         result = {}
         for item in queryset.order_by("-updated"):
             valid = item.is_valid_record()
@@ -541,13 +556,14 @@ class Article(ClusterableModel, CommonControlField):
                 return items[0].id
 
     @classmethod
-    def updated_availability_status(cls, user, timeout=None, repeated_items=None, filters=None):
-        if not repeated_items:
-            if filters:
-                repeated_items = cls.objects.filter(**filters)
-            else:
-                repeated_items = cls.objects.all()
-        for item in repeated_items:
+    def update_availability_status(cls, user, timeout=None, queryset=None, filters=None):
+        if not queryset:
+            queryset = cls.objects
+        if filters:
+            queryset = queryset.filter(**filters)
+        else:
+            queryset = queryset.all()
+        for item in queryset:
             try:
                 item.availability_status.first().retry(user, timeout, force_update=True)
             except Exception:
