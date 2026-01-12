@@ -511,9 +511,6 @@ class Article(ClusterableModel, CommonControlField):
             items_to_delete = repeated_items
         
         total = len(items_to_delete)
-        if items_to_delete.count():
-            items_to_delete.delete()
-        events.append(f"Deleted Article: {total}")
 
         pp_xml_id_to_delete = []
         sps_pkg_id_to_delete = []
@@ -522,7 +519,11 @@ class Article(ClusterableModel, CommonControlField):
                 sps_pkg_id_to_delete.append(item_to_delete.sps_pkg.id)
             if item_to_delete.pp_xml:
                 pp_xml_id_to_delete.append(item_to_delete.pp_xml.id)
-        
+
+        if total:
+            items_to_delete.delete()
+        events.append(f"Deleted Article: {total}")
+
         total = len(sps_pkg_id_to_delete)
         if total:
             SPSPkg.objects.filter(id__in=sps_pkg_id_to_delete).delete()
