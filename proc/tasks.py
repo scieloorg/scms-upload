@@ -1391,52 +1391,37 @@ def task_exclude_article_repetition_from_issue(self, issue_proc_id, qa_api_data=
         queryset = Article.objects.filter(issue=issue_proc.issue)
         task_exec.add_number("total_articles_in_issue", queryset.count())
 
-        repeated_pkg_names = Article.repeated_items(queryset)
-        task_exec.add_number("repeated_pkg_names", len(repeated_pkg_names))
-
-        for repeated_pkg_name in repeated_pkg_names:
-            try:
-                events = Article.exclude_repetitions(user, repeated_pkg_name, timeout)
-                task_exec.add_event(events)
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                task_exec.add_exception(
-                    {
-                        "repeated_pkg_name": repeated_pkg_name,
-                        "traceback": traceback.format_exc(),
-                    }
-                )
-
-        if not qa_api_data:
-            qa_api_data = get_api_data(collection, "issue", "QA")
-        if qa_api_data and not qa_api_data.get("error"):
-            try:
-                task_exec.add_event("Syncing issue in QA website")
-                sync_issue(issue_proc, qa_api_data)
-                task_exec.add_event("Issue synced in QA website")
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                task_exec.add_exception(
-                    {
-                        "website": "QA",
-                        "traceback": traceback.format_exc(),
-                    }
-                )       
-        if not public_api_data:
-            public_api_data = get_api_data(collection, "issue", "PUBLIC")
-        if public_api_data and not public_api_data.get("error"):
-            try:
-                task_exec.add_event("Syncing issue in PUBLIC website")
-                sync_issue(issue_proc, public_api_data)
-                task_exec.add_event("Issue synced in PUBLIC website")
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                task_exec.add_exception(
-                    {
-                        "website": "PUBLIC",
-                        "traceback": traceback.format_exc(),
-                    }
-                )
+        for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
+            repeated_items = Article.get_repeated_items(field_name, queryset)
+            task_exec.add_number(f"repeated_by_{field_name}", len(repeated_items))
+            for repeated_value in repeated_items:
+                try:
+                    events = Article.exclude_repetitions(user, field_name, repeated_value, timeout=None)
+                    task_exec.add_event(events)
+                except Exception as e:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    task_exec.add_exception(
+                        {
+                            f"repeated_by_{field_name}": repeated_value,
+                            "traceback": traceback.format_exc(),
+                        }
+                    )
+        for website_label, api_data in zip((QA, PUBLIC), (qa_api_data, public_api_data)):
+            if not api_data:
+                api_data = get_api_data(collection, "issue", website_label)
+            if api_data and not api_data.get("error"):
+                try:
+                    task_exec.add_event(f"Syncing issue in {website_label} website")
+                    sync_issue(issue_proc, api_data)
+                    task_exec.add_event(f"Issue synced in {website_label} website")
+                except Exception as e:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    task_exec.add_exception(
+                        {
+                            "website": website_label,
+                            "traceback": traceback.format_exc(),
+                        }
+                    )
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
