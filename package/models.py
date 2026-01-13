@@ -359,6 +359,14 @@ class SPSPkg(CommonControlField, ClusterableModel):
     def autocomplete_label(self):
         return f"{self.sps_pkg_name} {self.pid_v3}"
 
+    def fix_sps_pkg_name(self):
+        sps_pkg_name = self.xml_with_pre.sps_pkg_name
+        if self.sps_pkg_name != sps_pkg_name:
+            self.sps_pkg_name = sps_pkg_name
+            self.save()
+            return True
+        return False
+
     @property
     def xml_with_pre(self):
         for item in XMLWithPre.create(path=self.file.path):
