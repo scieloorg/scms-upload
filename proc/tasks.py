@@ -1391,6 +1391,9 @@ def task_exclude_article_repetition_from_issue(self, issue_proc_id, qa_api_data=
         queryset = Article.objects.filter(issue=issue_proc.issue)
         task_exec.add_number("total_articles_in_issue", queryset.count())
 
+        response = Article.fix_sps_pkg_names(queryset)
+        task_exec.add_event(f"fixed sps_pkg_names: {response}")
+
         for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
             repeated_items = Article.get_repeated_items(field_name, queryset)
             task_exec.add_number(f"repeated_by_{field_name}", len(repeated_items))

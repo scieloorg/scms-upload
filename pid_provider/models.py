@@ -1413,6 +1413,13 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 detail=pkg_name,
             )
 
+    def fix_pkg_name(self, pkg_name):
+        if self.pkg_name != pkg_name:
+            self.pkg_name = pkg_name
+            self.save()
+            return True
+        return False
+
 
 class FixPidV2(CommonControlField):
     """
