@@ -40,6 +40,7 @@ class ArticleSnippetViewSet(SnippetViewSet):
     list_display = (
         "__str__",
         "pid_v3",
+        "pid_v2",
         "status",
         "display_sections",
         "fpage",
