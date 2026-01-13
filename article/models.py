@@ -1,4 +1,5 @@
 import logging
+import traceback
 from datetime import datetime, timezone
 
 from django.contrib.auth import get_user_model
@@ -493,6 +494,25 @@ class Article(ClusterableModel, CommonControlField):
             return False
 
     @classmethod
+    def fix_sps_pkg_names(cls, queryset):
+        response = []
+        for item in queryset:
+            data = {"sps_pkg_name": item.sps_pkg.sps_pkg_name}
+            try:
+                if item.fix_sps_pkg_name():
+                    data["fixed"] = item.sps_pkg.sps_pkg_name
+                if item.pp_xml:
+                    if item.pp_xml.fix_pkg_name(item.sps_pkg.sps_pkg_name):
+                        data["pp_xml_sps_pkg_name"] = item.pp_xml.pkg_name
+            except Exception as e:
+                data["exception"] = traceback.format_exc()
+            response.append(data)
+        return response
+
+    def fix_sps_pkg_name(self):
+        return self.sps_pkg.fix_sps_pkg_name()
+
+    @classmethod
     def exclude_repetitions(cls, user, field_name, field_value, timeout=None):
         events = []
         repeated_items = cls.objects.filter(**{field_name: field_value})
@@ -506,7 +526,7 @@ class Article(ClusterableModel, CommonControlField):
 
         if item_to_keep_id:
             events.append(f"Item to keep: Article ID {item_to_keep_id}")
-            items_to_delete = repeated_items.exclude(id__in=item_to_keep_id)
+            items_to_delete = repeated_items.exclude(id=item_to_keep_id)
         else:
             items_to_delete = repeated_items
         
