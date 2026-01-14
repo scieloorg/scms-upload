@@ -1,0 +1,3378 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-14 13:40+0000\n"
+"PO-Revision-Date: 2026-01-14 14:00+0000\n"
+"Last-Translator: Gemini <ai@google.com>\n"
+"Language-Team: Russian <ru@li.org>\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+#: article/button_helper.py:11
+msgid "See instructions"
+msgstr "Посмотреть инструкции"
+
+#: article/button_helper.py:21 article/button_helper.py:84
+msgid "Submit change"
+msgstr "Отправить изменения"
+
+#: article/button_helper.py:75
+msgid "Request change"
+msgstr "Запросить изменения"
+
+#: article/choices.py:8 upload/choices.py:111
+msgid "Update"
+msgstr "Обновить"
+
+#: article/choices.py:9 upload/choices.py:112
+msgid "Erratum"
+msgstr "Опечатка (Erratum)"
+
+#: article/choices.py:22 article/choices.py:72
+msgid "Addendum"
+msgstr "Дополнение (Addendum)"
+
+#: article/choices.py:23
+msgid "Commentary article"
+msgstr "Статья-комментарий"
+
+#: article/choices.py:24
+msgid "Corrected article"
+msgstr "Исправленная статья"
+
+#: article/choices.py:25 article/choices.py:92
+msgid "Letter"
+msgstr "Письмо"
+
+#: article/choices.py:26
+msgid "Partial retraction"
+msgstr "Частичный отзыв"
+
+#: article/choices.py:27
+msgid "Retracted article"
+msgstr "Отозванная статья"
+
+#: article/choices.py:71
+msgid "Abstract"
+msgstr "Аннотация"
+
+#: article/choices.py:73
+msgid "Announcement"
+msgstr "Объявление"
+
+#: article/choices.py:74
+msgid "Article-Commentary"
+msgstr "Статья-комментарий"
+
+#: article/choices.py:75
+msgid "Book-Review"
+msgstr "Рецензия на книгу"
+
+#: article/choices.py:76
+msgid "Books-Received"
+msgstr "Полученные книги"
+
+#: article/choices.py:77
+msgid "Brief-Report"
+msgstr "Краткий отчет"
+
+#: article/choices.py:78
+msgid "Calendar"
+msgstr "Календарь"
+
+#: article/choices.py:79
+msgid "Case-Report"
+msgstr "Описание клинического случая"
+
+#: article/choices.py:80
+msgid "Clinical-Trial"
+msgstr "Клиническое испытание"
+
+#: article/choices.py:81
+msgid "Collection"
+msgstr "Коллекция"
+
+#: article/choices.py:82
+msgid "Correction"
+msgstr "Исправление"
+
+#: article/choices.py:83
+msgid "Data-Article"
+msgstr "Статья о данных"
+
+#: article/choices.py:84
+msgid "Discussion"
+msgstr "Дискуссия"
+
+#: article/choices.py:85
+msgid "Dissertation"
+msgstr "Диссертация"
+
+#: article/choices.py:86
+msgid "Editorial"
+msgstr "Редакционная статья"
+
+#: article/choices.py:87
+msgid "Editorial-Material"
+msgstr "Редакционный материал"
+
+#: article/choices.py:88
+msgid "Guideline"
+msgstr "Руководство"
+
+#: article/choices.py:89
+msgid "In-Brief"
+msgstr "Вкратце"
+
+#: article/choices.py:90
+msgid "Interview"
+msgstr "Интервью"
+
+#: article/choices.py:91
+msgid "Introduction"
+msgstr "Введение"
+
+#: article/choices.py:93
+msgid "Meeting-Report"
+msgstr "Отчет о встрече"
+
+#: article/choices.py:94
+msgid "News"
+msgstr "Новости"
+
+#: article/choices.py:95
+msgid "Obituary"
+msgstr "Некролог"
+
+#: article/choices.py:96
+msgid "Oration"
+msgstr "Речь"
+
+#: article/choices.py:97
+msgid "Other"
+msgstr "Другое"
+
+#: article/choices.py:98
+msgid "Partial-Retraction"
+msgstr "Частичный отзыв"
+
+#: article/choices.py:99
+msgid "Product-Review"
+msgstr "Обзор продукта"
+
+#: article/choices.py:100
+msgid "Rapid-Communication"
+msgstr "Краткое сообщение"
+
+#: article/choices.py:101
+msgid "Reply"
+msgstr "Ответ"
+
+#: article/choices.py:102
+msgid "Reprint"
+msgstr "Перепечатка"
+
+#: article/choices.py:103
+msgid "Research-Article"
+msgstr "Научная статья"
+
+#: article/choices.py:104
+msgid "Retraction"
+msgstr "Отзыв (Retraction)"
+
+#: article/choices.py:105
+msgid "Review-Article"
+msgstr "Обзорная статья"
+
+#: article/choices.py:106
+msgid "Technical-Report"
+msgstr "Технический отчет"
+
+#: article/choices.py:107
+msgid "Translation"
+msgstr "Перевод"
+
+#: article/choices.py:125
+msgid "Erratum submitted"
+msgstr "Опечатка отправлена"
+
+#: article/choices.py:126
+msgid "Update submitted"
+msgstr "Обновление отправлено"
+
+#: article/choices.py:127 upload/choices.py:77
+msgid "Required update"
+msgstr "Требуется обновление"
+
+#: article/choices.py:128 upload/choices.py:76
+msgid "Required erratum"
+msgstr "Требуется исправление опечатки"
+
+#: article/choices.py:129
+msgid "Prepare to publish"
+msgstr "Подготовка к публикации"
+
+#: article/choices.py:130
+msgid "Ready to publish"
+msgstr "Готово к публикации"
+
+#: article/choices.py:131
+msgid "Scheduled to publish"
+msgstr "Запланировано к публикации"
+
+#: article/choices.py:132 migration/choices.py:17 upload/choices.py:87
+msgid "Published"
+msgstr "Опубликовано"
+
+#: article/controller.py:48
+msgid "Unable to update article {} {} {}"
+msgstr "Не удалось обновить статью {} {} {}"
+
+#: article/forms.py:37
+msgid "Inform the article that needs to be changed"
+msgstr "Укажите статью, которую необходимо изменить"
+
+#: article/forms.py:42
+msgid "Comment what needs to be changed"
+msgstr "Прокомментируйте, что нужно изменить"
+
+#: article/forms.py:47
+msgid "Inform the type of change"
+msgstr "Укажите тип изменения"
+
+#: article/models.py:50
+msgid "PID v3"
+msgstr "PID v3"
+
+#: article/models.py:51 upload/models.py:2194
+msgid "PID v2"
+msgstr "PID v2"
+
+#: article/models.py:55
+msgid "Article type"
+msgstr "Тип статьи"
+
+#: article/models.py:64
+msgid "Article status"
+msgstr "Статус статьи"
+
+#: article/models.py:70 issue/models.py:335
+msgid "Position"
+msgstr "Позиция"
+
+#: article/models.py:74
+msgid "First publication date ISO"
+msgstr "Дата первой публикации ISO"
+
+#: article/models.py:78
+msgid "Elocation ID"
+msgstr "Elocation ID"
+
+#: article/models.py:80
+msgid "First page"
+msgstr "Первая страница"
+
+#: article/models.py:81
+msgid "Last page"
+msgstr "Последняя страница"
+
+#: article/models.py:92
+msgid "sections"
+msgstr "разделы"
+
+#: article/models.py:132
+msgid "Can make article change"
+msgstr "Может изменять статью"
+
+#: article/models.py:133
+msgid "Can request article change"
+msgstr "Может запрашивать изменение статьи"
+
+#: article/models.py:600
+msgid "Article DOI with Language"
+msgstr "DOI статьи с языком"
+
+#: article/models.py:601
+msgid "Article DOIs with Language"
+msgstr "DOI статей с языком"
+
+#: article/models.py:679
+msgid "Related item type"
+msgstr "Тип связанного элемента"
+
+#: article/models.py:715
+msgid "Change type"
+msgstr "Тип изменения"
+
+#: article/models.py:721
+msgid "Comment"
+msgstr "Комментарий"
+
+#: article/templates/modeladmin/article/article/inspect.html:6
+#: upload/templates/modeladmin/upload/package/inspect.html:31
+#: upload/templates/modeladmin/upload/package/inspect_.html:31
+#: upload/templates/modeladmin/upload/validationresult/inspect.html:20
+msgid "Details"
+msgstr "Детали"
+
+#: article/templates/modeladmin/article/article/inspect.html:21
+msgid "Article change instructions"
+msgstr "Инструкции по изменению статьи"
+
+#: article/templates/modeladmin/article/article/inspect.html:24
+msgid "Identifier"
+msgstr "Идентификатор"
+
+#: article/templates/modeladmin/article/article/inspect.html:26
+#: migration/models.py:821
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:25
+msgid "Type"
+msgstr "Тип"
+
+#: article/templates/modeladmin/article/article/inspect.html:28
+msgid "Deadline"
+msgstr "Срок"
+
+#: article/templates/modeladmin/article/article/inspect.html:30
+msgid "Instructions"
+msgstr "Инструкции"
+
+#: article/templates/modeladmin/article/article/inspect.html:36
+msgid "Available packages"
+msgstr "Доступные пакеты"
+
+#: article/templates/modeladmin/article/article/inspect.html:40
+#: core/models.py:44
+msgid "Creator"
+msgstr "Создатель"
+
+#: article/templates/modeladmin/article/article/inspect.html:41
+msgid "Created"
+msgstr "Создано"
+
+#: article/templates/modeladmin/article/article/inspect.html:42
+#: htmlxml/models.py:583 htmlxml/models.py:621 package/models.py:341
+#: proc/models.py:392 proc/models.py:874 proc/models.py:1050
+#: proc/models.py:1561 upload/models.py:199 upload/models.py:313
+#: upload/models.py:1368 upload/models.py:1420
+#: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:22
+msgid "Status"
+msgstr "Статус"
+
+#: article/templates/modeladmin/article/article/inspect.html:43
+#: upload/models.py:192
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:21
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:21
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:24
+#: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:21
+msgid "Category"
+msgstr "Категория"
+
+#: article/templates/modeladmin/article/article/inspect.html:44
+#: upload/templates/modeladmin/upload/package/inspect.html:74
+#: upload/templates/modeladmin/upload/package/inspect.html:122
+#: upload/templates/modeladmin/upload/package/inspect.html:167
+#: upload/templates/modeladmin/upload/package/inspect_.html:74
+#: upload/templates/modeladmin/upload/package/inspect_.html:122
+#: upload/templates/modeladmin/upload/package/inspect_.html:167
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:27
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:63
+msgid "Link"
+msgstr "Ссылка"
+
+#: article/templates/modeladmin/article/article/inspect.html:60
+msgid "Download package"
+msgstr "Скачать пакет"
+
+#: article/wagtail_hooks.py:28 article/wagtail_hooks.py:127
+msgid "Articles"
+msgstr "Статьи"
+
+#: article/wagtail_hooks.py:68
+msgid "Related items"
+msgstr "Связанные элементы"
+
+#: article/wagtail_hooks.py:94
+msgid "Changes request"
+msgstr "Запрос изменений"
+
+#: bigbang/tasks_scheduler.py:127
+msgid "Check article availability"
+msgstr "Проверить доступность статьи"
+
+#: bigbang/tasks_scheduler.py:150
+msgid "Create Journal, Issue e Article Processing items"
+msgstr "Создать элементы обработки журнала, выпуска и статьи"
+
+#: bigbang/tasks_scheduler.py:176
+msgid "Migra e publica"
+msgstr "Миграция и публикация"
+
+#: bigbang/tasks_scheduler.py:202
+msgid "Migra e publica os periódicos"
+msgstr "Миграция и публикация периодических изданий"
+
+#: bigbang/tasks_scheduler.py:230
+msgid "Migra e publica os fascículos"
+msgstr "Миграция и публикация выпусков"
+
+#: bigbang/tasks_scheduler.py:258
+msgid "Migra e publica artigos"
+msgstr "Миграция и публикация статей"
+
+#: bigbang/tasks_scheduler.py:303
+msgid "Publica periódicos"
+msgstr "Опубликовать периодические издания"
+
+#: bigbang/tasks_scheduler.py:328
+msgid "Publica fascículos"
+msgstr "Опубликовать выпуски"
+
+#: bigbang/tasks_scheduler.py:349
+msgid "Publica artigos"
+msgstr "Опубликовать статьи"
+
+#: bigbang/tasks_scheduler.py:376
+msgid "Busca e cria periódicos"
+msgstr "Поиск и создание периодических изданий"
+
+#: bigbang/utils/scheduler.py:55 core/utils/scheduler.py:51
+msgid "Scheduled task: {}"
+msgstr "Запланированная задача: {}"
+
+#: collection/choices.py:13 journal/choices.py:17
+msgid "Suspended"
+msgstr "Приостановлено"
+
+#: collection/choices.py:14 collection/choices.py:23 journal/choices.py:18
+#: journal/choices.py:26
+msgid "Unknown"
+msgstr "Неизвестно"
+
+#: collection/choices.py:15 journal/choices.py:19
+msgid "Ceased"
+msgstr "Прекращено"
+
+#: collection/choices.py:16 journal/choices.py:20
+msgid "Not informed"
+msgstr "Не информировано"
+
+#: collection/choices.py:17 collection/choices.py:24 journal/choices.py:21
+#: journal/choices.py:27
+msgid "Current"
+msgstr "Текущий"
+
+#: collection/choices.py:32
+msgid "QA"
+msgstr "Контроль качества (QA)"
+
+#: collection/choices.py:33
+msgid "PUBLIC"
+msgstr "ПУБЛИЧНЫЙ"
+
+#: collection/models.py:33
+msgid "Collection Acronym"
+msgstr "Аббревиатура коллекции"
+
+#: collection/models.py:35
+msgid "Collection Name"
+msgstr "Название коллекции"
+
+#: collection/models.py:71
+msgid "Website URL"
+msgstr "URL веб-сайта"
+
+#: collection/models.py:73
+msgid "Article API URL"
+msgstr "API URL статьи"
+
+#: collection/models.py:76
+msgid "Issue API URL"
+msgstr "API URL выпуска"
+
+#: collection/models.py:79
+msgid "Journal API URL"
+msgstr "API URL журнала"
+
+#: collection/models.py:82
+msgid "Get token API URL"
+msgstr "API URL получения токена"
+
+#: collection/models.py:87
+msgid "Purpose"
+msgstr "Цель"
+
+#: collection/models.py:118
+msgid "EndPoints"
+msgstr "Конечные точки (Endpoints)"
+
+#: collection/models.py:210
+msgid "Language Name"
+msgstr "Название языка"
+
+#: collection/models.py:211
+msgid "Language code 2"
+msgstr "Код языка (2 символа)"
+
+#: collection/models.py:216 migration/models.py:374
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:59
+msgid "Language"
+msgstr "Язык"
+
+#: collection/models.py:217
+msgid "Languages"
+msgstr "Языки"
+
+#: collection/models.py:287
+msgid "Endpoint name"
+msgstr "Название конечной точки"
+
+#: collection/models.py:288
+msgid "Endpoint URL"
+msgstr "URL конечной точки"
+
+#: collection/wagtail_hooks.py:27 collection/wagtail_hooks.py:124
+msgid "Collections"
+msgstr "Коллекции"
+
+#: collection/wagtail_hooks.py:55
+msgid "New WebSites Configurations"
+msgstr "Конфигурации новых сайтов"
+
+#: collection/wagtail_hooks.py:81
+msgid "Files Storage Configuration"
+msgstr "Конфигурация хранилища файлов"
+
+#: collection/wagtail_hooks.py:108 migration/wagtail_hooks.py:22
+msgid "Classic Website Configuration"
+msgstr "Конфигурация классического сайта"
+
+#: core/choices.py:206
+msgid "JANUARY"
+msgstr "ЯНВАРЬ"
+
+#: core/choices.py:207
+msgid "FEBRUARY"
+msgstr "ФЕВРАЛЬ"
+
+#: core/choices.py:208
+msgid "MARCH"
+msgstr "МАРТ"
+
+#: core/choices.py:209
+msgid "APRIL"
+msgstr "АПРЕЛЬ"
+
+#: core/choices.py:210
+msgid "MAY"
+msgstr "МАЙ"
+
+#: core/choices.py:211
+msgid "JUNE"
+msgstr "ИЮНЬ"
+
+#: core/choices.py:212
+msgid "JULY"
+msgstr "ИЮЛЬ"
+
+#: core/choices.py:213
+msgid "AUGUST"
+msgstr "АВГУСТ"
+
+#: core/choices.py:214
+msgid "SEPTEMBER"
+msgstr "СЕНТЯБРЬ"
+
+#: core/choices.py:215
+msgid "OCTOBER"
+msgstr "ОКТЯБРЬ"
+
+#: core/choices.py:216
+msgid "NOVEMBER"
+msgstr "НОЯБРЬ"
+
+#: core/choices.py:217
+msgid "DECEMBER"
+msgstr "ДЕКАБРЬ"
+
+#: core/models.py:36 tracker/models.py:52 tracker/models.py:98
+msgid "Creation date"
+msgstr "Дата создания"
+
+#: core/models.py:39 tracker/models.py:185
+msgid "Last update date"
+msgstr "Дата последнего обновления"
+
+#: core/models.py:53
+msgid "Updater"
+msgstr "Обновил"
+
+#: core/models.py:139
+msgid "Publication month number"
+msgstr "Номер месяца публикации"
+
+#: core/models.py:145
+msgid "Publication month name"
+msgstr "Название месяца публикации"
+
+#: core/models.py:162
+msgid "Publication initial month number"
+msgstr "Номер начального месяца публикации"
+
+#: core/models.py:168
+msgid "Publication initial month name"
+msgstr "Название начального месяца публикации"
+
+#: core/models.py:174
+msgid "Publication final month number"
+msgstr "Номер конечного месяца публикации"
+
+#: core/models.py:180
+msgid "Publication final month name"
+msgstr "Название конечного месяца публикации"
+
+#: core/models.py:196
+msgid "Publication date text"
+msgstr "Текст даты публикации"
+
+#: core/models.py:201 core/models.py:227
+msgid "Publication year"
+msgstr "Год публикации"
+
+#: core/models.py:370 journal/models.py:225 proc/models.py:850
+#: upload/models.py:1730
+msgid "Title"
+msgstr "Заголовок"
+
+#: core/templates/account/account_inactive.html:5
+#: core/templates/account/account_inactive.html:8
+msgid "Account Inactive"
+msgstr "Аккаунт неактивен"
+
+#: core/templates/account/account_inactive.html:10
+msgid "This account is inactive."
+msgstr "Этот аккаунт неактивен."
+
+#: core/templates/account/email.html:7
+msgid "Account"
+msgstr "Аккаунт"
+
+#: core/templates/account/email.html:10
+msgid "E-mail Addresses"
+msgstr "Адреса электронной почты"
+
+#: core/templates/account/email.html:13
+msgid "The following e-mail addresses are associated with your account:"
+msgstr "Следующие адреса электронной почты связаны с вашим аккаунтом:"
+
+#: core/templates/account/email.html:27
+msgid "Verified"
+msgstr "Подтверждено"
+
+#: core/templates/account/email.html:29
+msgid "Unverified"
+msgstr "Не подтверждено"
+
+#: core/templates/account/email.html:31
+msgid "Primary"
+msgstr "Основной"
+
+#: core/templates/account/email.html:37
+msgid "Make Primary"
+msgstr "Сделать основным"
+
+#: core/templates/account/email.html:38
+msgid "Re-send Verification"
+msgstr "Отправить подтверждение повторно"
+
+#: core/templates/account/email.html:39
+msgid "Remove"
+msgstr "Удалить"
+
+#: core/templates/account/email.html:46
+msgid "Warning:"
+msgstr "Предупреждение:"
+
+#: core/templates/account/email.html:46
+msgid ""
+"You currently do not have any e-mail address set up. You should really add "
+"an e-mail address so you can receive notifications, reset your password, etc."
+msgstr ""
+"У вас в данный момент не настроен адрес электронной почты. Вам действительно стоит добавить "
+"адрес, чтобы получать уведомления, сбрасывать пароль и т.д."
+
+#: core/templates/account/email.html:51
+msgid "Add E-mail Address"
+msgstr "Добавить адрес электронной почты"
+
+#: core/templates/account/email.html:56
+msgid "Add E-mail"
+msgstr "Добавить E-mail"
+
+#: core/templates/account/email.html:66
+msgid "Do you really want to remove the selected e-mail address?"
+msgstr "Вы действительно хотите удалить выбранный адрес электронной почты?"
+
+#: core/templates/account/email_confirm.html:6
+#: core/templates/account/email_confirm.html:10
+msgid "Confirm E-mail Address"
+msgstr "Подтвердите адрес электронной почты"
+
+#: core/templates/account/email_confirm.html:16
+#, python-format
+msgid ""
+"Please confirm that <a href=\"mailto:%(email)s\">%(email)s</a> is an e-mail "
+"address for user %(user_display)s."
+msgstr ""
+"Пожалуйста, подтвердите, что <a href=\"mailto:%(email)s\">%(email)s</a> является адресом "
+"электронной почты пользователя %(user_display)s."
+
+#: core/templates/account/email_confirm.html:20
+msgid "Confirm"
+msgstr "Подтвердить"
+
+#: core/templates/account/email_confirm.html:27
+#, python-format
+msgid ""
+"This e-mail confirmation link expired or is invalid. Please <a href="
+"\"%(email_url)s\">issue a new e-mail confirmation request</a>."
+msgstr ""
+"Эта ссылка для подтверждения e-mail истекла или недействительна. Пожалуйста, <a href="
+"\"%(email_url)s\">создайте новый запрос на подтверждение</a>."
+
+#: core/templates/account/login.html:7 core/templates/account/login.html:11
+#: core/templates/account/login.html:56 core/templates/base.html:83
+msgid "Sign In"
+msgstr "Войти"
+
+#: core/templates/account/login.html:17
+msgid "Please sign in with one of your existing third party accounts:"
+msgstr "Пожалуйста, войдите с помощью одного из ваших существующих аккаунтов сторонних сервисов:"
+
+#: core/templates/account/login.html:19
+#, python-format
+msgid ""
+"Or, <a href=\"%(signup_url)s\">sign up</a> for a %(site_name)s account and "
+"sign in below:"
+msgstr ""
+"Или <a href=\"%(signup_url)s\">зарегистрируйтесь</a> в %(site_name)s и войдите ниже:"
+
+#: core/templates/account/login.html:32
+msgid "or"
+msgstr "или"
+
+#: core/templates/account/login.html:41
+#, python-format
+msgid ""
+"If you have not created an account yet, then please <a href=\"%(signup_url)s"
+"\">sign up</a> first."
+msgstr ""
+"Если вы еще не создали аккаунт, пожалуйста, сначала <a href=\"%(signup_url)s"
+"\">зарегистрируйтесь</a>."
+
+#: core/templates/account/login.html:55
+msgid "Forgot Password?"
+msgstr "Забыли пароль?"
+
+#: core/templates/account/logout.html:5 core/templates/account/logout.html:8
+#: core/templates/account/logout.html:17 core/templates/base.html:72
+msgid "Sign Out"
+msgstr "Выйти"
+
+#: core/templates/account/logout.html:10
+msgid "Are you sure you want to sign out?"
+msgstr "Вы уверены, что хотите выйти?"
+
+#: core/templates/account/password_change.html:6
+#: core/templates/account/password_change.html:9
+#: core/templates/account/password_change.html:14
+#: core/templates/account/password_reset_from_key.html:5
+#: core/templates/account/password_reset_from_key.html:8
+#: core/templates/account/password_reset_from_key_done.html:4
+#: core/templates/account/password_reset_from_key_done.html:7
+msgid "Change Password"
+msgstr "Сменить пароль"
+
+#: core/templates/account/password_reset.html:7
+#: core/templates/account/password_reset.html:11
+#: core/templates/account/password_reset_done.html:6
+#: core/templates/account/password_reset_done.html:9
+msgid "Password Reset"
+msgstr "Сброс пароля"
+
+#: core/templates/account/password_reset.html:16
+msgid ""
+"Forgotten your password? Enter your e-mail address below, and we'll send you "
+"an e-mail allowing you to reset it."
+msgstr ""
+"Забыли пароль? Введите ваш адрес электронной почты ниже, и мы отправим вам письмо "
+"для его сброса."
+
+#: core/templates/account/password_reset.html:21
+msgid "Reset My Password"
+msgstr "Сбросить мой пароль"
+
+#: core/templates/account/password_reset.html:24
+msgid "Please contact us if you have any trouble resetting your password."
+msgstr "Пожалуйста, свяжитесь с нами, если у вас возникли проблемы со сбросом пароля."
+
+#: core/templates/account/password_reset_done.html:15
+msgid ""
+"We have sent you an e-mail. Please contact us if you do not receive it "
+"within a few minutes."
+msgstr ""
+"Мы отправили вам письмо. Пожалуйста, свяжитесь с нами, если вы не получите его "
+"в течение нескольких минут."
+
+#: core/templates/account/password_reset_from_key.html:8
+msgid "Bad Token"
+msgstr "Неверный токен"
+
+#: core/templates/account/password_reset_from_key.html:12
+#, python-format
+msgid ""
+"The password reset link was invalid, possibly because it has already been "
+"used.  Please request a <a href=\"%(passwd_reset_url)s\">new password reset</"
+"a>."
+msgstr ""
+"Ссылка для сброса пароля недействительна, возможно, она уже использовалась. "
+"Пожалуйста, запросите <a href=\"%(passwd_reset_url)s\">новый сброс пароля</a>."
+
+#: core/templates/account/password_reset_from_key.html:18
+msgid "change password"
+msgstr "изменить пароль"
+
+#: core/templates/account/password_reset_from_key.html:21
+#: core/templates/account/password_reset_from_key_done.html:8
+msgid "Your password is now changed."
+msgstr "Ваш пароль изменен."
+
+#: core/templates/account/password_set.html:6
+#: core/templates/account/password_set.html:9
+#: core/templates/account/password_set.html:14
+msgid "Set Password"
+msgstr "Установить пароль"
+
+#: core/templates/account/signup.html:6
+msgid "Signup"
+msgstr "Регистрация"
+
+#: core/templates/account/signup.html:9 core/templates/account/signup.html:19
+#: core/templates/base.html:78
+msgid "Sign Up"
+msgstr "Зарегистрироваться"
+
+#: core/templates/account/signup.html:11
+#, python-format
+msgid ""
+"Already have an account? Then please <a href=\"%(login_url)s\">sign in</a>."
+msgstr ""
+"Уже есть аккаунт? Тогда, пожалуйста, <a href=\"%(login_url)s\">войдите</a>."
+
+#: core/templates/account/signup_closed.html:5
+#: core/templates/account/signup_closed.html:8
+msgid "Sign Up Closed"
+msgstr "Регистрация закрыта"
+
+#: core/templates/account/signup_closed.html:10
+msgid "We are sorry, but the sign up is currently closed."
+msgstr "К сожалению, регистрация в данный момент закрыта."
+
+#: core/templates/account/verification_sent.html:5
+#: core/templates/account/verification_sent.html:8
+#: core/templates/account/verified_email_required.html:5
+#: core/templates/account/verified_email_required.html:8
+msgid "Verify Your E-mail Address"
+msgstr "Подтвердите ваш адрес электронной почты"
+
+#: core/templates/account/verification_sent.html:10
+msgid ""
+"We have sent an e-mail to you for verification. Follow the link provided to "
+"finalize the signup process. Please contact us if you do not receive it "
+"within a few minutes."
+msgstr ""
+"Мы отправили вам письмо для подтверждения. Перейдите по ссылке, чтобы завершить "
+"процесс регистрации. Пожалуйста, свяжитесь с нами, если вы не получите письмо в течение нескольких минут."
+
+#: core/templates/account/verified_email_required.html:12
+msgid ""
+"This part of the site requires us to verify that\n"
+"you are who you claim to be. For this purpose, we require that you\n"
+"verify ownership of your e-mail address. "
+msgstr ""
+"Эта часть сайта требует подтверждения вашей личности.\n"
+"Для этого нам необходимо, чтобы вы подтвердили\n"
+"владение вашим адресом электронной почты."
+
+#: core/templates/account/verified_email_required.html:16
+msgid ""
+"We have sent an e-mail to you for\n"
+"verification. Please click on the link inside this e-mail. Please\n"
+"contact us if you do not receive it within a few minutes."
+msgstr ""
+"Мы отправили вам письмо для подтверждения.\n"
+"Пожалуйста, перейдите по ссылке внутри письма.\n"
+"Свяжитесь с нами, если не получите его в течение нескольких минут."
+
+#: core/templates/account/verified_email_required.html:20
+#, python-format
+msgid ""
+"<strong>Note:</strong> you can still <a href=\"%(email_url)s\">change your e-"
+"mail address</a>."
+msgstr ""
+"<strong>Примечание:</strong> вы все еще можете <a href=\"%(email_url)s\">изменить свой e-mail</a>."
+
+#: core/templates/base.html:68
+msgid "My Profile"
+msgstr "Мой профиль"
+
+#: core/templates/home/welcome_page.html:53
+#: core/templates/home/welcome_page.html:56
+msgid "View the release notes"
+msgstr "Посмотреть примечания к выпуску"
+
+#: core/templates/home/welcome_page.html:68
+msgid "Welcome to your SciELO Content Manager"
+msgstr "Добро пожаловать в SciELO Content Manager"
+
+#: core/templates/home/welcome_page.html:69
+msgid ""
+"Please feel free to <a href=\"https://github.com/wagtail/wagtail/wiki/Slack"
+"\">join our community on Slack</a>, or get started with one of the links "
+"below."
+msgstr ""
+"Пожалуйста, не стесняйтесь <a href=\"https://github.com/wagtail/wagtail/wiki/Slack"
+"\">присоединиться к нашему сообществу в Slack</a> или начните работу с одной из ссылок ниже."
+
+#: core/templates/home/welcome_page.html:77
+msgid "Wagtail Documentation"
+msgstr "Документация Wagtail"
+
+#: core/templates/home/welcome_page.html:78
+msgid "Topics, references, & how-tos"
+msgstr "Темы, ссылки и руководства"
+
+#: core/templates/home/welcome_page.html:85
+msgid "Tutorial"
+msgstr "Учебное пособие"
+
+#: core/templates/home/welcome_page.html:86
+msgid "Build your first Wagtail site"
+msgstr "Создайте свой первый сайт на Wagtail"
+
+#: core/templates/home/welcome_page.html:93
+msgid "Admin Interface"
+msgstr "Административный интерфейс"
+
+#: core/templates/home/welcome_page.html:94
+msgid "Create your superuser first!"
+msgstr "Сначала создайте суперпользователя!"
+
+#: core/templates/modeladmin/edit.html:9
+#: upload/templates/modeladmin/upload/package/validation_report/edit.html:9
+#: upload/templates/modeladmin/upload/validationresult/inspect.html:9
+#, python-format
+msgid "Back to %(model_name)s list"
+msgstr "Назад к списку %(model_name)s"
+
+#: core/templates/wagtailadmin/home.html:5
+msgid "Welcome to the administrative area of SciELO Upload"
+msgstr "Добро пожаловать в административную панель SciELO Upload"
+
+#: core/templates/wagtailadmin/login.html:5
+msgid "Administrative area of SciELO Upload"
+msgstr "Административная панель SciELO Upload"
+
+#: core/templates/wagtailadmin/shared/header.html:10
+#, python-format
+msgid "%(result_count)s out of %(all_count)s"
+msgstr "%(result_count)s из %(all_count)s"
+
+#: core/templates/wagtailadmin/summary_items/article_summary_item.html:6
+#, python-format
+msgid "<span>%(total_article)s</span> Article"
+msgid_plural "<span>%(total_article)s</span> Articles"
+msgstr[0] "<span>%(total_article)s</span> Статья"
+msgstr[1] "<span>%(total_article)s</span> Статьи"
+msgstr[2] "<span>%(total_article)s</span> Статей"
+
+#: core/templates/wagtailadmin/summary_items/collection_summary_item.html:6
+#, python-format
+msgid "<span>%(total_collection)s</span> Collection"
+msgid_plural "<span>%(total_collection)s</span> Collections"
+msgstr[0] "<span>%(total_collection)s</span> Коллекция"
+msgstr[1] "<span>%(total_collection)s</span> Коллекции"
+msgstr[2] "<span>%(total_collection)s</span> Коллекций"
+
+#: core/templates/wagtailadmin/summary_items/journal_summary_item.html:6
+#, python-format
+msgid "<span>%(total_journal)s</span> Journal"
+msgid_plural "<span>%(total_journal)s</span> Journals"
+msgstr[0] "<span>%(total_journal)s</span> Журнал"
+msgstr[1] "<span>%(total_journal)s</span> Журнала"
+msgstr[2] "<span>%(total_journal)s</span> Журналов"
+
+#: core/users/admin.py:17
+msgid "Personal info"
+msgstr "Личная информация"
+
+#: core/users/admin.py:19
+msgid "Permissions"
+msgstr "Права доступа"
+
+#: core/users/admin.py:30
+msgid "Important dates"
+msgstr "Важные даты"
+
+#: core/users/apps.py:7
+msgid "Users"
+msgstr "Пользователи"
+
+#: core/users/forms.py:25 core/users/tests/test_forms.py:40
+msgid "This username has already been taken."
+msgstr "Это имя пользователя уже занято."
+
+#: core/users/models.py:15
+msgid "Name of User"
+msgstr "Имя пользователя"
+
+#: core/users/views.py:23
+msgid "Information successfully updated"
+msgstr "Информация успешно обновлена"
+
+#: doi/models.py:12 pid_provider/models.py:389 upload/models.py:188
+msgid "DOI"
+msgstr "DOI"
+
+#: files_storage/models.py:36 institution/models.py:16 proc/models.py:63
+#: upload/templates/modeladmin/upload/package/inspect.html:68
+#: upload/templates/modeladmin/upload/package/inspect.html:114
+#: upload/templates/modeladmin/upload/package/inspect.html:164
+#: upload/templates/modeladmin/upload/package/inspect_.html:68
+#: upload/templates/modeladmin/upload/package/inspect_.html:114
+#: upload/templates/modeladmin/upload/package/inspect_.html:164
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:24
+msgid "Name"
+msgstr "Имя"
+
+#: files_storage/models.py:37
+msgid "Host"
+msgstr "Хост"
+
+#: files_storage/models.py:39
+msgid "Bucket root"
+msgstr "Корень бакета (Bucket root)"
+
+#: files_storage/models.py:42 location/models.py:235
+#: location/wagtail_hooks.py:20
+msgid "Location"
+msgstr "Местоположение"
+
+#: files_storage/models.py:49
+msgid "Access key"
+msgstr "Ключ доступа"
+
+#: files_storage/models.py:50
+msgid "Secret key"
+msgstr "Секретный ключ"
+
+#: files_storage/models.py:52
+msgid "Secure"
+msgstr "Безопасный"
+
+#: files_storage/models.py:132
+msgid "Basename"
+msgstr "Базовое имя"
+
+#: files_storage/models.py:133
+msgid "URI"
+msgstr "URI"
+
+#: files_storage/wagtail_hooks.py:18
+msgid "Minio Configuration"
+msgstr "Конфигурация Minio"
+
+#: htmlxml/choices.py:9
+msgid "approved automatically"
+msgstr "одобрено автоматически"
+
+#: htmlxml/choices.py:10
+msgid "approved"
+msgstr "одобрено"
+
+#: htmlxml/choices.py:11
+msgid "rejected"
+msgstr "отклонено"
+
+#: htmlxml/choices.py:12
+msgid "not evaluated"
+msgstr "не оценено"
+
+#: htmlxml/models.py:249
+msgid "Unable to create_or_update_body and back file with empty content {} {}"
+msgstr "Не удалось создать или обновить тело и обратный файл с пустым содержимым {} {}"
+
+#: htmlxml/models.py:275
+msgid "Unable to create_or_update_body and back file {} {} {} {}"
+msgstr "Не удалось создать или обновить тело и обратный файл {} {} {} {}"
+
+#: htmlxml/models.py:326
+msgid "Body vazio"
+msgstr "Пустое тело"
+
+#: htmlxml/models.py:327
+msgid "Sim"
+msgstr "Да"
+
+#: htmlxml/models.py:327
+msgid "Não"
+msgstr "Нет"
+
+#: htmlxml/models.py:330
+msgid "Pontos de atenção"
+msgstr "Точки внимания"
+
+#: htmlxml/models.py:334
+msgid "Tipo de artigo"
+msgstr "Тип статьи"
+
+#: htmlxml/models.py:335
+msgid "Não identificado"
+msgstr "Не идентифицировано"
+
+#: htmlxml/models.py:338
+msgid "Tabelas no HTML"
+msgstr "Таблицы в HTML"
+
+#: htmlxml/models.py:342
+msgid "Imagens no HTML"
+msgstr "Изображения в HTML"
+
+#: htmlxml/models.py:346
+msgid "Material suplementar no XML"
+msgstr "Дополнительный материал в XML"
+
+#: htmlxml/models.py:350
+msgid "Elementos de mídia no XML"
+msgstr "Медиа-элементы в XML"
+
+#: htmlxml/models.py:354
+msgid "Figuras no XML"
+msgstr "Рисунки в XML"
+
+#: htmlxml/models.py:358
+msgid "Tabelas no XML"
+msgstr "Таблицы в XML"
+
+#: htmlxml/models.py:362
+msgid "Equações no XML"
+msgstr "Уравнения в XML"
+
+#: htmlxml/models.py:366
+msgid "Gráficos no XML"
+msgstr "Графики в XML"
+
+#: htmlxml/models.py:370
+msgid "Gráficos inline no XML"
+msgstr "Встроенные графики в XML"
+
+#: htmlxml/models.py:374
+msgid "Citações estruturadas (element-citation)"
+msgstr "Структурированные цитаты (element-citation)"
+
+#: htmlxml/models.py:378
+msgid "Citações mistas (mixed-citation)"
+msgstr "Смешанные цитаты (mixed-citation)"
+
+#: htmlxml/models.py:382
+msgid "Idiomas do texto no XML"
+msgstr "Языки текста в XML"
+
+#: htmlxml/models.py:456
+msgid "Estatísticas de Conversão HTML para XML"
+msgstr "Статистика конвертации HTML в XML"
+
+#: htmlxml/models.py:458
+msgid "Trocas de HTML para XML"
+msgstr "Обмен HTML на XML"
+
+#: htmlxml/models.py:589
+msgid "Quality"
+msgstr "Качество"
+
+#: htmlxml/models.py:613
+msgid "Body and Back XML files"
+msgstr "XML файлы тела и конца (Body/Back)"
+
+#: htmlxml/models.py:622
+msgid "Generated XML and Report"
+msgstr "Сгенерированный XML и отчет"
+
+#: htmlxml/models.py:623
+msgid "Body and Back XML Files"
+msgstr "XML файлы тела и конца"
+
+#: htmlxml/models.py:701
+msgid ""
+"Unable to create or update the record of the conversion of HTML to XML for "
+"{} {} {}"
+msgstr "Не удалось создать или обновить запись конвертации HTML в XML для {} {} {}"
+
+#: institution/choices.py:13
+msgid "agência de apoio à pesquisa"
+msgstr "агентство поддержки исследований"
+
+#: institution/choices.py:14
+msgid "universidade e instâncias ligadas à universidades"
+msgstr "университет и связанные структуры"
+
+#: institution/choices.py:15
+msgid "empresa ou instituto ligadas ao governo"
+msgstr "государственная компания или институт"
+
+#: institution/choices.py:16
+msgid "organização privada"
+msgstr "частная организация"
+
+#: institution/choices.py:17
+msgid "organização sem fins de lucros"
+msgstr "некоммерческая организация"
+
+#: institution/choices.py:20
+msgid "sociedade científica, associação pós-graduação, associação profissional"
+msgstr "научное общество, ассоциация аспирантов, профессиональная ассоциация"
+
+#: institution/choices.py:22
+msgid "outros"
+msgstr "другое"
+
+#: institution/models.py:18
+msgid "Institution Type"
+msgstr "Тип учреждения"
+
+#: institution/models.py:29
+msgid "Institution Acronym"
+msgstr "Аббревиатура учреждения"
+
+#: institution/models.py:31
+msgid "Organization Level 1"
+msgstr "Организация Уровень 1"
+
+#: institution/models.py:33
+msgid "Organization Level 2"
+msgstr "Организация Уровень 2"
+
+#: institution/models.py:35
+msgid "Organization Level 3"
+msgstr "Организация Уровень 3"
+
+#: institution/models.py:39
+msgid "Logo"
+msgstr "Логотип"
+
+#: institution/models.py:167
+msgid "Initial Date"
+msgstr "Начальная дата"
+
+#: institution/models.py:168
+msgid "Final Date"
+msgstr "Конечная дата"
+
+#: institution/models.py:171 institution/wagtail_hooks.py:20
+msgid "Institution"
+msgstr "Учреждение"
+
+#: issue/models.py:40
+msgid "Volume"
+msgstr "Том"
+
+#: issue/models.py:41
+msgid "Number"
+msgstr "Номер"
+
+#: issue/models.py:42
+msgid "Supplement"
+msgstr "Дополнение"
+
+#: issue/models.py:43
+msgid "Year"
+msgstr "Год"
+
+#: issue/models.py:50
+msgid ""
+"This number controls the order issues appear for a specific year on the "
+"website grid"
+msgstr "Это число контролирует порядок появления выпусков за конкретный год в сетке сайта"
+
+#: issue/models.py:288
+msgid "Sections"
+msgstr "Разделы"
+
+#: issue/wagtail_hooks.py:15 issue/wagtail_hooks.py:106
+msgid "Issues"
+msgstr "Выпуски"
+
+#: issue/wagtail_hooks.py:64
+msgid "Table of contents sections"
+msgstr "Разделы оглавления"
+
+#: journal/choices.py:6
+msgid "Journal URL"
+msgstr "URL журнала"
+
+#: journal/choices.py:31
+msgid "Ceased journal"
+msgstr "Издание журнала прекращено"
+
+#: journal/choices.py:32
+msgid "Not open access"
+msgstr "Нет открытого доступа"
+
+#: journal/choices.py:33
+msgid "by the committee"
+msgstr "комитетом"
+
+#: journal/choices.py:34
+msgid "by the editor"
+msgstr "редактором"
+
+#: journal/choices.py:39
+msgid "Admitted to the collection"
+msgstr "Принят в коллекцию"
+
+#: journal/choices.py:40
+msgid "Indexing interrupted"
+msgstr "Индексация прервана"
+
+#: journal/choices.py:45
+msgid "Agricultural Sciences"
+msgstr "Сельскохозяйственные науки"
+
+#: journal/choices.py:46
+msgid "Applied Social Sciences"
+msgstr "Прикладные общественные науки"
+
+#: journal/choices.py:47
+msgid "Biological Sciences"
+msgstr "Биологические науки"
+
+#: journal/choices.py:48
+msgid "Engineering"
+msgstr "Инженерное дело"
+
+#: journal/choices.py:49
+msgid "Exact and Earth Sciences"
+msgstr "Точные науки и науки о Земле"
+
+#: journal/choices.py:50
+msgid "Health Sciences"
+msgstr "Медицинские науки"
+
+#: journal/choices.py:51
+msgid "Human Sciences"
+msgstr "Гуманитарные науки"
+
+#: journal/choices.py:52
+msgid "Linguistic, Literature and Arts"
+msgstr "Лингвистика, литература и искусство"
+
+#: journal/choices.py:53
+msgid "Psicanalise"
+msgstr "Психоанализ"
+
+#: journal/models.py:113
+msgid "Official Title"
+msgstr "Официальное название"
+
+#: journal/models.py:114 journal/models.py:604
+msgid "ISO Title"
+msgstr "Название ISO"
+
+#: journal/models.py:116
+msgid "Foundation Year"
+msgstr "Год основания"
+
+#: journal/models.py:118
+msgid "ISSN Print"
+msgstr "ISSN печатный"
+
+#: journal/models.py:120
+msgid "ISSN Eletronic"
+msgstr "ISSN электронный"
+
+#: journal/models.py:122
+msgid "ISSNL"
+msgstr "ISSN-L"
+
+#: journal/models.py:134 journal/models.py:582
+msgid "Official Journal"
+msgstr "Официальный журнал"
+
+#: journal/models.py:135 journal/wagtail_hooks.py:16
+msgid "Official Journals"
+msgstr "Официальные журналы"
+
+#: journal/models.py:223 journal/models.py:580
+msgid "Short Title"
+msgstr "Краткое название"
+
+#: journal/models.py:227 journal/models.py:581
+msgid "Journal Acronym"
+msgstr "Аббревиатура журнала"
+
+#: journal/models.py:236
+msgid "Submission online URL"
+msgstr "URL для онлайн-подачи"
+
+#: journal/models.py:240
+msgid "Study Areas"
+msgstr "Области изучения"
+
+#: journal/models.py:249
+msgid "Address"
+msgstr "Адрес"
+
+#: journal/models.py:273
+msgid "Owner"
+msgstr "Владелец"
+
+#: journal/models.py:277 journal/models.py:288
+msgid "Publisher"
+msgstr "Издатель"
+
+#: journal/models.py:281 journal/models.py:289
+msgid "Mission"
+msgstr "Миссия"
+
+#: journal/models.py:286 pid_provider/models.py:440 proc/models.py:199
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:23
+msgid "Identification"
+msgstr "Идентификация"
+
+#: journal/models.py:287
+msgid "Owners"
+msgstr "Владельцы"
+
+#: journal/models.py:579
+msgid "Journal Title"
+msgstr "Название журнала"
+
+#: journal/models.py:583
+msgid "Contact Name"
+msgstr "Контактное лицо"
+
+#: journal/models.py:584
+msgid "Contact Address"
+msgstr "Контактный адрес"
+
+#: journal/models.py:585
+msgid "Contact Location"
+msgstr "Контактное местоположение"
+
+#: journal/models.py:586
+msgid "Submission Online URL"
+msgstr "URL для онлайн-подачи"
+
+#: journal/models.py:587
+msgid "Logo URL"
+msgstr "URL логотипа"
+
+#: journal/models.py:588
+msgid "License Code"
+msgstr "Код лицензии"
+
+#: journal/models.py:589
+msgid "WoS Areas"
+msgstr "Области WoS"
+
+#: journal/models.py:600 pid_provider/models.py:359
+msgid "Electronic ISSN"
+msgstr "Электронный ISSN"
+
+#: journal/models.py:602 pid_provider/models.py:361
+msgid "Print ISSN"
+msgstr "Печатный ISSN"
+
+#: journal/models.py:608
+msgid "mission"
+msgstr "миссия"
+
+#: journal/models.py:612
+msgid "sponsor"
+msgstr "спонсор"
+
+#: journal/models.py:616
+msgid "owner"
+msgstr "владелец"
+
+#: journal/models.py:620
+msgid "publisher"
+msgstr "издатель"
+
+#: journal/models.py:624
+msgid "study area"
+msgstr "область изучения"
+
+#: journal/models.py:871
+msgid "Journal collection"
+msgstr "Коллекция журнала"
+
+#: journal/models.py:872
+msgid "Journal collections"
+msgstr "Коллекции журналов"
+
+#: journal/models.py:921
+msgid "Event year"
+msgstr "Год события"
+
+#: journal/models.py:923
+msgid "Event month"
+msgstr "Месяц события"
+
+#: journal/models.py:929
+msgid "Event day"
+msgstr "День события"
+
+#: journal/models.py:932
+msgid "Event type"
+msgstr "Тип события"
+
+#: journal/models.py:939
+msgid "Indexing interruption reason"
+msgstr "Причина прерывания индексации"
+
+#: journal/models.py:957
+msgid "Collection journal event"
+msgstr "Событие журнала коллекции"
+
+#: journal/models.py:958
+msgid "Collection journal events"
+msgstr "События журнала коллекции"
+
+#: journal/wagtail_hooks.py:43
+msgid "Journal"
+msgstr "Журнал"
+
+#: journal/wagtail_hooks.py:68
+msgid "Journals"
+msgstr "Журналы"
+
+#: location/models.py:17
+msgid "City Name"
+msgstr "Название города"
+
+#: location/models.py:20 location/models.py:214
+msgid "City"
+msgstr "Город"
+
+#: location/models.py:21
+msgid "Cities"
+msgstr "Города"
+
+#: location/models.py:63
+msgid "State Name"
+msgstr "Название штата/области"
+
+#: location/models.py:64
+msgid "State Acronym"
+msgstr "Аббревиатура штата/области"
+
+#: location/models.py:67 location/models.py:221
+msgid "State"
+msgstr "Штат/Область"
+
+#: location/models.py:68
+msgid "States"
+msgstr "Штаты/Области"
+
+#: location/models.py:151
+msgid "Country Name"
+msgstr "Название страны"
+
+#: location/models.py:153
+msgid "Country Acronym"
+msgstr "Аббревиатура страны"
+
+#: location/models.py:157 location/models.py:228
+msgid "Country"
+msgstr "Страна"
+
+#: location/models.py:158
+msgid "Countries"
+msgstr "Страны"
+
+#: location/models.py:236
+msgid "Locations"
+msgstr "Местоположения"
+
+#: migration/button_helper.py:12
+msgid "View migration failure"
+msgstr "Посмотреть сбой миграции"
+
+#: migration/choices.py:14
+msgid "To migrate"
+msgstr "К миграции"
+
+#: migration/choices.py:15
+msgid "To ignore"
+msgstr "Игнорировать"
+
+#: migration/choices.py:16
+msgid "Imported"
+msgstr "Импортировано"
+
+#: migration/controller.py:685
+msgid "Unable to get xml with pre from migrated article ({}) {}: {} {}"
+msgstr "Не удалось получить XML из мигрированной статьи ({}) {}: {} {}"
+
+#: migration/controller.py:734
+msgid "IdFileRecord is already up-to-date with acron.id"
+msgstr "Запись IdFileRecord уже обновлена с acron.id"
+
+#: migration/models.py:70
+msgid "Title path"
+msgstr "Путь к заголовку"
+
+#: migration/models.py:74
+msgid "Title path: title.id path or title.mst path without extension"
+msgstr "Путь к заголовку: путь title.id или title.mst без расширения"
+
+#: migration/models.py:77
+msgid "Issue path"
+msgstr "Путь к выпуску"
+
+#: migration/models.py:81
+msgid "Issue path: issue.id path or issue.mst path without extension"
+msgstr "Путь к выпуску: путь issue.id или issue.mst без расширения"
+
+#: migration/models.py:84 migration/models.py:88
+msgid "Serial path"
+msgstr "Серийный путь"
+
+#: migration/models.py:91 migration/models.py:95
+msgid "Bases work path"
+msgstr "Рабочий путь баз"
+
+#: migration/models.py:98
+msgid "Bases pdf path"
+msgstr "Путь PDF баз"
+
+#: migration/models.py:102 migration/models.py:105 migration/models.py:109
+msgid "Bases translation path"
+msgstr "Путь перевода баз"
+
+#: migration/models.py:112 migration/models.py:116
+msgid "Bases XML path"
+msgstr "Путь XML баз"
+
+#: migration/models.py:119 migration/models.py:123
+msgid "Htdocs img revistas path"
+msgstr "Путь Htdocs img revistas"
+
+#: migration/models.py:126
+msgid "PID list path"
+msgstr "Путь к списку PID"
+
+#: migration/models.py:131
+msgid "Path of a text file which contains all the article PIDs from artigo.mst"
+msgstr "Путь к текстовому файлу, содержащему все PID статей из artigo.mst"
+
+#: migration/models.py:185 migration/models.py:820 proc/models.py:193
+#: proc/models.py:341
+msgid "PID"
+msgstr "PID"
+
+#: migration/models.py:186
+msgid "Origin"
+msgstr "Происхождение"
+
+#: migration/models.py:191
+msgid "ISIS updated date"
+msgstr "Дата обновления ISIS"
+
+#: migration/models.py:194
+msgid "ISIS created date"
+msgstr "Дата создания ISIS"
+
+#: migration/models.py:197 proc/models.py:344
+msgid "Migration Status"
+msgstr "Статус миграции"
+
+#: migration/models.py:318
+msgid "Unable to create_or_update_migrated_data {} {} {} {}"
+msgstr "Не удалось создать или обновить мигрированные данные {} {} {} {}"
+
+#: migration/models.py:356
+msgid "Original Path"
+msgstr "Исходный путь"
+
+#: migration/models.py:361
+msgid "Original name"
+msgstr "Исходное имя"
+
+#: migration/models.py:369
+msgid "Original href"
+msgstr "Исходный href"
+
+#: migration/models.py:372
+msgid "Component type"
+msgstr "Тип компонента"
+
+#: migration/models.py:375
+msgid "Pkg name"
+msgstr "Имя пакета"
+
+#: migration/models.py:376
+msgid "Part"
+msgstr "Часть"
+
+#: migration/models.py:625
+msgid "File type"
+msgstr "Тип файла"
+
+#: migration/models.py:677
+msgid "Source"
+msgstr "Источник"
+
+#: migration/wagtail_hooks.py:41
+msgid "Migrated Data"
+msgstr "Мигрированные данные"
+
+#: migration/wagtail_hooks.py:76
+msgid "Migrated Article"
+msgstr "Мигрированная статья"
+
+#: migration/wagtail_hooks.py:110
+msgid "Migrated Journal"
+msgstr "Мигрированный журнал"
+
+#: migration/wagtail_hooks.py:142
+msgid "Migrated Issue"
+msgstr "Мигрированный выпуск"
+
+#: migration/wagtail_hooks.py:174
+msgid "Migrated files"
+msgstr "Мигрированные файлы"
+
+#: migration/wagtail_hooks.py:206
+msgid "Article id file"
+msgstr "ID файл статьи"
+
+#: migration/wagtail_hooks.py:235
+msgid "Migration"
+msgstr "Миграция"
+
+#: package/choices.py:8
+msgid "MIGRATION"
+msgstr "МИГРАЦИЯ"
+
+#: package/choices.py:9
+msgid "UPLOAD"
+msgstr "ЗАГРУЗКА"
+
+#: package/models.py:149 pid_provider/models.py:165
+msgid "Unable to get xml with pre (XMLVersion) {}: {} {}"
+msgstr "Не удалось получить XML с pre (XMLVersion) {}: {} {}"
+
+#: package/models.py:207
+msgid "Package component type"
+msgstr "Тип компонента пакета"
+
+#: package/models.py:291
+msgid "SPS Name"
+msgstr "Имя SPS"
+
+#: package/models.py:327
+msgid "Package component"
+msgstr "Компонент пакета"
+
+#: package/models.py:342 proc/models.py:1562
+msgid "Files"
+msgstr "Файлы"
+
+#: package/models.py:566
+msgid "Unable to register pid"
+msgstr "Не удалось зарегистрировать PID"
+
+#: pid_provider/choices.py:14 tracker/choices.py:36
+msgid "To do"
+msgstr "Сделать"
+
+#: pid_provider/choices.py:15 tracker/choices.py:37
+msgid "Done"
+msgstr "Готово"
+
+#: pid_provider/choices.py:16
+msgid "waiting"
+msgstr "ожидание"
+
+#: pid_provider/choices.py:17
+msgid "ignore"
+msgstr "игнорировать"
+
+#: pid_provider/choices.py:18
+msgid "undefined"
+msgstr "не определено"
+
+#: pid_provider/choices.py:19
+msgid "invalid"
+msgstr "недействительно"
+
+#: pid_provider/choices.py:20
+msgid "duplicated"
+msgstr "дублировано"
+
+#: pid_provider/choices.py:21
+msgid "deduplicated"
+msgstr "дубликаты удалены"
+
+#: pid_provider/client.py:143
+msgid "Unable to get api token {} {} {} {} {}"
+msgstr "Не удалось получить токен API {} {} {} {} {}"
+
+#: pid_provider/client.py:213
+msgid "Unable to get pid from pid provider {} {} {} {}"
+msgstr "Не удалось получить PID от провайдера PID {} {} {} {}"
+
+#: pid_provider/client.py:308
+msgid "Unable to get pid from pid provider {} {} {} {} {}"
+msgstr "Не удалось получить PID от провайдера PID {} {} {} {} {}"
+
+#: pid_provider/models.py:226
+msgid "XML Post URI"
+msgstr "URI для отправки XML"
+
+#: pid_provider/models.py:229
+msgid "Get Token URI"
+msgstr "URI для получения токена"
+
+#: pid_provider/models.py:231
+msgid "Timeout"
+msgstr "Тайм-аут"
+
+#: pid_provider/models.py:233
+msgid "API Username"
+msgstr "Имя пользователя API"
+
+#: pid_provider/models.py:236
+msgid "API Password"
+msgstr "Пароль API"
+
+#: pid_provider/models.py:291
+msgid "PID type"
+msgstr "Тип PID"
+
+#: pid_provider/models.py:293
+msgid "PID pid_in_xml"
+msgstr "PID в XML"
+
+#: pid_provider/models.py:351
+msgid "processing status"
+msgstr "статус обработки"
+
+#: pid_provider/models.py:363
+msgid "publication year"
+msgstr "год публикации"
+
+#: pid_provider/models.py:365
+msgid "volume"
+msgstr "том"
+
+#: pid_provider/models.py:366
+msgid "number"
+msgstr "номер"
+
+#: pid_provider/models.py:367
+msgid "suppl"
+msgstr "доп."
+
+#: pid_provider/models.py:374 proc/models.py:1498 upload/models.py:2192
+msgid "Package name"
+msgstr "Имя пакета"
+
+#: pid_provider/models.py:376
+msgid "v3"
+msgstr "v3"
+
+#: pid_provider/models.py:377
+msgid "v2"
+msgstr "v2"
+
+#: pid_provider/models.py:378
+msgid "AOP PID"
+msgstr "AOP PID"
+
+#: pid_provider/models.py:381
+msgid "elocation id"
+msgstr "elocation id"
+
+#: pid_provider/models.py:383
+msgid "fpage"
+msgstr "первая страница"
+
+#: pid_provider/models.py:384
+msgid "fpage_seq"
+msgstr "seq первой страницы"
+
+#: pid_provider/models.py:385
+msgid "lpage"
+msgstr "последняя страница"
+
+#: pid_provider/models.py:387
+msgid "Document Publication Year"
+msgstr "Год публикации документа"
+
+#: pid_provider/models.py:391
+msgid "surnames"
+msgstr "фамилии"
+
+#: pid_provider/models.py:392
+msgid "collab"
+msgstr "коллаборация"
+
+#: pid_provider/models.py:393
+msgid "links"
+msgstr "ссылки"
+
+#: pid_provider/models.py:395
+msgid "partial_body"
+msgstr "частичное тело"
+
+#: pid_provider/models.py:399
+msgid "Origin date"
+msgstr "Дата происхождения"
+
+#: pid_provider/models.py:404
+msgid "Available since"
+msgstr "Доступно с"
+
+#: pid_provider/models.py:429
+msgid "Other PID"
+msgstr "Другой PID"
+
+#: pid_provider/models.py:441
+msgid "Other PIDs"
+msgstr "Другие PID"
+
+#: pid_provider/models.py:442 proc/models.py:875 proc/models.py:1051
+#: upload/models.py:1442
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:23
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:23
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:26
+#: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:24
+msgid "Data"
+msgstr "Данные"
+
+#: pid_provider/models.py:912
+msgid ""
+"The XML content is an ahead of print version but the document {} is already "
+"published in an issue"
+msgstr "Содержимое XML является версией ahead-of-print, но документ {} уже опубликован в выпуске"
+
+#: pid_provider/models.py:973
+msgid "No matching record found for the provided XML data."
+msgstr "Для предоставленных данных XML не найдено соответствующих записей."
+
+#: pid_provider/models.py:1434
+msgid "Incorrect v2"
+msgstr "Некорректная v2"
+
+#: pid_provider/models.py:1437
+msgid "Correct v2"
+msgstr "Корректная v2"
+
+#: pid_provider/query_params.py:207
+msgid "Required Print or Electronic ISSN to identify XML {}"
+msgstr "Требуется печатный или электронный ISSN для идентификации XML {}"
+
+#: pid_provider/wagtail_hooks.py:14
+msgid "Pid Provider XMLs"
+msgstr "XML провайдера PID"
+
+#: pid_provider/wagtail_hooks.py:66
+msgid "Pid Changes"
+msgstr "Изменения PID"
+
+#: pid_provider/wagtail_hooks.py:98
+msgid "Pid Provider Config"
+msgstr "Конфигурация провайдера PID"
+
+#: pid_provider/wagtail_hooks.py:120
+msgid "Fix pid v2"
+msgstr "Исправить PID v2"
+
+#: pid_provider/wagtail_hooks.py:158
+msgid "XML Versions"
+msgstr "Версии XML"
+
+#: pid_provider/wagtail_hooks.py:184
+msgid "Pid Provider"
+msgstr "Провайдер PID"
+
+#: proc/models.py:195
+msgid "Procedure name"
+msgstr "Название процедуры"
+
+#: proc/models.py:201
+msgid "Item type"
+msgstr "Тип элемента"
+
+#: proc/models.py:216
+msgid "Processing report"
+msgstr "Отчет об обработке"
+
+#: proc/models.py:217
+msgid "Processing reports"
+msgstr "Отчеты об обработке"
+
+#: proc/models.py:351
+msgid "QA Website Status"
+msgstr "Статус сайта QA"
+
+#: proc/models.py:357
+msgid "Public Website Status"
+msgstr "Статус публичного сайта"
+
+#: proc/models.py:393 proc/models.py:876 proc/models.py:1052
+#: proc/models.py:1563 upload/models.py:314 upload/models.py:1369
+#: upload/models.py:1421
+msgid "Events"
+msgstr "События"
+
+#: proc/models.py:849
+msgid "Acronym"
+msgstr "Аббревиатура"
+
+#: proc/models.py:852
+msgid "Availability Status"
+msgstr "Статус доступности"
+
+#: proc/models.py:868 proc/models.py:1042 proc/models.py:1557
+#: upload/models.py:309 upload/models.py:1362 upload/models.py:1406
+msgid "Event newest to oldest"
+msgstr "События от новых к старым"
+
+#: proc/models.py:927
+msgid "Unable to update journal {} {} {} {}"
+msgstr "Не удалось обновить журнал {} {} {} {}"
+
+#: proc/models.py:1010
+msgid "Issue Folder"
+msgstr "Папка выпуска"
+
+#: proc/models.py:1014
+msgid "Files migration status"
+msgstr "Статус миграции файлов"
+
+#: proc/models.py:1022
+msgid "Document records migration status"
+msgstr "Статус миграции записей документа"
+
+#: proc/models.py:1146
+msgid "Unable to update issue {} {} {} {}"
+msgstr "Не удалось обновить выпуск {} {} {} {}"
+
+#: proc/models.py:1501
+msgid "Main lang"
+msgstr "Основной язык"
+
+#: proc/models.py:1515
+msgid "XML status"
+msgstr "Статус XML"
+
+#: proc/models.py:1523
+msgid "SPS Pkg status"
+msgstr "Статус пакета SPS"
+
+#: proc/models.py:1531
+msgid "Processed XML"
+msgstr "Обработанный XML"
+
+#: proc/models.py:1535
+msgid "Native XML + modifications or converted XML from HTML"
+msgstr "Нативный XML + изменения или конвертированный XML из HTML"
+
+#: proc/models.py:1639
+msgid "Unable to update article_proc{} {} {} {}"
+msgstr "Не удалось обновить article_proc{} {} {} {}"
+
+#: proc/models.py:1726
+msgid "Unable to get xml_with_pre for {}: {}"
+msgstr "Не удалось получить xml_with_pre для {}: {}"
+
+#: proc/models.py:1771
+msgid "Unable to get xml with pre from migrated article {}: {} {}"
+msgstr "Не удалось получить XML с pre из мигрированной статьи {}: {} {}"
+
+#: proc/models.py:1906
+msgid "No migrated XML file found for {} ({})"
+msgstr "Файл мигрированного XML не найден для {} ({})"
+
+#: proc/tasks.py:803
+msgid "Select journals by collection"
+msgstr "Выбрать журналы по коллекции"
+
+#: proc/wagtail_hooks.py:17
+msgid "Journal Processing"
+msgstr "Обработка журналов"
+
+#: proc/wagtail_hooks.py:50
+msgid "Issue Processing"
+msgstr "Обработка выпусков"
+
+#: proc/wagtail_hooks.py:87
+msgid "XML from HTML"
+msgstr "XML из HTML"
+
+#: proc/wagtail_hooks.py:126
+msgid "SPS Package"
+msgstr "Пакет SPS"
+
+#: proc/wagtail_hooks.py:161
+msgid "Article Processing"
+msgstr "Обработка статей"
+
+#: proc/wagtail_hooks.py:197
+msgid "Processing Report"
+msgstr "Отчет об обработке"
+
+#: proc/wagtail_hooks.py:227
+msgid "Processing"
+msgstr "Обработка"
+
+#: publication/api/issue.py:43
+#, python-format
+msgid "Error syncing issue %s: %s"
+msgstr "Ошибка синхронизации выпуска %s: %s"
+
+#: publication/api/publication.py:76
+msgid "Website enabled is False ({})"
+msgstr "Сайт отключен ({})"
+
+#: publication/models.py:37
+msgid "published by"
+msgstr "опубликовано"
+
+#: publication/models.py:40
+msgid "publication rule"
+msgstr "правило публикации"
+
+#: researcher/choices.py:3
+msgid "Mujer"
+msgstr "Женщина"
+
+#: researcher/choices.py:3
+msgid "Hombre"
+msgstr "Мужчина"
+
+#: researcher/choices.py:6
+msgid "Declarado por el investigador"
+msgstr "Заявлено исследователем"
+
+#: researcher/choices.py:7
+msgid "Identificado automáticamente por programa de computador"
+msgstr "Определено автоматически компьютерной программой"
+
+#: researcher/choices.py:8
+msgid "Identificado por algun usuario"
+msgstr "Определено пользователем"
+
+#: researcher/models.py:21
+msgid "Given names"
+msgstr "Имена"
+
+#: researcher/models.py:24
+msgid "Last name"
+msgstr "Фамилия"
+
+#: researcher/models.py:26
+msgid "Suffix"
+msgstr "Суффикс"
+
+#: researcher/models.py:27
+msgid "ORCID"
+msgstr "ORCID"
+
+#: researcher/models.py:28
+msgid "Lattes"
+msgstr "Lattes"
+
+#: researcher/models.py:29
+msgid "Gender"
+msgstr "Пол"
+
+#: researcher/models.py:31
+msgid "Gender identification status"
+msgstr "Статус идентификации пола"
+
+#: researcher/models.py:60 researcher/models.py:71
+msgid "Email"
+msgstr "Email"
+
+#: researcher/models.py:63
+msgid "Affiliation"
+msgstr "Принадлежность (Аффилиация)"
+
+#: researcher/wagtail_hooks.py:20
+msgid "Researcher"
+msgstr "Исследователь"
+
+#: team/models.py:56
+msgid "Team"
+msgstr "Команда"
+
+#: team/models.py:57 team/wagtail_hooks.py:51
+msgid "Teams"
+msgstr "Команды"
+
+#: team/models.py:80
+msgid "Team member"
+msgstr "Член команды"
+
+#: team/models.py:81
+msgid "Team members"
+msgstr "Члены команды"
+
+#: team/views.py:14
+msgid "Member has been successfully created"
+msgstr "Участник успешно создан"
+
+#: team/wagtail_hooks.py:23
+msgid "Collection Team Members"
+msgstr "Члены команды коллекции"
+
+#: tracker/choices.py:8
+msgid "started"
+msgstr "запущено"
+
+#: tracker/choices.py:9
+msgid "interrupted"
+msgstr "прервано"
+
+#: tracker/choices.py:10
+msgid "finished"
+msgstr "завершено"
+
+#: tracker/choices.py:19 upload/choices.py:183
+msgid "error"
+msgstr "ошибка"
+
+#: tracker/choices.py:20 upload/choices.py:185
+msgid "warning"
+msgstr "предупреждение"
+
+#: tracker/choices.py:21
+msgid "info"
+msgstr "инфо"
+
+#: tracker/choices.py:22
+msgid "exception"
+msgstr "исключение"
+
+#: tracker/choices.py:35
+msgid "To reprocess"
+msgstr "К переработке"
+
+#: tracker/choices.py:38
+msgid "Doing"
+msgstr "В процессе"
+
+#: tracker/choices.py:39
+msgid "Blocked"
+msgstr "Заблокировано"
+
+#: tracker/choices.py:40
+msgid "Pending"
+msgstr "В ожидании"
+
+#: tracker/choices.py:41
+msgid "ignored"
+msgstr "игнорировано"
+
+#: tracker/models.py:50
+msgid "name"
+msgstr "имя"
+
+#: tracker/models.py:99
+msgid "Exception Type"
+msgstr "Тип исключения"
+
+#: tracker/models.py:100
+msgid "Exception Msg"
+msgstr "Сообщение исключения"
+
+#: tracker/models.py:104 tracker/models.py:178
+msgid "Item"
+msgstr "Элемент"
+
+#: tracker/models.py:110
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:4
+msgid "Action"
+msgstr "Действие"
+
+#: tracker/models.py:180
+msgid "Total to process"
+msgstr "Всего к обработке"
+
+#: tracker/models.py:183
+msgid "Total processed"
+msgstr "Всего обработано"
+
+#: tracker/models.py:187
+msgid "status"
+msgstr "статус"
+
+#: tracker/wagtail_hooks.py:13
+msgid "Unexpected Events"
+msgstr "Непредвиденные события"
+
+#: tracker/wagtail_hooks.py:55
+msgid "Event Tracker"
+msgstr "Трекер событий"
+
+#: tracker/wagtail_hooks.py:99
+msgid "Event Monitoring"
+msgstr "Мониторинг событий"
+
+#: upload/button_helper.py:63
+msgid "Accept / Reject the package or delegate it"
+msgstr "Принять / Отклонить пакет или делегировать его"
+
+#: upload/button_helper.py:76
+msgid "Finish deposit"
+msgstr "Завершить депонирование"
+
+#: upload/button_helper.py:90
+msgid "Archive"
+msgstr "Архив"
+
+#: upload/choices.py:78
+msgid "Submitted"
+msgstr "Отправлено"
+
+#: upload/choices.py:79
+msgid "Enqueued for validation"
+msgstr "В очереди на валидацию"
+
+#: upload/choices.py:80 upload/choices.py:93
+msgid "Validated with errors"
+msgstr "Проверено с ошибками"
+
+#: upload/choices.py:81
+msgid "Pending quality analysis decision"
+msgstr "Ожидание решения по анализу качества"
+
+#: upload/choices.py:82 upload/choices.py:92
+msgid "Pending for correction"
+msgstr "Ожидание исправления"
+
+#: upload/choices.py:83
+msgid "Unexpected"
+msgstr "Непредвиденное"
+
+#: upload/choices.py:84
+msgid "Ready to preview on QA website"
+msgstr "Готово к просмотру на сайте QA"
+
+#: upload/choices.py:85
+msgid "Preview"
+msgstr "Предпросмотр"
+
+#: upload/choices.py:86
+msgid "Ready to publish on public website"
+msgstr "Готово к публикации на публичном сайте"
+
+#: upload/choices.py:88
+msgid "Archived"
+msgstr "Архивировано"
+
+#: upload/choices.py:97
+msgid "Depublish"
+msgstr "Снять с публикации"
+
+#: upload/choices.py:98
+msgid "Request correction"
+msgstr "Запросить исправление"
+
+#: upload/choices.py:99
+msgid "Assign quality review"
+msgstr "Назначить проверку качества"
+
+#: upload/choices.py:100
+msgid "Publish on QA website"
+msgstr "Опубликовать на сайте QA"
+
+#: upload/choices.py:101
+msgid "Publish on public website"
+msgstr "Опубликовать на публичном сайте"
+
+#: upload/choices.py:113
+msgid "New document"
+msgstr "Новый документ"
+
+#: upload/choices.py:181
+msgid "blocking"
+msgstr "блокирующий"
+
+#: upload/choices.py:182
+msgid "critical"
+msgstr "критический"
+
+#: upload/choices.py:184
+msgid "unknown"
+msgstr "неизвестно"
+
+#: upload/choices.py:186
+msgid "ok"
+msgstr "ок"
+
+#: upload/choices.py:195
+msgid "The error will be fixed"
+msgstr "Ошибка будет исправлена"
+
+#: upload/choices.py:198
+msgid "Impossible to fix it"
+msgstr "Невозможно исправить"
+
+#: upload/choices.py:200
+msgid "There's disagreement about the error"
+msgstr "Есть разногласия по поводу ошибки"
+
+#: upload/choices.py:210
+msgid "Accepted with errors"
+msgstr "Принято с ошибками"
+
+#: upload/choices.py:211
+msgid "Accepted"
+msgstr "Принято"
+
+#: upload/choices.py:212
+msgid "Correction required"
+msgstr "Требуется исправление"
+
+#: upload/choices.py:221
+msgid "Flexible auto publication"
+msgstr "Гибкая автопубликация"
+
+#: upload/choices.py:222
+msgid "Strict auto publication"
+msgstr "Строгая автопубликация"
+
+#: upload/choices.py:223
+msgid "Manual publication"
+msgstr "Ручная публикация"
+
+#: upload/choices.py:234
+msgid "unreleased"
+msgstr "не выпущено"
+
+#: upload/choices.py:235
+msgid "published"
+msgstr "опубликовано"
+
+#: upload/choices.py:236
+msgid "depublished"
+msgstr "снято с публикации"
+
+#: upload/choices.py:90
+msgid "Package file"
+msgstr "Файл пакета"
+
+#: upload/controller.py:142
+msgid "File Report"
+msgstr "Отчет по файлу"
+
+#: upload/controller.py:220 upload/controller.py:234
+msgid ""
+"Not allowed to accept new package. There is a previous package which "
+"status={}. Search it and change the status to '{}'"
+msgstr "Не разрешено принимать новый пакет. Существует предыдущий пакет со статусом {}. Найдите его и измените статус на '{}'"
+
+#: upload/controller.py:281
+msgid "Registered journals: {}. "
+msgstr "Зарегистрированные журналы: {}. "
+
+#: upload/controller.py:283
+msgid "Found no registered journal. "
+msgstr "Зарегистрированных журналов не найдено. "
+
+#: upload/controller.py:286
+msgid ""
+"Journal in XML must be a registered journal. Journal in XML: {}. {}. "
+"Register the journal on core.scielo.org"
+msgstr "Журнал в XML должен быть зарегистрированным. Журнал в XML: {}. {}. Зарегистрируйте журнал на core.scielo.org"
+
+#: upload/controller.py:339
+msgid "Registered issues: {}. "
+msgstr "Зарегистрированные выпуски: {}. "
+
+#: upload/controller.py:341
+msgid "{} has no registered issues"
+msgstr "У {} нет зарегистрированных выпусков"
+
+#: upload/controller.py:344
+msgid ""
+"Issue in XML must be a registered issue. Issue in XML {}. {}. Register the "
+"issue on core.scielo.org"
+msgstr "Выпуск в XML должен быть зарегистрированным. Выпуск в XML {}. {}. Зарегистрируйте выпуск на core.scielo.org"
+
+#: upload/controller.py:356 upload/controller.py:364
+msgid "{} (registered, {}) differs from {} (XML, {})"
+msgstr "{} (зарегистрировано, {}) отличается от {} (XML, {})"
+
+#: upload/forms.py:30 upload/forms.py:32 upload/forms.py:82 upload/forms.py:84
+msgid "Força a publicação de journal"
+msgstr "Принудительная публикация журнала"
+
+#: upload/forms.py:36 upload/forms.py:38 upload/forms.py:88 upload/forms.py:90
+msgid "Força a publicação de issue"
+msgstr "Принудительная публикация выпуска"
+
+#: upload/forms.py:49
+msgid "Choose the analyst who will decide about the package"
+msgstr "Выберите аналитика, который примет решение по пакету"
+
+#: upload/forms.py:56
+msgid ""
+"Make a decision about the package or choose the analyst who will decide "
+"about the package"
+msgstr "Примите решение по пакету или выберите аналитика для принятия решения"
+
+#: upload/forms.py:101
+msgid "Justify your decision about the package"
+msgstr "Обоснуйте решение по пакету"
+
+#: upload/forms.py:131
+msgid "Inform if you finish or not the errors review"
+msgstr "Укажите, завершили ли вы проверку ошибок"
+
+#: upload/forms.py:154 upload/forms.py:160
+msgid "Value must be from 0 to 100"
+msgstr "Значение должно быть от 0 до 100"
+
+#: upload/models.py:105
+msgid "Package Zip"
+msgstr "Zip пакета"
+
+#: upload/models.py:108
+msgid "Package Zip File"
+msgstr "Zip файл пакета"
+
+#: upload/models.py:114
+msgid "Show package validations"
+msgstr "Показать валидации пакета"
+
+#: upload/models.py:117
+msgid ""
+"Unchecked to be redirect to package upload. Checked to be redirect to "
+"package validation"
+msgstr "Снимите галочку для перехода к загрузке пакета. Отметьте для перехода к валидации пакета"
+
+#: upload/models.py:130
+msgid "Zip file"
+msgstr "Zip файл"
+
+#: upload/models.py:131
+msgid "Zip files"
+msgstr "Zip файлы"
+
+#: upload/models.py:183
+msgid "Package File"
+msgstr "Файл пакета"
+
+#: upload/models.py:189
+msgid "SPS Package name"
+msgstr "Имя пакета SPS"
+
+#: upload/models.py:190
+msgid "Signature"
+msgstr "Подпись"
+
+#: upload/models.py:205
+msgid "Quality analysis decision"
+msgstr "Решение анализа качества"
+
+#: upload/models.py:211
+msgid ""
+"Make a decision about the package or choose the analyst who will decide it"
+msgstr "Примите решение по пакету или выберите аналитика для этого"
+
+#: upload/models.py:215
+msgid "Quality analysis comment"
+msgstr "Комментарий к анализу качества"
+
+#: upload/models.py:219
+msgid ""
+"Comment the decision about the package or choose the analyst who will "
+"comment it"
+msgstr "Прокомментируйте решение по пакету или выберите аналитика для комментария"
+
+#: upload/models.py:228
+msgid ""
+"Choose the analyst who will decide about the package or add your decision"
+msgstr "Выберите аналитика для принятия решения или добавьте свое решение"
+
+#: upload/models.py:250
+msgid "Expiration date"
+msgstr "Дата истечения"
+
+#: upload/models.py:255
+msgid "Error percentual"
+msgstr "Процент ошибок"
+
+#: upload/models.py:259 upload/models.py:266 upload/models.py:269
+#: upload/models.py:272 upload/models.py:2031 upload/models.py:2034
+#: upload/models.py:2037
+msgid "0 to 100"
+msgstr "от 0 до 100"
+
+#: upload/models.py:262
+msgid "Warning percentual"
+msgstr "Процент предупреждений"
+
+#: upload/models.py:278
+msgid "Linked packages"
+msgstr "Связанные пакеты"
+
+#: upload/models.py:279
+msgid "Linked packages which will be published only if all are approved"
+msgstr "Связанные пакеты, которые будут опубликованы только при одобрении всех"
+
+#: upload/models.py:320 upload/models.py:321 upload/wagtail_hooks.py:92
+msgid "Package admin"
+msgstr "Админ пакетов"
+
+#: upload/models.py:323
+msgid "Can finish deposit"
+msgstr "Может завершать депонирование"
+
+#: upload/models.py:324
+msgid "Can access all packages from all users"
+msgstr "Может просматривать пакеты всех пользователей"
+
+#: upload/models.py:325
+msgid "Can assign package"
+msgstr "Может назначать пакет"
+
+#: upload/models.py:684
+msgid "The error review has been completed"
+msgstr "Проверка ошибок завершена"
+
+#: upload/models.py:687
+msgid "The error review is in progress"
+msgstr "Проверка ошибок выполняется"
+
+#: upload/models.py:690 upload/models.py:709
+msgid "The XML package needs to be fixed and sent again"
+msgstr "Пакет XML нужно исправить и отправить повторно"
+
+#: upload/models.py:697
+msgid "It was concluded that {} are not errors"
+msgstr "Сделан вывод, что {} не являются ошибками"
+
+#: upload/models.py:703
+msgid "It was concluded that {} are impossible to fix"
+msgstr "Сделан вывод, что {} невозможно исправить"
+
+#: upload/models.py:712
+msgid "Finish the deposit"
+msgstr "Завершить депонирование"
+
+#: upload/models.py:715
+msgid "Review and comment the errors"
+msgstr "Проверить и прокомментировать ошибки"
+
+#: upload/models.py:904
+msgid "SPS Package was not created"
+msgstr "Пакет SPS не был создан"
+
+#: upload/models.py:907
+msgid "Article was not created"
+msgstr "Статья не была создана"
+
+#: upload/models.py:920
+msgid "{} is not published on MinIO"
+msgstr "{} не опубликован на MinIO"
+
+#: upload/models.py:924
+msgid "Total of XML, PDF, HTML do not match {}"
+msgstr "Общее количество XML, PDF, HTML не совпадает с {}"
+
+#: upload/models.py:939
+msgid "SPS package requires PID provider registration"
+msgstr "Пакет SPS требует регистрации у провайдера PID"
+
+#: upload/models.py:1203
+msgid "QA decision report"
+msgstr "Отчет о решении QA"
+
+#: upload/models.py:1366 upload/models.py:1417 upload/models.py:1663
+msgid "Decision"
+msgstr "Решение"
+
+#: upload/models.py:1367 upload/models.py:1418
+msgid "Article"
+msgstr "Статья"
+
+#: upload/models.py:1376 upload/models.py:1377 upload/wagtail_hooks.py:203
+msgid "Quality control admin"
+msgstr "Админ контроля качества"
+
+#: upload/models.py:1419
+msgid "Publication Status"
+msgstr "Статус публикации"
+
+#: upload/models.py:1429 upload/models.py:1430 upload/wagtail_hooks.py:286
+msgid "Publication admin"
+msgstr "Админ публикаций"
+
+#: upload/models.py:1436
+msgid "Subject"
+msgstr "Тема"
+
+#: upload/models.py:1440
+msgid "Item being analyzed"
+msgstr "Анализируемый элемент"
+
+#: upload/models.py:1443
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:22
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:22
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:25
+#: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:23
+msgid "Message"
+msgstr "Сообщение"
+
+#: upload/models.py:1445 upload/models.py:1883
+msgid "Result"
+msgstr "Результат"
+
+#: upload/models.py:1477
+msgid "Validation result"
+msgstr "Результат валидации"
+
+#: upload/models.py:1478
+msgid "Validation results"
+msgstr "Результаты валидации"
+
+#: upload/models.py:1566
+msgid "Sub-item being analyzed"
+msgstr "Анализируемый подэлемент"
+
+#: upload/models.py:1569
+msgid "Focus on"
+msgstr "Фокус на"
+
+#: upload/models.py:1572
+msgid "Validation type"
+msgstr "Тип валидации"
+
+#: upload/models.py:1601
+msgid "XML validation result"
+msgstr "Результат валидации XML"
+
+#: upload/models.py:1602
+msgid "XML validation results"
+msgstr "Результаты валидации XML"
+
+#: upload/models.py:1633 upload/wagtail_hooks.py:468
+msgid "XML info"
+msgstr "XML информация"
+
+#: upload/models.py:1634
+msgid "XML infos"
+msgstr "XML информация (мн.ч.)"
+
+#: upload/models.py:1648
+msgid "Expected value"
+msgstr "Ожидаемое значение"
+
+#: upload/models.py:1652
+msgid "Got value"
+msgstr "Полученное значение"
+
+#: upload/models.py:1653
+msgid "Advice"
+msgstr "Совет"
+
+#: upload/models.py:1655
+msgid "Reaction"
+msgstr "Реакция"
+
+#: upload/models.py:1678 upload/models.py:1969
+msgid "XML error"
+msgstr "Ошибка XML"
+
+#: upload/models.py:1679
+#: upload/templates/modeladmin/upload/package/inspect.html:204
+#: upload/templates/modeladmin/upload/package/inspect_.html:204
+#: upload/wagtail_hooks.py:389
+msgid "XML errors"
+msgstr "Ошибки XML"
+
+#: upload/models.py:1732
+msgid "Validation category"
+msgstr "Категория валидации"
+
+#: upload/models.py:1739
+msgid "creation"
+msgstr "создание"
+
+#: upload/models.py:1759
+msgid "Validation Report"
+msgstr "Отчет о валидации"
+
+#: upload/models.py:1760 upload/wagtail_hooks.py:512
+msgid "Validation Reports"
+msgstr "Отчеты о валидации"
+
+#: upload/models.py:1902
+msgid "Report File"
+msgstr "Файл отчета"
+
+#: upload/models.py:1958
+msgid "The error review is complete"
+msgstr "Проверка ошибок завершена"
+
+#: upload/models.py:1978 upload/validation/xml_data_checker.py:55
+msgid "XML Error Report"
+msgstr "Отчет об ошибках XML"
+
+#: upload/models.py:1979 upload/wagtail_hooks.py:353
+msgid "XML Error Reports"
+msgstr "Отчеты об ошибках XML"
+
+#: upload/models.py:2197
+msgid "Pid Reservation"
+msgstr "Резервирование PID"
+
+#: upload/models.py:2198
+msgid "Pid Reservations"
+msgstr "Резервирование PID (мн.ч.)"
+
+#: upload/models.py:2253
+msgid "Setting package.pid_v2 from PidProviderXML"
+msgstr "Установка package.pid_v2 из PidProviderXML"
+
+#: upload/models.py:2268
+msgid "Unable to set package.pid_v2 because issue ({}) is not registered"
+msgstr "Не удалось установить package.pid_v2, так как выпуск ({}) не зарегистрирован"
+
+#: upload/models.py:2299
+msgid "Unable to reserve pid_v2 {} for {}"
+msgstr "Не удалось зарезервировать pid_v2 {} для {}"
+
+#: upload/models.py:2309
+msgid "Unable to update pid_provider ({}) with {}"
+msgstr "Не удалось обновить pid_provider ({}) с {}"
+
+#: upload/models.py:2354
+msgid "Setting v2 ({}) from {}"
+msgstr "Установка v2 ({}) из {}"
+
+#: upload/models.py:2385
+msgid "Setting v2 ({}) from random {}"
+msgstr "Установка v2 ({}) из случайного {}"
+
+#: upload/tasks.py:172
+msgid "Assets Report"
+msgstr "Отчет по активам (Assets)"
+
+#: upload/tasks.py:191
+msgid "Package has all the expected asset files"
+msgstr "В пакете присутствуют все ожидаемые файлы активов"
+
+#: upload/tasks.py:193
+msgid "Assets"
+msgstr "Активы"
+
+#: upload/tasks.py:216
+msgid "Renditions Report"
+msgstr "Отчет по рендерингам (Renditions)"
+
+#: upload/tasks.py:229 upload/tasks.py:237
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:55
+msgid "Renditions"
+msgstr "Представления (Renditions)"
+
+#: upload/tasks.py:235
+msgid "Package has all the expected rendition files"
+msgstr "В пакете присутствуют все ожидаемые файлы представлений"
+
+#: upload/tasks.py:259
+msgid "Renditions content report"
+msgstr "Отчет о содержимом представлений"
+
+#: upload/tasks.py:414
+msgid "DTD Report"
+msgstr "Отчет DTD"
+
+#: upload/tasks.py:425 upload/tasks.py:432 upload/tasks.py:440
+msgid "XML Structure"
+msgstr "Структура XML"
+
+#: upload/tasks.py:430 upload/tasks.py:468
+msgid "No error found"
+msgstr "Ошибок не найдено"
+
+#: upload/tasks.py:448
+msgid "Style checker Report"
+msgstr "Отчет проверки стиля"
+
+#: upload/tasks.py:463 upload/tasks.py:470 upload/tasks.py:478
+msgid "XML Style"
+msgstr "Стиль XML"
+
+#: upload/tasks.py:556
+msgid "Web page Report"
+msgstr "Отчет по веб-странице"
+
+#: upload/templates/modeladmin/upload/package/create.html:23
+msgid "Saving…"
+msgstr "Сохранение…"
+
+#: upload/templates/modeladmin/upload/package/create.html:24
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:12
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:12
+msgid "Save"
+msgstr "Сохранить"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:15
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:15
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:15
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:15
+#: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:15
+msgid "Back to package inspection"
+msgstr "Назад к инспекции пакета"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:24
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:24
+msgid "Resolution action"
+msgstr "Действие решения"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:25
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:25
+msgid "Resolution rationale"
+msgstr "Обоснование решения"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:26
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:4
+msgid "Opinion"
+msgstr "Мнение"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:47
+msgid "Add validation error"
+msgstr "Добавить ошибку валидации"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:52
+msgid "Send opinions"
+msgstr "Отправить мнения"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:26
+msgid "Quality analyst opinion"
+msgstr "Мнение аналитика качества"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:27
+msgid "Quality analyst guidance"
+msgstr "Руководство аналитика качества"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:19
+msgid "If you don\\"
+msgstr "Если вы не..."
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:19
+msgid "Google Groups"
+msgstr "Google Группы"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:27
+msgid "Resolution"
+msgstr "Решение"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:48
+msgid "Send resolutions"
+msgstr "Отправить решения"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:6
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:6
+msgid "Choose an option"
+msgstr "Выберите вариант"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:7
+msgid "I will fix this error"
+msgstr "Я исправлю эту ошибку"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:8
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:7
+msgid "This is not an error"
+msgstr "Это не ошибка"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:10
+msgid "Rationale"
+msgstr "Обоснование"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:8
+msgid "This error has to be fixed"
+msgstr "Эту ошибку необходимо исправить"
+
+#: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:10
+msgid "Guidance"
+msgstr "Руководство"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:12
+#: upload/templates/modeladmin/upload/package/inspect_.html:12
+#, python-format
+msgid "Back to %(pkg_zip_name)s list"
+msgstr "Назад к списку %(pkg_zip_name)s"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:19
+#: upload/templates/modeladmin/upload/package/inspect_.html:19
+#, python-format
+msgid "Go to %(lk)s validation reports (%(st)s)"
+msgstr "Перейти к отчетам о валидации %(lk)s (%(st)s)"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:57
+#: upload/templates/modeladmin/upload/package/inspect_.html:57
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:27
+msgid "XML"
+msgstr "XML"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:64
+#: upload/templates/modeladmin/upload/package/inspect_.html:64
+msgid "Package validations"
+msgstr "Валидации пакета"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:69
+#: upload/templates/modeladmin/upload/package/inspect.html:115
+#: upload/templates/modeladmin/upload/package/inspect.html:165
+#: upload/templates/modeladmin/upload/package/inspect_.html:69
+#: upload/templates/modeladmin/upload/package/inspect_.html:115
+#: upload/templates/modeladmin/upload/package/inspect_.html:165
+msgid "Date"
+msgstr "Дата"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:70
+#: upload/templates/modeladmin/upload/package/inspect_.html:70
+msgid "Blocking issues"
+msgstr "Блокирующие проблемы"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:71
+#: upload/templates/modeladmin/upload/package/inspect.html:116
+#: upload/templates/modeladmin/upload/package/inspect.html:205
+#: upload/templates/modeladmin/upload/package/inspect_.html:71
+#: upload/templates/modeladmin/upload/package/inspect_.html:116
+#: upload/templates/modeladmin/upload/package/inspect_.html:205
+msgid "Critical issues"
+msgstr "Критические проблемы"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:72
+#: upload/templates/modeladmin/upload/package/inspect.html:117
+#: upload/templates/modeladmin/upload/package/inspect_.html:72
+#: upload/templates/modeladmin/upload/package/inspect_.html:117
+msgid "Errors"
+msgstr "Ошибки"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:73
+#: upload/templates/modeladmin/upload/package/inspect.html:118
+#: upload/templates/modeladmin/upload/package/inspect_.html:73
+#: upload/templates/modeladmin/upload/package/inspect_.html:118
+msgid "Warnings"
+msgstr "Предупреждения"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:89
+#: upload/templates/modeladmin/upload/package/inspect_.html:89
+#: upload/templates/modeladmin/upload/package/inspect_.html:139
+msgid "Processing..."
+msgstr "Обработка..."
+
+#: upload/templates/modeladmin/upload/package/inspect.html:93
+#: upload/templates/modeladmin/upload/package/inspect_.html:93
+msgid "Resolve errors"
+msgstr "Устранить ошибки"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:95
+#: upload/templates/modeladmin/upload/package/inspect.html:178
+#: upload/templates/modeladmin/upload/package/inspect_.html:95
+#: upload/templates/modeladmin/upload/package/inspect_.html:178
+msgid "View report"
+msgstr "Посмотреть отчет"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:104
+#: upload/templates/modeladmin/upload/package/inspect_.html:104
+msgid "XML Validations"
+msgstr "Валидации XML"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:108
+#: upload/templates/modeladmin/upload/package/inspect_.html:108
+msgid ""
+"By default the system sets all the XML errors were accepted by the XML "
+"producer and will be corrected. In case of disagreement, review the errors "
+"and set a different opinion"
+msgstr "По умолчанию система считает, что все ошибки XML приняты производителем и будут исправлены. В случае несогласия проверьте ошибки и укажите другое мнение."
+
+#: upload/templates/modeladmin/upload/package/inspect.html:119
+#: upload/templates/modeladmin/upload/package/inspect_.html:119
+msgid "Accepted to fix"
+msgstr "Принято к исправлению"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:120
+#: upload/templates/modeladmin/upload/package/inspect_.html:120
+msgid "Contested issues"
+msgstr "Оспоренные вопросы"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:121
+#: upload/templates/modeladmin/upload/package/inspect_.html:121
+msgid "Declared impossible to fix"
+msgstr "Объявлено невозможным к исправлению"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:139
+msgid "Processing... Reload page"
+msgstr "Обработка... Перезагрузите страницу"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:143
+#: upload/templates/modeladmin/upload/package/inspect_.html:143
+msgid "Error review completed"
+msgstr "Проверка ошибок завершена"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:146
+#: upload/templates/modeladmin/upload/package/inspect_.html:146
+msgid "Review the XML errors"
+msgstr "Проверить ошибки XML"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:148
+#: upload/templates/modeladmin/upload/package/inspect_.html:148
+msgid "View the XML errors"
+msgstr "Посмотреть ошибки XML"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:153
+#: upload/templates/modeladmin/upload/package/inspect_.html:153
+msgid "Pending conclusion"
+msgstr "Ожидание заключения"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:166
+#: upload/templates/modeladmin/upload/package/inspect_.html:166
+#: upload/wagtail_hooks.py:548
+msgid "Validations"
+msgstr "Валидации"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:190
+#: upload/templates/modeladmin/upload/package/inspect_.html:190
+msgid "Processing validations... Reload page. "
+msgstr "Обработка валидаций... Перезагрузите страницу. "
+
+#: upload/templates/modeladmin/upload/package/inspect.html:195
+#: upload/templates/modeladmin/upload/package/inspect_.html:195
+msgid "Validations finished!"
+msgstr "Валидации завершены!"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:198
+#: upload/templates/modeladmin/upload/package/inspect_.html:198
+msgid "Summary"
+msgstr "Сводка"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:203
+#: upload/templates/modeladmin/upload/package/inspect_.html:203
+msgid "XML warnings"
+msgstr "Предупреждения XML"
+
+#: upload/templates/modeladmin/upload/package/inspect.html:223
+#: upload/templates/modeladmin/upload/package/inspect_.html:223
+msgid "Download XML errors report"
+msgstr "Скачать отчет об ошибках XML"
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:4
+msgid "Preview (optimized package)"
+msgstr "Предпросмотр (оптимизированный пакет)"
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:8
+msgid "HTML"
+msgstr "HTML"
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:18
+msgid "Preview HTML "
+msgstr "Предпросмотр HTML "
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:35
+msgid "View XML "
+msgstr "Просмотреть XML "
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:43
+msgid "PDF"
+msgstr "PDF"
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons.html:51
+msgid "Download PDF"
+msgstr "Скачать PDF"
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:4
+msgid "Download"
+msgstr "Скачать"
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:12
+msgid "Original package"
+msgstr "Оригинальный пакет"
+
+#: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:20
+msgid "Optimized package"
+msgstr "Оптимизированный пакет"
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:19
+msgid "Digital assets"
+msgstr "Цифровые активы"
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:26
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:62
+msgid "Is present in the package?"
+msgstr "Присутствует в пакете?"
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:38
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:72
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:77
+msgid "Yes"
+msgstr "Да"
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:40
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:74
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:79
+msgid "No"
+msgstr "Нет"
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:46
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:85
+msgid "File is missing"
+msgstr "Файл отсутствует"
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:60
+msgid "Expected filename"
+msgstr "Ожидаемое имя файла"
+
+#: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:61
+msgid "Is the main Language"
+msgstr "Является ли основным языком"
+
+#: upload/templates/modeladmin/upload/package/validation_report/edit.html:15
+#: upload/templates/modeladmin/upload/validationreport/edit.html:15
+#: upload/templates/modeladmin/upload/xmlerrorreport/edit.html:15
+#: upload/templates/modeladmin/upload/xmlinforeport/edit.html:15
+#, python-format
+msgid "Got to %(model_name)s list"
+msgstr "Перейти к списку %(model_name)s"
+
+#: upload/templates/modeladmin/upload/validationreport/edit.html:9
+#: upload/templates/modeladmin/upload/xmlerrorreport/edit.html:9
+#: upload/templates/modeladmin/upload/xmlinforeport/edit.html:9
+msgid "Back to package validations"
+msgstr "Назад к валидациям пакета"
+
+#: upload/templates/modeladmin/upload/validationresult/inspect.html:15
+msgid "Back to related package"
+msgstr "Назад к связанному пакету"
+
+#: upload/templates/modeladmin/upload/validationresult/inspect.html:37
+msgid "Missing file"
+msgstr "Файл отсутствует"
+
+#: upload/templates/modeladmin/upload/validationresult/inspect.html:46
+msgid "Snippet"
+msgstr "Фрагмент (Snippet)"
+
+#: upload/validation/html_validation.py:22
+msgid "Web page `{}` does not exist"
+msgstr "Веб-страница `{}` не существует"
+
+#: upload/validation/html_validation.py:29
+#: upload/validation/rendition_validation.py:23
+msgid "It was expected to find `{}` in {} ({})"
+msgstr "Ожидалось найти `{}` в {} ({})"
+
+#: upload/validation/rendition_validation.py:30
+msgid "It was expected to find `{}` in XML ({})"
+msgstr "Ожидалось найти `{}` в XML ({})"
+
+#: upload/validation/xml_data_checker.py:46
+msgid "XML Info Report"
+msgstr "Отчет об информации XML"
+
+#: upload/views.py:30 upload/views.py:149 upload/views.py:213
+msgid "Operation not available"
+msgstr "Операция недоступна"
+
+#: upload/views.py:119
+msgid "Success ..."
+msgstr "Успех..."
+
+#: upload/views.py:147
+msgid "The decision was executed as planned"
+msgstr "Решение выполнено по плану"
+
+#: upload/views.py:148
+msgid "There was an impediment to executing the decision."
+msgstr "При выполнении решения возникло препятствие."
+
+#: upload/views.py:204
+msgid "Article successfully published"
+msgstr "Статья успешно опубликована"
+
+#: upload/views.py:205
+msgid "Failed to publish the article. Please try again."
+msgstr "Не удалось опубликовать статью. Пожалуйста, попробуйте снова."
+
+#: upload/views.py:231
+msgid "Package has been deposited"
+msgstr "Пакет депонирован"
+
+#: upload/views.py:237
+msgid "The XML package needs review and comment"
+msgstr "Пакет XML требует проверки и комментариев"
+
+#: upload/views.py:244
+msgid "Package deposit failed due to errors"
+msgstr "Депонирование пакета не удалось из-за ошибок"
+
+#: upload/views.py:248
+msgid "Correct package based on report and resubmit"
+msgstr "Исправьте пакет на основе отчета и отправьте повторно"
+
+#: upload/views.py:320
+msgid "You do not have permission to assign packages."
+msgstr "У вас нет прав для назначения пакетов."
+
+#: upload/views.py:341
+msgid "You do not have permission to archive packages."
+msgstr "У вас нет прав для архивации пакетов."
+
+#: upload/views.py:348
+msgid "Package was archived."
+msgstr "Пакет был архивирован."
+
+#: upload/views.py:352
+msgid "Unable to archive package which status = {}."
+msgstr "Невозможно архивировать пакет со статусом {}."
+
+#: upload/wagtail_hooks.py:52
+msgid "Package upload"
+msgstr "Загрузка пакета"
+
+#: upload/wagtail_hooks.py:432
+msgid "XML Info Reports"
+msgstr "Отчеты об информации XML"
+
+#: upload/wagtail_hooks.py:581
+msgid "Upload Validator"
+msgstr "Валидатор загрузки"
+
+#: upload/wagtail_hooks.py:617
+msgid "Archived Packages"
+msgstr "Архивные пакеты"
+
+#: upload/wagtail_hooks.py:693
+msgid "Error management"
+msgstr "Управление ошибками"
