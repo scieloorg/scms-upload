@@ -1,6 +1,3 @@
-import logging
-from datetime import datetime
-
 from django.db import IntegrityError, models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -9,7 +6,6 @@ from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.models import Orderable
 
 from article.models import Article
-from collection.models import Collection
 from core.models import CommonControlField
 from core.utils.requester import NonRetryableError, fetch_data
 
@@ -34,6 +30,7 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         on_delete=models.SET_NULL,
         null=True,
         unique=True,
+        related_name="availability_status",
     )
     completed = models.BooleanField(default=False)
     published_by = models.CharField(
@@ -107,7 +104,7 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
 
     def create_or_update_urls(self, user, website_url, timeout=None):
         for url in self.article.get_urls(website_url):
-            item = ScieloURLStatus.create_or_update(
+            ScieloURLStatus.create_or_update(
                 user=user,
                 article=self.article,
                 url=url,

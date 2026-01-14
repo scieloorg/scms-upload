@@ -1,5 +1,6 @@
 import logging
 
+from langdetect import detect
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -8,7 +9,7 @@ from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from collection import choices
-from collection.utils import language_iso
+from collection.utils import get_valid_language_code
 from core.choices import LANGUAGE
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
@@ -57,6 +58,10 @@ class Collection(CommonControlField):
             collection.creator = user
             collection.save()
             return collection
+    
+    def get_website_config(self, purpose, content_type):
+        ws = WebSiteConfiguration.get(collection=self, purpose=purpose)
+        return ws.get_data(content_type=content_type)
 
 
 class WebSiteConfiguration(CommonControlField, ClusterableModel):
@@ -112,6 +117,21 @@ class WebSiteConfiguration(CommonControlField, ClusterableModel):
         FieldPanel("enabled"),
         InlinePanel("endpoint", label=_("EndPoints"), classname="collapsed"),
     ]
+
+    def get_data(self, content_type=None):
+        data = {
+            "enabled": self.enabled,
+            "get_token_url": self.api_get_token_url,
+            "username": self.api_username,
+            "password": self.api_password
+        }
+        if content_type == "journal":
+            data["post_data_url"] = self.api_url_journal
+        elif content_type == "issue":
+            data["post_data_url"] = self.api_url_issue
+        elif content_type == "article":
+            data["post_data_url"] = self.api_url_article
+        return data
 
     @classmethod
     def get(cls, url=None, collection=None, purpose=None):
@@ -190,6 +210,8 @@ class Language(CommonControlField):
     name = models.CharField(_("Language Name"), max_length=64, blank=True, null=True)
     code2 = models.CharField(_("Language code 2"), max_length=5, blank=True, null=True)
 
+    base_form_class = CoreAdminModelForm
+
     class Meta:
         verbose_name = _("Language")
         verbose_name_plural = _("Languages")
@@ -211,17 +233,20 @@ class Language(CommonControlField):
 
     @classmethod
     def get(cls, name=None, code2=None):
-        code2 = language_iso(code=code2)
+        original_code = code2
+        valid_code2 = get_valid_language_code(code2)
+        code2 = valid_code2 or original_code
         if code2:
-            if not code2.isalpha() or len(code2) != 2:
-                raise ValueError(f"Language.get_or_create invalid code2 {code2}")
             return cls.objects.get(code2=code2)
         if name:
             return cls.objects.get(name=name)
         raise ValueError("Language.get_or_create requires name or code2")
 
     @classmethod
-    def get_or_create(cls, name=None, code2=None, creator=None):
+    def get_or_create(cls, name=None, code2=None, creator=None, text_to_detect_language=None):
+        original_code = code2
+        valid_code2 = get_valid_language_code(code2, text_to_detect_language)
+        code2 = valid_code2 or original_code
         try:
             return cls.get(name, code2)
         except cls.MultipleObjectsReturned as e:
@@ -245,8 +270,6 @@ class Language(CommonControlField):
     @property
     def data(self):
         return {"value": self.name, "code": self.code2}
-
-    base_form_class = CoreAdminModelForm
 
 
 class WebSiteConfigurationEndpoint(CommonControlField):

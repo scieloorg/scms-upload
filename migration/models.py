@@ -1,7 +1,7 @@
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from django.core.files.base import ContentFile
@@ -24,7 +24,7 @@ from . import exceptions
 
 
 def now():
-    return datetime.utcnow().isoformat().replace(":", "-").replace(".", "-")
+    return datetime.now(timezone.utc).isoformat().replace(":", "-").replace(".", "-")
 
 
 class MigratedFileCreateOrUpdateError(Exception): ...
@@ -36,12 +36,29 @@ class MigratedDocumentHTMLForbiddenError(Exception): ...
 class MigrationError(Exception): ...
 
 
+def get_file_size(source_path):
+    return os.stat(source_path).st_size
+
+    
 def modified_date(file_path):
     try:
         s = os.stat(file_path)
         return datetime.fromtimestamp(s.st_mtime).isoformat()
     except Exception as e:
-        return datetime.utcnow().isoformat()
+        return datetime.now(timezone.utc).isoformat()
+
+
+def has_changed(file_path, other_file_size, other_file_modified_date):
+    s = os.stat(file_path)
+    if other_file_size != s.st_size:
+        logging.info((other_file_size, s.st_size))
+        return True
+    f_date = datetime.fromtimestamp(s.st_mtime).isoformat()
+    if f_date > other_file_modified_date:
+        logging.info(f"{file_path} modified date: {f_date}")
+        logging.info(f"registered file - modified date: {other_file_modified_date}")
+        return True
+    return False
 
 
 class ClassicWebsiteConfiguration(CommonControlField):
@@ -424,7 +441,7 @@ class MigratedFile(CommonControlField):
                     file_datetime_iso=file_datetime_iso,
                 )
             return cls.objects.get(collection=collection, original_path=original_path)
-        raise ValueError("MigratedFile.get requires collection and original_path")
+        raise ValueError(f"MigratedFile.get requires collection {collection} and original_path {original_path}")
 
     @classmethod
     def create_or_update(
@@ -444,7 +461,7 @@ class MigratedFile(CommonControlField):
     ):
         if not source_path and not collection and not original_path:
             raise ValueError(
-                "MigratedFile.create_or_update requires source_path, collection, original_path"
+                f"MigratedFile.create_or_update requires source_path ({source_path}), collection ({collection}), original_path ({original_path})"
             )
 
         if not file_datetime_iso:
@@ -527,34 +544,12 @@ class MigratedFile(CommonControlField):
         return obj
 
     @classmethod
-    def find(cls, collection, xlink_href, journal_acron):
-        try:
-            # dirname = os.path.dirname(xlink_href)
-            basename = os.path.basename(xlink_href)
-            name, ext = os.path.splitext(basename)
-
-            # issue_folder = dirname.split("/")[-1]
-            # issue_folder__name = os.path.join(issue_folder, name)
-
-            return cls.objects.filter(
-                # Q(original_href__contains=issue_folder__name + "."),
-                collection=collection,
-                original_href__contains=f"/{journal_acron}/",
-                original_name__contains=name + ".",
-            )
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            UnexpectedEvent.create(
-                e=e,
-                exc_traceback=exc_traceback,
-                detail={
-                    "task": "migrations.models.MigratedFile.find",
-                    "xlink_href": xlink_href,
-                    "journal_acron": journal_acron,
-                    "collection": str(collection),
-                },
-            )
-            return []
+    def find(cls, collection, journal_acron, name):
+        qs = cls.objects.filter(
+            collection=collection,
+            original_href__contains=f"/{journal_acron}/",
+        )
+        return qs.filter(original_href__contains=name + ".")
 
     def get_original_href(self, original_path):
         try:
@@ -702,26 +697,24 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
 
     @classmethod
     def has_changes(cls, user, collection, journal_acron, file_path, force_update):
-        if not force_update:
-            try:
-                file_size = JournalAcronIdFile.get_file_size(file_path)
-                if cls.objects.filter(
-                    collection=collection, source_path=file_path, file_size=file_size
-                ).exists():
-                    return False
-            except cls.DoesNotExist:
-                pass
-            except cls.MultipleObjectsReturned:
-                pass
-
-        cls.create_or_update(
-            user=user,
-            collection=collection,
-            journal_acron=journal_acron,
-            source_path=file_path,
-            force_update=force_update,
-        )
-        return True
+        if force_update:
+            return True
+        file_size = get_file_size(file_path)
+        obj = None
+        try:
+            obj = cls.objects.get(
+                collection=collection, source_path=file_path, file_size=file_size
+            )
+        except cls.DoesNotExist:
+            return True
+        except cls.MultipleObjectsReturned:
+            obj = cls.objects.filter(
+                collection=collection, source_path=file_path, file_size=file_size
+            ).order_by("-updated").first()
+        if not obj:
+            return True
+        if obj.id_file_records.count() == 0:
+            return True
 
     @classmethod
     def get(
@@ -763,9 +756,9 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             obj.journal_acron = journal_acron
             obj.source_path = source_path
             obj.creator = user
-            obj.file_size = JournalAcronIdFile.get_file_size(source_path)
+            obj.file_size = get_file_size(source_path)
             obj.save()
-
+    
             with open(source_path, "rb") as fp:
                 basename = os.path.basename(source_path)
                 obj.save_file(basename, fp.read())
@@ -777,7 +770,8 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
 
     def save_file(self, name, content, save=False):
         try:
-            self.file.delete(save=save)
+            if os.path.isfile(self.file.path):
+                os.unlink(self.file.path)
         except Exception as e:
             pass
         self.file.save(name, ContentFile(content))
@@ -791,39 +785,31 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         source_path,
         force_update=None,
     ):
+        # raises FileNotFoundError (source_path)
         try:
             obj = cls.get(collection, source_path)
-            if journal_acron and obj.journal_acron is None:
-                obj.journal_acron = journal_acron
-                obj.save()
-            file_size = JournalAcronIdFile.get_file_size(source_path)
-
-            doit = any((force_update, not obj.is_up_to_date(file_size)))
-            if not doit:
-                return obj
-
-            obj.updated_by = user
-            obj.updated = datetime.utcnow()
-            obj.file_size = file_size
-
-            with open(source_path, "rb") as fp:
-                basename = os.path.basename(source_path)
-                obj.save_file(basename, fp.read())
-            obj.save()
-            return obj
         except cls.DoesNotExist:
             return cls.create(user, collection, journal_acron, source_path)
+        except cls.MultipleObjectsReturned:
+            obj = cls.filter(collection, source_path).order_by("-updated").first()
 
-    @staticmethod
-    def get_file_size(source_path):
-        return os.stat(source_path).st_size
-
-    def is_up_to_date(self, file_size):
+        if journal_acron and obj.journal_acron is None:
+            obj.journal_acron = journal_acron
+            obj.save()
+        
         try:
-            logging.info(f"{self.file.path} {file_size} {self.file_size}")
-            return bool(self.file_size and self.file_size == file_size)
-        except Exception as e:
-            return False
+            if force_update or has_changed(source_path, obj.file_size, obj.updated.isoformat()):
+                obj.updated_by = user
+                obj.updated = datetime.now(timezone.utc)
+                obj.file_size = get_file_size(source_path)
+                basename = os.path.basename(source_path)
+                with open(source_path, "rb") as fp:
+                    obj.save_file(basename, fp.read())
+                obj.save()
+        except FileNotFoundError:
+            # só não atualiza
+            pass
+        return obj
 
 
 class IdFileRecord(CommonControlField, Orderable):
@@ -943,7 +929,7 @@ class IdFileRecord(CommonControlField, Orderable):
                 if data == obj.data:
                     return obj
             obj.updated_by = user
-            obj.updated = datetime.utcnow()
+            obj.updated = datetime.now(timezone.utc)
             obj.data = data
             obj.todo = todo
             obj.save()
@@ -973,7 +959,7 @@ class IdFileRecord(CommonControlField, Orderable):
             )
         data["issue"] = issue_data
         try:
-            p_records = (
+            data["paragraph"] = (
                 IdFileRecord.objects.filter(
                     parent=self.parent,
                     item_pid=self.item_pid,
@@ -983,8 +969,8 @@ class IdFileRecord(CommonControlField, Orderable):
                 .data
             )
         except AttributeError:
-            p_records = []
-        data["article"] = self.data + list(p_records)
+            pass
+        data["article"] = self.data
         return {
             "data": data,
             "pid": self.item_pid,
@@ -1000,8 +986,6 @@ class IdFileRecord(CommonControlField, Orderable):
             params["item_pid__startswith"] = f"S{issue_pid}"
         if not force_update:
             params["todo"] = True
-
-        logging.info(f"IdFileRecord.document_records_to_migrate {params}")
         return cls.objects.filter(item_type="article", **params)
 
     @classmethod

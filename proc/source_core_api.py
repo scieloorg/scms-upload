@@ -135,7 +135,7 @@ def fetch_and_create_journal(
             issn_electronic=issn_electronic,
             issn_print=issn_print,
         )
-
+    
     for result in results:
         try:
             process_journal_result(
@@ -177,6 +177,8 @@ def fetch_journal_data_with_pagination(
     params = {k: v for k, v in params.items() if v}
 
     url = settings.JOURNAL_API_URL
+    if not url:
+        return []
     while url:
         try:
             response = fetch_data(
@@ -192,6 +194,7 @@ def fetch_journal_data_with_pagination(
         else:
             # Próxima URL (se existir)
             url = response.get("next")
+            params = {}
             yield from response.get("results") or []
 
 
@@ -203,9 +206,9 @@ def process_journal_result(
     """
 
     if block_unregistered_collection:
-        collections = []
+        collections = set()
         for item in result.get("scielo_journal") or []:
-            collections.append(item["collection_acron"])
+            collections.add(item["collection_acron"])
         if not collections:
             return
         if not Collection.objects.filter(acron__in=collections).exists():
@@ -395,6 +398,8 @@ def fetch_and_create_issues(journal, pub_year, volume, suppl, number, user):
     """
     Busca dados de issues na API Core e cria/atualiza as entidades correspondentes.
     """
+    if not settings.ISSUE_API_URL:
+        return None
     if journal:
         issn_print = journal.official_journal.issn_print
         issn_electronic = journal.official_journal.issn_electronic
