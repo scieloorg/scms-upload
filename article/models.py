@@ -494,9 +494,9 @@ class Article(ClusterableModel, CommonControlField):
             return False
 
     @classmethod
-    def fix_sps_pkg_names(cls, queryset):
+    def fix_sps_pkg_names(cls, items):
         response = []
-        for item in queryset:
+        for item in items:
             data = {"sps_pkg_name": item.sps_pkg.sps_pkg_name}
             try:
                 if item.fix_sps_pkg_name():
