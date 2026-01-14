@@ -99,6 +99,7 @@ def migrate_collection_articles(user, collection_acron, items, force_update):
     articles_migrated = 0
     for article_proc in items.iterator():
         try:
+            logging.info(f"Migrating article_proc {article_proc}")
             article = article_proc.migrate_article(user, force_update)
             if article:
                 articles_migrated += 1

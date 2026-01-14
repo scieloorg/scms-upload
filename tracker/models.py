@@ -50,7 +50,7 @@ class BaseEvent(models.Model):
     name = models.CharField(_("name"), max_length=200)
     detail = models.JSONField(null=True, blank=True)
     created = models.DateTimeField(verbose_name=_("Creation date"), auto_now_add=True)
-    completed = models.BooleanField(default=False)
+    completed = models.BooleanField(default=False, null=True, blank=True)
 
     class Meta:
         abstract = True
@@ -72,6 +72,7 @@ class BaseEvent(models.Model):
         obj = cls()
         obj.detail = detail
         obj.name = name
+        obj.completed = False
         obj.save()
         return obj
 
@@ -174,6 +175,13 @@ class UnexpectedEvent(models.Model):
 
 
 class TaskTracker(BaseEvent):
+    item = models.CharField(_("Item"), max_length=200, null=True, blank=True)
+    total_to_process = models.IntegerField(
+        _("Total to process"), null=True, blank=True, default=0
+    )
+    total_processed = models.IntegerField(
+        _("Total processed"), null=True, blank=True, default=0
+    )
     updated = models.DateTimeField(verbose_name=_("Last update date"), auto_now=True)
     status = models.CharField(
         _("status"),
@@ -191,9 +199,34 @@ class TaskTracker(BaseEvent):
         ]
         ordering = ["-updated"]
 
+    panels = [
+        FieldPanel("item", read_only=True),
+        FieldPanel("name", read_only=True),
+        FieldPanel("completed", read_only=True),
+        FieldPanel("total_to_process", read_only=True),
+        FieldPanel("total_processed", read_only=True),
+        FieldPanel("status", read_only=True),
+        FieldPanel("detail", read_only=True),
+    ]
+
+    @classmethod
+    def create(
+        cls,
+        name=None,
+        detail=None,
+        item=None,
+    ):
+        obj = cls()
+        obj.detail = detail
+        obj.name = name
+        obj.completed = False
+        obj.item = item
+        obj.save()
+        return obj
+
     def finish(
         self,
-        completed=False,
+        completed=True,
         exception=None,
         message_type=None,
         message=None,
@@ -205,8 +238,10 @@ class TaskTracker(BaseEvent):
             logging.exception(exception)
             detail["exception_message"] = str(exception)
             detail["exception_type"] = str(type(exception))
+            completed = False
         if exc_traceback:
             detail["traceback"] = str(format_traceback(exc_traceback))
+            completed = False
         if message_type:
             detail["message_type"] = message_type
         if message:
@@ -222,5 +257,6 @@ class TaskTracker(BaseEvent):
             status = choices.TASK_TRACK_STATUS_FINISHED
         else:
             status = choices.TASK_TRACK_STATUS_INTERRUPTED
+        self.completed = completed
         self.status = status
         self.save()

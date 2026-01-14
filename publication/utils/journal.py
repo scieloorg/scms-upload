@@ -17,6 +17,7 @@ def build_journal(
 
     for journal_history in journal_history.all():
         logging.info(f"journal_history.event_type: {journal_history.event_type}")
+
         if journal_history.event_type == "ADMITTED":
             event_type = "current"
         elif journal_history.interruption_reason == "ceased":
@@ -28,6 +29,9 @@ def build_journal(
             event_type = "suspended"
         elif journal_history.interruption_reason == "not-open-access":
             event_type = "suspended"
+        elif journal_history.event_type == "INTERRUPTED":
+            # deceased está incorreto no opac
+            event_type = "deceased"
         else:
             event_type = "inprogress"
 
@@ -43,10 +47,8 @@ def build_journal(
             current_status = sorted(
                 builder.data["status_history"], key=lambda x: x["date"]
             )[-1]["status"]
-            if current_status not in ("inprogress", "current"):
-                current_status = "no-current"
         except (IndexError, KeyError):
-            pass
+            current_status = "inprogress"
     builder.data["current_status"] = current_status
 
     builder.add_journal_issns(

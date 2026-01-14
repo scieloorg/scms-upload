@@ -1,6 +1,8 @@
 import logging
 import os
 import sys
+import traceback
+from functools import cached_property
 
 from django.core.files.base import ContentFile
 from django.db import models
@@ -25,6 +27,7 @@ from scielo_classic_website.classic_ws import Document
 from scielo_classic_website.models.document import GenerateBodyAndBackFromHTMLError
 # from tracker.models import EventLogger
 from tracker import choices as tracker_choices
+from tracker.models import UnexpectedEvent, format_traceback
 
 from . import choices, exceptions
 
@@ -131,9 +134,15 @@ def get_xpath_for_name_stats(name):
     return []
 
 
-def get_xml_nodes_to_string(xml, xpath):
+def get_xml_nodes_to_string(xml, xpaths):
+    if not xpaths:
+        return ""
+
+    xpath = "|".join(xpaths)
+    items = []
     for item in xml.xpath(xpath, namespaces={"xlink": "http://www.w3.org/1999/xlink"}):
-        yield xml_node_to_string(item)
+        items.append(xml_node_to_string(item))
+    return items
 
 
 # Extrair de Html2xmlAnalysis
@@ -142,37 +151,24 @@ def xml_node_to_string(node):
     return etree.tostring(node, encoding="utf-8", pretty_print=True).decode("utf-8")
 
 
-def format_data_as_tabular(data_dict):
-    """Unifica _format_csv() e _format_txt() (eram idênticos)"""
-    for k, v in data_dict.items():
-        if k == "html_vs_xml":
-            for item in v:
-                yield f"{item['html']}\t{item['xml']}"
-        else:
-            yield f"{k}\t{v}"
-
-
-def format_html_numbers_section(data_dict):
+def format_html_numbers_section(statistics_list):
     """Era Html2xmlAnalysis._format_html_numbers()"""
     yield "<div><div>"
-    for k, v in data_dict.items():
-        if k == "html_vs_xml":
-            continue
-        else:
-            yield (
-                f'<div class="row"><div class="col-sm">{k}</div>'
-                f'<div class="col-sm">{v}</div></div>'
-            )
+    for item in statistics_list:
+        label = item.get('label', '')
+        value = item.get('value', '')
+        yield (
+            f'<div class="row"><div class="col-sm">{label}</div>'
+            f'<div class="col-sm">{value}</div></div>'
+        )
     yield "</div></div>"
 
 
-def format_html_match_section(data_dict):
+def format_html_match_section(html_vs_xml):
     """Era Html2xmlAnalysis._format_html_match()"""
     yield "<div>"
-    for k, v in data_dict.items():
-        if k == "html_vs_xml":
-            for item in v:
-                yield from format_code(item)
+    for item in html_vs_xml:
+        yield from format_code(item)
     yield "</div>"
 
 
@@ -199,11 +195,6 @@ def format_code(cols):
     yield "<h4>xml</h4>"
     for item in cols["xml"]:
         yield f"<div><pre><code>{format_code_(item)}</code></pre></div>"
-
-
-def _fromstring(xml_content):
-    pref, xml = split_processing_instruction_doctype_declaration_and_xml(xml_content)
-    return etree.fromstring(xml)
 
 
 def body_and_back_directory_path(instance, filename):
@@ -276,7 +267,7 @@ class BodyAndBackFile(BasicXMLFile, Orderable):
             obj.save()
         try:
             # cria / atualiza arquivo
-            obj.save_file(pkg_name + ".xml", file_content)
+            obj.save_file(pkg_name + ".xml", file_content, True)
             obj.save()
             return obj
         except Exception as e:
@@ -320,26 +311,78 @@ class Html2xmlAnalysis(models.Model):
     xml_text_lang_total = models.IntegerField(null=True, blank=True, default=0)
     article_type = models.CharField(null=True, blank=True, max_length=32)
 
-    @property
+    @cached_property
     def analysis_data(self):
-        return dict(
-            empty_body=self.empty_body,
-            attention_demands=self.attention_demands,
-            html_img_total=self.html_img_total,
-            html_table_total=self.html_table_total,
-            xml_supplmat_total=self.xml_supplmat_total,
-            xml_media_total=self.xml_media_total,
-            xml_fig_total=self.xml_fig_total,
-            xml_table_wrap_total=self.xml_table_wrap_total,
-            xml_eq_total=self.xml_eq_total,
-            xml_graphic_total=self.xml_graphic_total,
-            xml_inline_graphic_total=self.xml_inline_graphic_total,
-            xml_ref_elem_citation_total=self.xml_ref_elem_citation_total,
-            xml_ref_mixed_citation_total=self.xml_ref_mixed_citation_total,
-            xml_text_lang_total=self.xml_text_lang_total,
-            article_type=self.article_type,
-            html_vs_xml=self._html_vs_xml,
-        )
+        """
+        Retorna dados de análise como lista de dicionários com labels traduzíveis
+        
+        Returns:
+            dict com duas chaves:
+                - 'statistics': lista de dicionários com label/value para estatísticas
+                - 'html_vs_xml': dados de comparação HTML vs XML
+        """
+        return [
+            {
+                'label': _('Body vazio'),
+                'value': _('Sim') if self.empty_body else _('Não')
+            },
+            {
+                'label': _('Pontos de atenção'),
+                'value': self.attention_demands or 0
+            },
+            {
+                'label': _('Tipo de artigo'),
+                'value': self.article_type or _('Não identificado')
+            },
+            {
+                'label': _('Tabelas no HTML'),
+                'value': self.html_table_total or 0
+            },
+            {
+                'label': _('Imagens no HTML'),
+                'value': self.html_img_total or 0
+            },
+            {
+                'label': _('Material suplementar no XML'),
+                'value': self.xml_supplmat_total or 0
+            },
+            {
+                'label': _('Elementos de mídia no XML'),
+                'value': self.xml_media_total or 0
+            },
+            {
+                'label': _('Figuras no XML'),
+                'value': self.xml_fig_total or 0
+            },
+            {
+                'label': _('Tabelas no XML'),
+                'value': self.xml_table_wrap_total or 0
+            },
+            {
+                'label': _('Equações no XML'),
+                'value': self.xml_eq_total or 0
+            },
+            {
+                'label': _('Gráficos no XML'),
+                'value': self.xml_graphic_total or 0
+            },
+            {
+                'label': _('Gráficos inline no XML'),
+                'value': self.xml_inline_graphic_total or 0
+            },
+            {
+                'label': _('Citações estruturadas (element-citation)'),
+                'value': self.xml_ref_elem_citation_total or 0
+            },
+            {
+                'label': _('Citações mistas (mixed-citation)'),
+                'value': self.xml_ref_mixed_citation_total or 0
+            },
+            {
+                'label': _('Idiomas do texto no XML'),
+                'value': self.xml_text_lang_total or 0
+            }
+        ]
 
     panels = [
         FieldPanel("comment"),
@@ -367,27 +410,54 @@ class Html2xmlAnalysis(models.Model):
             models.Index(fields=["attention_demands"]),
         ]
 
-    @property
-    def csv_report_content(self):
-        return "\n".join(format_data_as_tabular(self.analysis_data))
-
-    @property
-    def txt_report_content(self):
-        return "\n".join(format_data_as_tabular(self.analysis_data))
-
     def html_report_content(self, title):
-        rows = "\n".join(format_html_numbers_section(self.analysis_data)) + "\n".join(
-            format_html_match_section(self.analysis_data)
-        )
+        """
+        Gera o conteúdo HTML do relatório
+        
+        Args:
+            title: Título do relatório
+            
+        Returns:
+            str: HTML completo do relatório
+        """
+        stats = format_html_numbers_section(self.analysis_data or [])
+        changes = format_html_match_section(self._html_vs_xml or [])      
         return (
-            f"""<html>"""
+            """<html>"""
             """<head>
-              <title>Report</title>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-              <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>            </head>"""
-            f"""<body><div class="container"><title>Report {title}</title><h1>Report {title}</h1>{rows}</div></body></html>"""
+            <title>Report</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+            </head>"""
+            """<body>
+            <div class="container">
+                <h1>Report {}</h1>
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3>{}</h3>
+                    </div>
+                    <div class="card-body">
+                        {}
+                    </div>
+                </div>
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3>{}</h3>
+                    </div>
+                    <div class="card-body">
+                        {}
+                    </div>
+                </div>
+            </div>
+            </body></html>""".format(
+                title,
+                _('Estatísticas de Conversão HTML para XML'),
+                "".join(stats),
+                _('Trocas de HTML para XML'),
+                "".join(changes),
+            )
         )
 
     def get_a_href_stats(self, html, xml, journal_acron):
@@ -395,7 +465,7 @@ class Html2xmlAnalysis(models.Model):
             xpaths = get_xpath_for_a_href_stats(a, journal_acron)
             yield {
                 "html": xml_node_to_string(a),
-                "xml": (get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []),
+                "xml": get_xml_nodes_to_string(xml, xpaths),
             }
 
     def get_src_stats(self, html, xml, journal_acron):
@@ -412,9 +482,7 @@ class Html2xmlAnalysis(models.Model):
 
             yield {
                 "html": xml_node_to_string(element),
-                "xml": (
-                    get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []
-                ),
+                "xml": get_xml_nodes_to_string(xml, xpaths),
             }
 
     def get_a_name_stats(self, html, xml):
@@ -429,9 +497,7 @@ class Html2xmlAnalysis(models.Model):
 
             yield {
                 "html": xml_node_to_string(node),
-                "xml": (
-                    get_xml_nodes_to_string(xml, " | ".join(xpaths)) if xpaths else []
-                ),
+                "xml": get_xml_nodes_to_string(xml, xpaths),
             }
 
     def get_html_stats(self, html):
@@ -636,15 +702,10 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 ).format(migrated_article, type(e), e)
             )
 
-    @property
-    def bb_files(self):
-        return BodyAndBackFile.objects.filter(bb_parent=self)
-
     def html_to_xml(
         self,
         user,
         article_proc,
-        body_and_back_xml,
     ):
         try:
             detail = {}
@@ -667,32 +728,35 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             document = Document(article_proc.migrated_data.data)
             document._translated_html_by_lang = article_proc.translations
 
-            body_and_back = self._generate_xml_body_and_back(
+            body_and_back_created = self._generate_xml_body_and_back(
                 user, article_proc, document
             )
-            xml_content = self._generate_xml_from_html(user, article_proc, document)
+            xml_created = self._generate_xml_from_html(user, article_proc, document)
 
             detail = {
-                "xml_content": bool(xml_content),
-                "body_and_back": bool(body_and_back),
+                "xml_created": xml_created,
+                "body_and_back": body_and_back_created,
+                "exceptions": document.exceptions,
             }
-            completed = bool(xml_content and body_and_back)
-            if completed and not document.exceptions:
-                self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
+            if xml_created:
+                if document.exceptions:
+                    self.html2xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+                else:
+                    self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
             else:
-                self.html2xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+                self.html2xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
-
+            detail["status"] = self.html2xml_status
             op.finish(
                 user,
-                completed=completed,
+                completed=self.html2xml_status == tracker_choices.PROGRESS_STATUS_DONE,
                 exception=None,
                 message_type=None,
                 message=None,
                 exc_traceback=None,
                 detail=detail,
             )
-            return {"xml": xml_content, "exceptions": document.exceptions}
+            return detail
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -710,28 +774,20 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             )
 
     @property
-    def first_bb_file(self):
-        try:
-            return self.bb_files.first().text
-        except Exception as e:
-            return ""
-
-    @property
-    def latest_bb_file(self):
-        try:
-            return self.bb_files.latest("version").text
-        except Exception as e:
-            return ""
-
+    def initial_html_tree(self):
+        # o bb_file[0] contém o HTML original dentro de CDATA então não cria uma árvore de elementos
+        # o bb_file[1] contém HTML original estruturado em body, back, ref-list
+        item = list(self.bb_file.all())[1]
+        for xml_with_pre in XMLWithPre.create(path=item.file.path):
+            return xml_with_pre.xmltree
+    
     def generate_report(self, user, article_proc):
-        op = article_proc.start(user, "html_to_xml: generate report")
         try:
             detail = {}
-            html = _fromstring(self.first_bb_file)
-
+            op = article_proc.start(user, "html_to_xml: generate report")
             for xml_with_pre in XMLWithPre.create(path=self.file.path):
                 xml = xml_with_pre.xmltree
-
+            html = self.initial_html_tree
             self.evaluate_xml(html, xml, article_proc.issue_proc.journal_proc.acron)
             self.save_report(self.html_report_content(title=article_proc))
 
@@ -750,6 +806,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
+            logging.exception(e)
             op.finish(
                 user,
                 completed=False,
@@ -764,22 +821,26 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         """
         Generate XML body and back from html_translation_langs and p records
         """
-        done = False
-        operation = article_proc.start(user, "html_to_xml: generate xml body + back")
-
-        languages = document._translated_html_by_lang
-        detail = {}
-        detail.update(languages)
-
         try:
-            document.generate_body_and_back_from_html(languages)
-            done = True
-            # guarda cada versão de body/back
-        except GenerateBodyAndBackFromHTMLError as e:
-            document.xml_body_and_back = ["<article><body/><back/></article>"]
             done = False
+            exceptions = []
+            operation = article_proc.start(user, "html_to_xml: generate xml body + back")
 
-        if document.xml_body_and_back:
+            translations = document._translated_html_by_lang
+            detail = {}
+            detail["translation languages"] = list(translations.keys())
+
+            document.generate_body_and_back_from_html(translations)
+
+            if not document.xml_body_and_back:
+                document.xml_body_and_back = ["<article><body/><back/></article>"]
+
+            exceptions.extend(document.exceptions)
+            done = len(exceptions) == 0
+            
+            for item in self.bb_file.all():
+                item.delete()
+
             for i, xml_body_and_back in enumerate(document.xml_body_and_back, start=1):
                 BodyAndBackFile.create_or_update(
                     user=user,
@@ -789,36 +850,70 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                     pkg_name=article_proc.pkg_name,
                 )
                 detail["xml_to_html_steps"] = i
-        operation.finish(user, done, detail=detail)
-        return done
-
-    def _generate_xml_from_html(self, user, article_proc, document):
-        operation = article_proc.start(user, "html_to_xml: merge front + body + back")
-        xml_content = None
-        detail = {}
-        try:
-            xml_content = document.generate_full_xml(None).decode("utf-8")
-            xml_file = article_proc.pkg_name + ".xml"
-            self.save_file(xml_file, xml_content)
-            detail["xml"] = xml_file
-            if document.exceptions:
-                detail["xml_exceptions"] = document.exceptions
-                completed = False
-            else:
-                completed = True
-            operation.finish(user, completed, detail=detail)
-            return xml_content
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
+            
+            detail["exceptions"] = exceptions
             operation.finish(
                 user,
-                completed=False,
-                exception=e,
+                completed=done,
+                exception=None,
                 message_type=None,
                 message=None,
-                exc_traceback=exc_traceback,
                 detail=detail,
             )
+            return done
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            try:
+                operation.finish(
+                    user,
+                    completed=False,
+                    exception=e,
+                    message_type=None,
+                    message=None,
+                    exc_traceback=exc_traceback,
+                    detail=detail,
+                )
+            except AttributeError:
+                UnexpectedEvent.create(
+                    e=e,
+                    exc_traceback=exc_traceback,
+                    detail={
+                        "task": "htmlxml.models.HTMLXML._generate_xml_body_and_back",
+                        "article_proc": article_proc,
+                    },
+                )
+            
+    def _generate_xml_from_html(self, user, article_proc, document):
+        try:
+            detail = {}
+            operation = article_proc.start(user, "html_to_xml: merge front + body + back")
+            detail["xml"] = article_proc.pkg_name + ".xml"
+            self.save_file(detail["xml"], document.generate_full_xml(None).decode("utf-8"), True)
+            detail["xml_exceptions"] = document.exceptions
+            completed = len(document.exceptions) == 0
+            operation.finish(user, completed, detail=detail)
+            return os.path.isfile(self.file.path)
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            try:
+                operation.finish(
+                    user,
+                    completed=False,
+                    exception=e,
+                    message_type=None,
+                    message=None,
+                    exc_traceback=exc_traceback,
+                    detail=detail,
+                )
+            except AttributeError:
+                UnexpectedEvent.create(
+                    e=e,
+                    exc_traceback=exc_traceback,
+                    detail={
+                        "task": "htmlxml.models.HTMLXML._generate_xml_from_html",
+                        "article_proc": article_proc,
+                    },
+                )
 
     def save_report(self, content):
         # content = json.dumps(data)

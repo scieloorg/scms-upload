@@ -61,7 +61,7 @@ def build_article(builder, article, bundle_id, order, pub_date, is_public=True):
 
     builder.add_in_issue(**article_xml.get_in_issue(order))
 
-    builder.add_publication_date(**article_xml.get_publication_date(pub_date))
+    builder.add_publication_date(pub_date)
 
     contribs = article_xml.get_contribs()
     for item in contribs.get("names") or []:
