@@ -1710,9 +1710,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             n_references=len(classic_ws_doc.citations or []),
             record_types="|".join(classic_ws_doc.record_types or []),
         )
-        result = htmlxml.html_to_xml(user, self)
-        detail["html_to_xml"] = result
-        htmlxml.generate_report(user, self)
+        detail["html_to_xml"] = htmlxml.html_to_xml(user, self)
         self.xml_status = htmlxml.html2xml_status
         if os.path.isfile(htmlxml.file.path):
             return htmlxml.file.path
