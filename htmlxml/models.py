@@ -681,6 +681,20 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
     def directory_path(self):
         return f"classic_website/{self.migrated_article.collection.acron}/html2xml/{self.migrated_article.path}"
 
+    def get_meaningful_package_name(self):
+        """Gera um nome de pacote significativo incluindo journal acron, issue folder e pkg_name"""
+        if not self.migrated_article:
+            return "unknown_package"
+        
+        try:
+            journal_acron = self.migrated_article.document.journal.acronym
+            issue_label = self.migrated_article.document.issue.issue_label
+            pkg_name = self.migrated_article.pkg_name
+            return f"{self.migrated_article.collection.acron}_{journal_acron}_{issue_label}_{pkg_name}"
+        except AttributeError:
+            # Fallback para caso algum atributo não exista
+            return self.migrated_article.pkg_name or "unknown_package"
+
     @property
     def created_updated(self):
         return self.updated or self.created
@@ -783,15 +797,23 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 )
             try:
                 self._save_zip(
-                    article_proc.pkg_name,
+                    self.get_meaningful_package_name(),
                     document.xml_body_and_back,
                     xml_content,
                     report_content,
                 )
+                for bb_file_ in self.bb_file.all():
+                    try:
+                        bb_file_.delete()
+                    except Exception as e:
+                        detail["exceptions"].append(
+                            _("Error deleting body and back file {}: {}").format(str(bb_file_.version), str(e))
+                        )
             except Exception as e:
                 detail["exceptions"].append(
                     _("Error saving body and back ZIP file: {}").format(e)
                 )
+            
 
             self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
             self.save()
