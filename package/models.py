@@ -166,7 +166,7 @@ class BasicXMLFile(models.Model):
         try:
             delete_files(self.file.path)
         except Exception as e:
-            logging.exception(f"Error deleting file {self.file.path}: {e}")
+            pass
         super().delete(using=using, keep_parents=keep_parents)
 
     @property
@@ -606,7 +606,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             operation.finish(
                 user,
                 completed=True,
-                detail={"source": zip_file_path, "saved": self.file.path},
+                detail={"source": zip_file_path, "saved": filename},
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -621,7 +621,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         try:
             delete_files(self.file.path)
         except Exception as e:
-            logging.exception(f"Unable to delete {self.file.path} {e} {type(e)}")
+            pass
         try:
             self.file.save(name, ContentFile(content))
         except Exception as e:
