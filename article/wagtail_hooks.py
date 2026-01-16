@@ -53,6 +53,7 @@ class ArticleSnippetViewSet(SnippetViewSet):
     list_filter = ("status", "journal")
     search_fields = (
         "sps_pkg__sps_pkg_name",
+        "pid_v2",
         "pid_v3",
         "issue__publication_year",
         "journal__official_journal__title",
