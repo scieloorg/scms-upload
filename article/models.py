@@ -457,15 +457,17 @@ class Article(ClusterableModel, CommonControlField):
             yield f"{website_url}/scielo.php?script=sci_pdf&pid={pid_v2}&tlng={lang}"
     
     @classmethod
-    def get_repeated_items(cls, field_name, queryset=None):
-        if not queryset:
+    def get_repeated_items(cls, field_name, journal=None):
+        if journal:
+            queryset = cls.objects.filter(journal=journal)
+        else:
             queryset = cls.objects.all()
-        return list((
+        return (
             queryset.values(field_name)
             .annotate(total=Count("id"))
             .filter(total__gt=1)
             .values_list(field_name, flat=True)
-        ).distinct())
+        )
 
     @classmethod
     def select_articles(cls, journal_id_list=None, issue_id_list=None):
@@ -516,22 +518,21 @@ class Article(ClusterableModel, CommonControlField):
     def exclude_repetitions(cls, user, field_name, field_value, timeout=None):
         events = []
         repeated_items = cls.objects.filter(**{field_name: field_value})
-        cls.update_availability_status(user, timeout, repeated_items)
-        events.append(f"{field_name}='{field_value}': {repeated_items.count()} articles")
+        events.append(f"{field_name}='{field_value}': {len(repeated_items)} articles")
 
+        cls.update_availability_status(user, timeout, repeated_items)
         if not repeated_items.exists():
+            events.append(f"{field_name}='{field_value}': {len(repeated_items)} articles")
             return events
         
+        items_to_delete = repeated_items
         item_to_keep_id = cls.choose_item_to_keep(repeated_items)
-
         if item_to_keep_id:
             events.append(f"Item to keep: Article ID {item_to_keep_id}")
-            items_to_delete = repeated_items.exclude(id=item_to_keep_id)
-        else:
-            items_to_delete = repeated_items
+            items_to_delete = items_to_delete.exclude(id=item_to_keep_id)
         
         total = len(items_to_delete)
-
+        events.append(f"{field_name}='{field_value}': {total} articles")
         pp_xml_id_to_delete = []
         sps_pkg_id_to_delete = []
         for item_to_delete in items_to_delete:
