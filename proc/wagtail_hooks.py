@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSetGroup
+import django_filters
 
 from config.menu import get_menu_order
 from core.views import CommonControlFieldViewSet
@@ -10,6 +11,64 @@ from htmlxml.models import HTMLXML
 from package.models import SPSPkg
 
 from .models import ArticleProc, IssueProc, JournalProc, ProcReport
+
+
+class HTMLXMLFilterSet(django_filters.FilterSet):
+    has_images = django_filters.BooleanFilter(
+        field_name='html_img_total',
+        lookup_expr='gt',
+        label=_('Has Images'),
+        method='filter_has_images'
+    )
+    
+    has_tables = django_filters.BooleanFilter(
+        field_name='html_table_total', 
+        lookup_expr='gt',
+        label=_('Has Tables'),
+        method='filter_has_tables'
+    )
+    
+    has_attention_demands = django_filters.BooleanFilter(
+        field_name='attention_demands',
+        lookup_expr='gt', 
+        label=_('Has Attention Demands'),
+        method='filter_has_attention_demands'
+    )
+    
+    def filter_has_images(self, queryset, name, value):
+        if value is True:
+            return queryset.filter(html_img_total__gt=0)
+        elif value is False:
+            return queryset.filter(html_img_total=0)
+        return queryset
+    
+    def filter_has_tables(self, queryset, name, value):
+        if value is True:
+            return queryset.filter(html_table_total__gt=0)
+        elif value is False:
+            return queryset.filter(html_table_total=0)
+        return queryset
+    
+    def filter_has_attention_demands(self, queryset, name, value):
+        if value is True:
+            return queryset.filter(attention_demands__gt=0)
+        elif value is False:
+            return queryset.filter(attention_demands=0)
+        return queryset
+
+    class Meta:
+        model = HTMLXML
+        fields = [
+            'html2xml_status',
+            'quality', 
+            'pdf_langs',
+            'html_translation_langs',
+            'article_type',
+            'empty_body',
+            'has_images',
+            'has_tables',
+            'has_attention_demands',
+        ]
 
 
 class JournalProcViewSet(CommonControlFieldViewSet):
@@ -89,6 +148,7 @@ class HTMLXMLViewSet(CommonControlFieldViewSet):
     menu_order = 300
     add_to_settings_menu = False
     inspect_view_enabled = True
+    filterset_class = HTMLXMLFilterSet
 
     list_per_page = 10
 
@@ -102,17 +162,6 @@ class HTMLXMLViewSet(CommonControlFieldViewSet):
         "n_paragraphs",
         "n_references",
         "created_updated",
-    ]
-    list_filter = [
-        "html2xml_status",
-        "quality",
-        "pdf_langs",
-        "html_translation_langs",
-        "article_type",
-        "empty_body",
-        "html_img_total",
-        "html_table_total",
-        "attention_demands",
     ]
     search_fields = [
         "migrated_article__pid",

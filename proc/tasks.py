@@ -7,6 +7,8 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from article.models import Article
+from journal.models import Journal
+from issue.models import Issue
 from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
@@ -74,6 +76,7 @@ class TaskExecution:
             completed = False
         else:
             completed = True
+        self.params["item"] = self.item
         detail = {
             "params": self.params,
             "stats": self.stats,
@@ -882,19 +885,28 @@ def task_migrate_and_publish_articles_by_journal(
             collection__acron=collection_acron,
             acron=journal_acron,
         )
+
+        task_exclude_article_repetition(
+            journal_proc.id,
+            qa_api_data=None,
+            public_api_data=None,
+            username=user.username,
+            user_id=user.id,
+            timeout=None,
+        )
+
         task_exec.add_event("Read journal acron id file")
         response = controller.register_acron_id_file_content(
             user,
             journal_proc,
             force_update=force_import_acron_id_file,
         )
+
         try:
             article_pids = response.pop("article_pids")
         except KeyError:
             article_pids = []
-        task_exec.add_event(
-            {"read acron.id response": response}
-        )
+        task_exec.add_event(f"acron.id response: {response}")
         task_exec.add_number("total_articles_to_process", len(article_pids))
         
         # Agrupa os article_pids por issue_pid
@@ -911,6 +923,7 @@ def task_migrate_and_publish_articles_by_journal(
 
         status = tracker_choices.get_valid_status(status, force_update)
         task_exec.add_event(f"Select journal issues which docs_status or files_status in {status} and/or has articles to process")
+
         events = []
         issue_proc_list = IssueProc.get_id_and_pid_list_to_process(
             journal_proc,
@@ -994,31 +1007,23 @@ def task_migrate_and_publish_articles_by_issue(
             "collection", "journal_proc",
         ).get(id=issue_proc_id)
         task_exec.item = str(issue_proc)
-        task_exec.add_event("Exclude article repetition from issue")
-        task_exclude_article_repetition_from_issue(
-            issue_proc_id=issue_proc_id,
-            qa_api_data=qa_api_data,
-            public_api_data=public_api_data,
-            username=username,
-            user_id=user_id,
+
+        task_exec.add_event(f"STATUS={status}")
+        task_exec.add_event(f"total article_pids: {len(article_pids)}")
+        task_exec.add_event(f"docs_status: {issue_proc.docs_status}")
+
+        task_exec.add_event("Migrate document records")
+        total_migrated_records = issue_proc.migrate_document_records(user, force_migrate_document_records)
+        task_exec.add_number("total_migrated_records", total_migrated_records)
+
+        task_exec.add_event("Migrate issue files")
+        total_migrated_files = issue_proc.get_files_from_classic_website(
+            user, force_migrate_document_files, controller.migrate_issue_files
         )
+        task_exec.add_number("total_migrated_files", total_migrated_files)
 
         task_exec.add_event("Mark articles for reprocessing")
         ArticleProc.mark_for_reprocessing(issue_proc, article_pids)
-
-        task_exec.add_event(f"docs_status in {status} or article_pids={bool(article_pids)}")
-        if issue_proc.docs_status in status or article_pids:
-            task_exec.add_event("Migrate document records")
-            total_docs_to_migrate = issue_proc.migrate_document_records(user, force_update)
-            task_exec.add_number("total_docs_to_migrate", total_docs_to_migrate)
-
-        task_exec.add_event(f"files_status in {status} or article_pids={bool(article_pids)}")
-        if issue_proc.files_status in status:
-            task_exec.add_event("Migrate issue files")
-            total_files_to_migrate = issue_proc.get_files_from_classic_website(
-                user, force_update, controller.migrate_issue_files
-            )
-            task_exec.add_number("total_files_to_migrate", total_files_to_migrate)
 
         task_exec.add_event("Select articles to migrate and/or publish")
         query_by_status = (
@@ -1076,6 +1081,24 @@ def task_migrate_and_publish_articles_by_issue(
                 publication_year=issue_proc.issue.publication_year,
                 force_update=force_update,
             )
+
+        for website_label, api_data in zip((QA, PUBLIC), (qa_api_data, public_api_data)):
+            if not api_data:
+                api_data = get_api_data(issue_proc.collection, "issue", website_label)
+            if api_data and not api_data.get("error"):
+                try:
+                    task_exec.add_event(f"Syncing issue in {website_label} website")
+                    sync_issue(issue_proc, api_data)
+                    task_exec.add_event(f"Issue synced in {website_label} website")
+                except Exception as e:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    task_exec.add_exception(
+                        {
+                            "website": website_label,
+                            "traceback": traceback.format_exc(),
+                        }
+                    )
+
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1336,72 +1359,44 @@ def task_fetch_and_create_journal(
 
 ###############################
 
-@celery_app.task(bind=True)
-def task_exclude_article_repetition(self, username=None, user_id=None, collection_acron_list=None, journal_acron_list=None, issue_folder=None):
-    task_params = {
-        "collection_acron_list": collection_acron_list,
-        "journal_acron_list": journal_acron_list,
-        "issue_folder": issue_folder,
-    }
-    try:
-        user = _get_user(user_id=user_id, username=username)
-        kwargs = {}
-        if collection_acron_list:
-            kwargs["collection__acron__in"] = collection_acron_list
-        if journal_acron_list:
-            kwargs["journal_proc__acron__in"] = journal_acron_list
-        if issue_folder:
-            kwargs["issue_folder__contains"] = issue_folder
-        for issue_proc in IssueProc.objects.filter(**kwargs):
-            task_exclude_article_repetition_from_issue.delay(
-                issue_proc_id=issue_proc.id,
-                username=username,
-                user_id=user_id,
-            )
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            item="",
-            action="task_exclude_article_repetition",
-            e=e,
-            exc_traceback=exc_traceback,
-            detail=task_params,
-        )
 
 @celery_app.task(bind=True)
-def task_exclude_article_repetition_from_issue(self, issue_proc_id, qa_api_data=None, public_api_data=None, username=None, user_id=None, timeout=None):
+def task_exclude_article_repetition(self, journal_proc_id, qa_api_data=None, public_api_data=None, username=None, user_id=None, timeout=None):
     task_params = {
-        "issue_proc_id": issue_proc_id,
+        "journal_proc_id": journal_proc_id,
         "qa_api_data": bool(qa_api_data),
         "public_api_data": bool(public_api_data),
     }
-    issue_proc_id_ = str(issue_proc_id)
+    journal_proc_str = str(journal_proc_id)
     task_exec = TaskExecution(
-        name="task_exclude_article_repetition_from_issue",
-        item=issue_proc_id_,
+        name="task_exclude_article_repetition",
+        item=journal_proc_str,
         params=task_params,
     )
     try:
         user = _get_user(user_id=user_id, username=username)
-        issue_proc = IssueProc.objects.select_related("collection").get(id=issue_proc_id)
-        task_exec.item = str(issue_proc)
-        issue_proc_id_ = str(issue_proc)
-        collection = issue_proc.collection
+        journal_proc = JournalProc.objects.get(id=journal_proc_id)
+        journal = journal_proc.journal
+        collection = journal_proc.collection
 
-        queryset = Article.objects.filter(issue=issue_proc.issue)
-        task_exec.add_number("total_articles_in_issue", queryset.count())
+        task_exec.item = str(journal_proc)
+        journal_proc_str = str(journal_proc)
 
-        response = Article.fix_sps_pkg_names(list(queryset))
+        journal_articles_qs = Article.objects.filter(journal=journal)
+        task_exec.add_number("total_articles_in_journal", journal_articles_qs.count())
+
+        journal_articles_to_fix_sps_pkg_names_qs = journal_articles_qs.filter(
+            Q(issue__supplement__isnull=True),
+            ~Q(sps_pkg__sps_pkg_name__contains="-s"),
+            sps_pkg__isnull=False,
+        )
+        response = Article.fix_sps_pkg_names(journal_articles_to_fix_sps_pkg_names_qs)
         task_exec.add_event(f"fixed sps_pkg_names: {response}")
 
+        issues = set()
         for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
-            total_filtered = len(queryset)
-            task_exec.add_number(f"total_{field_name}", total_filtered)
-            if total_filtered == 0:
-                task_exec.add_event(f"Consulta novamente Article para obter artigos do issue ({field_name})")
-                queryset = Article.objects.filter(issue=issue_proc.issue)
-            repeated_items = Article.get_repeated_items(field_name, queryset)
-            task_exec.add_number(f"repeated_by_{field_name}", len(repeated_items))
+            repeated_items = Article.get_repeated_items(field_name, journal)
+            task_exec.add_number(f"repeated_by_{field_name}", repeated_items.count())
             for repeated_value in repeated_items:
                 try:
                     events = Article.exclude_repetitions(user, field_name, repeated_value, timeout=timeout)
@@ -1411,22 +1406,6 @@ def task_exclude_article_repetition_from_issue(self, issue_proc_id, qa_api_data=
                     task_exec.add_exception(
                         {
                             f"repeated_by_{field_name}": repeated_value,
-                            "traceback": traceback.format_exc(),
-                        }
-                    )
-        for website_label, api_data in zip((QA, PUBLIC), (qa_api_data, public_api_data)):
-            if not api_data:
-                api_data = get_api_data(collection, "issue", website_label)
-            if api_data and not api_data.get("error"):
-                try:
-                    task_exec.add_event(f"Syncing issue in {website_label} website")
-                    sync_issue(issue_proc, api_data)
-                    task_exec.add_event(f"Issue synced in {website_label} website")
-                except Exception as e:
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    task_exec.add_exception(
-                        {
-                            "website": website_label,
                             "traceback": traceback.format_exc(),
                         }
                     )
@@ -1440,9 +1419,81 @@ def task_exclude_article_repetition_from_issue(self, issue_proc_id, qa_api_data=
             )
         except Exception:
             UnexpectedEvent.create(
-                item=issue_proc_id_,
-                action="proc.tasks.task_exclude_article_repetition_from_issue",
+                item=journal_proc_str,
+                action="proc.tasks.task_exclude_article_repetition",
                 e=e,
                 exc_traceback=exc_traceback,
                 detail=task_params,
             )
+
+
+@celery_app.task(bind=True)
+def task_remove_duplicate_issues(
+    self,
+    user_id=None,
+    username=None,
+    journal_id=None,
+):
+    """
+    Remove Issue duplicados.
+    
+    Args:
+        dry_run: Se True, apenas identifica duplicatas sem remover.
+    """
+    task_params = {
+        "user_id": user_id,
+        "username": username,
+        "journal_id": journal_id,
+    }
+    task_exec = TaskExecution(
+        name="proc.tasks.task_remove_duplicate_issues",
+        item=f"{journal_id or 'all'}",
+        params=task_params,
+    )
+    try:
+        user = _get_user(user_id, username)
+        stats = {}
+        journal = None
+        if journal_id:
+            journal = Journal.objects.get(id=journal_id)
+        
+        duplicates = Issue.get_duplicates(journal)
+        stats["total_duplicated_issues"] = duplicates.count()
+        task_exec.total_to_process = stats["total_duplicated_issues"]
+        duplicated_issues = []
+        for duplicated_issue_data in duplicates.iterator():
+            try:
+                duplicated_issues.append(duplicated_issue_data)
+                issues = list(Issue.objects.filter(**duplicated_issue_data).order_by("-updated"))
+                keep = issues[0]
+                task_exec.add_event(f"Remove duplicated Issues, (keeping {keep})")
+                for issue in issues[1:]:
+                    try:
+                        # Migra artigos para o Issue mantido
+                        Article.objects.filter(issue=issue).update(issue=keep)
+                        # Atualiza IssueProc se existir
+                        IssueProc.objects.filter(issue=issue).update(issue=keep)
+                        issue.delete()
+                    except Exception as e:
+                        exc_type, exc_value, exc_traceback = sys.exc_info()
+                        task_exec.add_exception(
+                            {
+                                "duplicated_issue_data": duplicated_issue_data,
+                                "issue_id": issue.id,
+                                "traceback": traceback.format_exc(),
+                            }
+                        )
+                task_exec.total_processed += 1
+            except Exception as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                task_exec.add_exception(
+                    {
+                        "duplicated_issue_data": duplicated_issue_data,
+                        "traceback": traceback.format_exc(),
+                    }
+                )
+        task_exec.finish()
+        
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        task_exec.finish(exception=e, exc_traceback=exc_traceback)

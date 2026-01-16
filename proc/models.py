@@ -27,6 +27,7 @@ from article.models import Article
 from collection import choices as collection_choices
 from collection.models import Collection
 from core.models import CommonControlField
+from core.utils.file_utils import delete_files
 from htmlxml.models import HTMLXML
 from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
@@ -1229,13 +1230,16 @@ class IssueProc(BaseProc, ClusterableModel):
                 force_update=force_update,
             )
             failures = migration_result.get("exceptions", [])
+            migrated = migration_result.get("migrated") or []
             self.issue_files.clear()
             self.issue_files.set(migration_result.get("migrated", []))
-            self.files_status = (
-                tracker_choices.PROGRESS_STATUS_PENDING
-                if failures
-                else tracker_choices.PROGRESS_STATUS_DONE
-            )
+
+            if migrated and failures:
+                self.files_status = tracker_choices.PROGRESS_STATUS_PENDING
+            elif migrated:
+                self.files_status = tracker_choices.PROGRESS_STATUS_DONE
+            else:
+                self.files_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
 
             operation.finish(
@@ -1354,6 +1358,9 @@ class IssueProc(BaseProc, ClusterableModel):
                 force_update=True,  # todos os registros encontrados em acron.id no momento
             ).count()
             detail["total_document_records"] = total_document_records
+
+            force_update = ArticleProc.objects.filter(issue_proc=self).count() < total_document_records
+
             id_file_records = IdFileRecord.document_records_to_migrate(
                 collection=self.collection,
                 issue_pid=self.pid,
@@ -1579,6 +1586,16 @@ class ArticleProc(BaseProc, ClusterableModel):
         params = {"issue_proc": issue_proc}
         if article_pids:
             params["pid__in"] = article_pids
+        if issue_proc.docs_status not in (
+            tracker_choices.PROGRESS_STATUS_DONE,
+            tracker_choices.PROGRESS_STATUS_PENDING,
+        ):
+            return
+        if issue_proc.files_status not in (
+            tracker_choices.PROGRESS_STATUS_DONE,
+            tracker_choices.PROGRESS_STATUS_PENDING,
+        ):
+            return
         cls.objects.filter(**params).update(
             xml_status=tracker_choices.PROGRESS_STATUS_REPROC,
             sps_pkg_status=tracker_choices.PROGRESS_STATUS_REPROC,
@@ -1587,19 +1604,18 @@ class ArticleProc(BaseProc, ClusterableModel):
             public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC,
         )
 
-    def set_status(self, new_status=None):
-        new_status = new_status or tracker_choices.PROGRESS_STATUS_REPROC
-        if self.xml_status == new_status:
-            self.sps_pkg_status = new_status
+    def set_status(self):
+        if self.xml_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
 
-        if self.sps_pkg_status == new_status:
-            self.migration_status = new_status
+        if self.sps_pkg_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.migration_status = tracker_choices.PROGRESS_STATUS_REPROC
 
-        if self.migration_status == new_status:
-            self.qa_ws_status = new_status
+        if self.migration_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.qa_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
 
-        if self.qa_ws_status == new_status:
-            self.public_ws_status = new_status
+        if self.qa_ws_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.public_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
 
         self.save()
 
@@ -1647,9 +1663,9 @@ class ArticleProc(BaseProc, ClusterableModel):
             operation = self.start(user, "get xml")
 
             self.xml_status = tracker_choices.PROGRESS_STATUS_DOING
+            self.save()
             try:
-                os.unlink(self.processed_xml.file.path)
-                self.save()
+                delete_files(self.processed_xml.file.path)
             except Exception:
                 pass
 
@@ -2026,8 +2042,8 @@ class ArticleProc(BaseProc, ClusterableModel):
 
     def migrate_article(self, user, force_update):
         if force_update:
-            self.xml_status = tracker_choices.PROGRESS_STATUS_TODO
-            self.set_status(tracker_choices.PROGRESS_STATUS_TODO)
+            self.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
+            self.set_status()
         if not self.get_xml(user):
             return None
         if not self.generate_sps_package(user):
