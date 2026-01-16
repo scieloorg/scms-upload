@@ -23,6 +23,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
+from core.utils.file_utils import delete_files
 from migration.models import MigratedArticle
 from package.models import BasicXMLFile
 from scielo_classic_website.classic_ws import Document
@@ -182,15 +183,6 @@ def format_code_(data):
 
 
 def format_code(cols):
-    # xml = ""
-    # for item in cols["xml"]:
-    #     xml += f"<li><pre><code>{format_code_(item)}</code></pre></li>"
-
-    # if xml:
-    #     xml = f"<ul>{xml}</ul>"
-
-    # cols["html"] = "<pre><code>" + format_code_(cols["html"]) + "</code></pre>"
-    # cols["xml"] = xml
     yield "<hr/>"
     yield "<h4>html</h4>"
     yield "<div><pre><code>" + format_code_(cols["html"]) + "</code></pre></div>"
@@ -292,12 +284,13 @@ class BodyAndBackFile(BasicXMLFile, Orderable):
 
 def generated_xml_report_directory_path(instance, filename):
     migrated_article = instance.migrated_article
-    pkg_path = (
+    return (
+        f"classic_website/{migrated_article.collection.acron}/html2xml/"
         f"{migrated_article.document.journal.acronym}/"
         f"{migrated_article.document.issue.issue_label}/"
-        f"{migrated_article.pkg_name}"
+        f"{migrated_article.pkg_name}/"
+        f"report/{filename}"
     )
-    return f"classic_website/{migrated_article.collection.acron}/html2xml/{pkg_path}/report/{filename}"
 
 
 class Html2xmlAnalysis(models.Model):
@@ -699,6 +692,21 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
     def created_updated(self):
         return self.updated or self.created
 
+    # @property
+    # def has_images(self):
+    #     """Retorna True se o HTML contém imagens"""
+    #     return (self.html_img_total or 0) > 0
+    
+    # @property
+    # def has_tables(self):
+    #     """Retorna True se o HTML contém tabelas"""
+    #     return (self.html_table_total or 0) > 0
+    
+    # @property
+    # def has_attention_demands(self):
+    #     """Retorna True se há pontos de atenção"""
+    #     return (self.attention_demands or 0) > 0
+
     @classmethod
     def get(
         cls,
@@ -787,13 +795,27 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                     _("Errors found when generating full XML from HTML")
                 )
             self.save_file(detail["xml"], xml_content, True)
+            self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
+            self.save()
+            detail["xml_created"] = True
+            detail["status"] = self.html2xml_status
+            op.finish(
+                user,
+                completed=detail["xml_created"],
+                exception=None,
+                message_type=None,
+                message=None,
+                exc_traceback=None,
+                detail=detail,
+            )
 
             try:
                 report_content = self.generate_report(article_proc)
             except Exception as e:
                 report_content = None
+                error = traceback.format_exc()
                 detail["exceptions"].append(
-                    _("Error generating HTML to XML report: {}").format(e)
+                    _("Error generating HTML to XML report: {} {}").format(e, error)
                 )
             try:
                 self._save_zip(
@@ -813,22 +835,6 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 detail["exceptions"].append(
                     _("Error saving body and back ZIP file: {}").format(e)
                 )
-            
-
-            self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
-            self.save()
-
-            detail["xml_created"] = True
-            detail["status"] = self.html2xml_status
-            op.finish(
-                user,
-                completed=detail["xml_created"],
-                exception=None,
-                message_type=None,
-                message=None,
-                exc_traceback=None,
-                detail=detail,
-            )
             return detail
 
         except Exception as e:
@@ -875,17 +881,13 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             logging.exception(e)
 
     def generate_report(self, article_proc):
-        try:
-            self.report.delete(save=False)
-        except (FileNotFoundError, AttributeError, TypeError):
-            pass
         for xml_with_pre in XMLWithPre.create(path=self.file.path):
             xml = xml_with_pre.xmltree
         html = self.initial_html_tree
         self.evaluate_xml(html, xml, article_proc.issue_proc.journal_proc.acron)
         report_content = self.html_report_content(title=article_proc)
-        self.report.save("html2xml.html", ContentFile(report_content))
 
+        self.save_report(report_content)
         if self.attention_demands == 0:
             self.quality = choices.HTML2XML_QA_AUTO_APPROVED
         else:
@@ -924,3 +926,14 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         self.conversion_steps_zip_file.save(zip_filename, ContentFile(zip_content), save=True)
 
         return True
+
+    def save_report(self, report_content):
+        try:
+            delete_files(self.report.path)
+        except Exception as e:
+            pass
+        self.report.save(
+            "report.html",
+            ContentFile(report_content),
+            save=True,
+        )
