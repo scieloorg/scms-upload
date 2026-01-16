@@ -1397,8 +1397,6 @@ def task_exclude_article_repetition(self, journal_proc_id, qa_api_data=None, pub
         for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
             repeated_items = Article.get_repeated_items(field_name, journal)
             task_exec.add_number(f"repeated_by_{field_name}", repeated_items.count())
-            task_exec.add_number(f"repeated_by_{field_name}", len(repeated_items))
-            task_exec.add_number(f"repeated_by_{field_name}", repeated_items.count())
             for repeated_value in repeated_items:
                 try:
                     events = Article.exclude_repetitions(user, field_name, repeated_value, timeout=timeout)

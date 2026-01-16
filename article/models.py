@@ -2,6 +2,7 @@ import logging
 import traceback
 from datetime import datetime, timezone
 
+from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, models
 from django.db.models import Count, Q
@@ -516,44 +517,68 @@ class Article(ClusterableModel, CommonControlField):
 
     @classmethod
     def exclude_repetitions(cls, user, field_name, field_value, timeout=None):
-        events = []
+        """
+        Remove artigos duplicados baseado em um campo específico,
+        mantendo o artigo mais relevante (publicado e válido tem prioridade).
+        """
         repeated_items = cls.objects.filter(**{field_name: field_value})
-        events.append(f"{field_name}='{field_value}': {len(repeated_items)} articles")
-
+        total_initial = repeated_items.count()
+        
+        if total_initial <= 1:
+            return [f"{field_name}='{field_value}': {total_initial} artigo(s), nenhuma ação necessária"]
+        
+        events = [f"{field_name}='{field_value}': {total_initial} artigos encontrados"]
+        
+        # Atualiza status de disponibilidade antes de decidir qual manter
         cls.update_availability_status(user, timeout, repeated_items)
-        if not repeated_items.exists():
-            events.append(f"{field_name}='{field_value}': {len(repeated_items)} articles")
+        
+        # Recarrega queryset após atualização de status
+        repeated_items = cls.objects.filter(**{field_name: field_value})
+        
+        item_to_keep_id = cls.choose_item_to_keep(repeated_items)
+        if not item_to_keep_id:
+            # Fallback: mantém o mais recentemente atualizado
+            item_to_keep_id = repeated_items.order_by('-updated').values_list('id', flat=True).first()
+        
+        if not item_to_keep_id:
+            events.append("Erro: nenhum item encontrado para manter")
             return events
         
-        items_to_delete = repeated_items
-        item_to_keep_id = cls.choose_item_to_keep(repeated_items)
-        if item_to_keep_id:
-            events.append(f"Item to keep: Article ID {item_to_keep_id}")
-            items_to_delete = items_to_delete.exclude(id=item_to_keep_id)
+        events.append(f"Artigo mantido: ID {item_to_keep_id}")
         
-        total = len(items_to_delete)
-        events.append(f"{field_name}='{field_value}': {total} articles")
-        pp_xml_id_to_delete = []
-        sps_pkg_id_to_delete = []
-        for item_to_delete in items_to_delete:
-            if item_to_delete.sps_pkg:
-                sps_pkg_id_to_delete.append(item_to_delete.sps_pkg.id)
-            if item_to_delete.pp_xml:
-                pp_xml_id_to_delete.append(item_to_delete.pp_xml.id)
-
-        if total:
-            items_to_delete.delete()
-        events.append(f"Deleted Article: {total}")
-
-        total = len(sps_pkg_id_to_delete)
-        if total:
-            SPSPkg.objects.filter(id__in=sps_pkg_id_to_delete).delete()
-        events.append(f"Deleted SPSPkg: {total}")
+        # Coleta IDs relacionados em uma única passagem
+        items_to_delete = repeated_items.exclude(id=item_to_keep_id).select_related('sps_pkg', 'pp_xml')
         
-        total = len(pp_xml_id_to_delete)
-        if total:
-            PidProviderXML.objects.filter(id__in=pp_xml_id_to_delete).delete()
-        events.append(f"Deleted PidProviderXML: {total}")
+        sps_pkg_ids = set()
+        pp_xml_ids = set()
+        article_ids = []
+        
+        for item in items_to_delete:
+            article_ids.append(item.id)
+            if item.sps_pkg_id:
+                sps_pkg_ids.add(item.sps_pkg_id)
+            if item.pp_xml_id:
+                pp_xml_ids.add(item.pp_xml_id)
+        
+        total_to_delete = len(article_ids)
+        events.append(f"Artigos a deletar: {total_to_delete}")
+        
+        if not total_to_delete:
+            return events
+        
+        # Executa deleções em transação atômica
+        with transaction.atomic():
+            deleted_articles, _ = cls.objects.filter(id__in=article_ids).delete()
+            events.append(f"Articles deletados: {deleted_articles}")
+            
+            if sps_pkg_ids:
+                deleted_sps, _ = SPSPkg.objects.filter(id__in=sps_pkg_ids).delete()
+                events.append(f"SPSPkg deletados: {deleted_sps}")
+            
+            if pp_xml_ids:
+                deleted_pp, _ = PidProviderXML.objects.filter(id__in=pp_xml_ids).delete()
+                events.append(f"PidProviderXML deletados: {deleted_pp}")
+        
         return events
 
     @classmethod
