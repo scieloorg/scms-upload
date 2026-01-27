@@ -1711,11 +1711,31 @@ class ArticleProc(BaseProc, ClusterableModel):
     def get_xml_from_native(self, detail):
         try:
             xml_with_pre = list(XMLWithPre.create(path=self.migrated_xml.file.path))[0]
+        except IndexError as e:
+            raise XMLVersionXmlWithPreError(
+                _("Unable to get xml_with_pre from native for {}: {}").format(self, e)
+            )
+        try:
+            # correção de fig/inline-graphic para fig/graphic
             detail["fix_inline_graphic_in_caption"] = fix_inline_graphic_in_caption(xml_with_pre.xmltree)
-            return xml_with_pre
         except Exception as e:
             logging.exception(e)
             raise
+        try:
+            article_publication_date = xml_with_pre.article_publication_date
+            if not article_publication_date or len(article_publication_date) != 10:
+                processing_date = self.migrated_data.document.processing_date
+                if processing_date:
+                    # adota a data de processamento do documento como data de publicação
+                    article_publication_date = datetime.strptime(processing_date, "%Y%m%d").strftime("%Y-%m-%d")
+                else:
+                    # completa a data de publicação com média de dia e/ou mes ausentes
+                    article_publication_date =  xml_with_pre.get_complete_publication_date()
+                xml_with_pre.article_publication_date = article_publication_date
+        except Exception as e:
+            logging.exception(e)
+            raise
+        return xml_with_pre
     
     def get_xml_from_html(self, user, detail):
         migrated_data = self.migrated_data
