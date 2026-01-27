@@ -183,7 +183,6 @@ class XMLArticle:
     def get_main_metadata(self):
         xml_article_titles = ArticleTitles(self.xmltree)
         xml_toc_section = ArticleTocSections(self.xmltree)
-        xml_abstracts = Abstract(self.xmltree)
         root = ArticleAndSubArticles(self.xmltree)
         xml_doi = DoiWithLang(self.xmltree)
 
