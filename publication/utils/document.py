@@ -1,6 +1,6 @@
 import logging
 
-from packtools.sps.models.article_abstract import Abstract
+from packtools.sps.models.v2.article_abstract import XMLAbstracts
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.article_contribs import ArticleContribs
 from packtools.sps.models.article_doi_with_lang import DoiWithLang
@@ -158,8 +158,12 @@ class XMLArticle:
 
     def get_abstracts(self):
         try:
-            for item in Abstract(self.xmltree).get_abstracts(style="only_p"):
-                yield {"language": item["lang"], "text": item["abstract"]}
+            for item in XMLAbstracts(self.xmltree).get_abstracts():
+                text = item.get("text")
+                lang = item.get("lang")
+                if not text:
+                    continue
+                yield {"language": lang, "text": text}
         except Exception as e:
             return []
 
@@ -172,26 +176,24 @@ class XMLArticle:
     def get_doi_with_lang(self):
         doi_with_lang = DoiWithLang(self.xmltree)
         for item in doi_with_lang.data:
+            if not item["value"]:
+                continue
             yield {"language": item["lang"], "doi": item["value"]}
-
-    def get_renditions(self):
-        root = ArticleAndSubArticles(self.xmltree)
-        for item in ArticleRenditions(self.xmltree).article_renditions:
-            yield {
-                "language": item["language"] or root.main_lang,
-                "uri": item.get("uri"),
-            }
 
     def get_main_metadata(self):
         xml_article_titles = ArticleTitles(self.xmltree)
         xml_toc_section = ArticleTocSections(self.xmltree)
-        xml_abstracts = Abstract(self.xmltree)
         root = ArticleAndSubArticles(self.xmltree)
         xml_doi = DoiWithLang(self.xmltree)
 
+        section = None
+        for sec in xml_toc_section.article_section:
+            section = sec.get("text")
+            break
+
         return dict(
-            title=xml_article_titles.article_title["text"],
-            section=xml_toc_section.article_section[0]["text"],
+            title=(xml_article_titles.article_title or {}).get("text"),
+            section=section,
             abstract=None,
             lang=root.main_lang,
             doi=xml_doi.main_doi,
@@ -201,11 +203,6 @@ class XMLArticle:
     def main_article_type(self):
         root = ArticleAndSubArticles(self.xmltree)
         return root.main_article_type
-
-    def get_htmls(self):
-        root = ArticleAndSubArticles(self.xmltree)
-        for item in root.data:
-            yield {"language": item["lang"]}
 
     def get_in_issue(self, order):
         aids = ArticleIds(self.xmltree)
