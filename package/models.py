@@ -891,8 +891,14 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
     @property
     def pub_date(self):
-        try:
-            xml_with_pre = self.xml_with_pre
-            return xml_with_pre.article_publication_date
-        except Exception as e:
-            return xml_with_pre.get_complete_publication_date()
+        # esta data deveria ser completa (AAAA-MM-DD)
+        xml_with_pre = self.xml_with_pre
+        if not xml_with_pre:
+            return None
+        pub_date = xml_with_pre.article_publication_date
+        if not pub_date:
+            return None
+        if len(pub_date) == 10:
+            return pub_date
+        # em caso de data incompleta, tenta retornar a data completa, completando com 06 o mes ausente e com 15 o dia ausente
+        return xml_with_pre.get_complete_publication_date()
