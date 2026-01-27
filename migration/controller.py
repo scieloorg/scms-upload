@@ -30,6 +30,7 @@ from journal.models import (
 )
 from location.models import Location
 from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile
+from proc.models import ArticleProc
 from scielo_classic_website import classic_ws
 from scielo_classic_website.iid2json.id2json3 import get_doc_records
 from tracker import choices as tracker_choices
@@ -733,10 +734,8 @@ def register_acron_id_file_content(
             raise IdFileRecordIsAlreadyUptodate(
                 _("IdFileRecord is already up-to-date with acron.id")
             )
+
         logging.info(f"Updating IdFileRecord from {source_path}")
-        latest = journal_id_file.id_file_records.order_by("-updated").first()
-        t1 = latest.updated.isoformat()
-    
         for item in get_bases_work_acron_id_file_records(
             user,
             source_path,
@@ -749,19 +748,15 @@ def register_acron_id_file_content(
                 user,
                 journal_id_file,
                 **item,
-            )
-        t2 = latest.updated.isoformat()
-        if t1 == t2:
-            latest.updated = datetime.now(timezone.utc).isoformat()
-            latest.save()
+            )        
 
         qs = journal_id_file.id_file_records.filter(item_type="article")
-        total_document_records = qs.count()
+        total_id_file_records = qs.count()
         article_pids = list(qs.filter(todo=True).values_list("item_pid", flat=True).distinct())
         
-        stats["total_document_records_after"] = total_document_records
-        stats["total_document_records_to_migrate_after"] = len(article_pids)
-        stats["total_document_records_new"] = journal_id_file.id_file_records.filter(
+        stats["total_id_file_records_resulting"] = total_id_file_records
+        stats["total_id_file_records_to_migrate_resulting"] = len(article_pids)
+        stats["total_id_file_records_new"] = journal_id_file.id_file_records.filter(
             updated__gte=datetime_now,
         ).count()
         detail["article_pids"] = article_pids
@@ -784,27 +779,22 @@ def register_acron_id_file_content(
 def id_file_record_need_to_be_updated(journal_id_file, datetime_now, output, stats):
     output["datetime_now"] = datetime_now
     
-    journal_id_file_updated = journal_id_file.updated.isoformat()
-    logging.info(f"journal_id_file.updated: {journal_id_file_updated}")
-    output["journal_id_file_updated"] = journal_id_file_updated
-
-    journal_id_file_changed = datetime_now < journal_id_file_updated
+    output["journal_id_file_last_updated"] = journal_id_file.updated.isoformat()
     
     qs = journal_id_file.id_file_records.filter(item_type="article")
-    total_document_records = qs.count()
-    total_document_records_to_migrate = qs.filter(todo=True).count()
-    
-    stats["total_document_records_before"] = total_document_records
-    stats["total_document_records_to_migrate_before"] = total_document_records_to_migrate
-    stats["total_document_records"] = total_document_records
+    total_id_file_records = qs.count()
+    stats["total_id_file_records"] = total_id_file_records
+    if total_id_file_records == 0:
+        return True
 
-    if total_document_records == 0:
-        return True
+    total_id_file_records = journal_id_file.id_file_records.count()
+    stats["total_id_file_records"] = total_id_file_records
     
-    id_file_record_last_updated = qs.order_by("-updated").first().updated.isoformat()
-    logging.info(f"id_file_record_last_updated: {id_file_record_last_updated}")
-    if journal_id_file_updated > id_file_record_last_updated:
+    output["id_file_record_last_updated"] = qs.order_by("-updated").first().updated.isoformat()
+    logging.info(f"id_file_record_last_updated: {output['id_file_record_last_updated']}")
+    if output["journal_id_file_last_updated"] > output["id_file_record_last_updated"]:
         return True
+
     return False
 
 
