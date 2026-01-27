@@ -114,6 +114,7 @@ class IssueProcViewSet(CommonControlFieldViewSet):
 
     list_display = [
         "issue",
+        "__str__",
         "docs_status",
         "files_status",
         "qa_ws_status",
