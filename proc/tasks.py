@@ -77,6 +77,9 @@ class TaskExecution:
         else:
             completed = True
         self.params["item"] = self.item
+
+        self.stats["total_to_process"] = self.total_to_process
+        self.stats["total_processed"] = self.total_processed
         detail = {
             "params": self.params,
             "stats": self.stats,
