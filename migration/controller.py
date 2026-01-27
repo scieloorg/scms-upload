@@ -30,7 +30,6 @@ from journal.models import (
 )
 from location.models import Location
 from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile
-from proc.models import ArticleProc
 from scielo_classic_website import classic_ws
 from scielo_classic_website.iid2json.id2json3 import get_doc_records
 from tracker import choices as tracker_choices
