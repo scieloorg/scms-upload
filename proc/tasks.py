@@ -1250,16 +1250,13 @@ def task_publish_articles(
                 total_scheduled = 0
                 task_exec.total_to_process = items_to_publish.count()
                 for article_proc in items_to_publish:
-                    celery_app.send_task(
-                        'proc.tasks.task_publish_article',
-                        kwargs=dict(
-                            user_id=user_id,
-                            username=username,
-                            website_kind=website_kind,
-                            article_proc_id=article_proc.id,
-                            api_data=api_data,
-                            force_update=force_update,
-                        )
+                    task_publish_article.delay(
+                        user_id=user_id,
+                        username=username,
+                        website_kind=website_kind,
+                        article_proc_id=article_proc.id,
+                        api_data=api_data,
+                        force_update=force_update,
                     )
                     total_scheduled += 1
                 task_exec.total_processed = total_scheduled
@@ -1269,7 +1266,7 @@ def task_publish_articles(
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             item=title,
-            action="proc.tasks.task_migrate_and_publish_articles",
+            action="proc.tasks.task_publish_articles",
             e=e,
             exc_traceback=exc_traceback,
             detail=task_params,
