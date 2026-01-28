@@ -1,6 +1,6 @@
 import logging
 
-from packtools.sps.models.v2.article_abstract import XMLAbstracts
+from packtools.sps.models.v2.abstract import XMLAbstracts
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.article_contribs import ArticleContribs
 from packtools.sps.models.article_doi_with_lang import DoiWithLang
