@@ -47,8 +47,6 @@ class TaskExecution:
         self.events = []
         self.stats = {}
         self.exceptions = []
-        self.total_to_process = 0
-        self.total_processed = 0
 
     @property
     def item(self):
@@ -57,8 +55,23 @@ class TaskExecution:
     @item.setter
     def item(self, value):
         self.task_tracker.item = value
-        self.task_tracker.save()
+
+    @property
+    def total_to_process(self):
+        return self.task_tracker.total_to_process
     
+    @total_to_process.setter
+    def total_to_process(self, value):
+        self.task_tracker.total_to_process = value
+
+    @property
+    def total_processed(self):
+        return self.task_tracker.total_processed
+    
+    @total_processed.setter
+    def total_processed(self, value):
+        self.task_tracker.total_processed = value
+
     def add_exception(self, exception):
         self.exceptions.append({"type": str(type(exception)), "message": str(exception)})
 
@@ -659,6 +672,7 @@ def task_publish_issues(
 
         for collection in _get_collections(collection_acron):
             for website_kind in (QA, PUBLIC):
+                total_processed = 0
                 api_data = get_api_data(collection, "issue", website_kind)
                 if not api_data or api_data.get("error"):
                     continue
@@ -674,7 +688,7 @@ def task_publish_issues(
                     force_update=force_update,
                     params=params,
                 )
-                task_exec.total_to_process += items.count()
+                task_exec.total_to_process = items.count()
                 for issue_proc in items:
                     try:
                         task_publish_issue.apply_async(
@@ -687,11 +701,11 @@ def task_publish_issues(
                                 force_update=force_update,
                             )
                         )
-
+                        total_processed += 1
                     except Exception as e:
                         exc_type, exc_value, exc_traceback = sys.exc_info()
                         task_exec.add_exception(traceback.format_exc())
-                    task_exec.total_processed += 1
+                task_exec.total_processed = total_processed
                 task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -818,15 +832,16 @@ def task_migrate_and_publish_articles(
         kwargs_.pop("journal_acron_list", None)
 
         task_exec.total_to_process = total_journals_to_process
+        total_processed = 0
         for journal_acron, collection_acron in journal_collection_pairs:
             kwargs = {}
             kwargs.update(kwargs_)
             kwargs["journal_acron"] = journal_acron
             kwargs["collection_acron"] = collection_acron
-
+            total_processed += 1
             task_migrate_and_publish_articles_by_journal.delay(**kwargs)
 
-            task_exec.total_processed += 1
+        task_exec.total_processed = total_processed
         task_exec.finish()
 
     except Exception as e:
@@ -910,6 +925,7 @@ def task_migrate_and_publish_articles_by_journal(
         except KeyError:
             article_pids = []
         task_exec.add_event(f"acron.id response: {response}")
+        task_exec.total_to_process = len(article_pids)
         task_exec.add_number("total_articles_to_process", len(article_pids))
         
         # Agrupa os article_pids por issue_pid
@@ -952,7 +968,9 @@ def task_migrate_and_publish_articles_by_journal(
         # - processamento de artigos
         qa_api_data = get_api_data(journal_proc.collection, "issue", "QA")
         public_api_data = get_api_data(journal_proc.collection, "issue", "PUBLIC")
+        total_processed = 0
         for issue_proc_id, issue_pid in issue_proc_list:
+            total_processed += 1
             task_migrate_and_publish_articles_by_issue.delay(
                 user_id=user_id,
                 username=username,
@@ -965,6 +983,7 @@ def task_migrate_and_publish_articles_by_journal(
                 qa_api_data=qa_api_data,
                 public_api_data=public_api_data,
         )
+        task_exec.total_processed = total_processed
         task_exec.finish()
     
     except Exception as e:
@@ -1010,9 +1029,8 @@ def task_migrate_and_publish_articles_by_issue(
             "collection", "journal_proc",
         ).get(id=issue_proc_id)
         task_exec.item = str(issue_proc)
-
+        task_exec.total_to_process = len(article_pids)
         task_exec.add_event(f"STATUS={status}")
-        task_exec.add_event(f"total article_pids: {len(article_pids)}")
         task_exec.add_event(f"docs_status: {issue_proc.docs_status}")
 
         task_exec.add_event("Migrate document records")
@@ -1040,7 +1058,7 @@ def task_migrate_and_publish_articles_by_issue(
             query_by_status, issue_proc=issue_proc,
         )
         total_articles_to_process = articles_to_process.count()
-        task_exec.add_number("total_articles_to_process", total_articles_to_process)
+        task_exec.total_to_process = total_articles_to_process
         task_exec.add_event("Migrate articles")
         total_processed = 0
         exceptions = {}
@@ -1052,6 +1070,8 @@ def task_migrate_and_publish_articles_by_issue(
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 exceptions[article_proc.pid] = traceback.format_exc()
                 task_exec.add_exception(exceptions[article_proc.pid])
+
+        task_exec.total_processed = total_processed
             
         article_ids_to_publish = ArticleProc.objects.select_related(
             "issue_proc", "sps_pkg",
@@ -1062,46 +1082,112 @@ def task_migrate_and_publish_articles_by_issue(
         ).values_list("id", flat=True)
         total_articles_to_publish = article_ids_to_publish.count()
         task_exec.add_number("total_articles_to_publish", total_articles_to_publish)
+
+        for website_label in (QA, PUBLIC):
+            task_exec.add_event(f"Schedule Publish articles / sync issue tasks for {website_label}")
+            task_sync_issue.apply_async(
+                kwargs=dict(
+                    user_id=user_id,
+                    username=username,
+                    issue_proc_id=issue_proc.id,
+                    website_kind=website_label,
+                    status=status,
+                    force_update=force_update,
+                )
+            )
+
+        task_exec.finish()
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        task_exec.finish(
+            exception=e,
+            exc_traceback=exc_traceback,
+        )
+
+
+@celery_app.task(bind=True)
+def task_sync_issue(
+    self,
+    user_id=None,
+    username=None,
+    issue_proc_id=None,
+    website_kind=None,
+    status=None,
+    force_update=False,
+):
+    task_params = {
+        "user_id": user_id,
+        "username": username,
+        "issue_proc_id": issue_proc_id,
+        "website_kind": website_kind,
+        "status": status,
+        "force_update": force_update,
+    }
+    task_exec = TaskExecution(
+        name="proc.tasks.task_sync_issue",
+        item=f"{issue_proc_id}",
+        params=task_params,
+    )
+    try:
+        user = _get_user(user_id, username)
+        issue_proc = IssueProc.objects.select_related(
+            "collection", "journal_proc", "issue"
+        ).get(id=issue_proc_id)
         
+        task_exec.item = f"{issue_proc} {website_kind}"
+        
+        status = tracker_choices.get_valid_status(status, force_update)
+        task_exec.add_event(f"Publishing articles for {website_kind} with status {status}")
+
+        query_by_status = Q()
+        if website_kind == QA:
+            query_by_status = Q(qa_ws_status__in=status)
+        elif website_kind == PUBLIC:
+            query_by_status = Q(public_ws_status__in=status)
+
         article_ids_to_publish = ArticleProc.objects.select_related(
             "issue_proc", "sps_pkg",
         ).filter(
-            Q(qa_ws_status__in=status) | Q(public_ws_status__in=status),
-            issue_proc_id=issue_proc_id,
+            query_by_status,
+            issue_proc=issue_proc,
             sps_pkg__pid_v3__isnull=False,
         ).values_list("id", flat=True)
-        total_articles_to_publish = article_ids_to_publish.count()
-        task_exec.add_number("total_articles_to_publish", total_articles_to_publish)
 
-        if total_articles_to_publish:
-            task_exec.add_event("Schedule Publish articles")
-            task_publish_articles.delay(
-                user_id=user_id,
-                username=username,
-                collection_acron=issue_proc.collection.acron,
-                journal_acron=issue_proc.journal_proc.acron,
-                issue_folder=issue_proc.issue_folder,
-                publication_year=issue_proc.issue.publication_year,
-                force_update=force_update,
-            )
+        task_exec.total_to_process = article_ids_to_publish.count()
+        total_processed = 0
 
-        for website_label, api_data in zip((QA, PUBLIC), (qa_api_data, public_api_data)):
-            if not api_data:
-                api_data = get_api_data(issue_proc.collection, "issue", website_label)
-            if api_data and not api_data.get("error"):
-                try:
-                    task_exec.add_event(f"Syncing issue in {website_label} website")
-                    sync_issue(issue_proc, api_data)
-                    task_exec.add_event(f"Issue synced in {website_label} website")
-                except Exception as e:
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    task_exec.add_exception(
-                        {
-                            "website": website_label,
-                            "traceback": traceback.format_exc(),
-                        }
-                    )
+        api_data = get_api_data(issue_proc.collection, "article", website_kind)
+        if not api_data or api_data.get("error"):
+            task_exec.add_event(f"API data not available for {website_kind} {api_data}")
+            task_exec.finish()
+            return
 
+        for article_proc_id in article_ids_to_publish:
+            try:
+                task_publish_article(
+                    user_id=user_id,
+                    username=username,
+                    website_kind=website_kind,
+                    article_proc_id=article_proc_id,
+                    api_data=api_data,
+                    force_update=force_update,
+                )
+                total_processed += 1
+            except Exception as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                task_exec.add_exception(traceback.format_exc())
+        task_exec.total_processed = total_processed
+
+        api_data = get_api_data(issue_proc.collection, "issue", website_kind)
+        if not api_data or api_data.get("error"):
+            task_exec.add_event(f"API data not available for {website_kind} {api_data}")
+            task_exec.finish()
+            return
+
+        task_exec.add_event(f"Syncing issue in {website_kind} website")
+        sync_issue(issue_proc, api_data)
+        task_exec.add_event(f"Issue synced in {website_kind} website")
+        
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1164,7 +1250,8 @@ def task_publish_articles(
                 total_scheduled = 0
                 task_exec.total_to_process = items_to_publish.count()
                 for article_proc in items_to_publish:
-                    task_publish_article.apply_async(
+                    celery_app.send_task(
+                        'proc.tasks.task_publish_article',
                         kwargs=dict(
                             user_id=user_id,
                             username=username,
