@@ -272,8 +272,8 @@ class PidRequester(BasePidProvider):
         }
 
         try:
-            pid_provider_xml = PidProviderXML.objects.get(
-                v3=pid_v3, v2__contains=correct_pid_v2[:14]
+            pid_provider_xml = PidProviderXML.get_by_pid_v3(
+                pid_v3, partial_pid_v2=correct_pid_v2[:14]
             )
             fixed["pid_v2"] = pid_provider_xml.v2
         except PidProviderXML.DoesNotExist:

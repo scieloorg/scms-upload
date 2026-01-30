@@ -1265,12 +1265,24 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             response.update({"error_msg": str(e), "error_type": str(type(e))})
             return response
         return {}
+    
+    @classmethod
+    def get_by_pid_v3(cls, pid_v3, partial_pid_v2=None, pid_v2=None):
+        params = {}
+        if pid_v2:
+            params["v2"] = pid_v2
+        if partial_pid_v2:
+            params["v2__contains"] = partial_pid_v2
+        try:
+            return cls.objects.get(v3=pid_v3, **params)
+        except cls.MultipleObjectsReturned as e:
+            return cls.objects.filter(v3=pid_v3, **params).order_by("-updated").first()
 
     @classmethod
     @profile_classmethod
     def fix_pid_v2(cls, user, pid_v3, correct_pid_v2):
         try:
-            item = cls.objects.get(v3=pid_v3)
+            item = cls.get_by_pid_v3(pid_v3)
         except cls.DoesNotExist as e:
             raise cls.DoesNotExist(f"{e}: {pid_v3}")
 

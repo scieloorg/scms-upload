@@ -260,7 +260,7 @@ class Article(ClusterableModel, CommonControlField):
     def add_pp_xml(self, save=False):
         if not self.pp_xml:
             try:
-                self.pp_xml = PidProviderXML.objects.get(v3=self.pid_v3)
+                self.pp_xml = PidProviderXML.get_by_pid_v3(pid_v3=self.pid_v3)
             except PidProviderXML.DoesNotExist:
                 pass
             else:
@@ -483,7 +483,7 @@ class Article(ClusterableModel, CommonControlField):
         try:
             if self.pp_xml is None:
                 try:
-                    self.pp_xml = PidProviderXML.objects.get(v3=self.pid_v3)
+                    self.pp_xml = PidProviderXML.get_by_pid_v3(self.pid_v3)
                 except PidProviderXML.DoesNotExist:
                     return False
             sps_pkg__pkg_name = self.sps_pkg.xml_with_pre.sps_pkg_name
