@@ -463,11 +463,15 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
             issue_folder,
         )
         for file in files_and_exceptions:
+            exception = {}
             try:
                 if not file:
                     continue
+
+                exception["file"] = file.get("path")
                 if file.get("error"):
-                    exceptions.append(file)
+                    exception["error"] = file["error"]
+                    exceptions.append(exception)
                     continue
 
                 component_type = check_component_type(file)
@@ -491,7 +495,9 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                 )
 
             except Exception as e:
-                exceptions.append({"error": str(e), "type": str(type(e)), "file": file})
+                exception["error"] = str(e)
+                exception["type"] = str(type(e))
+                exceptions.append(exception)
 
     except Exception as e:
         exceptions.append(
