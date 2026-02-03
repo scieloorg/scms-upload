@@ -1,7 +1,6 @@
 """
 Tests for string utility functions.
 """
-import pytest
 
 from core.utils.string_utils import sanitize_unicode_surrogates
 
@@ -14,7 +13,7 @@ class TestSanitizeUnicodeSurrogates:
         # String with a low surrogate (would be from 'Sumário' read with encoding errors)
         input_str = "Sum\udce1rio.pdf"
         result = sanitize_unicode_surrogates(input_str)
-        
+
         # Surrogates should be replaced with replacement character
         assert "\udce1" not in result
         assert "Sum" in result
@@ -30,13 +29,9 @@ class TestSanitizeUnicodeSurrogates:
 
     def test_sanitize_dict_with_surrogate_in_value(self):
         """Test that surrogates in dict values are sanitized."""
-        input_dict = {
-            "file": "Sum\udce1rio.pdf",
-            "count": 5,
-            "status": "ok"
-        }
+        input_dict = {"file": "Sum\udce1rio.pdf", "count": 5, "status": "ok"}
         result = sanitize_unicode_surrogates(input_dict)
-        
+
         assert isinstance(result, dict)
         assert result["count"] == 5
         assert result["status"] == "ok"
@@ -44,11 +39,9 @@ class TestSanitizeUnicodeSurrogates:
 
     def test_sanitize_dict_with_surrogate_in_key(self):
         """Test that surrogates in dict keys are sanitized."""
-        input_dict = {
-            "Sum\udce1rio": "value"
-        }
+        input_dict = {"Sum\udce1rio": "value"}
         result = sanitize_unicode_surrogates(input_dict)
-        
+
         assert isinstance(result, dict)
         # The key should be sanitized
         for key in result.keys():
@@ -56,13 +49,9 @@ class TestSanitizeUnicodeSurrogates:
 
     def test_sanitize_list_with_surrogates(self):
         """Test that surrogates in lists are sanitized."""
-        input_list = [
-            "normal.pdf",
-            "Sum\udce1rio.pdf",
-            {"file": "test\udce1.txt"}
-        ]
+        input_list = ["normal.pdf", "Sum\udce1rio.pdf", {"file": "test\udce1.txt"}]
         result = sanitize_unicode_surrogates(input_list)
-        
+
         assert isinstance(result, list)
         assert len(result) == 3
         assert result[0] == "normal.pdf"
@@ -76,15 +65,13 @@ class TestSanitizeUnicodeSurrogates:
                 {
                     "file": "Sum\udce1rio.pdf",
                     "error": "Some error",
-                    "nested": {
-                        "path": "/path/to/\udce1file"
-                    }
+                    "nested": {"path": "/path/to/\udce1file"},
                 }
             ],
-            "count": 1
+            "count": 1,
         }
         result = sanitize_unicode_surrogates(input_data)
-        
+
         assert isinstance(result, dict)
         assert "\udce1" not in result["exceptions"][0]["file"]
         assert "\udce1" not in result["exceptions"][0]["nested"]["path"]
@@ -94,7 +81,7 @@ class TestSanitizeUnicodeSurrogates:
         """Test that tuples are properly handled."""
         input_tuple = ("normal", "test\udce1")
         result = sanitize_unicode_surrogates(input_tuple)
-        
+
         assert isinstance(result, tuple)
         assert len(result) == 2
         assert result[0] == "normal"
@@ -104,7 +91,7 @@ class TestSanitizeUnicodeSurrogates:
         """Test that sets are properly handled."""
         input_set = {"normal", "test\udce1"}
         result = sanitize_unicode_surrogates(input_set)
-        
+
         assert isinstance(result, set)
         assert "normal" in result
         # Check that no item has surrogates
@@ -130,16 +117,13 @@ class TestSanitizeUnicodeSurrogates:
         failures = [
             {
                 "file": "/scielo_www/pepsic/bases/pdf/vinculo/v9n2/Sum\udce1rio.pdf",
-                "error": "Some error message"
+                "error": "Some error message",
             }
         ]
-        detail = {
-            "migrated": 10,
-            "failures": failures
-        }
-        
+        detail = {"migrated": 10, "failures": failures}
+
         result = sanitize_unicode_surrogates(detail)
-        
+
         # Should not contain surrogates
         assert "\udce1" not in str(result)
         assert result["migrated"] == 10
