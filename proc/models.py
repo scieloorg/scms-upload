@@ -28,6 +28,7 @@ from collection import choices as collection_choices
 from collection.models import Collection
 from core.models import CommonControlField
 from core.utils.file_utils import delete_files
+from core.utils.string_utils import sanitize_unicode_surrogates
 from htmlxml.models import HTMLXML
 from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
@@ -165,6 +166,10 @@ class Operation(CommonControlField):
             detail["message_type"] = message_type
         if message:
             detail["message"] = message
+
+        # Sanitize Unicode surrogates before saving to database
+        # This prevents PostgreSQL from rejecting JSON with invalid Unicode
+        detail = sanitize_unicode_surrogates(detail)
 
         try:
             json.dumps(detail)
