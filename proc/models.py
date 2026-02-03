@@ -14,12 +14,8 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from packtools.sps.utils.xml_fixer import fix_inline_graphic_in_caption
-from wagtail.admin.panels import (
-    FieldPanel,
-    InlinePanel,
-    ObjectList,
-    TabbedInterface,
-)
+from scielo_classic_website.htmlbody.html_body import HTMLContent
+from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
@@ -28,6 +24,7 @@ from collection import choices as collection_choices
 from collection.models import Collection
 from core.models import CommonControlField
 from core.utils.file_utils import delete_files
+from core.utils.string_utils import sanitize_unicode_surrogates
 from htmlxml.models import HTMLXML
 from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
@@ -50,13 +47,12 @@ from package.models import SPSPkg
 from proc import exceptions
 from proc.forms import IssueProcAdminModelForm, ProcAdminModelForm
 from publication.api.publication import get_api_data
-from scielo_classic_website.htmlbody.html_body import HTMLContent
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 
 
-class NoDocumentRecordsToMigrateError(Exception):
-    ...
+class NoDocumentRecordsToMigrateError(Exception): ...
+
 
 class Operation(CommonControlField):
 
@@ -165,6 +161,10 @@ class Operation(CommonControlField):
             detail["message_type"] = message_type
         if message:
             detail["message"] = message
+
+        # Sanitize Unicode surrogates before saving to database
+        # This prevents PostgreSQL from rejecting JSON with invalid Unicode
+        detail = sanitize_unicode_surrogates(detail)
 
         try:
             json.dumps(detail)
@@ -424,7 +424,9 @@ class BaseProc(CommonControlField):
             except cls.DoesNotExist:
                 return cls.create(user, collection, pid)
             except cls.MultipleObjectsReturned:
-                items = cls.objects.filter(collection=collection, pid=pid).order_by("-created")
+                items = cls.objects.filter(collection=collection, pid=pid).order_by(
+                    "-created"
+                )
                 for item in items[1:]:
                     item.delete()
                 return items[0]
@@ -1001,12 +1003,12 @@ class IssueProc(BaseProc, ClusterableModel):
         if self.journal_proc:
             return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection})"
         return f"{self.pid} ({self.collection})"
-    
+
     def __str__(self):
         if self.journal_proc:
             return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection})"
         return f"{self.pid} ({self.collection})"
-    
+
     journal_proc = models.ForeignKey(
         JournalProc, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -1213,7 +1215,10 @@ class IssueProc(BaseProc, ClusterableModel):
     ):
         try:
             operation = self.start(user, "get_files_from_classic_website")
-            if self.files_status == tracker_choices.PROGRESS_STATUS_DONE and not force_update:
+            if (
+                self.files_status == tracker_choices.PROGRESS_STATUS_DONE
+                and not force_update
+            ):
                 operation.finish(
                     user,
                     completed=True,
@@ -1298,7 +1303,7 @@ class IssueProc(BaseProc, ClusterableModel):
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
             **params,
         )
-    
+
     def find_asset(self, basename, name=None):
         if not name:
             name, ext = os.path.splitext(basename)
@@ -1312,11 +1317,13 @@ class IssueProc(BaseProc, ClusterableModel):
         return MigratedFile.find(
             collection=self.collection,
             journal_acron=self.journal_proc.acron,
-            name=name,  
+            name=name,
         )
 
     @classmethod
-    def get_id_and_pid_list_to_process(cls, journal_proc, issue_folder, publication_year, issue_pids, status, events):
+    def get_id_and_pid_list_to_process(
+        cls, journal_proc, issue_folder, publication_year, issue_pids, status, events
+    ):
         events.append("Identify filter: status")
         q = Q(docs_status__in=status) | Q(files_status__in=status)
 
@@ -1326,14 +1333,13 @@ class IssueProc(BaseProc, ClusterableModel):
             issue_filter["issue_folder"] = issue_folder
         if publication_year:
             issue_filter["issue__publication_year"] = publication_year
-        
+
         events.append("Select journal issues to process")
         if issue_filter:
             if issue_pids:
                 issue_filter["pid__in"] = issue_pids
             return cls.objects.filter(
-                journal_proc=journal_proc,
-                **issue_filter
+                journal_proc=journal_proc, **issue_filter
             ).values_list("id", "pid")
 
         if issue_pids:
@@ -1363,7 +1369,10 @@ class IssueProc(BaseProc, ClusterableModel):
             ).count()
             detail["total_document_records"] = total_document_records
 
-            force_update = ArticleProc.objects.filter(issue_proc=self).count() < total_document_records
+            force_update = (
+                ArticleProc.objects.filter(issue_proc=self).count()
+                < total_document_records
+            )
 
             id_file_records = IdFileRecord.document_records_to_migrate(
                 collection=self.collection,
@@ -1392,17 +1401,23 @@ class IssueProc(BaseProc, ClusterableModel):
                     )
                     total += 1
                     if not article_proc:
-                        raise ValueError(f"Unable to create ArticleProc for PID {record.item_pid}")
+                        raise ValueError(
+                            f"Unable to create ArticleProc for PID {record.item_pid}"
+                        )
                 except Exception as e:
                     exceptions[record.item_pid] = traceback.format_exc()
 
             detail["exceptions"] = exceptions
             detail["total failed"] = len(exceptions)
-            detail["total done"] = detail["total_document_records_to_migrate"] - detail["total failed"]
-            id_file_records.exclude(item_pid__in=list(exceptions.keys())).update(todo=False)
+            detail["total done"] = (
+                detail["total_document_records_to_migrate"] - detail["total failed"]
+            )
+            id_file_records.exclude(item_pid__in=list(exceptions.keys())).update(
+                todo=False
+            )
 
             new_status = self.get_new_docs_status(total_document_records)
-            
+
         except NoDocumentRecordsToMigrateError as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             new_status = self.get_new_docs_status(total_document_records)
@@ -1420,11 +1435,13 @@ class IssueProc(BaseProc, ClusterableModel):
                 completed=self.docs_status == tracker_choices.PROGRESS_STATUS_DONE,
                 exc_traceback=exc_traceback,
                 exception=exception,
-                detail=detail
+                detail=detail,
             )
         return total
 
-    def get_new_docs_status(self, total_document_records=None, total_migrated_articles=None):
+    def get_new_docs_status(
+        self, total_document_records=None, total_migrated_articles=None
+    ):
         if total_document_records is None:
             total_document_records = IdFileRecord.document_records_to_migrate(
                 collection=self.collection,
@@ -1432,7 +1449,9 @@ class IssueProc(BaseProc, ClusterableModel):
                 force_update=True,  # todos os registros encontrados em acron.id no momento
             ).count()
         if total_migrated_articles is None:
-            total_migrated_articles = ArticleProc.objects.filter(issue_proc=self).count()
+            total_migrated_articles = ArticleProc.objects.filter(
+                issue_proc=self
+            ).count()
         if total_document_records == 0:
             return tracker_choices.PROGRESS_STATUS_BLOCKED
         if total_migrated_articles == 0:
@@ -1482,7 +1501,6 @@ class IssueProc(BaseProc, ClusterableModel):
         if not self.issue or not self.issue.bundle_id_suffix:
             return ""
         return "-".join([self.journal_proc.pid, self.issue.bundle_id_suffix])
-
 
 
 class ArticleEventCreateError(Exception): ...
@@ -1675,7 +1693,9 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             migrated_data = self.migrated_data
             document = migrated_data.document
-            migrated_document_publication_day = document.get_complete_article_publication_date()
+            migrated_document_publication_day = (
+                document.get_complete_article_publication_date()
+            )
 
             if not migrated_data.file_type:
                 migrated_data.file_type = document.file_type
@@ -1721,7 +1741,9 @@ class ArticleProc(BaseProc, ClusterableModel):
             )
         try:
             # correção de fig/inline-graphic para fig/graphic
-            detail["fix_inline_graphic_in_caption"] = fix_inline_graphic_in_caption(xml_with_pre.xmltree)
+            detail["fix_inline_graphic_in_caption"] = fix_inline_graphic_in_caption(
+                xml_with_pre.xmltree
+            )
         except Exception as e:
             logging.exception(e)
             raise
@@ -1731,16 +1753,20 @@ class ArticleProc(BaseProc, ClusterableModel):
                 processing_date = self.migrated_data.document.processing_date
                 if processing_date:
                     # adota a data de processamento do documento como data de publicação
-                    article_publication_date = datetime.strptime(processing_date, "%Y%m%d").strftime("%Y-%m-%d")
+                    article_publication_date = datetime.strptime(
+                        processing_date, "%Y%m%d"
+                    ).strftime("%Y-%m-%d")
                 else:
                     # completa a data de publicação com média de dia e/ou mes ausentes
-                    article_publication_date =  xml_with_pre.get_complete_publication_date()
+                    article_publication_date = (
+                        xml_with_pre.get_complete_publication_date()
+                    )
                 xml_with_pre.article_publication_date = article_publication_date
         except Exception as e:
             logging.exception(e)
             raise
         return xml_with_pre
-    
+
     def get_xml_from_html(self, user, detail):
         migrated_data = self.migrated_data
         classic_ws_doc = migrated_data.document
@@ -1754,7 +1780,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         self.xml_status = htmlxml.html2xml_status
         if os.path.isfile(htmlxml.file.path):
             return htmlxml.file.path
-    
+
     @property
     def xml_with_pre(self):
         try:
@@ -1763,12 +1789,14 @@ class ArticleProc(BaseProc, ClusterableModel):
             raise XMLVersionXmlWithPreError(
                 _("Unable to get xml_with_pre for {}: {}").format(self, e)
             )
-            
-    def save_processed_xml(self, xml_with_pre, xml_file_path, detail, migrated_document_publication_day):
+
+    def save_processed_xml(
+        self, xml_with_pre, xml_file_path, detail, migrated_document_publication_day
+    ):
         try:
             if not xml_with_pre and xml_file_path:
                 xml_with_pre = list(XMLWithPre.create(path=xml_file_path))[0]
-            
+
             if not xml_with_pre:
                 raise ValueError("No XML with pre to process")
 
@@ -1790,7 +1818,8 @@ class ArticleProc(BaseProc, ClusterableModel):
                 article_date = None
             if not article_date:
                 xml_with_pre.article_publication_date = (
-                    migrated_document_publication_day or xml_with_pre.get_complete_publication_date()
+                    migrated_document_publication_day
+                    or xml_with_pre.get_complete_publication_date()
                 )
 
             detail.update(xml_with_pre.data)
@@ -1941,7 +1970,9 @@ class ArticleProc(BaseProc, ClusterableModel):
                 continue
             return item
         raise MigratedFile.DoesNotExist(
-            _("No migrated XML file found for {} ({})").format(self.pkg_name, self.issue_proc)
+            _("No migrated XML file found for {} ({})").format(
+                self.pkg_name, self.issue_proc
+            )
         )
 
     @property
