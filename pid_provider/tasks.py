@@ -73,95 +73,6 @@ def task_load_records_from_counter_dict(
     self,
     username=None,
     user_id=None,
-    collection_acron_list=None,
-    from_date=None,
-    until_date=None,
-    limit=None,
-    timeout=None,
-    force_update=None,
-    opac_domain=None,
-):
-    """
-    Tarefa orquestradora para carregar registros em PidProviderXML consultando
-    o endpoint counter_dict do novo site SciELO.
-
-    Dispara tarefas paralelas para cada coleção, otimizando o processamento
-    em larga escala. Se nenhuma coleção for especificada, processa apenas
-    a coleção Brasil (scl).
-
-    Args:
-        self: Instância da tarefa Celery
-        username (str, optional): Nome do usuário executando a tarefa
-        user_id (int, optional): ID do usuário executando a tarefa
-        collection_acron_list (list, optional): Lista de acrônimos das coleções.
-            Se None, usa apenas ["scl"] (Brasil).
-            Ex: ["scl"]
-        from_date (str, optional): Data inicial para coleta (formato ISO)
-        until_date (str, optional): Data final para coleta (formato ISO)
-        limit (int, optional): Limite de documentos por página
-        timeout (int, optional): Timeout em segundos para requisições HTTP
-        force_update (bool, optional): Força atualização mesmo se já existe
-        opac_domain (str, optional): Domínio do OPAC (default: "www.scielo.br")
-
-    Returns:
-        None
-
-    Side Effects:
-        - Dispara uma tarefa para cada coleção em collection_acron_list
-        - Registra UnexpectedEvent em caso de erro
-
-    Examples:
-        # Carregar registros da coleção Brasil
-        task_load_records_from_counter_dict.delay(
-            collection_acron_list=["scl"],
-            from_date="2024-01-01",
-            until_date="2024-12-31"
-        )
-    """
-    try:
-        user = _get_user(self.request, username=username, user_id=user_id)
-
-        # Define coleção padrão se não especificada (apenas Brasil)
-        if not collection_acron_list:
-            collection_acron_list = ["scl"]
-
-        # Dispara tarefa para cada coleção
-        for collection_acron in collection_acron_list:
-            task_load_records_from_collection_endpoint.apply_async(
-                kwargs={
-                    "username": username,
-                    "user_id": user_id,
-                    "collection_acron": collection_acron,
-                    "from_date": from_date,
-                    "until_date": until_date,
-                    "limit": limit,
-                    "timeout": timeout,
-                    "force_update": force_update,
-                    "opac_domain": opac_domain,
-                }
-            )
-
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            exception=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "task_load_records_from_counter_dict",
-                "collection_acron_list": collection_acron_list,
-                "from_date": from_date,
-                "until_date": until_date,
-                "limit": limit,
-                "timeout": timeout,
-            },
-        )
-
-
-@celery_app.task(bind=True)
-def task_load_records_from_collection_endpoint(
-    self,
-    username=None,
-    user_id=None,
     collection_acron=None,
     from_date=None,
     until_date=None,
@@ -174,36 +85,43 @@ def task_load_records_from_collection_endpoint(
     Coleta documentos de uma coleção específica via endpoint counter_dict do OPAC.
 
     Utiliza OPACHarvester para coletar documentos da API do novo site SciELO.
+    Processa uma coleção por vez.
 
     Args:
         self: Instância da tarefa Celery
         username (str, optional): Nome do usuário executando a tarefa
         user_id (int, optional): ID do usuário executando a tarefa
-        collection_acron (str): Acrônimo da coleção (obrigatório).
+        collection_acron (str, optional): Acrônimo da coleção.
+            Se None, usa "scl" (Brasil) como padrão.
             Ex: "scl"
         from_date (str, optional): Data inicial para coleta (formato ISO)
         until_date (str, optional): Data final para coleta (formato ISO)
         limit (int, optional): Limite de documentos por página
-        timeout (int, optional): Timeout em segundos para requisições
-        force_update (bool, optional): Força atualização de registros existentes
+        timeout (int, optional): Timeout em segundos para requisições HTTP
+        force_update (bool, optional): Força atualização mesmo se já existe
         opac_domain (str, optional): Domínio do OPAC (default: "www.scielo.br")
 
     Returns:
         None
 
-    Raises:
-        ValueError: Se collection_acron não for fornecido
-
     Side Effects:
         - Dispara task_load_record_from_xml_url para cada documento
         - Registra UnexpectedEvent em caso de erro
 
-    Notes:
-        - Usa OPAC counter_dict API para coleta de documentos
+    Examples:
+        # Carregar registros da coleção Brasil
+        task_load_records_from_counter_dict.delay(
+            collection_acron="scl",
+            from_date="2024-01-01",
+            until_date="2024-12-31"
+        )
     """
     try:
+        user = _get_user(self.request, username=username, user_id=user_id)
+
+        # Define coleção padrão se não especificada (apenas Brasil)
         if not collection_acron:
-            raise ValueError("Missing collection_acron")
+            collection_acron = "scl"
 
         # Cria harvester do OPAC
         harvester = OPACHarvester(
@@ -234,7 +152,7 @@ def task_load_records_from_collection_endpoint(
             exception=e,
             exc_traceback=exc_traceback,
             detail={
-                "task": "task_load_records_from_collection_endpoint",
+                "task": "task_load_records_from_counter_dict",
                 "collection_acron": collection_acron,
                 "from_date": from_date,
                 "until_date": until_date,
