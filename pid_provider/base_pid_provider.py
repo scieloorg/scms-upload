@@ -1,4 +1,3 @@
-import logging
 import sys
 
 # from django.utils.translation import gettext_lazy as _
@@ -225,7 +224,14 @@ class BasePidProvider:
         try:
             XMLURL.create_or_update(user=user, url=xml_uri, status="xml_fetch_failed", pid=None)
         except Exception as xmlurl_error:
-            logging.error(f"Failed to create/update XMLURL for {xml_uri}: {xmlurl_error}")
+            UnexpectedEvent.create(
+                exception=xmlurl_error,
+                exc_traceback=sys.exc_info()[2],
+                detail={
+                    "operation": "PidProvider.provide_pid_for_xml_uri._handle_xml_fetch_failure",
+                    "error": f"Failed to create/update XMLURL for {xml_uri}",
+                },
+            )
         
         return dict(
             error_msg=str(exception),
@@ -264,7 +270,14 @@ class BasePidProvider:
             # Use XMLWithPre.tostring() method
             xmlurl_obj.save_file(xml_with_pre.tostring(), filename=name or 'content.xml')
         except Exception as xmlurl_error:
-            logging.error(f"Failed to create/update XMLURL with zipfile for {xml_uri}: {xmlurl_error}")
+            UnexpectedEvent.create(
+                exception=xmlurl_error,
+                exc_traceback=sys.exc_info()[2],
+                detail={
+                    "operation": "PidProvider.provide_pid_for_xml_uri._handle_pid_provider_failure",
+                    "error": f"Failed to create/update XMLURL with zipfile for {xml_uri}",
+                },
+            )
 
     def _register_success(self, xml_with_pre, xml_uri, name, user, response):
         """Register successful XML processing in XMLURL"""
@@ -278,7 +291,14 @@ class BasePidProvider:
             # Use XMLWithPre.tostring() method
             xmlurl_obj.save_file(xml_with_pre.tostring(), filename=name or 'content.xml')
         except Exception as xmlurl_error:
-            logging.error(f"Failed to create/update XMLURL for successful processing {xml_uri}: {xmlurl_error}")
+            UnexpectedEvent.create(
+                exception=xmlurl_error,
+                exc_traceback=sys.exc_info()[2],
+                detail={
+                    "operation": "PidProvider.provide_pid_for_xml_uri._register_success",
+                    "error": f"Failed to create/update XMLURL for successful processing {xml_uri}",
+                },
+            )
 
     def _handle_unexpected_error(self, exception, xml_uri, name, user, origin_date, force_update, is_published):
         """Handle exception type c) - Unexpected error during processing"""
