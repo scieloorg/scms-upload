@@ -226,7 +226,7 @@ class BasePidProvider:
         except Exception as xmlurl_error:
             UnexpectedEvent.create(
                 exception=xmlurl_error,
-                exc_traceback=sys.exc_info()[2],
+                exc_traceback=xmlurl_error.__traceback__,
                 detail={
                     "operation": "PidProvider.provide_pid_for_xml_uri._handle_xml_fetch_failure",
                     "error": f"Failed to create/update XMLURL for {xml_uri}",
@@ -272,7 +272,7 @@ class BasePidProvider:
         except Exception as xmlurl_error:
             UnexpectedEvent.create(
                 exception=xmlurl_error,
-                exc_traceback=sys.exc_info()[2],
+                exc_traceback=xmlurl_error.__traceback__,
                 detail={
                     "operation": "PidProvider.provide_pid_for_xml_uri._handle_pid_provider_failure",
                     "error": f"Failed to create/update XMLURL with zipfile for {xml_uri}",
@@ -293,7 +293,7 @@ class BasePidProvider:
         except Exception as xmlurl_error:
             UnexpectedEvent.create(
                 exception=xmlurl_error,
-                exc_traceback=sys.exc_info()[2],
+                exc_traceback=xmlurl_error.__traceback__,
                 detail={
                     "operation": "PidProvider.provide_pid_for_xml_uri._register_success",
                     "error": f"Failed to create/update XMLURL for successful processing {xml_uri}",
