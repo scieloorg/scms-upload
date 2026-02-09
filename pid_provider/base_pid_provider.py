@@ -236,11 +236,9 @@ class BasePidProvider:
 
     def _handle_pid_provider_failure(self, response, xml_with_pre, xml_uri, name, user, origin_date, force_update, is_published):
         """Handle exception type b) - XML obtained but PidProviderXML creation failed"""
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        
         UnexpectedEvent.create(
             exception=Exception(response.get("error_message", "Unknown error")),
-            exc_traceback=exc_traceback,
+            exc_traceback=None,
             detail={
                 "operation": "PidProvider.provide_pid_for_xml_uri",
                 "exception_type": "pid_provider_xml_creation_failure",
