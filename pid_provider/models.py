@@ -1594,7 +1594,7 @@ class XMLURL(CommonControlField):
         _("Status"), max_length=50, null=True, blank=True
     )
     pid = models.CharField(
-        _("Article PID"), max_length=50, null=True, blank=True
+        _("Article PID"), max_length=23, null=True, blank=True
     )
 
     base_form_class = CoreAdminModelForm

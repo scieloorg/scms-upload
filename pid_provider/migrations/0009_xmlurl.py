@@ -56,7 +56,7 @@ class Migration(migrations.Migration):
                     "pid",
                     models.CharField(
                         blank=True,
-                        max_length=50,
+                        max_length=23,
                         null=True,
                         verbose_name="Article PID",
                     ),
