@@ -2,6 +2,7 @@ import logging
 import sys
 
 # from django.utils.translation import gettext_lazy as _
+from lxml import etree
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre, get_xml_with_pre
 
 from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutura
@@ -259,8 +260,6 @@ class BasePidProvider:
                 
                 # Create or update XMLURL with full data + save_file
                 try:
-                    from lxml import etree
-                    
                     xmlurl_obj = XMLURL.create_or_update(
                         user=user,
                         url=xml_uri,
@@ -280,8 +279,6 @@ class BasePidProvider:
             
             # Success case - create or update XMLURL with success status
             try:
-                from lxml import etree
-                
                 xmlurl_obj = XMLURL.create_or_update(
                     user=user,
                     url=xml_uri,
