@@ -17,12 +17,15 @@ def _truncate_traceback(tb_str, max_length=255):
     If longer than max_length, keep start and end portions.
     
     Args:
-        tb_str: Traceback string
+        tb_str: Traceback string (can be None)
         max_length: Maximum length (default 255)
         
     Returns:
-        Truncated traceback string
+        Truncated traceback string or None
     """
+    if tb_str is None:
+        return None
+        
     if len(tb_str) <= max_length:
         return tb_str
     
@@ -247,9 +250,11 @@ class BasePidProvider:
 
     def _handle_pid_provider_failure(self, response, xml_with_pre, xml_uri, name, user, origin_date, force_update, is_published):
         """Handle exception type b) - XML obtained but PidProviderXML creation failed"""
-        # Get traceback and truncate if needed
-        tb_str = traceback.format_exc()
-        truncated_tb = _truncate_traceback(tb_str)
+        # Format error information from response (not from an exception context)
+        error_msg = response.get("error_message", "Unknown error")
+        error_type = response.get("error_type", "Unknown")
+        error_info = f"{error_type}: {error_msg}"
+        truncated_error = _truncate_traceback(error_info)
         
         # Create or update XMLURL with exception info and save zipfile
         xmlurl_obj = XMLURL.create_or_update(
@@ -257,7 +262,7 @@ class BasePidProvider:
             url=xml_uri,
             status="pid_provider_xml_failed",
             pid=response.get("id") or response.get("v3"),
-            exceptions=truncated_tb,
+            exceptions=truncated_error,
         )
         # Use XMLWithPre.tostring() method
         xmlurl_obj.save_file(xml_with_pre.tostring(), filename=name or 'content.xml')
