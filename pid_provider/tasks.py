@@ -219,13 +219,13 @@ def task_load_records_from_collection_endpoint(
         for document in harvester.harvest_documents():
             origin_date = document.get("origin_date")
             task_load_record_from_xml_url.delay(
-                username,
-                user_id,
-                collection_acron,
-                document["pid_v3"],
-                document["url"],
-                origin_date,
-                force_update,
+                username=username,
+                user_id=user_id,
+                collection_acron=collection_acron,
+                pid_v3=document["pid_v3"],
+                xml_url=document["url"],
+                origin_date=origin_date,
+                force_update=force_update,
             )
 
     except Exception as e:

@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Generator, Optional
 from urllib.parse import urlencode
 
@@ -37,7 +37,7 @@ class OPACHarvester:
         self.domain = domain
         self.collection_acron = collection_acron
         self.from_date = from_date or "2000-01-01"
-        self.until_date = until_date or datetime.utcnow().isoformat()[:10]
+        self.until_date = until_date or datetime.now(timezone.utc).isoformat()[:10]
         self.limit = limit
         self.timeout = timeout
 
@@ -124,7 +124,7 @@ class OPACHarvester:
                             "created_at": self._parse_gmt_date(item.get("create")),
                             "updated_at": self._parse_gmt_date(item.get("update")),
                             "raw_data": item,
-                            "harvested_at": datetime.utcnow().isoformat(),
+                            "harvested_at": datetime.now(timezone.utc).isoformat(),
                         },
                     }
 
