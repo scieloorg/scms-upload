@@ -7,7 +7,7 @@ from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre, get_xml_with_pre
 from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutura
     profile_method,
 )
-from pid_provider.models import PidProviderXML
+from pid_provider.models import PidProviderXML, XMLURL
 from tracker.models import UnexpectedEvent
 
 
@@ -159,26 +159,36 @@ class BasePidProvider:
     ):
         """
         Fornece / Valida PID de um XML disponível por um URI
+        
+        This method handles three types of exceptions:
+        a) Failure to obtain XML - registers only URL, status, and PID in XMLURL
+        b) Successfully obtain XML but fail to create PidProviderXML record - 
+           registers everything + saves compressed XML content
+        c) Unexpected errors - logs in UnexpectedEvent
 
         Returns
         -------
             dict
         """
+        xml_with_pre = None
+        xml_content = None
+        
+        # a) Try to obtain XML from URI
         try:
             xml_with_pre = list(XMLWithPre.create(uri=xml_uri))[0]
+            # Store the raw XML content for potential compression
+            xml_content = xml_with_pre.xmltree
         except Exception as e:
+            # Exception type a) - Failure to obtain XML
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            detail = dict(
-                error_msg=str(e),
-                error_type=str(exc_type),
-                exc_value=str(exc_value),
-                exc_traceback=str(exc_traceback),
-            )
+            
+            # Log the error
             UnexpectedEvent.create(
                 exception=e,
                 exc_traceback=exc_traceback,
                 detail={
                     "operation": "PidProvider.provide_pid_for_xml_uri",
+                    "exception_type": "xml_fetch_failure",
                     "input": dict(
                         xml_uri=xml_uri,
                         user=user.username,
@@ -189,8 +199,28 @@ class BasePidProvider:
                     ),
                 },
             )
-            return detail
-        else:
+            
+            # Create or update XMLURL with only URL and status (no zipfile)
+            try:
+                XMLURL.create_or_update(
+                    user=user,
+                    url=xml_uri,
+                    status="xml_fetch_failed",
+                    pid=None,
+                )
+            except Exception as xmlurl_error:
+                logging.error(f"Failed to create/update XMLURL for {xml_uri}: {xmlurl_error}")
+            
+            # Return error details
+            return dict(
+                error_msg=str(e),
+                error_type=str(exc_type),
+                exc_value=str(exc_value),
+                exc_traceback=str(exc_traceback),
+            )
+        
+        # b) Try to create PidProviderXML record
+        try:
             response = self.provide_pid_for_xml_with_pre(
                 xml_with_pre,
                 name,
@@ -202,8 +232,100 @@ class BasePidProvider:
                 registered_in_core=registered_in_core,
                 auto_solve_pid_conflict=auto_solve_pid_conflict,
             )
-
+            
+            # Check if the response indicates an error
+            if response.get("error_type") or response.get("error_message"):
+                # Exception type b) - XML obtained but PidProviderXML creation failed
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                
+                # Log the error
+                UnexpectedEvent.create(
+                    exception=Exception(response.get("error_message", "Unknown error")),
+                    exc_traceback=exc_traceback,
+                    detail={
+                        "operation": "PidProvider.provide_pid_for_xml_uri",
+                        "exception_type": "pid_provider_xml_creation_failure",
+                        "input": dict(
+                            xml_uri=xml_uri,
+                            user=user.username,
+                            name=name,
+                            origin_date=origin_date,
+                            force_update=force_update,
+                            is_published=is_published,
+                        ),
+                        "response": response,
+                    },
+                )
+                
+                # Create or update XMLURL with full data + save_file
+                try:
+                    from lxml import etree
+                    
+                    xmlurl_obj = XMLURL.create_or_update(
+                        user=user,
+                        url=xml_uri,
+                        status="pid_provider_xml_failed",
+                        pid=response.get("id") or response.get("v3"),
+                    )
+                    
+                    # Save the compressed XML content
+                    if xml_content is not None:
+                        xml_string = etree.tostring(xml_content, encoding='utf-8')
+                        xmlurl_obj.save_file(xml_string, filename=name or 'content.xml')
+                        
+                except Exception as xmlurl_error:
+                    logging.error(f"Failed to create/update XMLURL with zipfile for {xml_uri}: {xmlurl_error}")
+                
+                return response
+            
+            # Success case - create or update XMLURL with success status
+            try:
+                from lxml import etree
+                
+                xmlurl_obj = XMLURL.create_or_update(
+                    user=user,
+                    url=xml_uri,
+                    status="success",
+                    pid=response.get("v3"),
+                )
+                
+                # Save the compressed XML content
+                if xml_content is not None:
+                    xml_string = etree.tostring(xml_content, encoding='utf-8')
+                    xmlurl_obj.save_file(xml_string, filename=name or 'content.xml')
+                    
+            except Exception as xmlurl_error:
+                logging.error(f"Failed to create/update XMLURL for successful processing {xml_uri}: {xmlurl_error}")
+            
             return response
+            
+        except Exception as e:
+            # Exception type c) - Unexpected error during processing
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            
+            UnexpectedEvent.create(
+                exception=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "operation": "PidProvider.provide_pid_for_xml_uri",
+                    "exception_type": "unexpected_error",
+                    "input": dict(
+                        xml_uri=xml_uri,
+                        user=user.username,
+                        name=name,
+                        origin_date=origin_date,
+                        force_update=force_update,
+                        is_published=is_published,
+                    ),
+                },
+            )
+            
+            return dict(
+                error_msg=str(e),
+                error_type=str(exc_type),
+                exc_value=str(exc_value),
+                exc_traceback=str(exc_traceback),
+            )
 
     @classmethod
     @profile_method
