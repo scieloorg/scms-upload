@@ -1572,3 +1572,99 @@ class FixPidV2(CommonControlField):
                 fixed_in_core=None,
                 fixed_in_upload=None,
             )
+
+
+class XMLURL(CommonControlField):
+    """
+    Model to store URLs that experienced failures and should be retried in the future.
+    
+    This model tracks URLs that failed during processing, along with their status
+    and associated article PID, enabling retry mechanisms to reprocess them later.
+    
+    Fields:
+        url: URLField - The URL that needs to be retried
+        status: CharField - To control the request status (e.g., "pending", "failed", "retrying")
+        pid: CharField - Article PID associated with this URL
+    """
+
+    url = models.URLField(
+        _("URL"), max_length=500, null=False, blank=False
+    )
+    status = models.CharField(
+        _("Status"), max_length=50, null=True, blank=True
+    )
+    pid = models.CharField(
+        _("Article PID"), max_length=23, null=True, blank=True
+    )
+
+    base_form_class = CoreAdminModelForm
+
+    panels = [
+        FieldPanel("url"),
+        FieldPanel("status"),
+        FieldPanel("pid"),
+    ]
+
+    class Meta:
+        ordering = ["-updated", "-created"]
+        verbose_name = _("XML URL")
+        verbose_name_plural = _("XML URLs")
+
+        indexes = [
+            models.Index(fields=["url"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["pid"]),
+        ]
+
+    def __str__(self):
+        return f"{self.url} - {self.status}"
+
+    @classmethod
+    def get(cls, url=None):
+        if url:
+            return cls.objects.get(url=url)
+        raise ValueError("XMLURL.get() requires a url parameter")
+
+    @classmethod
+    def create(
+        cls,
+        user,
+        url=None,
+        status=None,
+        pid=None,
+    ):
+        try:
+            obj = cls()
+            obj.url = url
+            obj.status = status
+            obj.pid = pid
+            obj.creator = user
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(url)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        user,
+        url=None,
+        status=None,
+        pid=None,
+    ):
+        try:
+            obj = cls.get(url=url)
+            obj.updated_by = user
+            if status is not None:
+                obj.status = status
+            if pid is not None:
+                obj.pid = pid
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(
+                user,
+                url,
+                status,
+                pid,
+            )
