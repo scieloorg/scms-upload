@@ -1576,12 +1576,15 @@ class FixPidV2(CommonControlField):
 
 class XMLURL(CommonControlField):
     """
-    Model to store URLs that had failures to retry them in the future.
+    Model to store URLs that experienced failures and should be retried in the future.
+    
+    This model tracks URLs that failed during processing, along with their status
+    and associated article PID, enabling retry mechanisms to reprocess them later.
     
     Fields:
         url: URLField - The URL that needs to be retried
-        status: CharField - To control the request status
-        pid: CharField - Article PID
+        status: CharField - To control the request status (e.g., "pending", "failed", "retrying")
+        pid: CharField - Article PID associated with this URL
     """
 
     url = models.URLField(
@@ -1620,7 +1623,7 @@ class XMLURL(CommonControlField):
     def get(cls, url=None):
         if url:
             return cls.objects.get(url=url)
-        raise ValueError("XMLURL.get requires url")
+        raise ValueError("XMLURL.get() requires a url parameter")
 
     @classmethod
     def create(
