@@ -48,7 +48,6 @@ services:
 
   celeryworker:
     <<: *django-function
-    container_name: upload_production_celeryworker
     command: /start-celeryworker
     ports: []
     deploy:
