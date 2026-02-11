@@ -1,8 +1,10 @@
+import io
 import json
 import logging
 import os
 import sys
 import traceback
+import zipfile
 from datetime import datetime
 from functools import lru_cache, cached_property
 from zlib import crc32
@@ -1574,6 +1576,22 @@ class FixPidV2(CommonControlField):
             )
 
 
+def xml_url_zipfile_path(instance, filename):
+    """
+    Generate the upload path for XMLURL zipfile.
+    
+    Args:
+        instance: XMLURL instance
+        filename: Name of the file
+        
+    Returns:
+        Path string for file upload
+    """
+    # Use URL hash to create a unique subdirectory
+    url_hash = abs(hash(instance.url)) % (10 ** 8)
+    return f"pid_provider/xmlurl/{url_hash}/{filename}"
+
+
 class XMLURL(CommonControlField):
     """
     Model to store URLs that experienced failures and should be retried in the future.
@@ -1585,6 +1603,8 @@ class XMLURL(CommonControlField):
         url: URLField - The URL that needs to be retried
         status: CharField - To control the request status (e.g., "pending", "failed", "retrying")
         pid: CharField - Article PID associated with this URL
+        zipfile: FileField - Compressed XML content retrieved from the URL
+        exceptions: CharField - Exception traceback information (truncated to 255 chars if needed)
     """
 
     url = models.URLField(
@@ -1596,6 +1616,12 @@ class XMLURL(CommonControlField):
     pid = models.CharField(
         _("Article PID"), max_length=23, null=True, blank=True
     )
+    zipfile = models.FileField(
+        _("ZIP File"), upload_to=xml_url_zipfile_path, null=True, blank=True
+    )
+    exceptions = models.CharField(
+        _("Exceptions"), max_length=255, null=True, blank=True
+    )
 
     base_form_class = CoreAdminModelForm
 
@@ -1603,6 +1629,8 @@ class XMLURL(CommonControlField):
         FieldPanel("url"),
         FieldPanel("status"),
         FieldPanel("pid"),
+        FieldPanel("zipfile"),
+        FieldPanel("exceptions"),
     ]
 
     class Meta:
@@ -1632,12 +1660,14 @@ class XMLURL(CommonControlField):
         url=None,
         status=None,
         pid=None,
+        exceptions=None,
     ):
         try:
             obj = cls()
             obj.url = url
             obj.status = status
             obj.pid = pid
+            obj.exceptions = exceptions
             obj.creator = user
             obj.save()
             return obj
@@ -1651,6 +1681,7 @@ class XMLURL(CommonControlField):
         url=None,
         status=None,
         pid=None,
+        exceptions=None,
     ):
         try:
             obj = cls.get(url=url)
@@ -1659,6 +1690,8 @@ class XMLURL(CommonControlField):
                 obj.status = status
             if pid is not None:
                 obj.pid = pid
+            if exceptions is not None:
+                obj.exceptions = exceptions
             obj.save()
             return obj
         except cls.DoesNotExist:
@@ -1667,4 +1700,37 @@ class XMLURL(CommonControlField):
                 url,
                 status,
                 pid,
+                exceptions,
             )
+
+    def save_file(self, xml_content, filename=None):
+        """
+        Create a zip file from XML content and save it to the zipfile field.
+        
+        Args:
+            xml_content: str or bytes - The XML content to compress
+            filename: str - Optional filename for the XML inside the zip (defaults to 'content.xml')
+            
+        Returns:
+            bool - True if file was saved successfully, False otherwise
+        """
+        try:
+            # Convert string to bytes if needed
+            if isinstance(xml_content, str):
+                xml_content = xml_content.encode('utf-8')
+            
+            # Create in-memory zip file
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                # Use provided filename or default
+                xml_filename = filename or 'content.xml'
+                zip_file.writestr(xml_filename, xml_content)
+            
+            # Save the zip file to the model
+            zip_filename = f"{self.pid or 'unknown'}_{self.pk or 'new'}.zip"
+            self.zipfile.save(zip_filename, ContentFile(zip_buffer.getvalue()), save=True)
+            
+            return True
+        except Exception as e:
+            logging.error(f"Error saving zip file for XMLURL {self.url}: {e}")
+            return False
