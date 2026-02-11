@@ -195,7 +195,7 @@ class ProcReport(CommonControlField):
     task_name = models.CharField(
         _("Procedure name"), max_length=64, null=True, blank=True
     )
-    file = models.FileField(upload_to=proc_report_directory_path, null=True, blank=True)
+    file = models.FileField(upload_to=proc_report_directory_path, null=True, blank=True, max_length=300)
     report_date = models.CharField(
         _("Identification"), max_length=34, null=True, blank=True
     )
@@ -1544,6 +1544,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         null=True,
         blank=True,
         help_text=_("Native XML + modifications or converted XML from HTML"),
+        max_length=300,
     )
 
     base_form_class = ProcAdminModelForm
