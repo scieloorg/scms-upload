@@ -500,20 +500,31 @@ class Article(ClusterableModel, CommonControlField):
     def fix_sps_pkg_names(cls, items):
         response = []
         for item in items:
-            data = {"sps_pkg_name": item.sps_pkg.sps_pkg_name}
+            data = {}
             try:
-                if item.fix_sps_pkg_name():
-                    data["fixed"] = item.sps_pkg.sps_pkg_name
-                if item.pp_xml:
-                    if item.pp_xml.fix_pkg_name(item.sps_pkg.sps_pkg_name):
-                        data["pp_xml_sps_pkg_name"] = item.pp_xml.pkg_name
+                data["pid_v3"] = item.pid_v3
+                data["pid_v2"] = item.pid_v2
+                
+                try:
+                    data["sps_pkg__pkg_name"] = item.sps_pkg.sps_pkg_name
+                    data["sps_pkg__pkg_name_fixed"] = item.fix_sps_pkg_name()
+                except Exception as e:
+                    data["sps_pkg__pkg_name_exception"] = traceback.format_exc()
+
+                try:
+                    data["pp_xml__pkg_name"] = item.pp_xml.pkg_name
+                    data["pp_xml__pkg_name_fixed"] = item.pp_xml.fix_pkg_name(data["sps_pkg__pkg_name"])
+                except Exception as e:
+                    data["pp_xml__pkg_name_exception"] = traceback.format_exc()
+
             except Exception as e:
                 data["exception"] = traceback.format_exc()
             response.append(data)
         return response
 
     def fix_sps_pkg_name(self):
-        return self.sps_pkg.fix_sps_pkg_name()
+        if self.sps_pkg:
+            return self.sps_pkg.fix_sps_pkg_name()
 
     @classmethod
     def exclude_repetitions(cls, user, field_name, field_value, timeout=None):
