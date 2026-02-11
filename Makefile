@@ -48,6 +48,7 @@ up:  ## Start app using $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) up -d
 
 up_scale:  ## Start app using $(compose) and scaling worker up to $(numworkers)
+	$(eval numworkers ?= 1)
 	$(DOCKER_COMPOSE) -f $(compose) up -d --scale celeryworker=$(numworkers)
 
 logs: ## See all app logs using $(compose)
