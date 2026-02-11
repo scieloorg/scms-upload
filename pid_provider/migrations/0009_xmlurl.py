@@ -3,6 +3,7 @@
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
+import pid_provider.models
 
 
 class Migration(migrations.Migration):
@@ -59,6 +60,24 @@ class Migration(migrations.Migration):
                         max_length=23,
                         null=True,
                         verbose_name="Article PID",
+                    ),
+                ),
+                (
+                    "zipfile",
+                    models.FileField(
+                        blank=True,
+                        null=True,
+                        upload_to=pid_provider.models.xml_url_zipfile_path,
+                        verbose_name="ZIP File",
+                    ),
+                ),
+                (
+                    "exceptions",
+                    models.CharField(
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Exceptions",
                     ),
                 ),
                 (
