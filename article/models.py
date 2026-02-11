@@ -513,7 +513,7 @@ class Article(ClusterableModel, CommonControlField):
 
                 try:
                     data["pp_xml__pkg_name"] = item.pp_xml.pkg_name
-                    data["pp_xml__pkg_name_fixed"] = item.pp_xml.fix_pkg_name(data["sps_pkg__pkg_name"])
+                    data["pp_xml__pkg_name_fixed"] = item.pp_xml.fix_pkg_name(data.get("sps_pkg__pkg_name"))
                 except Exception as e:
                     data["pp_xml__pkg_name_exception"] = traceback.format_exc()
 
