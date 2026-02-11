@@ -124,7 +124,7 @@ def basic_xml_directory_path(instance, filename):
 
 
 class BasicXMLFile(models.Model):
-    file = models.FileField(upload_to=basic_xml_directory_path, null=True, blank=True)
+    file = models.FileField(upload_to=basic_xml_directory_path, null=True, blank=True, max_length=300)
 
     panels = [
         FieldPanel("file"),
