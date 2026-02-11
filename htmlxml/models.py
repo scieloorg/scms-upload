@@ -216,7 +216,7 @@ class BodyAndBackFile(BasicXMLFile, Orderable):
     bb_parent = ParentalKey("HTMLXML", related_name="bb_file")
 
     file = models.FileField(
-        upload_to=body_and_back_directory_path, null=True, blank=True
+        upload_to=body_and_back_directory_path, null=True, blank=True, max_length=300
     )
     version = models.IntegerField()
 
@@ -597,7 +597,7 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         default=choices.HTML2XML_QA_NOT_EVALUATED,
     )
     report = models.FileField(
-        upload_to=generated_xml_report_directory_path, null=True, blank=True
+        upload_to=generated_xml_report_directory_path, null=True, blank=True, max_length=300
     )
     n_paragraphs = models.IntegerField(default=0)
     n_references = models.IntegerField(default=0)
@@ -609,14 +609,16 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         null=True,
         blank=True,
         verbose_name=_("Initial HTML file"),
-        help_text=_("Initial HTML structured in body, back, ref-list")
+        help_text=_("Initial HTML structured in body, back, ref-list"),
+        max_length=300,
     )
     conversion_steps_zip_file = models.FileField(
         upload_to=body_and_back_directory_path, 
         null=True, 
         blank=True,
         verbose_name=_("Body and Back ZIP file"),
-        help_text=_("ZIP file containing all body and back XML versions")
+        help_text=_("ZIP file containing all body and back XML versions"),
+        max_length=300,
     )
     panel_status = [
         FieldPanel("html2xml_status"),

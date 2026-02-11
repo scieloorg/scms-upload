@@ -110,7 +110,7 @@ class XMLVersion(CommonControlField):
     pid_provider_xml = models.ForeignKey(
         "PidProviderXML", null=True, blank=True, on_delete=models.SET_NULL
     )
-    file = models.FileField(upload_to=xml_directory_path, null=True, blank=True)
+    file = models.FileField(upload_to=xml_directory_path, null=True, blank=True, max_length=300)
     finger_print = models.CharField(max_length=64, null=True, blank=True)
 
     class Meta:
@@ -200,16 +200,17 @@ class XMLVersion(CommonControlField):
     def get_or_create(cls, user, pid_provider_xml, xml_with_pre):
         try:
             latest = cls.get(pid_provider_xml, xml_with_pre.finger_print)
-            if not os.path.isfile(latest.file.path):
-                try:
-                    filename = xml_with_pre.sps_pkg_name
-                except Exception as e:
-                    filename = pid_provider_xml.v3
-                latest.save_file(
-                    f"{filename}.xml",
-                    xml_with_pre.tostring(pretty_print=True),
-                )
-                latest.save()
+            try:
+                file_exist = os.path.isfile(latest.file.path)
+            except (AttributeError, TypeError, ValueError) as e:
+                file_exist = False
+            if file_exist:
+                return latest
+            latest.save_file(
+                f"{pid_provider_xml.v3}.xml",
+                xml_with_pre.tostring(pretty_print=True),
+            )
+            latest.save()
             return latest
         except cls.DoesNotExist:
             return cls.create(
@@ -1617,7 +1618,7 @@ class XMLURL(CommonControlField):
         _("Article PID"), max_length=23, null=True, blank=True
     )
     zipfile = models.FileField(
-        _("ZIP File"), upload_to=xml_url_zipfile_path, null=True, blank=True
+        _("ZIP File"), upload_to=xml_url_zipfile_path, null=True, blank=True, max_length=300,
     )
     exceptions = models.CharField(
         _("Exceptions"), max_length=255, null=True, blank=True
