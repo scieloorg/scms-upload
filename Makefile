@@ -47,6 +47,9 @@ build_no_cache:  ## Build app using $(compose) --no-cache
 up:  ## Start app using $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) up -d
 
+up_scale:  ## Start app using $(compose) and scaling worker up to $(numworkers)
+	$(DOCKER_COMPOSE) -f $(compose) up -d --scale celeryworker=$(numworkers)
+
 logs: ## See all app logs using $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) logs -f
 
@@ -57,6 +60,12 @@ restart:
 	$(DOCKER_COMPOSE) -f $(compose) restart
 ps:  ## See all containers using $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) ps
+
+top:  ## See docker top using $(compose)
+	$(DOCKER_COMPOSE) -f $(compose) top
+
+stats:  ## See docker stats using $(compose)
+	$(DOCKER_COMPOSE) -f $(compose) stats
 
 rm:  ## Remove all containers using $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) rm -f
