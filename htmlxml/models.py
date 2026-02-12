@@ -660,6 +660,14 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             models.Index(fields=["quality"]),
             models.Index(fields=["migrated_article"]),
         ]
+        
+        constraints = [
+            models.UniqueConstraint(
+                fields=["migrated_article"],
+                name="unique_migrated_article",
+                condition=models.Q(migrated_article__isnull=False),
+            ),
+        ]
 
     @property
     def data(self):
