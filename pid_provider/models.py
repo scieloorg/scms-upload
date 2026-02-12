@@ -1429,7 +1429,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             )
 
     def fix_pkg_name(self, pkg_name):
-        if self.pkg_name != pkg_name:
+        if not pkg_name:
+            pkg_name = self.xml_with_pre.sps_pkg_name
+        if pkg_name and self.pkg_name != pkg_name:
             self.pkg_name = pkg_name
             self.save()
             return True
