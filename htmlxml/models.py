@@ -715,7 +715,14 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         migrated_article=None,
     ):
         if migrated_article:
-            return cls.objects.get(migrated_article=migrated_article)
+            try:
+                return cls.objects.get(migrated_article=migrated_article)
+            except cls.MultipleObjectsReturned:
+                # If multiple objects exist, return the most recently updated one
+                # This handles legacy duplicate data gracefully
+                return cls.objects.filter(
+                    migrated_article=migrated_article
+                ).order_by("-updated").first()
         raise ValueError("HTMLXML.get requires migrated_article")
 
     @classmethod
@@ -731,6 +738,17 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         try:
             obj = cls.get(migrated_article)
             obj.updated_by = user
+            
+            # Clean up duplicates if they exist by keeping only the most recent
+            duplicates = cls.objects.filter(
+                migrated_article=migrated_article
+            ).exclude(pk=obj.pk)
+            if duplicates.exists():
+                logging.warning(
+                    f"Found {duplicates.count()} duplicate HTMLXML records for "
+                    f"migrated_article {migrated_article}. Deleting duplicates."
+                )
+                duplicates.delete()
         except cls.DoesNotExist:
             obj = cls()
             obj.migrated_article = migrated_article
