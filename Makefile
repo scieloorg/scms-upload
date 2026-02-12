@@ -9,6 +9,7 @@ ifneq ($(shell docker compose version 2>/dev/null),)
   DOCKER_COMPOSE=docker compose
 else
   DOCKER_COMPOSE=docker-compose
+  DOCKER_COMPATIBILITY=--compatibility
 endif
 
 help: ## Show this help
@@ -49,7 +50,7 @@ up:  ## Start app using $(compose)
 
 up_scale:  ## Start app using $(compose) and scaling worker up to $(numworkers)
 	$(eval numworkers ?= 1)
-	$(DOCKER_COMPOSE) -f $(compose) up -d --scale celeryworker=$(numworkers)
+	$(DOCKER_COMPOSE) $(DOCKER_COMPATIBILITY) -f $(compose) up -d --scale celeryworker=$(numworkers)
 
 logs: ## See all app logs using $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) logs -f
@@ -159,7 +160,7 @@ volume_down:  ## Remove all volume
 	$(DOCKER_COMPOSE) -f $(compose) down -v
 
 clean_celery_logs:
-	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' $$(docker ps -q -f 'name=celeryworker'))
+	@sudo truncate -s 0 $$(docker inspect --format='{{.LogPath}}' $$($(DOCKER_COMPOSE) -f $(compose) ps -q celeryworker))
 
 exclude_upload_production_django:  ## Exclude all productions containers
 	@if [ -n "$$(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'infrascielo/upload' | grep -v 'upload_production_postgres')" ]; then \
