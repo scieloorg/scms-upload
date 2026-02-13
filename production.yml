@@ -1,5 +1,5 @@
 x-django-function: &django-function
-  image: infrascielo/upload:${SCMS_WEBAPP_VERSION:-v2.10.4}
+  image: infrascielo/upload:${SCMS_WEBAPP_VERSION}
   restart: unless-stopped
   platform: linux/x86_64
   depends_on:
@@ -48,9 +48,12 @@ services:
 
   celeryworker:
     <<: *django-function
-    container_name: upload_production_celeryworker
     command: /start-celeryworker
     ports: []
+    deploy:
+      resources:
+        limits:
+          memory: 2.5G
 
   celerybeat:
     <<: *django-function
