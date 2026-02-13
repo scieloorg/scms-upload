@@ -25,7 +25,7 @@ COPY ./requirements .
 RUN python -m pip install --upgrade pip setuptools wheel
 
 # Garantir que setuptools esteja nos wheels
-RUN pip wheel --wheel-dir /usr/src/app/wheels setuptools>=68.2.2
+RUN pip wheel --wheel-dir /usr/src/app/wheels setuptools==80.10.2
 
 # Create Python Dependency and Sub-Dependency Wheels.
 RUN pip wheel --wheel-dir /usr/src/app/wheels  \
