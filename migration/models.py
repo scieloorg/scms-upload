@@ -349,7 +349,7 @@ class MigratedFile(CommonControlField):
         Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
     file = models.FileField(
-        upload_to=migrated_files_directory_path, null=True, blank=True
+        upload_to=migrated_files_directory_path, null=True, blank=True, max_length=300
     )
     # bases/pdf/acron/volnum/pt_a01.pdf
     original_path = models.CharField(
@@ -671,10 +671,10 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
     )
     journal_acron = models.CharField(max_length=16, null=True, blank=True)
     file = models.FileField(
-        upload_to=migrated_files_directory_path, null=True, blank=True
+        upload_to=migrated_files_directory_path, null=True, blank=True, max_length=300
     )
     # classic_website/spa/scielo_www/hercules-spa/new_platform/bases_for_upload/bases-work/acron/file_asdg.id
-    source_path = models.CharField(_("Source"), max_length=200, null=True, blank=True)
+    source_path = models.CharField(_("Source"), max_length=300, null=True, blank=True)
 
     file_size = models.IntegerField(null=True, blank=True)
 

@@ -124,7 +124,7 @@ def basic_xml_directory_path(instance, filename):
 
 
 class BasicXMLFile(models.Model):
-    file = models.FileField(upload_to=basic_xml_directory_path, null=True, blank=True)
+    file = models.FileField(upload_to=basic_xml_directory_path, null=True, blank=True, max_length=300)
 
     panels = [
         FieldPanel("file"),
@@ -166,7 +166,7 @@ class BasicXMLFile(models.Model):
         try:
             delete_files(self.file.path)
         except Exception as e:
-            logging.exception(f"Error deleting file {self.file.path}: {e}")
+            pass
         super().delete(using=using, keep_parents=keep_parents)
 
     @property
@@ -606,7 +606,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             operation.finish(
                 user,
                 completed=True,
-                detail={"source": zip_file_path, "saved": self.file.path},
+                detail={"source": zip_file_path, "saved": filename},
             )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -621,7 +621,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         try:
             delete_files(self.file.path)
         except Exception as e:
-            logging.exception(f"Unable to delete {self.file.path} {e} {type(e)}")
+            pass
         try:
             self.file.save(name, ContentFile(content))
         except Exception as e:
@@ -891,8 +891,14 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
     @property
     def pub_date(self):
-        try:
-            xml_with_pre = self.xml_with_pre
-            return xml_with_pre.article_publication_date
-        except Exception as e:
-            return xml_with_pre.get_complete_publication_date()
+        # esta data deveria ser completa (AAAA-MM-DD)
+        xml_with_pre = self.xml_with_pre
+        if not xml_with_pre:
+            return None
+        pub_date = xml_with_pre.article_publication_date
+        if not pub_date:
+            return None
+        if len(pub_date) == 10:
+            return pub_date
+        # em caso de data incompleta, tenta retornar a data completa, completando com 06 o mes ausente e com 15 o dia ausente
+        return xml_with_pre.get_complete_publication_date()

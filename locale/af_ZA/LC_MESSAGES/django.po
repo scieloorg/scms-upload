@@ -1,254 +1,253 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# Afrikaans translation for SciELO Content Manager.
+# Copyright (C) 2026
 # This file is distributed under the same license as the PACKAGE package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# Gemini AI <gemini@example.com>, 2026.
 #
-#, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-01-14 13:34+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: es\n"
+"POT-Creation-Date: 2026-01-14 13:40+0000\n"
+"PO-Revision-Date: 2026-01-14 10:45+0000\n"
+"Last-Translator: Gemini AI\n"
+"Language-Team: Afrikaans\n"
+"Language: af\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: article/button_helper.py:11
 msgid "See instructions"
-msgstr "Ver instrucciones"
+msgstr "Sien instruksies"
 
 #: article/button_helper.py:21 article/button_helper.py:84
 msgid "Submit change"
-msgstr "Enviar cambio"
+msgstr "Dien wysiging in"
 
 #: article/button_helper.py:75
 msgid "Request change"
-msgstr "Solicitar cambio"
+msgstr "Versoek wysiging"
 
 #: article/choices.py:8 upload/choices.py:111
 msgid "Update"
-msgstr "Actualización"
+msgstr "Bywerk"
 
 #: article/choices.py:9 upload/choices.py:112
 msgid "Erratum"
-msgstr "Fe de erratas"
+msgstr "Erratum"
 
 #: article/choices.py:22 article/choices.py:72
 msgid "Addendum"
-msgstr "Anexo"
+msgstr "Addendum"
 
 #: article/choices.py:23
 msgid "Commentary article"
-msgstr "Artículo de comentario"
+msgstr "Kommentaarartikel"
 
 #: article/choices.py:24
 msgid "Corrected article"
-msgstr "Artículo corregido"
+msgstr "Gekorrigeerde artikel"
 
 #: article/choices.py:25 article/choices.py:92
 msgid "Letter"
-msgstr "Carta"
+msgstr "Brief"
 
 #: article/choices.py:26
 msgid "Partial retraction"
-msgstr "Retractación parcial"
+msgstr "Gedeeltelike terugtrekking"
 
 #: article/choices.py:27
 msgid "Retracted article"
-msgstr "Artículo retractado"
+msgstr "Teruggetrekte artikel"
 
 #: article/choices.py:71
 msgid "Abstract"
-msgstr "Resumen"
+msgstr "Abstrak"
 
 #: article/choices.py:73
 msgid "Announcement"
-msgstr "Anuncio"
+msgstr "Aankondiging"
 
 #: article/choices.py:74
 msgid "Article-Commentary"
-msgstr "Artículo-Comentario"
+msgstr "Artikel-Kommentaar"
 
 #: article/choices.py:75
 msgid "Book-Review"
-msgstr "Reseña de libro"
+msgstr "Boekbespreking"
 
 #: article/choices.py:76
 msgid "Books-Received"
-msgstr "Libros recibidos"
+msgstr "Boeke Ontvang"
 
 #: article/choices.py:77
 msgid "Brief-Report"
-msgstr "Informe breve"
+msgstr "Kort Verslag"
 
 #: article/choices.py:78
 msgid "Calendar"
-msgstr "Calendario"
+msgstr "Kalender"
 
 #: article/choices.py:79
 msgid "Case-Report"
-msgstr "Reporte de caso"
+msgstr "Gevalleverslag"
 
 #: article/choices.py:80
 msgid "Clinical-Trial"
-msgstr "Ensayo clínico"
+msgstr "Kliniese Proef"
 
 #: article/choices.py:81
 msgid "Collection"
-msgstr "Colección"
+msgstr "Versameling"
 
 #: article/choices.py:82
 msgid "Correction"
-msgstr "Corrección"
+msgstr "Regstelling"
 
 #: article/choices.py:83
 msgid "Data-Article"
-msgstr "Artículo de datos"
+msgstr "Data-artikel"
 
 #: article/choices.py:84
 msgid "Discussion"
-msgstr "Discusión"
+msgstr "Bespreking"
 
 #: article/choices.py:85
 msgid "Dissertation"
-msgstr "Disertación"
+msgstr "Verhandeling"
 
 #: article/choices.py:86
 msgid "Editorial"
-msgstr "Editorial"
+msgstr "Redaksioneel"
 
 #: article/choices.py:87
 msgid "Editorial-Material"
-msgstr "Material editorial"
+msgstr "Redaksionele Materiaal"
 
 #: article/choices.py:88
 msgid "Guideline"
-msgstr "Directriz"
+msgstr "Riglyn"
 
 #: article/choices.py:89
 msgid "In-Brief"
-msgstr "En breve"
+msgstr "In Kort"
 
 #: article/choices.py:90
 msgid "Interview"
-msgstr "Entrevista"
+msgstr "Onderhoud"
 
 #: article/choices.py:91
 msgid "Introduction"
-msgstr "Introducción"
+msgstr "Inleiding"
 
 #: article/choices.py:93
 msgid "Meeting-Report"
-msgstr "Informe de reunión"
+msgstr "Vergaderingsverslag"
 
 #: article/choices.py:94
 msgid "News"
-msgstr "Noticias"
+msgstr "Nuus"
 
 #: article/choices.py:95
 msgid "Obituary"
-msgstr "Obituario"
+msgstr "Doodsberig"
 
 #: article/choices.py:96
 msgid "Oration"
-msgstr "Oración"
+msgstr "Redevoering"
 
 #: article/choices.py:97
 msgid "Other"
-msgstr "Otro"
+msgstr "Ander"
 
 #: article/choices.py:98
 msgid "Partial-Retraction"
-msgstr "Retractación parcial"
+msgstr "Gedeeltelike-Terugtrekking"
 
 #: article/choices.py:99
 msgid "Product-Review"
-msgstr "Revisión de producto"
+msgstr "Produkresensie"
 
 #: article/choices.py:100
 msgid "Rapid-Communication"
-msgstr "Comunicación rápida"
+msgstr "Snelkommunikasie"
 
 #: article/choices.py:101
 msgid "Reply"
-msgstr "Respuesta"
+msgstr "Antwoord"
 
 #: article/choices.py:102
 msgid "Reprint"
-msgstr "Reimpresión"
+msgstr "Herdruk"
 
 #: article/choices.py:103
 msgid "Research-Article"
-msgstr "Artículo de investigación"
+msgstr "Navorsingsartikel"
 
 #: article/choices.py:104
 msgid "Retraction"
-msgstr "Retractación"
+msgstr "Terugtrekking"
 
 #: article/choices.py:105
 msgid "Review-Article"
-msgstr "Artículo de revisión"
+msgstr "Oorsigartikel"
 
 #: article/choices.py:106
 msgid "Technical-Report"
-msgstr "Informe técnico"
+msgstr "Tegniese Verslag"
 
 #: article/choices.py:107
 msgid "Translation"
-msgstr "Traducción"
+msgstr "Vertaling"
 
 #: article/choices.py:125
 msgid "Erratum submitted"
-msgstr "Fe de erratas enviada"
+msgstr "Erratum ingedien"
 
 #: article/choices.py:126
 msgid "Update submitted"
-msgstr "Actualización enviada"
+msgstr "Bywerking ingedien"
 
 #: article/choices.py:127 upload/choices.py:77
 msgid "Required update"
-msgstr "Actualización requerida"
+msgstr "Vereiste bywerking"
 
 #: article/choices.py:128 upload/choices.py:76
 msgid "Required erratum"
-msgstr "Fe de erratas requerida"
+msgstr "Vereiste erratum"
 
 #: article/choices.py:129
 msgid "Prepare to publish"
-msgstr "Preparar para publicar"
+msgstr "Berei voor vir publikasie"
 
 #: article/choices.py:130
 msgid "Ready to publish"
-msgstr "Listo para publicar"
+msgstr "Gereed vir publikasie"
 
 #: article/choices.py:131
 msgid "Scheduled to publish"
-msgstr "Programado para publicar"
+msgstr "Geskeduleer vir publikasie"
 
 #: article/choices.py:132 migration/choices.py:17 upload/choices.py:87
 msgid "Published"
-msgstr "Publicado"
+msgstr "Gepubliseer"
 
 #: article/controller.py:48
 msgid "Unable to update article {} {} {}"
-msgstr "No se puede actualizar el artículo {} {} {}"
+msgstr "Kan nie artikel {} {} {} bywerk nie"
 
 #: article/forms.py:37
 msgid "Inform the article that needs to be changed"
-msgstr "Informar el artículo que necesita ser cambiado"
+msgstr "Meld die artikel wat gewysig moet word"
 
 #: article/forms.py:42
 msgid "Comment what needs to be changed"
-msgstr "Comentar lo que necesita ser cambiado"
+msgstr "Lewer kommentaar oor wat gewysig moet word"
 
 #: article/forms.py:47
 msgid "Inform the type of change"
-msgstr "Informar el tipo de cambio"
+msgstr "Meld die tipe wysiging"
 
 #: article/models.py:50
 msgid "PID v3"
@@ -260,105 +259,105 @@ msgstr "PID v2"
 
 #: article/models.py:55
 msgid "Article type"
-msgstr "Tipo de artículo"
+msgstr "Artikel tipe"
 
 #: article/models.py:64
 msgid "Article status"
-msgstr "Estado del artículo"
+msgstr "Artikel status"
 
 #: article/models.py:70 issue/models.py:335
 msgid "Position"
-msgstr "Posición"
+msgstr "Posisie"
 
 #: article/models.py:74
 msgid "First publication date ISO"
-msgstr "Fecha de primera publicación ISO"
+msgstr "Eerste publikasiedatum ISO"
 
 #: article/models.py:78
 msgid "Elocation ID"
-msgstr "ID de Elocation"
+msgstr "Elocation ID"
 
 #: article/models.py:80
 msgid "First page"
-msgstr "Primera página"
+msgstr "Eerste bladsy"
 
 #: article/models.py:81
 msgid "Last page"
-msgstr "Última página"
+msgstr "Laaste bladsy"
 
 #: article/models.py:92
 msgid "sections"
-msgstr "secciones"
+msgstr "seksies"
 
 #: article/models.py:132
 msgid "Can make article change"
-msgstr "Puede hacer cambios en el artículo"
+msgstr "Kan artikel wysig"
 
 #: article/models.py:133
 msgid "Can request article change"
-msgstr "Puede solicitar cambios en el artículo"
+msgstr "Kan artikelwysiging versoek"
 
 #: article/models.py:600
 msgid "Article DOI with Language"
-msgstr "DOI del artículo con idioma"
+msgstr "Artikel DOI met Taal"
 
 #: article/models.py:601
 msgid "Article DOIs with Language"
-msgstr "DOIs del artículo con idioma"
+msgstr "Artikel DOIs met Taal"
 
 #: article/models.py:679
 msgid "Related item type"
-msgstr "Tipo de ítem relacionado"
+msgstr "Verwante item tipe"
 
 #: article/models.py:715
 msgid "Change type"
-msgstr "Tipo de cambio"
+msgstr "Wysiging tipe"
 
 #: article/models.py:721
 msgid "Comment"
-msgstr "Comentario"
+msgstr "Kommentaar"
 
 #: article/templates/modeladmin/article/article/inspect.html:6
 #: upload/templates/modeladmin/upload/package/inspect.html:31
 #: upload/templates/modeladmin/upload/package/inspect_.html:31
 #: upload/templates/modeladmin/upload/validationresult/inspect.html:20
 msgid "Details"
-msgstr "Detalles"
+msgstr "Besonderhede"
 
 #: article/templates/modeladmin/article/article/inspect.html:21
 msgid "Article change instructions"
-msgstr "Instrucciones de cambio de artículo"
+msgstr "Instruksies vir artikelwysiging"
 
 #: article/templates/modeladmin/article/article/inspect.html:24
 msgid "Identifier"
-msgstr "Identificador"
+msgstr "Identifiseerder"
 
 #: article/templates/modeladmin/article/article/inspect.html:26
 #: migration/models.py:821
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:25
 msgid "Type"
-msgstr "Tipo"
+msgstr "Tipe"
 
 #: article/templates/modeladmin/article/article/inspect.html:28
 msgid "Deadline"
-msgstr "Fecha límite"
+msgstr "Sperdatum"
 
 #: article/templates/modeladmin/article/article/inspect.html:30
 msgid "Instructions"
-msgstr "Instrucciones"
+msgstr "Instruksies"
 
 #: article/templates/modeladmin/article/article/inspect.html:36
 msgid "Available packages"
-msgstr "Paquetes disponibles"
+msgstr "Beskikbare pakkette"
 
 #: article/templates/modeladmin/article/article/inspect.html:40
 #: core/models.py:44
 msgid "Creator"
-msgstr "Creador"
+msgstr "Skepper"
 
 #: article/templates/modeladmin/article/article/inspect.html:41
 msgid "Created"
-msgstr "Creado"
+msgstr "Geskep"
 
 #: article/templates/modeladmin/article/article/inspect.html:42
 #: htmlxml/models.py:583 htmlxml/models.py:621 package/models.py:341
@@ -367,7 +366,7 @@ msgstr "Creado"
 #: upload/models.py:1368 upload/models.py:1420
 #: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:22
 msgid "Status"
-msgstr "Estado"
+msgstr "Status"
 
 #: article/templates/modeladmin/article/article/inspect.html:43
 #: upload/models.py:192
@@ -376,7 +375,7 @@ msgstr "Estado"
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:24
 #: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:21
 msgid "Category"
-msgstr "Categoría"
+msgstr "Kategorie"
 
 #: article/templates/modeladmin/article/article/inspect.html:44
 #: upload/templates/modeladmin/upload/package/inspect.html:74
@@ -388,349 +387,345 @@ msgstr "Categoría"
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:27
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:63
 msgid "Link"
-msgstr "Enlace"
+msgstr "Skakel"
 
 #: article/templates/modeladmin/article/article/inspect.html:60
 msgid "Download package"
-msgstr "Descargar paquete"
+msgstr "Laai pakket af"
 
 #: article/wagtail_hooks.py:28 article/wagtail_hooks.py:127
 msgid "Articles"
-msgstr "Artículos"
+msgstr "Artikels"
 
 #: article/wagtail_hooks.py:68
 msgid "Related items"
-msgstr "Ítems relacionados"
+msgstr "Verwante items"
 
 #: article/wagtail_hooks.py:94
 msgid "Changes request"
-msgstr "Solicitud de cambios"
+msgstr "Wysigingsversoek"
 
 #: bigbang/tasks_scheduler.py:127
 msgid "Check article availability"
-msgstr "Verificar disponibilidad del artículo"
+msgstr "Gaan artikelbeskikbaarheid na"
 
 #: bigbang/tasks_scheduler.py:150
 msgid "Create Journal, Issue e Article Processing items"
-msgstr "Crear ítems de Procesamiento de Revistas, Fascículos y Artículos"
+msgstr "Skep Tydskrif-, Uitgawe- en Artikelverwerkingsitems"
 
 #: bigbang/tasks_scheduler.py:176
 msgid "Migra e publica"
-msgstr "Migrar y publicar"
+msgstr "Migreer en publiseer"
 
 #: bigbang/tasks_scheduler.py:202
 msgid "Migra e publica os periódicos"
-msgstr "Migrar y publicar las revistas"
+msgstr "Migreer en publiseer tydskrifte"
 
 #: bigbang/tasks_scheduler.py:230
 msgid "Migra e publica os fascículos"
-msgstr "Migrar y publicar los fascículos"
+msgstr "Migreer en publiseer uitgawes"
 
 #: bigbang/tasks_scheduler.py:258
 msgid "Migra e publica artigos"
-msgstr "Migrar y publicar artículos"
+msgstr "Migreer en publiseer artikels"
 
 #: bigbang/tasks_scheduler.py:303
 msgid "Publica periódicos"
-msgstr "Publicar revistas"
+msgstr "Publiseer tydskrifte"
 
 #: bigbang/tasks_scheduler.py:328
 msgid "Publica fascículos"
-msgstr "Publicar fascículos"
+msgstr "Publiseer uitgawes"
 
 #: bigbang/tasks_scheduler.py:349
 msgid "Publica artigos"
-msgstr "Publicar artículos"
+msgstr "Publiseer artikels"
 
 #: bigbang/tasks_scheduler.py:376
 msgid "Busca e cria periódicos"
-msgstr "Buscar y crear revistas"
+msgstr "Soek en skep tydskrifte"
 
 #: bigbang/utils/scheduler.py:55 core/utils/scheduler.py:51
 msgid "Scheduled task: {}"
-msgstr "Tarea programada: {}"
+msgstr "Geskeduleerde taak: {}"
 
 #: collection/choices.py:13 journal/choices.py:17
 msgid "Suspended"
-msgstr "Suspendido"
+msgstr "Opgeskort"
 
 #: collection/choices.py:14 collection/choices.py:23 journal/choices.py:18
 #: journal/choices.py:26
 msgid "Unknown"
-msgstr "Desconocido"
+msgstr "Onbekend"
 
 #: collection/choices.py:15 journal/choices.py:19
 msgid "Ceased"
-msgstr "Cesado"
+msgstr "Gestaak"
 
 #: collection/choices.py:16 journal/choices.py:20
 msgid "Not informed"
-msgstr "No informado"
+msgstr "Nie in kennis gestel nie"
 
 #: collection/choices.py:17 collection/choices.py:24 journal/choices.py:21
 #: journal/choices.py:27
 msgid "Current"
-msgstr "Actual"
+msgstr "Huidig"
 
 #: collection/choices.py:32
 msgid "QA"
-msgstr "Control de calidad"
+msgstr "Kwaliteitsbeheer (QA)"
 
 #: collection/choices.py:33
 msgid "PUBLIC"
-msgstr "PÚBLICO"
+msgstr "PUBLIEK"
 
 #: collection/models.py:33
 msgid "Collection Acronym"
-msgstr "Acrónimo de la colección"
+msgstr "Versamelingsakroniem"
 
 #: collection/models.py:35
 msgid "Collection Name"
-msgstr "Nombre de la colección"
+msgstr "Versamelingsnaam"
 
 #: collection/models.py:71
 msgid "Website URL"
-msgstr "URL del sitio web"
+msgstr "Webwerf-URL"
 
 #: collection/models.py:73
 msgid "Article API URL"
-msgstr "URL de la API de artículos"
+msgstr "Artikel API-URL"
 
 #: collection/models.py:76
 msgid "Issue API URL"
-msgstr "URL de la API de fascículos"
+msgstr "Uitgawe API-URL"
 
 #: collection/models.py:79
 msgid "Journal API URL"
-msgstr "URL de la API de revistas"
+msgstr "Tydskrif API-URL"
 
 #: collection/models.py:82
 msgid "Get token API URL"
-msgstr "URL de la API para obtener token"
+msgstr "Kry-token API-URL"
 
 #: collection/models.py:87
 msgid "Purpose"
-msgstr "Propósito"
+msgstr "Doel"
 
 #: collection/models.py:118
 msgid "EndPoints"
-msgstr "EndPoints"
+msgstr "Eindpunte"
 
 #: collection/models.py:210
 msgid "Language Name"
-msgstr "Nombre del idioma"
+msgstr "Taalnaam"
 
 #: collection/models.py:211
 msgid "Language code 2"
-msgstr "Código de idioma 2"
+msgstr "Taalkode 2"
 
 #: collection/models.py:216 migration/models.py:374
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:59
 msgid "Language"
-msgstr "Idioma"
+msgstr "Taal"
 
 #: collection/models.py:217
 msgid "Languages"
-msgstr "Idiomas"
+msgstr "Tale"
 
 #: collection/models.py:287
 msgid "Endpoint name"
-msgstr "Nombre del endpoint"
+msgstr "Eindpuntnaam"
 
 #: collection/models.py:288
 msgid "Endpoint URL"
-msgstr "URL del endpoint"
+msgstr "Eindpunt-URL"
 
 #: collection/wagtail_hooks.py:27 collection/wagtail_hooks.py:124
 msgid "Collections"
-msgstr "Colecciones"
+msgstr "Versamelings"
 
 #: collection/wagtail_hooks.py:55
 msgid "New WebSites Configurations"
-msgstr "Nuevas configuraciones de sitios web"
+msgstr "Nuwe Webwerf-konfigurasies"
 
 #: collection/wagtail_hooks.py:81
 msgid "Files Storage Configuration"
-msgstr "Configuración de almacenamiento de archivos"
+msgstr "Lêerstoor-konfigurasie"
 
 #: collection/wagtail_hooks.py:108 migration/wagtail_hooks.py:22
 msgid "Classic Website Configuration"
-msgstr "Configuración del sitio web clásico"
+msgstr "Klassieke Webwerf-konfigurasie"
 
 #: core/choices.py:206
 msgid "JANUARY"
-msgstr "ENERO"
+msgstr "JANUARIE"
 
 #: core/choices.py:207
 msgid "FEBRUARY"
-msgstr "FEBRERO"
+msgstr "FEBRUARIE"
 
 #: core/choices.py:208
 msgid "MARCH"
-msgstr "MARZO"
+msgstr "MAART"
 
 #: core/choices.py:209
 msgid "APRIL"
-msgstr "ABRIL"
+msgstr "APRIL"
 
 #: core/choices.py:210
 msgid "MAY"
-msgstr "MAYO"
+msgstr "MEI"
 
 #: core/choices.py:211
 msgid "JUNE"
-msgstr "JUNIO"
+msgstr "JUNIE"
 
 #: core/choices.py:212
 msgid "JULY"
-msgstr "JULIO"
+msgstr "JULIE"
 
 #: core/choices.py:213
 msgid "AUGUST"
-msgstr "AGOSTO"
+msgstr "AUGUSTUS"
 
 #: core/choices.py:214
 msgid "SEPTEMBER"
-msgstr "SEPTIEMBRE"
+msgstr "SEPTEMBER"
 
 #: core/choices.py:215
 msgid "OCTOBER"
-msgstr "OCTUBRE"
+msgstr "OKTOBER"
 
 #: core/choices.py:216
 msgid "NOVEMBER"
-msgstr "NOVIEMBRE"
+msgstr "NOVEMBER"
 
 #: core/choices.py:217
 msgid "DECEMBER"
-msgstr "DICIEMBRE"
+msgstr "DESEMBER"
 
 #: core/models.py:36 tracker/models.py:52 tracker/models.py:98
 msgid "Creation date"
-msgstr "Fecha de creación"
+msgstr "Skeppingsdatum"
 
 #: core/models.py:39 tracker/models.py:185
 msgid "Last update date"
-msgstr "Fecha de última actualización"
+msgstr "Laaste bywerkingsdatum"
 
 #: core/models.py:53
 msgid "Updater"
-msgstr "Actualizador"
+msgstr "Bywerker"
 
 #: core/models.py:139
 msgid "Publication month number"
-msgstr "Número del mes de publicación"
+msgstr "Publikasiemaand nommer"
 
 #: core/models.py:145
 msgid "Publication month name"
-msgstr "Nombre del mes de publicación"
+msgstr "Publikasiemaand naam"
 
 #: core/models.py:162
 msgid "Publication initial month number"
-msgstr "Número del mes inicial de publicación"
+msgstr "Publikasie aanvangsmaand nommer"
 
 #: core/models.py:168
 msgid "Publication initial month name"
-msgstr "Nombre del mes inicial de publicación"
+msgstr "Publikasie aanvangsmaand naam"
 
 #: core/models.py:174
 msgid "Publication final month number"
-msgstr "Número del mes final de publicación"
+msgstr "Publikasie finale maand nommer"
 
 #: core/models.py:180
 msgid "Publication final month name"
-msgstr "Nombre del mes final de publicación"
+msgstr "Publikasie finale maand naam"
 
 #: core/models.py:196
 msgid "Publication date text"
-msgstr "Texto de la fecha de publicación"
+msgstr "Publikasiedatum teks"
 
 #: core/models.py:201 core/models.py:227
 msgid "Publication year"
-msgstr "Año de publicación"
+msgstr "Publikasiejaar"
 
 #: core/models.py:370 journal/models.py:225 proc/models.py:850
 #: upload/models.py:1730
 msgid "Title"
-msgstr "Título"
+msgstr "Titel"
 
 #: core/templates/account/account_inactive.html:5
 #: core/templates/account/account_inactive.html:8
 msgid "Account Inactive"
-msgstr "Cuenta inactiva"
+msgstr "Rekening Onaktief"
 
 #: core/templates/account/account_inactive.html:10
 msgid "This account is inactive."
-msgstr "Esta cuenta está inactiva."
+msgstr "Hierdie rekening is onaktief."
 
 #: core/templates/account/email.html:7
 msgid "Account"
-msgstr "Cuenta"
+msgstr "Rekening"
 
 #: core/templates/account/email.html:10
 msgid "E-mail Addresses"
-msgstr "Direcciones de correo electrónico"
+msgstr "E-posadresse"
 
 #: core/templates/account/email.html:13
 msgid "The following e-mail addresses are associated with your account:"
-msgstr ""
-"Las siguientes direcciones de correo electrónico están asociadas con tu "
-"cuenta:"
+msgstr "Die volgende e-posadresse is aan u rekening gekoppel:"
 
 #: core/templates/account/email.html:27
 msgid "Verified"
-msgstr "Verificado"
+msgstr "Geverifieer"
 
 #: core/templates/account/email.html:29
 msgid "Unverified"
-msgstr "No verificado"
+msgstr "Ongeverifieer"
 
 #: core/templates/account/email.html:31
 msgid "Primary"
-msgstr "Principal"
+msgstr "Primêr"
 
 #: core/templates/account/email.html:37
 msgid "Make Primary"
-msgstr "Hacer principal"
+msgstr "Maak Primêr"
 
 #: core/templates/account/email.html:38
 msgid "Re-send Verification"
-msgstr "Reenviar verificación"
+msgstr "Stuur verifikasie weer"
 
 #: core/templates/account/email.html:39
 msgid "Remove"
-msgstr "Eliminar"
+msgstr "Verwyder"
 
 #: core/templates/account/email.html:46
 msgid "Warning:"
-msgstr "Advertencia:"
+msgstr "Waarskuwing:"
 
 #: core/templates/account/email.html:46
 msgid ""
 "You currently do not have any e-mail address set up. You should really add "
 "an e-mail address so you can receive notifications, reset your password, etc."
 msgstr ""
-"Actualmente no tienes ninguna dirección de correo electrónico configurada. "
-"Deberías agregar una dirección de correo electrónico para recibir "
-"notificaciones, restablecer tu contraseña, etc."
+"U het tans geen e-posadres opgestel nie. U moet regtig 'n e-posadres byvoeg "
+"sodat u kennisgewings kan ontvang, u wagwoord kan terugstel, ens."
 
 #: core/templates/account/email.html:51
 msgid "Add E-mail Address"
-msgstr "Agregar dirección de correo electrónico"
+msgstr "Voeg e-posadres by"
 
 #: core/templates/account/email.html:56
 msgid "Add E-mail"
-msgstr "Agregar correo electrónico"
+msgstr "Voeg e-pos by"
 
 #: core/templates/account/email.html:66
 msgid "Do you really want to remove the selected e-mail address?"
-msgstr ""
-"¿Realmente deseas eliminar la dirección de correo electrónico seleccionada?"
+msgstr "Wil u regtig die gekose e-posadres verwyder?"
 
 #: core/templates/account/email_confirm.html:6
 #: core/templates/account/email_confirm.html:10
 msgid "Confirm E-mail Address"
-msgstr "Confirmar dirección de correo electrónico"
+msgstr "Bevestig e-posadres"
 
 #: core/templates/account/email_confirm.html:16
 #, python-format
@@ -738,12 +733,12 @@ msgid ""
 "Please confirm that <a href=\"mailto:%(email)s\">%(email)s</a> is an e-mail "
 "address for user %(user_display)s."
 msgstr ""
-"Por favor, confirma que <a href=\"mailto:%(email)s\">%(email)s</a> es una "
-"dirección de correo electrónico para el usuario %(user_display)s."
+"Bevestig asseblief dat <a href=\"mailto:%(email)s\">%(email)s</a> 'n "
+"e-posadres vir gebruiker %(user_display)s is."
 
 #: core/templates/account/email_confirm.html:20
 msgid "Confirm"
-msgstr "Confirmar"
+msgstr "Bevestig"
 
 #: core/templates/account/email_confirm.html:27
 #, python-format
@@ -751,19 +746,17 @@ msgid ""
 "This e-mail confirmation link expired or is invalid. Please <a href="
 "\"%(email_url)s\">issue a new e-mail confirmation request</a>."
 msgstr ""
-"Este enlace de confirmación de correo electrónico ha expirado o no es "
-"válido. Por favor, <a href=\"%(email_url)s\">solicita una nueva confirmación "
-"de correo electrónico</a>."
+"Hierdie e-posbevestigingskakel het verval of is ongeldig. <a href="
+"\"%(email_url)s\">Versoek asseblief 'n nuwe e-posbevestiging</a>."
 
 #: core/templates/account/login.html:7 core/templates/account/login.html:11
 #: core/templates/account/login.html:56 core/templates/base.html:83
 msgid "Sign In"
-msgstr "Iniciar sesión"
+msgstr "Meld Aan"
 
 #: core/templates/account/login.html:17
 msgid "Please sign in with one of your existing third party accounts:"
-msgstr ""
-"Por favor, inicia sesión con una de tus cuentas de terceros existentes:"
+msgstr "Meld asseblief aan met een van u bestaande derdeparty-rekeninge:"
 
 #: core/templates/account/login.html:19
 #, python-format
@@ -771,12 +764,12 @@ msgid ""
 "Or, <a href=\"%(signup_url)s\">sign up</a> for a %(site_name)s account and "
 "sign in below:"
 msgstr ""
-"O <a href=\"%(signup_url)s\">regístrate</a> para una cuenta de %(site_name)s "
-"e inicia sesión a continuación:"
+"Of, <a href=\"%(signup_url)s\">registreer</a> vir 'n %(site_name)s rekening "
+"en meld hieronder aan:"
 
 #: core/templates/account/login.html:32
 msgid "or"
-msgstr "o"
+msgstr "of"
 
 #: core/templates/account/login.html:41
 #, python-format
@@ -784,21 +777,21 @@ msgid ""
 "If you have not created an account yet, then please <a href=\"%(signup_url)s"
 "\">sign up</a> first."
 msgstr ""
-"Si aún no has creado una cuenta, por favor <a href=\"%(signup_url)s"
-"\">regístrate</a> primero."
+"As u nog nie 'n rekening geskep het nie, <a href=\"%(signup_url)s\">registreer</"
+"a> asseblief eers."
 
 #: core/templates/account/login.html:55
 msgid "Forgot Password?"
-msgstr "¿Olvidaste tu contraseña?"
+msgstr "Wagwoord vergeet?"
 
 #: core/templates/account/logout.html:5 core/templates/account/logout.html:8
 #: core/templates/account/logout.html:17 core/templates/base.html:72
 msgid "Sign Out"
-msgstr "Cerrar sesión"
+msgstr "Meld Af"
 
 #: core/templates/account/logout.html:10
 msgid "Are you sure you want to sign out?"
-msgstr "¿Estás seguro de que quieres cerrar sesión?"
+msgstr "Is u seker u wil afmeld?"
 
 #: core/templates/account/password_change.html:6
 #: core/templates/account/password_change.html:9
@@ -808,45 +801,43 @@ msgstr "¿Estás seguro de que quieres cerrar sesión?"
 #: core/templates/account/password_reset_from_key_done.html:4
 #: core/templates/account/password_reset_from_key_done.html:7
 msgid "Change Password"
-msgstr "Cambiar contraseña"
+msgstr "Verander Wagwoord"
 
 #: core/templates/account/password_reset.html:7
 #: core/templates/account/password_reset.html:11
 #: core/templates/account/password_reset_done.html:6
 #: core/templates/account/password_reset_done.html:9
 msgid "Password Reset"
-msgstr "Restablecer contraseña"
+msgstr "Wagwoord Terugstel"
 
 #: core/templates/account/password_reset.html:16
 msgid ""
 "Forgotten your password? Enter your e-mail address below, and we'll send you "
 "an e-mail allowing you to reset it."
 msgstr ""
-"¿Olvidaste tu contraseña? Ingresa tu dirección de correo electrónico a "
-"continuación y te enviaremos un correo electrónico que te permitirá "
-"restablecerla."
+"U wagwoord vergeet? Voer u e-posadres hieronder in, en ons sal vir u 'n e-pos "
+"stuur om dit terug te stel."
 
 #: core/templates/account/password_reset.html:21
 msgid "Reset My Password"
-msgstr "Restablecer mi contraseña"
+msgstr "Stel My Wagwoord Terug"
 
 #: core/templates/account/password_reset.html:24
 msgid "Please contact us if you have any trouble resetting your password."
 msgstr ""
-"Por favor, contáctanos si tienes algún problema para restablecer tu "
-"contraseña."
+"Kontak ons asseblief as u enige probleme ondervind om u wagwoord terug te stel."
 
 #: core/templates/account/password_reset_done.html:15
 msgid ""
 "We have sent you an e-mail. Please contact us if you do not receive it "
 "within a few minutes."
 msgstr ""
-"Te hemos enviado un correo electrónico. Por favor, contáctanos si no lo "
-"recibes en unos minutos."
+"Ons het vir u 'n e-pos gestuur. Kontak ons asseblief as u dit nie binne 'n paar "
+"minute ontvang nie."
 
 #: core/templates/account/password_reset_from_key.html:8
 msgid "Bad Token"
-msgstr "Token incorrecto"
+msgstr "Ongeldige Token"
 
 #: core/templates/account/password_reset_from_key.html:12
 #, python-format
@@ -855,57 +846,56 @@ msgid ""
 "used.  Please request a <a href=\"%(passwd_reset_url)s\">new password reset</"
 "a>."
 msgstr ""
-"El enlace para restablecer la contraseña no era válido, posiblemente porque "
-"ya ha sido utilizado. Por favor, solicita un <a href=\"%(passwd_reset_url)s"
-"\">nuevo restablecimiento de contraseña</a>."
+"Die wagwoord-terugstelskakel was ongeldig, moontlik omdat dit reeds gebruik is. "
+"Versoek asseblief 'n <a href=\"%(passwd_reset_url)s\">nuwe wagwoord-terugstel</"
+"a>."
 
 #: core/templates/account/password_reset_from_key.html:18
 msgid "change password"
-msgstr "cambiar contraseña"
+msgstr "verander wagwoord"
 
 #: core/templates/account/password_reset_from_key.html:21
 #: core/templates/account/password_reset_from_key_done.html:8
 msgid "Your password is now changed."
-msgstr "Tu contraseña ha sido cambiada."
+msgstr "U wagwoord is nou verander."
 
 #: core/templates/account/password_set.html:6
 #: core/templates/account/password_set.html:9
 #: core/templates/account/password_set.html:14
 msgid "Set Password"
-msgstr "Establecer contraseña"
+msgstr "Stel Wagwoord"
 
 #: core/templates/account/signup.html:6
 msgid "Signup"
-msgstr "Registro"
+msgstr "Registreer"
 
 #: core/templates/account/signup.html:9 core/templates/account/signup.html:19
 #: core/templates/base.html:78
 msgid "Sign Up"
-msgstr "Registrarse"
+msgstr "Registreer"
 
 #: core/templates/account/signup.html:11
 #, python-format
 msgid ""
 "Already have an account? Then please <a href=\"%(login_url)s\">sign in</a>."
 msgstr ""
-"¿Ya tienes una cuenta? Entonces, por favor <a href=\"%(login_url)s\">inicia "
-"sesión</a>."
+"Het u reeds 'n rekening? <a href=\"%(login_url)s\">Meld dan asseblief aan</a>."
 
 #: core/templates/account/signup_closed.html:5
 #: core/templates/account/signup_closed.html:8
 msgid "Sign Up Closed"
-msgstr "Registro cerrado"
+msgstr "Registrasie Gesluit"
 
 #: core/templates/account/signup_closed.html:10
 msgid "We are sorry, but the sign up is currently closed."
-msgstr "Lo sentimos, pero el registro está actualmente cerrado."
+msgstr "Ons is jammer, maar registrasie is tans gesluit."
 
 #: core/templates/account/verification_sent.html:5
 #: core/templates/account/verification_sent.html:8
 #: core/templates/account/verified_email_required.html:5
 #: core/templates/account/verified_email_required.html:8
 msgid "Verify Your E-mail Address"
-msgstr "Verifica tu dirección de correo electrónico"
+msgstr "Verifieer U E-posadres"
 
 #: core/templates/account/verification_sent.html:10
 msgid ""
@@ -913,9 +903,9 @@ msgid ""
 "finalize the signup process. Please contact us if you do not receive it "
 "within a few minutes."
 msgstr ""
-"Te hemos enviado un correo electrónico para verificación. Sigue el enlace "
-"proporcionado para finalizar el proceso de registro. Por favor, contáctanos "
-"si no lo recibes en unos minutos."
+"Ons het 'n e-pos aan u gestuur vir verifikasie. Volg die skakel om die "
+"registrasieproses te voltooi. Kontak ons asseblief as u dit nie binne 'n paar "
+"minute ontvang nie."
 
 #: core/templates/account/verified_email_required.html:12
 msgid ""
@@ -923,9 +913,9 @@ msgid ""
 "you are who you claim to be. For this purpose, we require that you\n"
 "verify ownership of your e-mail address. "
 msgstr ""
-"Esta parte del sitio requiere que verifiquemos que\n"
-"eres quien dices ser. Para este propósito, requerimos que\n"
-"verifiques la propiedad de tu dirección de correo electrónico."
+"Hierdie deel van die webwerf vereis dat ons verifieer dat\n"
+"u is wie u sê u is. Vir hierdie doel vereis ons dat u\n"
+"eienaarskap van u e-posadres verifieer."
 
 #: core/templates/account/verified_email_required.html:16
 msgid ""
@@ -933,10 +923,9 @@ msgid ""
 "verification. Please click on the link inside this e-mail. Please\n"
 "contact us if you do not receive it within a few minutes."
 msgstr ""
-"Te hemos enviado un correo electrónico para\n"
-"verificación. Por favor, haz clic en el enlace dentro de este correo "
-"electrónico. Por favor,\n"
-"contáctanos si no lo recibes en unos minutos."
+"Ons het 'n e-pos aan u gestuur vir\n"
+"verifikasie. Klik asseblief op die skakel binne hierdie e-pos. Kontak\n"
+"ons asseblief as u dit nie binne 'n paar minute ontvang nie."
 
 #: core/templates/account/verified_email_required.html:20
 #, python-format
@@ -944,21 +933,21 @@ msgid ""
 "<strong>Note:</strong> you can still <a href=\"%(email_url)s\">change your e-"
 "mail address</a>."
 msgstr ""
-"<strong>Nota:</strong> todavía puedes <a href=\"%(email_url)s\">cambiar tu "
-"dirección de correo electrónico</a>."
+"<strong>Let wel:</strong> u kan steeds u <a href=\"%(email_url)s\">e-posadres "
+"verander</a>."
 
 #: core/templates/base.html:68
 msgid "My Profile"
-msgstr "Mi perfil"
+msgstr "My Profiel"
 
 #: core/templates/home/welcome_page.html:53
 #: core/templates/home/welcome_page.html:56
 msgid "View the release notes"
-msgstr "Ver las notas de la versión"
+msgstr "Sien die vrystellingsnotas"
 
 #: core/templates/home/welcome_page.html:68
 msgid "Welcome to your SciELO Content Manager"
-msgstr "Bienvenido a tu Gestor de Contenido SciELO"
+msgstr "Welkom by u SciELO Inhoudsbestuurder"
 
 #: core/templates/home/welcome_page.html:69
 msgid ""
@@ -966,102 +955,101 @@ msgid ""
 "\">join our community on Slack</a>, or get started with one of the links "
 "below."
 msgstr ""
-"Siéntete libre de <a href=\"https://github.com/wagtail/wagtail/wiki/Slack"
-"\">unirte a nuestra comunidad en Slack</a>, o comienza con uno de los "
-"enlaces a continuación."
+"Sluit gerus aan by ons <a href=\"https://github.com/wagtail/wagtail/wiki/Slack"
+"\">gemeenskap op Slack</a>, of begin met een van die skakels hieronder."
 
 #: core/templates/home/welcome_page.html:77
 msgid "Wagtail Documentation"
-msgstr "Documentación de Wagtail"
+msgstr "Wagtail Dokumentasie"
 
 #: core/templates/home/welcome_page.html:78
 msgid "Topics, references, & how-tos"
-msgstr "Temas, referencias y guías"
+msgstr "Onderwerpe, verwysings, & handleidings"
 
 #: core/templates/home/welcome_page.html:85
 msgid "Tutorial"
-msgstr "Tutorial"
+msgstr "Handleiding"
 
 #: core/templates/home/welcome_page.html:86
 msgid "Build your first Wagtail site"
-msgstr "Construye tu primer sitio Wagtail"
+msgstr "Bou u eerste Wagtail-webwerf"
 
 #: core/templates/home/welcome_page.html:93
 msgid "Admin Interface"
-msgstr "Interfaz de administración"
+msgstr "Administrasie-koppelvlak"
 
 #: core/templates/home/welcome_page.html:94
 msgid "Create your superuser first!"
-msgstr "¡Crea tu superusuario primero!"
+msgstr "Skep eers u supergebruiker!"
 
 #: core/templates/modeladmin/edit.html:9
 #: upload/templates/modeladmin/upload/package/validation_report/edit.html:9
 #: upload/templates/modeladmin/upload/validationresult/inspect.html:9
 #, python-format
 msgid "Back to %(model_name)s list"
-msgstr "Volver a la lista de %(model_name)s"
+msgstr "Terug na %(model_name)s lys"
 
 #: core/templates/wagtailadmin/home.html:5
 msgid "Welcome to the administrative area of SciELO Upload"
-msgstr "Bienvenido al área administrativa de SciELO Upload"
+msgstr "Welkom by die administratiewe area van SciELO Upload"
 
 #: core/templates/wagtailadmin/login.html:5
 msgid "Administrative area of SciELO Upload"
-msgstr "Área administrativa de SciELO Upload"
+msgstr "Administratiewe area van SciELO Upload"
 
 #: core/templates/wagtailadmin/shared/header.html:10
 #, python-format
 msgid "%(result_count)s out of %(all_count)s"
-msgstr "%(result_count)s de %(all_count)s"
+msgstr "%(result_count)s uit %(all_count)s"
 
 #: core/templates/wagtailadmin/summary_items/article_summary_item.html:6
 #, python-format
 msgid "<span>%(total_article)s</span> Article"
 msgid_plural "<span>%(total_article)s</span> Articles"
-msgstr[0] "<span>%(total_article)s</span> Artículo"
-msgstr[1] "<span>%(total_article)s</span> Artículos"
+msgstr[0] "<span>%(total_article)s</span> Artikel"
+msgstr[1] "<span>%(total_article)s</span> Artikels"
 
 #: core/templates/wagtailadmin/summary_items/collection_summary_item.html:6
 #, python-format
 msgid "<span>%(total_collection)s</span> Collection"
 msgid_plural "<span>%(total_collection)s</span> Collections"
-msgstr[0] "<span>%(total_collection)s</span> Colección"
-msgstr[1] "<span>%(total_collection)s</span> Colecciones"
+msgstr[0] "<span>%(total_collection)s</span> Versameling"
+msgstr[1] "<span>%(total_collection)s</span> Versamelings"
 
 #: core/templates/wagtailadmin/summary_items/journal_summary_item.html:6
 #, python-format
 msgid "<span>%(total_journal)s</span> Journal"
 msgid_plural "<span>%(total_journal)s</span> Journals"
-msgstr[0] "<span>%(total_journal)s</span> Revista"
-msgstr[1] "<span>%(total_journal)s</span> Revistas"
+msgstr[0] "<span>%(total_journal)s</span> Tydskrif"
+msgstr[1] "<span>%(total_journal)s</span> Tydskrifte"
 
 #: core/users/admin.py:17
 msgid "Personal info"
-msgstr "Información personal"
+msgstr "Persoonlike inligting"
 
 #: core/users/admin.py:19
 msgid "Permissions"
-msgstr "Permisos"
+msgstr "Toestemmings"
 
 #: core/users/admin.py:30
 msgid "Important dates"
-msgstr "Fechas importantes"
+msgstr "Belangrike datums"
 
 #: core/users/apps.py:7
 msgid "Users"
-msgstr "Usuarios"
+msgstr "Gebruikers"
 
 #: core/users/forms.py:25 core/users/tests/test_forms.py:40
 msgid "This username has already been taken."
-msgstr "Este nombre de usuario ya ha sido tomado."
+msgstr "Hierdie gebruikersnaam is reeds geneem."
 
 #: core/users/models.py:15
 msgid "Name of User"
-msgstr "Nombre de usuario"
+msgstr "Naam van Gebruiker"
 
 #: core/users/views.py:23
 msgid "Information successfully updated"
-msgstr "Información actualizada con éxito"
+msgstr "Inligting suksesvol bygewerk"
 
 #: doi/models.py:12 pid_provider/models.py:389 upload/models.py:188
 msgid "DOI"
@@ -1076,36 +1064,36 @@ msgstr "DOI"
 #: upload/templates/modeladmin/upload/package/inspect_.html:164
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:24
 msgid "Name"
-msgstr "Nombre"
+msgstr "Naam"
 
 #: files_storage/models.py:37
 msgid "Host"
-msgstr "Host"
+msgstr "Gasheer"
 
 #: files_storage/models.py:39
 msgid "Bucket root"
-msgstr "Raíz del bucket"
+msgstr "Emmer-wortel (Bucket root)"
 
 #: files_storage/models.py:42 location/models.py:235
 #: location/wagtail_hooks.py:20
 msgid "Location"
-msgstr "Ubicación"
+msgstr "Ligging"
 
 #: files_storage/models.py:49
 msgid "Access key"
-msgstr "Clave de acceso"
+msgstr "Toegangssleutel"
 
 #: files_storage/models.py:50
 msgid "Secret key"
-msgstr "Clave secreta"
+msgstr "Geheime sleutel"
 
 #: files_storage/models.py:52
 msgid "Secure"
-msgstr "Seguro"
+msgstr "Veilig"
 
 #: files_storage/models.py:132
 msgid "Basename"
-msgstr "Nombre base"
+msgstr "Basisnaam"
 
 #: files_storage/models.py:133
 msgid "URI"
@@ -1113,186 +1101,181 @@ msgstr "URI"
 
 #: files_storage/wagtail_hooks.py:18
 msgid "Minio Configuration"
-msgstr "Configuración de Minio"
+msgstr "Minio Konfigurasie"
 
 #: htmlxml/choices.py:9
 msgid "approved automatically"
-msgstr "aprobado automáticamente"
+msgstr "outomaties goedgekeur"
 
 #: htmlxml/choices.py:10
 msgid "approved"
-msgstr "aprobado"
+msgstr "goedgekeur"
 
 #: htmlxml/choices.py:11
 msgid "rejected"
-msgstr "rechazado"
+msgstr "afgekeur"
 
 #: htmlxml/choices.py:12
 msgid "not evaluated"
-msgstr "no evaluado"
+msgstr "nie geëvalueer nie"
 
 #: htmlxml/models.py:249
 msgid "Unable to create_or_update_body and back file with empty content {} {}"
-msgstr ""
-"No se puede crear_o_actualizar_cuerpo y archivo de respaldo con contenido "
-"vacío {} {}"
+msgstr "Kan nie create_or_update_body en back-lêer met leë inhoud skep nie {} {}"
 
 #: htmlxml/models.py:275
 msgid "Unable to create_or_update_body and back file {} {} {} {}"
-msgstr ""
-"No se puede crear_o_actualizar_cuerpo y archivo de respaldo {} {} {} {}"
+msgstr "Kan nie create_or_update_body en back-lêer skep nie {} {} {} {}"
 
 #: htmlxml/models.py:326
 msgid "Body vazio"
-msgstr "Body vacío"
+msgstr "Liggaam is leeg"
 
 #: htmlxml/models.py:327
 msgid "Sim"
-msgstr "Sí"
+msgstr "Ja"
 
 #: htmlxml/models.py:327
 msgid "Não"
-msgstr "No"
+msgstr "Nee"
 
 #: htmlxml/models.py:330
 msgid "Pontos de atenção"
-msgstr "Puntos de atención"
+msgstr "Aandagpunte"
 
 #: htmlxml/models.py:334
 msgid "Tipo de artigo"
-msgstr "Tipo de artículo"
+msgstr "Artikel tipe"
 
 #: htmlxml/models.py:335
 msgid "Não identificado"
-msgstr "No identificado"
+msgstr "Nie geïdentifiseer nie"
 
 #: htmlxml/models.py:338
 msgid "Tabelas no HTML"
-msgstr "Tablas en HTML"
+msgstr "Tabelle in HTML"
 
 #: htmlxml/models.py:342
 msgid "Imagens no HTML"
-msgstr "Imágenes en HTML"
+msgstr "Beelde in HTML"
 
 #: htmlxml/models.py:346
 msgid "Material suplementar no XML"
-msgstr "Material suplementario en XML"
+msgstr "Aanvullende materiaal in XML"
 
 #: htmlxml/models.py:350
 msgid "Elementos de mídia no XML"
-msgstr "Elementos de medios en XML"
+msgstr "Media-elemente in XML"
 
 #: htmlxml/models.py:354
 msgid "Figuras no XML"
-msgstr "Figuras en XML"
+msgstr "Figure in XML"
 
 #: htmlxml/models.py:358
 msgid "Tabelas no XML"
-msgstr "Tablas en XML"
+msgstr "Tabelle in XML"
 
 #: htmlxml/models.py:362
 msgid "Equações no XML"
-msgstr "Ecuaciones en XML"
+msgstr "Vergelkings in XML"
 
 #: htmlxml/models.py:366
 msgid "Gráficos no XML"
-msgstr "Gráficos en XML"
+msgstr "Grafieke in XML"
 
 #: htmlxml/models.py:370
 msgid "Gráficos inline no XML"
-msgstr "Gráficos inline en XML"
+msgstr "Inlyn-grafieke in XML"
 
 #: htmlxml/models.py:374
 msgid "Citações estruturadas (element-citation)"
-msgstr "Citas estructuradas (element-citation)"
+msgstr "Gestruktureerde aanhalings (element-citation)"
 
 #: htmlxml/models.py:378
 msgid "Citações mistas (mixed-citation)"
-msgstr "Citas mixtas (mixed-citation)"
+msgstr "Gemengde aanhalings (mixed-citation)"
 
 #: htmlxml/models.py:382
 msgid "Idiomas do texto no XML"
-msgstr "Idiomas del texto en XML"
+msgstr "Tekstale in XML"
 
 #: htmlxml/models.py:456
 msgid "Estatísticas de Conversão HTML para XML"
-msgstr "Estadísticas de conversión HTML a XML"
+msgstr "Statistieke vir HTML na XML-omskakeling"
 
 #: htmlxml/models.py:458
 msgid "Trocas de HTML para XML"
-msgstr "Conversiones de HTML a XML"
+msgstr "Wisselings van HTML na XML"
 
 #: htmlxml/models.py:589
 msgid "Quality"
-msgstr "Calidad"
+msgstr "Kwaliteit"
 
 #: htmlxml/models.py:613
 msgid "Body and Back XML files"
-msgstr "Archivos XML de cuerpo y respaldo"
+msgstr "Liggaam- en Agterkant-XML-lêers"
 
 #: htmlxml/models.py:622
 msgid "Generated XML and Report"
-msgstr "XML generado e informe"
+msgstr "Gegenereerde XML en Verslag"
 
 #: htmlxml/models.py:623
 msgid "Body and Back XML Files"
-msgstr "Archivos XML de cuerpo y respaldo"
+msgstr "Liggaam- en Agterkant-XML-lêers"
 
 #: htmlxml/models.py:701
 msgid ""
 "Unable to create or update the record of the conversion of HTML to XML for "
 "{} {} {}"
-msgstr ""
-"No se puede crear o actualizar el registro de la conversión de HTML a XML "
-"para {} {} {}"
+msgstr "Kon nie die rekord van die omskakeling van HTML na XML skep of bywerk vir {} {} {} nie"
 
 #: institution/choices.py:13
 msgid "agência de apoio à pesquisa"
-msgstr "agencia de apoyo a la investigación"
+msgstr "navorsingsondersteuningsagentskap"
 
 #: institution/choices.py:14
-msgid "universidade e instâncias ligadas à universidades"
-msgstr "universidad e instancias relacionadas con universidades"
+msgid "universidade e instâncias ligadas à universities"
+msgstr "universiteit en instansies gekoppel aan universiteite"
 
 #: institution/choices.py:15
 msgid "empresa ou instituto ligadas ao governo"
-msgstr "empresa o instituto vinculado al gobierno"
+msgstr "maatskappy of instituut gekoppel aan die regering"
 
 #: institution/choices.py:16
 msgid "organização privada"
-msgstr "organización privada"
+msgstr "privaat organisasie"
 
 #: institution/choices.py:17
 msgid "organização sem fins de lucros"
-msgstr "organización sin fines de lucro"
+msgstr "organisasie sonder winsoogmerk"
 
 #: institution/choices.py:20
 msgid "sociedade científica, associação pós-graduação, associação profissional"
-msgstr "sociedad científica, asociación de posgrado, asociación profesional"
+msgstr "wetenskaplike vereniging, nagraadse vereniging, professionele vereniging"
 
 #: institution/choices.py:22
 msgid "outros"
-msgstr "otros"
+msgstr "ander"
 
 #: institution/models.py:18
 msgid "Institution Type"
-msgstr "Tipo de institución"
+msgstr "Instansie Tipe"
 
 #: institution/models.py:29
 msgid "Institution Acronym"
-msgstr "Acrónimo de la institución"
+msgstr "Instansie Akroniem"
 
 #: institution/models.py:31
 msgid "Organization Level 1"
-msgstr "Nivel de organización 1"
+msgstr "Organisasievlak 1"
 
 #: institution/models.py:33
 msgid "Organization Level 2"
-msgstr "Nivel de organización 2"
+msgstr "Organisasievlak 2"
 
 #: institution/models.py:35
 msgid "Organization Level 3"
-msgstr "Nivel de organización 3"
+msgstr "Organisasievlak 3"
 
 #: institution/models.py:39
 msgid "Logo"
@@ -1300,135 +1283,134 @@ msgstr "Logo"
 
 #: institution/models.py:167
 msgid "Initial Date"
-msgstr "Fecha inicial"
+msgstr "Begindatum"
 
 #: institution/models.py:168
 msgid "Final Date"
-msgstr "Fecha final"
+msgstr "Einddatum"
 
 #: institution/models.py:171 institution/wagtail_hooks.py:20
 msgid "Institution"
-msgstr "Institución"
+msgstr "Instansie"
 
 #: issue/models.py:40
 msgid "Volume"
-msgstr "Volumen"
+msgstr "Volume"
 
 #: issue/models.py:41
 msgid "Number"
-msgstr "Número"
+msgstr "Nommer"
 
 #: issue/models.py:42
 msgid "Supplement"
-msgstr "Suplemento"
+msgstr "Supplement"
 
 #: issue/models.py:43
 msgid "Year"
-msgstr "Año"
+msgstr "Jaar"
 
 #: issue/models.py:50
 msgid ""
 "This number controls the order issues appear for a specific year on the "
 "website grid"
 msgstr ""
-"Este número controla el orden en que aparecen los fascículos de un año "
-"específico en la cuadrícula del sitio web"
+"Hierdie nommer beheer die volgorde waarin uitgawes vir 'n spesifieke jaar op die webwerf verskyn"
 
 #: issue/models.py:288
 msgid "Sections"
-msgstr "Secciones"
+msgstr "Seksies"
 
 #: issue/wagtail_hooks.py:15 issue/wagtail_hooks.py:106
 msgid "Issues"
-msgstr "Fascículos"
+msgstr "Uitgawes"
 
 #: issue/wagtail_hooks.py:64
 msgid "Table of contents sections"
-msgstr "Secciones de la tabla de contenidos"
+msgstr "Inhoudsopgawe-seksies"
 
 #: journal/choices.py:6
 msgid "Journal URL"
-msgstr "URL de la revista"
+msgstr "Tydskrif URL"
 
 #: journal/choices.py:31
 msgid "Ceased journal"
-msgstr "Revista cesada"
+msgstr "Gestaakte tydskrif"
 
 #: journal/choices.py:32
 msgid "Not open access"
-msgstr "No es de acceso abierto"
+msgstr "Nie oop toegang nie"
 
 #: journal/choices.py:33
 msgid "by the committee"
-msgstr "por el comité"
+msgstr "deur die komitee"
 
 #: journal/choices.py:34
 msgid "by the editor"
-msgstr "por el editor"
+msgstr "deur die redakteur"
 
 #: journal/choices.py:39
 msgid "Admitted to the collection"
-msgstr "Admitido en la colección"
+msgstr "Toegelaat tot die versameling"
 
 #: journal/choices.py:40
 msgid "Indexing interrupted"
-msgstr "Indexación interrumpida"
+msgstr "Indeksering onderbreek"
 
 #: journal/choices.py:45
 msgid "Agricultural Sciences"
-msgstr "Ciencias agrícolas"
+msgstr "Landbouwetenskappe"
 
 #: journal/choices.py:46
 msgid "Applied Social Sciences"
-msgstr "Ciencias sociales aplicadas"
+msgstr "Toegepaste Sosiale Wetenskappe"
 
 #: journal/choices.py:47
 msgid "Biological Sciences"
-msgstr "Ciencias biológicas"
+msgstr "Biologiese Wetenskappe"
 
 #: journal/choices.py:48
 msgid "Engineering"
-msgstr "Ingeniería"
+msgstr "Ingenieurswese"
 
 #: journal/choices.py:49
 msgid "Exact and Earth Sciences"
-msgstr "Ciencias exactas y de la tierra"
+msgstr "Eksakte- en Aardwetenskappe"
 
 #: journal/choices.py:50
 msgid "Health Sciences"
-msgstr "Ciencias de la salud"
+msgstr "Gesondheidswetenskappe"
 
 #: journal/choices.py:51
 msgid "Human Sciences"
-msgstr "Ciencias humanas"
+msgstr "Geesteswetenskappe"
 
 #: journal/choices.py:52
 msgid "Linguistic, Literature and Arts"
-msgstr "Lingüística, literatura y artes"
+msgstr "Linguistiek, Literatuur en Kunste"
 
 #: journal/choices.py:53
 msgid "Psicanalise"
-msgstr "Psicoanálisis"
+msgstr "Psigoanalise"
 
 #: journal/models.py:113
 msgid "Official Title"
-msgstr "Título oficial"
+msgstr "Amptelike Titel"
 
 #: journal/models.py:114 journal/models.py:604
 msgid "ISO Title"
-msgstr "Título ISO"
+msgstr "ISO Titel"
 
 #: journal/models.py:116
 msgid "Foundation Year"
-msgstr "Año de fundación"
+msgstr "Stigtingsjaar"
 
 #: journal/models.py:118
 msgid "ISSN Print"
-msgstr "ISSN impreso"
+msgstr "ISSN Druk"
 
 #: journal/models.py:120
 msgid "ISSN Eletronic"
-msgstr "ISSN electrónico"
+msgstr "ISSN Elektronies"
 
 #: journal/models.py:122
 msgid "ISSNL"
@@ -1436,278 +1418,276 @@ msgstr "ISSNL"
 
 #: journal/models.py:134 journal/models.py:582
 msgid "Official Journal"
-msgstr "Revista oficial"
+msgstr "Amptelike Tydskrif"
 
 #: journal/models.py:135 journal/wagtail_hooks.py:16
 msgid "Official Journals"
-msgstr "Revistas oficiales"
+msgstr "Amptelike Tydskrifte"
 
 #: journal/models.py:223 journal/models.py:580
 msgid "Short Title"
-msgstr "Título corto"
+msgstr "Kort Titel"
 
 #: journal/models.py:227 journal/models.py:581
 msgid "Journal Acronym"
-msgstr "Acrónimo de la revista"
+msgstr "Tydskrifakroniem"
 
 #: journal/models.py:236
 msgid "Submission online URL"
-msgstr "URL de envío en línea"
+msgstr "Aanlyn-indiening URL"
 
 #: journal/models.py:240
 msgid "Study Areas"
-msgstr "Áreas de estudio"
+msgstr "Studiegebiede"
 
 #: journal/models.py:249
 msgid "Address"
-msgstr "Dirección"
+msgstr "Adres"
 
 #: journal/models.py:273
 msgid "Owner"
-msgstr "Propietario"
+msgstr "Eienaar"
 
 #: journal/models.py:277 journal/models.py:288
 msgid "Publisher"
-msgstr "Editor"
+msgstr "Uitgewer"
 
 #: journal/models.py:281 journal/models.py:289
 msgid "Mission"
-msgstr "Misión"
+msgstr "Missie"
 
 #: journal/models.py:286 pid_provider/models.py:440 proc/models.py:199
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:23
 msgid "Identification"
-msgstr "Identificación"
+msgstr "Identifikasie"
 
 #: journal/models.py:287
 msgid "Owners"
-msgstr "Propietarios"
+msgstr "Eienaars"
 
 #: journal/models.py:579
 msgid "Journal Title"
-msgstr "Título de la revista"
+msgstr "Tydskriftitel"
 
 #: journal/models.py:583
 msgid "Contact Name"
-msgstr "Nombre del contacto"
+msgstr "Kontaknaam"
 
 #: journal/models.py:584
 msgid "Contact Address"
-msgstr "Dirección del contacto"
+msgstr "Kontakadres"
 
 #: journal/models.py:585
 msgid "Contact Location"
-msgstr "Ubicación del contacto"
+msgstr "Kontakligging"
 
 #: journal/models.py:586
 msgid "Submission Online URL"
-msgstr "URL de envío en línea"
+msgstr "Aanlyn-indiening URL"
 
 #: journal/models.py:587
 msgid "Logo URL"
-msgstr "URL del logo"
+msgstr "Logo URL"
 
 #: journal/models.py:588
 msgid "License Code"
-msgstr "Código de licencia"
+msgstr "Lisensiekode"
 
 #: journal/models.py:589
 msgid "WoS Areas"
-msgstr "Áreas WoS"
+msgstr "WoS Gebiede"
 
 #: journal/models.py:600 pid_provider/models.py:359
 msgid "Electronic ISSN"
-msgstr "ISSN electrónico"
+msgstr "Elektroniese ISSN"
 
 #: journal/models.py:602 pid_provider/models.py:361
 msgid "Print ISSN"
-msgstr "ISSN impreso"
+msgstr "Gedrukte ISSN"
 
 #: journal/models.py:608
 msgid "mission"
-msgstr "misión"
+msgstr "missie"
 
 #: journal/models.py:612
 msgid "sponsor"
-msgstr "patrocinador"
+msgstr "borg"
 
 #: journal/models.py:616
 msgid "owner"
-msgstr "propietario"
+msgstr "eienaar"
 
 #: journal/models.py:620
 msgid "publisher"
-msgstr "editor"
+msgstr "uitgewer"
 
 #: journal/models.py:624
 msgid "study area"
-msgstr "área de estudio"
+msgstr "studiegebied"
 
 #: journal/models.py:871
 msgid "Journal collection"
-msgstr "Colección de revistas"
+msgstr "Tydskrifversameling"
 
 #: journal/models.py:872
 msgid "Journal collections"
-msgstr "Colecciones de revistas"
+msgstr "Tydskrifversamelings"
 
 #: journal/models.py:921
 msgid "Event year"
-msgstr "Año del evento"
+msgstr "Gebeurtenisjaar"
 
 #: journal/models.py:923
 msgid "Event month"
-msgstr "Mes del evento"
+msgstr "Gebeurtenismaand"
 
 #: journal/models.py:929
 msgid "Event day"
-msgstr "Día del evento"
+msgstr "Gebeurtenisdag"
 
 #: journal/models.py:932
 msgid "Event type"
-msgstr "Tipo de evento"
+msgstr "Gebeurtenistipe"
 
 #: journal/models.py:939
 msgid "Indexing interruption reason"
-msgstr "Razón de interrupción de indexación"
+msgstr "Rede vir onderbreking van indeksering"
 
 #: journal/models.py:957
 msgid "Collection journal event"
-msgstr "Evento de colección de revistas"
+msgstr "Versamelingtydskrifgebeurtenis"
 
 #: journal/models.py:958
 msgid "Collection journal events"
-msgstr "Eventos de colección de revistas"
+msgstr "Versamelingtydskrifgebeurtenisse"
 
 #: journal/wagtail_hooks.py:43
 msgid "Journal"
-msgstr "Revista"
+msgstr "Tydskrif"
 
 #: journal/wagtail_hooks.py:68
 msgid "Journals"
-msgstr "Revistas"
+msgstr "Tydskrifte"
 
 #: location/models.py:17
 msgid "City Name"
-msgstr "Nombre de la ciudad"
+msgstr "Stadsnaam"
 
 #: location/models.py:20 location/models.py:214
 msgid "City"
-msgstr "Ciudad"
+msgstr "Stad"
 
 #: location/models.py:21
 msgid "Cities"
-msgstr "Ciudades"
+msgstr "Stede"
 
 #: location/models.py:63
 msgid "State Name"
-msgstr "Nombre del estado"
+msgstr "Provinsie/Staat-naam"
 
 #: location/models.py:64
 msgid "State Acronym"
-msgstr "Acrónimo del estado"
+msgstr "Provinsie/Staat-akroniem"
 
 #: location/models.py:67 location/models.py:221
 msgid "State"
-msgstr "Estado"
+msgstr "Provinsie/Staat"
 
 #: location/models.py:68
 msgid "States"
-msgstr "Estados"
+msgstr "Provinsies/State"
 
 #: location/models.py:151
 msgid "Country Name"
-msgstr "Nombre del país"
+msgstr "Landnaam"
 
 #: location/models.py:153
 msgid "Country Acronym"
-msgstr "Acrónimo del país"
+msgstr "Landakroniem"
 
 #: location/models.py:157 location/models.py:228
 msgid "Country"
-msgstr "País"
+msgstr "Land"
 
 #: location/models.py:158
 msgid "Countries"
-msgstr "Países"
+msgstr "Lande"
 
 #: location/models.py:236
 msgid "Locations"
-msgstr "Ubicaciones"
+msgstr "Liggings"
 
 #: migration/button_helper.py:12
 msgid "View migration failure"
-msgstr "Ver fallo de migración"
+msgstr "Sien migrasiefaling"
 
 #: migration/choices.py:14
 msgid "To migrate"
-msgstr "Por migrar"
+msgstr "Om te migreer"
 
 #: migration/choices.py:15
 msgid "To ignore"
-msgstr "Por ignorar"
+msgstr "Om te ignoreer"
 
 #: migration/choices.py:16
 msgid "Imported"
-msgstr "Importado"
+msgstr "Ingevoer"
 
 #: migration/controller.py:685
 msgid "Unable to get xml with pre from migrated article ({}) {}: {} {}"
-msgstr "No se puede obtener xml con pre del artículo migrado ({}) {}: {} {}"
+msgstr "Kan nie XML met 'pre' kry vanaf gemigreerde artikel ({}) {}: {} {} nie"
 
 #: migration/controller.py:734
 msgid "IdFileRecord is already up-to-date with acron.id"
-msgstr "IdFileRecord ya está actualizado con acron.id"
+msgstr "IdFileRecord is reeds op datum met acron.id"
 
 #: migration/models.py:70
 msgid "Title path"
-msgstr "Ruta del título"
+msgstr "Titel-pad"
 
 #: migration/models.py:74
 msgid "Title path: title.id path or title.mst path without extension"
-msgstr "Ruta del título: ruta de title.id o ruta de title.mst sin extensión"
+msgstr "Titel-pad: title.id pad of title.mst pad sonder uitbreiding"
 
 #: migration/models.py:77
 msgid "Issue path"
-msgstr "Ruta del fascículo"
+msgstr "Uitgawe-pad"
 
 #: migration/models.py:81
 msgid "Issue path: issue.id path or issue.mst path without extension"
-msgstr "Ruta del fascículo: ruta de issue.id o ruta de issue.mst sin extensión"
+msgstr "Uitgawe-pad: issue.id pad of issue.mst pad sonder uitbreiding"
 
 #: migration/models.py:84 migration/models.py:88
 msgid "Serial path"
-msgstr "Ruta serial"
+msgstr "Reeks-pad (Serial path)"
 
 #: migration/models.py:91 migration/models.py:95
 msgid "Bases work path"
-msgstr "Ruta de trabajo de bases"
+msgstr "Bases werk-pad"
 
 #: migration/models.py:98
 msgid "Bases pdf path"
-msgstr "Ruta de pdf de bases"
+msgstr "Bases PDF-pad"
 
 #: migration/models.py:102 migration/models.py:105 migration/models.py:109
 msgid "Bases translation path"
-msgstr "Ruta de traducción de bases"
+msgstr "Bases vertaling-pad"
 
 #: migration/models.py:112 migration/models.py:116
 msgid "Bases XML path"
-msgstr "Ruta de XML de bases"
+msgstr "Bases XML-pad"
 
 #: migration/models.py:119 migration/models.py:123
 msgid "Htdocs img revistas path"
-msgstr "Ruta de htdocs img revistas"
+msgstr "Htdocs img revistas-pad"
 
 #: migration/models.py:126
 msgid "PID list path"
-msgstr "Ruta de lista de PID"
+msgstr "PID lys-pad"
 
 #: migration/models.py:131
 msgid "Path of a text file which contains all the article PIDs from artigo.mst"
-msgstr ""
-"Ruta de un archivo de texto que contiene todos los PID de artículos de "
-"artigo.mst"
+msgstr "Pad van 'n tekslêer wat al die artikel PIDs bevat vanaf artigo.mst"
 
 #: migration/models.py:185 migration/models.py:820 proc/models.py:193
 #: proc/models.py:341
@@ -1716,183 +1696,183 @@ msgstr "PID"
 
 #: migration/models.py:186
 msgid "Origin"
-msgstr "Origen"
+msgstr "Oorsprong"
 
 #: migration/models.py:191
 msgid "ISIS updated date"
-msgstr "Fecha de actualización de ISIS"
+msgstr "ISIS bywerkingsdatum"
 
 #: migration/models.py:194
 msgid "ISIS created date"
-msgstr "Fecha de creación de ISIS"
+msgstr "ISIS skeppingsdatum"
 
 #: migration/models.py:197 proc/models.py:344
 msgid "Migration Status"
-msgstr "Estado de migración"
+msgstr "Migrasiestatus"
 
 #: migration/models.py:318
 msgid "Unable to create_or_update_migrated_data {} {} {} {}"
-msgstr "No se puede crear_o_actualizar_datos_migrados {} {} {} {}"
+msgstr "Kan nie create_or_update_migrated_data skep nie {} {} {} {}"
 
 #: migration/models.py:356
 msgid "Original Path"
-msgstr "Ruta original"
+msgstr "Oorspronklike Pad"
 
 #: migration/models.py:361
 msgid "Original name"
-msgstr "Nombre original"
+msgstr "Oorspronklike naam"
 
 #: migration/models.py:369
 msgid "Original href"
-msgstr "Href original"
+msgstr "Oorspronklike href"
 
 #: migration/models.py:372
 msgid "Component type"
-msgstr "Tipo de componente"
+msgstr "Komponenttipe"
 
 #: migration/models.py:375
 msgid "Pkg name"
-msgstr "Nombre del paquete"
+msgstr "Pakketnaam"
 
 #: migration/models.py:376
 msgid "Part"
-msgstr "Parte"
+msgstr "Deel"
 
 #: migration/models.py:625
 msgid "File type"
-msgstr "Tipo de archivo"
+msgstr "Lêertipe"
 
 #: migration/models.py:677
 msgid "Source"
-msgstr "Fuente"
+msgstr "Bron"
 
 #: migration/wagtail_hooks.py:41
 msgid "Migrated Data"
-msgstr "Datos migrados"
+msgstr "Gemigreerde Data"
 
 #: migration/wagtail_hooks.py:76
 msgid "Migrated Article"
-msgstr "Artículo migrado"
+msgstr "Gemigreerde Artikel"
 
 #: migration/wagtail_hooks.py:110
 msgid "Migrated Journal"
-msgstr "Revista migrada"
+msgstr "Gemigreerde Tydskrif"
 
 #: migration/wagtail_hooks.py:142
 msgid "Migrated Issue"
-msgstr "Fascículo migrado"
+msgstr "Gemigreerde Uitgawe"
 
 #: migration/wagtail_hooks.py:174
 msgid "Migrated files"
-msgstr "Archivos migrados"
+msgstr "Gemigreerde lêers"
 
 #: migration/wagtail_hooks.py:206
 msgid "Article id file"
-msgstr "Archivo de ID de artículo"
+msgstr "Artikel id-lêer"
 
 #: migration/wagtail_hooks.py:235
 msgid "Migration"
-msgstr "Migración"
+msgstr "Migrasie"
 
 #: package/choices.py:8
 msgid "MIGRATION"
-msgstr "MIGRACIÓN"
+msgstr "MIGRASIE"
 
 #: package/choices.py:9
 msgid "UPLOAD"
-msgstr "CARGA"
+msgstr "OPLAAI"
 
 #: package/models.py:149 pid_provider/models.py:165
 msgid "Unable to get xml with pre (XMLVersion) {}: {} {}"
-msgstr "No se puede obtener xml con pre (XMLVersion) {}: {} {}"
+msgstr "Kan nie XML met 'pre' (XMLVersion) kry nie {}: {} {}"
 
 #: package/models.py:207
 msgid "Package component type"
-msgstr "Tipo de componente del paquete"
+msgstr "Pakketkomponenttipe"
 
 #: package/models.py:291
 msgid "SPS Name"
-msgstr "Nombre SPS"
+msgstr "SPS Naam"
 
 #: package/models.py:327
 msgid "Package component"
-msgstr "Componente del paquete"
+msgstr "Pakketkomponent"
 
 #: package/models.py:342 proc/models.py:1562
 msgid "Files"
-msgstr "Archivos"
+msgstr "Lêers"
 
 #: package/models.py:566
 msgid "Unable to register pid"
-msgstr "No se puede registrar el pid"
+msgstr "Kan nie PID registreer nie"
 
 #: pid_provider/choices.py:14 tracker/choices.py:36
 msgid "To do"
-msgstr "Por hacer"
+msgstr "Om te doen"
 
 #: pid_provider/choices.py:15 tracker/choices.py:37
 msgid "Done"
-msgstr "Hecho"
+msgstr "Klaar"
 
 #: pid_provider/choices.py:16
 msgid "waiting"
-msgstr "esperando"
+msgstr "wag"
 
 #: pid_provider/choices.py:17
 msgid "ignore"
-msgstr "ignorar"
+msgstr "ignoreer"
 
 #: pid_provider/choices.py:18
 msgid "undefined"
-msgstr "indefinido"
+msgstr "ongedefinieerd"
 
 #: pid_provider/choices.py:19
 msgid "invalid"
-msgstr "inválido"
+msgstr "ongeldig"
 
 #: pid_provider/choices.py:20
 msgid "duplicated"
-msgstr "duplicado"
+msgstr "gedupliseer"
 
 #: pid_provider/choices.py:21
 msgid "deduplicated"
-msgstr "deduplicado"
+msgstr "ontdupliseer"
 
 #: pid_provider/client.py:143
 msgid "Unable to get api token {} {} {} {} {}"
-msgstr "No se puede obtener token de api {} {} {} {} {}"
+msgstr "Kan nie API-token kry nie {} {} {} {} {}"
 
 #: pid_provider/client.py:213
 msgid "Unable to get pid from pid provider {} {} {} {}"
-msgstr "No se puede obtener pid del proveedor de pid {} {} {} {}"
+msgstr "Kan nie PID vanaf PID-verskaffer kry nie {} {} {} {}"
 
 #: pid_provider/client.py:308
 msgid "Unable to get pid from pid provider {} {} {} {} {}"
-msgstr "No se puede obtener pid del proveedor de pid {} {} {} {} {}"
+msgstr "Kan nie PID vanaf PID-verskaffer kry nie {} {} {} {} {}"
 
 #: pid_provider/models.py:226
 msgid "XML Post URI"
-msgstr "URI de publicación XML"
+msgstr "XML Post URI"
 
 #: pid_provider/models.py:229
 msgid "Get Token URI"
-msgstr "URI de obtención de token"
+msgstr "Get Token URI"
 
 #: pid_provider/models.py:231
 msgid "Timeout"
-msgstr "Tiempo de espera"
+msgstr "Tydverstreke"
 
 #: pid_provider/models.py:233
 msgid "API Username"
-msgstr "Nombre de usuario de API"
+msgstr "API Gebruikersnaam"
 
 #: pid_provider/models.py:236
 msgid "API Password"
-msgstr "Contraseña de API"
+msgstr "API Wagwoord"
 
 #: pid_provider/models.py:291
 msgid "PID type"
-msgstr "Tipo de PID"
+msgstr "PID tipe"
 
 #: pid_provider/models.py:293
 msgid "PID pid_in_xml"
@@ -1900,27 +1880,31 @@ msgstr "PID pid_in_xml"
 
 #: pid_provider/models.py:351
 msgid "processing status"
-msgstr "estado de procesamiento"
+msgstr "verwerkingstatus"
+
+#: pid_provider/models.py:351
+msgid "processing status"
+msgstr "verwerkingstatus"
 
 #: pid_provider/models.py:363
 msgid "publication year"
-msgstr "año de publicación"
+msgstr "publikasiejaar"
 
 #: pid_provider/models.py:365
 msgid "volume"
-msgstr "volumen"
+msgstr "volume"
 
 #: pid_provider/models.py:366
 msgid "number"
-msgstr "número"
+msgstr "nommer"
 
 #: pid_provider/models.py:367
 msgid "suppl"
-msgstr "supl"
+msgstr "suppl"
 
 #: pid_provider/models.py:374 proc/models.py:1498 upload/models.py:2192
 msgid "Package name"
-msgstr "Nombre del paquete"
+msgstr "Pakketnaam"
 
 #: pid_provider/models.py:376
 msgid "v3"
@@ -1932,59 +1916,59 @@ msgstr "v2"
 
 #: pid_provider/models.py:378
 msgid "AOP PID"
-msgstr "PID AOP"
+msgstr "AOP PID"
 
 #: pid_provider/models.py:381
 msgid "elocation id"
-msgstr "id de elocation"
+msgstr "elocation id"
 
 #: pid_provider/models.py:383
 msgid "fpage"
-msgstr "pág_inicial"
+msgstr "fpage"
 
 #: pid_provider/models.py:384
 msgid "fpage_seq"
-msgstr "pág_inicial_seq"
+msgstr "fpage_seq"
 
 #: pid_provider/models.py:385
 msgid "lpage"
-msgstr "pág_final"
+msgstr "lpage"
 
 #: pid_provider/models.py:387
 msgid "Document Publication Year"
-msgstr "Año de publicación del documento"
+msgstr "Dokument Publikasiejaar"
 
 #: pid_provider/models.py:391
 msgid "surnames"
-msgstr "apellidos"
+msgstr "vanne"
 
 #: pid_provider/models.py:392
 msgid "collab"
-msgstr "colab"
+msgstr "medewerking (collab)"
 
 #: pid_provider/models.py:393
 msgid "links"
-msgstr "enlaces"
+msgstr "skakels"
 
 #: pid_provider/models.py:395
 msgid "partial_body"
-msgstr "cuerpo_parcial"
+msgstr "gedeeltelike_liggaam"
 
 #: pid_provider/models.py:399
 msgid "Origin date"
-msgstr "Fecha de origen"
+msgstr "Oorsprongdatum"
 
 #: pid_provider/models.py:404
 msgid "Available since"
-msgstr "Disponible desde"
+msgstr "Beskikbaar sedert"
 
 #: pid_provider/models.py:429
 msgid "Other PID"
-msgstr "Otro PID"
+msgstr "Ander PID"
 
 #: pid_provider/models.py:441
 msgid "Other PIDs"
-msgstr "Otros PIDs"
+msgstr "Ander PIDs"
 
 #: pid_provider/models.py:442 proc/models.py:875 proc/models.py:1051
 #: upload/models.py:1442
@@ -1993,235 +1977,233 @@ msgstr "Otros PIDs"
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:26
 #: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:24
 msgid "Data"
-msgstr "Datos"
+msgstr "Data"
 
 #: pid_provider/models.py:912
 msgid ""
 "The XML content is an ahead of print version but the document {} is already "
 "published in an issue"
-msgstr ""
-"El contenido XML es una versión ahead of print pero el documento {} ya está "
-"publicado en un fascículo"
+msgstr "Die XML-inhoud is 'n 'ahead of print' weergawe, maar die dokument {} is reeds in 'n uitgawe gepubliseer"
 
 #: pid_provider/models.py:973
 msgid "No matching record found for the provided XML data."
-msgstr "No se encontró ningún registro coincidente para los datos XML proporcionados."
+msgstr "Geen ooreenstemmende rekord gevind vir die verskafde XML-data nie."
 
 #: pid_provider/models.py:1434
 msgid "Incorrect v2"
-msgstr "v2 incorrecto"
+msgstr "Verkeerde v2"
 
 #: pid_provider/models.py:1437
 msgid "Correct v2"
-msgstr "v2 correcto"
+msgstr "Korrekte v2"
 
 #: pid_provider/query_params.py:207
 msgid "Required Print or Electronic ISSN to identify XML {}"
-msgstr "Se requiere ISSN impreso o electrónico para identificar XML {}"
+msgstr "Vereis Gedrukte of Elektroniese ISSN om XML te identifiseer {}"
 
 #: pid_provider/wagtail_hooks.py:14
 msgid "Pid Provider XMLs"
-msgstr "XMLs del proveedor de Pid"
+msgstr "PID-verskaffer XMLs"
 
 #: pid_provider/wagtail_hooks.py:66
 msgid "Pid Changes"
-msgstr "Cambios de Pid"
+msgstr "PID-wysigings"
 
 #: pid_provider/wagtail_hooks.py:98
 msgid "Pid Provider Config"
-msgstr "Configuración del proveedor de Pid"
+msgstr "PID-verskaffer konfigurasie"
 
 #: pid_provider/wagtail_hooks.py:120
 msgid "Fix pid v2"
-msgstr "Corregir pid v2"
+msgstr "Herstel PID v2"
 
 #: pid_provider/wagtail_hooks.py:158
 msgid "XML Versions"
-msgstr "Versiones XML"
+msgstr "XML-weergawes"
 
 #: pid_provider/wagtail_hooks.py:184
 msgid "Pid Provider"
-msgstr "Proveedor de Pid"
+msgstr "PID-verskaffer"
 
 #: proc/models.py:195
 msgid "Procedure name"
-msgstr "Nombre del procedimiento"
+msgstr "Prosedurenaam"
 
 #: proc/models.py:201
 msgid "Item type"
-msgstr "Tipo de ítem"
+msgstr "Itemtipe"
 
 #: proc/models.py:216
 msgid "Processing report"
-msgstr "Informe de procesamiento"
+msgstr "Verwerkingsverslag"
 
 #: proc/models.py:217
 msgid "Processing reports"
-msgstr "Informes de procesamiento"
+msgstr "Verwerkingsverslae"
 
 #: proc/models.py:351
 msgid "QA Website Status"
-msgstr "Estado del sitio web de QA"
+msgstr "QA-webwerfstatus"
 
 #: proc/models.py:357
 msgid "Public Website Status"
-msgstr "Estado del sitio web público"
+msgstr "Publieke webwerfstatus"
 
 #: proc/models.py:393 proc/models.py:876 proc/models.py:1052
 #: proc/models.py:1563 upload/models.py:314 upload/models.py:1369
 #: upload/models.py:1421
 msgid "Events"
-msgstr "Eventos"
+msgstr "Gebeurtenisse"
 
 #: proc/models.py:849
 msgid "Acronym"
-msgstr "Acrónimo"
+msgstr "Akroniem"
 
 #: proc/models.py:852
 msgid "Availability Status"
-msgstr "Estado de disponibilidad"
+msgstr "Beskikbaarheidstatus"
 
 #: proc/models.py:868 proc/models.py:1042 proc/models.py:1557
 #: upload/models.py:309 upload/models.py:1362 upload/models.py:1406
 msgid "Event newest to oldest"
-msgstr "Evento más reciente a más antiguo"
+msgstr "Gebeurtenisse nuutste na oudste"
 
 #: proc/models.py:927
 msgid "Unable to update journal {} {} {} {}"
-msgstr "No se puede actualizar la revista {} {} {} {}"
+msgstr "Kan nie tydskrif bywerk nie {} {} {} {}"
 
 #: proc/models.py:1010
 msgid "Issue Folder"
-msgstr "Carpeta del fascículo"
+msgstr "Uitgawe-vouer"
 
 #: proc/models.py:1014
 msgid "Files migration status"
-msgstr "Estado de migración de archivos"
+msgstr "Lêers migrasiestatus"
 
 #: proc/models.py:1022
 msgid "Document records migration status"
-msgstr "Estado de migración de registros de documentos"
+msgstr "Dokumentrekords migrasiestatus"
 
 #: proc/models.py:1146
 msgid "Unable to update issue {} {} {} {}"
-msgstr "No se puede actualizar el fascículo {} {} {} {}"
+msgstr "Kan nie uitgawe bywerk nie {} {} {} {}"
 
 #: proc/models.py:1501
 msgid "Main lang"
-msgstr "Idioma principal"
+msgstr "Hooftaal"
 
 #: proc/models.py:1515
 msgid "XML status"
-msgstr "Estado XML"
+msgstr "XML status"
 
 #: proc/models.py:1523
 msgid "SPS Pkg status"
-msgstr "Estado del paquete SPS"
+msgstr "SPS Pakketstatus"
 
 #: proc/models.py:1531
 msgid "Processed XML"
-msgstr "XML procesado"
+msgstr "Verwerkte XML"
 
 #: proc/models.py:1535
 msgid "Native XML + modifications or converted XML from HTML"
-msgstr "XML nativo + modificaciones o XML convertido desde HTML"
+msgstr "Natuurlike XML + wysigings of omgeskakelde XML vanaf HTML"
 
 #: proc/models.py:1639
 msgid "Unable to update article_proc{} {} {} {}"
-msgstr "No se puede actualizar article_proc{} {} {} {}"
+msgstr "Kan nie article_proc bywerk nie {} {} {} {}"
 
 #: proc/models.py:1726
 msgid "Unable to get xml_with_pre for {}: {}"
-msgstr "No se puede obtener xml_with_pre para {}: {}"
+msgstr "Kan nie xml_with_pre kry vir {}: {} nie"
 
 #: proc/models.py:1771
 msgid "Unable to get xml with pre from migrated article {}: {} {}"
-msgstr "No se puede obtener xml con pre del artículo migrado {}: {} {}"
+msgstr "Kan nie XML met 'pre' kry vanaf gemigreerde artikel {}: {} {} nie"
 
 #: proc/models.py:1906
 msgid "No migrated XML file found for {} ({})"
-msgstr "No se encontró archivo XML migrado para {} ({})"
+msgstr "Geen gemigreerde XML-lêer gevind vir {} ({}) nie"
 
 #: proc/tasks.py:803
 msgid "Select journals by collection"
-msgstr "Seleccionar revistas por colección"
+msgstr "Kies tydskrifte volgens versameling"
 
 #: proc/wagtail_hooks.py:17
 msgid "Journal Processing"
-msgstr "Procesamiento de revistas"
+msgstr "Tydskrifverwerking"
 
 #: proc/wagtail_hooks.py:50
 msgid "Issue Processing"
-msgstr "Procesamiento de fascículos"
+msgstr "Uitgaweverwerking"
 
 #: proc/wagtail_hooks.py:87
 msgid "XML from HTML"
-msgstr "XML desde HTML"
+msgstr "XML vanaf HTML"
 
 #: proc/wagtail_hooks.py:126
 msgid "SPS Package"
-msgstr "Paquete SPS"
+msgstr "SPS Pakket"
 
 #: proc/wagtail_hooks.py:161
 msgid "Article Processing"
-msgstr "Procesamiento de artículos"
+msgstr "Artikelverwerking"
 
 #: proc/wagtail_hooks.py:197
 msgid "Processing Report"
-msgstr "Informe de procesamiento"
+msgstr "Verwerkingsverslag"
 
 #: proc/wagtail_hooks.py:227
 msgid "Processing"
-msgstr "Procesamiento"
+msgstr "Verwerking"
 
 #: publication/api/issue.py:43
 #, python-format
 msgid "Error syncing issue %s: %s"
-msgstr "Error al sincronizar fascículo %s: %s"
+msgstr "Fout met sinkronisering van uitgawe %s: %s"
 
 #: publication/api/publication.py:76
 msgid "Website enabled is False ({})"
-msgstr "Sitio web habilitado es Falso ({})"
+msgstr "Webwerf geaktiveer is Vals ({})"
 
 #: publication/models.py:37
 msgid "published by"
-msgstr "publicado por"
+msgstr "gepubliseer deur"
 
 #: publication/models.py:40
 msgid "publication rule"
-msgstr "regla de publicación"
+msgstr "publikasiereël"
 
 #: researcher/choices.py:3
 msgid "Mujer"
-msgstr "Mujer"
+msgstr "Vrou"
 
 #: researcher/choices.py:3
 msgid "Hombre"
-msgstr "Hombre"
+msgstr "Man"
 
 #: researcher/choices.py:6
 msgid "Declarado por el investigador"
-msgstr "Declarado por el investigador"
+msgstr "Verklaar deur die navorser"
 
 #: researcher/choices.py:7
 msgid "Identificado automáticamente por programa de computador"
-msgstr "Identificado automáticamente por programa de computador"
+msgstr "Outomaties geïdentifiseer deur rekenaarprogram"
 
 #: researcher/choices.py:8
 msgid "Identificado por algun usuario"
-msgstr "Identificado por algún usuario"
+msgstr "Geïdentifiseer deur 'n gebruiker"
 
 #: researcher/models.py:21
 msgid "Given names"
-msgstr "Nombres"
+msgstr "Voorname"
 
 #: researcher/models.py:24
 msgid "Last name"
-msgstr "Apellido"
+msgstr "Van"
 
 #: researcher/models.py:26
 msgid "Suffix"
-msgstr "Sufijo"
+msgstr "Suffiks"
 
 #: researcher/models.py:27
 msgid "ORCID"
@@ -2233,551 +2215,540 @@ msgstr "Lattes"
 
 #: researcher/models.py:29
 msgid "Gender"
-msgstr "Género"
+msgstr "Geslag"
 
 #: researcher/models.py:31
 msgid "Gender identification status"
-msgstr "Estado de identificación de género"
+msgstr "Geslagsidentifikasiestatus"
 
 #: researcher/models.py:60 researcher/models.py:71
 msgid "Email"
-msgstr "Correo electrónico"
+msgstr "E-pos"
 
 #: researcher/models.py:63
 msgid "Affiliation"
-msgstr "Afiliación"
+msgstr "Affiliasie"
 
 #: researcher/wagtail_hooks.py:20
 msgid "Researcher"
-msgstr "Investigador"
+msgstr "Navorser"
 
 #: team/models.py:56
 msgid "Team"
-msgstr "Equipo"
+msgstr "Span"
 
 #: team/models.py:57 team/wagtail_hooks.py:51
 msgid "Teams"
-msgstr "Equipos"
+msgstr "Spanne"
 
 #: team/models.py:80
 msgid "Team member"
-msgstr "Miembro del equipo"
+msgstr "Spanlid"
 
 #: team/models.py:81
 msgid "Team members"
-msgstr "Miembros del equipo"
+msgstr "Spanlede"
 
 #: team/views.py:14
 msgid "Member has been successfully created"
-msgstr "El miembro ha sido creado exitosamente"
+msgstr "Lid is suksesvol geskep"
 
 #: team/wagtail_hooks.py:23
 msgid "Collection Team Members"
-msgstr "Miembros del equipo de colección"
+msgstr "Versameling-spanlede"
 
 #: tracker/choices.py:8
 msgid "started"
-msgstr "iniciado"
+msgstr "begin"
 
 #: tracker/choices.py:9
 msgid "interrupted"
-msgstr "interrumpido"
+msgstr "onderbreek"
 
 #: tracker/choices.py:10
 msgid "finished"
-msgstr "finalizado"
+msgstr "klaar"
 
 #: tracker/choices.py:19 upload/choices.py:183
 msgid "error"
-msgstr "error"
+msgstr "fout"
 
 #: tracker/choices.py:20 upload/choices.py:185
 msgid "warning"
-msgstr "advertencia"
+msgstr "waarskuwing"
 
 #: tracker/choices.py:21
 msgid "info"
-msgstr "información"
+msgstr "inligting"
 
 #: tracker/choices.py:22
 msgid "exception"
-msgstr "excepción"
+msgstr "uitsondering"
 
 #: tracker/choices.py:35
 msgid "To reprocess"
-msgstr "Por reprocesar"
+msgstr "Om te herverwerk"
 
 #: tracker/choices.py:38
 msgid "Doing"
-msgstr "Haciendo"
+msgstr "Besig"
 
 #: tracker/choices.py:39
 msgid "Blocked"
-msgstr "Bloqueado"
+msgstr "Geblokkeer"
 
 #: tracker/choices.py:40
 msgid "Pending"
-msgstr "Pendiente"
+msgstr "Hangende"
 
 #: tracker/choices.py:41
 msgid "ignored"
-msgstr "ignorado"
+msgstr "geïgnoreer"
 
 #: tracker/models.py:50
 msgid "name"
-msgstr "nombre"
+msgstr "naam"
 
 #: tracker/models.py:99
 msgid "Exception Type"
-msgstr "Tipo de excepción"
+msgstr "Uitsonderingstipe"
 
 #: tracker/models.py:100
 msgid "Exception Msg"
-msgstr "Mensaje de excepción"
+msgstr "Uitsonderingsboodskap"
 
 #: tracker/models.py:104 tracker/models.py:178
 msgid "Item"
-msgstr "Ítem"
+msgstr "Item"
 
 #: tracker/models.py:110
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:4
 msgid "Action"
-msgstr "Acción"
+msgstr "Aksie"
 
 #: tracker/models.py:180
 msgid "Total to process"
-msgstr "Total a procesar"
+msgstr "Totaal om te verwerk"
 
 #: tracker/models.py:183
 msgid "Total processed"
-msgstr "Total procesado"
+msgstr "Totaal verwerk"
 
 #: tracker/models.py:187
 msgid "status"
-msgstr "estado"
+msgstr "status"
 
 #: tracker/wagtail_hooks.py:13
 msgid "Unexpected Events"
-msgstr "Eventos inesperados"
+msgstr "Onverwagte Gebeurtenisse"
 
 #: tracker/wagtail_hooks.py:55
 msgid "Event Tracker"
-msgstr "Rastreador de eventos"
+msgstr "Gebeurtenis-spoorder"
 
 #: tracker/wagtail_hooks.py:99
 msgid "Event Monitoring"
-msgstr "Monitoreo de eventos"
+msgstr "Gebeurtenis-monitering"
 
 #: upload/button_helper.py:63
 msgid "Accept / Reject the package or delegate it"
-msgstr "Aceptar / Rechazar el paquete o delegarlo"
+msgstr "Aanvaar / Verwerp die pakket of delegeer dit"
 
 #: upload/button_helper.py:76
 msgid "Finish deposit"
-msgstr "Finalizar depósito"
+msgstr "Voltooi deposito"
 
 #: upload/button_helper.py:90
 msgid "Archive"
-msgstr "Archivar"
+msgstr "Argiveer"
 
 #: upload/choices.py:78
 msgid "Submitted"
-msgstr "Enviado"
+msgstr "Ingedien"
 
 #: upload/choices.py:79
 msgid "Enqueued for validation"
-msgstr "En cola para validación"
+msgstr "In waglys vir validering"
 
 #: upload/choices.py:80 upload/choices.py:93
 msgid "Validated with errors"
-msgstr "Validado con errores"
+msgstr "Gevalideer met foute"
 
 #: upload/choices.py:81
 msgid "Pending quality analysis decision"
-msgstr "Pendiente de decisión de análisis de calidad"
+msgstr "Hangende kwaliteitsontleding-besluit"
 
 #: upload/choices.py:82 upload/choices.py:92
 msgid "Pending for correction"
-msgstr "Pendiente de corrección"
+msgstr "Hangende vir korreksie"
 
 #: upload/choices.py:83
 msgid "Unexpected"
-msgstr "Inesperado"
+msgstr "Onverwags"
 
 #: upload/choices.py:84
 msgid "Ready to preview on QA website"
-msgstr "Listo para previsualizar en el sitio web de QA"
+msgstr "Gereed vir voorskou op QA-webwerf"
 
 #: upload/choices.py:85
 msgid "Preview"
-msgstr "Vista previa"
+msgstr "Voorskou"
 
 #: upload/choices.py:86
 msgid "Ready to publish on public website"
-msgstr "Listo para publicar en el sitio web público"
+msgstr "Gereed vir publikasie op publieke webwerf"
 
 #: upload/choices.py:88
 msgid "Archived"
-msgstr "Archivado"
+msgstr "Gearchiveer"
 
 #: upload/choices.py:97
 msgid "Depublish"
-msgstr "Despublicar"
+msgstr "Ontpubliseer"
 
 #: upload/choices.py:98
 msgid "Request correction"
-msgstr "Solicitar corrección"
+msgstr "Versoek korreksie"
 
 #: upload/choices.py:99
 msgid "Assign quality review"
-msgstr "Asignar revisión de calidad"
+msgstr "Wys kwaliteitsresensie toe"
 
 #: upload/choices.py:100
 msgid "Publish on QA website"
-msgstr "Publicar en el sitio web de QA"
+msgstr "Publiseer op QA-webwerf"
 
 #: upload/choices.py:101
 msgid "Publish on public website"
-msgstr "Publicar en el sitio web público"
+msgstr "Publiseer op publieke webwerf"
 
 #: upload/choices.py:113
 msgid "New document"
-msgstr "Nuevo documento"
+msgstr "Nuwe dokument"
 
 #: upload/choices.py:181
 msgid "blocking"
-msgstr "bloqueante"
+msgstr "blokkerend"
 
 #: upload/choices.py:182
 msgid "critical"
-msgstr "crítico"
+msgstr "krities"
 
 #: upload/choices.py:184
 msgid "unknown"
-msgstr "desconocido"
+msgstr "onbekend"
 
 #: upload/choices.py:186
 msgid "ok"
-msgstr "ok"
+msgstr "reg"
 
 #: upload/choices.py:195
 msgid "The error will be fixed"
-msgstr "El error será corregido"
+msgstr "Die fout sal reggemaak word"
 
 #: upload/choices.py:198
 msgid "Impossible to fix it"
-msgstr "Imposible de corregir"
+msgstr "Onmoontlik om reg te maak"
 
 #: upload/choices.py:200
 msgid "There's disagreement about the error"
-msgstr "Hay desacuerdo sobre el error"
+msgstr "Daar is meningsverskil oor die fout"
 
 #: upload/choices.py:210
 msgid "Accepted with errors"
-msgstr "Aceptado con errores"
+msgstr "Aanvaar met foute"
 
 #: upload/choices.py:211
 msgid "Accepted"
-msgstr "Aceptado"
+msgstr "Aanvaar"
 
 #: upload/choices.py:212
 msgid "Correction required"
-msgstr "Corrección requerida"
+msgstr "Korreksie word vereis"
 
 #: upload/choices.py:221
 msgid "Flexible auto publication"
-msgstr "Publicación automática flexible"
+msgstr "Buigsame outo-publikasie"
 
 #: upload/choices.py:222
 msgid "Strict auto publication"
-msgstr "Publicación automática estricta"
+msgstr "Strenge outo-publikasie"
 
 #: upload/choices.py:223
 msgid "Manual publication"
-msgstr "Publicación manual"
+msgstr "Handmatige publikasie"
 
 #: upload/choices.py:234
 msgid "unreleased"
-msgstr "no lanzado"
+msgstr "onvrygestel"
 
 #: upload/choices.py:235
 msgid "published"
-msgstr "publicado"
+msgstr "gepubliseer"
 
 #: upload/choices.py:236
 msgid "depublished"
-msgstr "despublicado"
+msgstr "ontpubliseer"
 
 #: upload/controller.py:90
 msgid "Package file"
-msgstr "Archivo de paquete"
+msgstr "Pakketlêer"
 
 #: upload/controller.py:142
 msgid "File Report"
-msgstr "Informe de archivo"
+msgstr "Lêerverslag"
 
 #: upload/controller.py:220 upload/controller.py:234
 msgid ""
 "Not allowed to accept new package. There is a previous package which "
 "status={}. Search it and change the status to '{}'"
-msgstr ""
-"No se permite aceptar un nuevo paquete. Hay un paquete anterior cuyo "
-"estado={}. Búscalo y cambia el estado a '{}'"
+msgstr "Nie toegelaat om nuwe pakket te aanvaar nie. Daar is 'n vorige pakket met status={}. Soek dit en verander die status na '{}'"
 
 #: upload/controller.py:281
 msgid "Registered journals: {}. "
-msgstr "Revistas registradas: {}. "
+msgstr "Geregistreerde tydskrifte: {}. "
 
 #: upload/controller.py:283
 msgid "Found no registered journal. "
-msgstr "No se encontró ninguna revista registrada. "
+msgstr "Geen geregistreerde tydskrif gevind nie. "
 
 #: upload/controller.py:286
 msgid ""
 "Journal in XML must be a registered journal. Journal in XML: {}. {}. "
 "Register the journal on core.scielo.org"
-msgstr ""
-"La revista en XML debe ser una revista registrada. Revista en XML: {}. {}. "
-"Registre la revista en core.scielo.org"
+msgstr "Tydskrif in XML moet 'n geregistreerde tydskrif wees. Tydskrif in XML: {}. {}. Registreer die tydskrif op core.scielo.org"
 
 #: upload/controller.py:339
 msgid "Registered issues: {}. "
-msgstr "Fascículos registrados: {}. "
+msgstr "Geregistreerde uitgawes: {}. "
 
 #: upload/controller.py:341
 msgid "{} has no registered issues"
-msgstr "{} no tiene fascículos registrados"
+msgstr "{} het geen geregistreerde uitgawes nie"
 
 #: upload/controller.py:344
 msgid ""
 "Issue in XML must be a registered issue. Issue in XML {}. {}. Register the "
 "issue on core.scielo.org"
-msgstr ""
-"El fascículo en XML debe ser un fascículo registrado. Fascículo en XML {}. {}. "
-"Registre el fascículo en core.scielo.org"
+msgstr "Uitgawe in XML moet 'n geregistreerde uitgawe wees. Uitgawe in XML {}. {}. Registreer die uitgawe op core.scielo.org"
 
 #: upload/controller.py:356 upload/controller.py:364
 msgid "{} (registered, {}) differs from {} (XML, {})"
-msgstr "{} (registrado, {}) difiere de {} (XML, {})"
+msgstr "{} (geregistreer, {}) verskil van {} (XML, {})"
 
 #: upload/forms.py:30 upload/forms.py:32 upload/forms.py:82 upload/forms.py:84
 msgid "Força a publicação de journal"
-msgstr "Forzar la publicación de revista"
+msgstr "Forseer die publikasie van tydskrif"
 
 #: upload/forms.py:36 upload/forms.py:38 upload/forms.py:88 upload/forms.py:90
 msgid "Força a publicação de issue"
-msgstr "Forzar la publicación de fascículo"
+msgstr "Forseer die publikasie van uitgawe"
 
 #: upload/forms.py:49
 msgid "Choose the analyst who will decide about the package"
-msgstr "Elige al analista que decidirá sobre el paquete"
+msgstr "Kies die ontleder wat oor die pakket sal besluit"
 
 #: upload/forms.py:56
 msgid ""
 "Make a decision about the package or choose the analyst who will decide "
 "about the package"
-msgstr ""
-"Toma una decisión sobre el paquete o elige al analista que decidirá sobre el "
-"paquete"
+msgstr "Neem 'n besluit oor die pakket of kies die ontleder wat daaroor sal besluit"
 
 #: upload/forms.py:101
 msgid "Justify your decision about the package"
-msgstr "Justifica tu decisión sobre el paquete"
+msgstr "Regverdig u besluit oor die pakket"
 
 #: upload/forms.py:131
 msgid "Inform if you finish or not the errors review"
-msgstr "Informa si has terminado o no la revisión de errores"
+msgstr "Meld of u die hersiening van foute voltooi het of nie"
 
 #: upload/forms.py:154 upload/forms.py:160
 msgid "Value must be from 0 to 100"
-msgstr "El valor debe estar entre 0 y 100"
+msgstr "Waarde moet tussen 0 en 100 wees"
 
 #: upload/models.py:105
 msgid "Package Zip"
-msgstr "Zip del paquete"
+msgstr "Pakket-Zip"
 
 #: upload/models.py:108
 msgid "Package Zip File"
-msgstr "Archivo Zip del paquete"
+msgstr "Pakket-Zip-lêer"
 
 #: upload/models.py:114
 msgid "Show package validations"
-msgstr "Mostrar validaciones del paquete"
+msgstr "Wys pakketvaliderings"
 
 #: upload/models.py:117
 msgid ""
 "Unchecked to be redirect to package upload. Checked to be redirect to "
 "package validation"
-msgstr ""
-"Desmarcado para ser redirigido a la carga del paquete. Marcado para ser "
-"redirigido a la validación del paquete"
+msgstr "Ongetik om na pakket-oplaai te herlei. Getik om na pakketvalidering te herlei"
 
 #: upload/models.py:130
 msgid "Zip file"
-msgstr "Archivo Zip"
+msgstr "Zip-lêer"
 
 #: upload/models.py:131
 msgid "Zip files"
-msgstr "Archivos Zip"
+msgstr "Zip-lêers"
 
 #: upload/models.py:183
 msgid "Package File"
-msgstr "Archivo del paquete"
+msgstr "Pakketlêer"
 
 #: upload/models.py:189
 msgid "SPS Package name"
-msgstr "Nombre del paquete SPS"
+msgstr "SPS Pakketnaam"
 
 #: upload/models.py:190
 msgid "Signature"
-msgstr "Firma"
+msgstr "Handtekening"
 
 #: upload/models.py:205
 msgid "Quality analysis decision"
-msgstr "Decisión de análisis de calidad"
+msgstr "Kwaliteitsontleding-besluit"
 
 #: upload/models.py:211
 msgid ""
 "Make a decision about the package or choose the analyst who will decide it"
-msgstr "Toma una decisión sobre el paquete o elige al analista que lo decidirá"
+msgstr "Neem 'n besluit oor die pakket of kies die ontleder wat daaroor sal besluit"
 
 #: upload/models.py:215
 msgid "Quality analysis comment"
-msgstr "Comentario de análisis de calidad"
+msgstr "Kwaliteitsontleding-kommentaar"
 
 #: upload/models.py:219
 msgid ""
 "Comment the decision about the package or choose the analyst who will "
 "comment it"
-msgstr ""
-"Comenta la decisión sobre el paquete o elige al analista que lo comentará"
+msgstr "Lewer kommentaar oor die besluit of kies die ontleder wat kommentaar sal lewer"
 
 #: upload/models.py:228
 msgid ""
 "Choose the analyst who will decide about the package or add your decision"
-msgstr "Elige al analista que decidirá sobre el paquete o agrega tu decisión"
+msgstr "Kies die ontleder wat oor die pakket sal besluit of voeg u eie besluit by"
 
 #: upload/models.py:250
 msgid "Expiration date"
-msgstr "Fecha de vencimiento"
+msgstr "Vervaldatum"
 
 #: upload/models.py:255
 msgid "Error percentual"
-msgstr "Porcentaje de error"
+msgstr "Foutpersentasie"
 
 #: upload/models.py:259 upload/models.py:266 upload/models.py:269
 #: upload/models.py:272 upload/models.py:2031 upload/models.py:2034
 #: upload/models.py:2037
 msgid "0 to 100"
-msgstr "0 a 100"
+msgstr "0 tot 100"
 
 #: upload/models.py:262
 msgid "Warning percentual"
-msgstr "Porcentaje de advertencia"
+msgstr "Waarskuwingpersentasie"
 
 #: upload/models.py:278
 msgid "Linked packages"
-msgstr "Paquetes vinculados"
+msgstr "Gekoppelde pakkette"
 
 #: upload/models.py:279
 msgid "Linked packages which will be published only if all are approved"
-msgstr "Paquetes vinculados que se publicarán solo si todos son aprobados"
+msgstr "Gekoppelde pakkette wat slegs gepubliseer sal word as almal goedgekeur is"
 
 #: upload/models.py:320 upload/models.py:321 upload/wagtail_hooks.py:92
 msgid "Package admin"
-msgstr "Administrador de paquetes"
+msgstr "Pakket-admin"
 
 #: upload/models.py:323
 msgid "Can finish deposit"
-msgstr "Puede finalizar depósito"
+msgstr "Kan deposito voltooi"
 
 #: upload/models.py:324
 msgid "Can access all packages from all users"
-msgstr "Puede acceder a todos los paquetes de todos los usuarios"
+msgstr "Het toegang tot alle pakkette van alle gebruikers"
 
 #: upload/models.py:325
 msgid "Can assign package"
-msgstr "Puede asignar paquete"
+msgstr "Kan pakket toewys"
 
 #: upload/models.py:684
 msgid "The error review has been completed"
-msgstr "La revisión de errores ha sido completada"
+msgstr "Die fouthersiening is voltooi"
 
 #: upload/models.py:687
 msgid "The error review is in progress"
-msgstr "La revisión de errores está en progreso"
+msgstr "Die fouthersiening is aan die gang"
 
 #: upload/models.py:690 upload/models.py:709
 msgid "The XML package needs to be fixed and sent again"
-msgstr "El paquete XML necesita ser corregido y enviado nuevamente"
+msgstr "Die XML-pakket moet reggemaak word en weer gestuur word"
 
 #: upload/models.py:697
 msgid "It was concluded that {} are not errors"
-msgstr "Se concluyó que {} no son errores"
+msgstr "Daar is bevind dat {} nie foute is nie"
 
 #: upload/models.py:703
 msgid "It was concluded that {} are impossible to fix"
-msgstr "Se concluyó que {} son imposibles de corregir"
+msgstr "Daar is bevind dat {} onmoontlik is om reg te maak"
 
 #: upload/models.py:712
 msgid "Finish the deposit"
-msgstr "Finalizar el depósito"
+msgstr "Voltooi die deposito"
 
 #: upload/models.py:715
 msgid "Review and comment the errors"
-msgstr "Revisar y comentar los errores"
+msgstr "Hersien en lewer kommentaar op die foute"
 
 #: upload/models.py:904
 msgid "SPS Package was not created"
-msgstr "El paquete SPS no fue creado"
+msgstr "SPS-pakket is nie geskep nie"
 
 #: upload/models.py:907
 msgid "Article was not created"
-msgstr "El artículo no fue creado"
+msgstr "Artikel is nie geskep nie"
 
 #: upload/models.py:920
 msgid "{} is not published on MinIO"
-msgstr "{} no está publicado en MinIO"
+msgstr "{} is nie op MinIO gepubliseer nie"
 
 #: upload/models.py:924
 msgid "Total of XML, PDF, HTML do not match {}"
-msgstr "El total de XML, PDF, HTML no coincide con {}"
+msgstr "Totaal van XML, PDF, HTML stem nie ooreen met {} nie"
 
 #: upload/models.py:939
 msgid "SPS package requires PID provider registration"
-msgstr "El paquete SPS requiere registro de proveedor de PID"
+msgstr "SPS-pakket vereis PID-verskaffer-registrasie"
 
 #: upload/models.py:1203
 msgid "QA decision report"
-msgstr "Informe de decisión de QA"
+msgstr "QA-besluitverslag"
 
 #: upload/models.py:1366 upload/models.py:1417 upload/models.py:1663
 msgid "Decision"
-msgstr "Decisión"
+msgstr "Besluit"
 
 #: upload/models.py:1367 upload/models.py:1418
 msgid "Article"
-msgstr "Artículo"
+msgstr "Artikel"
 
 #: upload/models.py:1376 upload/models.py:1377 upload/wagtail_hooks.py:203
 msgid "Quality control admin"
-msgstr "Administrador de control de calidad"
+msgstr "Kwaliteitsbeheer-admin"
 
 #: upload/models.py:1419
 msgid "Publication Status"
-msgstr "Estado de publicación"
+msgstr "Publikasiestatus"
 
 #: upload/models.py:1429 upload/models.py:1430 upload/wagtail_hooks.py:286
 msgid "Publication admin"
-msgstr "Administrador de publicación"
+msgstr "Publikasie-admin"
 
 #: upload/models.py:1436
 msgid "Subject"
-msgstr "Asunto"
+msgstr "Onderwerp"
 
 #: upload/models.py:1440
 msgid "Item being analyzed"
-msgstr "Ítem siendo analizado"
+msgstr "Item wat ontleed word"
 
 #: upload/models.py:1443
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:22
@@ -2785,201 +2756,201 @@ msgstr "Ítem siendo analizado"
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:25
 #: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:23
 msgid "Message"
-msgstr "Mensaje"
+msgstr "Boodskap"
 
 #: upload/models.py:1445 upload/models.py:1883
 msgid "Result"
-msgstr "Resultado"
+msgstr "Resultaat"
 
 #: upload/models.py:1477
 msgid "Validation result"
-msgstr "Resultado de validación"
+msgstr "Validering-resultaat"
 
 #: upload/models.py:1478
 msgid "Validation results"
-msgstr "Resultados de validación"
+msgstr "Validering-resultate"
 
 #: upload/models.py:1566
 msgid "Sub-item being analyzed"
-msgstr "Sub-ítem siendo analizado"
+msgstr "Sub-item wat ontleed word"
 
 #: upload/models.py:1569
 msgid "Focus on"
-msgstr "Enfoque en"
+msgstr "Fokus op"
 
 #: upload/models.py:1572
 msgid "Validation type"
-msgstr "Tipo de validación"
+msgstr "Valideringstipe"
 
 #: upload/models.py:1601
 msgid "XML validation result"
-msgstr "Resultado de validación XML"
+msgstr "XML-validering-resultaat"
 
 #: upload/models.py:1602
 msgid "XML validation results"
-msgstr "Resultados de validación XML"
+msgstr "XML-validering-resultate"
 
 #: upload/models.py:1633 upload/wagtail_hooks.py:468
 msgid "XML info"
-msgstr "Información XML"
+msgstr "XML-inligting"
 
 #: upload/models.py:1634
 msgid "XML infos"
-msgstr "Informaciones XML"
+msgstr "XML-inligtingrekords"
 
 #: upload/models.py:1648
 msgid "Expected value"
-msgstr "Valor esperado"
+msgstr "Verwagte waarde"
 
 #: upload/models.py:1652
 msgid "Got value"
-msgstr "Valor obtenido"
+msgstr "Ontvangde waarde"
 
 #: upload/models.py:1653
 msgid "Advice"
-msgstr "Consejo"
+msgstr "Advies"
 
 #: upload/models.py:1655
 msgid "Reaction"
-msgstr "Reacción"
+msgstr "Reaksie"
 
 #: upload/models.py:1678 upload/models.py:1969
 msgid "XML error"
-msgstr "Error XML"
+msgstr "XML-fout"
 
 #: upload/models.py:1679
 #: upload/templates/modeladmin/upload/package/inspect.html:204
 #: upload/templates/modeladmin/upload/package/inspect_.html:204
 #: upload/wagtail_hooks.py:389
 msgid "XML errors"
-msgstr "Errores XML"
+msgstr "XML-foute"
 
 #: upload/models.py:1732
 msgid "Validation category"
-msgstr "Categoría de validación"
+msgstr "Validering-kategorie"
 
 #: upload/models.py:1739
 msgid "creation"
-msgstr "creación"
+msgstr "skepping"
 
 #: upload/models.py:1759
 msgid "Validation Report"
-msgstr "Informe de validación"
+msgstr "Valideringverslag"
 
 #: upload/models.py:1760 upload/wagtail_hooks.py:512
 msgid "Validation Reports"
-msgstr "Informes de validación"
+msgstr "Valideringverslae"
 
 #: upload/models.py:1902
 msgid "Report File"
-msgstr "Archivo de informe"
+msgstr "Verslaglêer"
 
 #: upload/models.py:1958
 msgid "The error review is complete"
-msgstr "La revisión de errores está completa"
+msgstr "Die fouthersiening is voltooi"
 
 #: upload/models.py:1978 upload/validation/xml_data_checker.py:55
 msgid "XML Error Report"
-msgstr "Informe de error XML"
+msgstr "XML-foutverslag"
 
 #: upload/models.py:1979 upload/wagtail_hooks.py:353
 msgid "XML Error Reports"
-msgstr "Informes de error XML"
+msgstr "XML-foutverslae"
 
 #: upload/models.py:2197
 msgid "Pid Reservation"
-msgstr "Reserva de Pid"
+msgstr "PID-reservering"
 
 #: upload/models.py:2198
 msgid "Pid Reservations"
-msgstr "Reservas de Pid"
+msgstr "PID-reserverings"
 
 #: upload/models.py:2253
 msgid "Setting package.pid_v2 from PidProviderXML"
-msgstr "Configurando package.pid_v2 desde PidProviderXML"
+msgstr "Stel package.pid_v2 vanaf PidProviderXML"
 
 #: upload/models.py:2268
 msgid "Unable to set package.pid_v2 because issue ({}) is not registered"
-msgstr "No se puede configurar package.pid_v2 porque el fascículo ({}) no está registrado"
+msgstr "Kan nie package.pid_v2 stel nie omdat uitgawe ({}) nie geregistreer is nie"
 
 #: upload/models.py:2299
 msgid "Unable to reserve pid_v2 {} for {}"
-msgstr "No se puede reservar pid_v2 {} para {}"
+msgstr "Kan nie pid_v2 {} vir {} reserveer nie"
 
 #: upload/models.py:2309
 msgid "Unable to update pid_provider ({}) with {}"
-msgstr "No se puede actualizar pid_provider ({}) con {}"
+msgstr "Kan nie pid_provider ({}) bywerk met {} nie"
 
 #: upload/models.py:2354
 msgid "Setting v2 ({}) from {}"
-msgstr "Configurando v2 ({}) desde {}"
+msgstr "Stel v2 ({}) vanaf {}"
 
 #: upload/models.py:2385
 msgid "Setting v2 ({}) from random {}"
-msgstr "Configurando v2 ({}) desde aleatorio {}"
+msgstr "Stel v2 ({}) vanaf ewekansige {}"
 
 #: upload/tasks.py:172
 msgid "Assets Report"
-msgstr "Informe de activos"
+msgstr "Batesverslag (Assets Report)"
 
 #: upload/tasks.py:191
 msgid "Package has all the expected asset files"
-msgstr "El paquete tiene todos los archivos de activos esperados"
+msgstr "Pakket het al die verwagte batelêers"
 
 #: upload/tasks.py:193
 msgid "Assets"
-msgstr "Activos"
+msgstr "Bates"
 
 #: upload/tasks.py:216
 msgid "Renditions Report"
-msgstr "Informe de representaciones"
+msgstr "Renditions-verslag"
 
 #: upload/tasks.py:229 upload/tasks.py:237
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:55
 msgid "Renditions"
-msgstr "Representaciones"
+msgstr "Renditions"
 
 #: upload/tasks.py:235
 msgid "Package has all the expected rendition files"
-msgstr "El paquete tiene todos los archivos de representación esperados"
+msgstr "Pakket het al die verwagte rendition-lêers"
 
 #: upload/tasks.py:259
 msgid "Renditions content report"
-msgstr "Informe de contenido de representaciones"
+msgstr "Renditions-inhoudsverslag"
 
 #: upload/tasks.py:414
 msgid "DTD Report"
-msgstr "Informe DTD"
+msgstr "DTD-verslag"
 
 #: upload/tasks.py:425 upload/tasks.py:432 upload/tasks.py:440
 msgid "XML Structure"
-msgstr "Estructura XML"
+msgstr "XML-struktuur"
 
 #: upload/tasks.py:430 upload/tasks.py:468
 msgid "No error found"
-msgstr "No se encontró ningún error"
+msgstr "Geen fout gevind nie"
 
 #: upload/tasks.py:448
 msgid "Style checker Report"
-msgstr "Informe del verificador de estilo"
+msgstr "Styltoetser-verslag"
 
 #: upload/tasks.py:463 upload/tasks.py:470 upload/tasks.py:478
 msgid "XML Style"
-msgstr "Estilo XML"
+msgstr "XML-styl"
 
 #: upload/tasks.py:556
 msgid "Web page Report"
-msgstr "Informe de página web"
+msgstr "Webbladsyverslag"
 
 #: upload/templates/modeladmin/upload/package/create.html:23
 msgid "Saving…"
-msgstr "Guardando…"
+msgstr "Stoor tans…"
 
 #: upload/templates/modeladmin/upload/package/create.html:24
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:12
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:12
 msgid "Save"
-msgstr "Guardar"
+msgstr "Stoor"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:15
 #: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:15
@@ -2987,42 +2958,42 @@ msgstr "Guardar"
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:15
 #: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:15
 msgid "Back to package inspection"
-msgstr "Volver a la inspección del paquete"
+msgstr "Terug na pakket-inspeksie"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:24
 #: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:24
 msgid "Resolution action"
-msgstr "Acción de resolución"
+msgstr "Oplossingsaksie"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:25
 #: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:25
 msgid "Resolution rationale"
-msgstr "Justificación de la resolución"
+msgstr "Oplossingsrasionaal"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:26
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:4
 msgid "Opinion"
-msgstr "Opinión"
+msgstr "Opinie"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:47
 msgid "Add validation error"
-msgstr "Añadir error de validación"
+msgstr "Voeg valideringsfout by"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:52
 msgid "Send opinions"
-msgstr "Enviar opiniones"
+msgstr "Stuur opinies"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:26
 msgid "Quality analyst opinion"
-msgstr "Opinión del analista de calidad"
+msgstr "Kwaliteitsontleder-opinie"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:27
 msgid "Quality analyst guidance"
-msgstr "Orientación del analista de calidad"
+msgstr "Kwaliteitsontleder-leiding"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:19
 msgid "If you don\\"
-msgstr "Si no\\"
+msgstr "As u nie..."
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:19
 msgid "Google Groups"
@@ -3030,49 +3001,49 @@ msgstr "Google Groups"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:27
 msgid "Resolution"
-msgstr "Resolución"
+msgstr "Oplossing"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:48
 msgid "Send resolutions"
-msgstr "Enviar resoluciones"
+msgstr "Stuur oplossings"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:6
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:6
 msgid "Choose an option"
-msgstr "Elige una opción"
+msgstr "Kies 'n opsie"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:7
 msgid "I will fix this error"
-msgstr "Corregiré este error"
+msgstr "Ek sal hierdie fout regmaak"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:8
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:7
 msgid "This is not an error"
-msgstr "Esto no es un error"
+msgstr "Hierdie is nie 'n fout nie"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:10
 msgid "Rationale"
-msgstr "Justificación"
+msgstr "Rasionaal"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:8
 msgid "This error has to be fixed"
-msgstr "Este error debe ser corregido"
+msgstr "Hierdie fout moet reggemaak word"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:10
 msgid "Guidance"
-msgstr "Orientación"
+msgstr "Leiding"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:12
 #: upload/templates/modeladmin/upload/package/inspect_.html:12
 #, python-format
 msgid "Back to %(pkg_zip_name)s list"
-msgstr "Volver a la lista de %(pkg_zip_name)s"
+msgstr "Terug na %(pkg_zip_name)s lys"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:19
 #: upload/templates/modeladmin/upload/package/inspect_.html:19
 #, python-format
 msgid "Go to %(lk)s validation reports (%(st)s)"
-msgstr "Ir a informes de validación de %(lk)s (%(st)s)"
+msgstr "Gaan na %(lk)s valideringverslae (%(st)s)"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:57
 #: upload/templates/modeladmin/upload/package/inspect_.html:57
@@ -3083,7 +3054,7 @@ msgstr "XML"
 #: upload/templates/modeladmin/upload/package/inspect.html:64
 #: upload/templates/modeladmin/upload/package/inspect_.html:64
 msgid "Package validations"
-msgstr "Validaciones del paquete"
+msgstr "Pakketvaliderings"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:69
 #: upload/templates/modeladmin/upload/package/inspect.html:115
@@ -3092,12 +3063,12 @@ msgstr "Validaciones del paquete"
 #: upload/templates/modeladmin/upload/package/inspect_.html:115
 #: upload/templates/modeladmin/upload/package/inspect_.html:165
 msgid "Date"
-msgstr "Fecha"
+msgstr "Datum"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:70
 #: upload/templates/modeladmin/upload/package/inspect_.html:70
 msgid "Blocking issues"
-msgstr "Problemas bloqueantes"
+msgstr "Blokkerende kwessies"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:71
 #: upload/templates/modeladmin/upload/package/inspect.html:116
@@ -3106,44 +3077,44 @@ msgstr "Problemas bloqueantes"
 #: upload/templates/modeladmin/upload/package/inspect_.html:116
 #: upload/templates/modeladmin/upload/package/inspect_.html:205
 msgid "Critical issues"
-msgstr "Problemas críticos"
+msgstr "Kritiese kwessies"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:72
 #: upload/templates/modeladmin/upload/package/inspect.html:117
 #: upload/templates/modeladmin/upload/package/inspect_.html:72
 #: upload/templates/modeladmin/upload/package/inspect_.html:117
 msgid "Errors"
-msgstr "Errores"
+msgstr "Foute"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:73
 #: upload/templates/modeladmin/upload/package/inspect.html:118
 #: upload/templates/modeladmin/upload/package/inspect_.html:73
 #: upload/templates/modeladmin/upload/package/inspect_.html:118
 msgid "Warnings"
-msgstr "Advertencias"
+msgstr "Waarskuwings"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:89
 #: upload/templates/modeladmin/upload/package/inspect_.html:89
 #: upload/templates/modeladmin/upload/package/inspect_.html:139
 msgid "Processing..."
-msgstr "Procesando..."
+msgstr "Verwerk tans..."
 
 #: upload/templates/modeladmin/upload/package/inspect.html:93
 #: upload/templates/modeladmin/upload/package/inspect_.html:93
 msgid "Resolve errors"
-msgstr "Resolver errores"
+msgstr "Los foute op"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:95
 #: upload/templates/modeladmin/upload/package/inspect.html:178
 #: upload/templates/modeladmin/upload/package/inspect_.html:95
 #: upload/templates/modeladmin/upload/package/inspect_.html:178
 msgid "View report"
-msgstr "Ver informe"
+msgstr "Sien verslag"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:104
 #: upload/templates/modeladmin/upload/package/inspect_.html:104
 msgid "XML Validations"
-msgstr "Validaciones XML"
+msgstr "XML-validerings"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:108
 #: upload/templates/modeladmin/upload/package/inspect_.html:108
@@ -3151,84 +3122,81 @@ msgid ""
 "By default the system sets all the XML errors were accepted by the XML "
 "producer and will be corrected. In case of disagreement, review the errors "
 "and set a different opinion"
-msgstr ""
-"Por defecto, el sistema establece que todos los errores XML fueron aceptados "
-"por el productor XML y serán corregidos. En caso de desacuerdo, revisa los "
-"errores y establece una opinión diferente"
+msgstr "By verstek stel die stelsel dat alle XML-foute deur die XML-produsent aanvaar is en reggemaak sal word. In geval van meningsverskil, hersien die foute en stel 'n ander opinie"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:119
 #: upload/templates/modeladmin/upload/package/inspect_.html:119
 msgid "Accepted to fix"
-msgstr "Aceptado para corregir"
+msgstr "Aanvaar om reg te maak"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:120
 #: upload/templates/modeladmin/upload/package/inspect_.html:120
 msgid "Contested issues"
-msgstr "Problemas impugnados"
+msgstr "Betwiste kwessies"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:121
 #: upload/templates/modeladmin/upload/package/inspect_.html:121
 msgid "Declared impossible to fix"
-msgstr "Declarado imposible de corregir"
+msgstr "Onmoontlik verklaar om reg te maak"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:139
 msgid "Processing... Reload page"
-msgstr "Procesando... Recargar página"
+msgstr "Verwerk tans... Herlaai bladsy"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:143
 #: upload/templates/modeladmin/upload/package/inspect_.html:143
 msgid "Error review completed"
-msgstr "Revisión de errores completada"
+msgstr "Fouthersiening voltooi"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:146
 #: upload/templates/modeladmin/upload/package/inspect_.html:146
 msgid "Review the XML errors"
-msgstr "Revisar los errores XML"
+msgstr "Hersien die XML-foute"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:148
 #: upload/templates/modeladmin/upload/package/inspect_.html:148
 msgid "View the XML errors"
-msgstr "Ver los errores XML"
+msgstr "Sien die XML-foute"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:153
 #: upload/templates/modeladmin/upload/package/inspect_.html:153
 msgid "Pending conclusion"
-msgstr "Conclusión pendiente"
+msgstr "Hangende afhandeling"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:166
 #: upload/templates/modeladmin/upload/package/inspect_.html:166
 #: upload/wagtail_hooks.py:548
 msgid "Validations"
-msgstr "Validaciones"
+msgstr "Validerings"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:190
 #: upload/templates/modeladmin/upload/package/inspect_.html:190
 msgid "Processing validations... Reload page. "
-msgstr "Procesando validaciones... Recargar página. "
+msgstr "Verwerk validerings tans... Herlaai bladsy. "
 
 #: upload/templates/modeladmin/upload/package/inspect.html:195
 #: upload/templates/modeladmin/upload/package/inspect_.html:195
 msgid "Validations finished!"
-msgstr "¡Validaciones finalizadas!"
+msgstr "Validerings voltooi!"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:198
 #: upload/templates/modeladmin/upload/package/inspect_.html:198
 msgid "Summary"
-msgstr "Resumen"
+msgstr "Opsomming"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:203
 #: upload/templates/modeladmin/upload/package/inspect_.html:203
 msgid "XML warnings"
-msgstr "Advertencias XML"
+msgstr "XML-waarskuwings"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:223
 #: upload/templates/modeladmin/upload/package/inspect_.html:223
 msgid "Download XML errors report"
-msgstr "Descargar informe de errores XML"
+msgstr "Laai XML-foutverslag af"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:4
 msgid "Preview (optimized package)"
-msgstr "Vista previa (paquete optimizado)"
+msgstr "Voorskou (geoptimaliseerde pakket)"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:8
 msgid "HTML"
@@ -3236,11 +3204,11 @@ msgstr "HTML"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:18
 msgid "Preview HTML "
-msgstr "Vista previa HTML "
+msgstr "Voorskou HTML"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:35
 msgid "View XML "
-msgstr "Ver XML "
+msgstr "Sien XML"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:43
 msgid "PDF"
@@ -3248,53 +3216,53 @@ msgstr "PDF"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:51
 msgid "Download PDF"
-msgstr "Descargar PDF"
+msgstr "Laai PDF af"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:4
 msgid "Download"
-msgstr "Descargar"
+msgstr "Laai af"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:12
 msgid "Original package"
-msgstr "Paquete original"
+msgstr "Oorspronklike pakket"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:20
 msgid "Optimized package"
-msgstr "Paquete optimizado"
+msgstr "Geoptimaliseerde pakket"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:19
 msgid "Digital assets"
-msgstr "Activos digitales"
+msgstr "Digitale bates"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:26
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:62
 msgid "Is present in the package?"
-msgstr "¿Está presente en el paquete?"
+msgstr "Is teenwoordig in die pakket?"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:38
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:72
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:77
 msgid "Yes"
-msgstr "Sí"
+msgstr "Ja"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:40
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:74
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:79
 msgid "No"
-msgstr "No"
+msgstr "Nee"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:46
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:85
 msgid "File is missing"
-msgstr "Falta el archivo"
+msgstr "Lêer ontbreek"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:60
 msgid "Expected filename"
-msgstr "Nombre de archivo esperado"
+msgstr "Verwagte lêernaam"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:61
 msgid "Is the main Language"
-msgstr "¿Es el idioma principal?"
+msgstr "Is die hooftaal"
 
 #: upload/templates/modeladmin/upload/package/validation_report/edit.html:15
 #: upload/templates/modeladmin/upload/validationreport/edit.html:15
@@ -3302,115 +3270,115 @@ msgstr "¿Es el idioma principal?"
 #: upload/templates/modeladmin/upload/xmlinforeport/edit.html:15
 #, python-format
 msgid "Got to %(model_name)s list"
-msgstr "Ir a la lista de %(model_name)s"
+msgstr "Gaan na %(model_name)s lys"
 
 #: upload/templates/modeladmin/upload/validationreport/edit.html:9
 #: upload/templates/modeladmin/upload/xmlerrorreport/edit.html:9
 #: upload/templates/modeladmin/upload/xmlinforeport/edit.html:9
 msgid "Back to package validations"
-msgstr "Volver a las validaciones del paquete"
+msgstr "Terug na pakketvaliderings"
 
 #: upload/templates/modeladmin/upload/validationresult/inspect.html:15
 msgid "Back to related package"
-msgstr "Volver al paquete relacionado"
+msgstr "Terug na verwante pakket"
 
 #: upload/templates/modeladmin/upload/validationresult/inspect.html:37
 msgid "Missing file"
-msgstr "Archivo faltante"
+msgstr "Ontbrekende lêer"
 
 #: upload/templates/modeladmin/upload/validationresult/inspect.html:46
 msgid "Snippet"
-msgstr "Fragmento"
+msgstr "Snipsel"
 
 #: upload/validation/html_validation.py:22
 msgid "Web page `{}` does not exist"
-msgstr "La página web `{}` no existe"
+msgstr "Webbladsy `{}` bestaan nie"
 
 #: upload/validation/html_validation.py:29
 #: upload/validation/rendition_validation.py:23
 msgid "It was expected to find `{}` in {} ({})"
-msgstr "Se esperaba encontrar `{}` en {} ({})"
+msgstr "Daar is verwag om `{}` te vind in {} ({})"
 
 #: upload/validation/rendition_validation.py:30
 msgid "It was expected to find `{}` in XML ({})"
-msgstr "Se esperaba encontrar `{}` en XML ({})"
+msgstr "Daar is verwag om `{}` te vind in XML ({})"
 
 #: upload/validation/xml_data_checker.py:46
 msgid "XML Info Report"
-msgstr "Informe de información XML"
+msgstr "XML-inligtingsverslag"
 
 #: upload/views.py:30 upload/views.py:149 upload/views.py:213
 msgid "Operation not available"
-msgstr "Operación no disponible"
+msgstr "Operasie nie beskikbaar nie"
 
 #: upload/views.py:119
 msgid "Success ..."
-msgstr "Éxito ..."
+msgstr "Sukses ..."
 
 #: upload/views.py:147
 msgid "The decision was executed as planned"
-msgstr "La decisión se ejecutó según lo planeado"
+msgstr "Die besluit is soos beplan uitgevoer"
 
 #: upload/views.py:148
 msgid "There was an impediment to executing the decision."
-msgstr "Hubo un impedimento para ejecutar la decisión."
+msgstr "Daar was 'n struikelblok om die besluit uit te voer."
 
 #: upload/views.py:204
 msgid "Article successfully published"
-msgstr "Artículo publicado exitosamente"
+msgstr "Artikel suksesvol gepubliseer"
 
 #: upload/views.py:205
 msgid "Failed to publish the article. Please try again."
-msgstr "Error al publicar el artículo. Por favor, intente de nuevo."
+msgstr "Kon nie die artikel publiseer nie. Probeer asseblief weer."
 
 #: upload/views.py:231
 msgid "Package has been deposited"
-msgstr "El paquete ha sido depositado"
+msgstr "Pakket is gedeponeer"
 
 #: upload/views.py:237
 msgid "The XML package needs review and comment"
-msgstr "El paquete XML necesita revisión y comentarios"
+msgstr "Die XML-pakket benodig hersiening en kommentaar"
 
 #: upload/views.py:244
 msgid "Package deposit failed due to errors"
-msgstr "El depósito del paquete falló debido a errores"
+msgstr "Pakket-deposito het misluk weens foute"
 
 #: upload/views.py:248
 msgid "Correct package based on report and resubmit"
-msgstr "Corregir el paquete basado en el informe y volver a enviar"
+msgstr "Korrigeer pakket op grond van verslag en dien weer in"
 
 #: upload/views.py:320
 msgid "You do not have permission to assign packages."
-msgstr "No tienes permiso para asignar paquetes."
+msgstr "U het nie toestemming om pakkette toe te wys nie."
 
 #: upload/views.py:341
 msgid "You do not have permission to archive packages."
-msgstr "No tienes permiso para archivar paquetes."
+msgstr "U het nie toestemming om pakkette te argiveer nie."
 
 #: upload/views.py:348
 msgid "Package was archived."
-msgstr "El paquete fue archivado."
+msgstr "Pakket is geargiveer."
 
 #: upload/views.py:352
 msgid "Unable to archive package which status = {}."
-msgstr "No se puede archivar el paquete cuyo estado = {}."
+msgstr "Kan nie pakket argiveer met status = {} nie."
 
 #: upload/wagtail_hooks.py:52
 msgid "Package upload"
-msgstr "Carga de paquete"
+msgstr "Pakket-oplaai"
 
 #: upload/wagtail_hooks.py:432
 msgid "XML Info Reports"
-msgstr "Informes de información XML"
+msgstr "XML-inligtingsverslae"
 
 #: upload/wagtail_hooks.py:581
 msgid "Upload Validator"
-msgstr "Validador de carga"
+msgstr "Oplaai-valideerder"
 
 #: upload/wagtail_hooks.py:617
 msgid "Archived Packages"
-msgstr "Paquetes archivados"
+msgstr "Gearchiveerde Pakkette"
 
 #: upload/wagtail_hooks.py:693
 msgid "Error management"
-msgstr "Gestión de errores"
+msgstr "Foutbestuur"

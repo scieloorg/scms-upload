@@ -399,7 +399,10 @@ BASE_URL = "https://core"
 LANGUAGES = [
     ("en", "English"),
     ("es", "Spanish"),
-    ("pt-BR", "Portuguese"),
+    ("pt-BR", "Brazilian Portuguese"),
+    ("pt-PT", "Portuguese"),
+    ("af-ZA", "Afrikaans"),
+    ("ru-RU", "Russian"),
     ("it", "Italian"),
 ]
 
@@ -408,7 +411,10 @@ WAGTAIL_I18N_ENABLED = True
 WAGTAIL_CONTENT_LANGUAGES = [
     ("en", "English"),
     ("es", "Spanish"),
-    ("pt-BR", "Portuguese"),
+    ("pt-BR", "Brazilian Portuguese"),
+    ("pt-PT", "Portuguese"),
+    ("af-ZA", "Afrikaans"),
+    ("ru-RU", "Russian"),
     ("it", "Italian"),
 ]
 

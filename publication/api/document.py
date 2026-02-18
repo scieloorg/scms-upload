@@ -46,7 +46,6 @@ class ArticlePayload:
     def __init__(self, data):
         self.data = data
         self.data["authors_meta"] = None
-        self.data["authors"] = None
         self.data["translated_titles"] = None
         self.data["translated_sections"] = None
         self.data["abstract"] = None
@@ -118,22 +117,10 @@ class ArticlePayload:
         # authors_meta"] = EmbeddedDocumentListField(AuthorMeta))
         self.data["authors_meta"] = self.data["authors_meta"] or []
         author = {}
-        author["surname"] = surname
-        author["given_names"] = given_names
-        author["suffix"] = suffix
         author["affiliation"] = affiliation
         author["orcid"] = orcid
+        author["name"] = format_author_name(surname, given_names, suffix)
         self.data["authors_meta"].append(author)
-
-        # # author
-        # if self.data["authors"] is None:
-        #     self.data["authors"] = []
-        # _author = format_author_name(
-        #     surname,
-        #     given_names,
-        #     suffix,
-        # )
-        # self.data["authors"].append(_author)
 
     def add_collab(self, name):
         # collab
@@ -160,6 +147,8 @@ class ArticlePayload:
 
     def add_abstract(self, language, text):
         # abstracts"] = EmbeddedDocumentListField(Abstract))
+        if not text:
+            return
         if self.data["abstracts"] is None:
             self.data["abstracts"] = []
         if self.data["abstract"] is None:

@@ -27,6 +27,7 @@ from article.models import Article
 from collection import choices as collection_choices
 from collection.models import Collection
 from core.models import CommonControlField
+from core.utils.file_utils import delete_files
 from htmlxml.models import HTMLXML
 from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
@@ -194,7 +195,7 @@ class ProcReport(CommonControlField):
     task_name = models.CharField(
         _("Procedure name"), max_length=64, null=True, blank=True
     )
-    file = models.FileField(upload_to=proc_report_directory_path, null=True, blank=True)
+    file = models.FileField(upload_to=proc_report_directory_path, null=True, blank=True, max_length=300)
     report_date = models.CharField(
         _("Identification"), max_length=34, null=True, blank=True
     )
@@ -997,11 +998,15 @@ class IssueProc(BaseProc, ClusterableModel):
     )
 
     def __unicode__(self):
-        return f"{self.journal_proc and self.journal_proc.acron} {self.issue_folder} ({self.collection})"
-
+        if self.journal_proc:
+            return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection})"
+        return f"{self.pid} ({self.collection})"
+    
     def __str__(self):
-        return f"{self.journal_proc and self.journal_proc.acron} {self.issue_folder} ({self.collection})"
-
+        if self.journal_proc:
+            return f"{self.journal_proc.acron} {self.issue_folder} ({self.collection})"
+        return f"{self.pid} ({self.collection})"
+    
     journal_proc = models.ForeignKey(
         JournalProc, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -1229,13 +1234,16 @@ class IssueProc(BaseProc, ClusterableModel):
                 force_update=force_update,
             )
             failures = migration_result.get("exceptions", [])
+            migrated = migration_result.get("migrated") or []
             self.issue_files.clear()
             self.issue_files.set(migration_result.get("migrated", []))
-            self.files_status = (
-                tracker_choices.PROGRESS_STATUS_PENDING
-                if failures
-                else tracker_choices.PROGRESS_STATUS_DONE
-            )
+
+            if migrated and failures:
+                self.files_status = tracker_choices.PROGRESS_STATUS_PENDING
+            elif migrated:
+                self.files_status = tracker_choices.PROGRESS_STATUS_DONE
+            else:
+                self.files_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
 
             operation.finish(
@@ -1354,6 +1362,9 @@ class IssueProc(BaseProc, ClusterableModel):
                 force_update=True,  # todos os registros encontrados em acron.id no momento
             ).count()
             detail["total_document_records"] = total_document_records
+
+            force_update = ArticleProc.objects.filter(issue_proc=self).count() < total_document_records
+
             id_file_records = IdFileRecord.document_records_to_migrate(
                 collection=self.collection,
                 issue_pid=self.pid,
@@ -1533,6 +1544,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         null=True,
         blank=True,
         help_text=_("Native XML + modifications or converted XML from HTML"),
+        max_length=300,
     )
 
     base_form_class = ProcAdminModelForm
@@ -1579,6 +1591,16 @@ class ArticleProc(BaseProc, ClusterableModel):
         params = {"issue_proc": issue_proc}
         if article_pids:
             params["pid__in"] = article_pids
+        if issue_proc.docs_status not in (
+            tracker_choices.PROGRESS_STATUS_DONE,
+            tracker_choices.PROGRESS_STATUS_PENDING,
+        ):
+            return
+        if issue_proc.files_status not in (
+            tracker_choices.PROGRESS_STATUS_DONE,
+            tracker_choices.PROGRESS_STATUS_PENDING,
+        ):
+            return
         cls.objects.filter(**params).update(
             xml_status=tracker_choices.PROGRESS_STATUS_REPROC,
             sps_pkg_status=tracker_choices.PROGRESS_STATUS_REPROC,
@@ -1587,19 +1609,18 @@ class ArticleProc(BaseProc, ClusterableModel):
             public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC,
         )
 
-    def set_status(self, new_status=None):
-        new_status = new_status or tracker_choices.PROGRESS_STATUS_REPROC
-        if self.xml_status == new_status:
-            self.sps_pkg_status = new_status
+    def set_status(self):
+        if self.xml_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
 
-        if self.sps_pkg_status == new_status:
-            self.migration_status = new_status
+        if self.sps_pkg_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.migration_status = tracker_choices.PROGRESS_STATUS_REPROC
 
-        if self.migration_status == new_status:
-            self.qa_ws_status = new_status
+        if self.migration_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.qa_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
 
-        if self.qa_ws_status == new_status:
-            self.public_ws_status = new_status
+        if self.qa_ws_status == tracker_choices.PROGRESS_STATUS_REPROC:
+            self.public_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
 
         self.save()
 
@@ -1647,9 +1668,9 @@ class ArticleProc(BaseProc, ClusterableModel):
             operation = self.start(user, "get xml")
 
             self.xml_status = tracker_choices.PROGRESS_STATUS_DOING
+            self.save()
             try:
-                os.unlink(self.processed_xml.file.path)
-                self.save()
+                delete_files(self.processed_xml.file.path)
             except Exception:
                 pass
 
@@ -1695,11 +1716,31 @@ class ArticleProc(BaseProc, ClusterableModel):
     def get_xml_from_native(self, detail):
         try:
             xml_with_pre = list(XMLWithPre.create(path=self.migrated_xml.file.path))[0]
+        except IndexError as e:
+            raise XMLVersionXmlWithPreError(
+                _("Unable to get xml_with_pre from native for {}: {}").format(self, e)
+            )
+        try:
+            # correção de fig/inline-graphic para fig/graphic
             detail["fix_inline_graphic_in_caption"] = fix_inline_graphic_in_caption(xml_with_pre.xmltree)
-            return xml_with_pre
         except Exception as e:
             logging.exception(e)
             raise
+        try:
+            article_publication_date = xml_with_pre.article_publication_date
+            if not article_publication_date or len(article_publication_date) != 10:
+                processing_date = self.migrated_data.document.processing_date
+                if processing_date:
+                    # adota a data de processamento do documento como data de publicação
+                    article_publication_date = datetime.strptime(processing_date, "%Y%m%d").strftime("%Y-%m-%d")
+                else:
+                    # completa a data de publicação com média de dia e/ou mes ausentes
+                    article_publication_date =  xml_with_pre.get_complete_publication_date()
+                xml_with_pre.article_publication_date = article_publication_date
+        except Exception as e:
+            logging.exception(e)
+            raise
+        return xml_with_pre
     
     def get_xml_from_html(self, user, detail):
         migrated_data = self.migrated_data
@@ -1710,9 +1751,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             n_references=len(classic_ws_doc.citations or []),
             record_types="|".join(classic_ws_doc.record_types or []),
         )
-        result = htmlxml.html_to_xml(user, self)
-        detail["html_to_xml"] = result
-        htmlxml.generate_report(user, self)
+        detail["html_to_xml"] = htmlxml.html_to_xml(user, self)
         self.xml_status = htmlxml.html2xml_status
         if os.path.isfile(htmlxml.file.path):
             return htmlxml.file.path
@@ -2028,8 +2067,8 @@ class ArticleProc(BaseProc, ClusterableModel):
 
     def migrate_article(self, user, force_update):
         if force_update:
-            self.xml_status = tracker_choices.PROGRESS_STATUS_TODO
-            self.set_status(tracker_choices.PROGRESS_STATUS_TODO)
+            self.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
+            self.set_status()
         if not self.get_xml(user):
             return None
         if not self.generate_sps_package(user):
