@@ -1,7 +1,8 @@
+# button_helper.py - ATUALIZADO
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-from wagtail.contrib.modeladmin.helpers import ButtonHelper
-
+# Mudança: wagtail.contrib.modeladmin -> wagtail_modeladmin
+from wagtail_modeladmin.helpers import ButtonHelper
 from . import choices
 
 
@@ -12,34 +13,6 @@ class UploadButtonHelper(ButtonHelper):
         "icon",
     ]
 
-    def assign(self, obj, classnames, label=None):
-        text = label or _("Assign")
-        return {
-            "url": reverse("upload:assign") + "?package_id=%s" % str(obj.id),
-            "label": text,
-            "classname": self.finalise_classname(classnames),
-            "title": text,
-        }
-
-    def finish_deposit_button(self, obj, classnames):
-        text = _("Finish deposit")
-        return {
-            "url": reverse("upload:finish_deposit") + "?package_id=%s" % str(obj.id),
-            "label": text,
-            "classname": self.finalise_classname(classnames),
-            "title": text,
-        }
-
-    def view_published_document(self, obj, classnames):
-        # TODO: A URL deve ser configurada para ver o documento publicado
-        text = _("View document")
-        return {
-            "url": "",
-            "label": text,
-            "classname": self.finalise_classname(classnames),
-            "title": text,
-        }
-
     def get_buttons_for_obj(
         self, obj, exclude=None, classnames_add=None, classnames_exclude=None
     ):
@@ -47,34 +20,80 @@ class UploadButtonHelper(ButtonHelper):
         This function is used to gather all available buttons.
         We append our custom button to the btns list.
         """
-        btns = super().get_buttons_for_obj(
-            obj, exclude, classnames_add, classnames_exclude
-        )
-
         ph = self.permission_helper
         usr = self.request.user
         url_name = self.request.resolver_match.url_name
-
+        print(f"urlname: {url_name}")
+        analyst_team_member = ph.user_is_analyst_team_member(usr, obj)
+        
+        exclude = ["delete"]
+        if not analyst_team_member:
+            exclude.append("edit")
+            
+        if url_name.endswith("_modeladmin_inspect"):
+            exclude.append("inspect")
+            
+        btns = super().get_buttons_for_obj(
+            obj, exclude, classnames_add, classnames_exclude
+        )
+        
+        if not obj.is_validation_finished:
+            return btns
+            
         classnames = []
         if url_name.endswith("_modeladmin_inspect"):
             classnames.extend(ButtonHelper.inspect_button_classnames)
         if url_name.endswith("_modeladmin_index"):
             classnames.extend(UploadButtonHelper.index_button_classnames)
-
-        if (
-            obj.status == choices.PS_READY_TO_BE_FINISHED
-            and ph.user_can_finish_deposit(usr, obj)
-            and url_name == "upload_package_modeladmin_inspect"
-        ):
-            btns.append(self.finish_deposit_button(obj, classnames))
-
-        if obj.status == choices.PS_PUBLISHED:
-            btns.append(self.view_published_document(obj, classnames))
-
-        if obj.assignee is None:
-            if obj.status == choices.PS_QA and ph.user_can_assign_package(usr, obj):
-                btns.append(self.assign(obj, classnames))
-        elif obj.assignee != usr:
-            btns.append(self.assign(obj, classnames, _("Reassign")))
-
+            
+        self.add_finish_deposit_button(btns, obj, classnames, url_name)
+        
+        if analyst_team_member:
+            self.add_assign_button(btns, obj, classnames)
+            self.add_archive_button(btns, obj, classnames)
+            
         return btns
+
+    def add_assign_button(self, btns, obj, classnames, label=None):
+        status = (
+            choices.PS_PENDING_QA_DECISION,
+            choices.PS_VALIDATED_WITH_ERRORS,
+        )
+        if obj.status in status:
+            text = label or _("Accept / Reject the package or delegate it")
+            btns.append(
+                {
+                    "url": reverse("upload:assign") + "?package_id=%s" % str(obj.id),
+                    "label": text,
+                    "classname": self.finalise_classname(classnames),
+                    "title": text,
+                }
+            )
+
+    def add_finish_deposit_button(self, btns, obj, classnames, url_name):
+        status = (choices.PS_VALIDATED_WITH_ERRORS,)
+        if obj.status in status and url_name == "upload_package_modeladmin_inspect":
+            text = _("Finish deposit")
+            btns.append(
+                {
+                    "url": reverse("upload:finish_deposit")
+                    + "?package_id=%s" % str(obj.id),
+                    "label": text,
+                    "classname": self.finalise_classname(classnames),
+                    "title": text,
+                }
+            )
+
+    def add_archive_button(self, btns, obj, classnames, label=None):
+        status = (choices.PS_UNEXPECTED,)
+        if obj.status in status:
+            text = label or _("Archive")
+            btns.append(
+                {
+                    "url": reverse("upload:archive_package")
+                    + "?package_id=%s" % str(obj.id),
+                    "label": text,
+                    "classname": self.finalise_classname(classnames),
+                    "title": text,
+                }
+            )
