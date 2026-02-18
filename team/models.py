@@ -4,13 +4,10 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-from modelcluster.fields import ParentalKey
-from modelcluster.models import ClusterableModel
-from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
+from wagtail.admin.panels import FieldPanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from collection.models import Collection
-from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from team.forms import CollectionTeamMemberModelForm
 
@@ -29,11 +26,11 @@ class TeamRole(models.TextChoices):
 def has_permission(user=None):
     try:
         if not user:
-            logging.info(f"has_permission: collection")
+            logging.info("has_permission: collection")
             return Collection.objects.filter(acron__in=ALLOWED_COLLECTIONS).exists()
-        logging.info(f"has_permission: user")
+        logging.info("has_permission: user")
         return CollectionTeamMember.has_upload_permission(user)
-    except Exception as e:
+    except Exception:
         return False
 
 
@@ -112,7 +109,7 @@ class CollectionTeamMember(TeamMember):
             else:
                 for member in CollectionTeamMember.objects.filter(user=user):
                     yield member.collection
-        except Exception as e:
+        except Exception:
             return Collection.objects.all()
 
     @staticmethod

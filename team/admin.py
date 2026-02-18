@@ -1,4 +1,3 @@
-from django.contrib import admin
 from wagtail_modeladmin.options import ModelAdmin, modeladmin_register
 
 from team.models import (
