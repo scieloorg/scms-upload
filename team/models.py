@@ -129,6 +129,7 @@ class Company(VisualIdentityMixin, CommonControlField):
     """
     name = models.CharField(_("Company Name"), max_length=255, unique=True)
     description = models.TextField(_("Description"), blank=True, null=True)
+    personal_contact = models.CharField(_("Personal Contact"), max_length=30, blank=True, null=True)
     contact_email = models.EmailField(_("Contact Email"), blank=True, null=True)
     contact_phone = models.CharField(_("Contact Phone"), max_length=50, blank=True, null=True)
     certified_since = models.DateField(_("Certified Since"), blank=True, null=True)
@@ -147,6 +148,7 @@ class Company(VisualIdentityMixin, CommonControlField):
         FieldPanel("description"),
         FieldPanel("url"),
         FieldPanel("logo"),
+        FieldPanel("personal_contact"),
         FieldPanel("contact_email"),
         FieldPanel("contact_phone"),
         FieldPanel("certified_since"),
