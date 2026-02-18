@@ -2,7 +2,9 @@ import logging
 import os
 import sys
 import traceback
+from io import BytesIO
 from functools import cached_property
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from django.core.files.base import ContentFile
 from django.db import models
@@ -21,6 +23,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
+from core.utils.file_utils import delete_files
 from migration.models import MigratedArticle
 from package.models import BasicXMLFile
 from scielo_classic_website.classic_ws import Document
@@ -180,15 +183,6 @@ def format_code_(data):
 
 
 def format_code(cols):
-    # xml = ""
-    # for item in cols["xml"]:
-    #     xml += f"<li><pre><code>{format_code_(item)}</code></pre></li>"
-
-    # if xml:
-    #     xml = f"<ul>{xml}</ul>"
-
-    # cols["html"] = "<pre><code>" + format_code_(cols["html"]) + "</code></pre>"
-    # cols["xml"] = xml
     yield "<hr/>"
     yield "<h4>html</h4>"
     yield "<div><pre><code>" + format_code_(cols["html"]) + "</code></pre></div>"
@@ -199,20 +193,30 @@ def format_code(cols):
 
 def body_and_back_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
-    migrated_article = instance.bb_parent.migrated_article
+    try:
+        version = instance.version
+        migrated_article = instance.bb_parent.migrated_article
+    except AttributeError:
+        version = None
+        migrated_article = instance.migrated_article
     pkg_path = (
+        "classic_website/"
+        f"{migrated_article.collection.acron}/html2xml/"
         f"{migrated_article.document.journal.acronym}/"
         f"{migrated_article.document.issue.issue_label}/"
-        f"{migrated_article.pkg_name}"
+        f"{migrated_article.pkg_name}/bb"
     )
-    return f"classic_website/{migrated_article.collection.acron}/html2xml/{pkg_path}/bb/{instance.version}/{filename}"
+    
+    if version:
+        return f"{pkg_path}/{version}/{filename}"
+    return f"{pkg_path}/{filename}"
 
 
 class BodyAndBackFile(BasicXMLFile, Orderable):
     bb_parent = ParentalKey("HTMLXML", related_name="bb_file")
 
     file = models.FileField(
-        upload_to=body_and_back_directory_path, null=True, blank=True
+        upload_to=body_and_back_directory_path, null=True, blank=True, max_length=300
     )
     version = models.IntegerField()
 
@@ -280,12 +284,13 @@ class BodyAndBackFile(BasicXMLFile, Orderable):
 
 def generated_xml_report_directory_path(instance, filename):
     migrated_article = instance.migrated_article
-    pkg_path = (
+    return (
+        f"classic_website/{migrated_article.collection.acron}/html2xml/"
         f"{migrated_article.document.journal.acronym}/"
         f"{migrated_article.document.issue.issue_label}/"
-        f"{migrated_article.pkg_name}"
+        f"{migrated_article.pkg_name}/"
+        f"report/{filename}"
     )
-    return f"classic_website/{migrated_article.collection.acron}/html2xml/{pkg_path}/report/{filename}"
 
 
 class Html2xmlAnalysis(models.Model):
@@ -592,14 +597,29 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         default=choices.HTML2XML_QA_NOT_EVALUATED,
     )
     report = models.FileField(
-        upload_to=generated_xml_report_directory_path, null=True, blank=True
+        upload_to=generated_xml_report_directory_path, null=True, blank=True, max_length=300
     )
     n_paragraphs = models.IntegerField(default=0)
     n_references = models.IntegerField(default=0)
     record_types = models.CharField(max_length=16, blank=True, null=True)
     html_translation_langs = models.CharField(max_length=64, blank=True, null=True)
     pdf_langs = models.CharField(max_length=64, blank=True, null=True)
-
+    bb_init_file = models.FileField(
+        upload_to=body_and_back_directory_path,
+        null=True,
+        blank=True,
+        verbose_name=_("Initial HTML file"),
+        help_text=_("Initial HTML structured in body, back, ref-list"),
+        max_length=300,
+    )
+    conversion_steps_zip_file = models.FileField(
+        upload_to=body_and_back_directory_path, 
+        null=True, 
+        blank=True,
+        verbose_name=_("Body and Back ZIP file"),
+        help_text=_("ZIP file containing all body and back XML versions"),
+        max_length=300,
+    )
     panel_status = [
         FieldPanel("html2xml_status"),
         FieldPanel("quality"),
@@ -610,6 +630,8 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         FieldPanel("record_types"),
     ]
     panel_bb_files = [
+        FieldPanel("bb_init_file"),
+        FieldPanel("conversion_steps_zip_file"),
         InlinePanel("bb_file", label=_("Body and Back XML files")),
     ]
     panel_output = [
@@ -638,6 +660,14 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             models.Index(fields=["quality"]),
             models.Index(fields=["migrated_article"]),
         ]
+        
+        constraints = [
+            models.UniqueConstraint(
+                fields=["migrated_article"],
+                name="unique_migrated_article",
+                condition=models.Q(migrated_article__isnull=False),
+            ),
+        ]
 
     @property
     def data(self):
@@ -654,9 +684,38 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
     def directory_path(self):
         return f"classic_website/{self.migrated_article.collection.acron}/html2xml/{self.migrated_article.path}"
 
+    def get_meaningful_package_name(self):
+        """Gera um nome de pacote significativo incluindo journal acron, issue folder e pkg_name"""
+        if not self.migrated_article:
+            return "unknown_package"
+        
+        try:
+            journal_acron = self.migrated_article.document.journal.acronym
+            issue_label = self.migrated_article.document.issue.issue_label
+            pkg_name = self.migrated_article.pkg_name
+            return f"{self.migrated_article.collection.acron}_{journal_acron}_{issue_label}_{pkg_name}"
+        except AttributeError:
+            # Fallback para caso algum atributo não exista
+            return self.migrated_article.pkg_name or "unknown_package"
+
     @property
     def created_updated(self):
         return self.updated or self.created
+
+    # @property
+    # def has_images(self):
+    #     """Retorna True se o HTML contém imagens"""
+    #     return (self.html_img_total or 0) > 0
+    
+    # @property
+    # def has_tables(self):
+    #     """Retorna True se o HTML contém tabelas"""
+    #     return (self.html_table_total or 0) > 0
+    
+    # @property
+    # def has_attention_demands(self):
+    #     """Retorna True se há pontos de atenção"""
+    #     return (self.attention_demands or 0) > 0
 
     @classmethod
     def get(
@@ -664,7 +723,14 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         migrated_article=None,
     ):
         if migrated_article:
-            return cls.objects.get(migrated_article=migrated_article)
+            try:
+                return cls.objects.get(migrated_article=migrated_article)
+            except cls.MultipleObjectsReturned:
+                # If multiple objects exist, return the most recently updated one
+                # This handles legacy duplicate data gracefully
+                return cls.objects.filter(
+                    migrated_article=migrated_article
+                ).order_by("-updated").first()
         raise ValueError("HTMLXML.get requires migrated_article")
 
     @classmethod
@@ -680,6 +746,17 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         try:
             obj = cls.get(migrated_article)
             obj.updated_by = user
+            
+            # Clean up duplicates if they exist by keeping only the most recent
+            duplicates = cls.objects.filter(
+                migrated_article=migrated_article
+            ).exclude(pk=obj.pk)
+            if duplicates.exists():
+                logging.warning(
+                    f"Found {duplicates.count()} duplicate HTMLXML records for "
+                    f"migrated_article {migrated_article}. Deleting duplicates."
+                )
+                duplicates.delete()
         except cls.DoesNotExist:
             obj = cls()
             obj.migrated_article = migrated_article
@@ -707,12 +784,20 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         user,
         article_proc,
     ):
+        detail = {}
+        document = None
+        xml_content = None
+        report_content = None
+        op = None
+        
         try:
-            detail = {}
             op = article_proc.start(user, "html_to_xml")
+            translations = article_proc.translations or {}
+            translation_langs = list(translations.keys())
+
             self.html2xml_status = tracker_choices.PROGRESS_STATUS_DOING
             self.html_translation_langs = "-".join(
-                sorted(article_proc.translations.keys())
+                sorted(translation_langs)
             )
             self.pdf_langs = "-".join(
                 sorted(
@@ -724,198 +809,203 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             )
             self.save()
 
-            detail = {}
+            detail["exceptions"] = []
+            detail["translation languages"] = translation_langs
+            detail["xml_name"] = article_proc.pkg_name + ".xml"
+
+            # Inicializar document
             document = Document(article_proc.migrated_data.data)
-            document._translated_html_by_lang = article_proc.translations
+            self._generate_body_and_back(document, translations, detail)
+            xml_content = self._generate_xml(document, detail["xml_name"], detail)
 
-            body_and_back_created = self._generate_xml_body_and_back(
-                user, article_proc, document
-            )
-            xml_created = self._generate_xml_from_html(user, article_proc, document)
-
-            detail = {
-                "xml_created": xml_created,
-                "body_and_back": body_and_back_created,
-                "exceptions": document.exceptions,
-            }
-            if xml_created:
-                if document.exceptions:
-                    self.html2xml_status = tracker_choices.PROGRESS_STATUS_PENDING
+            report_content = None
+            if xml_content:
+                detail["xml_created"] = True
+                if detail.get("xml_exceptions"):
+                    detail["status"] = tracker_choices.PROGRESS_STATUS_PENDING
                 else:
-                    self.html2xml_status = tracker_choices.PROGRESS_STATUS_DONE
-            else:
-                self.html2xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
+                    detail["status"] = tracker_choices.PROGRESS_STATUS_DONE
+                self.html2xml_status = detail["status"]
+                self.save()
+                report_content = self.generate_report(str(article_proc), article_proc.issue_proc.journal_proc.acron, detail)
+    
+            self._save_zip(
+                article_proc.pkg_name,
+                document.xml_body_and_back,
+                xml_content or "",
+                report_content,
+                detail.get("exceptions"),
+                detail,
+            )
+            exception = None
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            exception = traceback.format_exc()
+            self.html2xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
-            detail["status"] = self.html2xml_status
+
+        if op:
             op.finish(
                 user,
-                completed=self.html2xml_status == tracker_choices.PROGRESS_STATUS_DONE,
-                exception=None,
+                completed=detail.get("xml_created") or False,
+                exception=exception,
                 message_type=None,
                 message=None,
                 exc_traceback=None,
                 detail=detail,
             )
-            return detail
+        return detail
 
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
+    def _generate_body_and_back(self, document, translations, detail):
+        # Inicializar document
+        document._translated_html_by_lang = translations
+        document.generate_body_and_back_from_html(translations)
 
-            self.html2xml_status = tracker_choices.PROGRESS_STATUS_BLOCKED
-            self.save()
-            op.finish(
-                user,
-                completed=False,
-                exception=e,
-                message_type=None,
-                message=None,
-                exc_traceback=exc_traceback,
-                detail=detail,
-            )
+        if document.exceptions:    
+            detail["body_and_back_exceptions"] = document.exceptions
+            detail["exceptions"].extend(document.exceptions)
+
+        index = 1
+        if not document.xml_body_and_back:
+            index = 0
+            document.xml_body_and_back = ["<article><body></body><back></back></article>"]
+        self.save_bb_init_file(document, index)
+
+    def _generate_xml(self, document, xml_filename, detail):
+        xml_content = document.generate_full_xml(None).decode("utf-8")
+        if not xml_content:
+            detail["xml_exceptions"] = document.exceptions
+            detail["exceptions"].extend(document.exceptions)
+            return None
+        self.save_file(xml_filename, xml_content, True)
+        return xml_content   
 
     @property
     def initial_html_tree(self):
-        # o bb_file[0] contém o HTML original dentro de CDATA então não cria uma árvore de elementos
-        # o bb_file[1] contém HTML original estruturado em body, back, ref-list
-        item = list(self.bb_file.all())[1]
-        for xml_with_pre in XMLWithPre.create(path=item.file.path):
-            return xml_with_pre.xmltree
-    
-    def generate_report(self, user, article_proc):
         try:
-            detail = {}
-            op = article_proc.start(user, "html_to_xml: generate report")
+            path = self.bb_init_file.path
+        except (ValueError, AttributeError):
+            try:
+                path = list(self.bb_file.all())[1].file.path
+            except (AttributeError, IndexError, TypeError):
+                return None
+        for xml_with_pre in XMLWithPre.create(path=path):
+            return xml_with_pre.xmltree
+        
+    def save_bb_init_file(self, document, index):
+        try:
+            self.bb_init_file.delete(save=False)
+        except (FileNotFoundError, AttributeError, TypeError):
+            pass
+        try:
+            # o bb_file[0] contém o HTML original dentro de CDATA então não cria uma árvore de elementos
+            # o bb_file[1] contém HTML original estruturado em body, back, ref-list
+            self.bb_init_file.save(
+                "initial_html.xml",
+                ContentFile(document.xml_body_and_back[index]),
+                save=True,
+            )
+        except Exception as e:
+            logging.exception(e)
+
+    def generate_report(self, report_title, journal_acron, detail):
+        try:
             for xml_with_pre in XMLWithPre.create(path=self.file.path):
                 xml = xml_with_pre.xmltree
+                break
             html = self.initial_html_tree
-            self.evaluate_xml(html, xml, article_proc.issue_proc.journal_proc.acron)
-            self.save_report(self.html_report_content(title=article_proc))
-
+            self.evaluate_xml(html, xml, journal_acron)
+            report_content = self.html_report_content(title=report_title)
+            self.save_report(report_content)
             if self.attention_demands == 0:
                 self.quality = choices.HTML2XML_QA_AUTO_APPROVED
             else:
                 self.quality = choices.HTML2XML_QA_NOT_EVALUATED
             self.save()
-            op.finish(
-                user,
-                completed=True,
-                detail={
-                    "attention_demands": self.attention_demands,
-                    "quality": self.quality,
-                },
-            )
+            return report_content
         except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            logging.exception(e)
-            op.finish(
-                user,
-                completed=False,
-                exception=e,
-                message_type=None,
-                message=None,
-                exc_traceback=exc_traceback,
-                detail=detail,
+            error = traceback.format_exc()
+            detail["report_exceptions"] = (
+                _("Error generating HTML to XML report: {} {}").format(e, error)
             )
+            raise
 
-    def _generate_xml_body_and_back(self, user, article_proc, document):
-        """
-        Generate XML body and back from html_translation_langs and p records
-        """
+    def _save_zip(self, pkg_name, xml_body_and_back_items, xml_content, report_content, exceptions, detail):
+        errors = []
         try:
-            done = False
-            exceptions = []
-            operation = article_proc.start(user, "html_to_xml: generate xml body + back")
-
-            translations = document._translated_html_by_lang
-            detail = {}
-            detail["translation languages"] = list(translations.keys())
-
-            document.generate_body_and_back_from_html(translations)
-
-            if not document.xml_body_and_back:
-                document.xml_body_and_back = ["<article><body/><back/></article>"]
-
-            exceptions.extend(document.exceptions)
-            done = len(exceptions) == 0
+            # Criar o ZIP em memória
+            zip_buffer = BytesIO()
             
-            for item in self.bb_file.all():
-                item.delete()
+            with ZipFile(zip_buffer, 'w', ZIP_DEFLATED) as zip_file:
+                # Adicionar cada versão do XML ao ZIP
+                if xml_body_and_back_items:
+                    for i, xml_body_and_back in enumerate(xml_body_and_back_items, start=1):
+                        try:
+                            zip_file.writestr(f"step_{i:03d}.xml", xml_body_and_back)
+                        except Exception as e:
+                            errors.append(f"Failed to write step_{i:03d}.xml to zip: {e}")
+                
+                # Adicionar XML final se existir
+                if xml_content:
+                    try:
+                        zip_file.writestr(f"{pkg_name}.xml", xml_content)
+                    except Exception as e:
+                        errors.append(f"Failed to write {pkg_name}.xml to zip: {e}")
+                
+                # Adicionar relatório se existir
+                if report_content:
+                    try:
+                        zip_file.writestr(f"report.html", report_content)
+                    except Exception as e:
+                        errors.append(f"Failed to write report.html to zip: {e}")
+                
+                # Adicionar exceções se existirem
+                if exceptions:
+                    try:
+                        exception_text = "\n".join([
+                            f"[{i+1}] {exc}" for i, exc in enumerate(exceptions)
+                        ])
+                        zip_file.writestr(f"exceptions.txt", exception_text)
+                    except Exception as e:
+                        errors.append(f"Failed to write exceptions to zip file: {e}")
 
-            for i, xml_body_and_back in enumerate(document.xml_body_and_back, start=1):
-                BodyAndBackFile.create_or_update(
-                    user=user,
-                    bb_parent=self,
-                    version=i,
-                    file_content=xml_body_and_back,
-                    pkg_name=article_proc.pkg_name,
-                )
-                detail["xml_to_html_steps"] = i
+            # Salvar o arquivo ZIP no campo FileField
+            zip_content = zip_buffer.getvalue()
+            zip_filename = f"{pkg_name}.zip"
             
-            detail["exceptions"] = exceptions
-            operation.finish(
-                user,
-                completed=done,
-                exception=None,
-                message_type=None,
-                message=None,
-                detail=detail,
-            )
-            return done
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
+            # Deletar ZIP anterior se existir
             try:
-                operation.finish(
-                    user,
-                    completed=False,
-                    exception=e,
-                    message_type=None,
-                    message=None,
-                    exc_traceback=exc_traceback,
-                    detail=detail,
-                )
-            except AttributeError:
-                UnexpectedEvent.create(
-                    e=e,
-                    exc_traceback=exc_traceback,
-                    detail={
-                        "task": "htmlxml.models.HTMLXML._generate_xml_body_and_back",
-                        "article_proc": article_proc,
-                    },
-                )
+                self.conversion_steps_zip_file.delete(save=False)
+            except (FileNotFoundError, AttributeError, TypeError):
+                pass
             
-    def _generate_xml_from_html(self, user, article_proc, document):
+            # Salvar novo ZIP
+            self.conversion_steps_zip_file.save(zip_filename, ContentFile(zip_content), save=True)
+
+            # Limpar arquivos temporários de body and back
+            try:
+                for bb_file_ in self.bb_file.all():
+                    try:
+                        bb_file_.delete()
+                    except Exception as e:
+                        logging.exception(f"Error deleting body and back file {bb_file_.version}: {e}")
+            except Exception as e:
+                logging.exception(f"Error accessing body and back files for deletion: {e}")
+            detail["zip_exceptions"] = errors
+            return True
+
+        except Exception as e:
+            errors.append(f"Error creating or saving ZIP file: {e}")
+            detail["zip_exceptions"] = errors
+            return False
+
+    def save_report(self, report_content):
         try:
-            detail = {}
-            operation = article_proc.start(user, "html_to_xml: merge front + body + back")
-            detail["xml"] = article_proc.pkg_name + ".xml"
-            self.save_file(detail["xml"], document.generate_full_xml(None).decode("utf-8"), True)
-            detail["xml_exceptions"] = document.exceptions
-            completed = len(document.exceptions) == 0
-            operation.finish(user, completed, detail=detail)
-            return os.path.isfile(self.file.path)
+            delete_files(self.report.path)
         except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            try:
-                operation.finish(
-                    user,
-                    completed=False,
-                    exception=e,
-                    message_type=None,
-                    message=None,
-                    exc_traceback=exc_traceback,
-                    detail=detail,
-                )
-            except AttributeError:
-                UnexpectedEvent.create(
-                    e=e,
-                    exc_traceback=exc_traceback,
-                    detail={
-                        "task": "htmlxml.models.HTMLXML._generate_xml_from_html",
-                        "article_proc": article_proc,
-                    },
-                )
-
-    def save_report(self, content):
-        # content = json.dumps(data)
-        # self.report.save("html2xml.json", ContentFile(content))
-        self.report.save("html2xml.html", ContentFile(content))
+            pass
+        self.report.save(
+            "report.html",
+            ContentFile(report_content),
+            save=True,
+        )

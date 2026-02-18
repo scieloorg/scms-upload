@@ -278,3 +278,4 @@ core/media/
 .envs/*
 !.envs/.local/
 !.envs/.production/
+src/

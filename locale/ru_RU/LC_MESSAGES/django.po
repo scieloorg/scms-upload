@@ -8,247 +8,247 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-01-14 13:34+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: es\n"
+"POT-Creation-Date: 2026-01-14 13:40+0000\n"
+"PO-Revision-Date: 2026-01-14 14:00+0000\n"
+"Last-Translator: Gemini <ai@google.com>\n"
+"Language-Team: Russian <ru@li.org>\n"
+"Language: ru\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
 #: article/button_helper.py:11
 msgid "See instructions"
-msgstr "Ver instrucciones"
+msgstr "Посмотреть инструкции"
 
 #: article/button_helper.py:21 article/button_helper.py:84
 msgid "Submit change"
-msgstr "Enviar cambio"
+msgstr "Отправить изменения"
 
 #: article/button_helper.py:75
 msgid "Request change"
-msgstr "Solicitar cambio"
+msgstr "Запросить изменения"
 
 #: article/choices.py:8 upload/choices.py:111
 msgid "Update"
-msgstr "Actualización"
+msgstr "Обновить"
 
 #: article/choices.py:9 upload/choices.py:112
 msgid "Erratum"
-msgstr "Fe de erratas"
+msgstr "Опечатка (Erratum)"
 
 #: article/choices.py:22 article/choices.py:72
 msgid "Addendum"
-msgstr "Anexo"
+msgstr "Дополнение (Addendum)"
 
 #: article/choices.py:23
 msgid "Commentary article"
-msgstr "Artículo de comentario"
+msgstr "Статья-комментарий"
 
 #: article/choices.py:24
 msgid "Corrected article"
-msgstr "Artículo corregido"
+msgstr "Исправленная статья"
 
 #: article/choices.py:25 article/choices.py:92
 msgid "Letter"
-msgstr "Carta"
+msgstr "Письмо"
 
 #: article/choices.py:26
 msgid "Partial retraction"
-msgstr "Retractación parcial"
+msgstr "Частичный отзыв"
 
 #: article/choices.py:27
 msgid "Retracted article"
-msgstr "Artículo retractado"
+msgstr "Отозванная статья"
 
 #: article/choices.py:71
 msgid "Abstract"
-msgstr "Resumen"
+msgstr "Аннотация"
 
 #: article/choices.py:73
 msgid "Announcement"
-msgstr "Anuncio"
+msgstr "Объявление"
 
 #: article/choices.py:74
 msgid "Article-Commentary"
-msgstr "Artículo-Comentario"
+msgstr "Статья-комментарий"
 
 #: article/choices.py:75
 msgid "Book-Review"
-msgstr "Reseña de libro"
+msgstr "Рецензия на книгу"
 
 #: article/choices.py:76
 msgid "Books-Received"
-msgstr "Libros recibidos"
+msgstr "Полученные книги"
 
 #: article/choices.py:77
 msgid "Brief-Report"
-msgstr "Informe breve"
+msgstr "Краткий отчет"
 
 #: article/choices.py:78
 msgid "Calendar"
-msgstr "Calendario"
+msgstr "Календарь"
 
 #: article/choices.py:79
 msgid "Case-Report"
-msgstr "Reporte de caso"
+msgstr "Описание клинического случая"
 
 #: article/choices.py:80
 msgid "Clinical-Trial"
-msgstr "Ensayo clínico"
+msgstr "Клиническое испытание"
 
 #: article/choices.py:81
 msgid "Collection"
-msgstr "Colección"
+msgstr "Коллекция"
 
 #: article/choices.py:82
 msgid "Correction"
-msgstr "Corrección"
+msgstr "Исправление"
 
 #: article/choices.py:83
 msgid "Data-Article"
-msgstr "Artículo de datos"
+msgstr "Статья о данных"
 
 #: article/choices.py:84
 msgid "Discussion"
-msgstr "Discusión"
+msgstr "Дискуссия"
 
 #: article/choices.py:85
 msgid "Dissertation"
-msgstr "Disertación"
+msgstr "Диссертация"
 
 #: article/choices.py:86
 msgid "Editorial"
-msgstr "Editorial"
+msgstr "Редакционная статья"
 
 #: article/choices.py:87
 msgid "Editorial-Material"
-msgstr "Material editorial"
+msgstr "Редакционный материал"
 
 #: article/choices.py:88
 msgid "Guideline"
-msgstr "Directriz"
+msgstr "Руководство"
 
 #: article/choices.py:89
 msgid "In-Brief"
-msgstr "En breve"
+msgstr "Вкратце"
 
 #: article/choices.py:90
 msgid "Interview"
-msgstr "Entrevista"
+msgstr "Интервью"
 
 #: article/choices.py:91
 msgid "Introduction"
-msgstr "Introducción"
+msgstr "Введение"
 
 #: article/choices.py:93
 msgid "Meeting-Report"
-msgstr "Informe de reunión"
+msgstr "Отчет о встрече"
 
 #: article/choices.py:94
 msgid "News"
-msgstr "Noticias"
+msgstr "Новости"
 
 #: article/choices.py:95
 msgid "Obituary"
-msgstr "Obituario"
+msgstr "Некролог"
 
 #: article/choices.py:96
 msgid "Oration"
-msgstr "Oración"
+msgstr "Речь"
 
 #: article/choices.py:97
 msgid "Other"
-msgstr "Otro"
+msgstr "Другое"
 
 #: article/choices.py:98
 msgid "Partial-Retraction"
-msgstr "Retractación parcial"
+msgstr "Частичный отзыв"
 
 #: article/choices.py:99
 msgid "Product-Review"
-msgstr "Revisión de producto"
+msgstr "Обзор продукта"
 
 #: article/choices.py:100
 msgid "Rapid-Communication"
-msgstr "Comunicación rápida"
+msgstr "Краткое сообщение"
 
 #: article/choices.py:101
 msgid "Reply"
-msgstr "Respuesta"
+msgstr "Ответ"
 
 #: article/choices.py:102
 msgid "Reprint"
-msgstr "Reimpresión"
+msgstr "Перепечатка"
 
 #: article/choices.py:103
 msgid "Research-Article"
-msgstr "Artículo de investigación"
+msgstr "Научная статья"
 
 #: article/choices.py:104
 msgid "Retraction"
-msgstr "Retractación"
+msgstr "Отзыв (Retraction)"
 
 #: article/choices.py:105
 msgid "Review-Article"
-msgstr "Artículo de revisión"
+msgstr "Обзорная статья"
 
 #: article/choices.py:106
 msgid "Technical-Report"
-msgstr "Informe técnico"
+msgstr "Технический отчет"
 
 #: article/choices.py:107
 msgid "Translation"
-msgstr "Traducción"
+msgstr "Перевод"
 
 #: article/choices.py:125
 msgid "Erratum submitted"
-msgstr "Fe de erratas enviada"
+msgstr "Опечатка отправлена"
 
 #: article/choices.py:126
 msgid "Update submitted"
-msgstr "Actualización enviada"
+msgstr "Обновление отправлено"
 
 #: article/choices.py:127 upload/choices.py:77
 msgid "Required update"
-msgstr "Actualización requerida"
+msgstr "Требуется обновление"
 
 #: article/choices.py:128 upload/choices.py:76
 msgid "Required erratum"
-msgstr "Fe de erratas requerida"
+msgstr "Требуется исправление опечатки"
 
 #: article/choices.py:129
 msgid "Prepare to publish"
-msgstr "Preparar para publicar"
+msgstr "Подготовка к публикации"
 
 #: article/choices.py:130
 msgid "Ready to publish"
-msgstr "Listo para publicar"
+msgstr "Готово к публикации"
 
 #: article/choices.py:131
 msgid "Scheduled to publish"
-msgstr "Programado para publicar"
+msgstr "Запланировано к публикации"
 
 #: article/choices.py:132 migration/choices.py:17 upload/choices.py:87
 msgid "Published"
-msgstr "Publicado"
+msgstr "Опубликовано"
 
 #: article/controller.py:48
 msgid "Unable to update article {} {} {}"
-msgstr "No se puede actualizar el artículo {} {} {}"
+msgstr "Не удалось обновить статью {} {} {}"
 
 #: article/forms.py:37
 msgid "Inform the article that needs to be changed"
-msgstr "Informar el artículo que necesita ser cambiado"
+msgstr "Укажите статью, которую необходимо изменить"
 
 #: article/forms.py:42
 msgid "Comment what needs to be changed"
-msgstr "Comentar lo que necesita ser cambiado"
+msgstr "Прокомментируйте, что нужно изменить"
 
 #: article/forms.py:47
 msgid "Inform the type of change"
-msgstr "Informar el tipo de cambio"
+msgstr "Укажите тип изменения"
 
 #: article/models.py:50
 msgid "PID v3"
@@ -260,105 +260,105 @@ msgstr "PID v2"
 
 #: article/models.py:55
 msgid "Article type"
-msgstr "Tipo de artículo"
+msgstr "Тип статьи"
 
 #: article/models.py:64
 msgid "Article status"
-msgstr "Estado del artículo"
+msgstr "Статус статьи"
 
 #: article/models.py:70 issue/models.py:335
 msgid "Position"
-msgstr "Posición"
+msgstr "Позиция"
 
 #: article/models.py:74
 msgid "First publication date ISO"
-msgstr "Fecha de primera publicación ISO"
+msgstr "Дата первой публикации ISO"
 
 #: article/models.py:78
 msgid "Elocation ID"
-msgstr "ID de Elocation"
+msgstr "Elocation ID"
 
 #: article/models.py:80
 msgid "First page"
-msgstr "Primera página"
+msgstr "Первая страница"
 
 #: article/models.py:81
 msgid "Last page"
-msgstr "Última página"
+msgstr "Последняя страница"
 
 #: article/models.py:92
 msgid "sections"
-msgstr "secciones"
+msgstr "разделы"
 
 #: article/models.py:132
 msgid "Can make article change"
-msgstr "Puede hacer cambios en el artículo"
+msgstr "Может изменять статью"
 
 #: article/models.py:133
 msgid "Can request article change"
-msgstr "Puede solicitar cambios en el artículo"
+msgstr "Может запрашивать изменение статьи"
 
 #: article/models.py:600
 msgid "Article DOI with Language"
-msgstr "DOI del artículo con idioma"
+msgstr "DOI статьи с языком"
 
 #: article/models.py:601
 msgid "Article DOIs with Language"
-msgstr "DOIs del artículo con idioma"
+msgstr "DOI статей с языком"
 
 #: article/models.py:679
 msgid "Related item type"
-msgstr "Tipo de ítem relacionado"
+msgstr "Тип связанного элемента"
 
 #: article/models.py:715
 msgid "Change type"
-msgstr "Tipo de cambio"
+msgstr "Тип изменения"
 
 #: article/models.py:721
 msgid "Comment"
-msgstr "Comentario"
+msgstr "Комментарий"
 
 #: article/templates/modeladmin/article/article/inspect.html:6
 #: upload/templates/modeladmin/upload/package/inspect.html:31
 #: upload/templates/modeladmin/upload/package/inspect_.html:31
 #: upload/templates/modeladmin/upload/validationresult/inspect.html:20
 msgid "Details"
-msgstr "Detalles"
+msgstr "Детали"
 
 #: article/templates/modeladmin/article/article/inspect.html:21
 msgid "Article change instructions"
-msgstr "Instrucciones de cambio de artículo"
+msgstr "Инструкции по изменению статьи"
 
 #: article/templates/modeladmin/article/article/inspect.html:24
 msgid "Identifier"
-msgstr "Identificador"
+msgstr "Идентификатор"
 
 #: article/templates/modeladmin/article/article/inspect.html:26
 #: migration/models.py:821
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:25
 msgid "Type"
-msgstr "Tipo"
+msgstr "Тип"
 
 #: article/templates/modeladmin/article/article/inspect.html:28
 msgid "Deadline"
-msgstr "Fecha límite"
+msgstr "Срок"
 
 #: article/templates/modeladmin/article/article/inspect.html:30
 msgid "Instructions"
-msgstr "Instrucciones"
+msgstr "Инструкции"
 
 #: article/templates/modeladmin/article/article/inspect.html:36
 msgid "Available packages"
-msgstr "Paquetes disponibles"
+msgstr "Доступные пакеты"
 
 #: article/templates/modeladmin/article/article/inspect.html:40
 #: core/models.py:44
 msgid "Creator"
-msgstr "Creador"
+msgstr "Создатель"
 
 #: article/templates/modeladmin/article/article/inspect.html:41
 msgid "Created"
-msgstr "Creado"
+msgstr "Создано"
 
 #: article/templates/modeladmin/article/article/inspect.html:42
 #: htmlxml/models.py:583 htmlxml/models.py:621 package/models.py:341
@@ -367,7 +367,7 @@ msgstr "Creado"
 #: upload/models.py:1368 upload/models.py:1420
 #: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:22
 msgid "Status"
-msgstr "Estado"
+msgstr "Статус"
 
 #: article/templates/modeladmin/article/article/inspect.html:43
 #: upload/models.py:192
@@ -376,7 +376,7 @@ msgstr "Estado"
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:24
 #: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:21
 msgid "Category"
-msgstr "Categoría"
+msgstr "Категория"
 
 #: article/templates/modeladmin/article/article/inspect.html:44
 #: upload/templates/modeladmin/upload/package/inspect.html:74
@@ -388,349 +388,345 @@ msgstr "Categoría"
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:27
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:63
 msgid "Link"
-msgstr "Enlace"
+msgstr "Ссылка"
 
 #: article/templates/modeladmin/article/article/inspect.html:60
 msgid "Download package"
-msgstr "Descargar paquete"
+msgstr "Скачать пакет"
 
 #: article/wagtail_hooks.py:28 article/wagtail_hooks.py:127
 msgid "Articles"
-msgstr "Artículos"
+msgstr "Статьи"
 
 #: article/wagtail_hooks.py:68
 msgid "Related items"
-msgstr "Ítems relacionados"
+msgstr "Связанные элементы"
 
 #: article/wagtail_hooks.py:94
 msgid "Changes request"
-msgstr "Solicitud de cambios"
+msgstr "Запрос изменений"
 
 #: bigbang/tasks_scheduler.py:127
 msgid "Check article availability"
-msgstr "Verificar disponibilidad del artículo"
+msgstr "Проверить доступность статьи"
 
 #: bigbang/tasks_scheduler.py:150
 msgid "Create Journal, Issue e Article Processing items"
-msgstr "Crear ítems de Procesamiento de Revistas, Fascículos y Artículos"
+msgstr "Создать элементы обработки журнала, выпуска и статьи"
 
 #: bigbang/tasks_scheduler.py:176
 msgid "Migra e publica"
-msgstr "Migrar y publicar"
+msgstr "Миграция и публикация"
 
 #: bigbang/tasks_scheduler.py:202
 msgid "Migra e publica os periódicos"
-msgstr "Migrar y publicar las revistas"
+msgstr "Миграция и публикация периодических изданий"
 
 #: bigbang/tasks_scheduler.py:230
 msgid "Migra e publica os fascículos"
-msgstr "Migrar y publicar los fascículos"
+msgstr "Миграция и публикация выпусков"
 
 #: bigbang/tasks_scheduler.py:258
 msgid "Migra e publica artigos"
-msgstr "Migrar y publicar artículos"
+msgstr "Миграция и публикация статей"
 
 #: bigbang/tasks_scheduler.py:303
 msgid "Publica periódicos"
-msgstr "Publicar revistas"
+msgstr "Опубликовать периодические издания"
 
 #: bigbang/tasks_scheduler.py:328
 msgid "Publica fascículos"
-msgstr "Publicar fascículos"
+msgstr "Опубликовать выпуски"
 
 #: bigbang/tasks_scheduler.py:349
 msgid "Publica artigos"
-msgstr "Publicar artículos"
+msgstr "Опубликовать статьи"
 
 #: bigbang/tasks_scheduler.py:376
 msgid "Busca e cria periódicos"
-msgstr "Buscar y crear revistas"
+msgstr "Поиск и создание периодических изданий"
 
 #: bigbang/utils/scheduler.py:55 core/utils/scheduler.py:51
 msgid "Scheduled task: {}"
-msgstr "Tarea programada: {}"
+msgstr "Запланированная задача: {}"
 
 #: collection/choices.py:13 journal/choices.py:17
 msgid "Suspended"
-msgstr "Suspendido"
+msgstr "Приостановлено"
 
 #: collection/choices.py:14 collection/choices.py:23 journal/choices.py:18
 #: journal/choices.py:26
 msgid "Unknown"
-msgstr "Desconocido"
+msgstr "Неизвестно"
 
 #: collection/choices.py:15 journal/choices.py:19
 msgid "Ceased"
-msgstr "Cesado"
+msgstr "Прекращено"
 
 #: collection/choices.py:16 journal/choices.py:20
 msgid "Not informed"
-msgstr "No informado"
+msgstr "Не информировано"
 
 #: collection/choices.py:17 collection/choices.py:24 journal/choices.py:21
 #: journal/choices.py:27
 msgid "Current"
-msgstr "Actual"
+msgstr "Текущий"
 
 #: collection/choices.py:32
 msgid "QA"
-msgstr "Control de calidad"
+msgstr "Контроль качества (QA)"
 
 #: collection/choices.py:33
 msgid "PUBLIC"
-msgstr "PÚBLICO"
+msgstr "ПУБЛИЧНЫЙ"
 
 #: collection/models.py:33
 msgid "Collection Acronym"
-msgstr "Acrónimo de la colección"
+msgstr "Аббревиатура коллекции"
 
 #: collection/models.py:35
 msgid "Collection Name"
-msgstr "Nombre de la colección"
+msgstr "Название коллекции"
 
 #: collection/models.py:71
 msgid "Website URL"
-msgstr "URL del sitio web"
+msgstr "URL веб-сайта"
 
 #: collection/models.py:73
 msgid "Article API URL"
-msgstr "URL de la API de artículos"
+msgstr "API URL статьи"
 
 #: collection/models.py:76
 msgid "Issue API URL"
-msgstr "URL de la API de fascículos"
+msgstr "API URL выпуска"
 
 #: collection/models.py:79
 msgid "Journal API URL"
-msgstr "URL de la API de revistas"
+msgstr "API URL журнала"
 
 #: collection/models.py:82
 msgid "Get token API URL"
-msgstr "URL de la API para obtener token"
+msgstr "API URL получения токена"
 
 #: collection/models.py:87
 msgid "Purpose"
-msgstr "Propósito"
+msgstr "Цель"
 
 #: collection/models.py:118
 msgid "EndPoints"
-msgstr "EndPoints"
+msgstr "Конечные точки (Endpoints)"
 
 #: collection/models.py:210
 msgid "Language Name"
-msgstr "Nombre del idioma"
+msgstr "Название языка"
 
 #: collection/models.py:211
 msgid "Language code 2"
-msgstr "Código de idioma 2"
+msgstr "Код языка (2 символа)"
 
 #: collection/models.py:216 migration/models.py:374
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:59
 msgid "Language"
-msgstr "Idioma"
+msgstr "Язык"
 
 #: collection/models.py:217
 msgid "Languages"
-msgstr "Idiomas"
+msgstr "Языки"
 
 #: collection/models.py:287
 msgid "Endpoint name"
-msgstr "Nombre del endpoint"
+msgstr "Название конечной точки"
 
 #: collection/models.py:288
 msgid "Endpoint URL"
-msgstr "URL del endpoint"
+msgstr "URL конечной точки"
 
 #: collection/wagtail_hooks.py:27 collection/wagtail_hooks.py:124
 msgid "Collections"
-msgstr "Colecciones"
+msgstr "Коллекции"
 
 #: collection/wagtail_hooks.py:55
 msgid "New WebSites Configurations"
-msgstr "Nuevas configuraciones de sitios web"
+msgstr "Конфигурации новых сайтов"
 
 #: collection/wagtail_hooks.py:81
 msgid "Files Storage Configuration"
-msgstr "Configuración de almacenamiento de archivos"
+msgstr "Конфигурация хранилища файлов"
 
 #: collection/wagtail_hooks.py:108 migration/wagtail_hooks.py:22
 msgid "Classic Website Configuration"
-msgstr "Configuración del sitio web clásico"
+msgstr "Конфигурация классического сайта"
 
 #: core/choices.py:206
 msgid "JANUARY"
-msgstr "ENERO"
+msgstr "ЯНВАРЬ"
 
 #: core/choices.py:207
 msgid "FEBRUARY"
-msgstr "FEBRERO"
+msgstr "ФЕВРАЛЬ"
 
 #: core/choices.py:208
 msgid "MARCH"
-msgstr "MARZO"
+msgstr "МАРТ"
 
 #: core/choices.py:209
 msgid "APRIL"
-msgstr "ABRIL"
+msgstr "АПРЕЛЬ"
 
 #: core/choices.py:210
 msgid "MAY"
-msgstr "MAYO"
+msgstr "МАЙ"
 
 #: core/choices.py:211
 msgid "JUNE"
-msgstr "JUNIO"
+msgstr "ИЮНЬ"
 
 #: core/choices.py:212
 msgid "JULY"
-msgstr "JULIO"
+msgstr "ИЮЛЬ"
 
 #: core/choices.py:213
 msgid "AUGUST"
-msgstr "AGOSTO"
+msgstr "АВГУСТ"
 
 #: core/choices.py:214
 msgid "SEPTEMBER"
-msgstr "SEPTIEMBRE"
+msgstr "СЕНТЯБРЬ"
 
 #: core/choices.py:215
 msgid "OCTOBER"
-msgstr "OCTUBRE"
+msgstr "ОКТЯБРЬ"
 
 #: core/choices.py:216
 msgid "NOVEMBER"
-msgstr "NOVIEMBRE"
+msgstr "НОЯБРЬ"
 
 #: core/choices.py:217
 msgid "DECEMBER"
-msgstr "DICIEMBRE"
+msgstr "ДЕКАБРЬ"
 
 #: core/models.py:36 tracker/models.py:52 tracker/models.py:98
 msgid "Creation date"
-msgstr "Fecha de creación"
+msgstr "Дата создания"
 
 #: core/models.py:39 tracker/models.py:185
 msgid "Last update date"
-msgstr "Fecha de última actualización"
+msgstr "Дата последнего обновления"
 
 #: core/models.py:53
 msgid "Updater"
-msgstr "Actualizador"
+msgstr "Обновил"
 
 #: core/models.py:139
 msgid "Publication month number"
-msgstr "Número del mes de publicación"
+msgstr "Номер месяца публикации"
 
 #: core/models.py:145
 msgid "Publication month name"
-msgstr "Nombre del mes de publicación"
+msgstr "Название месяца публикации"
 
 #: core/models.py:162
 msgid "Publication initial month number"
-msgstr "Número del mes inicial de publicación"
+msgstr "Номер начального месяца публикации"
 
 #: core/models.py:168
 msgid "Publication initial month name"
-msgstr "Nombre del mes inicial de publicación"
+msgstr "Название начального месяца публикации"
 
 #: core/models.py:174
 msgid "Publication final month number"
-msgstr "Número del mes final de publicación"
+msgstr "Номер конечного месяца публикации"
 
 #: core/models.py:180
 msgid "Publication final month name"
-msgstr "Nombre del mes final de publicación"
+msgstr "Название конечного месяца публикации"
 
 #: core/models.py:196
 msgid "Publication date text"
-msgstr "Texto de la fecha de publicación"
+msgstr "Текст даты публикации"
 
 #: core/models.py:201 core/models.py:227
 msgid "Publication year"
-msgstr "Año de publicación"
+msgstr "Год публикации"
 
 #: core/models.py:370 journal/models.py:225 proc/models.py:850
 #: upload/models.py:1730
 msgid "Title"
-msgstr "Título"
+msgstr "Заголовок"
 
 #: core/templates/account/account_inactive.html:5
 #: core/templates/account/account_inactive.html:8
 msgid "Account Inactive"
-msgstr "Cuenta inactiva"
+msgstr "Аккаунт неактивен"
 
 #: core/templates/account/account_inactive.html:10
 msgid "This account is inactive."
-msgstr "Esta cuenta está inactiva."
+msgstr "Этот аккаунт неактивен."
 
 #: core/templates/account/email.html:7
 msgid "Account"
-msgstr "Cuenta"
+msgstr "Аккаунт"
 
 #: core/templates/account/email.html:10
 msgid "E-mail Addresses"
-msgstr "Direcciones de correo electrónico"
+msgstr "Адреса электронной почты"
 
 #: core/templates/account/email.html:13
 msgid "The following e-mail addresses are associated with your account:"
-msgstr ""
-"Las siguientes direcciones de correo electrónico están asociadas con tu "
-"cuenta:"
+msgstr "Следующие адреса электронной почты связаны с вашим аккаунтом:"
 
 #: core/templates/account/email.html:27
 msgid "Verified"
-msgstr "Verificado"
+msgstr "Подтверждено"
 
 #: core/templates/account/email.html:29
 msgid "Unverified"
-msgstr "No verificado"
+msgstr "Не подтверждено"
 
 #: core/templates/account/email.html:31
 msgid "Primary"
-msgstr "Principal"
+msgstr "Основной"
 
 #: core/templates/account/email.html:37
 msgid "Make Primary"
-msgstr "Hacer principal"
+msgstr "Сделать основным"
 
 #: core/templates/account/email.html:38
 msgid "Re-send Verification"
-msgstr "Reenviar verificación"
+msgstr "Отправить подтверждение повторно"
 
 #: core/templates/account/email.html:39
 msgid "Remove"
-msgstr "Eliminar"
+msgstr "Удалить"
 
 #: core/templates/account/email.html:46
 msgid "Warning:"
-msgstr "Advertencia:"
+msgstr "Предупреждение:"
 
 #: core/templates/account/email.html:46
 msgid ""
 "You currently do not have any e-mail address set up. You should really add "
 "an e-mail address so you can receive notifications, reset your password, etc."
 msgstr ""
-"Actualmente no tienes ninguna dirección de correo electrónico configurada. "
-"Deberías agregar una dirección de correo electrónico para recibir "
-"notificaciones, restablecer tu contraseña, etc."
+"У вас в данный момент не настроен адрес электронной почты. Вам действительно стоит добавить "
+"адрес, чтобы получать уведомления, сбрасывать пароль и т.д."
 
 #: core/templates/account/email.html:51
 msgid "Add E-mail Address"
-msgstr "Agregar dirección de correo electrónico"
+msgstr "Добавить адрес электронной почты"
 
 #: core/templates/account/email.html:56
 msgid "Add E-mail"
-msgstr "Agregar correo electrónico"
+msgstr "Добавить E-mail"
 
 #: core/templates/account/email.html:66
 msgid "Do you really want to remove the selected e-mail address?"
-msgstr ""
-"¿Realmente deseas eliminar la dirección de correo electrónico seleccionada?"
+msgstr "Вы действительно хотите удалить выбранный адрес электронной почты?"
 
 #: core/templates/account/email_confirm.html:6
 #: core/templates/account/email_confirm.html:10
 msgid "Confirm E-mail Address"
-msgstr "Confirmar dirección de correo electrónico"
+msgstr "Подтвердите адрес электронной почты"
 
 #: core/templates/account/email_confirm.html:16
 #, python-format
@@ -738,12 +734,12 @@ msgid ""
 "Please confirm that <a href=\"mailto:%(email)s\">%(email)s</a> is an e-mail "
 "address for user %(user_display)s."
 msgstr ""
-"Por favor, confirma que <a href=\"mailto:%(email)s\">%(email)s</a> es una "
-"dirección de correo electrónico para el usuario %(user_display)s."
+"Пожалуйста, подтвердите, что <a href=\"mailto:%(email)s\">%(email)s</a> является адресом "
+"электронной почты пользователя %(user_display)s."
 
 #: core/templates/account/email_confirm.html:20
 msgid "Confirm"
-msgstr "Confirmar"
+msgstr "Подтвердить"
 
 #: core/templates/account/email_confirm.html:27
 #, python-format
@@ -751,19 +747,17 @@ msgid ""
 "This e-mail confirmation link expired or is invalid. Please <a href="
 "\"%(email_url)s\">issue a new e-mail confirmation request</a>."
 msgstr ""
-"Este enlace de confirmación de correo electrónico ha expirado o no es "
-"válido. Por favor, <a href=\"%(email_url)s\">solicita una nueva confirmación "
-"de correo electrónico</a>."
+"Эта ссылка для подтверждения e-mail истекла или недействительна. Пожалуйста, <a href="
+"\"%(email_url)s\">создайте новый запрос на подтверждение</a>."
 
 #: core/templates/account/login.html:7 core/templates/account/login.html:11
 #: core/templates/account/login.html:56 core/templates/base.html:83
 msgid "Sign In"
-msgstr "Iniciar sesión"
+msgstr "Войти"
 
 #: core/templates/account/login.html:17
 msgid "Please sign in with one of your existing third party accounts:"
-msgstr ""
-"Por favor, inicia sesión con una de tus cuentas de terceros existentes:"
+msgstr "Пожалуйста, войдите с помощью одного из ваших существующих аккаунтов сторонних сервисов:"
 
 #: core/templates/account/login.html:19
 #, python-format
@@ -771,12 +765,11 @@ msgid ""
 "Or, <a href=\"%(signup_url)s\">sign up</a> for a %(site_name)s account and "
 "sign in below:"
 msgstr ""
-"O <a href=\"%(signup_url)s\">regístrate</a> para una cuenta de %(site_name)s "
-"e inicia sesión a continuación:"
+"Или <a href=\"%(signup_url)s\">зарегистрируйтесь</a> в %(site_name)s и войдите ниже:"
 
 #: core/templates/account/login.html:32
 msgid "or"
-msgstr "o"
+msgstr "или"
 
 #: core/templates/account/login.html:41
 #, python-format
@@ -784,21 +777,21 @@ msgid ""
 "If you have not created an account yet, then please <a href=\"%(signup_url)s"
 "\">sign up</a> first."
 msgstr ""
-"Si aún no has creado una cuenta, por favor <a href=\"%(signup_url)s"
-"\">regístrate</a> primero."
+"Если вы еще не создали аккаунт, пожалуйста, сначала <a href=\"%(signup_url)s"
+"\">зарегистрируйтесь</a>."
 
 #: core/templates/account/login.html:55
 msgid "Forgot Password?"
-msgstr "¿Olvidaste tu contraseña?"
+msgstr "Забыли пароль?"
 
 #: core/templates/account/logout.html:5 core/templates/account/logout.html:8
 #: core/templates/account/logout.html:17 core/templates/base.html:72
 msgid "Sign Out"
-msgstr "Cerrar sesión"
+msgstr "Выйти"
 
 #: core/templates/account/logout.html:10
 msgid "Are you sure you want to sign out?"
-msgstr "¿Estás seguro de que quieres cerrar sesión?"
+msgstr "Вы уверены, что хотите выйти?"
 
 #: core/templates/account/password_change.html:6
 #: core/templates/account/password_change.html:9
@@ -808,45 +801,42 @@ msgstr "¿Estás seguro de que quieres cerrar sesión?"
 #: core/templates/account/password_reset_from_key_done.html:4
 #: core/templates/account/password_reset_from_key_done.html:7
 msgid "Change Password"
-msgstr "Cambiar contraseña"
+msgstr "Сменить пароль"
 
 #: core/templates/account/password_reset.html:7
 #: core/templates/account/password_reset.html:11
 #: core/templates/account/password_reset_done.html:6
 #: core/templates/account/password_reset_done.html:9
 msgid "Password Reset"
-msgstr "Restablecer contraseña"
+msgstr "Сброс пароля"
 
 #: core/templates/account/password_reset.html:16
 msgid ""
 "Forgotten your password? Enter your e-mail address below, and we'll send you "
 "an e-mail allowing you to reset it."
 msgstr ""
-"¿Olvidaste tu contraseña? Ingresa tu dirección de correo electrónico a "
-"continuación y te enviaremos un correo electrónico que te permitirá "
-"restablecerla."
+"Забыли пароль? Введите ваш адрес электронной почты ниже, и мы отправим вам письмо "
+"для его сброса."
 
 #: core/templates/account/password_reset.html:21
 msgid "Reset My Password"
-msgstr "Restablecer mi contraseña"
+msgstr "Сбросить мой пароль"
 
 #: core/templates/account/password_reset.html:24
 msgid "Please contact us if you have any trouble resetting your password."
-msgstr ""
-"Por favor, contáctanos si tienes algún problema para restablecer tu "
-"contraseña."
+msgstr "Пожалуйста, свяжитесь с нами, если у вас возникли проблемы со сбросом пароля."
 
 #: core/templates/account/password_reset_done.html:15
 msgid ""
 "We have sent you an e-mail. Please contact us if you do not receive it "
 "within a few minutes."
 msgstr ""
-"Te hemos enviado un correo electrónico. Por favor, contáctanos si no lo "
-"recibes en unos minutos."
+"Мы отправили вам письмо. Пожалуйста, свяжитесь с нами, если вы не получите его "
+"в течение нескольких минут."
 
 #: core/templates/account/password_reset_from_key.html:8
 msgid "Bad Token"
-msgstr "Token incorrecto"
+msgstr "Неверный токен"
 
 #: core/templates/account/password_reset_from_key.html:12
 #, python-format
@@ -855,57 +845,55 @@ msgid ""
 "used.  Please request a <a href=\"%(passwd_reset_url)s\">new password reset</"
 "a>."
 msgstr ""
-"El enlace para restablecer la contraseña no era válido, posiblemente porque "
-"ya ha sido utilizado. Por favor, solicita un <a href=\"%(passwd_reset_url)s"
-"\">nuevo restablecimiento de contraseña</a>."
+"Ссылка для сброса пароля недействительна, возможно, она уже использовалась. "
+"Пожалуйста, запросите <a href=\"%(passwd_reset_url)s\">новый сброс пароля</a>."
 
 #: core/templates/account/password_reset_from_key.html:18
 msgid "change password"
-msgstr "cambiar contraseña"
+msgstr "изменить пароль"
 
 #: core/templates/account/password_reset_from_key.html:21
 #: core/templates/account/password_reset_from_key_done.html:8
 msgid "Your password is now changed."
-msgstr "Tu contraseña ha sido cambiada."
+msgstr "Ваш пароль изменен."
 
 #: core/templates/account/password_set.html:6
 #: core/templates/account/password_set.html:9
 #: core/templates/account/password_set.html:14
 msgid "Set Password"
-msgstr "Establecer contraseña"
+msgstr "Установить пароль"
 
 #: core/templates/account/signup.html:6
 msgid "Signup"
-msgstr "Registro"
+msgstr "Регистрация"
 
 #: core/templates/account/signup.html:9 core/templates/account/signup.html:19
 #: core/templates/base.html:78
 msgid "Sign Up"
-msgstr "Registrarse"
+msgstr "Зарегистрироваться"
 
 #: core/templates/account/signup.html:11
 #, python-format
 msgid ""
 "Already have an account? Then please <a href=\"%(login_url)s\">sign in</a>."
 msgstr ""
-"¿Ya tienes una cuenta? Entonces, por favor <a href=\"%(login_url)s\">inicia "
-"sesión</a>."
+"Уже есть аккаунт? Тогда, пожалуйста, <a href=\"%(login_url)s\">войдите</a>."
 
 #: core/templates/account/signup_closed.html:5
 #: core/templates/account/signup_closed.html:8
 msgid "Sign Up Closed"
-msgstr "Registro cerrado"
+msgstr "Регистрация закрыта"
 
 #: core/templates/account/signup_closed.html:10
 msgid "We are sorry, but the sign up is currently closed."
-msgstr "Lo sentimos, pero el registro está actualmente cerrado."
+msgstr "К сожалению, регистрация в данный момент закрыта."
 
 #: core/templates/account/verification_sent.html:5
 #: core/templates/account/verification_sent.html:8
 #: core/templates/account/verified_email_required.html:5
 #: core/templates/account/verified_email_required.html:8
 msgid "Verify Your E-mail Address"
-msgstr "Verifica tu dirección de correo electrónico"
+msgstr "Подтвердите ваш адрес электронной почты"
 
 #: core/templates/account/verification_sent.html:10
 msgid ""
@@ -913,9 +901,8 @@ msgid ""
 "finalize the signup process. Please contact us if you do not receive it "
 "within a few minutes."
 msgstr ""
-"Te hemos enviado un correo electrónico para verificación. Sigue el enlace "
-"proporcionado para finalizar el proceso de registro. Por favor, contáctanos "
-"si no lo recibes en unos minutos."
+"Мы отправили вам письмо для подтверждения. Перейдите по ссылке, чтобы завершить "
+"процесс регистрации. Пожалуйста, свяжитесь с нами, если вы не получите письмо в течение нескольких минут."
 
 #: core/templates/account/verified_email_required.html:12
 msgid ""
@@ -923,9 +910,9 @@ msgid ""
 "you are who you claim to be. For this purpose, we require that you\n"
 "verify ownership of your e-mail address. "
 msgstr ""
-"Esta parte del sitio requiere que verifiquemos que\n"
-"eres quien dices ser. Para este propósito, requerimos que\n"
-"verifiques la propiedad de tu dirección de correo electrónico."
+"Эта часть сайта требует подтверждения вашей личности.\n"
+"Для этого нам необходимо, чтобы вы подтвердили\n"
+"владение вашим адресом электронной почты."
 
 #: core/templates/account/verified_email_required.html:16
 msgid ""
@@ -933,10 +920,9 @@ msgid ""
 "verification. Please click on the link inside this e-mail. Please\n"
 "contact us if you do not receive it within a few minutes."
 msgstr ""
-"Te hemos enviado un correo electrónico para\n"
-"verificación. Por favor, haz clic en el enlace dentro de este correo "
-"electrónico. Por favor,\n"
-"contáctanos si no lo recibes en unos minutos."
+"Мы отправили вам письмо для подтверждения.\n"
+"Пожалуйста, перейдите по ссылке внутри письма.\n"
+"Свяжитесь с нами, если не получите его в течение нескольких минут."
 
 #: core/templates/account/verified_email_required.html:20
 #, python-format
@@ -944,21 +930,20 @@ msgid ""
 "<strong>Note:</strong> you can still <a href=\"%(email_url)s\">change your e-"
 "mail address</a>."
 msgstr ""
-"<strong>Nota:</strong> todavía puedes <a href=\"%(email_url)s\">cambiar tu "
-"dirección de correo electrónico</a>."
+"<strong>Примечание:</strong> вы все еще можете <a href=\"%(email_url)s\">изменить свой e-mail</a>."
 
 #: core/templates/base.html:68
 msgid "My Profile"
-msgstr "Mi perfil"
+msgstr "Мой профиль"
 
 #: core/templates/home/welcome_page.html:53
 #: core/templates/home/welcome_page.html:56
 msgid "View the release notes"
-msgstr "Ver las notas de la versión"
+msgstr "Посмотреть примечания к выпуску"
 
 #: core/templates/home/welcome_page.html:68
 msgid "Welcome to your SciELO Content Manager"
-msgstr "Bienvenido a tu Gestor de Contenido SciELO"
+msgstr "Добро пожаловать в SciELO Content Manager"
 
 #: core/templates/home/welcome_page.html:69
 msgid ""
@@ -966,102 +951,104 @@ msgid ""
 "\">join our community on Slack</a>, or get started with one of the links "
 "below."
 msgstr ""
-"Siéntete libre de <a href=\"https://github.com/wagtail/wagtail/wiki/Slack"
-"\">unirte a nuestra comunidad en Slack</a>, o comienza con uno de los "
-"enlaces a continuación."
+"Пожалуйста, не стесняйтесь <a href=\"https://github.com/wagtail/wagtail/wiki/Slack"
+"\">присоединиться к нашему сообществу в Slack</a> или начните работу с одной из ссылок ниже."
 
 #: core/templates/home/welcome_page.html:77
 msgid "Wagtail Documentation"
-msgstr "Documentación de Wagtail"
+msgstr "Документация Wagtail"
 
 #: core/templates/home/welcome_page.html:78
 msgid "Topics, references, & how-tos"
-msgstr "Temas, referencias y guías"
+msgstr "Темы, ссылки и руководства"
 
 #: core/templates/home/welcome_page.html:85
 msgid "Tutorial"
-msgstr "Tutorial"
+msgstr "Учебное пособие"
 
 #: core/templates/home/welcome_page.html:86
 msgid "Build your first Wagtail site"
-msgstr "Construye tu primer sitio Wagtail"
+msgstr "Создайте свой первый сайт на Wagtail"
 
 #: core/templates/home/welcome_page.html:93
 msgid "Admin Interface"
-msgstr "Interfaz de administración"
+msgstr "Административный интерфейс"
 
 #: core/templates/home/welcome_page.html:94
 msgid "Create your superuser first!"
-msgstr "¡Crea tu superusuario primero!"
+msgstr "Сначала создайте суперпользователя!"
 
 #: core/templates/modeladmin/edit.html:9
 #: upload/templates/modeladmin/upload/package/validation_report/edit.html:9
 #: upload/templates/modeladmin/upload/validationresult/inspect.html:9
 #, python-format
 msgid "Back to %(model_name)s list"
-msgstr "Volver a la lista de %(model_name)s"
+msgstr "Назад к списку %(model_name)s"
 
 #: core/templates/wagtailadmin/home.html:5
 msgid "Welcome to the administrative area of SciELO Upload"
-msgstr "Bienvenido al área administrativa de SciELO Upload"
+msgstr "Добро пожаловать в административную панель SciELO Upload"
 
 #: core/templates/wagtailadmin/login.html:5
 msgid "Administrative area of SciELO Upload"
-msgstr "Área administrativa de SciELO Upload"
+msgstr "Административная панель SciELO Upload"
 
 #: core/templates/wagtailadmin/shared/header.html:10
 #, python-format
 msgid "%(result_count)s out of %(all_count)s"
-msgstr "%(result_count)s de %(all_count)s"
+msgstr "%(result_count)s из %(all_count)s"
 
 #: core/templates/wagtailadmin/summary_items/article_summary_item.html:6
 #, python-format
 msgid "<span>%(total_article)s</span> Article"
 msgid_plural "<span>%(total_article)s</span> Articles"
-msgstr[0] "<span>%(total_article)s</span> Artículo"
-msgstr[1] "<span>%(total_article)s</span> Artículos"
+msgstr[0] "<span>%(total_article)s</span> Статья"
+msgstr[1] "<span>%(total_article)s</span> Статьи"
+msgstr[2] "<span>%(total_article)s</span> Статей"
 
 #: core/templates/wagtailadmin/summary_items/collection_summary_item.html:6
 #, python-format
 msgid "<span>%(total_collection)s</span> Collection"
 msgid_plural "<span>%(total_collection)s</span> Collections"
-msgstr[0] "<span>%(total_collection)s</span> Colección"
-msgstr[1] "<span>%(total_collection)s</span> Colecciones"
+msgstr[0] "<span>%(total_collection)s</span> Коллекция"
+msgstr[1] "<span>%(total_collection)s</span> Коллекции"
+msgstr[2] "<span>%(total_collection)s</span> Коллекций"
 
 #: core/templates/wagtailadmin/summary_items/journal_summary_item.html:6
 #, python-format
 msgid "<span>%(total_journal)s</span> Journal"
 msgid_plural "<span>%(total_journal)s</span> Journals"
-msgstr[0] "<span>%(total_journal)s</span> Revista"
-msgstr[1] "<span>%(total_journal)s</span> Revistas"
+msgstr[0] "<span>%(total_journal)s</span> Журнал"
+msgstr[1] "<span>%(total_journal)s</span> Журнала"
+msgstr[2] "<span>%(total_journal)s</span> Журналов"
 
 #: core/users/admin.py:17
 msgid "Personal info"
-msgstr "Información personal"
+msgstr "Личная информация"
 
 #: core/users/admin.py:19
 msgid "Permissions"
-msgstr "Permisos"
+msgstr "Права доступа"
 
 #: core/users/admin.py:30
 msgid "Important dates"
-msgstr "Fechas importantes"
+msgstr "Важные даты"
 
 #: core/users/apps.py:7
 msgid "Users"
-msgstr "Usuarios"
+msgstr "Пользователи"
 
 #: core/users/forms.py:25 core/users/tests/test_forms.py:40
 msgid "This username has already been taken."
-msgstr "Este nombre de usuario ya ha sido tomado."
+msgstr "Это имя пользователя уже занято."
 
 #: core/users/models.py:15
 msgid "Name of User"
-msgstr "Nombre de usuario"
+msgstr "Имя пользователя"
 
 #: core/users/views.py:23
 msgid "Information successfully updated"
-msgstr "Información actualizada con éxito"
+msgstr "Информация успешно обновлена"
 
 #: doi/models.py:12 pid_provider/models.py:389 upload/models.py:188
 msgid "DOI"
@@ -1076,36 +1063,36 @@ msgstr "DOI"
 #: upload/templates/modeladmin/upload/package/inspect_.html:164
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:24
 msgid "Name"
-msgstr "Nombre"
+msgstr "Имя"
 
 #: files_storage/models.py:37
 msgid "Host"
-msgstr "Host"
+msgstr "Хост"
 
 #: files_storage/models.py:39
 msgid "Bucket root"
-msgstr "Raíz del bucket"
+msgstr "Корень бакета (Bucket root)"
 
 #: files_storage/models.py:42 location/models.py:235
 #: location/wagtail_hooks.py:20
 msgid "Location"
-msgstr "Ubicación"
+msgstr "Местоположение"
 
 #: files_storage/models.py:49
 msgid "Access key"
-msgstr "Clave de acceso"
+msgstr "Ключ доступа"
 
 #: files_storage/models.py:50
 msgid "Secret key"
-msgstr "Clave secreta"
+msgstr "Секретный ключ"
 
 #: files_storage/models.py:52
 msgid "Secure"
-msgstr "Seguro"
+msgstr "Безопасный"
 
 #: files_storage/models.py:132
 msgid "Basename"
-msgstr "Nombre base"
+msgstr "Базовое имя"
 
 #: files_storage/models.py:133
 msgid "URI"
@@ -1113,601 +1100,592 @@ msgstr "URI"
 
 #: files_storage/wagtail_hooks.py:18
 msgid "Minio Configuration"
-msgstr "Configuración de Minio"
+msgstr "Конфигурация Minio"
 
 #: htmlxml/choices.py:9
 msgid "approved automatically"
-msgstr "aprobado automáticamente"
+msgstr "одобрено автоматически"
 
 #: htmlxml/choices.py:10
 msgid "approved"
-msgstr "aprobado"
+msgstr "одобрено"
 
 #: htmlxml/choices.py:11
 msgid "rejected"
-msgstr "rechazado"
+msgstr "отклонено"
 
 #: htmlxml/choices.py:12
 msgid "not evaluated"
-msgstr "no evaluado"
+msgstr "не оценено"
 
 #: htmlxml/models.py:249
 msgid "Unable to create_or_update_body and back file with empty content {} {}"
-msgstr ""
-"No se puede crear_o_actualizar_cuerpo y archivo de respaldo con contenido "
-"vacío {} {}"
+msgstr "Не удалось создать или обновить тело и обратный файл с пустым содержимым {} {}"
 
 #: htmlxml/models.py:275
 msgid "Unable to create_or_update_body and back file {} {} {} {}"
-msgstr ""
-"No se puede crear_o_actualizar_cuerpo y archivo de respaldo {} {} {} {}"
+msgstr "Не удалось создать или обновить тело и обратный файл {} {} {} {}"
 
 #: htmlxml/models.py:326
 msgid "Body vazio"
-msgstr "Body vacío"
+msgstr "Пустое тело"
 
 #: htmlxml/models.py:327
 msgid "Sim"
-msgstr "Sí"
+msgstr "Да"
 
 #: htmlxml/models.py:327
 msgid "Não"
-msgstr "No"
+msgstr "Нет"
 
 #: htmlxml/models.py:330
 msgid "Pontos de atenção"
-msgstr "Puntos de atención"
+msgstr "Точки внимания"
 
 #: htmlxml/models.py:334
 msgid "Tipo de artigo"
-msgstr "Tipo de artículo"
+msgstr "Тип статьи"
 
 #: htmlxml/models.py:335
 msgid "Não identificado"
-msgstr "No identificado"
+msgstr "Не идентифицировано"
 
 #: htmlxml/models.py:338
 msgid "Tabelas no HTML"
-msgstr "Tablas en HTML"
+msgstr "Таблицы в HTML"
 
 #: htmlxml/models.py:342
 msgid "Imagens no HTML"
-msgstr "Imágenes en HTML"
+msgstr "Изображения в HTML"
 
 #: htmlxml/models.py:346
 msgid "Material suplementar no XML"
-msgstr "Material suplementario en XML"
+msgstr "Дополнительный материал в XML"
 
 #: htmlxml/models.py:350
 msgid "Elementos de mídia no XML"
-msgstr "Elementos de medios en XML"
+msgstr "Медиа-элементы в XML"
 
 #: htmlxml/models.py:354
 msgid "Figuras no XML"
-msgstr "Figuras en XML"
+msgstr "Рисунки в XML"
 
 #: htmlxml/models.py:358
 msgid "Tabelas no XML"
-msgstr "Tablas en XML"
+msgstr "Таблицы в XML"
 
 #: htmlxml/models.py:362
 msgid "Equações no XML"
-msgstr "Ecuaciones en XML"
+msgstr "Уравнения в XML"
 
 #: htmlxml/models.py:366
 msgid "Gráficos no XML"
-msgstr "Gráficos en XML"
+msgstr "Графики в XML"
 
 #: htmlxml/models.py:370
 msgid "Gráficos inline no XML"
-msgstr "Gráficos inline en XML"
+msgstr "Встроенные графики в XML"
 
 #: htmlxml/models.py:374
 msgid "Citações estruturadas (element-citation)"
-msgstr "Citas estructuradas (element-citation)"
+msgstr "Структурированные цитаты (element-citation)"
 
 #: htmlxml/models.py:378
 msgid "Citações mistas (mixed-citation)"
-msgstr "Citas mixtas (mixed-citation)"
+msgstr "Смешанные цитаты (mixed-citation)"
 
 #: htmlxml/models.py:382
 msgid "Idiomas do texto no XML"
-msgstr "Idiomas del texto en XML"
+msgstr "Языки текста в XML"
 
 #: htmlxml/models.py:456
 msgid "Estatísticas de Conversão HTML para XML"
-msgstr "Estadísticas de conversión HTML a XML"
+msgstr "Статистика конвертации HTML в XML"
 
 #: htmlxml/models.py:458
 msgid "Trocas de HTML para XML"
-msgstr "Conversiones de HTML a XML"
+msgstr "Обмен HTML на XML"
 
 #: htmlxml/models.py:589
 msgid "Quality"
-msgstr "Calidad"
+msgstr "Качество"
 
 #: htmlxml/models.py:613
 msgid "Body and Back XML files"
-msgstr "Archivos XML de cuerpo y respaldo"
+msgstr "XML файлы тела и конца (Body/Back)"
 
 #: htmlxml/models.py:622
 msgid "Generated XML and Report"
-msgstr "XML generado e informe"
+msgstr "Сгенерированный XML и отчет"
 
 #: htmlxml/models.py:623
 msgid "Body and Back XML Files"
-msgstr "Archivos XML de cuerpo y respaldo"
+msgstr "XML файлы тела и конца"
 
 #: htmlxml/models.py:701
 msgid ""
 "Unable to create or update the record of the conversion of HTML to XML for "
 "{} {} {}"
-msgstr ""
-"No se puede crear o actualizar el registro de la conversión de HTML a XML "
-"para {} {} {}"
+msgstr "Не удалось создать или обновить запись конвертации HTML в XML для {} {} {}"
 
 #: institution/choices.py:13
 msgid "agência de apoio à pesquisa"
-msgstr "agencia de apoyo a la investigación"
+msgstr "агентство поддержки исследований"
 
 #: institution/choices.py:14
 msgid "universidade e instâncias ligadas à universidades"
-msgstr "universidad e instancias relacionadas con universidades"
+msgstr "университет и связанные структуры"
 
 #: institution/choices.py:15
 msgid "empresa ou instituto ligadas ao governo"
-msgstr "empresa o instituto vinculado al gobierno"
+msgstr "государственная компания или институт"
 
 #: institution/choices.py:16
 msgid "organização privada"
-msgstr "organización privada"
+msgstr "частная организация"
 
 #: institution/choices.py:17
 msgid "organização sem fins de lucros"
-msgstr "organización sin fines de lucro"
+msgstr "некоммерческая организация"
 
 #: institution/choices.py:20
 msgid "sociedade científica, associação pós-graduação, associação profissional"
-msgstr "sociedad científica, asociación de posgrado, asociación profesional"
+msgstr "научное общество, ассоциация аспирантов, профессиональная ассоциация"
 
 #: institution/choices.py:22
 msgid "outros"
-msgstr "otros"
+msgstr "другое"
 
 #: institution/models.py:18
 msgid "Institution Type"
-msgstr "Tipo de institución"
+msgstr "Тип учреждения"
 
 #: institution/models.py:29
 msgid "Institution Acronym"
-msgstr "Acrónimo de la institución"
+msgstr "Аббревиатура учреждения"
 
 #: institution/models.py:31
 msgid "Organization Level 1"
-msgstr "Nivel de organización 1"
+msgstr "Организация Уровень 1"
 
 #: institution/models.py:33
 msgid "Organization Level 2"
-msgstr "Nivel de organización 2"
+msgstr "Организация Уровень 2"
 
 #: institution/models.py:35
 msgid "Organization Level 3"
-msgstr "Nivel de organización 3"
+msgstr "Организация Уровень 3"
 
 #: institution/models.py:39
 msgid "Logo"
-msgstr "Logo"
+msgstr "Логотип"
 
 #: institution/models.py:167
 msgid "Initial Date"
-msgstr "Fecha inicial"
+msgstr "Начальная дата"
 
 #: institution/models.py:168
 msgid "Final Date"
-msgstr "Fecha final"
+msgstr "Конечная дата"
 
 #: institution/models.py:171 institution/wagtail_hooks.py:20
 msgid "Institution"
-msgstr "Institución"
+msgstr "Учреждение"
 
 #: issue/models.py:40
 msgid "Volume"
-msgstr "Volumen"
+msgstr "Том"
 
 #: issue/models.py:41
 msgid "Number"
-msgstr "Número"
+msgstr "Номер"
 
 #: issue/models.py:42
 msgid "Supplement"
-msgstr "Suplemento"
+msgstr "Дополнение"
 
 #: issue/models.py:43
 msgid "Year"
-msgstr "Año"
+msgstr "Год"
 
 #: issue/models.py:50
 msgid ""
 "This number controls the order issues appear for a specific year on the "
 "website grid"
-msgstr ""
-"Este número controla el orden en que aparecen los fascículos de un año "
-"específico en la cuadrícula del sitio web"
+msgstr "Это число контролирует порядок появления выпусков за конкретный год в сетке сайта"
 
 #: issue/models.py:288
 msgid "Sections"
-msgstr "Secciones"
+msgstr "Разделы"
 
 #: issue/wagtail_hooks.py:15 issue/wagtail_hooks.py:106
 msgid "Issues"
-msgstr "Fascículos"
+msgstr "Выпуски"
 
 #: issue/wagtail_hooks.py:64
 msgid "Table of contents sections"
-msgstr "Secciones de la tabla de contenidos"
+msgstr "Разделы оглавления"
 
 #: journal/choices.py:6
 msgid "Journal URL"
-msgstr "URL de la revista"
+msgstr "URL журнала"
 
 #: journal/choices.py:31
 msgid "Ceased journal"
-msgstr "Revista cesada"
+msgstr "Издание журнала прекращено"
 
 #: journal/choices.py:32
 msgid "Not open access"
-msgstr "No es de acceso abierto"
+msgstr "Нет открытого доступа"
 
 #: journal/choices.py:33
 msgid "by the committee"
-msgstr "por el comité"
+msgstr "комитетом"
 
 #: journal/choices.py:34
 msgid "by the editor"
-msgstr "por el editor"
+msgstr "редактором"
 
 #: journal/choices.py:39
 msgid "Admitted to the collection"
-msgstr "Admitido en la colección"
+msgstr "Принят в коллекцию"
 
 #: journal/choices.py:40
 msgid "Indexing interrupted"
-msgstr "Indexación interrumpida"
+msgstr "Индексация прервана"
 
 #: journal/choices.py:45
 msgid "Agricultural Sciences"
-msgstr "Ciencias agrícolas"
+msgstr "Сельскохозяйственные науки"
 
 #: journal/choices.py:46
 msgid "Applied Social Sciences"
-msgstr "Ciencias sociales aplicadas"
+msgstr "Прикладные общественные науки"
 
 #: journal/choices.py:47
 msgid "Biological Sciences"
-msgstr "Ciencias biológicas"
+msgstr "Биологические науки"
 
 #: journal/choices.py:48
 msgid "Engineering"
-msgstr "Ingeniería"
+msgstr "Инженерное дело"
 
 #: journal/choices.py:49
 msgid "Exact and Earth Sciences"
-msgstr "Ciencias exactas y de la tierra"
+msgstr "Точные науки и науки о Земле"
 
 #: journal/choices.py:50
 msgid "Health Sciences"
-msgstr "Ciencias de la salud"
+msgstr "Медицинские науки"
 
 #: journal/choices.py:51
 msgid "Human Sciences"
-msgstr "Ciencias humanas"
+msgstr "Гуманитарные науки"
 
 #: journal/choices.py:52
 msgid "Linguistic, Literature and Arts"
-msgstr "Lingüística, literatura y artes"
+msgstr "Лингвистика, литература и искусство"
 
 #: journal/choices.py:53
 msgid "Psicanalise"
-msgstr "Psicoanálisis"
+msgstr "Психоанализ"
 
 #: journal/models.py:113
 msgid "Official Title"
-msgstr "Título oficial"
+msgstr "Официальное название"
 
 #: journal/models.py:114 journal/models.py:604
 msgid "ISO Title"
-msgstr "Título ISO"
+msgstr "Название ISO"
 
 #: journal/models.py:116
 msgid "Foundation Year"
-msgstr "Año de fundación"
+msgstr "Год основания"
 
 #: journal/models.py:118
 msgid "ISSN Print"
-msgstr "ISSN impreso"
+msgstr "ISSN печатный"
 
 #: journal/models.py:120
 msgid "ISSN Eletronic"
-msgstr "ISSN electrónico"
+msgstr "ISSN электронный"
 
 #: journal/models.py:122
 msgid "ISSNL"
-msgstr "ISSNL"
+msgstr "ISSN-L"
 
 #: journal/models.py:134 journal/models.py:582
 msgid "Official Journal"
-msgstr "Revista oficial"
+msgstr "Официальный журнал"
 
 #: journal/models.py:135 journal/wagtail_hooks.py:16
 msgid "Official Journals"
-msgstr "Revistas oficiales"
+msgstr "Официальные журналы"
 
 #: journal/models.py:223 journal/models.py:580
 msgid "Short Title"
-msgstr "Título corto"
+msgstr "Краткое название"
 
 #: journal/models.py:227 journal/models.py:581
 msgid "Journal Acronym"
-msgstr "Acrónimo de la revista"
+msgstr "Аббревиатура журнала"
 
 #: journal/models.py:236
 msgid "Submission online URL"
-msgstr "URL de envío en línea"
+msgstr "URL для онлайн-подачи"
 
 #: journal/models.py:240
 msgid "Study Areas"
-msgstr "Áreas de estudio"
+msgstr "Области изучения"
 
 #: journal/models.py:249
 msgid "Address"
-msgstr "Dirección"
+msgstr "Адрес"
 
 #: journal/models.py:273
 msgid "Owner"
-msgstr "Propietario"
+msgstr "Владелец"
 
 #: journal/models.py:277 journal/models.py:288
 msgid "Publisher"
-msgstr "Editor"
+msgstr "Издатель"
 
 #: journal/models.py:281 journal/models.py:289
 msgid "Mission"
-msgstr "Misión"
+msgstr "Миссия"
 
 #: journal/models.py:286 pid_provider/models.py:440 proc/models.py:199
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:23
 msgid "Identification"
-msgstr "Identificación"
+msgstr "Идентификация"
 
 #: journal/models.py:287
 msgid "Owners"
-msgstr "Propietarios"
+msgstr "Владельцы"
 
 #: journal/models.py:579
 msgid "Journal Title"
-msgstr "Título de la revista"
+msgstr "Название журнала"
 
 #: journal/models.py:583
 msgid "Contact Name"
-msgstr "Nombre del contacto"
+msgstr "Контактное лицо"
 
 #: journal/models.py:584
 msgid "Contact Address"
-msgstr "Dirección del contacto"
+msgstr "Контактный адрес"
 
 #: journal/models.py:585
 msgid "Contact Location"
-msgstr "Ubicación del contacto"
+msgstr "Контактное местоположение"
 
 #: journal/models.py:586
 msgid "Submission Online URL"
-msgstr "URL de envío en línea"
+msgstr "URL для онлайн-подачи"
 
 #: journal/models.py:587
 msgid "Logo URL"
-msgstr "URL del logo"
+msgstr "URL логотипа"
 
 #: journal/models.py:588
 msgid "License Code"
-msgstr "Código de licencia"
+msgstr "Код лицензии"
 
 #: journal/models.py:589
 msgid "WoS Areas"
-msgstr "Áreas WoS"
+msgstr "Области WoS"
 
 #: journal/models.py:600 pid_provider/models.py:359
 msgid "Electronic ISSN"
-msgstr "ISSN electrónico"
+msgstr "Электронный ISSN"
 
 #: journal/models.py:602 pid_provider/models.py:361
 msgid "Print ISSN"
-msgstr "ISSN impreso"
+msgstr "Печатный ISSN"
 
 #: journal/models.py:608
 msgid "mission"
-msgstr "misión"
+msgstr "миссия"
 
 #: journal/models.py:612
 msgid "sponsor"
-msgstr "patrocinador"
+msgstr "спонсор"
 
 #: journal/models.py:616
 msgid "owner"
-msgstr "propietario"
+msgstr "владелец"
 
 #: journal/models.py:620
 msgid "publisher"
-msgstr "editor"
+msgstr "издатель"
 
 #: journal/models.py:624
 msgid "study area"
-msgstr "área de estudio"
+msgstr "область изучения"
 
 #: journal/models.py:871
 msgid "Journal collection"
-msgstr "Colección de revistas"
+msgstr "Коллекция журнала"
 
 #: journal/models.py:872
 msgid "Journal collections"
-msgstr "Colecciones de revistas"
+msgstr "Коллекции журналов"
 
 #: journal/models.py:921
 msgid "Event year"
-msgstr "Año del evento"
+msgstr "Год события"
 
 #: journal/models.py:923
 msgid "Event month"
-msgstr "Mes del evento"
+msgstr "Месяц события"
 
 #: journal/models.py:929
 msgid "Event day"
-msgstr "Día del evento"
+msgstr "День события"
 
 #: journal/models.py:932
 msgid "Event type"
-msgstr "Tipo de evento"
+msgstr "Тип события"
 
 #: journal/models.py:939
 msgid "Indexing interruption reason"
-msgstr "Razón de interrupción de indexación"
+msgstr "Причина прерывания индексации"
 
 #: journal/models.py:957
 msgid "Collection journal event"
-msgstr "Evento de colección de revistas"
+msgstr "Событие журнала коллекции"
 
 #: journal/models.py:958
 msgid "Collection journal events"
-msgstr "Eventos de colección de revistas"
+msgstr "События журнала коллекции"
 
 #: journal/wagtail_hooks.py:43
 msgid "Journal"
-msgstr "Revista"
+msgstr "Журнал"
 
 #: journal/wagtail_hooks.py:68
 msgid "Journals"
-msgstr "Revistas"
+msgstr "Журналы"
 
 #: location/models.py:17
 msgid "City Name"
-msgstr "Nombre de la ciudad"
+msgstr "Название города"
 
 #: location/models.py:20 location/models.py:214
 msgid "City"
-msgstr "Ciudad"
+msgstr "Город"
 
 #: location/models.py:21
 msgid "Cities"
-msgstr "Ciudades"
+msgstr "Города"
 
 #: location/models.py:63
 msgid "State Name"
-msgstr "Nombre del estado"
+msgstr "Название штата/области"
 
 #: location/models.py:64
 msgid "State Acronym"
-msgstr "Acrónimo del estado"
+msgstr "Аббревиатура штата/области"
 
 #: location/models.py:67 location/models.py:221
 msgid "State"
-msgstr "Estado"
+msgstr "Штат/Область"
 
 #: location/models.py:68
 msgid "States"
-msgstr "Estados"
+msgstr "Штаты/Области"
 
 #: location/models.py:151
 msgid "Country Name"
-msgstr "Nombre del país"
+msgstr "Название страны"
 
 #: location/models.py:153
 msgid "Country Acronym"
-msgstr "Acrónimo del país"
+msgstr "Аббревиатура страны"
 
 #: location/models.py:157 location/models.py:228
 msgid "Country"
-msgstr "País"
+msgstr "Страна"
 
 #: location/models.py:158
 msgid "Countries"
-msgstr "Países"
+msgstr "Страны"
 
 #: location/models.py:236
 msgid "Locations"
-msgstr "Ubicaciones"
+msgstr "Местоположения"
 
 #: migration/button_helper.py:12
 msgid "View migration failure"
-msgstr "Ver fallo de migración"
+msgstr "Посмотреть сбой миграции"
 
 #: migration/choices.py:14
 msgid "To migrate"
-msgstr "Por migrar"
+msgstr "К миграции"
 
 #: migration/choices.py:15
 msgid "To ignore"
-msgstr "Por ignorar"
+msgstr "Игнорировать"
 
 #: migration/choices.py:16
 msgid "Imported"
-msgstr "Importado"
+msgstr "Импортировано"
 
 #: migration/controller.py:685
 msgid "Unable to get xml with pre from migrated article ({}) {}: {} {}"
-msgstr "No se puede obtener xml con pre del artículo migrado ({}) {}: {} {}"
+msgstr "Не удалось получить XML из мигрированной статьи ({}) {}: {} {}"
 
 #: migration/controller.py:734
 msgid "IdFileRecord is already up-to-date with acron.id"
-msgstr "IdFileRecord ya está actualizado con acron.id"
+msgstr "Запись IdFileRecord уже обновлена с acron.id"
 
 #: migration/models.py:70
 msgid "Title path"
-msgstr "Ruta del título"
+msgstr "Путь к заголовку"
 
 #: migration/models.py:74
 msgid "Title path: title.id path or title.mst path without extension"
-msgstr "Ruta del título: ruta de title.id o ruta de title.mst sin extensión"
+msgstr "Путь к заголовку: путь title.id или title.mst без расширения"
 
 #: migration/models.py:77
 msgid "Issue path"
-msgstr "Ruta del fascículo"
+msgstr "Путь к выпуску"
 
 #: migration/models.py:81
 msgid "Issue path: issue.id path or issue.mst path without extension"
-msgstr "Ruta del fascículo: ruta de issue.id o ruta de issue.mst sin extensión"
+msgstr "Путь к выпуску: путь issue.id или issue.mst без расширения"
 
 #: migration/models.py:84 migration/models.py:88
 msgid "Serial path"
-msgstr "Ruta serial"
+msgstr "Серийный путь"
 
 #: migration/models.py:91 migration/models.py:95
 msgid "Bases work path"
-msgstr "Ruta de trabajo de bases"
+msgstr "Рабочий путь баз"
 
 #: migration/models.py:98
 msgid "Bases pdf path"
-msgstr "Ruta de pdf de bases"
+msgstr "Путь PDF баз"
 
 #: migration/models.py:102 migration/models.py:105 migration/models.py:109
 msgid "Bases translation path"
-msgstr "Ruta de traducción de bases"
+msgstr "Путь перевода баз"
 
 #: migration/models.py:112 migration/models.py:116
 msgid "Bases XML path"
-msgstr "Ruta de XML de bases"
+msgstr "Путь XML баз"
 
 #: migration/models.py:119 migration/models.py:123
 msgid "Htdocs img revistas path"
-msgstr "Ruta de htdocs img revistas"
+msgstr "Путь Htdocs img revistas"
 
 #: migration/models.py:126
 msgid "PID list path"
-msgstr "Ruta de lista de PID"
+msgstr "Путь к списку PID"
 
 #: migration/models.py:131
 msgid "Path of a text file which contains all the article PIDs from artigo.mst"
-msgstr ""
-"Ruta de un archivo de texto que contiene todos los PID de artículos de "
-"artigo.mst"
+msgstr "Путь к текстовому файлу, содержащему все PID статей из artigo.mst"
 
 #: migration/models.py:185 migration/models.py:820 proc/models.py:193
 #: proc/models.py:341
@@ -1716,211 +1694,211 @@ msgstr "PID"
 
 #: migration/models.py:186
 msgid "Origin"
-msgstr "Origen"
+msgstr "Происхождение"
 
 #: migration/models.py:191
 msgid "ISIS updated date"
-msgstr "Fecha de actualización de ISIS"
+msgstr "Дата обновления ISIS"
 
 #: migration/models.py:194
 msgid "ISIS created date"
-msgstr "Fecha de creación de ISIS"
+msgstr "Дата создания ISIS"
 
 #: migration/models.py:197 proc/models.py:344
 msgid "Migration Status"
-msgstr "Estado de migración"
+msgstr "Статус миграции"
 
 #: migration/models.py:318
 msgid "Unable to create_or_update_migrated_data {} {} {} {}"
-msgstr "No se puede crear_o_actualizar_datos_migrados {} {} {} {}"
+msgstr "Не удалось создать или обновить мигрированные данные {} {} {} {}"
 
 #: migration/models.py:356
 msgid "Original Path"
-msgstr "Ruta original"
+msgstr "Исходный путь"
 
 #: migration/models.py:361
 msgid "Original name"
-msgstr "Nombre original"
+msgstr "Исходное имя"
 
 #: migration/models.py:369
 msgid "Original href"
-msgstr "Href original"
+msgstr "Исходный href"
 
 #: migration/models.py:372
 msgid "Component type"
-msgstr "Tipo de componente"
+msgstr "Тип компонента"
 
 #: migration/models.py:375
 msgid "Pkg name"
-msgstr "Nombre del paquete"
+msgstr "Имя пакета"
 
 #: migration/models.py:376
 msgid "Part"
-msgstr "Parte"
+msgstr "Часть"
 
 #: migration/models.py:625
 msgid "File type"
-msgstr "Tipo de archivo"
+msgstr "Тип файла"
 
 #: migration/models.py:677
 msgid "Source"
-msgstr "Fuente"
+msgstr "Источник"
 
 #: migration/wagtail_hooks.py:41
 msgid "Migrated Data"
-msgstr "Datos migrados"
+msgstr "Мигрированные данные"
 
 #: migration/wagtail_hooks.py:76
 msgid "Migrated Article"
-msgstr "Artículo migrado"
+msgstr "Мигрированная статья"
 
 #: migration/wagtail_hooks.py:110
 msgid "Migrated Journal"
-msgstr "Revista migrada"
+msgstr "Мигрированный журнал"
 
 #: migration/wagtail_hooks.py:142
 msgid "Migrated Issue"
-msgstr "Fascículo migrado"
+msgstr "Мигрированный выпуск"
 
 #: migration/wagtail_hooks.py:174
 msgid "Migrated files"
-msgstr "Archivos migrados"
+msgstr "Мигрированные файлы"
 
 #: migration/wagtail_hooks.py:206
 msgid "Article id file"
-msgstr "Archivo de ID de artículo"
+msgstr "ID файл статьи"
 
 #: migration/wagtail_hooks.py:235
 msgid "Migration"
-msgstr "Migración"
+msgstr "Миграция"
 
 #: package/choices.py:8
 msgid "MIGRATION"
-msgstr "MIGRACIÓN"
+msgstr "МИГРАЦИЯ"
 
 #: package/choices.py:9
 msgid "UPLOAD"
-msgstr "CARGA"
+msgstr "ЗАГРУЗКА"
 
 #: package/models.py:149 pid_provider/models.py:165
 msgid "Unable to get xml with pre (XMLVersion) {}: {} {}"
-msgstr "No se puede obtener xml con pre (XMLVersion) {}: {} {}"
+msgstr "Не удалось получить XML с pre (XMLVersion) {}: {} {}"
 
 #: package/models.py:207
 msgid "Package component type"
-msgstr "Tipo de componente del paquete"
+msgstr "Тип компонента пакета"
 
 #: package/models.py:291
 msgid "SPS Name"
-msgstr "Nombre SPS"
+msgstr "Имя SPS"
 
 #: package/models.py:327
 msgid "Package component"
-msgstr "Componente del paquete"
+msgstr "Компонент пакета"
 
 #: package/models.py:342 proc/models.py:1562
 msgid "Files"
-msgstr "Archivos"
+msgstr "Файлы"
 
 #: package/models.py:566
 msgid "Unable to register pid"
-msgstr "No se puede registrar el pid"
+msgstr "Не удалось зарегистрировать PID"
 
 #: pid_provider/choices.py:14 tracker/choices.py:36
 msgid "To do"
-msgstr "Por hacer"
+msgstr "Сделать"
 
 #: pid_provider/choices.py:15 tracker/choices.py:37
 msgid "Done"
-msgstr "Hecho"
+msgstr "Готово"
 
 #: pid_provider/choices.py:16
 msgid "waiting"
-msgstr "esperando"
+msgstr "ожидание"
 
 #: pid_provider/choices.py:17
 msgid "ignore"
-msgstr "ignorar"
+msgstr "игнорировать"
 
 #: pid_provider/choices.py:18
 msgid "undefined"
-msgstr "indefinido"
+msgstr "не определено"
 
 #: pid_provider/choices.py:19
 msgid "invalid"
-msgstr "inválido"
+msgstr "недействительно"
 
 #: pid_provider/choices.py:20
 msgid "duplicated"
-msgstr "duplicado"
+msgstr "дублировано"
 
 #: pid_provider/choices.py:21
 msgid "deduplicated"
-msgstr "deduplicado"
+msgstr "дубликаты удалены"
 
 #: pid_provider/client.py:143
 msgid "Unable to get api token {} {} {} {} {}"
-msgstr "No se puede obtener token de api {} {} {} {} {}"
+msgstr "Не удалось получить токен API {} {} {} {} {}"
 
 #: pid_provider/client.py:213
 msgid "Unable to get pid from pid provider {} {} {} {}"
-msgstr "No se puede obtener pid del proveedor de pid {} {} {} {}"
+msgstr "Не удалось получить PID от провайдера PID {} {} {} {}"
 
 #: pid_provider/client.py:308
 msgid "Unable to get pid from pid provider {} {} {} {} {}"
-msgstr "No se puede obtener pid del proveedor de pid {} {} {} {} {}"
+msgstr "Не удалось получить PID от провайдера PID {} {} {} {} {}"
 
 #: pid_provider/models.py:226
 msgid "XML Post URI"
-msgstr "URI de publicación XML"
+msgstr "URI для отправки XML"
 
 #: pid_provider/models.py:229
 msgid "Get Token URI"
-msgstr "URI de obtención de token"
+msgstr "URI для получения токена"
 
 #: pid_provider/models.py:231
 msgid "Timeout"
-msgstr "Tiempo de espera"
+msgstr "Тайм-аут"
 
 #: pid_provider/models.py:233
 msgid "API Username"
-msgstr "Nombre de usuario de API"
+msgstr "Имя пользователя API"
 
 #: pid_provider/models.py:236
 msgid "API Password"
-msgstr "Contraseña de API"
+msgstr "Пароль API"
 
 #: pid_provider/models.py:291
 msgid "PID type"
-msgstr "Tipo de PID"
+msgstr "Тип PID"
 
 #: pid_provider/models.py:293
 msgid "PID pid_in_xml"
-msgstr "PID pid_in_xml"
+msgstr "PID в XML"
 
 #: pid_provider/models.py:351
 msgid "processing status"
-msgstr "estado de procesamiento"
+msgstr "статус обработки"
 
 #: pid_provider/models.py:363
 msgid "publication year"
-msgstr "año de publicación"
+msgstr "год публикации"
 
 #: pid_provider/models.py:365
 msgid "volume"
-msgstr "volumen"
+msgstr "том"
 
 #: pid_provider/models.py:366
 msgid "number"
-msgstr "número"
+msgstr "номер"
 
 #: pid_provider/models.py:367
 msgid "suppl"
-msgstr "supl"
+msgstr "доп."
 
 #: pid_provider/models.py:374 proc/models.py:1498 upload/models.py:2192
 msgid "Package name"
-msgstr "Nombre del paquete"
+msgstr "Имя пакета"
 
 #: pid_provider/models.py:376
 msgid "v3"
@@ -1932,59 +1910,59 @@ msgstr "v2"
 
 #: pid_provider/models.py:378
 msgid "AOP PID"
-msgstr "PID AOP"
+msgstr "AOP PID"
 
 #: pid_provider/models.py:381
 msgid "elocation id"
-msgstr "id de elocation"
+msgstr "elocation id"
 
 #: pid_provider/models.py:383
 msgid "fpage"
-msgstr "pág_inicial"
+msgstr "первая страница"
 
 #: pid_provider/models.py:384
 msgid "fpage_seq"
-msgstr "pág_inicial_seq"
+msgstr "seq первой страницы"
 
 #: pid_provider/models.py:385
 msgid "lpage"
-msgstr "pág_final"
+msgstr "последняя страница"
 
 #: pid_provider/models.py:387
 msgid "Document Publication Year"
-msgstr "Año de publicación del documento"
+msgstr "Год публикации документа"
 
 #: pid_provider/models.py:391
 msgid "surnames"
-msgstr "apellidos"
+msgstr "фамилии"
 
 #: pid_provider/models.py:392
 msgid "collab"
-msgstr "colab"
+msgstr "коллаборация"
 
 #: pid_provider/models.py:393
 msgid "links"
-msgstr "enlaces"
+msgstr "ссылки"
 
 #: pid_provider/models.py:395
 msgid "partial_body"
-msgstr "cuerpo_parcial"
+msgstr "частичное тело"
 
 #: pid_provider/models.py:399
 msgid "Origin date"
-msgstr "Fecha de origen"
+msgstr "Дата происхождения"
 
 #: pid_provider/models.py:404
 msgid "Available since"
-msgstr "Disponible desde"
+msgstr "Доступно с"
 
 #: pid_provider/models.py:429
 msgid "Other PID"
-msgstr "Otro PID"
+msgstr "Другой PID"
 
 #: pid_provider/models.py:441
 msgid "Other PIDs"
-msgstr "Otros PIDs"
+msgstr "Другие PID"
 
 #: pid_provider/models.py:442 proc/models.py:875 proc/models.py:1051
 #: upload/models.py:1442
@@ -1993,235 +1971,233 @@ msgstr "Otros PIDs"
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:26
 #: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:24
 msgid "Data"
-msgstr "Datos"
+msgstr "Данные"
 
 #: pid_provider/models.py:912
 msgid ""
 "The XML content is an ahead of print version but the document {} is already "
 "published in an issue"
-msgstr ""
-"El contenido XML es una versión ahead of print pero el documento {} ya está "
-"publicado en un fascículo"
+msgstr "Содержимое XML является версией ahead-of-print, но документ {} уже опубликован в выпуске"
 
 #: pid_provider/models.py:973
 msgid "No matching record found for the provided XML data."
-msgstr "No se encontró ningún registro coincidente para los datos XML proporcionados."
+msgstr "Для предоставленных данных XML не найдено соответствующих записей."
 
 #: pid_provider/models.py:1434
 msgid "Incorrect v2"
-msgstr "v2 incorrecto"
+msgstr "Некорректная v2"
 
 #: pid_provider/models.py:1437
 msgid "Correct v2"
-msgstr "v2 correcto"
+msgstr "Корректная v2"
 
 #: pid_provider/query_params.py:207
 msgid "Required Print or Electronic ISSN to identify XML {}"
-msgstr "Se requiere ISSN impreso o electrónico para identificar XML {}"
+msgstr "Требуется печатный или электронный ISSN для идентификации XML {}"
 
 #: pid_provider/wagtail_hooks.py:14
 msgid "Pid Provider XMLs"
-msgstr "XMLs del proveedor de Pid"
+msgstr "XML провайдера PID"
 
 #: pid_provider/wagtail_hooks.py:66
 msgid "Pid Changes"
-msgstr "Cambios de Pid"
+msgstr "Изменения PID"
 
 #: pid_provider/wagtail_hooks.py:98
 msgid "Pid Provider Config"
-msgstr "Configuración del proveedor de Pid"
+msgstr "Конфигурация провайдера PID"
 
 #: pid_provider/wagtail_hooks.py:120
 msgid "Fix pid v2"
-msgstr "Corregir pid v2"
+msgstr "Исправить PID v2"
 
 #: pid_provider/wagtail_hooks.py:158
 msgid "XML Versions"
-msgstr "Versiones XML"
+msgstr "Версии XML"
 
 #: pid_provider/wagtail_hooks.py:184
 msgid "Pid Provider"
-msgstr "Proveedor de Pid"
+msgstr "Провайдер PID"
 
 #: proc/models.py:195
 msgid "Procedure name"
-msgstr "Nombre del procedimiento"
+msgstr "Название процедуры"
 
 #: proc/models.py:201
 msgid "Item type"
-msgstr "Tipo de ítem"
+msgstr "Тип элемента"
 
 #: proc/models.py:216
 msgid "Processing report"
-msgstr "Informe de procesamiento"
+msgstr "Отчет об обработке"
 
 #: proc/models.py:217
 msgid "Processing reports"
-msgstr "Informes de procesamiento"
+msgstr "Отчеты об обработке"
 
 #: proc/models.py:351
 msgid "QA Website Status"
-msgstr "Estado del sitio web de QA"
+msgstr "Статус сайта QA"
 
 #: proc/models.py:357
 msgid "Public Website Status"
-msgstr "Estado del sitio web público"
+msgstr "Статус публичного сайта"
 
 #: proc/models.py:393 proc/models.py:876 proc/models.py:1052
 #: proc/models.py:1563 upload/models.py:314 upload/models.py:1369
 #: upload/models.py:1421
 msgid "Events"
-msgstr "Eventos"
+msgstr "События"
 
 #: proc/models.py:849
 msgid "Acronym"
-msgstr "Acrónimo"
+msgstr "Аббревиатура"
 
 #: proc/models.py:852
 msgid "Availability Status"
-msgstr "Estado de disponibilidad"
+msgstr "Статус доступности"
 
 #: proc/models.py:868 proc/models.py:1042 proc/models.py:1557
 #: upload/models.py:309 upload/models.py:1362 upload/models.py:1406
 msgid "Event newest to oldest"
-msgstr "Evento más reciente a más antiguo"
+msgstr "События от новых к старым"
 
 #: proc/models.py:927
 msgid "Unable to update journal {} {} {} {}"
-msgstr "No se puede actualizar la revista {} {} {} {}"
+msgstr "Не удалось обновить журнал {} {} {} {}"
 
 #: proc/models.py:1010
 msgid "Issue Folder"
-msgstr "Carpeta del fascículo"
+msgstr "Папка выпуска"
 
 #: proc/models.py:1014
 msgid "Files migration status"
-msgstr "Estado de migración de archivos"
+msgstr "Статус миграции файлов"
 
 #: proc/models.py:1022
 msgid "Document records migration status"
-msgstr "Estado de migración de registros de documentos"
+msgstr "Статус миграции записей документа"
 
 #: proc/models.py:1146
 msgid "Unable to update issue {} {} {} {}"
-msgstr "No se puede actualizar el fascículo {} {} {} {}"
+msgstr "Не удалось обновить выпуск {} {} {} {}"
 
 #: proc/models.py:1501
 msgid "Main lang"
-msgstr "Idioma principal"
+msgstr "Основной язык"
 
 #: proc/models.py:1515
 msgid "XML status"
-msgstr "Estado XML"
+msgstr "Статус XML"
 
 #: proc/models.py:1523
 msgid "SPS Pkg status"
-msgstr "Estado del paquete SPS"
+msgstr "Статус пакета SPS"
 
 #: proc/models.py:1531
 msgid "Processed XML"
-msgstr "XML procesado"
+msgstr "Обработанный XML"
 
 #: proc/models.py:1535
 msgid "Native XML + modifications or converted XML from HTML"
-msgstr "XML nativo + modificaciones o XML convertido desde HTML"
+msgstr "Нативный XML + изменения или конвертированный XML из HTML"
 
 #: proc/models.py:1639
 msgid "Unable to update article_proc{} {} {} {}"
-msgstr "No se puede actualizar article_proc{} {} {} {}"
+msgstr "Не удалось обновить article_proc{} {} {} {}"
 
 #: proc/models.py:1726
 msgid "Unable to get xml_with_pre for {}: {}"
-msgstr "No se puede obtener xml_with_pre para {}: {}"
+msgstr "Не удалось получить xml_with_pre для {}: {}"
 
 #: proc/models.py:1771
 msgid "Unable to get xml with pre from migrated article {}: {} {}"
-msgstr "No se puede obtener xml con pre del artículo migrado {}: {} {}"
+msgstr "Не удалось получить XML с pre из мигрированной статьи {}: {} {}"
 
 #: proc/models.py:1906
 msgid "No migrated XML file found for {} ({})"
-msgstr "No se encontró archivo XML migrado para {} ({})"
+msgstr "Файл мигрированного XML не найден для {} ({})"
 
 #: proc/tasks.py:803
 msgid "Select journals by collection"
-msgstr "Seleccionar revistas por colección"
+msgstr "Выбрать журналы по коллекции"
 
 #: proc/wagtail_hooks.py:17
 msgid "Journal Processing"
-msgstr "Procesamiento de revistas"
+msgstr "Обработка журналов"
 
 #: proc/wagtail_hooks.py:50
 msgid "Issue Processing"
-msgstr "Procesamiento de fascículos"
+msgstr "Обработка выпусков"
 
 #: proc/wagtail_hooks.py:87
 msgid "XML from HTML"
-msgstr "XML desde HTML"
+msgstr "XML из HTML"
 
 #: proc/wagtail_hooks.py:126
 msgid "SPS Package"
-msgstr "Paquete SPS"
+msgstr "Пакет SPS"
 
 #: proc/wagtail_hooks.py:161
 msgid "Article Processing"
-msgstr "Procesamiento de artículos"
+msgstr "Обработка статей"
 
 #: proc/wagtail_hooks.py:197
 msgid "Processing Report"
-msgstr "Informe de procesamiento"
+msgstr "Отчет об обработке"
 
 #: proc/wagtail_hooks.py:227
 msgid "Processing"
-msgstr "Procesamiento"
+msgstr "Обработка"
 
 #: publication/api/issue.py:43
 #, python-format
 msgid "Error syncing issue %s: %s"
-msgstr "Error al sincronizar fascículo %s: %s"
+msgstr "Ошибка синхронизации выпуска %s: %s"
 
 #: publication/api/publication.py:76
 msgid "Website enabled is False ({})"
-msgstr "Sitio web habilitado es Falso ({})"
+msgstr "Сайт отключен ({})"
 
 #: publication/models.py:37
 msgid "published by"
-msgstr "publicado por"
+msgstr "опубликовано"
 
 #: publication/models.py:40
 msgid "publication rule"
-msgstr "regla de publicación"
+msgstr "правило публикации"
 
 #: researcher/choices.py:3
 msgid "Mujer"
-msgstr "Mujer"
+msgstr "Женщина"
 
 #: researcher/choices.py:3
 msgid "Hombre"
-msgstr "Hombre"
+msgstr "Мужчина"
 
 #: researcher/choices.py:6
 msgid "Declarado por el investigador"
-msgstr "Declarado por el investigador"
+msgstr "Заявлено исследователем"
 
 #: researcher/choices.py:7
 msgid "Identificado automáticamente por programa de computador"
-msgstr "Identificado automáticamente por programa de computador"
+msgstr "Определено автоматически компьютерной программой"
 
 #: researcher/choices.py:8
 msgid "Identificado por algun usuario"
-msgstr "Identificado por algún usuario"
+msgstr "Определено пользователем"
 
 #: researcher/models.py:21
 msgid "Given names"
-msgstr "Nombres"
+msgstr "Имена"
 
 #: researcher/models.py:24
 msgid "Last name"
-msgstr "Apellido"
+msgstr "Фамилия"
 
 #: researcher/models.py:26
 msgid "Suffix"
-msgstr "Sufijo"
+msgstr "Суффикс"
 
 #: researcher/models.py:27
 msgid "ORCID"
@@ -2233,551 +2209,540 @@ msgstr "Lattes"
 
 #: researcher/models.py:29
 msgid "Gender"
-msgstr "Género"
+msgstr "Пол"
 
 #: researcher/models.py:31
 msgid "Gender identification status"
-msgstr "Estado de identificación de género"
+msgstr "Статус идентификации пола"
 
 #: researcher/models.py:60 researcher/models.py:71
 msgid "Email"
-msgstr "Correo electrónico"
+msgstr "Email"
 
 #: researcher/models.py:63
 msgid "Affiliation"
-msgstr "Afiliación"
+msgstr "Принадлежность (Аффилиация)"
 
 #: researcher/wagtail_hooks.py:20
 msgid "Researcher"
-msgstr "Investigador"
+msgstr "Исследователь"
 
 #: team/models.py:56
 msgid "Team"
-msgstr "Equipo"
+msgstr "Команда"
 
 #: team/models.py:57 team/wagtail_hooks.py:51
 msgid "Teams"
-msgstr "Equipos"
+msgstr "Команды"
 
 #: team/models.py:80
 msgid "Team member"
-msgstr "Miembro del equipo"
+msgstr "Член команды"
 
 #: team/models.py:81
 msgid "Team members"
-msgstr "Miembros del equipo"
+msgstr "Члены команды"
 
 #: team/views.py:14
 msgid "Member has been successfully created"
-msgstr "El miembro ha sido creado exitosamente"
+msgstr "Участник успешно создан"
 
 #: team/wagtail_hooks.py:23
 msgid "Collection Team Members"
-msgstr "Miembros del equipo de colección"
+msgstr "Члены команды коллекции"
 
 #: tracker/choices.py:8
 msgid "started"
-msgstr "iniciado"
+msgstr "запущено"
 
 #: tracker/choices.py:9
 msgid "interrupted"
-msgstr "interrumpido"
+msgstr "прервано"
 
 #: tracker/choices.py:10
 msgid "finished"
-msgstr "finalizado"
+msgstr "завершено"
 
 #: tracker/choices.py:19 upload/choices.py:183
 msgid "error"
-msgstr "error"
+msgstr "ошибка"
 
 #: tracker/choices.py:20 upload/choices.py:185
 msgid "warning"
-msgstr "advertencia"
+msgstr "предупреждение"
 
 #: tracker/choices.py:21
 msgid "info"
-msgstr "información"
+msgstr "инфо"
 
 #: tracker/choices.py:22
 msgid "exception"
-msgstr "excepción"
+msgstr "исключение"
 
 #: tracker/choices.py:35
 msgid "To reprocess"
-msgstr "Por reprocesar"
+msgstr "К переработке"
 
 #: tracker/choices.py:38
 msgid "Doing"
-msgstr "Haciendo"
+msgstr "В процессе"
 
 #: tracker/choices.py:39
 msgid "Blocked"
-msgstr "Bloqueado"
+msgstr "Заблокировано"
 
 #: tracker/choices.py:40
 msgid "Pending"
-msgstr "Pendiente"
+msgstr "В ожидании"
 
 #: tracker/choices.py:41
 msgid "ignored"
-msgstr "ignorado"
+msgstr "игнорировано"
 
 #: tracker/models.py:50
 msgid "name"
-msgstr "nombre"
+msgstr "имя"
 
 #: tracker/models.py:99
 msgid "Exception Type"
-msgstr "Tipo de excepción"
+msgstr "Тип исключения"
 
 #: tracker/models.py:100
 msgid "Exception Msg"
-msgstr "Mensaje de excepción"
+msgstr "Сообщение исключения"
 
 #: tracker/models.py:104 tracker/models.py:178
 msgid "Item"
-msgstr "Ítem"
+msgstr "Элемент"
 
 #: tracker/models.py:110
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:4
 msgid "Action"
-msgstr "Acción"
+msgstr "Действие"
 
 #: tracker/models.py:180
 msgid "Total to process"
-msgstr "Total a procesar"
+msgstr "Всего к обработке"
 
 #: tracker/models.py:183
 msgid "Total processed"
-msgstr "Total procesado"
+msgstr "Всего обработано"
 
 #: tracker/models.py:187
 msgid "status"
-msgstr "estado"
+msgstr "статус"
 
 #: tracker/wagtail_hooks.py:13
 msgid "Unexpected Events"
-msgstr "Eventos inesperados"
+msgstr "Непредвиденные события"
 
 #: tracker/wagtail_hooks.py:55
 msgid "Event Tracker"
-msgstr "Rastreador de eventos"
+msgstr "Трекер событий"
 
 #: tracker/wagtail_hooks.py:99
 msgid "Event Monitoring"
-msgstr "Monitoreo de eventos"
+msgstr "Мониторинг событий"
 
 #: upload/button_helper.py:63
 msgid "Accept / Reject the package or delegate it"
-msgstr "Aceptar / Rechazar el paquete o delegarlo"
+msgstr "Принять / Отклонить пакет или делегировать его"
 
 #: upload/button_helper.py:76
 msgid "Finish deposit"
-msgstr "Finalizar depósito"
+msgstr "Завершить депонирование"
 
 #: upload/button_helper.py:90
 msgid "Archive"
-msgstr "Archivar"
+msgstr "Архив"
 
 #: upload/choices.py:78
 msgid "Submitted"
-msgstr "Enviado"
+msgstr "Отправлено"
 
 #: upload/choices.py:79
 msgid "Enqueued for validation"
-msgstr "En cola para validación"
+msgstr "В очереди на валидацию"
 
 #: upload/choices.py:80 upload/choices.py:93
 msgid "Validated with errors"
-msgstr "Validado con errores"
+msgstr "Проверено с ошибками"
 
 #: upload/choices.py:81
 msgid "Pending quality analysis decision"
-msgstr "Pendiente de decisión de análisis de calidad"
+msgstr "Ожидание решения по анализу качества"
 
 #: upload/choices.py:82 upload/choices.py:92
 msgid "Pending for correction"
-msgstr "Pendiente de corrección"
+msgstr "Ожидание исправления"
 
 #: upload/choices.py:83
 msgid "Unexpected"
-msgstr "Inesperado"
+msgstr "Непредвиденное"
 
 #: upload/choices.py:84
 msgid "Ready to preview on QA website"
-msgstr "Listo para previsualizar en el sitio web de QA"
+msgstr "Готово к просмотру на сайте QA"
 
 #: upload/choices.py:85
 msgid "Preview"
-msgstr "Vista previa"
+msgstr "Предпросмотр"
 
 #: upload/choices.py:86
 msgid "Ready to publish on public website"
-msgstr "Listo para publicar en el sitio web público"
+msgstr "Готово к публикации на публичном сайте"
 
 #: upload/choices.py:88
 msgid "Archived"
-msgstr "Archivado"
+msgstr "Архивировано"
 
 #: upload/choices.py:97
 msgid "Depublish"
-msgstr "Despublicar"
+msgstr "Снять с публикации"
 
 #: upload/choices.py:98
 msgid "Request correction"
-msgstr "Solicitar corrección"
+msgstr "Запросить исправление"
 
 #: upload/choices.py:99
 msgid "Assign quality review"
-msgstr "Asignar revisión de calidad"
+msgstr "Назначить проверку качества"
 
 #: upload/choices.py:100
 msgid "Publish on QA website"
-msgstr "Publicar en el sitio web de QA"
+msgstr "Опубликовать на сайте QA"
 
 #: upload/choices.py:101
 msgid "Publish on public website"
-msgstr "Publicar en el sitio web público"
+msgstr "Опубликовать на публичном сайте"
 
 #: upload/choices.py:113
 msgid "New document"
-msgstr "Nuevo documento"
+msgstr "Новый документ"
 
 #: upload/choices.py:181
 msgid "blocking"
-msgstr "bloqueante"
+msgstr "блокирующий"
 
 #: upload/choices.py:182
 msgid "critical"
-msgstr "crítico"
+msgstr "критический"
 
 #: upload/choices.py:184
 msgid "unknown"
-msgstr "desconocido"
+msgstr "неизвестно"
 
 #: upload/choices.py:186
 msgid "ok"
-msgstr "ok"
+msgstr "ок"
 
 #: upload/choices.py:195
 msgid "The error will be fixed"
-msgstr "El error será corregido"
+msgstr "Ошибка будет исправлена"
 
 #: upload/choices.py:198
 msgid "Impossible to fix it"
-msgstr "Imposible de corregir"
+msgstr "Невозможно исправить"
 
 #: upload/choices.py:200
 msgid "There's disagreement about the error"
-msgstr "Hay desacuerdo sobre el error"
+msgstr "Есть разногласия по поводу ошибки"
 
 #: upload/choices.py:210
 msgid "Accepted with errors"
-msgstr "Aceptado con errores"
+msgstr "Принято с ошибками"
 
 #: upload/choices.py:211
 msgid "Accepted"
-msgstr "Aceptado"
+msgstr "Принято"
 
 #: upload/choices.py:212
 msgid "Correction required"
-msgstr "Corrección requerida"
+msgstr "Требуется исправление"
 
 #: upload/choices.py:221
 msgid "Flexible auto publication"
-msgstr "Publicación automática flexible"
+msgstr "Гибкая автопубликация"
 
 #: upload/choices.py:222
 msgid "Strict auto publication"
-msgstr "Publicación automática estricta"
+msgstr "Строгая автопубликация"
 
 #: upload/choices.py:223
 msgid "Manual publication"
-msgstr "Publicación manual"
+msgstr "Ручная публикация"
 
 #: upload/choices.py:234
 msgid "unreleased"
-msgstr "no lanzado"
+msgstr "не выпущено"
 
 #: upload/choices.py:235
 msgid "published"
-msgstr "publicado"
+msgstr "опубликовано"
 
 #: upload/choices.py:236
 msgid "depublished"
-msgstr "despublicado"
+msgstr "снято с публикации"
 
-#: upload/controller.py:90
+#: upload/choices.py:90
 msgid "Package file"
-msgstr "Archivo de paquete"
+msgstr "Файл пакета"
 
 #: upload/controller.py:142
 msgid "File Report"
-msgstr "Informe de archivo"
+msgstr "Отчет по файлу"
 
 #: upload/controller.py:220 upload/controller.py:234
 msgid ""
 "Not allowed to accept new package. There is a previous package which "
 "status={}. Search it and change the status to '{}'"
-msgstr ""
-"No se permite aceptar un nuevo paquete. Hay un paquete anterior cuyo "
-"estado={}. Búscalo y cambia el estado a '{}'"
+msgstr "Не разрешено принимать новый пакет. Существует предыдущий пакет со статусом {}. Найдите его и измените статус на '{}'"
 
 #: upload/controller.py:281
 msgid "Registered journals: {}. "
-msgstr "Revistas registradas: {}. "
+msgstr "Зарегистрированные журналы: {}. "
 
 #: upload/controller.py:283
 msgid "Found no registered journal. "
-msgstr "No se encontró ninguna revista registrada. "
+msgstr "Зарегистрированных журналов не найдено. "
 
 #: upload/controller.py:286
 msgid ""
 "Journal in XML must be a registered journal. Journal in XML: {}. {}. "
 "Register the journal on core.scielo.org"
-msgstr ""
-"La revista en XML debe ser una revista registrada. Revista en XML: {}. {}. "
-"Registre la revista en core.scielo.org"
+msgstr "Журнал в XML должен быть зарегистрированным. Журнал в XML: {}. {}. Зарегистрируйте журнал на core.scielo.org"
 
 #: upload/controller.py:339
 msgid "Registered issues: {}. "
-msgstr "Fascículos registrados: {}. "
+msgstr "Зарегистрированные выпуски: {}. "
 
 #: upload/controller.py:341
 msgid "{} has no registered issues"
-msgstr "{} no tiene fascículos registrados"
+msgstr "У {} нет зарегистрированных выпусков"
 
 #: upload/controller.py:344
 msgid ""
 "Issue in XML must be a registered issue. Issue in XML {}. {}. Register the "
 "issue on core.scielo.org"
-msgstr ""
-"El fascículo en XML debe ser un fascículo registrado. Fascículo en XML {}. {}. "
-"Registre el fascículo en core.scielo.org"
+msgstr "Выпуск в XML должен быть зарегистрированным. Выпуск в XML {}. {}. Зарегистрируйте выпуск на core.scielo.org"
 
 #: upload/controller.py:356 upload/controller.py:364
 msgid "{} (registered, {}) differs from {} (XML, {})"
-msgstr "{} (registrado, {}) difiere de {} (XML, {})"
+msgstr "{} (зарегистрировано, {}) отличается от {} (XML, {})"
 
 #: upload/forms.py:30 upload/forms.py:32 upload/forms.py:82 upload/forms.py:84
 msgid "Força a publicação de journal"
-msgstr "Forzar la publicación de revista"
+msgstr "Принудительная публикация журнала"
 
 #: upload/forms.py:36 upload/forms.py:38 upload/forms.py:88 upload/forms.py:90
 msgid "Força a publicação de issue"
-msgstr "Forzar la publicación de fascículo"
+msgstr "Принудительная публикация выпуска"
 
 #: upload/forms.py:49
 msgid "Choose the analyst who will decide about the package"
-msgstr "Elige al analista que decidirá sobre el paquete"
+msgstr "Выберите аналитика, который примет решение по пакету"
 
 #: upload/forms.py:56
 msgid ""
 "Make a decision about the package or choose the analyst who will decide "
 "about the package"
-msgstr ""
-"Toma una decisión sobre el paquete o elige al analista que decidirá sobre el "
-"paquete"
+msgstr "Примите решение по пакету или выберите аналитика для принятия решения"
 
 #: upload/forms.py:101
 msgid "Justify your decision about the package"
-msgstr "Justifica tu decisión sobre el paquete"
+msgstr "Обоснуйте решение по пакету"
 
 #: upload/forms.py:131
 msgid "Inform if you finish or not the errors review"
-msgstr "Informa si has terminado o no la revisión de errores"
+msgstr "Укажите, завершили ли вы проверку ошибок"
 
 #: upload/forms.py:154 upload/forms.py:160
 msgid "Value must be from 0 to 100"
-msgstr "El valor debe estar entre 0 y 100"
+msgstr "Значение должно быть от 0 до 100"
 
 #: upload/models.py:105
 msgid "Package Zip"
-msgstr "Zip del paquete"
+msgstr "Zip пакета"
 
 #: upload/models.py:108
 msgid "Package Zip File"
-msgstr "Archivo Zip del paquete"
+msgstr "Zip файл пакета"
 
 #: upload/models.py:114
 msgid "Show package validations"
-msgstr "Mostrar validaciones del paquete"
+msgstr "Показать валидации пакета"
 
 #: upload/models.py:117
 msgid ""
 "Unchecked to be redirect to package upload. Checked to be redirect to "
 "package validation"
-msgstr ""
-"Desmarcado para ser redirigido a la carga del paquete. Marcado para ser "
-"redirigido a la validación del paquete"
+msgstr "Снимите галочку для перехода к загрузке пакета. Отметьте для перехода к валидации пакета"
 
 #: upload/models.py:130
 msgid "Zip file"
-msgstr "Archivo Zip"
+msgstr "Zip файл"
 
 #: upload/models.py:131
 msgid "Zip files"
-msgstr "Archivos Zip"
+msgstr "Zip файлы"
 
 #: upload/models.py:183
 msgid "Package File"
-msgstr "Archivo del paquete"
+msgstr "Файл пакета"
 
 #: upload/models.py:189
 msgid "SPS Package name"
-msgstr "Nombre del paquete SPS"
+msgstr "Имя пакета SPS"
 
 #: upload/models.py:190
 msgid "Signature"
-msgstr "Firma"
+msgstr "Подпись"
 
 #: upload/models.py:205
 msgid "Quality analysis decision"
-msgstr "Decisión de análisis de calidad"
+msgstr "Решение анализа качества"
 
 #: upload/models.py:211
 msgid ""
 "Make a decision about the package or choose the analyst who will decide it"
-msgstr "Toma una decisión sobre el paquete o elige al analista que lo decidirá"
+msgstr "Примите решение по пакету или выберите аналитика для этого"
 
 #: upload/models.py:215
 msgid "Quality analysis comment"
-msgstr "Comentario de análisis de calidad"
+msgstr "Комментарий к анализу качества"
 
 #: upload/models.py:219
 msgid ""
 "Comment the decision about the package or choose the analyst who will "
 "comment it"
-msgstr ""
-"Comenta la decisión sobre el paquete o elige al analista que lo comentará"
+msgstr "Прокомментируйте решение по пакету или выберите аналитика для комментария"
 
 #: upload/models.py:228
 msgid ""
 "Choose the analyst who will decide about the package or add your decision"
-msgstr "Elige al analista que decidirá sobre el paquete o agrega tu decisión"
+msgstr "Выберите аналитика для принятия решения или добавьте свое решение"
 
 #: upload/models.py:250
 msgid "Expiration date"
-msgstr "Fecha de vencimiento"
+msgstr "Дата истечения"
 
 #: upload/models.py:255
 msgid "Error percentual"
-msgstr "Porcentaje de error"
+msgstr "Процент ошибок"
 
 #: upload/models.py:259 upload/models.py:266 upload/models.py:269
 #: upload/models.py:272 upload/models.py:2031 upload/models.py:2034
 #: upload/models.py:2037
 msgid "0 to 100"
-msgstr "0 a 100"
+msgstr "от 0 до 100"
 
 #: upload/models.py:262
 msgid "Warning percentual"
-msgstr "Porcentaje de advertencia"
+msgstr "Процент предупреждений"
 
 #: upload/models.py:278
 msgid "Linked packages"
-msgstr "Paquetes vinculados"
+msgstr "Связанные пакеты"
 
 #: upload/models.py:279
 msgid "Linked packages which will be published only if all are approved"
-msgstr "Paquetes vinculados que se publicarán solo si todos son aprobados"
+msgstr "Связанные пакеты, которые будут опубликованы только при одобрении всех"
 
 #: upload/models.py:320 upload/models.py:321 upload/wagtail_hooks.py:92
 msgid "Package admin"
-msgstr "Administrador de paquetes"
+msgstr "Админ пакетов"
 
 #: upload/models.py:323
 msgid "Can finish deposit"
-msgstr "Puede finalizar depósito"
+msgstr "Может завершать депонирование"
 
 #: upload/models.py:324
 msgid "Can access all packages from all users"
-msgstr "Puede acceder a todos los paquetes de todos los usuarios"
+msgstr "Может просматривать пакеты всех пользователей"
 
 #: upload/models.py:325
 msgid "Can assign package"
-msgstr "Puede asignar paquete"
+msgstr "Может назначать пакет"
 
 #: upload/models.py:684
 msgid "The error review has been completed"
-msgstr "La revisión de errores ha sido completada"
+msgstr "Проверка ошибок завершена"
 
 #: upload/models.py:687
 msgid "The error review is in progress"
-msgstr "La revisión de errores está en progreso"
+msgstr "Проверка ошибок выполняется"
 
 #: upload/models.py:690 upload/models.py:709
 msgid "The XML package needs to be fixed and sent again"
-msgstr "El paquete XML necesita ser corregido y enviado nuevamente"
+msgstr "Пакет XML нужно исправить и отправить повторно"
 
 #: upload/models.py:697
 msgid "It was concluded that {} are not errors"
-msgstr "Se concluyó que {} no son errores"
+msgstr "Сделан вывод, что {} не являются ошибками"
 
 #: upload/models.py:703
 msgid "It was concluded that {} are impossible to fix"
-msgstr "Se concluyó que {} son imposibles de corregir"
+msgstr "Сделан вывод, что {} невозможно исправить"
 
 #: upload/models.py:712
 msgid "Finish the deposit"
-msgstr "Finalizar el depósito"
+msgstr "Завершить депонирование"
 
 #: upload/models.py:715
 msgid "Review and comment the errors"
-msgstr "Revisar y comentar los errores"
+msgstr "Проверить и прокомментировать ошибки"
 
 #: upload/models.py:904
 msgid "SPS Package was not created"
-msgstr "El paquete SPS no fue creado"
+msgstr "Пакет SPS не был создан"
 
 #: upload/models.py:907
 msgid "Article was not created"
-msgstr "El artículo no fue creado"
+msgstr "Статья не была создана"
 
 #: upload/models.py:920
 msgid "{} is not published on MinIO"
-msgstr "{} no está publicado en MinIO"
+msgstr "{} не опубликован на MinIO"
 
 #: upload/models.py:924
 msgid "Total of XML, PDF, HTML do not match {}"
-msgstr "El total de XML, PDF, HTML no coincide con {}"
+msgstr "Общее количество XML, PDF, HTML не совпадает с {}"
 
 #: upload/models.py:939
 msgid "SPS package requires PID provider registration"
-msgstr "El paquete SPS requiere registro de proveedor de PID"
+msgstr "Пакет SPS требует регистрации у провайдера PID"
 
 #: upload/models.py:1203
 msgid "QA decision report"
-msgstr "Informe de decisión de QA"
+msgstr "Отчет о решении QA"
 
 #: upload/models.py:1366 upload/models.py:1417 upload/models.py:1663
 msgid "Decision"
-msgstr "Decisión"
+msgstr "Решение"
 
 #: upload/models.py:1367 upload/models.py:1418
 msgid "Article"
-msgstr "Artículo"
+msgstr "Статья"
 
 #: upload/models.py:1376 upload/models.py:1377 upload/wagtail_hooks.py:203
 msgid "Quality control admin"
-msgstr "Administrador de control de calidad"
+msgstr "Админ контроля качества"
 
 #: upload/models.py:1419
 msgid "Publication Status"
-msgstr "Estado de publicación"
+msgstr "Статус публикации"
 
 #: upload/models.py:1429 upload/models.py:1430 upload/wagtail_hooks.py:286
 msgid "Publication admin"
-msgstr "Administrador de publicación"
+msgstr "Админ публикаций"
 
 #: upload/models.py:1436
 msgid "Subject"
-msgstr "Asunto"
+msgstr "Тема"
 
 #: upload/models.py:1440
 msgid "Item being analyzed"
-msgstr "Ítem siendo analizado"
+msgstr "Анализируемый элемент"
 
 #: upload/models.py:1443
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:22
@@ -2785,201 +2750,201 @@ msgstr "Ítem siendo analizado"
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:25
 #: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:23
 msgid "Message"
-msgstr "Mensaje"
+msgstr "Сообщение"
 
 #: upload/models.py:1445 upload/models.py:1883
 msgid "Result"
-msgstr "Resultado"
+msgstr "Результат"
 
 #: upload/models.py:1477
 msgid "Validation result"
-msgstr "Resultado de validación"
+msgstr "Результат валидации"
 
 #: upload/models.py:1478
 msgid "Validation results"
-msgstr "Resultados de validación"
+msgstr "Результаты валидации"
 
 #: upload/models.py:1566
 msgid "Sub-item being analyzed"
-msgstr "Sub-ítem siendo analizado"
+msgstr "Анализируемый подэлемент"
 
 #: upload/models.py:1569
 msgid "Focus on"
-msgstr "Enfoque en"
+msgstr "Фокус на"
 
 #: upload/models.py:1572
 msgid "Validation type"
-msgstr "Tipo de validación"
+msgstr "Тип валидации"
 
 #: upload/models.py:1601
 msgid "XML validation result"
-msgstr "Resultado de validación XML"
+msgstr "Результат валидации XML"
 
 #: upload/models.py:1602
 msgid "XML validation results"
-msgstr "Resultados de validación XML"
+msgstr "Результаты валидации XML"
 
 #: upload/models.py:1633 upload/wagtail_hooks.py:468
 msgid "XML info"
-msgstr "Información XML"
+msgstr "XML информация"
 
 #: upload/models.py:1634
 msgid "XML infos"
-msgstr "Informaciones XML"
+msgstr "XML информация (мн.ч.)"
 
 #: upload/models.py:1648
 msgid "Expected value"
-msgstr "Valor esperado"
+msgstr "Ожидаемое значение"
 
 #: upload/models.py:1652
 msgid "Got value"
-msgstr "Valor obtenido"
+msgstr "Полученное значение"
 
 #: upload/models.py:1653
 msgid "Advice"
-msgstr "Consejo"
+msgstr "Совет"
 
 #: upload/models.py:1655
 msgid "Reaction"
-msgstr "Reacción"
+msgstr "Реакция"
 
 #: upload/models.py:1678 upload/models.py:1969
 msgid "XML error"
-msgstr "Error XML"
+msgstr "Ошибка XML"
 
 #: upload/models.py:1679
 #: upload/templates/modeladmin/upload/package/inspect.html:204
 #: upload/templates/modeladmin/upload/package/inspect_.html:204
 #: upload/wagtail_hooks.py:389
 msgid "XML errors"
-msgstr "Errores XML"
+msgstr "Ошибки XML"
 
 #: upload/models.py:1732
 msgid "Validation category"
-msgstr "Categoría de validación"
+msgstr "Категория валидации"
 
 #: upload/models.py:1739
 msgid "creation"
-msgstr "creación"
+msgstr "создание"
 
 #: upload/models.py:1759
 msgid "Validation Report"
-msgstr "Informe de validación"
+msgstr "Отчет о валидации"
 
 #: upload/models.py:1760 upload/wagtail_hooks.py:512
 msgid "Validation Reports"
-msgstr "Informes de validación"
+msgstr "Отчеты о валидации"
 
 #: upload/models.py:1902
 msgid "Report File"
-msgstr "Archivo de informe"
+msgstr "Файл отчета"
 
 #: upload/models.py:1958
 msgid "The error review is complete"
-msgstr "La revisión de errores está completa"
+msgstr "Проверка ошибок завершена"
 
 #: upload/models.py:1978 upload/validation/xml_data_checker.py:55
 msgid "XML Error Report"
-msgstr "Informe de error XML"
+msgstr "Отчет об ошибках XML"
 
 #: upload/models.py:1979 upload/wagtail_hooks.py:353
 msgid "XML Error Reports"
-msgstr "Informes de error XML"
+msgstr "Отчеты об ошибках XML"
 
 #: upload/models.py:2197
 msgid "Pid Reservation"
-msgstr "Reserva de Pid"
+msgstr "Резервирование PID"
 
 #: upload/models.py:2198
 msgid "Pid Reservations"
-msgstr "Reservas de Pid"
+msgstr "Резервирование PID (мн.ч.)"
 
 #: upload/models.py:2253
 msgid "Setting package.pid_v2 from PidProviderXML"
-msgstr "Configurando package.pid_v2 desde PidProviderXML"
+msgstr "Установка package.pid_v2 из PidProviderXML"
 
 #: upload/models.py:2268
 msgid "Unable to set package.pid_v2 because issue ({}) is not registered"
-msgstr "No se puede configurar package.pid_v2 porque el fascículo ({}) no está registrado"
+msgstr "Не удалось установить package.pid_v2, так как выпуск ({}) не зарегистрирован"
 
 #: upload/models.py:2299
 msgid "Unable to reserve pid_v2 {} for {}"
-msgstr "No se puede reservar pid_v2 {} para {}"
+msgstr "Не удалось зарезервировать pid_v2 {} для {}"
 
 #: upload/models.py:2309
 msgid "Unable to update pid_provider ({}) with {}"
-msgstr "No se puede actualizar pid_provider ({}) con {}"
+msgstr "Не удалось обновить pid_provider ({}) с {}"
 
 #: upload/models.py:2354
 msgid "Setting v2 ({}) from {}"
-msgstr "Configurando v2 ({}) desde {}"
+msgstr "Установка v2 ({}) из {}"
 
 #: upload/models.py:2385
 msgid "Setting v2 ({}) from random {}"
-msgstr "Configurando v2 ({}) desde aleatorio {}"
+msgstr "Установка v2 ({}) из случайного {}"
 
 #: upload/tasks.py:172
 msgid "Assets Report"
-msgstr "Informe de activos"
+msgstr "Отчет по активам (Assets)"
 
 #: upload/tasks.py:191
 msgid "Package has all the expected asset files"
-msgstr "El paquete tiene todos los archivos de activos esperados"
+msgstr "В пакете присутствуют все ожидаемые файлы активов"
 
 #: upload/tasks.py:193
 msgid "Assets"
-msgstr "Activos"
+msgstr "Активы"
 
 #: upload/tasks.py:216
 msgid "Renditions Report"
-msgstr "Informe de representaciones"
+msgstr "Отчет по рендерингам (Renditions)"
 
 #: upload/tasks.py:229 upload/tasks.py:237
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:55
 msgid "Renditions"
-msgstr "Representaciones"
+msgstr "Представления (Renditions)"
 
 #: upload/tasks.py:235
 msgid "Package has all the expected rendition files"
-msgstr "El paquete tiene todos los archivos de representación esperados"
+msgstr "В пакете присутствуют все ожидаемые файлы представлений"
 
 #: upload/tasks.py:259
 msgid "Renditions content report"
-msgstr "Informe de contenido de representaciones"
+msgstr "Отчет о содержимом представлений"
 
 #: upload/tasks.py:414
 msgid "DTD Report"
-msgstr "Informe DTD"
+msgstr "Отчет DTD"
 
 #: upload/tasks.py:425 upload/tasks.py:432 upload/tasks.py:440
 msgid "XML Structure"
-msgstr "Estructura XML"
+msgstr "Структура XML"
 
 #: upload/tasks.py:430 upload/tasks.py:468
 msgid "No error found"
-msgstr "No se encontró ningún error"
+msgstr "Ошибок не найдено"
 
 #: upload/tasks.py:448
 msgid "Style checker Report"
-msgstr "Informe del verificador de estilo"
+msgstr "Отчет проверки стиля"
 
 #: upload/tasks.py:463 upload/tasks.py:470 upload/tasks.py:478
 msgid "XML Style"
-msgstr "Estilo XML"
+msgstr "Стиль XML"
 
 #: upload/tasks.py:556
 msgid "Web page Report"
-msgstr "Informe de página web"
+msgstr "Отчет по веб-странице"
 
 #: upload/templates/modeladmin/upload/package/create.html:23
 msgid "Saving…"
-msgstr "Guardando…"
+msgstr "Сохранение…"
 
 #: upload/templates/modeladmin/upload/package/create.html:24
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:12
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:12
 msgid "Save"
-msgstr "Guardar"
+msgstr "Сохранить"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:15
 #: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:15
@@ -2987,92 +2952,92 @@ msgstr "Guardar"
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:15
 #: upload/templates/modeladmin/upload/package/validation_report/individual_content.html:15
 msgid "Back to package inspection"
-msgstr "Volver a la inspección del paquete"
+msgstr "Назад к инспекции пакета"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:24
 #: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:24
 msgid "Resolution action"
-msgstr "Acción de resolución"
+msgstr "Действие решения"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:25
 #: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:25
 msgid "Resolution rationale"
-msgstr "Justificación de la resolución"
+msgstr "Обоснование решения"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:26
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:4
 msgid "Opinion"
-msgstr "Opinión"
+msgstr "Мнение"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:47
 msgid "Add validation error"
-msgstr "Añadir error de validación"
+msgstr "Добавить ошибку валидации"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/analyse.html:52
 msgid "Send opinions"
-msgstr "Enviar opiniones"
+msgstr "Отправить мнения"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:26
 msgid "Quality analyst opinion"
-msgstr "Opinión del analista de calidad"
+msgstr "Мнение аналитика качества"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/report.html:27
 msgid "Quality analyst guidance"
-msgstr "Orientación del analista de calidad"
+msgstr "Руководство аналитика качества"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:19
 msgid "If you don\\"
-msgstr "Si no\\"
+msgstr "Если вы не..."
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:19
 msgid "Google Groups"
-msgstr "Google Groups"
+msgstr "Google Группы"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:27
 msgid "Resolution"
-msgstr "Resolución"
+msgstr "Решение"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/index/start.html:48
 msgid "Send resolutions"
-msgstr "Enviar resoluciones"
+msgstr "Отправить решения"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:6
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:6
 msgid "Choose an option"
-msgstr "Elige una opción"
+msgstr "Выберите вариант"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:7
 msgid "I will fix this error"
-msgstr "Corregiré este error"
+msgstr "Я исправлю эту ошибку"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:8
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:7
 msgid "This is not an error"
-msgstr "Esto no es un error"
+msgstr "Это не ошибка"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution.html:10
 msgid "Rationale"
-msgstr "Justificación"
+msgstr "Обоснование"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:8
 msgid "This error has to be fixed"
-msgstr "Este error debe ser corregido"
+msgstr "Эту ошибку необходимо исправить"
 
 #: upload/templates/modeladmin/upload/package/error_resolution/item_resolution_opinion.html:10
 msgid "Guidance"
-msgstr "Orientación"
+msgstr "Руководство"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:12
 #: upload/templates/modeladmin/upload/package/inspect_.html:12
 #, python-format
 msgid "Back to %(pkg_zip_name)s list"
-msgstr "Volver a la lista de %(pkg_zip_name)s"
+msgstr "Назад к списку %(pkg_zip_name)s"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:19
 #: upload/templates/modeladmin/upload/package/inspect_.html:19
 #, python-format
 msgid "Go to %(lk)s validation reports (%(st)s)"
-msgstr "Ir a informes de validación de %(lk)s (%(st)s)"
+msgstr "Перейти к отчетам о валидации %(lk)s (%(st)s)"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:57
 #: upload/templates/modeladmin/upload/package/inspect_.html:57
@@ -3083,7 +3048,7 @@ msgstr "XML"
 #: upload/templates/modeladmin/upload/package/inspect.html:64
 #: upload/templates/modeladmin/upload/package/inspect_.html:64
 msgid "Package validations"
-msgstr "Validaciones del paquete"
+msgstr "Валидации пакета"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:69
 #: upload/templates/modeladmin/upload/package/inspect.html:115
@@ -3092,12 +3057,12 @@ msgstr "Validaciones del paquete"
 #: upload/templates/modeladmin/upload/package/inspect_.html:115
 #: upload/templates/modeladmin/upload/package/inspect_.html:165
 msgid "Date"
-msgstr "Fecha"
+msgstr "Дата"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:70
 #: upload/templates/modeladmin/upload/package/inspect_.html:70
 msgid "Blocking issues"
-msgstr "Problemas bloqueantes"
+msgstr "Блокирующие проблемы"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:71
 #: upload/templates/modeladmin/upload/package/inspect.html:116
@@ -3106,44 +3071,44 @@ msgstr "Problemas bloqueantes"
 #: upload/templates/modeladmin/upload/package/inspect_.html:116
 #: upload/templates/modeladmin/upload/package/inspect_.html:205
 msgid "Critical issues"
-msgstr "Problemas críticos"
+msgstr "Критические проблемы"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:72
 #: upload/templates/modeladmin/upload/package/inspect.html:117
 #: upload/templates/modeladmin/upload/package/inspect_.html:72
 #: upload/templates/modeladmin/upload/package/inspect_.html:117
 msgid "Errors"
-msgstr "Errores"
+msgstr "Ошибки"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:73
 #: upload/templates/modeladmin/upload/package/inspect.html:118
 #: upload/templates/modeladmin/upload/package/inspect_.html:73
 #: upload/templates/modeladmin/upload/package/inspect_.html:118
 msgid "Warnings"
-msgstr "Advertencias"
+msgstr "Предупреждения"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:89
 #: upload/templates/modeladmin/upload/package/inspect_.html:89
 #: upload/templates/modeladmin/upload/package/inspect_.html:139
 msgid "Processing..."
-msgstr "Procesando..."
+msgstr "Обработка..."
 
 #: upload/templates/modeladmin/upload/package/inspect.html:93
 #: upload/templates/modeladmin/upload/package/inspect_.html:93
 msgid "Resolve errors"
-msgstr "Resolver errores"
+msgstr "Устранить ошибки"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:95
 #: upload/templates/modeladmin/upload/package/inspect.html:178
 #: upload/templates/modeladmin/upload/package/inspect_.html:95
 #: upload/templates/modeladmin/upload/package/inspect_.html:178
 msgid "View report"
-msgstr "Ver informe"
+msgstr "Посмотреть отчет"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:104
 #: upload/templates/modeladmin/upload/package/inspect_.html:104
 msgid "XML Validations"
-msgstr "Validaciones XML"
+msgstr "Валидации XML"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:108
 #: upload/templates/modeladmin/upload/package/inspect_.html:108
@@ -3151,84 +3116,81 @@ msgid ""
 "By default the system sets all the XML errors were accepted by the XML "
 "producer and will be corrected. In case of disagreement, review the errors "
 "and set a different opinion"
-msgstr ""
-"Por defecto, el sistema establece que todos los errores XML fueron aceptados "
-"por el productor XML y serán corregidos. En caso de desacuerdo, revisa los "
-"errores y establece una opinión diferente"
+msgstr "По умолчанию система считает, что все ошибки XML приняты производителем и будут исправлены. В случае несогласия проверьте ошибки и укажите другое мнение."
 
 #: upload/templates/modeladmin/upload/package/inspect.html:119
 #: upload/templates/modeladmin/upload/package/inspect_.html:119
 msgid "Accepted to fix"
-msgstr "Aceptado para corregir"
+msgstr "Принято к исправлению"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:120
 #: upload/templates/modeladmin/upload/package/inspect_.html:120
 msgid "Contested issues"
-msgstr "Problemas impugnados"
+msgstr "Оспоренные вопросы"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:121
 #: upload/templates/modeladmin/upload/package/inspect_.html:121
 msgid "Declared impossible to fix"
-msgstr "Declarado imposible de corregir"
+msgstr "Объявлено невозможным к исправлению"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:139
 msgid "Processing... Reload page"
-msgstr "Procesando... Recargar página"
+msgstr "Обработка... Перезагрузите страницу"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:143
 #: upload/templates/modeladmin/upload/package/inspect_.html:143
 msgid "Error review completed"
-msgstr "Revisión de errores completada"
+msgstr "Проверка ошибок завершена"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:146
 #: upload/templates/modeladmin/upload/package/inspect_.html:146
 msgid "Review the XML errors"
-msgstr "Revisar los errores XML"
+msgstr "Проверить ошибки XML"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:148
 #: upload/templates/modeladmin/upload/package/inspect_.html:148
 msgid "View the XML errors"
-msgstr "Ver los errores XML"
+msgstr "Посмотреть ошибки XML"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:153
 #: upload/templates/modeladmin/upload/package/inspect_.html:153
 msgid "Pending conclusion"
-msgstr "Conclusión pendiente"
+msgstr "Ожидание заключения"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:166
 #: upload/templates/modeladmin/upload/package/inspect_.html:166
 #: upload/wagtail_hooks.py:548
 msgid "Validations"
-msgstr "Validaciones"
+msgstr "Валидации"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:190
 #: upload/templates/modeladmin/upload/package/inspect_.html:190
 msgid "Processing validations... Reload page. "
-msgstr "Procesando validaciones... Recargar página. "
+msgstr "Обработка валидаций... Перезагрузите страницу. "
 
 #: upload/templates/modeladmin/upload/package/inspect.html:195
 #: upload/templates/modeladmin/upload/package/inspect_.html:195
 msgid "Validations finished!"
-msgstr "¡Validaciones finalizadas!"
+msgstr "Валидации завершены!"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:198
 #: upload/templates/modeladmin/upload/package/inspect_.html:198
 msgid "Summary"
-msgstr "Resumen"
+msgstr "Сводка"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:203
 #: upload/templates/modeladmin/upload/package/inspect_.html:203
 msgid "XML warnings"
-msgstr "Advertencias XML"
+msgstr "Предупреждения XML"
 
 #: upload/templates/modeladmin/upload/package/inspect.html:223
 #: upload/templates/modeladmin/upload/package/inspect_.html:223
 msgid "Download XML errors report"
-msgstr "Descargar informe de errores XML"
+msgstr "Скачать отчет об ошибках XML"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:4
 msgid "Preview (optimized package)"
-msgstr "Vista previa (paquete optimizado)"
+msgstr "Предпросмотр (оптимизированный пакет)"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:8
 msgid "HTML"
@@ -3236,11 +3198,11 @@ msgstr "HTML"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:18
 msgid "Preview HTML "
-msgstr "Vista previa HTML "
+msgstr "Предпросмотр HTML "
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:35
 msgid "View XML "
-msgstr "Ver XML "
+msgstr "Просмотреть XML "
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:43
 msgid "PDF"
@@ -3248,53 +3210,53 @@ msgstr "PDF"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons.html:51
 msgid "Download PDF"
-msgstr "Descargar PDF"
+msgstr "Скачать PDF"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:4
 msgid "Download"
-msgstr "Descargar"
+msgstr "Скачать"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:12
 msgid "Original package"
-msgstr "Paquete original"
+msgstr "Оригинальный пакет"
 
 #: upload/templates/modeladmin/upload/package/inspect_buttons_download.html:20
 msgid "Optimized package"
-msgstr "Paquete optimizado"
+msgstr "Оптимизированный пакет"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:19
 msgid "Digital assets"
-msgstr "Activos digitales"
+msgstr "Цифровые активы"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:26
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:62
 msgid "Is present in the package?"
-msgstr "¿Está presente en el paquete?"
+msgstr "Присутствует в пакете?"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:38
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:72
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:77
 msgid "Yes"
-msgstr "Sí"
+msgstr "Да"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:40
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:74
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:79
 msgid "No"
-msgstr "No"
+msgstr "Нет"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:46
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:85
 msgid "File is missing"
-msgstr "Falta el archivo"
+msgstr "Файл отсутствует"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:60
 msgid "Expected filename"
-msgstr "Nombre de archivo esperado"
+msgstr "Ожидаемое имя файла"
 
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:61
 msgid "Is the main Language"
-msgstr "¿Es el idioma principal?"
+msgstr "Является ли основным языком"
 
 #: upload/templates/modeladmin/upload/package/validation_report/edit.html:15
 #: upload/templates/modeladmin/upload/validationreport/edit.html:15
@@ -3302,115 +3264,115 @@ msgstr "¿Es el idioma principal?"
 #: upload/templates/modeladmin/upload/xmlinforeport/edit.html:15
 #, python-format
 msgid "Got to %(model_name)s list"
-msgstr "Ir a la lista de %(model_name)s"
+msgstr "Перейти к списку %(model_name)s"
 
 #: upload/templates/modeladmin/upload/validationreport/edit.html:9
 #: upload/templates/modeladmin/upload/xmlerrorreport/edit.html:9
 #: upload/templates/modeladmin/upload/xmlinforeport/edit.html:9
 msgid "Back to package validations"
-msgstr "Volver a las validaciones del paquete"
+msgstr "Назад к валидациям пакета"
 
 #: upload/templates/modeladmin/upload/validationresult/inspect.html:15
 msgid "Back to related package"
-msgstr "Volver al paquete relacionado"
+msgstr "Назад к связанному пакету"
 
 #: upload/templates/modeladmin/upload/validationresult/inspect.html:37
 msgid "Missing file"
-msgstr "Archivo faltante"
+msgstr "Файл отсутствует"
 
 #: upload/templates/modeladmin/upload/validationresult/inspect.html:46
 msgid "Snippet"
-msgstr "Fragmento"
+msgstr "Фрагмент (Snippet)"
 
 #: upload/validation/html_validation.py:22
 msgid "Web page `{}` does not exist"
-msgstr "La página web `{}` no existe"
+msgstr "Веб-страница `{}` не существует"
 
 #: upload/validation/html_validation.py:29
 #: upload/validation/rendition_validation.py:23
 msgid "It was expected to find `{}` in {} ({})"
-msgstr "Se esperaba encontrar `{}` en {} ({})"
+msgstr "Ожидалось найти `{}` в {} ({})"
 
 #: upload/validation/rendition_validation.py:30
 msgid "It was expected to find `{}` in XML ({})"
-msgstr "Se esperaba encontrar `{}` en XML ({})"
+msgstr "Ожидалось найти `{}` в XML ({})"
 
 #: upload/validation/xml_data_checker.py:46
 msgid "XML Info Report"
-msgstr "Informe de información XML"
+msgstr "Отчет об информации XML"
 
 #: upload/views.py:30 upload/views.py:149 upload/views.py:213
 msgid "Operation not available"
-msgstr "Operación no disponible"
+msgstr "Операция недоступна"
 
 #: upload/views.py:119
 msgid "Success ..."
-msgstr "Éxito ..."
+msgstr "Успех..."
 
 #: upload/views.py:147
 msgid "The decision was executed as planned"
-msgstr "La decisión se ejecutó según lo planeado"
+msgstr "Решение выполнено по плану"
 
 #: upload/views.py:148
 msgid "There was an impediment to executing the decision."
-msgstr "Hubo un impedimento para ejecutar la decisión."
+msgstr "При выполнении решения возникло препятствие."
 
 #: upload/views.py:204
 msgid "Article successfully published"
-msgstr "Artículo publicado exitosamente"
+msgstr "Статья успешно опубликована"
 
 #: upload/views.py:205
 msgid "Failed to publish the article. Please try again."
-msgstr "Error al publicar el artículo. Por favor, intente de nuevo."
+msgstr "Не удалось опубликовать статью. Пожалуйста, попробуйте снова."
 
 #: upload/views.py:231
 msgid "Package has been deposited"
-msgstr "El paquete ha sido depositado"
+msgstr "Пакет депонирован"
 
 #: upload/views.py:237
 msgid "The XML package needs review and comment"
-msgstr "El paquete XML necesita revisión y comentarios"
+msgstr "Пакет XML требует проверки и комментариев"
 
 #: upload/views.py:244
 msgid "Package deposit failed due to errors"
-msgstr "El depósito del paquete falló debido a errores"
+msgstr "Депонирование пакета не удалось из-за ошибок"
 
 #: upload/views.py:248
 msgid "Correct package based on report and resubmit"
-msgstr "Corregir el paquete basado en el informe y volver a enviar"
+msgstr "Исправьте пакет на основе отчета и отправьте повторно"
 
 #: upload/views.py:320
 msgid "You do not have permission to assign packages."
-msgstr "No tienes permiso para asignar paquetes."
+msgstr "У вас нет прав для назначения пакетов."
 
 #: upload/views.py:341
 msgid "You do not have permission to archive packages."
-msgstr "No tienes permiso para archivar paquetes."
+msgstr "У вас нет прав для архивации пакетов."
 
 #: upload/views.py:348
 msgid "Package was archived."
-msgstr "El paquete fue archivado."
+msgstr "Пакет был архивирован."
 
 #: upload/views.py:352
 msgid "Unable to archive package which status = {}."
-msgstr "No se puede archivar el paquete cuyo estado = {}."
+msgstr "Невозможно архивировать пакет со статусом {}."
 
 #: upload/wagtail_hooks.py:52
 msgid "Package upload"
-msgstr "Carga de paquete"
+msgstr "Загрузка пакета"
 
 #: upload/wagtail_hooks.py:432
 msgid "XML Info Reports"
-msgstr "Informes de información XML"
+msgstr "Отчеты об информации XML"
 
 #: upload/wagtail_hooks.py:581
 msgid "Upload Validator"
-msgstr "Validador de carga"
+msgstr "Валидатор загрузки"
 
 #: upload/wagtail_hooks.py:617
 msgid "Archived Packages"
-msgstr "Paquetes archivados"
+msgstr "Архивные пакеты"
 
 #: upload/wagtail_hooks.py:693
 msgid "Error management"
-msgstr "Gestión de errores"
+msgstr "Управление ошибками"

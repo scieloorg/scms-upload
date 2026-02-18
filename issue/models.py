@@ -4,7 +4,7 @@ from string import ascii_lowercase, digits
 
 from django.conf import settings
 from django.db import IntegrityError, models
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -138,7 +138,7 @@ class Issue(CommonControlField, IssuePublicationDate):
                 volume=volume,
                 supplement=supplement,
                 number=number,
-            ).first()
+            ).order_by("-updated").first()
 
     @classmethod
     def create(
@@ -277,6 +277,15 @@ class Issue(CommonControlField, IssuePublicationDate):
     @property
     def article_ids(self):
         return [item.pid_v3 for item in self.article_set.all()]
+
+    @classmethod
+    def get_duplicates(cls, journal=None):
+        base_filter = {}
+        if journal:
+            base_filter["journal"] = journal
+        return cls.objects.filter(**base_filter).values(
+            "journal", "volume", "number", "supplement"
+        ).annotate(count=Count("id")).filter(count__gt=1)
 
 
 class TOC(CommonControlField, ClusterableModel):
