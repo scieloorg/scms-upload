@@ -57,15 +57,17 @@ class CompanyModelTest(TestCase):
         self.assertEqual(company.autocomplete_label(), "Test Company")
 
     def test_company_with_visual_identity(self):
-        """Test creating a company with url, logo, and certified_since."""
+        """Test creating a company with url, logo, certified_since, and personal_contact."""
         from datetime import date
         company = Company.objects.create(
             name="Certified Company",
             url="https://example.com",
+            personal_contact="John Doe",
             certified_since=date(2020, 1, 1),
             creator=self.user,
         )
         self.assertEqual(company.url, "https://example.com")
+        self.assertEqual(company.personal_contact, "John Doe")
         self.assertEqual(company.certified_since, date(2020, 1, 1))
 
 
