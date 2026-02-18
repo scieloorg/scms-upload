@@ -77,3 +77,29 @@ class JournalViewSetGroup(SnippetViewSetGroup):
 
 # Registrar o grupo no menu
 register_snippet(JournalViewSetGroup)
+
+
+from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
+from journal.models import JournalMember, JournalCompanyContract
+
+
+class JournalMemberAdmin(ModelAdmin):
+    model = JournalMember
+    menu_label = "Journal Members"
+    menu_icon = "user"
+    list_display = ("user", "journal", "role", "is_active_member", "created")
+    search_fields = ("user__username", "user__email", "journal__title")
+    list_filter = ("role", "is_active_member", "created")
+
+
+class JournalCompanyContractAdmin(ModelAdmin):
+    model = JournalCompanyContract
+    menu_label = "Journal-Company Contracts"
+    menu_icon = "doc-full"
+    list_display = ("journal", "company", "initial_date", "final_date", "created")
+    search_fields = ("journal__title", "company__name")
+    list_filter = ("initial_date", "final_date", "created")
+
+
+modeladmin_register(JournalMemberAdmin)
+modeladmin_register(JournalCompanyContractAdmin)

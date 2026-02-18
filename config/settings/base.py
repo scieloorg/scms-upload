@@ -123,6 +123,7 @@ LOCAL_APPS = [
     "article",
     "bigbang",
     "collection",
+    "company",
     "doi",
     "files_storage",
     "htmlxml",

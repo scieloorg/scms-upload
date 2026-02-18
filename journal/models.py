@@ -1103,3 +1103,199 @@ class Subject(CommonControlField):
         obj.updated = user
         obj.save()
         return obj
+
+
+class JournalMember(CommonControlField):
+    """
+    Membership relationship between a User and a Journal with a role.
+    """
+
+    MANAGER = "manager"
+    MEMBER = "member"
+
+    ROLE_CHOICES = [
+        (MANAGER, _("Manager")),
+        (MEMBER, _("Member")),
+    ]
+
+    journal = models.ForeignKey(
+        Journal,
+        verbose_name=_("Journal"),
+        on_delete=models.CASCADE,
+        related_name="journal_members",
+    )
+    user = models.ForeignKey(
+        "core_users.User",
+        verbose_name=_("User"),
+        on_delete=models.CASCADE,
+        related_name="journal_memberships",
+    )
+    role = models.CharField(
+        _("Role"),
+        max_length=20,
+        choices=ROLE_CHOICES,
+        default=MEMBER,
+    )
+    is_active_member = models.BooleanField(
+        _("Active Member"), default=True
+    )
+
+    panels = [
+        FieldPanel("journal"),
+        FieldPanel("user"),
+        FieldPanel("role"),
+        FieldPanel("is_active_member"),
+    ]
+
+    class Meta:
+        verbose_name = _("Journal Member")
+        verbose_name_plural = _("Journal Members")
+        unique_together = [("user", "journal")]
+        indexes = [
+            models.Index(fields=["role"]),
+            models.Index(fields=["is_active_member"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user} ({self.get_role_display()}) - {self.journal}"
+
+    autocomplete_search_field = "user__username"
+
+    def autocomplete_label(self):
+        return f"{self.user} - {self.journal} ({self.get_role_display()})"
+
+    def clean(self):
+        """Validate that we don't remove the last manager."""
+        from django.core.exceptions import ValidationError
+        
+        super().clean()
+        
+        # Check if this is the last manager being removed or demoted
+        if self.pk:  # Only for existing records
+            try:
+                old_instance = JournalMember.objects.get(pk=self.pk)
+                
+                # If changing from manager to member or deactivating a manager
+                if (
+                    old_instance.role == self.MANAGER
+                    and (self.role != self.MANAGER or not self.is_active_member)
+                ):
+                    # Count active managers
+                    active_managers = JournalMember.objects.filter(
+                        journal=self.journal,
+                        role=self.MANAGER,
+                        is_active_member=True,
+                    ).exclude(pk=self.pk).count()
+                    
+                    if active_managers == 0:
+                        raise ValidationError(
+                            _("Cannot remove or demote the last manager of the journal.")
+                        )
+            except JournalMember.DoesNotExist:
+                pass
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        """Prevent deletion of the last manager."""
+        from django.core.exceptions import ValidationError
+        
+        if self.role == self.MANAGER and self.is_active_member:
+            active_managers = JournalMember.objects.filter(
+                journal=self.journal,
+                role=self.MANAGER,
+                is_active_member=True,
+            ).exclude(pk=self.pk).count()
+            
+            if active_managers == 0:
+                raise ValidationError(
+                    _("Cannot delete the last manager of the journal.")
+                )
+        
+        super().delete(*args, **kwargs)
+
+    @staticmethod
+    def autocomplete_custom_queryset_filter(text):
+        return JournalMember.objects.filter(
+            Q(user__username__icontains=text)
+            | Q(user__email__icontains=text)
+            | Q(user__name__icontains=text)
+            | Q(journal__title__icontains=text)
+        )
+
+
+class JournalCompanyContract(CommonControlField):
+    """
+    Contract relationship between a Journal and a Company for XML production.
+    Supports logical deletion via final_date.
+    """
+
+    journal = models.ForeignKey(
+        Journal,
+        verbose_name=_("Journal"),
+        on_delete=models.CASCADE,
+        related_name="company_contracts",
+    )
+    company = models.ForeignKey(
+        "company.Company",
+        verbose_name=_("Company"),
+        on_delete=models.CASCADE,
+        related_name="journal_contracts",
+    )
+    initial_date = models.DateField(
+        _("Contract Start Date"), null=True, blank=True
+    )
+    final_date = models.DateField(
+        _("Contract End Date"), null=True, blank=True, 
+        help_text=_("Leave blank for active contracts. Set to end contract.")
+    )
+    notes = models.TextField(
+        _("Notes"), null=True, blank=True
+    )
+
+    panels = [
+        FieldPanel("journal"),
+        FieldPanel("company"),
+        FieldPanel("initial_date"),
+        FieldPanel("final_date"),
+        FieldPanel("notes"),
+    ]
+
+    class Meta:
+        verbose_name = _("Journal-Company Contract")
+        verbose_name_plural = _("Journal-Company Contracts")
+        unique_together = [("journal", "company")]
+        indexes = [
+            models.Index(fields=["initial_date"]),
+            models.Index(fields=["final_date"]),
+        ]
+
+    def __str__(self):
+        status = "Active" if self.is_active else "Ended"
+        return f"{self.journal} - {self.company} ({status})"
+
+    @property
+    def is_active(self):
+        """Check if contract is currently active (no end date)."""
+        return self.final_date is None
+
+    def end_contract(self, end_date=None):
+        """
+        Logically end the contract by setting final_date.
+        """
+        from datetime import date
+        
+        if end_date is None:
+            end_date = date.today()
+        
+        self.final_date = end_date
+        self.save()
+
+    @staticmethod
+    def autocomplete_custom_queryset_filter(text):
+        return JournalCompanyContract.objects.filter(
+            Q(journal__title__icontains=text)
+            | Q(company__name__icontains=text)
+        )
