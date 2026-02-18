@@ -81,6 +81,10 @@ register_snippet(JournalViewSetGroup)
 
 from wagtail.contrib.modeladmin.options import ModelAdmin, modeladmin_register
 from journal.models import JournalMember, JournalCompanyContract
+from journal.permission_helper import (
+    JournalMemberPermissionHelper,
+    JournalCompanyContractPermissionHelper,
+)
 
 
 class JournalMemberAdmin(ModelAdmin):
@@ -90,6 +94,7 @@ class JournalMemberAdmin(ModelAdmin):
     list_display = ("user", "journal", "role", "is_active_member", "created")
     search_fields = ("user__username", "user__email", "journal__title")
     list_filter = ("role", "is_active_member", "created")
+    permission_helper_class = JournalMemberPermissionHelper
 
 
 class JournalCompanyContractAdmin(ModelAdmin):
@@ -99,6 +104,7 @@ class JournalCompanyContractAdmin(ModelAdmin):
     list_display = ("journal", "company", "initial_date", "final_date", "created")
     search_fields = ("journal__title", "company__name")
     list_filter = ("initial_date", "final_date", "created")
+    permission_helper_class = JournalCompanyContractPermissionHelper
 
 
 modeladmin_register(JournalMemberAdmin)

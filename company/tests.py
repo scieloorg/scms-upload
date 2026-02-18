@@ -241,3 +241,98 @@ class TestCompanyMemberModel:
         )
         
         assert user.company_memberships.count() == 2
+
+
+@pytest.mark.django_db
+class TestCompanyPermissions:
+    def test_manager_can_edit_company(self, user, company_with_manager):
+        """Test that a manager can edit their company."""
+        from company.permission_helper import CompanyPermissionHelper
+        
+        helper = CompanyPermissionHelper(Company)
+        assert helper.user_can_edit_obj(user, company_with_manager) is True
+
+    def test_member_cannot_edit_company(self, user, another_user, company_with_manager):
+        """Test that a regular member cannot edit the company."""
+        from company.permission_helper import CompanyPermissionHelper
+        
+        # Add another_user as regular member
+        CompanyMember.objects.create(
+            company=company_with_manager,
+            user=another_user,
+            role=CompanyMember.MEMBER,
+            creator=user,
+        )
+        
+        helper = CompanyPermissionHelper(Company)
+        assert helper.user_can_edit_obj(another_user, company_with_manager) is False
+
+    def test_non_member_cannot_edit_company(self, another_user, company_with_manager):
+        """Test that a non-member cannot edit the company."""
+        from company.permission_helper import CompanyPermissionHelper
+        
+        helper = CompanyPermissionHelper(Company)
+        assert helper.user_can_edit_obj(another_user, company_with_manager) is False
+
+    def test_manager_can_add_members(self, user, company_with_manager):
+        """Test that a manager can add new members."""
+        from company.permission_helper import CompanyMemberPermissionHelper
+        
+        helper = CompanyMemberPermissionHelper(CompanyMember)
+        assert helper.user_can_create(user) is True
+
+    def test_member_cannot_add_members(self, user, another_user, company_with_manager):
+        """Test that a regular member cannot add new members."""
+        from company.permission_helper import CompanyMemberPermissionHelper
+        
+        # Add another_user as regular member
+        CompanyMember.objects.create(
+            company=company_with_manager,
+            user=another_user,
+            role=CompanyMember.MEMBER,
+            creator=user,
+        )
+        
+        helper = CompanyMemberPermissionHelper(CompanyMember)
+        assert helper.user_can_create(another_user) is False
+
+    def test_manager_can_edit_own_company_members(self, user, another_user, company_with_manager):
+        """Test that a manager can edit members of their own company."""
+        from company.permission_helper import CompanyMemberPermissionHelper
+        
+        member = CompanyMember.objects.create(
+            company=company_with_manager,
+            user=another_user,
+            role=CompanyMember.MEMBER,
+            creator=user,
+        )
+        
+        helper = CompanyMemberPermissionHelper(CompanyMember)
+        assert helper.user_can_edit_obj(user, member) is True
+
+    def test_manager_cannot_edit_other_company_members(self, user, another_user):
+        """Test that a manager cannot edit members of another company."""
+        from company.permission_helper import CompanyMemberPermissionHelper
+        
+        # Create two companies
+        company1 = Company.objects.create(name="Company 1", creator=user)
+        company2 = Company.objects.create(name="Company 2", creator=user)
+        
+        # User is manager of company1
+        CompanyMember.objects.create(
+            company=company1,
+            user=user,
+            role=CompanyMember.MANAGER,
+            creator=user,
+        )
+        
+        # Another user is member of company2
+        member2 = CompanyMember.objects.create(
+            company=company2,
+            user=another_user,
+            role=CompanyMember.MEMBER,
+            creator=user,
+        )
+        
+        helper = CompanyMemberPermissionHelper(CompanyMember)
+        assert helper.user_can_edit_obj(user, member2) is False

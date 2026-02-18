@@ -447,3 +447,197 @@ class TestIntegrationScenarios:
         contract.end_contract()
         
         assert contract.is_active is False
+
+
+@pytest.mark.django_db
+class TestJournalMemberPermissions:
+    def test_manager_can_add_members(self, user, journal_with_manager):
+        """Test that a journal manager can add new members."""
+        from journal.permission_helper import JournalMemberPermissionHelper
+        
+        helper = JournalMemberPermissionHelper(JournalMember)
+        assert helper.user_can_create(user) is True
+
+    def test_member_cannot_add_members(self, user, another_user, journal_with_manager):
+        """Test that a regular member cannot add new members."""
+        from journal.permission_helper import JournalMemberPermissionHelper
+        
+        # Add another_user as regular member
+        JournalMember.objects.create(
+            journal=journal_with_manager,
+            user=another_user,
+            role=JournalMember.MEMBER,
+            creator=user,
+        )
+        
+        helper = JournalMemberPermissionHelper(JournalMember)
+        assert helper.user_can_create(another_user) is False
+
+    def test_manager_can_edit_own_journal_members(self, user, another_user, journal_with_manager):
+        """Test that a manager can edit members of their own journal."""
+        from journal.permission_helper import JournalMemberPermissionHelper
+        
+        member = JournalMember.objects.create(
+            journal=journal_with_manager,
+            user=another_user,
+            role=JournalMember.MEMBER,
+            creator=user,
+        )
+        
+        helper = JournalMemberPermissionHelper(JournalMember)
+        assert helper.user_can_edit_obj(user, member) is True
+
+    def test_manager_cannot_edit_other_journal_members(self, user, another_user):
+        """Test that a manager cannot edit members of another journal."""
+        from journal.permission_helper import JournalMemberPermissionHelper
+        
+        # Create two journals
+        journal1 = Journal.objects.create(
+            title="Journal 1",
+            journal_acron="J1",
+            creator=user,
+        )
+        journal2 = Journal.objects.create(
+            title="Journal 2",
+            journal_acron="J2",
+            creator=user,
+        )
+        
+        # User is manager of journal1
+        JournalMember.objects.create(
+            journal=journal1,
+            user=user,
+            role=JournalMember.MANAGER,
+            creator=user,
+        )
+        
+        # Another user is member of journal2
+        member2 = JournalMember.objects.create(
+            journal=journal2,
+            user=another_user,
+            role=JournalMember.MEMBER,
+            creator=user,
+        )
+        
+        helper = JournalMemberPermissionHelper(JournalMember)
+        assert helper.user_can_edit_obj(user, member2) is False
+
+
+@pytest.mark.django_db
+class TestJournalCompanyContractPermissions:
+    def test_journal_manager_can_create_contracts(self, user, journal_with_manager):
+        """Test that a journal manager can create contracts."""
+        from journal.permission_helper import JournalCompanyContractPermissionHelper
+        
+        helper = JournalCompanyContractPermissionHelper(JournalCompanyContract)
+        assert helper.user_can_create(user) is True
+
+    def test_journal_member_cannot_create_contracts(self, user, another_user, journal_with_manager):
+        """Test that a regular journal member cannot create contracts."""
+        from journal.permission_helper import JournalCompanyContractPermissionHelper
+        
+        # Add another_user as regular member
+        JournalMember.objects.create(
+            journal=journal_with_manager,
+            user=another_user,
+            role=JournalMember.MEMBER,
+            creator=user,
+        )
+        
+        helper = JournalCompanyContractPermissionHelper(JournalCompanyContract)
+        assert helper.user_can_create(another_user) is False
+
+    def test_journal_manager_can_edit_own_contracts(self, user, journal_with_manager, company):
+        """Test that a journal manager can edit contracts of their own journal."""
+        from journal.permission_helper import JournalCompanyContractPermissionHelper
+        
+        contract = JournalCompanyContract.objects.create(
+            journal=journal_with_manager,
+            company=company,
+            initial_date=date.today(),
+            creator=user,
+        )
+        
+        helper = JournalCompanyContractPermissionHelper(JournalCompanyContract)
+        assert helper.user_can_edit_obj(user, contract) is True
+
+    def test_journal_manager_cannot_edit_other_journal_contracts(self, user, another_user, company):
+        """Test that a journal manager cannot edit contracts of another journal."""
+        from journal.permission_helper import JournalCompanyContractPermissionHelper
+        
+        # Create two journals
+        journal1 = Journal.objects.create(
+            title="Journal 1",
+            journal_acron="J1",
+            creator=user,
+        )
+        journal2 = Journal.objects.create(
+            title="Journal 2",
+            journal_acron="J2",
+            creator=user,
+        )
+        
+        # User is manager of journal1
+        JournalMember.objects.create(
+            journal=journal1,
+            user=user,
+            role=JournalMember.MANAGER,
+            creator=user,
+        )
+        
+        # Contract is for journal2
+        contract = JournalCompanyContract.objects.create(
+            journal=journal2,
+            company=company,
+            initial_date=date.today(),
+            creator=user,
+        )
+        
+        helper = JournalCompanyContractPermissionHelper(JournalCompanyContract)
+        assert helper.user_can_edit_obj(user, contract) is False
+
+    def test_company_member_can_inspect_contracts(self, user, another_user, journal, company):
+        """Test that a company member can inspect contracts involving their company."""
+        from journal.permission_helper import JournalCompanyContractPermissionHelper
+        
+        # Create contract
+        contract = JournalCompanyContract.objects.create(
+            journal=journal,
+            company=company,
+            initial_date=date.today(),
+            creator=user,
+        )
+        
+        # Another user is member of the company
+        CompanyMember.objects.create(
+            company=company,
+            user=another_user,
+            role=CompanyMember.MEMBER,
+            creator=user,
+        )
+        
+        helper = JournalCompanyContractPermissionHelper(JournalCompanyContract)
+        assert helper.user_can_inspect_obj(another_user, contract) is True
+
+    def test_journal_member_can_inspect_contracts(self, user, another_user, journal_with_manager, company):
+        """Test that a journal member can inspect contracts of their journal."""
+        from journal.permission_helper import JournalCompanyContractPermissionHelper
+        
+        # Create contract
+        contract = JournalCompanyContract.objects.create(
+            journal=journal_with_manager,
+            company=company,
+            initial_date=date.today(),
+            creator=user,
+        )
+        
+        # Another user is member of the journal
+        JournalMember.objects.create(
+            journal=journal_with_manager,
+            user=another_user,
+            role=JournalMember.MEMBER,
+            creator=user,
+        )
+        
+        helper = JournalCompanyContractPermissionHelper(JournalCompanyContract)
+        assert helper.user_can_inspect_obj(another_user, contract) is True
