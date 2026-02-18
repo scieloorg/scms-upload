@@ -8,7 +8,7 @@ from wagtail.admin.panels import FieldPanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from collection.models import Collection
-from core.models import CommonControlField
+from core.models import CommonControlField, VisualIdentityMixin
 from team.forms import CollectionTeamMemberModelForm
 
 User = get_user_model()
@@ -122,7 +122,7 @@ class CollectionTeamMember(TeamMember):
         return cls.objects.filter(user=user, collection__acron__in=ALLOWED_COLLECTIONS).exists()
 
 
-class Company(CommonControlField):
+class Company(VisualIdentityMixin, CommonControlField):
     """
     Company represents an editorial services provider that can be contracted
     by journals to produce XML files.
@@ -131,6 +131,7 @@ class Company(CommonControlField):
     description = models.TextField(_("Description"), blank=True, null=True)
     contact_email = models.EmailField(_("Contact Email"), blank=True, null=True)
     contact_phone = models.CharField(_("Contact Phone"), max_length=50, blank=True, null=True)
+    certified_since = models.DateField(_("Certified Since"), blank=True, null=True)
     is_active = models.BooleanField(_("Active"), default=True)
 
     class Meta:
@@ -144,8 +145,11 @@ class Company(CommonControlField):
     panels = [
         FieldPanel("name"),
         FieldPanel("description"),
+        FieldPanel("url"),
+        FieldPanel("logo"),
         FieldPanel("contact_email"),
         FieldPanel("contact_phone"),
+        FieldPanel("certified_since"),
         FieldPanel("is_active"),
     ]
 
