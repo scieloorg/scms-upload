@@ -12,9 +12,9 @@ class CompanyAdmin(ModelAdmin):
     model = Company
     menu_label = "Companies"
     menu_icon = "group"
-    list_display = ("name", "contact_email", "is_active", "created", "updated")
-    list_filter = ("is_active", "created", "updated")
-    search_fields = ("name", "contact_email")
+    list_display = ("name", "url", "contact_email", "certified_since", "is_active", "created", "updated")
+    list_filter = ("is_active", "certified_since", "created", "updated")
+    search_fields = ("name", "contact_email", "url")
 
 
 class JournalTeamMemberAdmin(ModelAdmin):
