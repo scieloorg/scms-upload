@@ -1,8 +1,14 @@
-from tempfile import mkdtemp
+import csv
+import logging
+import os
+from datetime import date, datetime, timedelta
+from random import randint
+from shutil import copyfile
+from tempfile import TemporaryDirectory, mkdtemp
 from time import sleep
-from zipfile import BadZipFile
+from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from lxml import etree
 from packtools import SPPackage
 from packtools.domain import HTMLGenerator
@@ -12,7 +18,7 @@ from packtools.sps.models.article_authors import Authors
 from packtools.sps.models.article_renditions import ArticleRenditions
 from packtools.sps.models.article_titles import ArticleTitles
 from packtools.sps.models.journal_meta import ISSN
-from packtools.sps.models.package import PackageName
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from .file_utils import (
     create_file_for_xml_etree,
@@ -39,6 +45,8 @@ CSS_ARTICLE = "/static/css/article-styles.css"
 
 def generate_xml_canonical(xml_uri):
     # Obtém conteúdo do XML
+    for xml_with_pre in XMLWithPre.create(uri=xml_uri):
+        pass
     xml_content = get_xml_content_from_uri(xml_uri)
     xml_etree = get_etree_from_xml_content(xml_content)
     aa = ArticleAssets(xml_etree)
@@ -47,7 +55,7 @@ def generate_xml_canonical(xml_uri):
     assets_uris_and_names = []
 
     # Obtém nome do pacote
-    package_name = PackageName(xml_etree).name
+    package_name = xml_with_pre.sps_pkg_name
 
     # Gera dicionário de substituição de nomes de assets e lista de uris e nomes novos
     for i in aa.article_assets:
@@ -79,10 +87,6 @@ def get_renditions_uris_and_names(doc):
             }
         )
     return renditions_uris_and_names
-
-
-def get_package_name(xmltree):
-    return PackageName(xmltree).name
 
 
 def create_package_file_from_site_doc(doc):
@@ -321,3 +325,17 @@ def get_article_data_for_comparison(xmltree):
         article_data["authors"].append(f'{c.get("surname")}, {c.get("given_names")}')
 
     return article_data
+
+
+def update_zip_file(zip_xml_file_path, xml_with_pre):
+    new_xml = xml_with_pre.tostring(pretty_print=True)
+    with TemporaryDirectory() as targetdir:
+        new_zip_path = os.path.join(targetdir, os.path.basename(zip_xml_file_path))
+        with ZipFile(new_zip_path, "a", compression=ZIP_DEFLATED) as new_zfp:
+            with ZipFile(zip_xml_file_path) as zfp:
+                for item in zfp.namelist():
+                    if item == xml_with_pre.filename:
+                        new_zfp.writestr(item, new_xml)
+                    else:
+                        new_zfp.writestr(item, zfp.read(item))
+        copyfile(new_zip_path, zip_xml_file_path)
