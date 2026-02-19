@@ -28,7 +28,9 @@ def get_user_membership_ids(user):
     Returns a dict with the list IDs of collections, journals or companies
     that the user is actively associated with, depending on team membership type.
     Priority order: collection > journal > company.
-    Only one key will have a non-empty list at a time.
+
+    For company team members, journal_list_ids is also populated with the journals
+    that have active contracts with the user's companies.
     """
     result = {"collection_list_ids": [], "journal_list_ids": [], "company_list_ids": []}
 
@@ -52,7 +54,13 @@ def get_user_membership_ids(user):
         CompanyTeamMember.objects.filter(user=user, is_active_member=True)
         .values_list("company", flat=True)
     )
-    result["company_list_ids"] = company_ids
+    if company_ids:
+        result["company_list_ids"] = company_ids
+        result["journal_list_ids"] = list(
+            JournalCompanyContract.objects.filter(
+                company__in=company_ids, is_active=True
+            ).values_list("journal", flat=True)
+        )
     return result
 
 
