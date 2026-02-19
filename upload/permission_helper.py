@@ -1,5 +1,7 @@
 from wagtail_modeladmin.helpers import PermissionHelper
 
+from core.permissions import GroupBasedPermissionHelper
+from core.users.user_groups import user_can_access_app
 from team.models import has_permission, CollectionTeamMember
 
 
@@ -10,11 +12,16 @@ SEND_VALIDATION_ERROR_RESOLUTION = "send_validation_error_resolution"
 ANALYSE_VALIDATION_ERROR_RESOLUTION = "analyse_validation_error_resolution"
 
 
-class UploadPermissionHelper(PermissionHelper):
+class UploadPermissionHelper(GroupBasedPermissionHelper):
+    app_name = "upload"
+    
     def user_can_packagezip_create(self, user, obj):
         return self.user_can_use_upload_module(user, obj)
 
     def user_can_use_upload_module(self, user, obj):
+        # Check both group-based access and collection-based permission
+        if not user_can_access_app(user, self.app_name):
+            return False
         return has_permission(user)
 
     def user_can_access_all_packages(self, user, obj):

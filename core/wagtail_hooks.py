@@ -9,6 +9,7 @@ from wagtail.admin.site_summary import SummaryItem
 from article.models import Article
 from collection.models import Collection
 from config.menu import WAGTAIL_MENU_APPS_ORDER, get_menu_order
+from core.users.user_groups import get_user_accessible_apps
 from journal.models import Journal
 
 # @hooks.register("insert_global_admin_css", order=100)
@@ -89,9 +90,46 @@ def reorder_menu_items(request, menu_items):
 
 @hooks.register("construct_main_menu")
 def remove_menu_items(request, menu_items):
+    # Non-superuser menu filtering
     if not request.user.is_superuser:
         menu_items[:] = [
             item
             for item in menu_items
             if item.name not in ["documents", "explorer", "reports"]
+        ]
+    
+    # Group-based menu filtering
+    accessible_apps = get_user_accessible_apps(request.user)
+    
+    # Map menu item names to app names
+    menu_to_app_mapping = {
+        'upload': 'upload',
+        'articles': 'article',
+        'journals': 'journal',
+        'issues': 'issue',
+        'collections': 'collection',
+        'team': 'team',
+        'institutions': 'institution',
+        'locations': 'location',
+        'migration': 'migration',
+        'doi': 'doi',
+        'pid-provider': 'pid_provider',
+        'publication': 'publication',
+        'package': 'package',
+        'processes': 'proc',
+        'tracker': 'tracker',
+        'files-storage': 'files_storage',
+        'htmlxml': 'htmlxml',
+        'researcher': 'researcher',
+        'core-settings': 'core_settings',
+        'django-celery-beat': 'django_celery_beat',
+    }
+    
+    # Filter menu items based on user's accessible apps
+    if not request.user.is_superuser:
+        menu_items[:] = [
+            item
+            for item in menu_items
+            if item.name not in menu_to_app_mapping or 
+               menu_to_app_mapping[item.name] in accessible_apps
         ]

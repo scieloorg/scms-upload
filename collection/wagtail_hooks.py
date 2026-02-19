@@ -9,6 +9,7 @@ from wagtail_modeladmin.options import (
 )
 from wagtail_modeladmin.views import CreateView
 
+from collection.permission_helper import CollectionPermissionHelper
 from config.menu import get_menu_order
 from files_storage.models import MinioConfiguration
 from migration.models import ClassicWebsiteConfiguration
@@ -30,6 +31,7 @@ class CollectionModelAdmin(ModelAdmin):
     add_to_settings_menu = False
     exclude_from_explorer = False
     inspect_view_enabled = True
+    permission_helper_class = CollectionPermissionHelper
 
     create_view_class = CoreCreateView
 
@@ -57,6 +59,7 @@ class WebSiteConfigurationModelAdmin(ModelAdmin):
     menu_order = 200
     exclude_from_explorer = False
     inspect_view_enabled = False
+    permission_helper_class = CollectionPermissionHelper
 
     create_view_class = CoreCreateView
 
@@ -83,6 +86,7 @@ class MinioConfigurationModelAdmin(ModelAdmin):
     menu_order = 200
     exclude_from_explorer = False
     inspect_view_enabled = False
+    permission_helper_class = CollectionPermissionHelper
 
     create_view_class = CoreCreateView
 
@@ -110,6 +114,7 @@ class ClassicWebsiteConfigurationModelAdmin(ModelAdmin):
     menu_order = 200
     exclude_from_explorer = False
     inspect_view_enabled = False
+    permission_helper_class = CollectionPermissionHelper
 
     create_view_class = CoreCreateView
 
