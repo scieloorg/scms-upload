@@ -5,7 +5,7 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from config.menu import get_menu_order
-from files_storage.models import MinioConfiguration
+from files_storage.wagtail_hooks import MinioConfigurationViewSet
 from migration.models import ClassicWebsiteConfiguration
 from team.models import get_user_membership_ids
 
@@ -71,39 +71,6 @@ class WebSiteConfigurationViewSet(SnippetViewSet):
         membership = get_user_membership_ids(user)
         if membership.get("collection_list_ids"):
             return qs.filter(collection_id__in=membership["collection_list_ids"])
-        return qs.none()
-
-
-class MinioConfigurationViewSet(SnippetViewSet):
-    model = MinioConfiguration
-    menu_label = _("Files Storage Configuration")
-    menu_icon = "doc-full"
-    menu_order = 200
-
-    list_display = (
-        "host",
-        "bucket_root",
-        "created",
-        "updated",
-        "updated_by",
-    )
-    list_filter = (
-        "host",
-        "bucket_root",
-    )
-    search_fields = (
-        "host",
-        "bucket_root",
-    )
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        user = request.user
-        if user.is_superuser:
-            return qs
-        membership = get_user_membership_ids(user)
-        if membership.get("collection_list_ids"):
-            return qs
         return qs.none()
 
 

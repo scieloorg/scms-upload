@@ -23,6 +23,47 @@ class TeamRole(models.TextChoices):
     MEMBER = "member", _("Member")
 
 
+def get_user_membership_ids(user):
+    """
+    Returns a dict with the list IDs of collections, journals or companies
+    that the user is actively associated with, depending on team membership type.
+    Priority order: collection > journal > company.
+
+    For company team members, journal_list_ids is also populated with the journals
+    that have active contracts with the user's companies.
+    """
+    result = {"collection_list_ids": [], "journal_list_ids": [], "company_list_ids": []}
+
+    collection_ids = list(
+        CollectionTeamMember.objects.filter(user=user, is_active_member=True)
+        .values_list("collection", flat=True)
+    )
+    if collection_ids:
+        result["collection_list_ids"] = collection_ids
+        return result
+
+    journal_ids = list(
+        JournalTeamMember.objects.filter(user=user, is_active_member=True)
+        .values_list("journal", flat=True)
+    )
+    if journal_ids:
+        result["journal_list_ids"] = journal_ids
+        return result
+
+    company_ids = list(
+        CompanyTeamMember.objects.filter(user=user, is_active_member=True)
+        .values_list("company", flat=True)
+    )
+    if company_ids:
+        result["company_list_ids"] = company_ids
+        result["journal_list_ids"] = list(
+            JournalCompanyContract.objects.filter(
+                company__in=company_ids, is_active=True
+            ).values_list("journal", flat=True)
+        )
+    return result
+
+
 def has_permission(user=None):
     try:
         if not user:
