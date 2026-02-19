@@ -1,5 +1,6 @@
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
+from publication.permission_helper import PublicationPermissionHelper
 
 from .models import ArticleAvailability
 
@@ -12,6 +13,7 @@ class ArticleAvailabilitySiteViewSet(SnippetViewSet):
     exclude_from_explorer = (
         False  # or True to exclude pages of this type from Wagtail's explorer view
     )
+    permission_helper_class = PublicationPermissionHelper
     list_display = (
         "article",
         "completed",

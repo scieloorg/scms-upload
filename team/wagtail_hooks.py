@@ -3,6 +3,7 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from config.menu import get_menu_order
+from team.permission_helper import TeamPermissionHelper
 
 from .models import (
     CollectionTeamMember,
@@ -19,6 +20,7 @@ class CollectionTeamMemberViewSet(SnippetViewSet):
     menu_icon = "group"
     add_to_settings_menu = False
     exclude_from_explorer = False
+    permission_helper_class = TeamPermissionHelper
 
     list_display = (
         "user",
@@ -49,6 +51,7 @@ class CompanyViewSet(SnippetViewSet):
     menu_icon = "group"
     add_to_settings_menu = False
     exclude_from_explorer = False
+    permission_helper_class = TeamPermissionHelper
 
     list_display = (
         "name",
@@ -73,6 +76,7 @@ class JournalTeamMemberViewSet(SnippetViewSet):
     menu_icon = "user"
     add_to_settings_menu = False
     exclude_from_explorer = False
+    permission_helper_class = TeamPermissionHelper
 
     list_display = (
         "user",
@@ -96,6 +100,7 @@ class CompanyTeamMemberViewSet(SnippetViewSet):
     menu_icon = "user"
     add_to_settings_menu = False
     exclude_from_explorer = False
+    permission_helper_class = TeamPermissionHelper
 
     list_display = (
         "user",
@@ -119,6 +124,7 @@ class JournalCompanyContractViewSet(SnippetViewSet):
     menu_icon = "doc-full"
     add_to_settings_menu = False
     exclude_from_explorer = False
+    permission_helper_class = TeamPermissionHelper
 
     list_display = (
         "journal",

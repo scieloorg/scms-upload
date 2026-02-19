@@ -4,6 +4,7 @@ from wagtail_modeladmin.options import ModelAdmin, modeladmin_register
 from wagtail_modeladmin.views import CreateView
 
 from config.menu import get_menu_order
+from institution.permission_helper import InstitutionPermissionHelper
 
 from .models import Institution
 
@@ -24,6 +25,7 @@ class InstitutionAdmin(ModelAdmin):
     exclude_from_explorer = (
         False  # or True to exclude pages of this type from Wagtail's explorer view
     )
+    permission_helper_class = InstitutionPermissionHelper
     list_display = (
         "name",
         "institution_type",

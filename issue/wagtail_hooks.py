@@ -6,6 +6,7 @@ from wagtail import hooks
 
 from config.menu import get_menu_order
 from issue.views import IssueCreateView, TOCEditView
+from issue.permission_helper import IssuePermissionHelper
 from .models import TOC, Issue
 
 
@@ -16,6 +17,7 @@ class IssueSnippetViewSet(SnippetViewSet):
     menu_order = get_menu_order("issue")
     add_to_settings_menu = False
     add_to_admin_menu = False
+    permission_helper_class = IssuePermissionHelper
     
     # Views customizadas
     create_view_class = IssueCreateView
@@ -65,6 +67,7 @@ class TOCSnippetViewSet(SnippetViewSet):
     menu_order = get_menu_order("issue") + 1
     add_to_settings_menu = False
     add_to_admin_menu = False
+    permission_helper_class = IssuePermissionHelper
     
     # Configuração de listagem
     list_display = [

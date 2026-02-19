@@ -9,6 +9,7 @@ from wagtail import hooks
 
 from config.menu import get_menu_order
 from journal.models import Journal, OfficialJournal
+from journal.permission_helper import JournalPermissionHelper
 
 
 class OfficialJournalViewSet(SnippetViewSet):
@@ -18,6 +19,7 @@ class OfficialJournalViewSet(SnippetViewSet):
     menu_order = get_menu_order("journal")
     add_to_settings_menu = False
     add_to_admin_menu = True
+    permission_helper_class = JournalPermissionHelper
     
     list_display = [
         "title",
@@ -45,6 +47,7 @@ class JournalViewSet(SnippetViewSet):
     menu_order = 200
     add_to_settings_menu = False
     add_to_admin_menu = False  # Será adicionado via grupo
+    permission_helper_class = JournalPermissionHelper
     
     list_display = [
         "title",

@@ -4,6 +4,7 @@ from wagtail_modeladmin.options import ModelAdmin, modeladmin_register
 from wagtail_modeladmin.views import CreateView
 
 from config.menu import get_menu_order
+from location.permission_helper import LocationPermissionHelper
 
 from .models import Location
 
@@ -24,6 +25,7 @@ class LocationAdmin(ModelAdmin):
     exclude_from_explorer = (
         False  # or True to exclude pages of this type from Wagtail's explorer view
     )
+    permission_helper_class = LocationPermissionHelper
     list_display = (
         "country",
         "state",

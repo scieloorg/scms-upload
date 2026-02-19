@@ -5,6 +5,7 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 from wagtail.admin.ui.tables import UpdatedAtColumn
 from tracker.models import UnexpectedEvent, TaskTracker
+from tracker.permission_helper import TrackerPermissionHelper
 
  
 class UnexpectedEventViewSet(SnippetViewSet):
@@ -14,6 +15,7 @@ class UnexpectedEventViewSet(SnippetViewSet):
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 10
+    permission_helper_class = TrackerPermissionHelper
     
     list_display = [
         'item',
@@ -56,6 +58,7 @@ class TaskTrackerViewSet(SnippetViewSet):
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 10
+    permission_helper_class = TrackerPermissionHelper
     
     list_display = [
         'name',

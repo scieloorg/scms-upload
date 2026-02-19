@@ -9,6 +9,7 @@ from config.menu import get_menu_order
 from core.views import CommonControlFieldViewSet
 from htmlxml.models import HTMLXML
 from package.models import SPSPkg
+from proc.permission_helper import ProcPermissionHelper
 
 from .models import ArticleProc, IssueProc, JournalProc, ProcReport
 
@@ -77,6 +78,7 @@ class JournalProcViewSet(CommonControlFieldViewSet):
     menu_icon = "folder"
     menu_order = 200
     add_to_settings_menu = False
+    permission_helper_class = ProcPermissionHelper
     
     list_display = [
         "journal",
@@ -111,6 +113,7 @@ class IssueProcViewSet(CommonControlFieldViewSet):
     menu_icon = "folder"
     menu_order = 300
     add_to_settings_menu = False
+    permission_helper_class = ProcPermissionHelper
 
     list_display = [
         "issue",
@@ -150,6 +153,7 @@ class HTMLXMLViewSet(CommonControlFieldViewSet):
     add_to_settings_menu = False
     inspect_view_enabled = True
     filterset_class = HTMLXMLFilterSet
+    permission_helper_class = ProcPermissionHelper
 
     list_per_page = 10
 
@@ -179,6 +183,7 @@ class SPSPkgViewSet(CommonControlFieldViewSet):
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 10
+    permission_helper_class = ProcPermissionHelper
 
     list_display = [
         "sps_pkg_name",
@@ -214,6 +219,7 @@ class ArticleProcViewSet(CommonControlFieldViewSet):
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 10
+    permission_helper_class = ProcPermissionHelper
     
     list_display = [
         "__str__",
@@ -249,6 +255,7 @@ class ProcReportViewSet(CommonControlFieldViewSet):
     menu_icon = "doc-full"
     menu_order = 200
     add_to_settings_menu = False
+    permission_helper_class = ProcPermissionHelper
 
     list_per_page = 50
 
