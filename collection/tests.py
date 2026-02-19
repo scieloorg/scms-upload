@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from collection.models import Collection, WebSiteConfiguration
-from collection.utils import get_user_collection_ids, is_collection_team_member
 from files_storage.models import MinioConfiguration
 from migration.models import ClassicWebsiteConfiguration
 from team.models import CollectionTeamMember, TeamRole
@@ -10,8 +9,20 @@ from team.models import CollectionTeamMember, TeamRole
 User = get_user_model()
 
 
+def _get_user_collection_ids(user):
+    return CollectionTeamMember.objects.filter(
+        user=user, is_active_member=True
+    ).values_list("collection_id", flat=True)
+
+
+def _is_collection_team_member(user):
+    return CollectionTeamMember.objects.filter(
+        user=user, is_active_member=True
+    ).exists()
+
+
 class CollectionTeamHelperFunctionsTest(TestCase):
-    """Tests for the helper functions in collection/utils.py."""
+    """Tests for the collection access-control helper functions."""
 
     def setUp(self):
         self.creator = User.objects.create_user(
@@ -43,25 +54,25 @@ class CollectionTeamHelperFunctionsTest(TestCase):
         )
 
     def test_get_user_collection_ids_returns_active_memberships(self):
-        ids = get_user_collection_ids(self.active_member)
+        ids = _get_user_collection_ids(self.active_member)
         self.assertIn(self.col.id, ids)
 
     def test_get_user_collection_ids_excludes_inactive_memberships(self):
-        ids = get_user_collection_ids(self.inactive_member)
+        ids = _get_user_collection_ids(self.inactive_member)
         self.assertNotIn(self.col.id, ids)
 
     def test_get_user_collection_ids_empty_for_non_member(self):
-        ids = get_user_collection_ids(self.non_member)
+        ids = _get_user_collection_ids(self.non_member)
         self.assertFalse(ids.exists())
 
     def test_is_collection_team_member_true_for_active(self):
-        self.assertTrue(is_collection_team_member(self.active_member))
+        self.assertTrue(_is_collection_team_member(self.active_member))
 
     def test_is_collection_team_member_false_for_inactive(self):
-        self.assertFalse(is_collection_team_member(self.inactive_member))
+        self.assertFalse(_is_collection_team_member(self.inactive_member))
 
     def test_is_collection_team_member_false_for_non_member(self):
-        self.assertFalse(is_collection_team_member(self.non_member))
+        self.assertFalse(_is_collection_team_member(self.non_member))
 
 
 class CollectionViewSetQueryFilterTest(TestCase):
@@ -95,7 +106,7 @@ class CollectionViewSetQueryFilterTest(TestCase):
         qs = Collection.objects.all()
         if user.is_superuser:
             return qs
-        collection_ids = get_user_collection_ids(user)
+        collection_ids = _get_user_collection_ids(user)
         if collection_ids.exists():
             return qs.filter(id__in=collection_ids)
         return qs.none()
@@ -151,7 +162,7 @@ class WebSiteConfigurationQueryFilterTest(TestCase):
         qs = WebSiteConfiguration.objects.all()
         if user.is_superuser:
             return qs
-        collection_ids = get_user_collection_ids(user)
+        collection_ids = _get_user_collection_ids(user)
         if collection_ids.exists():
             return qs.filter(collection_id__in=collection_ids)
         return qs.none()
@@ -203,7 +214,7 @@ class MinioConfigurationQueryFilterTest(TestCase):
         qs = MinioConfiguration.objects.all()
         if user.is_superuser:
             return qs
-        if is_collection_team_member(user):
+        if _is_collection_team_member(user):
             return qs
         return qs.none()
 
@@ -256,7 +267,7 @@ class ClassicWebsiteConfigurationQueryFilterTest(TestCase):
         qs = ClassicWebsiteConfiguration.objects.all()
         if user.is_superuser:
             return qs
-        collection_ids = get_user_collection_ids(user)
+        collection_ids = _get_user_collection_ids(user)
         if collection_ids.exists():
             return qs.filter(collection_id__in=collection_ids)
         return qs.none()
