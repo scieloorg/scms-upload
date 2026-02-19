@@ -7,6 +7,7 @@ from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 from config.menu import get_menu_order
 from files_storage.wagtail_hooks import MinioConfigurationViewSet
 from migration.models import ClassicWebsiteConfiguration
+from team.models import get_user_membership_ids
 
 from .models import Collection, WebSiteConfiguration
 
@@ -30,6 +31,16 @@ class CollectionViewSet(SnippetViewSet):
         "acron",
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+        if user.is_superuser:
+            return qs
+        membership = get_user_membership_ids(user)
+        if membership.get("collection_list_ids"):
+            return qs.filter(id__in=membership["collection_list_ids"])
+        return qs.none()
+
 
 class WebSiteConfigurationViewSet(SnippetViewSet):
     model = WebSiteConfiguration
@@ -52,6 +63,16 @@ class WebSiteConfigurationViewSet(SnippetViewSet):
     )
     search_fields = ("url", "collection__acron", "collection__name")
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+        if user.is_superuser:
+            return qs
+        membership = get_user_membership_ids(user)
+        if membership.get("collection_list_ids"):
+            return qs.filter(collection_id__in=membership["collection_list_ids"])
+        return qs.none()
+
 
 class ClassicWebsiteConfigurationViewSet(SnippetViewSet):
     model = ClassicWebsiteConfiguration
@@ -64,6 +85,16 @@ class ClassicWebsiteConfigurationViewSet(SnippetViewSet):
         "collection__acron",
         "collection__name",
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+        if user.is_superuser:
+            return qs
+        membership = get_user_membership_ids(user)
+        if membership.get("collection_list_ids"):
+            return qs.filter(collection_id__in=membership["collection_list_ids"])
+        return qs.none()
 
 
 class CollectionViewSetGroup(SnippetViewSetGroup):
