@@ -6,7 +6,7 @@ from wagtail import hooks
 
 from config.menu import get_menu_order
 from issue.views import IssueCreateView, TOCEditView
-from team.models import CollectionTeamMember, CompanyTeamMember, JournalTeamMember
+from team.models import get_user_membership_ids
 from .models import TOC, Issue
 
 
@@ -65,29 +65,19 @@ class IssueSnippetViewSet(SnippetViewSet):
         if user.is_superuser:
             return qs
 
-        collection_memberships = CollectionTeamMember.objects.filter(
-            user=user, is_active_member=True
-        )
-        if collection_memberships.exists():
-            collections = collection_memberships.values_list("collection", flat=True)
+        membership = get_user_membership_ids(user)
+
+        if membership["collection_list_ids"]:
             return qs.filter(
-                journal__journal_collections__collection__in=collections
+                journal__journal_collections__collection__in=membership["collection_list_ids"]
             ).distinct()
 
-        journal_memberships = JournalTeamMember.objects.filter(
-            user=user, is_active_member=True
-        )
-        if journal_memberships.exists():
-            journals = journal_memberships.values_list("journal", flat=True)
-            return qs.filter(journal__in=journals).distinct()
+        if membership["journal_list_ids"]:
+            return qs.filter(journal__in=membership["journal_list_ids"]).distinct()
 
-        company_memberships = CompanyTeamMember.objects.filter(
-            user=user, is_active_member=True
-        )
-        if company_memberships.exists():
-            companies = company_memberships.values_list("company", flat=True)
+        if membership["company_list_ids"]:
             return qs.filter(
-                journal__company_contracts__company__in=companies,
+                journal__company_contracts__company__in=membership["company_list_ids"],
                 journal__company_contracts__is_active=True,
             ).distinct()
 
@@ -142,29 +132,19 @@ class TOCSnippetViewSet(SnippetViewSet):
         if user.is_superuser:
             return qs
 
-        collection_memberships = CollectionTeamMember.objects.filter(
-            user=user, is_active_member=True
-        )
-        if collection_memberships.exists():
-            collections = collection_memberships.values_list("collection", flat=True)
+        membership = get_user_membership_ids(user)
+
+        if membership["collection_list_ids"]:
             return qs.filter(
-                issue__journal__journal_collections__collection__in=collections
+                issue__journal__journal_collections__collection__in=membership["collection_list_ids"]
             ).distinct()
 
-        journal_memberships = JournalTeamMember.objects.filter(
-            user=user, is_active_member=True
-        )
-        if journal_memberships.exists():
-            journals = journal_memberships.values_list("journal", flat=True)
-            return qs.filter(issue__journal__in=journals).distinct()
+        if membership["journal_list_ids"]:
+            return qs.filter(issue__journal__in=membership["journal_list_ids"]).distinct()
 
-        company_memberships = CompanyTeamMember.objects.filter(
-            user=user, is_active_member=True
-        )
-        if company_memberships.exists():
-            companies = company_memberships.values_list("company", flat=True)
+        if membership["company_list_ids"]:
             return qs.filter(
-                issue__journal__company_contracts__company__in=companies,
+                issue__journal__company_contracts__company__in=membership["company_list_ids"],
                 issue__journal__company_contracts__is_active=True,
             ).distinct()
 
