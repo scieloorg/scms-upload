@@ -9,6 +9,7 @@ from files_storage.models import MinioConfiguration
 from migration.models import ClassicWebsiteConfiguration
 
 from .models import Collection, WebSiteConfiguration
+from .utils import get_user_collection_ids, is_collection_team_member
 
 
 class CollectionViewSet(SnippetViewSet):
@@ -29,6 +30,16 @@ class CollectionViewSet(SnippetViewSet):
         "name",
         "acron",
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+        if user.is_superuser:
+            return qs
+        collection_ids = get_user_collection_ids(user)
+        if collection_ids.exists():
+            return qs.filter(id__in=collection_ids)
+        return qs.none()
 
 
 class WebSiteConfigurationViewSet(SnippetViewSet):
@@ -51,6 +62,16 @@ class WebSiteConfigurationViewSet(SnippetViewSet):
         "enabled",
     )
     search_fields = ("url", "collection__acron", "collection__name")
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+        if user.is_superuser:
+            return qs
+        collection_ids = get_user_collection_ids(user)
+        if collection_ids.exists():
+            return qs.filter(collection_id__in=collection_ids)
+        return qs.none()
 
 
 class MinioConfigurationViewSet(SnippetViewSet):
@@ -75,6 +96,15 @@ class MinioConfigurationViewSet(SnippetViewSet):
         "bucket_root",
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+        if user.is_superuser:
+            return qs
+        if is_collection_team_member(user):
+            return qs
+        return qs.none()
+
 
 class ClassicWebsiteConfigurationViewSet(SnippetViewSet):
     model = ClassicWebsiteConfiguration
@@ -87,6 +117,16 @@ class ClassicWebsiteConfigurationViewSet(SnippetViewSet):
         "collection__acron",
         "collection__name",
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+        if user.is_superuser:
+            return qs
+        collection_ids = get_user_collection_ids(user)
+        if collection_ids.exists():
+            return qs.filter(collection_id__in=collection_ids)
+        return qs.none()
 
 
 class CollectionViewSetGroup(SnippetViewSetGroup):

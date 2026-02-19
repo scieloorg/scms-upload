@@ -53,3 +53,19 @@ def get_valid_language_code(code2, text_to_detect_language=None):
         return detect_language(text_to_detect_language)
     return None
 
+
+def get_user_collection_ids(user):
+    """Return the IDs of collections the user is actively associated with."""
+    from team.models import CollectionTeamMember
+    return CollectionTeamMember.objects.filter(
+        user=user, is_active_member=True
+    ).values_list("collection_id", flat=True)
+
+
+def is_collection_team_member(user):
+    """Return True if the user belongs to any active collection team."""
+    from team.models import CollectionTeamMember
+    return CollectionTeamMember.objects.filter(
+        user=user, is_active_member=True
+    ).exists()
+
