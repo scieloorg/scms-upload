@@ -71,11 +71,18 @@ class CollectionTeamMember(TeamMember):
     collection = models.ForeignKey(
         Collection, null=True, blank=True, on_delete=models.SET_NULL
     )
+    role = models.CharField(
+        _("Role"),
+        max_length=20,
+        choices=TeamRole.choices,
+        default=TeamRole.MEMBER
+    )
 
     base_form_class = CollectionTeamMemberModelForm
     panels = [
         AutocompletePanel("collection"),
         AutocompletePanel("user"),
+        FieldPanel("role"),
         FieldPanel("is_active_member"),
     ]
 
@@ -83,6 +90,10 @@ class CollectionTeamMember(TeamMember):
         verbose_name = _("Team member")
         verbose_name_plural = _("Team members")
         unique_together = ("user", "collection")
+        indexes = [
+            models.Index(fields=["collection", "role"]),
+            models.Index(fields=["user", "is_active_member"]),
+        ]
 
     @staticmethod
     def autocomplete_custom_queryset_filter(text):
@@ -93,10 +104,34 @@ class CollectionTeamMember(TeamMember):
         )
 
     def autocomplete_label(self):
-        return str(self.user)
+        return f"{self.user} - {self.collection} ({self.get_role_display()})"
 
     def __str__(self):
-        return f"{self.user} ({self.collection})"
+        return f"{self.user} - {self.collection} ({self.get_role_display()})"
+
+    def is_manager(self):
+        """Check if this member is a manager."""
+        return self.role == TeamRole.MANAGER
+
+    @classmethod
+    def user_is_manager(cls, user, collection):
+        """Check if a user is a manager for a specific collection."""
+        return cls.objects.filter(
+            user=user,
+            collection=collection,
+            role=TeamRole.MANAGER,
+            is_active_member=True
+        ).exists()
+
+    @classmethod
+    def get_user_collections(cls, user, role=None, is_active=True):
+        """Get all collections a user is associated with."""
+        filters = {"user": user}
+        if role:
+            filters["role"] = role
+        if is_active is not None:
+            filters["is_active_member"] = is_active
+        return cls.objects.filter(**filters).select_related("collection")
 
     @staticmethod
     def collections(user, is_active_member=None):

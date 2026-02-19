@@ -2,8 +2,10 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
 
+from collection.models import Collection
 from journal.models import Journal
 from team.models import (
+    CollectionTeamMember,
     Company,
     CompanyTeamMember,
     JournalCompanyContract,
@@ -12,6 +14,166 @@ from team.models import (
 )
 
 User = get_user_model()
+
+
+class CollectionTeamMemberModelTest(TestCase):
+    """Test cases for the CollectionTeamMember model."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+        self.manager_user = User.objects.create_user(
+            username="manager", email="manager@example.com", password="testpass123"
+        )
+        self.collection = Collection.objects.create(
+            acron="TST",
+            name="Test Collection",
+            creator=self.user,
+        )
+
+    def test_create_collection_team_member(self):
+        """Test creating a collection team member."""
+        member = CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertEqual(member.user, self.user)
+        self.assertEqual(member.collection, self.collection)
+        self.assertEqual(member.role, TeamRole.MEMBER)
+        self.assertFalse(member.is_manager())
+
+    def test_create_collection_team_manager(self):
+        """Test creating a collection team manager."""
+        manager = CollectionTeamMember.objects.create(
+            user=self.manager_user,
+            collection=self.collection,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertEqual(manager.role, TeamRole.MANAGER)
+        self.assertTrue(manager.is_manager())
+
+    def test_collection_team_member_unique_together(self):
+        """Test that a user can only be added once to a collection."""
+        CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MEMBER,
+            creator=self.user,
+        )
+        with self.assertRaises(IntegrityError):
+            CollectionTeamMember.objects.create(
+                user=self.user,
+                collection=self.collection,
+                role=TeamRole.MANAGER,
+                creator=self.user,
+            )
+
+    def test_user_is_manager(self):
+        """Test checking if a user is a collection manager."""
+        CollectionTeamMember.objects.create(
+            user=self.manager_user,
+            collection=self.collection,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertTrue(
+            CollectionTeamMember.user_is_manager(self.manager_user, self.collection)
+        )
+        self.assertFalse(CollectionTeamMember.user_is_manager(self.user, self.collection))
+
+    def test_get_user_collections(self):
+        """Test getting collections for a user."""
+        CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        collections = CollectionTeamMember.get_user_collections(self.user)
+        self.assertEqual(collections.count(), 1)
+        self.assertEqual(collections.first().collection, self.collection)
+
+    def test_collection_get_managers(self):
+        """Test getting managers for a collection."""
+        CollectionTeamMember.objects.create(
+            user=self.manager_user,
+            collection=self.collection,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        managers = Collection.get_managers(self.collection.id)
+        self.assertEqual(managers.count(), 1)
+        self.assertEqual(managers.first().user, self.manager_user)
+
+    def test_collection_get_members(self):
+        """Test getting all members (including managers) for a collection."""
+        CollectionTeamMember.objects.create(
+            user=self.manager_user,
+            collection=self.collection,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        members = Collection.get_members(self.collection.id)
+        self.assertEqual(members.count(), 2)
+
+    def test_default_role_is_member(self):
+        """Test that the default role is MEMBER."""
+        member = CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertEqual(member.role, TeamRole.MEMBER)
+
+    def test_autocomplete_label_includes_role(self):
+        """Test that autocomplete label includes role."""
+        member = CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MEMBER,
+            creator=self.user,
+        )
+        label = member.autocomplete_label()
+        self.assertIn("Member", label)
+        self.assertIn(str(self.user), label)
+        self.assertIn(str(self.collection), label)
+
+    def test_str_includes_role(self):
+        """Test that string representation includes role."""
+        manager = CollectionTeamMember.objects.create(
+            user=self.manager_user,
+            collection=self.collection,
+            role=TeamRole.MANAGER,
+            creator=self.user,
+        )
+        str_repr = str(manager)
+        self.assertIn("Manager", str_repr)
+        self.assertIn(str(self.manager_user), str_repr)
 
 
 class CompanyModelTest(TestCase):
