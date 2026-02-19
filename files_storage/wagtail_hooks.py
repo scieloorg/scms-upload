@@ -1,5 +1,4 @@
 from django.utils.translation import gettext_lazy as _
-from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 
 from config.menu import get_menu_order
@@ -28,5 +27,3 @@ class MinioConfigurationViewSet(SnippetViewSet):
         "bucket_app_subdir",
     )
 
-
-register_snippet(MinioConfigurationViewSet)
