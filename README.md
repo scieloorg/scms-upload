@@ -96,6 +96,34 @@ Moved to [settings](http://cookiecutter-django.readthedocs.io/en/latest/settings
 
 For convenience, you can keep your normal user logged in on Chrome and your superuser logged in on Firefox (or similar), so that you can see how the site behaves for both kinds of users.
 
+### User Groups and Permissions
+
+This system implements group-based access control for administrative areas. Seven user groups are available:
+
+- **Superadmin**: Full system access
+- **Admin Coleção**: Collection administrator with broad access
+- **Analista**: Quality analyst for package review
+- **Produtor XML**: XML producer for package uploads
+- **Gestor de Periódico**: Journal manager
+- **Gestor de Empresa**: Company manager
+- **Revisor**: Content reviewer (read-only)
+
+**Setup user groups** (run after migrations):
+
+    $ python manage.py create_user_groups
+
+**Documentation**:
+- 📖 [Complete Permissions Matrix](docs/PERMISSIONS_MATRIX.md) - Detailed matrix and configuration guide
+- 📋 [Quick Reference](docs/PERMISSIONS_QUICK_REFERENCE.md) - Visual matrix and common use cases
+- 🔧 [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md) - Technical details
+
+**Assign users to groups** via Django Admin or shell:
+
+```python
+from django.contrib.auth.models import Group
+user.groups.add(Group.objects.get(name='Analista'))
+```
+
 ### Type checks
 
 Running type checks with mypy:
