@@ -34,31 +34,6 @@ def has_permission(user=None):
         return False
 
 
-def get_user_membership_ids(user, membership_type="collection"):
-    """Return IDs of objects the user is actively linked to as a team member.
-
-    Args:
-        user: The authenticated user.
-        membership_type: One of 'collection', 'journal', or 'company'.
-
-    Returns:
-        QuerySet of integer IDs (flat).
-    """
-    if membership_type == "collection":
-        return CollectionTeamMember.objects.filter(
-            user=user, is_active_member=True
-        ).values_list("collection_id", flat=True)
-    if membership_type == "journal":
-        return JournalTeamMember.objects.filter(
-            user=user, is_active_member=True
-        ).values_list("journal_id", flat=True)
-    if membership_type == "company":
-        return CompanyTeamMember.objects.filter(
-            user=user, is_active_member=True
-        ).values_list("company_id", flat=True)
-    return CollectionTeamMember.objects.none().values_list("collection_id", flat=True)
-
-
 class TeamMember(CommonControlField):
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
     is_active_member = models.BooleanField(null=True, blank=True, default=True)
