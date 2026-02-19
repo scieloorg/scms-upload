@@ -5,7 +5,6 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from config.menu import get_menu_order
-from files_storage.models import MinioConfiguration
 from migration.models import ClassicWebsiteConfiguration
 
 from .models import Collection, WebSiteConfiguration
@@ -53,29 +52,6 @@ class WebSiteConfigurationViewSet(SnippetViewSet):
     search_fields = ("url", "collection__acron", "collection__name")
 
 
-class MinioConfigurationViewSet(SnippetViewSet):
-    model = MinioConfiguration
-    menu_label = _("Files Storage Configuration")
-    menu_icon = "doc-full"
-    menu_order = 200
-
-    list_display = (
-        "host",
-        "bucket_root",
-        "created",
-        "updated",
-        "updated_by",
-    )
-    list_filter = (
-        "host",
-        "bucket_root",
-    )
-    search_fields = (
-        "host",
-        "bucket_root",
-    )
-
-
 class ClassicWebsiteConfigurationViewSet(SnippetViewSet):
     model = ClassicWebsiteConfiguration
     menu_label = _("Classic Website Configuration")
@@ -96,7 +72,6 @@ class CollectionViewSetGroup(SnippetViewSetGroup):
     items = [
         CollectionViewSet,
         WebSiteConfigurationViewSet,
-        MinioConfigurationViewSet,
         ClassicWebsiteConfigurationViewSet,
     ]
 
