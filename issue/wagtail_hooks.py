@@ -75,12 +75,6 @@ class IssueSnippetViewSet(SnippetViewSet):
         if membership["journal_list_ids"]:
             return qs.filter(journal__in=membership["journal_list_ids"]).distinct()
 
-        if membership["company_list_ids"]:
-            return qs.filter(
-                journal__company_contracts__company__in=membership["company_list_ids"],
-                journal__company_contracts__is_active=True,
-            ).distinct()
-
         return qs.none()
 
 
@@ -141,12 +135,6 @@ class TOCSnippetViewSet(SnippetViewSet):
 
         if membership["journal_list_ids"]:
             return qs.filter(issue__journal__in=membership["journal_list_ids"]).distinct()
-
-        if membership["company_list_ids"]:
-            return qs.filter(
-                issue__journal__company_contracts__company__in=membership["company_list_ids"],
-                issue__journal__company_contracts__is_active=True,
-            ).distinct()
 
         return qs.none()
 
