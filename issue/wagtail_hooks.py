@@ -6,6 +6,7 @@ from wagtail import hooks
 
 from config.menu import get_menu_order
 from issue.views import IssueCreateView, TOCEditView
+from team.models import CollectionTeamMember, CompanyTeamMember, JournalTeamMember
 from .models import TOC, Issue
 
 
@@ -57,6 +58,41 @@ class IssueSnippetViewSet(SnippetViewSet):
     list_export = ["csv", "xlsx"]
     export_filename = "issues"
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+
+        if user.is_superuser:
+            return qs
+
+        collection_memberships = CollectionTeamMember.objects.filter(
+            user=user, is_active_member=True
+        )
+        if collection_memberships.exists():
+            collections = collection_memberships.values_list("collection", flat=True)
+            return qs.filter(
+                journal__journal_collections__collection__in=collections
+            ).distinct()
+
+        journal_memberships = JournalTeamMember.objects.filter(
+            user=user, is_active_member=True
+        )
+        if journal_memberships.exists():
+            journals = journal_memberships.values_list("journal", flat=True)
+            return qs.filter(journal__in=journals).distinct()
+
+        company_memberships = CompanyTeamMember.objects.filter(
+            user=user, is_active_member=True
+        )
+        if company_memberships.exists():
+            companies = company_memberships.values_list("company", flat=True)
+            return qs.filter(
+                journal__company_contracts__company__in=companies,
+                journal__company_contracts__is_active=True,
+            ).distinct()
+
+        return qs.none()
+
 
 class TOCSnippetViewSet(SnippetViewSet):
     model = TOC
@@ -98,6 +134,41 @@ class TOCSnippetViewSet(SnippetViewSet):
     # Configurações de exportação
     list_export = ["csv", "xlsx"]
     export_filename = "table_of_contents"
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+
+        if user.is_superuser:
+            return qs
+
+        collection_memberships = CollectionTeamMember.objects.filter(
+            user=user, is_active_member=True
+        )
+        if collection_memberships.exists():
+            collections = collection_memberships.values_list("collection", flat=True)
+            return qs.filter(
+                issue__journal__journal_collections__collection__in=collections
+            ).distinct()
+
+        journal_memberships = JournalTeamMember.objects.filter(
+            user=user, is_active_member=True
+        )
+        if journal_memberships.exists():
+            journals = journal_memberships.values_list("journal", flat=True)
+            return qs.filter(issue__journal__in=journals).distinct()
+
+        company_memberships = CompanyTeamMember.objects.filter(
+            user=user, is_active_member=True
+        )
+        if company_memberships.exists():
+            companies = company_memberships.values_list("company", flat=True)
+            return qs.filter(
+                issue__journal__company_contracts__company__in=companies,
+                issue__journal__company_contracts__is_active=True,
+            ).distinct()
+
+        return qs.none()
 
 
 # Grupo de Snippets para Issues
