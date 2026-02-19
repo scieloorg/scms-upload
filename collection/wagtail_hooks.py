@@ -7,23 +7,9 @@ from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 from config.menu import get_menu_order
 from files_storage.models import MinioConfiguration
 from migration.models import ClassicWebsiteConfiguration
-from team.models import CollectionTeamMember
+from team.models import get_user_membership_ids
 
 from .models import Collection, WebSiteConfiguration
-
-
-def _get_user_collection_ids(user):
-    """Return the IDs of collections the user is actively associated with."""
-    return CollectionTeamMember.objects.filter(
-        user=user, is_active_member=True
-    ).values_list("collection_id", flat=True)
-
-
-def _is_collection_team_member(user):
-    """Return True if the user belongs to any active collection team."""
-    return CollectionTeamMember.objects.filter(
-        user=user, is_active_member=True
-    ).exists()
 
 
 class CollectionViewSet(SnippetViewSet):
@@ -50,9 +36,9 @@ class CollectionViewSet(SnippetViewSet):
         user = request.user
         if user.is_superuser:
             return qs
-        collection_ids = _get_user_collection_ids(user)
-        if collection_ids.exists():
-            return qs.filter(id__in=collection_ids)
+        membership = get_user_membership_ids(user)
+        if membership.get("collection_list_ids"):
+            return qs.filter(id__in=membership["collection_list_ids"])
         return qs.none()
 
 
@@ -82,9 +68,9 @@ class WebSiteConfigurationViewSet(SnippetViewSet):
         user = request.user
         if user.is_superuser:
             return qs
-        collection_ids = _get_user_collection_ids(user)
-        if collection_ids.exists():
-            return qs.filter(collection_id__in=collection_ids)
+        membership = get_user_membership_ids(user)
+        if membership.get("collection_list_ids"):
+            return qs.filter(collection_id__in=membership["collection_list_ids"])
         return qs.none()
 
 
@@ -115,7 +101,8 @@ class MinioConfigurationViewSet(SnippetViewSet):
         user = request.user
         if user.is_superuser:
             return qs
-        if _is_collection_team_member(user):
+        membership = get_user_membership_ids(user)
+        if membership.get("collection_list_ids"):
             return qs
         return qs.none()
 
@@ -137,9 +124,9 @@ class ClassicWebsiteConfigurationViewSet(SnippetViewSet):
         user = request.user
         if user.is_superuser:
             return qs
-        collection_ids = _get_user_collection_ids(user)
-        if collection_ids.exists():
-            return qs.filter(collection_id__in=collection_ids)
+        membership = get_user_membership_ids(user)
+        if membership.get("collection_list_ids"):
+            return qs.filter(collection_id__in=membership["collection_list_ids"])
         return qs.none()
 
 
