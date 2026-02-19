@@ -4,25 +4,13 @@ from django.test import TestCase
 from collection.models import Collection, WebSiteConfiguration
 from files_storage.models import MinioConfiguration
 from migration.models import ClassicWebsiteConfiguration
-from team.models import CollectionTeamMember, TeamRole
+from team.models import CollectionTeamMember, TeamRole, get_user_membership_ids
 
 User = get_user_model()
 
 
-def _get_user_collection_ids(user):
-    return CollectionTeamMember.objects.filter(
-        user=user, is_active_member=True
-    ).values_list("collection_id", flat=True)
-
-
-def _is_collection_team_member(user):
-    return CollectionTeamMember.objects.filter(
-        user=user, is_active_member=True
-    ).exists()
-
-
 class CollectionTeamHelperFunctionsTest(TestCase):
-    """Tests for the collection access-control helper functions."""
+    """Tests for get_user_membership_ids from team.models."""
 
     def setUp(self):
         self.creator = User.objects.create_user(
@@ -54,25 +42,28 @@ class CollectionTeamHelperFunctionsTest(TestCase):
         )
 
     def test_get_user_collection_ids_returns_active_memberships(self):
-        ids = _get_user_collection_ids(self.active_member)
-        self.assertIn(self.col.id, ids)
+        membership = get_user_membership_ids(self.active_member)
+        self.assertIn(self.col.id, membership["collection_list_ids"])
 
     def test_get_user_collection_ids_excludes_inactive_memberships(self):
-        ids = _get_user_collection_ids(self.inactive_member)
-        self.assertNotIn(self.col.id, ids)
+        membership = get_user_membership_ids(self.inactive_member)
+        self.assertNotIn(self.col.id, membership["collection_list_ids"])
 
     def test_get_user_collection_ids_empty_for_non_member(self):
-        ids = _get_user_collection_ids(self.non_member)
-        self.assertFalse(ids.exists())
+        membership = get_user_membership_ids(self.non_member)
+        self.assertFalse(membership.get("collection_list_ids"))
 
     def test_is_collection_team_member_true_for_active(self):
-        self.assertTrue(_is_collection_team_member(self.active_member))
+        membership = get_user_membership_ids(self.active_member)
+        self.assertTrue(membership.get("collection_list_ids"))
 
     def test_is_collection_team_member_false_for_inactive(self):
-        self.assertFalse(_is_collection_team_member(self.inactive_member))
+        membership = get_user_membership_ids(self.inactive_member)
+        self.assertFalse(membership.get("collection_list_ids"))
 
     def test_is_collection_team_member_false_for_non_member(self):
-        self.assertFalse(_is_collection_team_member(self.non_member))
+        membership = get_user_membership_ids(self.non_member)
+        self.assertFalse(membership.get("collection_list_ids"))
 
 
 class CollectionViewSetQueryFilterTest(TestCase):
@@ -106,9 +97,9 @@ class CollectionViewSetQueryFilterTest(TestCase):
         qs = Collection.objects.all()
         if user.is_superuser:
             return qs
-        collection_ids = _get_user_collection_ids(user)
-        if collection_ids.exists():
-            return qs.filter(id__in=collection_ids)
+        membership = get_user_membership_ids(user)
+        if membership.get("collection_list_ids"):
+            return qs.filter(id__in=membership["collection_list_ids"])
         return qs.none()
 
     def test_superuser_sees_all_collections(self):
@@ -162,9 +153,9 @@ class WebSiteConfigurationQueryFilterTest(TestCase):
         qs = WebSiteConfiguration.objects.all()
         if user.is_superuser:
             return qs
-        collection_ids = _get_user_collection_ids(user)
-        if collection_ids.exists():
-            return qs.filter(collection_id__in=collection_ids)
+        membership = get_user_membership_ids(user)
+        if membership.get("collection_list_ids"):
+            return qs.filter(collection_id__in=membership["collection_list_ids"])
         return qs.none()
 
     def test_superuser_sees_all_website_configs(self):
@@ -214,7 +205,8 @@ class MinioConfigurationQueryFilterTest(TestCase):
         qs = MinioConfiguration.objects.all()
         if user.is_superuser:
             return qs
-        if _is_collection_team_member(user):
+        membership = get_user_membership_ids(user)
+        if membership.get("collection_list_ids"):
             return qs
         return qs.none()
 
@@ -267,9 +259,9 @@ class ClassicWebsiteConfigurationQueryFilterTest(TestCase):
         qs = ClassicWebsiteConfiguration.objects.all()
         if user.is_superuser:
             return qs
-        collection_ids = _get_user_collection_ids(user)
-        if collection_ids.exists():
-            return qs.filter(collection_id__in=collection_ids)
+        membership = get_user_membership_ids(user)
+        if membership.get("collection_list_ids"):
+            return qs.filter(collection_id__in=membership["collection_list_ids"])
         return qs.none()
 
     def test_superuser_sees_all_classic_configs(self):
