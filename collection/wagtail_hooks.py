@@ -5,6 +5,7 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from config.menu import get_menu_order
+from files_storage.wagtail_hooks import MinioConfigurationViewSet
 from migration.models import ClassicWebsiteConfiguration
 from team.models import get_user_membership_ids
 
@@ -136,6 +137,7 @@ class CollectionViewSetGroup(SnippetViewSetGroup):
     items = [
         CollectionViewSet,
         WebSiteConfigurationViewSet,
+        MinioConfigurationViewSet,
         ClassicWebsiteConfigurationViewSet,
     ]
 
