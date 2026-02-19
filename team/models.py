@@ -29,9 +29,13 @@ def get_user_membership_ids(user):
     that the user is actively associated with, depending on team membership type.
     Priority order: collection > journal > company.
 
+    For collection team members, journal_list_ids is also populated with the journals
+    that belong to the user's collections.
     For company team members, journal_list_ids is also populated with the journals
     that have active contracts with the user's companies.
     """
+    from journal.models import JournalCollection
+
     result = {"collection_list_ids": [], "journal_list_ids": [], "company_list_ids": []}
 
     collection_ids = list(
@@ -40,6 +44,11 @@ def get_user_membership_ids(user):
     )
     if collection_ids:
         result["collection_list_ids"] = collection_ids
+        result["journal_list_ids"] = list(
+            JournalCollection.objects.filter(
+                collection__in=collection_ids
+            ).values_list("journal", flat=True)
+        )
         return result
 
     journal_ids = list(
@@ -73,34 +82,6 @@ def has_permission(user=None):
         return CollectionTeamMember.has_upload_permission(user)
     except Exception:
         return False
-
-
-def get_user_membership_ids(user):
-    """Return a dict of IDs of objects the user is actively linked to as a team member.
-
-    Returns:
-        dict with keys:
-            - "collection_list_ids": list of collection IDs
-            - "journal_list_ids": list of journal IDs
-            - "company_list_ids": list of company IDs
-    """
-    return {
-        "collection_list_ids": list(
-            CollectionTeamMember.objects.filter(
-                user=user, is_active_member=True
-            ).values_list("collection_id", flat=True)
-        ),
-        "journal_list_ids": list(
-            JournalTeamMember.objects.filter(
-                user=user, is_active_member=True
-            ).values_list("journal_id", flat=True)
-        ),
-        "company_list_ids": list(
-            CompanyTeamMember.objects.filter(
-                user=user, is_active_member=True
-            ).values_list("company_id", flat=True)
-        ),
-    }
 
 
 class TeamMember(CommonControlField):
