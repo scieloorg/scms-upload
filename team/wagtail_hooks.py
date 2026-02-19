@@ -22,11 +22,12 @@ class CollectionTeamMemberViewSet(SnippetViewSet):
 
     list_display = (
         "user",
-        "is_active_member",
         "collection",
+        "role",
+        "is_active_member",
         "updated",
     )
-    list_filter = ("is_active_member", "collection")
+    list_filter = ("role", "is_active_member", "collection")
     search_fields = (
         "collection__name",
         "collection__acron",
