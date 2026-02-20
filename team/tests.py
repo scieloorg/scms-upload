@@ -826,3 +826,142 @@ class GetQuerysetFilteringTest(TestCase):
         ).values_list("journal", flat=True)
         filtered = JournalCompanyContract.objects.filter(journal__in=managed_journal_ids)
         self.assertEqual(filtered.count(), 0)
+
+
+class UserGroupSyncTest(TestCase):
+    """Test that team member save/delete signals keep auth.Group memberships in sync."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="syncuser", email="syncuser@example.com", password="testpass123"
+        )
+        self.collection = Collection.objects.create(
+            acron="SYN", name="Sync Collection", creator=self.user
+        )
+        self.journal = Journal.objects.create(title="Sync Journal", creator=self.user)
+        self.company = Company.objects.create(name="Sync Company", creator=self.user)
+
+    def _group_names(self):
+        return set(self.user.groups.values_list("name", flat=True))
+
+    # --- CollectionTeamMember ---
+
+    def test_collection_manager_gets_collection_team_admin_group(self):
+        """Creating a MANAGER CollectionTeamMember adds COLLECTION_TEAM_ADMIN to the user."""
+        CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertIn(COLLECTION_TEAM_ADMIN, self._group_names())
+        self.assertNotIn(COLLECTION_TEAM_MEMBER, self._group_names())
+
+    def test_collection_member_gets_collection_team_member_group(self):
+        """Creating a MEMBER CollectionTeamMember adds COLLECTION_TEAM_MEMBER to the user."""
+        CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertIn(COLLECTION_TEAM_MEMBER, self._group_names())
+        self.assertNotIn(COLLECTION_TEAM_ADMIN, self._group_names())
+
+    def test_deactivating_collection_member_removes_group(self):
+        """Setting is_active_member=False removes the user from the group."""
+        member = CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertIn(COLLECTION_TEAM_ADMIN, self._group_names())
+        member.is_active_member = False
+        member.save()
+        self.assertNotIn(COLLECTION_TEAM_ADMIN, self._group_names())
+
+    def test_deleting_collection_member_removes_group(self):
+        """Deleting a CollectionTeamMember removes the user from the group."""
+        member = CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertIn(COLLECTION_TEAM_ADMIN, self._group_names())
+        member.delete()
+        self.assertNotIn(COLLECTION_TEAM_ADMIN, self._group_names())
+
+    # --- JournalTeamMember ---
+
+    def test_journal_manager_gets_journal_team_admin_group(self):
+        """Creating a MANAGER JournalTeamMember adds JOURNAL_TEAM_ADMIN to the user."""
+        JournalTeamMember.objects.create(
+            user=self.user,
+            journal=self.journal,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertIn(JOURNAL_TEAM_ADMIN, self._group_names())
+        self.assertNotIn(JOURNAL_TEAM_MEMBER, self._group_names())
+
+    def test_journal_member_gets_journal_team_member_group(self):
+        """Creating a MEMBER JournalTeamMember adds JOURNAL_TEAM_MEMBER to the user."""
+        JournalTeamMember.objects.create(
+            user=self.user,
+            journal=self.journal,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertIn(JOURNAL_TEAM_MEMBER, self._group_names())
+        self.assertNotIn(JOURNAL_TEAM_ADMIN, self._group_names())
+
+    # --- CompanyTeamMember ---
+
+    def test_company_manager_gets_company_team_admin_group(self):
+        """Creating a MANAGER CompanyTeamMember adds COMPANY_TEAM_ADMIN to the user."""
+        CompanyTeamMember.objects.create(
+            user=self.user,
+            company=self.company,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertIn(COMPANY_TEAM_ADMIN, self._group_names())
+        self.assertNotIn(COMPANY_MEMBER, self._group_names())
+
+    def test_company_member_gets_company_member_group(self):
+        """Creating a MEMBER CompanyTeamMember adds COMPANY_MEMBER to the user."""
+        CompanyTeamMember.objects.create(
+            user=self.user,
+            company=self.company,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertIn(COMPANY_MEMBER, self._group_names())
+        self.assertNotIn(COMPANY_TEAM_ADMIN, self._group_names())
+
+    def test_role_change_updates_groups(self):
+        """Changing role from MANAGER to MEMBER updates the groups correctly."""
+        member = CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        self.assertIn(COLLECTION_TEAM_ADMIN, self._group_names())
+        member.role = TeamRole.MEMBER
+        member.save()
+        # Refresh from DB
+        self.user.refresh_from_db()
+        self.assertNotIn(COLLECTION_TEAM_ADMIN, self._group_names())
+        self.assertIn(COLLECTION_TEAM_MEMBER, self._group_names())
