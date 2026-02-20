@@ -1,10 +1,17 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
 from collection.models import Collection
 from journal.models import Journal
 from team.models import (
+    COLLECTION_TEAM_ADMIN,
+    COLLECTION_TEAM_MEMBER,
+    COMPANY_MEMBER,
+    COMPANY_TEAM_ADMIN,
+    GROUP_NAMES,
+    JOURNAL_TEAM_ADMIN,
+    JOURNAL_TEAM_MEMBER,
     CollectionTeamMember,
     Company,
     CompanyTeamMember,
@@ -540,3 +547,274 @@ class JournalCompanyContractModelTest(TestCase):
         self.assertFalse(
             JournalCompanyContract.can_manage_contract(self.user, self.journal)
         )
+
+
+class GroupNamesTest(TestCase):
+    """Test that group name constants are defined correctly."""
+
+    def test_group_names_constants(self):
+        """Test that all group name constants are defined."""
+        self.assertEqual(COLLECTION_TEAM_ADMIN, "COLLECTION_TEAM_ADMIN")
+        self.assertEqual(COLLECTION_TEAM_MEMBER, "COLLECTION_TEAM_MEMBER")
+        self.assertEqual(JOURNAL_TEAM_ADMIN, "JOURNAL_TEAM_ADMIN")
+        self.assertEqual(JOURNAL_TEAM_MEMBER, "JOURNAL_TEAM_MEMBER")
+        self.assertEqual(COMPANY_TEAM_ADMIN, "COMPANY_TEAM_ADMIN")
+        self.assertEqual(COMPANY_MEMBER, "COMPANY_MEMBER")
+
+    def test_group_names_list(self):
+        """Test that GROUP_NAMES contains all expected group names."""
+        self.assertIn(COLLECTION_TEAM_ADMIN, GROUP_NAMES)
+        self.assertIn(COLLECTION_TEAM_MEMBER, GROUP_NAMES)
+        self.assertIn(JOURNAL_TEAM_ADMIN, GROUP_NAMES)
+        self.assertIn(JOURNAL_TEAM_MEMBER, GROUP_NAMES)
+        self.assertIn(COMPANY_TEAM_ADMIN, GROUP_NAMES)
+        self.assertIn(COMPANY_MEMBER, GROUP_NAMES)
+        self.assertEqual(len(GROUP_NAMES), 6)
+
+
+class GetQuerysetFilteringTest(TestCase):
+    """Test the queryset filtering logic used in wagtail_hooks get_queryset methods."""
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="superuser", email="super@example.com", password="pass"
+        )
+        self.collection_manager = User.objects.create_user(
+            username="col_manager", email="col_manager@example.com", password="pass"
+        )
+        self.collection_member = User.objects.create_user(
+            username="col_member", email="col_member@example.com", password="pass"
+        )
+        self.journal_manager = User.objects.create_user(
+            username="jour_manager", email="jour_manager@example.com", password="pass"
+        )
+        self.journal_member = User.objects.create_user(
+            username="jour_member", email="jour_member@example.com", password="pass"
+        )
+        self.company_manager = User.objects.create_user(
+            username="comp_manager", email="comp_manager@example.com", password="pass"
+        )
+        self.company_member_user = User.objects.create_user(
+            username="comp_member", email="comp_member@example.com", password="pass"
+        )
+
+        self.collection = Collection.objects.create(
+            acron="TST", name="Test Collection", creator=self.superuser
+        )
+        self.other_collection = Collection.objects.create(
+            acron="OTH", name="Other Collection", creator=self.superuser
+        )
+        self.journal = Journal.objects.create(title="Test Journal", creator=self.superuser)
+        self.other_journal = Journal.objects.create(title="Other Journal", creator=self.superuser)
+        self.company = Company.objects.create(name="Test Company", creator=self.superuser)
+        self.other_company = Company.objects.create(name="Other Company", creator=self.superuser)
+
+        # Set up collection team members
+        CollectionTeamMember.objects.create(
+            user=self.collection_manager,
+            collection=self.collection,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.superuser,
+        )
+        CollectionTeamMember.objects.create(
+            user=self.collection_member,
+            collection=self.collection,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.superuser,
+        )
+
+        # Set up journal team members
+        JournalTeamMember.objects.create(
+            user=self.journal_manager,
+            journal=self.journal,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.superuser,
+        )
+        JournalTeamMember.objects.create(
+            user=self.journal_member,
+            journal=self.journal,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.superuser,
+        )
+        # journal_manager also member of other_journal (as member)
+        JournalTeamMember.objects.create(
+            user=self.journal_manager,
+            journal=self.other_journal,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.superuser,
+        )
+
+        # Set up company team members
+        CompanyTeamMember.objects.create(
+            user=self.company_manager,
+            company=self.company,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.superuser,
+        )
+        CompanyTeamMember.objects.create(
+            user=self.company_member_user,
+            company=self.company,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.superuser,
+        )
+
+        # Contracts
+        self.contract = JournalCompanyContract.objects.create(
+            journal=self.journal,
+            company=self.company,
+            is_active=True,
+            creator=self.superuser,
+        )
+        self.other_contract = JournalCompanyContract.objects.create(
+            journal=self.other_journal,
+            company=self.other_company,
+            is_active=True,
+            creator=self.superuser,
+        )
+
+    # --- CollectionTeamMember queryset filtering ---
+
+    def test_collection_team_qs_superuser_sees_all(self):
+        """Superuser should see all CollectionTeamMember records."""
+        qs = CollectionTeamMember.objects.all()
+        self.assertEqual(qs.count(), 2)
+
+    def test_collection_team_qs_manager_sees_own_collection_members(self):
+        """COLLECTION_TEAM_ADMIN sees members of their collection(s)."""
+        managed_ids = CollectionTeamMember.objects.filter(
+            user=self.collection_manager, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("collection", flat=True)
+        filtered = CollectionTeamMember.objects.filter(collection__in=managed_ids)
+        # Both manager and member of the collection should be visible
+        self.assertEqual(filtered.count(), 2)
+
+    def test_collection_team_qs_member_sees_only_self(self):
+        """COLLECTION_TEAM_MEMBER sees only their own record."""
+        managed_ids = CollectionTeamMember.objects.filter(
+            user=self.collection_member, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("collection", flat=True)
+        self.assertFalse(managed_ids.exists())
+        # Falls back to filter(user=self.collection_member)
+        filtered = CollectionTeamMember.objects.filter(user=self.collection_member)
+        self.assertEqual(filtered.count(), 1)
+
+    # --- Company queryset filtering ---
+
+    def test_company_qs_collection_manager_sees_all(self):
+        """COLLECTION_TEAM_ADMIN can see all companies."""
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=self.collection_manager, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        self.assertTrue(is_collection_manager)
+        # Collection manager should see all companies
+        qs = Company.objects.all()
+        self.assertEqual(qs.count(), 2)
+
+    def test_company_qs_company_member_sees_own(self):
+        """Company member sees only their own companies."""
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=self.company_member_user, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        self.assertFalse(is_collection_manager)
+        company_ids = CompanyTeamMember.objects.filter(
+            user=self.company_member_user, is_active_member=True
+        ).values_list("company", flat=True)
+        filtered = Company.objects.filter(id__in=company_ids)
+        self.assertEqual(filtered.count(), 1)
+        self.assertEqual(filtered.first(), self.company)
+
+    # --- JournalTeamMember queryset filtering ---
+
+    def test_journal_team_qs_collection_manager_sees_all(self):
+        """COLLECTION_TEAM_ADMIN sees all journal team members."""
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=self.collection_manager, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        self.assertTrue(is_collection_manager)
+        # Should see all journal team members
+        self.assertEqual(JournalTeamMember.objects.count(), 3)
+
+    def test_journal_team_qs_journal_manager_sees_own_journal_members(self):
+        """JOURNAL_TEAM_ADMIN sees members of their managed journals."""
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=self.journal_manager, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        self.assertFalse(is_collection_manager)
+        managed_journal_ids = JournalTeamMember.objects.filter(
+            user=self.journal_manager, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("journal", flat=True)
+        self.assertTrue(managed_journal_ids.exists())
+        filtered = JournalTeamMember.objects.filter(journal__in=managed_journal_ids)
+        # journal_manager and journal_member are in the managed journal
+        self.assertEqual(filtered.count(), 2)
+
+    def test_journal_team_qs_journal_member_sees_only_self(self):
+        """JOURNAL_TEAM_MEMBER sees only their own record."""
+        managed_journal_ids = JournalTeamMember.objects.filter(
+            user=self.journal_member, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("journal", flat=True)
+        self.assertFalse(managed_journal_ids.exists())
+        filtered = JournalTeamMember.objects.filter(user=self.journal_member)
+        self.assertEqual(filtered.count(), 1)
+
+    # --- CompanyTeamMember queryset filtering ---
+
+    def test_company_team_qs_manager_sees_own_company_members(self):
+        """COMPANY_TEAM_ADMIN sees members of their managed companies."""
+        managed_company_ids = CompanyTeamMember.objects.filter(
+            user=self.company_manager, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("company", flat=True)
+        self.assertTrue(managed_company_ids.exists())
+        filtered = CompanyTeamMember.objects.filter(company__in=managed_company_ids)
+        self.assertEqual(filtered.count(), 2)
+
+    def test_company_team_qs_member_sees_only_self(self):
+        """COMPANY_MEMBER sees only their own record."""
+        managed_company_ids = CompanyTeamMember.objects.filter(
+            user=self.company_member_user, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("company", flat=True)
+        self.assertFalse(managed_company_ids.exists())
+        filtered = CompanyTeamMember.objects.filter(user=self.company_member_user)
+        self.assertEqual(filtered.count(), 1)
+
+    # --- JournalCompanyContract queryset filtering ---
+
+    def test_contract_qs_collection_manager_sees_all(self):
+        """COLLECTION_TEAM_ADMIN sees all contracts."""
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=self.collection_manager, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        self.assertTrue(is_collection_manager)
+        self.assertEqual(JournalCompanyContract.objects.count(), 2)
+
+    def test_contract_qs_journal_manager_sees_own_journal_contracts(self):
+        """JOURNAL_TEAM_ADMIN sees contracts for their managed journals."""
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=self.journal_manager, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        self.assertFalse(is_collection_manager)
+        managed_journal_ids = JournalTeamMember.objects.filter(
+            user=self.journal_manager, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("journal", flat=True)
+        filtered = JournalCompanyContract.objects.filter(journal__in=managed_journal_ids)
+        self.assertEqual(filtered.count(), 1)
+        self.assertEqual(filtered.first(), self.contract)
+
+    def test_contract_qs_non_manager_sees_none(self):
+        """Users with no manager role see no contracts."""
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=self.journal_member, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        self.assertFalse(is_collection_manager)
+        managed_journal_ids = JournalTeamMember.objects.filter(
+            user=self.journal_member, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("journal", flat=True)
+        filtered = JournalCompanyContract.objects.filter(journal__in=managed_journal_ids)
+        self.assertEqual(filtered.count(), 0)

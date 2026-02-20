@@ -10,6 +10,7 @@ from .models import (
     CompanyTeamMember,
     JournalCompanyContract,
     JournalTeamMember,
+    TeamRole,
 )
 
 
@@ -38,9 +39,17 @@ class CollectionTeamMemberViewSet(SnippetViewSet):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        if request.user.is_superuser:
+        user = request.user
+        if user.is_superuser:
             return qs
-        return CollectionTeamMember.members(request.user)
+        # Managers see members of their own collections
+        managed_collection_ids = CollectionTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("collection", flat=True)
+        if managed_collection_ids:
+            return qs.filter(collection__in=managed_collection_ids)
+        # Regular members see only their own record
+        return qs.filter(user=user)
 
 
 class CompanyViewSet(SnippetViewSet):
@@ -66,6 +75,23 @@ class CompanyViewSet(SnippetViewSet):
         "url",
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+        if user.is_superuser:
+            return qs
+        # COLLECTION_TEAM_ADMIN (collection managers) can manage all companies
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        if is_collection_manager:
+            return qs
+        # Company members see only their own companies
+        company_ids = CompanyTeamMember.objects.filter(
+            user=user, is_active_member=True
+        ).values_list("company", flat=True)
+        return qs.filter(id__in=company_ids)
+
 
 class JournalTeamMemberViewSet(SnippetViewSet):
     model = JournalTeamMember
@@ -88,6 +114,26 @@ class JournalTeamMemberViewSet(SnippetViewSet):
         "user__name",
         "journal__title",
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+        if user.is_superuser:
+            return qs
+        # COLLECTION_TEAM_ADMIN sees all journal team members
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        if is_collection_manager:
+            return qs
+        # JOURNAL_TEAM_ADMIN sees members of their managed journals
+        managed_journal_ids = JournalTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("journal", flat=True)
+        if managed_journal_ids:
+            return qs.filter(journal__in=managed_journal_ids)
+        # Regular members see only their own record
+        return qs.filter(user=user)
 
 
 class CompanyTeamMemberViewSet(SnippetViewSet):
@@ -112,6 +158,20 @@ class CompanyTeamMemberViewSet(SnippetViewSet):
         "company__name",
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+        if user.is_superuser:
+            return qs
+        # COMPANY_TEAM_ADMIN sees members of their managed companies
+        managed_company_ids = CompanyTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("company", flat=True)
+        if managed_company_ids:
+            return qs.filter(company__in=managed_company_ids)
+        # Regular members see only their own record
+        return qs.filter(user=user)
+
 
 class JournalCompanyContractViewSet(SnippetViewSet):
     model = JournalCompanyContract
@@ -132,6 +192,23 @@ class JournalCompanyContractViewSet(SnippetViewSet):
         "journal__title",
         "company__name",
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+        if user.is_superuser:
+            return qs
+        # COLLECTION_TEAM_ADMIN sees all contracts
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        if is_collection_manager:
+            return qs
+        # JOURNAL_TEAM_ADMIN sees contracts for their managed journals
+        managed_journal_ids = JournalTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("journal", flat=True)
+        return qs.filter(journal__in=managed_journal_ids)
 
 
 class TeamViewSetGroup(SnippetViewSetGroup):
