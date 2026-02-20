@@ -163,6 +163,12 @@ class CompanyTeamMemberViewSet(SnippetViewSet):
         user = request.user
         if user.is_superuser:
             return qs
+        # COLLECTION_TEAM_ADMIN sees all company team members
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        if is_collection_manager:
+            return qs
         # COMPANY_TEAM_ADMIN sees members of their managed companies
         managed_company_ids = CompanyTeamMember.objects.filter(
             user=user, role=TeamRole.MANAGER, is_active_member=True

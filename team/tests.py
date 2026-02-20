@@ -766,6 +766,14 @@ class GetQuerysetFilteringTest(TestCase):
 
     # --- CompanyTeamMember queryset filtering ---
 
+    def test_company_team_qs_collection_manager_sees_all(self):
+        """COLLECTION_TEAM_ADMIN sees all company team members."""
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=self.collection_manager, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        self.assertTrue(is_collection_manager)
+        self.assertEqual(CompanyTeamMember.objects.count(), 2)
+
     def test_company_team_qs_manager_sees_own_company_members(self):
         """COMPANY_TEAM_ADMIN sees members of their managed companies."""
         managed_company_ids = CompanyTeamMember.objects.filter(
