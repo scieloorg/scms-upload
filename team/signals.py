@@ -1,6 +1,5 @@
 from django.contrib.auth.models import Group
 from django.db.models.signals import post_delete, post_save
-from django.dispatch import receiver
 
 from .models import (
     COLLECTION_TEAM_ADMIN,
@@ -16,7 +15,7 @@ from .models import (
 )
 
 
-def _roles_for_user(model_class, user, fk_field):
+def _roles_for_user(model_class, user):
     """Return the set of active roles the user holds in a team model."""
     return set(
         model_class.objects.filter(user=user, is_active_member=True)
@@ -32,9 +31,9 @@ def update_user_groups(user):
     if user is None:
         return
 
-    collection_roles = _roles_for_user(CollectionTeamMember, user, "collection")
-    journal_roles = _roles_for_user(JournalTeamMember, user, "journal")
-    company_roles = _roles_for_user(CompanyTeamMember, user, "company")
+    collection_roles = _roles_for_user(CollectionTeamMember, user)
+    journal_roles = _roles_for_user(JournalTeamMember, user)
+    company_roles = _roles_for_user(CompanyTeamMember, user)
 
     _sync_group(user, COLLECTION_TEAM_ADMIN, TeamRole.MANAGER in collection_roles)
     _sync_group(user, COLLECTION_TEAM_MEMBER, TeamRole.MEMBER in collection_roles)

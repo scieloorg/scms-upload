@@ -965,3 +965,26 @@ class UserGroupSyncTest(TestCase):
         self.user.refresh_from_db()
         self.assertNotIn(COLLECTION_TEAM_ADMIN, self._group_names())
         self.assertIn(COLLECTION_TEAM_MEMBER, self._group_names())
+
+    def test_user_manager_of_one_collection_and_member_of_another_gets_both_groups(self):
+        """User who is MANAGER of one collection and MEMBER of another gets both groups."""
+        other_collection = Collection.objects.create(
+            acron="OTH", name="Other Collection", creator=self.user
+        )
+        CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=self.collection,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        CollectionTeamMember.objects.create(
+            user=self.user,
+            collection=other_collection,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=self.user,
+        )
+        group_names = self._group_names()
+        self.assertIn(COLLECTION_TEAM_ADMIN, group_names)
+        self.assertIn(COLLECTION_TEAM_MEMBER, group_names)

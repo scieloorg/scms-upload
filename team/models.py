@@ -16,12 +16,20 @@ User = get_user_model()
 
 ALLOWED_COLLECTIONS = ["dom", "spa", "scl", "pan"]
 
-# Django group names for team-based access control
+# Django group names for team-based access control.
+# COLLECTION_TEAM_ADMIN: collection managers — can CRUD Company, JournalTeamMember,
+#   CompanyTeamMember, and members of their own collections.
 COLLECTION_TEAM_ADMIN = "COLLECTION_TEAM_ADMIN"
+# COLLECTION_TEAM_MEMBER: regular collection members — read-only access to own record.
 COLLECTION_TEAM_MEMBER = "COLLECTION_TEAM_MEMBER"
+# JOURNAL_TEAM_ADMIN: journal managers — can CRUD JournalTeamMember and JournalCompanyContract
+#   for their managed journals.
 JOURNAL_TEAM_ADMIN = "JOURNAL_TEAM_ADMIN"
+# JOURNAL_TEAM_MEMBER: regular journal members — read-only access to own record.
 JOURNAL_TEAM_MEMBER = "JOURNAL_TEAM_MEMBER"
+# COMPANY_TEAM_ADMIN: company managers — can CRUD CompanyTeamMember for their companies.
 COMPANY_TEAM_ADMIN = "COMPANY_TEAM_ADMIN"
+# COMPANY_MEMBER: regular company members — read-only access to own record.
 COMPANY_MEMBER = "COMPANY_MEMBER"
 
 GROUP_NAMES = [
@@ -223,6 +231,20 @@ class CollectionTeamMember(TeamMember):
     def has_upload_permission(cls, user):
         return cls.objects.filter(user=user, collection__acron__in=ALLOWED_COLLECTIONS).exists()
 
+    @classmethod
+    def get_queryset_for_user(cls, user, qs):
+        """Return the queryset of CollectionTeamMember records visible to the user.
+
+        - Managers see all members of their own collection(s).
+        - Regular members see only their own record.
+        """
+        managed_collection_ids = cls.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("collection", flat=True)
+        if managed_collection_ids:
+            return qs.filter(collection__in=managed_collection_ids)
+        return qs.filter(user=user)
+
 
 class Company(VisualIdentityMixin, CommonControlField):
     """
@@ -281,6 +303,23 @@ class Company(VisualIdentityMixin, CommonControlField):
             company_id=company_id,
             is_active_member=True
         )
+
+    @classmethod
+    def get_queryset_for_user(cls, user, qs):
+        """Return the queryset of Company records visible to the user.
+
+        - COLLECTION_TEAM_ADMIN (collection managers) can see all companies.
+        - Company members see only the companies they belong to.
+        """
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        if is_collection_manager:
+            return qs
+        company_ids = CompanyTeamMember.objects.filter(
+            user=user, is_active_member=True
+        ).values_list("company", flat=True)
+        return qs.filter(id__in=company_ids)
 
 
 class JournalTeamMember(TeamMember):
@@ -356,6 +395,26 @@ class JournalTeamMember(TeamMember):
             filters["is_active_member"] = is_active
         return cls.objects.filter(**filters).select_related("journal")
 
+    @classmethod
+    def get_queryset_for_user(cls, user, qs):
+        """Return the queryset of JournalTeamMember records visible to the user.
+
+        - COLLECTION_TEAM_ADMIN sees all journal team members.
+        - JOURNAL_TEAM_ADMIN sees members of their managed journals.
+        - Regular members see only their own record.
+        """
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        if is_collection_manager:
+            return qs
+        managed_journal_ids = cls.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("journal", flat=True)
+        if managed_journal_ids:
+            return qs.filter(journal__in=managed_journal_ids)
+        return qs.filter(user=user)
+
 
 class CompanyTeamMember(TeamMember):
     """
@@ -430,6 +489,26 @@ class CompanyTeamMember(TeamMember):
             filters["is_active_member"] = is_active
         return cls.objects.filter(**filters).select_related("company")
 
+    @classmethod
+    def get_queryset_for_user(cls, user, qs):
+        """Return the queryset of CompanyTeamMember records visible to the user.
+
+        - COLLECTION_TEAM_ADMIN sees all company team members.
+        - COMPANY_TEAM_ADMIN sees members of their managed companies.
+        - Regular members see only their own record.
+        """
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        if is_collection_manager:
+            return qs
+        managed_company_ids = cls.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("company", flat=True)
+        if managed_company_ids:
+            return qs.filter(company__in=managed_company_ids)
+        return qs.filter(user=user)
+
 
 class JournalCompanyContract(CommonControlField):
     """
@@ -495,3 +574,23 @@ class JournalCompanyContract(CommonControlField):
     def can_manage_contract(cls, user, journal):
         """Check if a user can manage contracts for a journal (must be a journal manager)."""
         return JournalTeamMember.user_is_manager(user, journal)
+
+    @classmethod
+    def get_queryset_for_user(cls, user, qs):
+        """Return the queryset of JournalCompanyContract records visible to the user.
+
+        - COLLECTION_TEAM_ADMIN sees all contracts.
+        - JOURNAL_TEAM_ADMIN sees contracts for their managed journals.
+        - All others see no contracts.
+        """
+        is_collection_manager = CollectionTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).exists()
+        if is_collection_manager:
+            return qs
+        managed_journal_ids = JournalTeamMember.objects.filter(
+            user=user, role=TeamRole.MANAGER, is_active_member=True
+        ).values_list("journal", flat=True)
+        if managed_journal_ids:
+            return qs.filter(journal__in=managed_journal_ids)
+        return qs.none()
