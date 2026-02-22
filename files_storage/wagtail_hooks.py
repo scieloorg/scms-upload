@@ -18,12 +18,10 @@ class MinioConfigurationViewSet(SnippetViewSet):
         "name",
         "host",
         "bucket_root",
-        "bucket_app_subdir",
     )
     search_fields = (
         "name",
         "host",
         "bucket_root",
-        "bucket_app_subdir",
     )
 
