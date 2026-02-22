@@ -236,7 +236,6 @@ class MigrationViewSetGroup(SnippetViewSetGroup):
     menu_icon = "folder-open-inverse"
     menu_order = get_menu_order("migration")
     items = (
-        ClassicWebsiteConfigurationViewSet,
         MigratedDataViewSet,
         MigratedJournalViewSet,
         MigratedIssueViewSet,
