@@ -9,8 +9,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from collection.models import Collection
 from core.models import CommonControlField, VisualIdentityMixin
-from team.forms import CollectionTeamMemberModelForm
-
+from core.forms import CoreAdminModelForm
 User = get_user_model()
 
 
@@ -88,6 +87,7 @@ class TeamMember(CommonControlField):
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
     is_active_member = models.BooleanField(null=True, blank=True, default=True)
 
+    base_form_class = CoreAdminModelForm
     panels = [
         FieldPanel("user"),
         FieldPanel("is_active_member"),
@@ -128,7 +128,6 @@ class CollectionTeamMember(TeamMember):
         default=TeamRole.MEMBER
     )
 
-    base_form_class = CollectionTeamMemberModelForm
     panels = [
         AutocompletePanel("collection"),
         AutocompletePanel("user"),
@@ -227,7 +226,7 @@ class Company(VisualIdentityMixin, CommonControlField):
             models.Index(fields=["name"]),
             models.Index(fields=["is_active"]),
         ]
-
+    base_form_class = CoreAdminModelForm
     panels = [
         FieldPanel("name"),
         FieldPanel("description"),
@@ -444,7 +443,7 @@ class JournalCompanyContract(CommonControlField):
             models.Index(fields=["journal", "is_active"]),
             models.Index(fields=["company", "is_active"]),
         ]
-
+    base_form_class = CoreAdminModelForm
     panels = [
         AutocompletePanel("journal"),
         AutocompletePanel("company"),
