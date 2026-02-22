@@ -6,7 +6,7 @@ from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from config.menu import get_menu_order
 from files_storage.wagtail_hooks import MinioConfigurationViewSet
-from migration.models import ClassicWebsiteConfiguration
+from migration.wagtail_hooks import ClassicWebsiteConfigurationViewSet
 from team.models import get_user_membership_ids
 
 from .models import Collection, WebSiteConfiguration
@@ -74,62 +74,6 @@ class WebSiteConfigurationViewSet(SnippetViewSet):
         return qs.none()
 
 
-class MinioConfigurationViewSet(SnippetViewSet):
-    model = MinioConfiguration
-    menu_label = _("Files Storage Configuration")
-    menu_icon = "doc-full"
-    menu_order = 200
-
-    list_display = (
-        "host",
-        "bucket_root",
-        "created",
-        "updated",
-        "updated_by",
-    )
-    list_filter = (
-        "host",
-        "bucket_root",
-    )
-    search_fields = (
-        "host",
-        "bucket_root",
-    )
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        user = request.user
-        if user.is_superuser:
-            return qs
-        membership = get_user_membership_ids(user)
-        if membership.get("collection_list_ids"):
-            return qs
-        return qs.none()
-
-
-class ClassicWebsiteConfigurationViewSet(SnippetViewSet):
-    model = ClassicWebsiteConfiguration
-    menu_label = _("Classic Website Configuration")
-    menu_icon = "doc-full"
-    menu_order = 200
-
-    list_display = ("collection",)
-    search_fields = (
-        "collection__acron",
-        "collection__name",
-    )
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        user = request.user
-        if user.is_superuser:
-            return qs
-        membership = get_user_membership_ids(user)
-        if membership.get("collection_list_ids"):
-            return qs.filter(collection_id__in=membership["collection_list_ids"])
-        return qs.none()
-
-
 class CollectionViewSetGroup(SnippetViewSetGroup):
     menu_label = _("Collections")
     menu_icon = "folder-open-inverse"
@@ -141,12 +85,4 @@ class CollectionViewSetGroup(SnippetViewSetGroup):
         ClassicWebsiteConfigurationViewSet,
     ]
 
-
 register_snippet(CollectionViewSetGroup)
-
-
-@hooks.register("register_admin_urls")
-def register_disclosure_url():
-    return [
-        path("collection/", include("collection.urls", namespace="collection")),
-    ]
