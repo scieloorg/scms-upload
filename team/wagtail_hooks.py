@@ -3,7 +3,8 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from config.menu import get_menu_order
-
+from core.views import CommonControlFieldCreateView
+from core.forms import CoreAdminModelForm
 from .models import (
     CollectionTeamMember,
     Company,
@@ -19,6 +20,8 @@ class CollectionTeamMemberViewSet(SnippetViewSet):
     menu_icon = "group"
     add_to_settings_menu = False
     exclude_from_explorer = False
+    base_form_class = CoreAdminModelForm
+    add_view_class = CommonControlFieldCreateView
 
     list_display = (
         "user",
@@ -49,6 +52,8 @@ class CompanyViewSet(SnippetViewSet):
     menu_icon = "group"
     add_to_settings_menu = False
     exclude_from_explorer = False
+    add_view_class = CommonControlFieldCreateView
+    base_form_class = CoreAdminModelForm
 
     list_display = (
         "name",
@@ -73,6 +78,8 @@ class JournalTeamMemberViewSet(SnippetViewSet):
     menu_icon = "user"
     add_to_settings_menu = False
     exclude_from_explorer = False
+    add_view_class = CommonControlFieldCreateView
+    base_form_class = CoreAdminModelForm
 
     list_display = (
         "user",
@@ -96,6 +103,8 @@ class CompanyTeamMemberViewSet(SnippetViewSet):
     menu_icon = "user"
     add_to_settings_menu = False
     exclude_from_explorer = False
+    add_view_class = CommonControlFieldCreateView
+    base_form_class = CoreAdminModelForm
 
     list_display = (
         "user",
@@ -119,6 +128,8 @@ class JournalCompanyContractViewSet(SnippetViewSet):
     menu_icon = "doc-full"
     add_to_settings_menu = False
     exclude_from_explorer = False
+    add_view_class = CommonControlFieldCreateView
+    base_form_class = CoreAdminModelForm
 
     list_display = (
         "journal",

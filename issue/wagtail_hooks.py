@@ -66,13 +66,7 @@ class IssueSnippetViewSet(SnippetViewSet):
             return qs
 
         membership = get_user_membership_ids(user)
-
-        if membership["collection_list_ids"]:
-            return qs.filter(
-                journal__journal_collections__collection__in=membership["collection_list_ids"]
-            ).distinct()
-
-        if membership["journal_list_ids"]:
+        if membership.get("journal_list_ids"):
             return qs.filter(journal__in=membership["journal_list_ids"]).distinct()
 
         return qs.none()
@@ -127,13 +121,7 @@ class TOCSnippetViewSet(SnippetViewSet):
             return qs
 
         membership = get_user_membership_ids(user)
-
-        if membership["collection_list_ids"]:
-            return qs.filter(
-                issue__journal__journal_collections__collection__in=membership["collection_list_ids"]
-            ).distinct()
-
-        if membership["journal_list_ids"]:
+        if membership.get("journal_list_ids"):
             return qs.filter(issue__journal__in=membership["journal_list_ids"]).distinct()
 
         return qs.none()
