@@ -138,7 +138,14 @@ class OPACHarvester:
 
             except Exception as e:
                 logger.error(f"Error harvesting OPAC documents on page {page}: {e}")
-                break
+                if total_pages is None:
+                    # First page failed, we don't know pagination; stop
+                    break
+                # Known pagination: skip this page and try the next
+                page += 1
+                if page > total_pages:
+                    break
+                continue
 
     def _parse_gmt_date(self, date_str: Optional[str]) -> Optional[str]:
         """
