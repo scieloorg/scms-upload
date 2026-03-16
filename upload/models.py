@@ -1960,11 +1960,15 @@ class XMLErrorReport(BaseValidationReport, ClusterableModel):
         null=True,
         default=False,
     )
+    file = models.FileField(
+        _("Report File"), upload_to=upload_package_directory_path, null=True, blank=True
+    )
 
     panels = (
         []
         + BaseValidationReport.panels
         + [
+            FieldPanel("file"),
             # FieldPanel("package"),
             InlinePanel("xml_error", label=_("XML error")),
             FieldPanel("xml_producer_ack"),
@@ -1988,6 +1992,41 @@ class XMLErrorReport(BaseValidationReport, ClusterableModel):
     @property
     def validation_results(self):
         return self.xml_error
+
+    def save_file(self, filename, content):
+        try:
+            self.file.delete(save=True)
+        except Exception as e:
+            pass
+        self.file.save(filename, ContentFile(content))
+
+    def generate_report(self):
+        item = self.validation_results.first()
+
+        if not item:
+            return
+
+        fieldnames = ["package"]
+        fieldnames.extend(XMLError.cols)
+
+        filename = self.package.name + f"-{report_datetime()}-xml_errors.csv"
+        with TemporaryDirectory() as targetdir:
+            target = os.path.join(targetdir, filename)
+
+            with open(target, "w", newline="") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+
+                for row in self.ValidationResultClass.rows(self.package, fieldnames):
+                    writer.writerow(row)
+
+            with open(target, "rb") as fp:
+                self.save_file(filename, fp.read())
+
+    def finish_validations(self):
+        self.generate_report()
+        self.creation = choices.REPORT_CREATION_DONE
+        self.save()
 
     @property
     def data(self):

@@ -179,6 +179,17 @@
                         </td>
                     </tr>
                 {% endfor %}
+                {% for report in xml_error_reports %}
+                    <tr>
+                        <td class='title'>{{ report.title }}</td>
+                        <td>{{ report.updated }}</td>
+                        <td>{{ report.total }}</td>    
+                        <td>
+                            <a name="xer_report{{ report.id }}"/>
+                            <a class="button" href="/admin/upload/xmlerrorreport/edit/{{ report.id }}">{% trans 'View report' %}</a>
+                        </td>
+                    </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>
