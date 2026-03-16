@@ -116,7 +116,11 @@ class XMLArticle:
                 try:
                     affs = item.get("affs") or []
                     affiliation = ", ".join(
-                        [a.get("original") or a.get("orgname") for a in affs]
+                        [
+                            a.get("original") or a.get("orgname")
+                            for a in affs
+                            if a.get("original") or a.get("orgname")
+                        ]
                     )
                 except KeyError:
                     affiliation = None
