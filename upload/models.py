@@ -1719,14 +1719,13 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
             .values("status", "reaction")
             .annotate(total=Count("id"))
         ):
-            status = item.get("status") or ""
-            if status:
-                status_key = "total_" + status.lower()
-                items[status_key] = items.get(status_key, 0) + item["total"]
-            reaction = item.get("reaction") or ""
-            if reaction:
-                reaction_key = "total_" + reaction
-                items[reaction_key] = items.get(reaction_key, 0) + item["total"]
+            status_key = "total_" + (item.get("status") or "").lower()
+            if status_key not in items:
+                continue
+            items[status_key] += item["total"]
+            reaction_key = "total_" + (item.get("reaction") or "")
+            if reaction_key in items:
+                items[reaction_key] += item["total"]
             total += item["total"]
 
         items["total"] = total
