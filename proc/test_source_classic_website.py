@@ -1,9 +1,9 @@
 import os
 import tempfile
 from unittest import TestCase
-from unittest.mock import MagicMock, Mock, patch, PropertyMock, call
+from unittest.mock import MagicMock, Mock, patch, PropertyMock
 
-from proc.source_classic_website import track_classic_website_article_pids
+from proc.source_classic_website import track_classic_website_article_pids, BATCH_SIZE
 
 
 class TestTrackClassicWebsiteArticlePids(TestCase):
@@ -219,6 +219,44 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
 
         self.assertNotIn("pids", result["items"][0])
         self.assertNotIn("pids", result["items"][1])
+
+    @patch("proc.source_classic_website.ArticleProc")
+    def test_processes_multiple_batches(self, mock_article_proc):
+        """Verify correct results when PIDs exceed BATCH_SIZE requiring multiple batches."""
+        # Create PIDs exceeding BATCH_SIZE (2.5x to ensure multiple batches)
+        total_pids = int(BATCH_SIZE * 2.5)
+        classic_pids = {f"S0001-3765200000{i:07d}" for i in range(total_pids)}
+        # Half of them exist in DB
+        existing_in_db = {f"S0001-3765200000{i:07d}" for i in range(0, total_pids, 2)}
+        # Some extra PIDs only in DB
+        extra_db_pids = {f"S0001-3765200000{i:07d}" for i in range(total_pids, total_pids + 100)}
+
+        self.classic_website_config.pid_list = classic_pids
+
+        def filter_side_effect(**kwargs):
+            result_mock = Mock()
+            if "pid__in" in kwargs:
+                batch = kwargs["pid__in"]
+                found = [p for p in batch if p in existing_in_db]
+                result_mock.values_list.return_value = found
+            else:
+                all_db_pids = list(existing_in_db | extra_db_pids)
+                vl_mock = Mock()
+                vl_mock.iterator.return_value = iter(all_db_pids)
+                result_mock.values_list.return_value = vl_mock
+            return result_mock
+
+        mock_article_proc.objects.filter.side_effect = filter_side_effect
+
+        result = track_classic_website_article_pids(
+            self.user, self.collection, self.classic_website_config
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["classic_website_total"], total_pids)
+        expected_missing = total_pids - len(existing_in_db)
+        self.assertEqual(result["items"][0]["total"], expected_missing)
+        self.assertEqual(result["items"][1]["total"], 100)  # extra DB PIDs
 
 
 class TestClassicWebsiteConfigurationPidList(TestCase):

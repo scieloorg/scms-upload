@@ -433,7 +433,7 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
                     collection=collection, pid__in=batch
                 ).values_list("pid", flat=True)
             )
-            missing_total += sum(1 for pid in batch if pid not in existing)
+            missing_total += len(batch) - len(existing)
 
         # Find excess PIDs (in ArticleProc but not in classic) in batches
         excess_total = 0
