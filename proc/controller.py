@@ -27,6 +27,7 @@ from proc.source_classic_website import (
     migrate_document_records,
     migrate_issue,
     migrate_journal,
+    track_classic_website_article_pids,
 )
 
 # Imports da API Core
@@ -57,6 +58,7 @@ __all__ = [
     "migrate_issue",
     "migrate_document_records",
     "get_files_from_classic_website",
+    "track_classic_website_article_pids",
     # Publication functions
     "publish_journals",
     "publish_issues",

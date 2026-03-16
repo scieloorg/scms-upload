@@ -2,11 +2,12 @@
 Módulo responsável pela migração de dados do site clássico e processamento de PIDs.
 """
 
+import json
 import logging
 import sys
 
 from migration import controller
-from proc.models import ArticleProc, IssueProc, JournalProc
+from proc.models import ArticleProc, IssueProc, JournalProc, ProcReport
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
 
@@ -396,3 +397,78 @@ def get_files_from_classic_website(
             user, force_update, controller.migrate_issue_files
         )
         ArticleProc.mark_for_reprocessing(issue_proc)
+
+
+def track_classic_website_article_pids(user, collection, classic_website_config):
+    """
+    Compares the PID list from the classic website with ArticleProc records
+    to identify missing items (in classic but not migrated) and excess items
+    (migrated but not in classic PID list).
+
+    Returns a dict with the tracking results including criticality levels:
+    - CRITICAL: missing PIDs (articles in classic website not registered in ArticleProc)
+    - WARNING: excess PIDs (articles in ArticleProc not present in classic PID list)
+    """
+    try:
+        classic_pids = classic_website_config.pid_list
+        if not classic_pids:
+            logging.warning(
+                "No PIDs found from classic website for collection %s",
+                collection.acron,
+            )
+            return None
+
+        migrated_pids = set(
+            ArticleProc.objects.filter(collection=collection)
+            .values_list("pid", flat=True)
+        )
+
+        missing_pids = sorted(classic_pids - migrated_pids)
+        excess_pids = sorted(migrated_pids - classic_pids)
+
+        result = {
+            "collection": collection.acron,
+            "classic_website_total": len(classic_pids),
+            "migrated_total": len(migrated_pids),
+            "items": [
+                {
+                    "type": "MISSING",
+                    "criticality": "CRITICAL",
+                    "description": "PIDs in classic website but absent from ArticleProc",
+                    "total": len(missing_pids),
+                    "pids": missing_pids,
+                },
+                {
+                    "type": "EXCESS",
+                    "criticality": "WARNING",
+                    "description": "PIDs in ArticleProc but absent from classic website PID list",
+                    "total": len(excess_pids),
+                    "pids": excess_pids,
+                },
+            ],
+        }
+
+        logging.info(
+            "PID tracking for %s: classic=%d, migrated=%d, missing=%d, excess=%d",
+            collection.acron,
+            len(classic_pids),
+            len(migrated_pids),
+            len(missing_pids),
+            len(excess_pids),
+        )
+
+        return result
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.source_classic_website.track_classic_website_article_pids",
+                "user_id": user.id if user else None,
+                "username": user.username if user else None,
+                "collection": collection.acron if collection else None,
+            },
+        )
+        return None

@@ -176,6 +176,31 @@ class ClassicWebsiteConfiguration(CommonControlField):
 
     base_form_class = CoreAdminModelForm
 
+    @property
+    def pid_list(self):
+        """
+        Reads and returns a set of 23-character article PIDs from the file
+        indicated by pid_list_path.
+        """
+        pids = set()
+        if not self.pid_list_path:
+            return pids
+        try:
+            with open(self.pid_list_path, "r") as fp:
+                for line in fp:
+                    pid = line.strip()
+                    if len(pid) == 23:
+                        pids.add(pid)
+        except FileNotFoundError:
+            logging.warning(
+                "pid_list_path file not found: %s", self.pid_list_path
+            )
+        except Exception as e:
+            logging.exception(
+                "Error reading pid_list_path %s: %s", self.pid_list_path, e
+            )
+        return pids
+
 
 class MigratedData(CommonControlField):
     collection = models.ForeignKey(
