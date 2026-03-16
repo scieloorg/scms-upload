@@ -81,8 +81,6 @@ def _get_numbers():
         "total_critical": 0,
         "total_error": 0,
         "total_warning": 0,
-        "total_ok": 0,
-        "total_ukn": 0,
     }
 
 
