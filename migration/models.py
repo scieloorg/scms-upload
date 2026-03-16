@@ -288,6 +288,12 @@ class MigratedData(CommonControlField):
             if obj.is_up_to_date(isis_updated_date, data) and not force_update:
                 return obj
             obj.updated_by = user
+        except cls.MultipleObjectsReturned:
+            items = cls.objects.filter(collection=collection, pid=pid).order_by("-updated")
+            for item in items[1:]:
+                item.delete()
+            obj = items[0]
+            obj.updated_by = user
         except cls.DoesNotExist:
             obj = cls()
             obj.collection = collection

@@ -48,7 +48,7 @@ class Article(ClusterableModel, CommonControlField):
         SPSPkg, blank=True, null=True, on_delete=models.SET_NULL
     )
     # PID v3
-    pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True)
+    pid_v3 = models.CharField(_("PID v3"), max_length=23, blank=True, null=True, unique=True)
     pid_v2 = models.CharField(_("PID v2"), max_length=23, blank=True, null=True)
 
     # Article type
@@ -124,7 +124,6 @@ class Article(ClusterableModel, CommonControlField):
 
     class Meta:
         indexes = [
-            models.Index(fields=["pid_v3"]),
             models.Index(fields=["status"]),
         ]
         ordering = ["position", "fpage", "-first_pubdate_iso"]
@@ -205,7 +204,13 @@ class Article(ClusterableModel, CommonControlField):
     @classmethod
     def get(cls, pid_v3):
         if pid_v3:
-            return cls.objects.get(pid_v3=pid_v3)
+            try:
+                return cls.objects.get(pid_v3=pid_v3)
+            except cls.MultipleObjectsReturned:
+                items = cls.objects.filter(pid_v3=pid_v3).order_by("-updated")
+                for item in items[1:]:
+                    item.delete()
+                return items[0]
         raise ValueError("Article.get requires pid_v3")
 
     @classmethod
