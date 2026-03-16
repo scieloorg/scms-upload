@@ -120,6 +120,7 @@ class OPACHarvesterTest(TestCase):
             "documents": {
                 "abc123": {
                     "journal_acronym": "jtest",
+                    "pid_v2": "S0001-00002024000100001",
                     "publication_date": "2024-01-01",
                 },
             },
