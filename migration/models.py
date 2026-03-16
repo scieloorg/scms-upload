@@ -176,8 +176,7 @@ class ClassicWebsiteConfiguration(CommonControlField):
 
     base_form_class = CoreAdminModelForm
 
-    @property
-    def pid_list(self):
+    def get_pid_list(self):
         """
         Reads and returns a set of 23-character article PIDs from the file
         indicated by pid_list_path.
@@ -200,6 +199,10 @@ class ClassicWebsiteConfiguration(CommonControlField):
                 "Error reading pid_list_path %s: %s", self.pid_list_path, e
             )
         return pids
+
+    @property
+    def pid_list(self):
+        return self.get_pid_list()
 
 
 class MigratedData(CommonControlField):

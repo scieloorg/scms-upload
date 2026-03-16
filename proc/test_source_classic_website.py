@@ -142,29 +142,26 @@ class TestClassicWebsiteConfigurationPidList(TestCase):
             f.write("S0001-37652000000100002\n")
             f.write("short\n")
             f.write("S0001-37652000000100003\n")
-            f.name
+            temp_path = f.name
         try:
-            config = Mock()
-            config.pid_list_path = f.name
-
             from migration.models import ClassicWebsiteConfiguration
             config_instance = Mock(spec=ClassicWebsiteConfiguration)
-            config_instance.pid_list_path = f.name
+            config_instance.pid_list_path = temp_path
 
-            pids = ClassicWebsiteConfiguration.pid_list.fget(config_instance)
+            pids = ClassicWebsiteConfiguration.get_pid_list(config_instance)
             self.assertEqual(len(pids), 3)
             self.assertIn("S0001-37652000000100001", pids)
             self.assertIn("S0001-37652000000100002", pids)
             self.assertIn("S0001-37652000000100003", pids)
         finally:
-            os.unlink(f.name)
+            os.unlink(temp_path)
 
     def test_returns_empty_set_when_no_path(self):
         from migration.models import ClassicWebsiteConfiguration
         config_instance = Mock(spec=ClassicWebsiteConfiguration)
         config_instance.pid_list_path = None
 
-        pids = ClassicWebsiteConfiguration.pid_list.fget(config_instance)
+        pids = ClassicWebsiteConfiguration.get_pid_list(config_instance)
         self.assertEqual(pids, set())
 
     def test_returns_empty_set_when_file_not_found(self):
@@ -172,5 +169,5 @@ class TestClassicWebsiteConfigurationPidList(TestCase):
         config_instance = Mock(spec=ClassicWebsiteConfiguration)
         config_instance.pid_list_path = "/nonexistent/path/to/file.txt"
 
-        pids = ClassicWebsiteConfiguration.pid_list.fget(config_instance)
+        pids = ClassicWebsiteConfiguration.get_pid_list(config_instance)
         self.assertEqual(pids, set())

@@ -2,7 +2,6 @@
 Módulo responsável pela migração de dados do site clássico e processamento de PIDs.
 """
 
-import json
 import logging
 import sys
 
