@@ -455,13 +455,29 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
                         pid=pid,
                         content_type="article",
                     )
+                except Exception as e:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    UnexpectedEvent.create(
+                        e=e,
+                        exc_traceback=exc_traceback,
+                        detail={
+                            "task": "proc.source_classic_website.track_classic_website_article_pids",
+                            "step": "create_migrated_article",
+                            "pid": pid,
+                            "collection": collection.acron,
+                        },
+                    )
+                    continue
+
+                try:
                     # Ensure ArticleProc exists and link to MigratedArticle
                     article_proc = ArticleProc.get_or_create(user, collection, pid)
                     if not article_proc.migrated_data:
                         article_proc.migrated_data = migrated_article
 
                     # Set pid_status based on MigratedArticle data
-                    if not migrated_article.data:
+                    # None and {} both mean the record was not migrated
+                    if migrated_article.data is None or migrated_article.data == {}:
                         article_proc.pid_status = PID_STATUS_MISSING
                         missing_total += 1
                     else:
@@ -476,7 +492,7 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
                         exc_traceback=exc_traceback,
                         detail={
                             "task": "proc.source_classic_website.track_classic_website_article_pids",
-                            "step": "process_classic_pid",
+                            "step": "update_article_proc",
                             "pid": pid,
                             "collection": collection.acron,
                         },
@@ -484,14 +500,14 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
 
         # Detect exceeding ArticleProcs (not in classic PID list)
         exceeding_total = 0
+        exceeding_pids_batch = []
         for article_proc in (
             ArticleProc.objects.filter(collection=collection)
             .only("pid", "pid_status")
             .iterator(chunk_size=BATCH_SIZE)
         ):
             if article_proc.pid not in classic_pids:
-                article_proc.pid_status = PID_STATUS_EXCEEDING
-                article_proc.save(update_fields=["pid_status"])
+                exceeding_pids_batch.append(article_proc.pid)
                 exceeding_total += 1
                 UnexpectedEvent.create(
                     e=Exception(
@@ -505,6 +521,16 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
                         "collection": collection.acron,
                     },
                 )
+                if len(exceeding_pids_batch) >= BATCH_SIZE:
+                    ArticleProc.objects.filter(
+                        collection=collection, pid__in=exceeding_pids_batch
+                    ).update(pid_status=PID_STATUS_EXCEEDING)
+                    exceeding_pids_batch = []
+
+        if exceeding_pids_batch:
+            ArticleProc.objects.filter(
+                collection=collection, pid__in=exceeding_pids_batch
+            ).update(pid_status=PID_STATUS_EXCEEDING)
 
         # Detect exceeding MigratedArticles (not in classic PID list)
         for migrated in (
