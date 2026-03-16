@@ -626,7 +626,8 @@ class PkgZipBuilder:
                     sps_filename = xml_graphic.name_canonical(self.sps_pkg_name).lower()
 
                     # se o nome canônico não tem extensão, obtém a extensão do arquivo original
-                    if not os.path.splitext(sps_filename)[1]:
+                    _, sps_ext = os.path.splitext(sps_filename)
+                    if not sps_ext:
                         _, asset_ext = os.path.splitext(asset.file.path)
                         if asset_ext:
                             sps_filename += asset_ext.lower()
