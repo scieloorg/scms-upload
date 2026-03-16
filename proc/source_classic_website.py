@@ -398,11 +398,17 @@ def get_files_from_classic_website(
         ArticleProc.mark_for_reprocessing(issue_proc)
 
 
+BATCH_SIZE = 1000
+
+
 def track_classic_website_article_pids(user, collection, classic_website_config):
     """
     Compares the PID list from the classic website with ArticleProc records
     to identify missing items (in classic but not migrated) and excess items
     (migrated but not in classic PID list).
+
+    Processes data in batches to avoid memory issues with large datasets
+    (500k+ PIDs).
 
     Returns a dict with the tracking results including criticality levels:
     - CRITICAL: missing PIDs (articles in classic website not registered in ArticleProc)
@@ -417,32 +423,46 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
             )
             return None
 
-        migrated_pids = set(
+        # Find missing PIDs (in classic but not in ArticleProc) in batches
+        missing_total = 0
+        classic_pids_list = list(classic_pids)
+        for i in range(0, len(classic_pids_list), BATCH_SIZE):
+            batch = classic_pids_list[i:i + BATCH_SIZE]
+            existing = set(
+                ArticleProc.objects.filter(
+                    collection=collection, pid__in=batch
+                ).values_list("pid", flat=True)
+            )
+            missing_total += sum(1 for pid in batch if pid not in existing)
+
+        # Find excess PIDs (in ArticleProc but not in classic) in batches
+        excess_total = 0
+        migrated_total = 0
+        for pid in (
             ArticleProc.objects.filter(collection=collection)
             .values_list("pid", flat=True)
-        )
-
-        missing_pids = sorted(classic_pids - migrated_pids)
-        excess_pids = sorted(migrated_pids - classic_pids)
+            .iterator(chunk_size=BATCH_SIZE)
+        ):
+            migrated_total += 1
+            if pid not in classic_pids:
+                excess_total += 1
 
         result = {
             "collection": collection.acron,
             "classic_website_total": len(classic_pids),
-            "migrated_total": len(migrated_pids),
+            "migrated_total": migrated_total,
             "items": [
                 {
                     "type": "MISSING",
                     "criticality": "CRITICAL",
                     "description": "PIDs in classic website but absent from ArticleProc",
-                    "total": len(missing_pids),
-                    "pids": missing_pids,
+                    "total": missing_total,
                 },
                 {
                     "type": "EXCESS",
                     "criticality": "WARNING",
                     "description": "PIDs in ArticleProc but absent from classic website PID list",
-                    "total": len(excess_pids),
-                    "pids": excess_pids,
+                    "total": excess_total,
                 },
             ],
         }
@@ -451,9 +471,9 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
             "PID tracking for %s: classic=%d, migrated=%d, missing=%d, excess=%d",
             collection.acron,
             len(classic_pids),
-            len(migrated_pids),
-            len(missing_pids),
-            len(excess_pids),
+            migrated_total,
+            missing_total,
+            excess_total,
         )
 
         return result
