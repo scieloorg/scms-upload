@@ -701,9 +701,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
             response = {}
 
             if content:
+                mimetype = mimetypes.types_map.get(ext) or "application/octet-stream"
                 response = minio_push_file_content(
                     content=content,
-                    mimetype=mimetypes.types_map[ext],
+                    mimetype=mimetype,
                     object_name=f"{self.subdir}/{filename}",
                 )
                 uri = response["uri"]
@@ -768,6 +769,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
                 else:
                     component = original_pkg_components.get(item) or {}
+                    if not ext:
+                        legacy_uri = component.get("legacy_uri")
+                        if legacy_uri:
+                            _, ext = os.path.splitext(legacy_uri)
                     result = self.upload_to_the_cloud(
                         user=user,
                         filename=item,

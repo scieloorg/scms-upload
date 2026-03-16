@@ -625,6 +625,12 @@ class PkgZipBuilder:
                     # obtém o nome do arquivo no padrão sps
                     sps_filename = xml_graphic.name_canonical(self.sps_pkg_name).lower()
 
+                    # se o nome canônico não tem extensão, obtém a extensão do arquivo original
+                    if not os.path.splitext(sps_filename)[1]:
+                        _, asset_ext = os.path.splitext(asset.file.path)
+                        if asset_ext:
+                            sps_filename += asset_ext.lower()
+
                     # indica a troca de href original para o padrão SPS
                     self.replacements[xml_graphic.xlink_href] = sps_filename
 
