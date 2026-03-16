@@ -81,6 +81,8 @@ def _get_numbers():
         "total_critical": 0,
         "total_error": 0,
         "total_warning": 0,
+        "total_ok": 0,
+        "total_ukn": 0,
     }
 
 
@@ -1717,8 +1719,14 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
             .values("status", "reaction")
             .annotate(total=Count("id"))
         ):
-            items["total_" + item["status"].lower()] += item["total"]
-            items["total_" + item["reaction"]] += item["total"]
+            status = item.get("status") or ""
+            if status:
+                status_key = "total_" + status.lower()
+                items[status_key] = items.get(status_key, 0) + item["total"]
+            reaction = item.get("reaction") or ""
+            if reaction:
+                reaction_key = "total_" + reaction
+                items[reaction_key] = items.get(reaction_key, 0) + item["total"]
             total += item["total"]
 
         items["total"] = total
