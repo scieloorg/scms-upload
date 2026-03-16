@@ -6,7 +6,16 @@ import logging
 import sys
 
 from migration import controller
-from proc.models import ArticleProc, IssueProc, JournalProc, ProcReport
+from migration.models import MigratedArticle
+from proc.models import (
+    ArticleProc,
+    IssueProc,
+    JournalProc,
+    PID_STATUS_EXCEEDING,
+    PID_STATUS_MATCHED,
+    PID_STATUS_MISSING,
+    ProcReport,
+)
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
 
@@ -404,15 +413,22 @@ BATCH_SIZE = 1000
 def track_classic_website_article_pids(user, collection, classic_website_config):
     """
     Compares the PID list from the classic website with ArticleProc records
-    to identify missing items (in classic but not migrated) and excess items
-    (migrated but not in classic PID list).
+    to identify missing, matched, and exceeding items.
 
     Processes data in batches to avoid memory issues with large datasets
     (500k+ PIDs).
 
-    Returns a dict with the tracking results including criticality levels:
-    - CRITICAL: missing PIDs (articles in classic website not registered in ArticleProc)
-    - WARNING: excess PIDs (articles in ArticleProc not present in classic PID list)
+    For each PID in the classic list:
+    - Creates MigratedArticle stub if it doesn't exist
+    - Creates ArticleProc and links to MigratedArticle
+    - Sets pid_status = "missing" if MigratedArticle has no data (None or {})
+    - Sets pid_status = "matched" if MigratedArticle has data
+
+    For ArticleProc/MigratedArticle not in classic list:
+    - Sets pid_status = "exceeding" on ArticleProc
+    - Creates UnexpectedEvent
+
+    Returns a summary dict with counts.
     """
     try:
         classic_pids = classic_website_config.pid_list
@@ -423,30 +439,94 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
             )
             return None
 
-        # Find missing PIDs (in classic but not in ArticleProc) in batches
         missing_total = 0
+        matched_total = 0
+
+        # Process classic PIDs in batches
         classic_pids_list = list(classic_pids)
         for i in range(0, len(classic_pids_list), BATCH_SIZE):
-            batch = classic_pids_list[i:i + BATCH_SIZE]
-            existing = set(
-                ArticleProc.objects.filter(
-                    collection=collection, pid__in=batch
-                ).values_list("pid", flat=True)
-            )
-            missing_total += len(batch) - len(existing)
+            batch = classic_pids_list[i : i + BATCH_SIZE]
+            for pid in batch:
+                try:
+                    # Ensure MigratedArticle exists
+                    migrated_article = MigratedArticle.create_or_update_migrated_data(
+                        user=user,
+                        collection=collection,
+                        pid=pid,
+                        content_type="article",
+                    )
+                    # Ensure ArticleProc exists and link to MigratedArticle
+                    article_proc = ArticleProc.get_or_create(user, collection, pid)
+                    if not article_proc.migrated_data:
+                        article_proc.migrated_data = migrated_article
 
-        # Find excess PIDs (in ArticleProc but not in classic) in batches
-        excess_total = 0
-        migrated_total = 0
-        for pid in (
+                    # Set pid_status based on MigratedArticle data
+                    if not migrated_article.data:
+                        article_proc.pid_status = PID_STATUS_MISSING
+                        missing_total += 1
+                    else:
+                        article_proc.pid_status = PID_STATUS_MATCHED
+                        matched_total += 1
+
+                    article_proc.save()
+                except Exception as e:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    UnexpectedEvent.create(
+                        e=e,
+                        exc_traceback=exc_traceback,
+                        detail={
+                            "task": "proc.source_classic_website.track_classic_website_article_pids",
+                            "step": "process_classic_pid",
+                            "pid": pid,
+                            "collection": collection.acron,
+                        },
+                    )
+
+        # Detect exceeding ArticleProcs (not in classic PID list)
+        exceeding_total = 0
+        for article_proc in (
             ArticleProc.objects.filter(collection=collection)
-            .values_list("pid", flat=True)
+            .only("pid", "pid_status")
             .iterator(chunk_size=BATCH_SIZE)
         ):
-            migrated_total += 1
-            if pid not in classic_pids:
-                excess_total += 1
+            if article_proc.pid not in classic_pids:
+                article_proc.pid_status = PID_STATUS_EXCEEDING
+                article_proc.save(update_fields=["pid_status"])
+                exceeding_total += 1
+                UnexpectedEvent.create(
+                    e=Exception(
+                        "ArticleProc PID not in classic website PID list"
+                    ),
+                    exc_traceback=None,
+                    detail={
+                        "task": "proc.source_classic_website.track_classic_website_article_pids",
+                        "step": "exceeding_article_proc",
+                        "pid": article_proc.pid,
+                        "collection": collection.acron,
+                    },
+                )
 
+        # Detect exceeding MigratedArticles (not in classic PID list)
+        for migrated in (
+            MigratedArticle.objects.filter(collection=collection)
+            .only("pid")
+            .iterator(chunk_size=BATCH_SIZE)
+        ):
+            if migrated.pid not in classic_pids:
+                UnexpectedEvent.create(
+                    e=Exception(
+                        "MigratedArticle PID not in classic website PID list"
+                    ),
+                    exc_traceback=None,
+                    detail={
+                        "task": "proc.source_classic_website.track_classic_website_article_pids",
+                        "step": "exceeding_migrated_article",
+                        "pid": migrated.pid,
+                        "collection": collection.acron,
+                    },
+                )
+
+        migrated_total = matched_total + missing_total
         result = {
             "collection": collection.acron,
             "classic_website_total": len(classic_pids),
@@ -455,25 +535,31 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
                 {
                     "type": "MISSING",
                     "criticality": "CRITICAL",
-                    "description": "PIDs in classic website but absent from ArticleProc",
+                    "description": "PIDs in classic website but MigratedArticle has no data",
                     "total": missing_total,
                 },
                 {
-                    "type": "EXCESS",
+                    "type": "MATCHED",
+                    "criticality": "INFO",
+                    "description": "PIDs in classic website with MigratedArticle data",
+                    "total": matched_total,
+                },
+                {
+                    "type": "EXCEEDING",
                     "criticality": "WARNING",
-                    "description": "PIDs in ArticleProc but absent from classic website PID list",
-                    "total": excess_total,
+                    "description": "PIDs in ArticleProc/MigratedArticle but absent from classic website PID list",
+                    "total": exceeding_total,
                 },
             ],
         }
 
         logging.info(
-            "PID tracking for %s: classic=%d, migrated=%d, missing=%d, excess=%d",
+            "PID tracking for %s: classic=%d, missing=%d, matched=%d, exceeding=%d",
             collection.acron,
             len(classic_pids),
-            migrated_total,
             missing_total,
-            excess_total,
+            matched_total,
+            exceeding_total,
         )
 
         return result

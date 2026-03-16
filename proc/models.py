@@ -58,6 +58,18 @@ from tracker.models import UnexpectedEvent, format_traceback
 class NoDocumentRecordsToMigrateError(Exception):
     ...
 
+
+PID_STATUS_MISSING = "missing"
+PID_STATUS_MATCHED = "matched"
+PID_STATUS_EXCEEDING = "exceeding"
+
+PID_STATUS = (
+    ("", ""),
+    (PID_STATUS_MISSING, _("Missing")),
+    (PID_STATUS_MATCHED, _("Matched")),
+    (PID_STATUS_EXCEEDING, _("Exceeding")),
+)
+
 class Operation(CommonControlField):
 
     name = models.CharField(
@@ -1538,6 +1550,13 @@ class ArticleProc(BaseProc, ClusterableModel):
         blank=True,
         null=True,
     )
+    pid_status = models.CharField(
+        _("PID Status"),
+        max_length=10,
+        choices=PID_STATUS,
+        default="",
+        blank=True,
+    )
     processed_xml = models.FileField(
         _("Processed XML"),
         upload_to=proc_directory_path,
@@ -1556,6 +1575,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         AutocompletePanel("sps_pkg", read_only=True),
     ]
     panel_status = [
+        FieldPanel("pid_status"),
         FieldPanel("xml_status"),
         FieldPanel("sps_pkg_status"),
         FieldPanel("migration_status"),
@@ -1584,6 +1604,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             models.Index(fields=["pkg_name"]),
             models.Index(fields=["xml_status"]),
             models.Index(fields=["sps_pkg_status"]),
+            models.Index(fields=["pid_status"]),
         ]
 
     @classmethod
