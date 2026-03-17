@@ -8,19 +8,20 @@ def remove_duplicate_articles(apps, schema_editor):
     Article = apps.get_model("article", "Article")
     from django.db.models import Count
 
+    # Normalize empty strings to NULL so the unique constraint ignores them
+    Article.objects.filter(pid_v3="").update(pid_v3=None)
+
     duplicates = (
         Article.objects.values("pid_v3")
         .exclude(pid_v3__isnull=True)
-        .exclude(pid_v3="")
         .annotate(count=Count("id"))
         .filter(count__gt=1)
     )
     for dup in duplicates:
         pid_v3 = dup["pid_v3"]
-        items = Article.objects.filter(pid_v3=pid_v3).order_by("-updated")
-        # Keep the most recently updated, delete the rest
-        for item in items[1:]:
-            item.delete()
+        keep = Article.objects.filter(pid_v3=pid_v3).order_by("-updated").first()
+        if keep:
+            Article.objects.filter(pid_v3=pid_v3).exclude(pk=keep.pk).delete()
 
 
 class Migration(migrations.Migration):

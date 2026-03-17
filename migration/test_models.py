@@ -50,11 +50,13 @@ class MigratedDataCreateOrUpdateTestCase(unittest.TestCase):
         mock_recent.isis_updated_date = None
 
         mock_queryset = MagicMock()
-        mock_queryset.order_by.return_value.first.return_value = mock_recent
+        mock_ordered_qs = MagicMock()
+        mock_ordered_qs.first.return_value = mock_recent
+        mock_queryset.order_by.return_value = mock_ordered_qs
         mock_filter.return_value = mock_queryset
 
         mock_exclude_qs = MagicMock()
-        mock_queryset.exclude.return_value = mock_exclude_qs
+        mock_ordered_qs.exclude.return_value = mock_exclude_qs
 
         result = MigratedData.create_or_update_migrated_data(
             user=mock_user,
@@ -66,10 +68,12 @@ class MigratedDataCreateOrUpdateTestCase(unittest.TestCase):
             isis_created_date="20240101",
         )
 
+        # Verify the returned object is the most recent one
+        self.assertEqual(result, mock_recent)
         # Verify duplicates were deleted via filter().exclude().delete()
         mock_filter.assert_any_call(collection=mock_collection, pid="pid123")
         mock_queryset.order_by.assert_called_with("-updated")
-        mock_queryset.exclude.assert_called_once_with(pk=mock_recent.pk)
+        mock_ordered_qs.exclude.assert_called_once_with(pk=mock_recent.pk)
         mock_exclude_qs.delete.assert_called_once()
         # Verify the most recent was kept and saved
         mock_recent.save.assert_called_once()
