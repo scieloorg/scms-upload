@@ -510,8 +510,6 @@ def process_issue_result(user, journal, result):
         issue.season = result.get("season")
     if hasattr(issue, "month") and result.get("month"):
         issue.month = result.get("month")
-    if hasattr(issue, "issue_folder") and result.get("issue_folder"):
-        issue.issue_folder = result.get("issue_folder")
 
     issue.save()
 
