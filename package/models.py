@@ -701,7 +701,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             response = {}
 
             if content:
-                mimetype = mimetypes.types_map.get(ext) or "application/octet-stream"
+                mimetype = mimetypes.types_map.get(ext.lower()) or "application/octet-stream"
                 response = minio_push_file_content(
                     content=content,
                     mimetype=mimetype,
@@ -773,6 +773,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
                         legacy_uri = component.get("legacy_uri")
                         if legacy_uri:
                             _, ext = os.path.splitext(legacy_uri)
+                            if ext:
+                                item = item + ext
                     result = self.upload_to_the_cloud(
                         user=user,
                         filename=item,
@@ -786,10 +788,12 @@ class SPSPkg(CommonControlField, ClusterableModel):
         return {"xml_with_pre": xml_with_pre, "items": items}
 
     def upload_xml_to_the_cloud(self, user, xml_with_pre):
-        replacements = {
-            item.basename: item.uri
-            for item in self.components.filter(uri__isnull=False).iterator()
-        }
+        replacements = {}
+        for item in self.components.filter(uri__isnull=False).iterator():
+            replacements[item.basename] = item.uri
+            name_without_ext, file_ext = os.path.splitext(item.basename)
+            if file_ext:
+                replacements[name_without_ext] = item.uri
         if replacements:
             xml_assets = ArticleAssets(xml_with_pre.xmltree)
             xml_assets.replace_names(replacements)
