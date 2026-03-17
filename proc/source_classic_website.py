@@ -8,13 +8,11 @@ import sys
 
 from migration import controller
 from migration.models import MigratedArticle
+from proc import choices as proc_choices
 from proc.models import (
     ArticleProc,
     IssueProc,
     JournalProc,
-    PID_STATUS_EXCEEDING,
-    PID_STATUS_MATCHED,
-    PID_STATUS_MISSING,
 )
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
@@ -511,13 +509,13 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
             if missing_pids:
                 ArticleProc.objects.filter(
                     collection=collection, pid__in=missing_pids
-                ).update(pid_status=PID_STATUS_MISSING)
+                ).update(pid_status=proc_choices.PID_STATUS_MISSING)
                 missing_total += len(missing_pids)
 
             if matched_pids:
                 ArticleProc.objects.filter(
                     collection=collection, pid__in=matched_pids
-                ).update(pid_status=PID_STATUS_MATCHED)
+                ).update(pid_status=proc_choices.PID_STATUS_MATCHED)
                 matched_total += len(matched_pids)
 
         # Detect exceeding ArticleProcs (not in classic PID list)
@@ -535,7 +533,7 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
                 if len(exceeding_pids_batch) >= BATCH_SIZE:
                     ArticleProc.objects.filter(
                         collection=collection, pid__in=exceeding_pids_batch
-                    ).update(pid_status=PID_STATUS_EXCEEDING)
+                    ).update(pid_status=proc_choices.PID_STATUS_EXCEEDING)
                     UnexpectedEvent.create(
                         e=Exception(
                             "ArticleProc PIDs not in classic website PID list"
@@ -554,7 +552,7 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
         if exceeding_pids_batch:
             ArticleProc.objects.filter(
                 collection=collection, pid__in=exceeding_pids_batch
-            ).update(pid_status=PID_STATUS_EXCEEDING)
+            ).update(pid_status=proc_choices.PID_STATUS_EXCEEDING)
             UnexpectedEvent.create(
                 e=Exception(
                     "ArticleProc PIDs not in classic website PID list"

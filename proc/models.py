@@ -47,6 +47,7 @@ from migration.models import (
 )
 from package import choices as package_choices
 from package.models import SPSPkg
+from proc import choices as proc_choices
 from proc import exceptions
 from proc.forms import IssueProcAdminModelForm, ProcAdminModelForm
 from publication.api.publication import get_api_data
@@ -58,17 +59,6 @@ from tracker.models import UnexpectedEvent, format_traceback
 class NoDocumentRecordsToMigrateError(Exception):
     ...
 
-
-PID_STATUS_MISSING = "missing"
-PID_STATUS_MATCHED = "matched"
-PID_STATUS_EXCEEDING = "exceeding"
-
-PID_STATUS = (
-    ("", ""),
-    (PID_STATUS_MISSING, _("Missing")),
-    (PID_STATUS_MATCHED, _("Matched")),
-    (PID_STATUS_EXCEEDING, _("Exceeding")),
-)
 
 class Operation(CommonControlField):
 
@@ -1553,7 +1543,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     pid_status = models.CharField(
         _("PID Status"),
         max_length=10,
-        choices=PID_STATUS,
+        choices=proc_choices.PID_STATUS,
         default="",
         blank=True,
     )
