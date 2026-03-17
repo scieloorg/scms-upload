@@ -407,6 +407,7 @@ def get_files_from_classic_website(
 
 BATCH_SIZE = 1000
 SAMPLE_SIZE = 10
+PID_V2_LENGTH = 23
 
 
 def _iter_batches(iterable, batch_size):
@@ -435,7 +436,7 @@ def _get_stored_pid_list(collection, pid_list_path):
             return {
                 line.strip()
                 for line in content.splitlines()
-                if len(line.strip()) == 23
+                if len(line.strip()) == PID_V2_LENGTH
             }
     except MigratedFile.DoesNotExist:
         pass
@@ -615,27 +616,25 @@ def track_classic_website_article_pids(
 
         if previous_pids and not force_update:
             # Diff mode: mark removed PIDs as exceeding
-            exceeding_pids_batch = []
             for batch in _iter_batches(removed_pids, BATCH_SIZE):
                 ArticleProc.objects.filter(
                     collection=collection, pid__in=batch
                 ).update(pid_status=proc_choices.PID_STATUS_EXCEEDING)
                 exceeding_total += len(batch)
 
-                if batch:
-                    UnexpectedEvent.create(
-                        e=Exception(
-                            "ArticleProc PIDs removed from classic website PID list"
-                        ),
-                        exc_traceback=None,
-                        detail={
-                            "task": "proc.source_classic_website.track_classic_website_article_pids",
-                            "step": "exceeding_article_proc",
-                            "collection": collection.acron,
-                            "total": len(batch),
-                            "sample": batch[:SAMPLE_SIZE],
-                        },
-                    )
+                UnexpectedEvent.create(
+                    e=Exception(
+                        "ArticleProc PIDs removed from classic website PID list"
+                    ),
+                    exc_traceback=None,
+                    detail={
+                        "task": "proc.source_classic_website.track_classic_website_article_pids",
+                        "step": "exceeding_article_proc",
+                        "collection": collection.acron,
+                        "total": len(batch),
+                        "sample": batch[:SAMPLE_SIZE],
+                    },
+                )
         else:
             # Full mode: scan all ArticleProcs not in classic PID list
             exceeding_pids_batch = []
