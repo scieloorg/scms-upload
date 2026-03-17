@@ -90,6 +90,13 @@ class SanitizeForJsonTest(unittest.TestCase):
         self.assertEqual(len(parsed["failures"]), 1)
         self.assertIn("Sum", parsed["failures"][0]["file"])
 
+    def test_high_surrogate_handled(self):
+        """High surrogates (not from surrogateescape) are also handled."""
+        text = "test\ud800value"
+        result = sanitize_for_json(text)
+        json.dumps(result)  # Must not raise
+        self.assertNotIn("\ud800", result)
+
 
 if __name__ == "__main__":
     unittest.main()
