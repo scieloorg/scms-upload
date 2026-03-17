@@ -39,8 +39,8 @@ class MigratedDataCreateOrUpdateTestCase(unittest.TestCase):
 
         mock_get.side_effect = MigratedData.MultipleObjectsReturned()
 
-        # Create mock records ordered by -updated
         mock_recent = MagicMock(spec=MigratedData)
+        mock_recent.pk = 1
         mock_recent.content_type = "article"
         mock_recent.collection = mock_collection
         mock_recent.pid = "pid123"
@@ -49,18 +49,12 @@ class MigratedDataCreateOrUpdateTestCase(unittest.TestCase):
         mock_recent.isis_created_date = "20240101"
         mock_recent.isis_updated_date = None
 
-        mock_old = Mock(spec=MigratedData)
-        mock_old.pk = 2
-
-        # Mock queryset: order_by returns items where [0] = recent, [1:] = [old]
-        ordered_items = MagicMock()
-        ordered_items.__getitem__ = lambda self, key: (
-            [mock_old] if isinstance(key, slice) else mock_recent
-        )
-
         mock_queryset = MagicMock()
-        mock_queryset.order_by.return_value = ordered_items
+        mock_queryset.order_by.return_value.first.return_value = mock_recent
         mock_filter.return_value = mock_queryset
+
+        mock_exclude_qs = MagicMock()
+        mock_queryset.exclude.return_value = mock_exclude_qs
 
         result = MigratedData.create_or_update_migrated_data(
             user=mock_user,
@@ -72,10 +66,10 @@ class MigratedDataCreateOrUpdateTestCase(unittest.TestCase):
             isis_created_date="20240101",
         )
 
-        # Verify duplicate was deleted
-        mock_old.delete.assert_called_once()
-        # Verify filter was called with correct params
-        mock_filter.assert_called_once_with(collection=mock_collection, pid="pid123")
-        mock_queryset.order_by.assert_called_once_with("-updated")
+        # Verify duplicates were deleted via filter().exclude().delete()
+        mock_filter.assert_any_call(collection=mock_collection, pid="pid123")
+        mock_queryset.order_by.assert_called_with("-updated")
+        mock_queryset.exclude.assert_called_once_with(pk=mock_recent.pk)
+        mock_exclude_qs.delete.assert_called_once()
         # Verify the most recent was kept and saved
         mock_recent.save.assert_called_once()
