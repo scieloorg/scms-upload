@@ -192,8 +192,8 @@ def publish_articles(
         for article_proc in items:
             task_publish_article.apply_async(
                 kwargs=dict(
-                    user_id=user.id,
-                    username=user.username,
+                    user_id=user.id if user else None,
+                    username=user.username if user else None,
                     website_kind=website_kind,
                     article_proc_id=article_proc.id,
                     api_data=api_data,

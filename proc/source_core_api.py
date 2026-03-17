@@ -149,7 +149,7 @@ def fetch_and_create_journal(
                 exc_traceback=exc_traceback,
                 detail={
                     "task": "proc.source_core_api",
-                    "username": user.username,
+                    "username": user.username if user else None,
                     "collection": collection_acron,
                     "issn_electronic": issn_electronic,
                     "issn_print": issn_print,
@@ -436,7 +436,7 @@ def fetch_and_create_issues(journal, pub_year, volume, suppl, number, user):
                     exc_traceback=exc_traceback,
                     detail={
                         "task": "proc.source_core_api.fetch_and_create_issues",
-                        "username": user.username,
+                        "username": user.username if user else None,
                         "issn_print": issn_print,
                         "issn_electronic": issn_electronic,
                         "volume": volume,

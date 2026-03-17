@@ -152,8 +152,8 @@ def publish_collection_articles(
                 response = schedule_article_publication(
                     task_publish_article,
                     article_proc.id,
-                    user.id,
-                    user.username,
+                    user.id if user else None,
+                    user.username if user else None,
                     qa_api_data,
                     public_api_data,
                     force_update,

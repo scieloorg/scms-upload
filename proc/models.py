@@ -510,7 +510,7 @@ class BaseProc(CommonControlField):
                     exc_traceback=exc_traceback,
                     detail={
                         "task": "proc.BaseProc.register_classic_website_data",
-                        "username": user.username,
+                        "username": user.username if user else None,
                         "collection": collection.acron,
                         "pid": pid,
                     },
@@ -545,7 +545,7 @@ class BaseProc(CommonControlField):
                     exc_traceback=exc_traceback,
                     detail={
                         "task": "proc.BaseProc.register_pid",
-                        "username": user.username,
+                        "username": user.username if user else None,
                         "collection": collection.acron,
                         "pid": pid,
                     },

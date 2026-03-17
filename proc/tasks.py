@@ -908,8 +908,8 @@ def task_migrate_and_publish_articles_by_journal(
             journal_proc.id,
             qa_api_data=None,
             public_api_data=None,
-            username=user.username,
-            user_id=user.id,
+            username=user.username if user else username,
+            user_id=user.id if user else user_id,
             timeout=None,
         )
 
@@ -1352,7 +1352,7 @@ def task_create_procs_from_pid_list(
         for collection in _get_collections(collection_acron):
             task_create_collection_procs_from_pid_list.apply_async(
                 kwargs=dict(
-                    username=user.username,
+                    username=user.username if user else username,
                     collection_acron=collection.acron,
                     force_update=force_update,
                 )

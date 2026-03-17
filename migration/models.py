@@ -904,8 +904,8 @@ class IdFileRecord(CommonControlField, Orderable):
                 exc_traceback=exc_traceback,
                 detail={
                     "task": "migrations.models.IdFileRecord.create",
-                    "user_id": user.id,
-                    "username": user.username,
+                    "user_id": user.id if user else None,
+                    "username": user.username if user else None,
                     "item_type": item_type,
                     "item_pid": item_pid,
                     "data": data,

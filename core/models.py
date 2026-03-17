@@ -45,6 +45,8 @@ class CommonControlField(models.Model):
         related_name="%(class)s_creator",
         editable=False,
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
 
     # Last modifier user
