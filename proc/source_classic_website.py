@@ -7,7 +7,7 @@ import logging
 import sys
 
 from migration import controller
-from migration.models import MigratedArticle
+from migration.models import MigratedArticle, MigratedFile
 from proc import choices as proc_choices
 from proc.models import (
     ArticleProc,
@@ -419,23 +419,95 @@ def _iter_batches(iterable, batch_size):
         yield batch
 
 
-def track_classic_website_article_pids(user, collection, classic_website_config):
+def _get_stored_pid_list(collection, pid_list_path):
+    """
+    Retrieve the previously stored PID list from MigratedFile.
+
+    Returns a set of PIDs parsed from the stored file content,
+    or an empty set if no previous version exists.
+    """
+    if not pid_list_path:
+        return set()
+    try:
+        migrated_file = MigratedFile.get(collection, pid_list_path)
+        if migrated_file.file:
+            content = migrated_file.file.read().decode("utf-8")
+            return {
+                line.strip()
+                for line in content.splitlines()
+                if len(line.strip()) == 23
+            }
+    except MigratedFile.DoesNotExist:
+        pass
+    except Exception as e:
+        logging.exception(
+            "Error reading stored PID list for %s: %s", pid_list_path, e
+        )
+    return set()
+
+
+def _store_pid_list(user, collection, pid_list_path, force_update):
+    """
+    Store/update the current PID list file as a MigratedFile instance.
+
+    Uses MigratedFile.create_or_update which checks file_datetime_iso
+    to skip the update if the file hasn't changed (unless force_update=True).
+    """
+    if not pid_list_path:
+        return
+    try:
+        MigratedFile.create_or_update(
+            user=user,
+            collection=collection,
+            original_path=pid_list_path,
+            source_path=pid_list_path,
+            component_type="pid_list",
+            force_update=force_update,
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "proc.source_classic_website._store_pid_list",
+                "collection": collection.acron,
+                "pid_list_path": pid_list_path,
+            },
+        )
+
+
+def track_classic_website_article_pids(
+    user, collection, classic_website_config, force_update=False
+):
     """
     Compares the PID list from the classic website with ArticleProc records
     to identify missing, matched, and exceeding items.
 
+    Stores the PID list as a MigratedFile instance. On subsequent runs,
+    retrieves the previous version, computes a diff, and processes only
+    the differences. Use force_update=True to process the full list.
+
     Processes data in batches to avoid memory issues with large datasets
     (500k+ PIDs).
 
-    For each PID in the classic list:
+    For each PID to process:
     - Creates MigratedArticle stub if it doesn't exist
     - Creates ArticleProc and links to MigratedArticle
     - Sets pid_status = "missing" if MigratedArticle has no data (None or {})
     - Sets pid_status = "matched" if MigratedArticle has data
 
-    For ArticleProc/MigratedArticle not in classic list:
+    For removed PIDs (diff mode) or ArticleProc/MigratedArticle not in
+    classic list (full mode):
     - Sets pid_status = "exceeding" on ArticleProc
     - Creates aggregated UnexpectedEvent per batch
+
+    Args:
+        user: The user performing the operation
+        collection: The collection to process
+        classic_website_config: ClassicWebsiteConfiguration instance
+        force_update: If True, processes the full PID list regardless of
+                      any previous version stored in MigratedFile
 
     Returns a summary dict with counts.
     """
@@ -448,11 +520,31 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
             )
             return None
 
+        pid_list_path = classic_website_config.pid_list_path
+
+        # Retrieve previously stored PID list for diff
+        previous_pids = set()
+        if not force_update:
+            previous_pids = _get_stored_pid_list(collection, pid_list_path)
+
+        # Store current PID list as MigratedFile
+        _store_pid_list(user, collection, pid_list_path, force_update)
+
+        # Determine which PIDs to process
+        if previous_pids and not force_update:
+            # Diff mode: only process differences
+            pids_to_process = classic_pids - previous_pids
+            removed_pids = previous_pids - classic_pids
+        else:
+            # Full mode: process all PIDs
+            pids_to_process = classic_pids
+            removed_pids = set()
+
         missing_total = 0
         matched_total = 0
 
-        # Process classic PIDs in batches (iterate set directly, no list copy)
-        for batch in _iter_batches(classic_pids, BATCH_SIZE):
+        # Process PIDs in batches (iterate set directly, no list copy)
+        for batch in _iter_batches(pids_to_process, BATCH_SIZE):
             missing_pids = []
             matched_pids = []
 
@@ -518,95 +610,121 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
                 ).update(pid_status=proc_choices.PID_STATUS_MATCHED)
                 matched_total += len(matched_pids)
 
-        # Detect exceeding ArticleProcs (not in classic PID list)
+        # Detect exceeding PIDs
         exceeding_total = 0
-        exceeding_pids_batch = []
-        for article_proc in (
-            ArticleProc.objects.filter(collection=collection)
-            .only("pid", "pid_status")
-            .iterator(chunk_size=BATCH_SIZE)
-        ):
-            if article_proc.pid not in classic_pids:
-                exceeding_pids_batch.append(article_proc.pid)
-                exceeding_total += 1
 
-                if len(exceeding_pids_batch) >= BATCH_SIZE:
-                    ArticleProc.objects.filter(
-                        collection=collection, pid__in=exceeding_pids_batch
-                    ).update(pid_status=proc_choices.PID_STATUS_EXCEEDING)
+        if previous_pids and not force_update:
+            # Diff mode: mark removed PIDs as exceeding
+            exceeding_pids_batch = []
+            for batch in _iter_batches(removed_pids, BATCH_SIZE):
+                ArticleProc.objects.filter(
+                    collection=collection, pid__in=batch
+                ).update(pid_status=proc_choices.PID_STATUS_EXCEEDING)
+                exceeding_total += len(batch)
+
+                if batch:
                     UnexpectedEvent.create(
                         e=Exception(
-                            "ArticleProc PIDs not in classic website PID list"
+                            "ArticleProc PIDs removed from classic website PID list"
                         ),
                         exc_traceback=None,
                         detail={
                             "task": "proc.source_classic_website.track_classic_website_article_pids",
                             "step": "exceeding_article_proc",
                             "collection": collection.acron,
-                            "total": len(exceeding_pids_batch),
-                            "sample": exceeding_pids_batch[:SAMPLE_SIZE],
+                            "total": len(batch),
+                            "sample": batch[:SAMPLE_SIZE],
                         },
                     )
-                    exceeding_pids_batch = []
+        else:
+            # Full mode: scan all ArticleProcs not in classic PID list
+            exceeding_pids_batch = []
+            for article_proc in (
+                ArticleProc.objects.filter(collection=collection)
+                .only("pid", "pid_status")
+                .iterator(chunk_size=BATCH_SIZE)
+            ):
+                if article_proc.pid not in classic_pids:
+                    exceeding_pids_batch.append(article_proc.pid)
+                    exceeding_total += 1
 
-        if exceeding_pids_batch:
-            ArticleProc.objects.filter(
-                collection=collection, pid__in=exceeding_pids_batch
-            ).update(pid_status=proc_choices.PID_STATUS_EXCEEDING)
-            UnexpectedEvent.create(
-                e=Exception(
-                    "ArticleProc PIDs not in classic website PID list"
-                ),
-                exc_traceback=None,
-                detail={
-                    "task": "proc.source_classic_website.track_classic_website_article_pids",
-                    "step": "exceeding_article_proc",
-                    "collection": collection.acron,
-                    "total": len(exceeding_pids_batch),
-                    "sample": exceeding_pids_batch[:SAMPLE_SIZE],
-                },
-            )
+                    if len(exceeding_pids_batch) >= BATCH_SIZE:
+                        ArticleProc.objects.filter(
+                            collection=collection, pid__in=exceeding_pids_batch
+                        ).update(pid_status=proc_choices.PID_STATUS_EXCEEDING)
+                        UnexpectedEvent.create(
+                            e=Exception(
+                                "ArticleProc PIDs not in classic website PID list"
+                            ),
+                            exc_traceback=None,
+                            detail={
+                                "task": "proc.source_classic_website.track_classic_website_article_pids",
+                                "step": "exceeding_article_proc",
+                                "collection": collection.acron,
+                                "total": len(exceeding_pids_batch),
+                                "sample": exceeding_pids_batch[:SAMPLE_SIZE],
+                            },
+                        )
+                        exceeding_pids_batch = []
 
-        # Detect exceeding MigratedArticles (not in classic PID list)
-        exceeding_migrated_pids = []
-        for migrated in (
-            MigratedArticle.objects.filter(collection=collection)
-            .only("pid")
-            .iterator(chunk_size=BATCH_SIZE)
-        ):
-            if migrated.pid not in classic_pids:
-                exceeding_migrated_pids.append(migrated.pid)
+            if exceeding_pids_batch:
+                ArticleProc.objects.filter(
+                    collection=collection, pid__in=exceeding_pids_batch
+                ).update(pid_status=proc_choices.PID_STATUS_EXCEEDING)
+                UnexpectedEvent.create(
+                    e=Exception(
+                        "ArticleProc PIDs not in classic website PID list"
+                    ),
+                    exc_traceback=None,
+                    detail={
+                        "task": "proc.source_classic_website.track_classic_website_article_pids",
+                        "step": "exceeding_article_proc",
+                        "collection": collection.acron,
+                        "total": len(exceeding_pids_batch),
+                        "sample": exceeding_pids_batch[:SAMPLE_SIZE],
+                    },
+                )
 
-                if len(exceeding_migrated_pids) >= BATCH_SIZE:
-                    UnexpectedEvent.create(
-                        e=Exception(
-                            "MigratedArticle PIDs not in classic website PID list"
-                        ),
-                        exc_traceback=None,
-                        detail={
-                            "task": "proc.source_classic_website.track_classic_website_article_pids",
-                            "step": "exceeding_migrated_article",
-                            "collection": collection.acron,
-                            "total": len(exceeding_migrated_pids),
-                            "sample": exceeding_migrated_pids[:SAMPLE_SIZE],
-                        },
-                    )
-                    exceeding_migrated_pids = []
+            # Full mode: also detect exceeding MigratedArticles
+            exceeding_migrated_pids = []
+            for migrated in (
+                MigratedArticle.objects.filter(collection=collection)
+                .only("pid")
+                .iterator(chunk_size=BATCH_SIZE)
+            ):
+                if migrated.pid not in classic_pids:
+                    exceeding_migrated_pids.append(migrated.pid)
 
-        if exceeding_migrated_pids:
-            UnexpectedEvent.create(
-                e=Exception(
-                    "MigratedArticle PIDs not in classic website PID list"
-                ),
-                exc_traceback=None,
-                detail={
-                    "task": "proc.source_classic_website.track_classic_website_article_pids",
-                    "step": "exceeding_migrated_article",
-                    "collection": collection.acron,
-                    "total": len(exceeding_migrated_pids),
-                    "sample": exceeding_migrated_pids[:SAMPLE_SIZE],
-                },
-            )
+                    if len(exceeding_migrated_pids) >= BATCH_SIZE:
+                        UnexpectedEvent.create(
+                            e=Exception(
+                                "MigratedArticle PIDs not in classic website PID list"
+                            ),
+                            exc_traceback=None,
+                            detail={
+                                "task": "proc.source_classic_website.track_classic_website_article_pids",
+                                "step": "exceeding_migrated_article",
+                                "collection": collection.acron,
+                                "total": len(exceeding_migrated_pids),
+                                "sample": exceeding_migrated_pids[:SAMPLE_SIZE],
+                            },
+                        )
+                        exceeding_migrated_pids = []
+
+            if exceeding_migrated_pids:
+                UnexpectedEvent.create(
+                    e=Exception(
+                        "MigratedArticle PIDs not in classic website PID list"
+                    ),
+                    exc_traceback=None,
+                    detail={
+                        "task": "proc.source_classic_website.track_classic_website_article_pids",
+                        "step": "exceeding_migrated_article",
+                        "collection": collection.acron,
+                        "total": len(exceeding_migrated_pids),
+                        "sample": exceeding_migrated_pids[:SAMPLE_SIZE],
+                    },
+                )
 
         migrated_total = matched_total + missing_total
         result = {

@@ -1589,11 +1589,12 @@ def task_remove_duplicate_issues(
 
 @celery_app.task(bind=True)
 def task_track_classic_website_article_pids(
-    self, username, user_id=None, collection_acron=None
+    self, username, user_id=None, collection_acron=None, force_update=False
 ):
     task_params = {
         "username": username,
         "collection_acron": collection_acron,
+        "force_update": force_update,
     }
     task_exec = TaskExecution(
         name="proc.tasks.task_track_classic_website_article_pids",
@@ -1607,7 +1608,8 @@ def task_track_classic_website_article_pids(
                 collection.acron
             )
             result = track_classic_website_article_pids(
-                user, collection, classic_website_config
+                user, collection, classic_website_config,
+                force_update=force_update,
             )
             if result:
                 task_exec.add_event(result)
