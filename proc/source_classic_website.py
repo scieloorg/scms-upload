@@ -408,6 +408,7 @@ def get_files_from_classic_website(
 
 
 BATCH_SIZE = 1000
+SAMPLE_SIZE = 10
 
 
 def _iter_batches(iterable, batch_size):
@@ -545,7 +546,7 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
                             "step": "exceeding_article_proc",
                             "collection": collection.acron,
                             "total": len(exceeding_pids_batch),
-                            "sample": exceeding_pids_batch[:10],
+                            "sample": exceeding_pids_batch[:SAMPLE_SIZE],
                         },
                     )
                     exceeding_pids_batch = []
@@ -564,7 +565,7 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
                     "step": "exceeding_article_proc",
                     "collection": collection.acron,
                     "total": len(exceeding_pids_batch),
-                    "sample": exceeding_pids_batch[:10],
+                    "sample": exceeding_pids_batch[:SAMPLE_SIZE],
                 },
             )
 
@@ -589,7 +590,7 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
                             "step": "exceeding_migrated_article",
                             "collection": collection.acron,
                             "total": len(exceeding_migrated_pids),
-                            "sample": exceeding_migrated_pids[:10],
+                            "sample": exceeding_migrated_pids[:SAMPLE_SIZE],
                         },
                     )
                     exceeding_migrated_pids = []
@@ -605,7 +606,7 @@ def track_classic_website_article_pids(user, collection, classic_website_config)
                     "step": "exceeding_migrated_article",
                     "collection": collection.acron,
                     "total": len(exceeding_migrated_pids),
-                    "sample": exceeding_migrated_pids[:10],
+                    "sample": exceeding_migrated_pids[:SAMPLE_SIZE],
                 },
             )
 
