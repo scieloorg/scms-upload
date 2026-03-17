@@ -168,7 +168,10 @@ class Operation(CommonControlField):
         if message:
             detail["message"] = message
 
-        detail = sanitize_for_json(detail)
+        try:
+            json.dumps(detail)
+        except Exception as exc_detail:
+            detail = sanitize_for_json(detail)
 
         self.detail = detail
         self.completed = completed
