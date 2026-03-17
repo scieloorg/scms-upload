@@ -289,8 +289,11 @@ class MigratedData(CommonControlField):
                 return obj
             obj.updated_by = user
         except cls.MultipleObjectsReturned:
-            obj = cls.objects.filter(collection=collection, pid=pid).order_by("-updated").first()
-            cls.objects.filter(collection=collection, pid=pid).exclude(pk=obj.pk).delete()
+            qs = cls.objects.filter(collection=collection, pid=pid).order_by("-updated")
+            obj = qs.first()
+            if obj is None:
+                raise cls.DoesNotExist
+            qs.exclude(pk=obj.pk).delete()
             obj.updated_by = user
         except cls.DoesNotExist:
             obj = cls()

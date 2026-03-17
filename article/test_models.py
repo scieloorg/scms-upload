@@ -45,16 +45,19 @@ class ArticleGetTestCase(unittest.TestCase):
         mock_recent.pk = 1
 
         mock_queryset = MagicMock()
-        mock_queryset.order_by.return_value.first.return_value = mock_recent
-        mock_objects.filter.return_value = mock_queryset
+        mock_ordered_qs = MagicMock()
+        mock_ordered_qs.first.return_value = mock_recent
+        mock_queryset.order_by.return_value = mock_ordered_qs
 
         mock_exclude_qs = MagicMock()
-        mock_queryset.exclude.return_value = mock_exclude_qs
+        mock_ordered_qs.exclude.return_value = mock_exclude_qs
+
+        mock_objects.filter.return_value = mock_queryset
 
         result = Article.get("pid123")
 
         self.assertEqual(result, mock_recent)
         mock_objects.filter.assert_any_call(pid_v3="pid123")
         mock_queryset.order_by.assert_called_with("-updated")
-        mock_queryset.exclude.assert_called_once_with(pk=mock_recent.pk)
+        mock_ordered_qs.exclude.assert_called_once_with(pk=mock_recent.pk)
         mock_exclude_qs.delete.assert_called_once()
