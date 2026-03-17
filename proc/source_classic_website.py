@@ -544,43 +544,25 @@ def track_classic_website_article_pids(
         missing_total = 0
         matched_total = 0
 
-        # Process PIDs in batches (iterate set directly, no list copy)
+        # For each PID: create MigratedArticle if not exists,
+        # create ArticleProc if not exists, link them
         for batch in _iter_batches(pids_to_process, BATCH_SIZE):
             missing_pids = []
             matched_pids = []
 
             for pid in batch:
                 try:
-                    # Ensure MigratedArticle exists
                     migrated_article = MigratedArticle.create_or_update_migrated_data(
                         user=user,
                         collection=collection,
                         pid=pid,
                         content_type="article",
                     )
-                except Exception as e:
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    UnexpectedEvent.create(
-                        e=e,
-                        exc_traceback=exc_traceback,
-                        detail={
-                            "task": "proc.source_classic_website.track_classic_website_article_pids",
-                            "step": "create_migrated_article",
-                            "pid": pid,
-                            "collection": collection.acron,
-                        },
-                    )
-                    continue
-
-                try:
-                    # Ensure ArticleProc exists and link to MigratedArticle
                     article_proc = ArticleProc.get_or_create(user, collection, pid)
                     if not article_proc.migrated_data:
                         article_proc.migrated_data = migrated_article
                         article_proc.save()
 
-                    # Classify pid_status based on MigratedArticle data
-                    # None and {} both mean the record was not migrated
                     if migrated_article.data is None or migrated_article.data == {}:
                         missing_pids.append(pid)
                     else:
@@ -592,7 +574,6 @@ def track_classic_website_article_pids(
                         exc_traceback=exc_traceback,
                         detail={
                             "task": "proc.source_classic_website.track_classic_website_article_pids",
-                            "step": "update_article_proc",
                             "pid": pid,
                             "collection": collection.acron,
                         },
