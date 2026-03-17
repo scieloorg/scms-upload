@@ -207,10 +207,9 @@ class Article(ClusterableModel, CommonControlField):
             try:
                 return cls.objects.get(pid_v3=pid_v3)
             except cls.MultipleObjectsReturned:
-                items = cls.objects.filter(pid_v3=pid_v3).order_by("-updated")
-                for item in items[1:]:
-                    item.delete()
-                return items[0]
+                obj = cls.objects.filter(pid_v3=pid_v3).order_by("-updated").first()
+                cls.objects.filter(pid_v3=pid_v3).exclude(pk=obj.pk).delete()
+                return obj
         raise ValueError("Article.get requires pid_v3")
 
     @classmethod
