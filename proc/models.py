@@ -28,6 +28,7 @@ from collection import choices as collection_choices
 from collection.models import Collection
 from core.models import CommonControlField
 from core.utils.file_utils import delete_files
+from core.utils.sanitize import sanitize_for_json
 from htmlxml.models import HTMLXML
 from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
@@ -57,6 +58,7 @@ from tracker.models import UnexpectedEvent, format_traceback
 
 class NoDocumentRecordsToMigrateError(Exception):
     ...
+
 
 class Operation(CommonControlField):
 
@@ -169,7 +171,7 @@ class Operation(CommonControlField):
         try:
             json.dumps(detail)
         except Exception as exc_detail:
-            detail = str(detail)
+            detail = sanitize_for_json(detail)
 
         self.detail = detail
         self.completed = completed
