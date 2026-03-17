@@ -213,7 +213,7 @@ class JournalPayload:
         text = re.sub(r"<br\s*/?>", ", ", text, flags=re.IGNORECASE)
         # Collapse sequences of commas and whitespace (e.g. ", , " -> ", ")
         text = re.sub(r"(\s*,\s*)+", ", ", text)
-        return text.strip().strip(",").strip()
+        return text.strip(", ")
 
     def add_contact(self, name, email, address, city, state, country):
         # email to contact
