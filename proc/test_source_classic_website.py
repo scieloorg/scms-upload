@@ -1,9 +1,9 @@
 import os
 import tempfile
 from unittest import TestCase
-from unittest.mock import MagicMock, Mock, patch, PropertyMock, call
+from unittest.mock import Mock, patch
 
-from proc.source_classic_website import track_classic_website_article_pids, BATCH_SIZE
+from proc.source_classic_website import track_classic_website_article_pids
 
 
 class TestTrackClassicWebsiteArticlePids(TestCase):
@@ -57,6 +57,8 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         self.assertEqual(result["items"][0]["total"], 2)
         self.assertEqual(result["items"][1]["type"], "MATCHED")
         self.assertEqual(result["items"][1]["total"], 0)
+        # Verify bulk update was called for missing status
+        mock_article_proc.objects.filter.return_value.update.assert_called()
 
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
@@ -90,6 +92,8 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         self.assertEqual(result["items"][0]["total"], 0)
         self.assertEqual(result["items"][1]["type"], "MATCHED")
         self.assertEqual(result["items"][1]["total"], 2)
+        # Verify bulk update was called for matched status
+        mock_article_proc.objects.filter.return_value.update.assert_called()
 
     @patch("proc.source_classic_website.UnexpectedEvent")
     @patch("proc.source_classic_website.MigratedArticle")
@@ -195,7 +199,8 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         self.assertIsNotNone(result)
         # Verify migrated_data was linked
         self.assertEqual(article_proc_stub.migrated_data, migrated_stub)
-        article_proc_stub.save.assert_called()
+        # save() is called to persist the migrated_data link
+        article_proc_stub.save.assert_called_once()
 
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
