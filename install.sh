@@ -8,7 +8,7 @@
 #     Check the tag version at https://github.com/scieloorg/scms-upload/releases
 
 
-if [ ! $1 ]; then
+if [ -z "$1" ]; then
     # Version is mandatory
     echo "Version not informed. Please, inform the Upload version. E.g.: v2.3.4, ./install.sh v2.3.4"
     exit 128
