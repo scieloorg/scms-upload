@@ -574,6 +574,7 @@ def track_classic_website_article_pids(
                         exc_traceback=exc_traceback,
                         detail={
                             "task": "proc.source_classic_website.track_classic_website_article_pids",
+                            "step": "create_or_update_pid",
                             "pid": pid,
                             "collection": collection.acron,
                         },
