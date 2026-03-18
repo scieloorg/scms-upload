@@ -8,7 +8,7 @@ from wagtail_modeladmin.views import CreateView, EditView, InspectView
 
 from article.models import Article
 from issue.models import Issue
-from upload.models import Package, choices
+from upload.models import Package, PkgValidationResult, choices
 from upload.tasks import (
     task_receive_packages,
     task_publish_article,
@@ -82,6 +82,12 @@ class PackageAdminInspectView(InspectView):
             data["pdfs"] = []
 
     def get_context_data(self):
+        blocking_errors = list(
+            PkgValidationResult.objects.filter(
+                report__package=self.instance,
+                status=choices.VALIDATION_RESULT_BLOCKING,
+            ).values_list("message", flat=True)
+        )
         data = {
             "pkg_zip_name": self.instance.pkg_zip.name,
             "linked": self.instance.linked.all(),
@@ -97,6 +103,7 @@ class PackageAdminInspectView(InspectView):
             "xml_info_reports": list(self.instance.xml_info_reports),
             "summary": self.instance.summary,
             "xml": self.instance.xml,
+            "blocking_errors": blocking_errors,
         }
 
         # optz_file_path, optz_dir = self.get_optimized_package_filepath_and_directory()
