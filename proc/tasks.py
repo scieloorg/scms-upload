@@ -20,8 +20,8 @@ from proc.controller import (
     create_or_update_migrated_journal,
     fetch_and_create_journal,
     migrate_issue,
-    migrate_journal,
 )
+from proc.article_controller import track_classic_website_article_pids
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue, sync_issue
@@ -1581,6 +1581,36 @@ def task_remove_duplicate_issues(
                 )
         task_exec.finish()
         
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        task_exec.finish(exception=e, exc_traceback=exc_traceback)
+
+
+@celery_app.task(bind=True)
+def task_track_classic_website_article_pids(
+    self, username, user_id=None, collection_acron=None,
+):
+    task_params = {
+        "username": username,
+        "collection_acron": collection_acron,
+    }
+    task_exec = TaskExecution(
+        name="proc.tasks.task_track_classic_website_article_pids",
+        item=f"{collection_acron or 'all'}",
+        params=task_params,
+    )
+    try:
+        user = _get_user(user_id=user_id, username=username)
+        for collection in _get_collections(collection_acron):
+            classic_website_config = controller.get_classic_website_config(
+                collection.acron
+            )
+            result = track_classic_website_article_pids(
+                user, collection, classic_website_config,
+            )
+            if result:
+                task_exec.add_event(result)
+        task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         task_exec.finish(exception=e, exc_traceback=exc_traceback)
