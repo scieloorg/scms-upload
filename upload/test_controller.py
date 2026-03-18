@@ -585,8 +585,8 @@ class CheckXmlAndRegisteredDataCompabilityTestCase(unittest.TestCase):
         issue_checker = Mock()
 
         # After refresh, journal matches
-        def refresh_side_effect(resp):
-            resp["journal"] = mock_journal
+        def refresh_side_effect(response):
+            response["journal"] = mock_journal
 
         journal_checker.refresh.side_effect = refresh_side_effect
 
@@ -612,8 +612,8 @@ class CheckXmlAndRegisteredDataCompabilityTestCase(unittest.TestCase):
         journal_checker = Mock()
         issue_checker = Mock()
 
-        def refresh_side_effect(resp):
-            resp["core_communication_error"] = True
+        def refresh_side_effect(response):
+            response["core_communication_error"] = True
 
         journal_checker.refresh.side_effect = refresh_side_effect
 
