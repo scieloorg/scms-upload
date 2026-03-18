@@ -600,6 +600,7 @@ class MigratedFile(CommonControlField):
     def get_lines(self):
         """Read file content and return stripped non-empty lines."""
         if self.file:
+            self.file.seek(0)
             content = self.file.read().decode("utf-8")
             return [line.strip() for line in content.splitlines() if line.strip()]
         return []
