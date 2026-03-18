@@ -265,7 +265,7 @@ def _check_journal(response, xmltree, user):
     issn_electronic = xml.epub
     issn_print = xml.ppub
 
-    # Step 1: Try local data first
+    # 1. consulta dados locais de journal
     try:
         response["journal"] = Journal.get_registered(
             journal_title, issn_electronic, issn_print
@@ -274,8 +274,8 @@ def _check_journal(response, xmltree, user):
     except Journal.DoesNotExist:
         pass
 
-    # Step 2: Local data not found, try fetching from core API
-    # and updating local data
+    # 2. dados locais inexistentes, consulta dados remotos de journal
+    # e atualiza os dados locais com os dados remotos
     core_communication_error = False
     try:
         fetch_and_create_journal(
@@ -288,7 +288,7 @@ def _check_journal(response, xmltree, user):
         core_communication_error = True
         logging.warning(f"Core API communication failure for journal: {e}")
 
-    # Step 3: Try local again after remote fetch attempt
+    # 3. consulta dados locais novamente após a tentativa de busca remota
     try:
         response["journal"] = Journal.get_registered(
             journal_title, issn_electronic, issn_print
@@ -297,7 +297,7 @@ def _check_journal(response, xmltree, user):
     except Journal.DoesNotExist:
         pass
 
-    # Step 4: Failed - build error message
+    # 4. falha - monta mensagem de erro
     response["journal"] = None
     data = {
         "journal_title": journal_title,
@@ -348,7 +348,7 @@ def _check_issue(response, xmltree, user):
 
     xml = ArticleMetaIssue(xmltree)
 
-    # Step 1: Try local data first
+    # 1. consulta dados locais de issue
     try:
         response["issue"] = Issue.get(
             journal=response["journal"],
@@ -360,8 +360,8 @@ def _check_issue(response, xmltree, user):
     except Issue.DoesNotExist:
         pass
 
-    # Step 2: Local data not found, try fetching from core API
-    # and updating local data
+    # 2. dados locais inexistentes, consulta dados remotos de issue
+    # e atualiza os dados locais com os dados remotos
     core_communication_error = False
     try:
         fetch_and_create_issues(
@@ -376,7 +376,7 @@ def _check_issue(response, xmltree, user):
         core_communication_error = True
         logging.warning(f"Core API communication failure for issue: {e}")
 
-    # Step 3: Try local again after remote fetch attempt
+    # 3. consulta dados locais novamente após a tentativa de busca remota
     try:
         response["issue"] = Issue.get(
             journal=response["journal"],
@@ -389,7 +389,7 @@ def _check_issue(response, xmltree, user):
     except Issue.DoesNotExist:
         pass
 
-    # Step 4: Failed - build error message
+    # 4. falha - monta mensagem de erro
     response["issue"] = None
     data = {
         "journal": response["journal"],
@@ -451,11 +451,11 @@ def _check_xml_and_registered_data_compability(response, xmltree, user):
     if article:
         journal = response["journal"]
         if not journal == article.journal:
-            # Divergence detected - try refreshing journal data from core
+            # divergência detectada - consulta dados remotos de journal
             _refresh_journal_from_core(response, xmltree, user)
             journal = response["journal"]
 
-            # Re-check after refresh
+            # re-verifica após a tentativa de atualização
             if not journal == article.journal:
                 error_msg = _("{} (registered, {}) differs from {} (XML, {})").format(
                     article.journal, article.journal.id, journal, journal.id
@@ -469,11 +469,11 @@ def _check_xml_and_registered_data_compability(response, xmltree, user):
 
         issue = response["issue"]
         if not issue == article.issue:
-            # Divergence detected - try refreshing issue data from core
+            # divergência detectada - consulta dados remotos de issue
             _refresh_issue_from_core(response, xmltree, user)
             issue = response["issue"]
 
-            # Re-check after refresh
+            # re-verifica após a tentativa de atualização
             if not issue == article.issue:
                 error_msg = _("{} (registered, {}) differs from {} (XML, {})").format(
                     article.issue, article.issue.id, issue, issue.id
@@ -487,7 +487,7 @@ def _check_xml_and_registered_data_compability(response, xmltree, user):
 
 
 def _refresh_journal_from_core(response, xmltree, user):
-    """Try to refresh journal data from core API and re-lookup."""
+    """Consulta dados remotos de journal e atualiza os dados locais."""
     xml = ISSN(xmltree)
     issn_electronic = xml.epub
     issn_print = xml.ppub
@@ -505,7 +505,7 @@ def _refresh_journal_from_core(response, xmltree, user):
         response["core_communication_error"] = True
         return
 
-    # Re-lookup journal after refresh
+    # consulta dados locais após a atualização remota
     try:
         response["journal"] = Journal.get_registered(
             journal_title, issn_electronic, issn_print
@@ -515,7 +515,7 @@ def _refresh_journal_from_core(response, xmltree, user):
 
 
 def _refresh_issue_from_core(response, xmltree, user):
-    """Try to refresh issue data from core API and re-lookup."""
+    """Consulta dados remotos de issue e atualiza os dados locais."""
     xml = ArticleDates(xmltree)
     try:
         publication_year = xml.collection_date["year"]
@@ -541,7 +541,7 @@ def _refresh_issue_from_core(response, xmltree, user):
         response["core_communication_error"] = True
         return
 
-    # Re-lookup issue after refresh
+    # consulta dados locais após a atualização remota
     try:
         response["issue"] = Issue.get(
             journal=response["journal"],
