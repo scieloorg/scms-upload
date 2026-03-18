@@ -2,7 +2,6 @@
 Módulo responsável pela migração de dados do site clássico e processamento de PIDs.
 """
 
-import itertools
 import logging
 import sys
 
@@ -407,69 +406,33 @@ def get_files_from_classic_website(
 
 BATCH_SIZE = 1000
 SAMPLE_SIZE = 10
-PID_V2_LENGTH = 23
 
 
 class ClassicWebsiteArticlePidTracker:
     """Tracks PIDs between the classic website PID list and ArticleProc records.
 
     Stores the PID list as a MigratedFile instance. On subsequent runs,
-    retrieves the previous version, computes a diff, and processes only
-    the differences. Use force_update=True to process the full list.
-
-    Processes data in batches to avoid memory issues with large datasets
-    (500k+ PIDs).
+    retrieves the previous version via get_lines(), computes a diff,
+    and processes only the differences. Use force_update=True to process
+    the full list.
     """
 
     TASK_NAME = "proc.source_classic_website.track_classic_website_article_pids"
 
-    def __init__(self, user, collection, classic_website_config, force_update=False):
+    def __init__(self, user, collection, pid_list_path, force_update=False):
         self.user = user
         self.collection = collection
-        self.classic_website_config = classic_website_config
-        self.pid_list_path = classic_website_config.pid_list_path
+        self.pid_list_path = pid_list_path
         self.force_update = force_update
         self.missing_total = 0
         self.matched_total = 0
         self.exceeding_total = 0
-
-    @staticmethod
-    def _iter_batches(iterable, batch_size):
-        """Yield successive batches from an iterable without converting to list."""
-        it = iter(iterable)
-        while True:
-            batch = list(itertools.islice(it, batch_size))
-            if not batch:
-                break
-            yield batch
-
-    def _get_stored_pid_list(self):
-        """Retrieve the previously stored PID list from MigratedFile.
-
-        Returns a set of PIDs parsed from the stored file content,
-        or an empty set if no previous version exists.
-        """
-        if not self.pid_list_path:
-            return set()
-        try:
-            migrated_file = MigratedFile.get(self.collection, self.pid_list_path)
-            return {
-                line
-                for line in migrated_file.get_lines()
-                if len(line) == PID_V2_LENGTH
-            }
-        except MigratedFile.DoesNotExist:
-            pass
-        except Exception as e:
-            logging.exception(
-                "Error reading stored PID list for %s: %s",
-                self.pid_list_path,
-                e,
-            )
-        return set()
+        self.current_pids = set()
+        self._previous_pids = set()
+        self._removed_pids = set()
 
     def _store_pid_list(self):
-        """Store/update the current PID list file as a MigratedFile instance."""
+        """Store/update the PID list file as a MigratedFile instance."""
         if not self.pid_list_path:
             return
         try:
@@ -494,10 +457,40 @@ class ClassicWebsiteArticlePidTracker:
                 },
             )
 
+    def _get_migrated_file_pids(self):
+        """Get PIDs from the stored MigratedFile via get_lines()."""
+        if not self.pid_list_path:
+            return set()
+        try:
+            migrated_file = MigratedFile.get(self.collection, self.pid_list_path)
+            return set(migrated_file.get_lines())
+        except MigratedFile.DoesNotExist:
+            return set()
+        except Exception as e:
+            logging.exception("Error reading stored PID list: %s", e)
+            return set()
+
+    def get_pids_to_process(self):
+        """Compute PIDs to process. Stores PID list and computes diff.
+
+        Sets self.current_pids, self._previous_pids, self._removed_pids.
+        Returns the set of PIDs to add/process.
+        """
+        if not self.force_update:
+            self._previous_pids = self._get_migrated_file_pids()
+
+        self._store_pid_list()
+        self.current_pids = self._get_migrated_file_pids()
+
+        if self._previous_pids and not self.force_update:
+            self._removed_pids = self._previous_pids - self.current_pids
+            return self.current_pids - self._previous_pids
+        return self.current_pids
+
     def _process_pid(self, pid):
         """Create MigratedArticle and ArticleProc for a PID, link them.
 
-        Returns "missing" or "matched" based on MigratedArticle data presence.
+        Returns pid_status based on MigratedArticle data presence.
         """
         migrated_article = MigratedArticle.create_or_update_migrated_data(
             user=self.user,
@@ -514,49 +507,60 @@ class ClassicWebsiteArticlePidTracker:
             return proc_choices.PID_STATUS_MISSING
         return proc_choices.PID_STATUS_MATCHED
 
-    def _process_pids(self, pids_to_process):
-        """Process PIDs in batches: create records and classify pid_status."""
-        for batch in self._iter_batches(pids_to_process, BATCH_SIZE):
-            missing_pids = []
-            matched_pids = []
+    def _flush_status_batch(self, pids, status):
+        """Bulk update pid_status for a list of PIDs."""
+        if pids:
+            ArticleProc.objects.filter(
+                collection=self.collection, pid__in=pids
+            ).update(pid_status=status)
 
-            for pid in batch:
-                try:
-                    status = self._process_pid(pid)
-                    if status == proc_choices.PID_STATUS_MISSING:
-                        missing_pids.append(pid)
-                    else:
-                        matched_pids.append(pid)
-                except Exception as e:
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    UnexpectedEvent.create(
-                        e=e,
-                        exc_traceback=exc_traceback,
-                        detail={
-                            "task": self.TASK_NAME,
-                            "step": "create_or_update_pid",
-                            "pid": pid,
-                            "collection": self.collection.acron,
-                        },
+    def _process_pids(self):
+        """Process PIDs: create records and classify pid_status."""
+        pids_to_add = self.get_pids_to_process()
+        missing_pids, matched_pids = [], []
+
+        for pid in pids_to_add:
+            try:
+                status = self._process_pid(pid)
+                if status == proc_choices.PID_STATUS_MISSING:
+                    missing_pids.append(pid)
+                else:
+                    matched_pids.append(pid)
+
+                if len(missing_pids) >= BATCH_SIZE:
+                    self._flush_status_batch(
+                        missing_pids, proc_choices.PID_STATUS_MISSING
                     )
+                    self.missing_total += len(missing_pids)
+                    missing_pids = []
 
-            if missing_pids:
-                ArticleProc.objects.filter(
-                    collection=self.collection, pid__in=missing_pids
-                ).update(pid_status=proc_choices.PID_STATUS_MISSING)
-                self.missing_total += len(missing_pids)
+                if len(matched_pids) >= BATCH_SIZE:
+                    self._flush_status_batch(
+                        matched_pids, proc_choices.PID_STATUS_MATCHED
+                    )
+                    self.matched_total += len(matched_pids)
+                    matched_pids = []
+            except Exception as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                UnexpectedEvent.create(
+                    e=e,
+                    exc_traceback=exc_traceback,
+                    detail={
+                        "task": self.TASK_NAME,
+                        "step": "create_or_update_pid",
+                        "pid": pid,
+                        "collection": self.collection.acron,
+                    },
+                )
 
-            if matched_pids:
-                ArticleProc.objects.filter(
-                    collection=self.collection, pid__in=matched_pids
-                ).update(pid_status=proc_choices.PID_STATUS_MATCHED)
-                self.matched_total += len(matched_pids)
+        self._flush_status_batch(missing_pids, proc_choices.PID_STATUS_MISSING)
+        self.missing_total += len(missing_pids)
+        self._flush_status_batch(matched_pids, proc_choices.PID_STATUS_MATCHED)
+        self.matched_total += len(matched_pids)
 
     def _mark_exceeding_batch(self, pids_batch, message):
-        """Mark a batch of PIDs as exceeding and create an UnexpectedEvent."""
-        ArticleProc.objects.filter(
-            collection=self.collection, pid__in=pids_batch
-        ).update(pid_status=proc_choices.PID_STATUS_EXCEEDING)
+        """Mark a batch of PIDs as exceeding with aggregated UnexpectedEvent."""
+        self._flush_status_batch(pids_batch, proc_choices.PID_STATUS_EXCEEDING)
         UnexpectedEvent.create(
             e=Exception(message),
             exc_traceback=None,
@@ -569,94 +573,97 @@ class ClassicWebsiteArticlePidTracker:
             },
         )
 
-    def _detect_exceeding_diff_mode(self, removed_pids):
+    def _detect_exceeding(self):
+        """Detect exceeding PIDs based on mode (diff or full)."""
+        if self._previous_pids and not self.force_update:
+            self._detect_exceeding_diff_mode()
+        else:
+            self._detect_exceeding_full_mode()
+
+    def _detect_exceeding_diff_mode(self):
         """Diff mode: mark removed PIDs as exceeding."""
-        for batch in self._iter_batches(removed_pids, BATCH_SIZE):
+        batch = []
+        for pid in self._removed_pids:
+            batch.append(pid)
+            if len(batch) >= BATCH_SIZE:
+                self._mark_exceeding_batch(
+                    batch,
+                    "ArticleProc PIDs removed from classic website PID list",
+                )
+                self.exceeding_total += len(batch)
+                batch = []
+        if batch:
             self._mark_exceeding_batch(
-                batch, "ArticleProc PIDs removed from classic website PID list"
+                batch,
+                "ArticleProc PIDs removed from classic website PID list",
             )
             self.exceeding_total += len(batch)
 
-    def _detect_exceeding_full_mode(self, classic_pids):
-        """Full mode: scan all ArticleProcs not in classic PID list.
+    def _detect_exceeding_full_mode(self):
+        """Full mode: scan ArticleProcs and MigratedArticles not in PID list."""
+        self._scan_exceeding_article_procs()
+        self._scan_exceeding_migrated_articles()
 
-        Also delegates to _detect_exceeding_migrated_articles for
-        MigratedArticle scanning.
-        """
-        exceeding_pids_batch = []
-        for article_proc in (
+    def _scan_exceeding_article_procs(self):
+        """Scan ArticleProcs for PIDs not in current PID list."""
+        batch = []
+        for ap in (
             ArticleProc.objects.filter(collection=self.collection)
-            .only("pid", "pid_status")
+            .only("pid")
             .iterator(chunk_size=BATCH_SIZE)
         ):
-            if article_proc.pid not in classic_pids:
-                exceeding_pids_batch.append(article_proc.pid)
+            if ap.pid not in self.current_pids:
+                batch.append(ap.pid)
                 self.exceeding_total += 1
-
-                if len(exceeding_pids_batch) >= BATCH_SIZE:
+                if len(batch) >= BATCH_SIZE:
                     self._mark_exceeding_batch(
-                        exceeding_pids_batch,
+                        batch,
                         "ArticleProc PIDs not in classic website PID list",
                     )
-                    exceeding_pids_batch = []
-
-        if exceeding_pids_batch:
+                    batch = []
+        if batch:
             self._mark_exceeding_batch(
-                exceeding_pids_batch,
-                "ArticleProc PIDs not in classic website PID list",
+                batch, "ArticleProc PIDs not in classic website PID list"
             )
 
-        self._detect_exceeding_migrated_articles(classic_pids)
-
-    def _detect_exceeding_migrated_articles(self, classic_pids):
-        """Full mode: detect MigratedArticle PIDs not in classic PID list."""
-        exceeding_migrated_pids = []
-        for migrated in (
+    def _scan_exceeding_migrated_articles(self):
+        """Scan MigratedArticles for PIDs not in current PID list."""
+        batch = []
+        for ma in (
             MigratedArticle.objects.filter(collection=self.collection)
             .only("pid")
             .iterator(chunk_size=BATCH_SIZE)
         ):
-            if migrated.pid not in classic_pids:
-                exceeding_migrated_pids.append(migrated.pid)
+            if ma.pid not in self.current_pids:
+                batch.append(ma.pid)
+                if len(batch) >= BATCH_SIZE:
+                    self._report_exceeding_migrated(batch)
+                    batch = []
+        if batch:
+            self._report_exceeding_migrated(batch)
 
-                if len(exceeding_migrated_pids) >= BATCH_SIZE:
-                    UnexpectedEvent.create(
-                        e=Exception(
-                            "MigratedArticle PIDs not in classic website PID list"
-                        ),
-                        exc_traceback=None,
-                        detail={
-                            "task": self.TASK_NAME,
-                            "step": "exceeding_migrated_article",
-                            "collection": self.collection.acron,
-                            "total": len(exceeding_migrated_pids),
-                            "sample": exceeding_migrated_pids[:SAMPLE_SIZE],
-                        },
-                    )
-                    exceeding_migrated_pids = []
+    def _report_exceeding_migrated(self, pids_batch):
+        """Report exceeding MigratedArticle PIDs via UnexpectedEvent."""
+        UnexpectedEvent.create(
+            e=Exception(
+                "MigratedArticle PIDs not in classic website PID list"
+            ),
+            exc_traceback=None,
+            detail={
+                "task": self.TASK_NAME,
+                "step": "exceeding_migrated_article",
+                "collection": self.collection.acron,
+                "total": len(pids_batch),
+                "sample": pids_batch[:SAMPLE_SIZE],
+            },
+        )
 
-        if exceeding_migrated_pids:
-            UnexpectedEvent.create(
-                e=Exception(
-                    "MigratedArticle PIDs not in classic website PID list"
-                ),
-                exc_traceback=None,
-                detail={
-                    "task": self.TASK_NAME,
-                    "step": "exceeding_migrated_article",
-                    "collection": self.collection.acron,
-                    "total": len(exceeding_migrated_pids),
-                    "sample": exceeding_migrated_pids[:SAMPLE_SIZE],
-                },
-            )
-
-    def _build_result(self, classic_pids):
+    def _build_result(self):
         """Build the summary result dict."""
-        migrated_total = self.matched_total + self.missing_total
         return {
             "collection": self.collection.acron,
-            "classic_website_total": len(classic_pids),
-            "migrated_total": migrated_total,
+            "classic_website_total": len(self.current_pids),
+            "migrated_total": self.matched_total + self.missing_total,
             "items": [
                 {
                     "type": "MISSING",
@@ -682,40 +689,22 @@ class ClassicWebsiteArticlePidTracker:
     def run(self):
         """Execute PID tracking. Returns a summary dict or None."""
         try:
-            classic_pids = self.classic_website_config.pid_list
-            if not classic_pids:
+            self._process_pids()
+
+            if not self.current_pids:
                 logging.warning(
                     "No PIDs found from classic website for collection %s",
                     self.collection.acron,
                 )
                 return None
 
-            previous_pids = set()
-            if not self.force_update:
-                previous_pids = self._get_stored_pid_list()
-
-            self._store_pid_list()
-
-            if previous_pids and not self.force_update:
-                pids_to_process = classic_pids - previous_pids
-                removed_pids = previous_pids - classic_pids
-            else:
-                pids_to_process = classic_pids
-                removed_pids = set()
-
-            self._process_pids(pids_to_process)
-
-            if previous_pids and not self.force_update:
-                self._detect_exceeding_diff_mode(removed_pids)
-            else:
-                self._detect_exceeding_full_mode(classic_pids)
-
-            result = self._build_result(classic_pids)
+            self._detect_exceeding()
+            result = self._build_result()
 
             logging.info(
                 "PID tracking for %s: classic=%d, missing=%d, matched=%d, exceeding=%d",
                 self.collection.acron,
-                len(classic_pids),
+                len(self.current_pids),
                 self.missing_total,
                 self.matched_total,
                 self.exceeding_total,
@@ -732,7 +721,9 @@ class ClassicWebsiteArticlePidTracker:
                     "task": self.TASK_NAME,
                     "user_id": self.user.id if self.user else None,
                     "username": self.user.username if self.user else None,
-                    "collection": self.collection.acron if self.collection else None,
+                    "collection": self.collection.acron
+                    if self.collection
+                    else None,
                 },
             )
             return None
@@ -746,6 +737,6 @@ def track_classic_website_article_pids(
     Delegates to ClassicWebsiteArticlePidTracker.run().
     """
     tracker = ClassicWebsiteArticlePidTracker(
-        user, collection, classic_website_config, force_update
+        user, collection, classic_website_config.pid_list_path, force_update
     )
     return tracker.run()

@@ -14,20 +14,20 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         self.collection = Mock()
         self.collection.acron = "scl"
         self.classic_website_config = Mock()
+        self.classic_website_config.pid_list_path = "/some/pid_list.txt"
 
     @patch(
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids",
         return_value=set(),
     )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_returns_none_when_no_classic_pids(
-        self, mock_article_proc, mock_migrated, mock_get_stored, mock_store
+        self, mock_article_proc, mock_migrated, mock_get_pids, mock_store
     ):
-        self.classic_website_config.pid_list = set()
         result = track_classic_website_article_pids(
             self.user, self.collection, self.classic_website_config
         )
@@ -37,20 +37,20 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
-        return_value=set(),
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_sets_missing_status_when_no_data(
-        self, mock_article_proc, mock_migrated, mock_get_stored, mock_store
+        self, mock_article_proc, mock_migrated, mock_get_pids, mock_store
     ):
         """PIDs in classic list where MigratedArticle has no data → pid_status = missing."""
         classic_pids = {
             "S0001-37652000000100001",
             "S0001-37652000000100002",
         }
-        self.classic_website_config.pid_list = classic_pids
+        # First call: no previous PIDs; second call: current PIDs
+        mock_get_pids.side_effect = [set(), classic_pids]
 
         # MigratedArticle stubs with no data
         migrated_stub = Mock()
@@ -82,20 +82,19 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
-        return_value=set(),
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_sets_matched_status_when_has_data(
-        self, mock_article_proc, mock_migrated, mock_get_stored, mock_store
+        self, mock_article_proc, mock_migrated, mock_get_pids, mock_store
     ):
         """PIDs in classic list where MigratedArticle has data → pid_status = matched."""
         classic_pids = {
             "S0001-37652000000100001",
             "S0001-37652000000100002",
         }
-        self.classic_website_config.pid_list = classic_pids
+        mock_get_pids.side_effect = [set(), classic_pids]
 
         # MigratedArticle with data
         migrated_with_data = Mock()
@@ -126,21 +125,20 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
-        return_value=set(),
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.UnexpectedEvent")
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_sets_exceeding_status_and_creates_event(
         self, mock_article_proc, mock_migrated, mock_unexpected_event,
-        mock_get_stored, mock_store
+        mock_get_pids, mock_store
     ):
         """ArticleProc PIDs not in classic list → pid_status = exceeding + UnexpectedEvent."""
         classic_pids = {
             "S0001-37652000000100001",
         }
-        self.classic_website_config.pid_list = classic_pids
+        mock_get_pids.side_effect = [set(), classic_pids]
 
         # MigratedArticle with data for classic PID
         migrated_with_data = Mock()
@@ -175,21 +173,20 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
-        return_value=set(),
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.UnexpectedEvent")
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_creates_event_for_exceeding_migrated_article(
         self, mock_article_proc, mock_migrated, mock_unexpected_event,
-        mock_get_stored, mock_store
+        mock_get_pids, mock_store
     ):
         """MigratedArticle PIDs not in classic list → UnexpectedEvent."""
         classic_pids = {
             "S0001-37652000000100001",
         }
-        self.classic_website_config.pid_list = classic_pids
+        mock_get_pids.side_effect = [set(), classic_pids]
 
         migrated_with_data = Mock()
         migrated_with_data.data = {"some": "data"}
@@ -220,17 +217,16 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
-        return_value=set(),
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_links_migrated_data_to_article_proc(
-        self, mock_article_proc, mock_migrated, mock_get_stored, mock_store
+        self, mock_article_proc, mock_migrated, mock_get_pids, mock_store
     ):
         """Verify ArticleProc.migrated_data is linked when not already set."""
         classic_pids = {"S0001-37652000000100001"}
-        self.classic_website_config.pid_list = classic_pids
+        mock_get_pids.side_effect = [set(), classic_pids]
 
         migrated_stub = Mock()
         migrated_stub.data = {"some": "data"}
@@ -258,15 +254,15 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
-        return_value=set(),
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_result_contains_collection_acron(
-        self, mock_article_proc, mock_migrated, mock_get_stored, mock_store
+        self, mock_article_proc, mock_migrated, mock_get_pids, mock_store
     ):
-        self.classic_website_config.pid_list = {"S0001-37652000000100001"}
+        classic_pids = {"S0001-37652000000100001"}
+        mock_get_pids.side_effect = [set(), classic_pids]
 
         migrated_stub = Mock()
         migrated_stub.data = None
@@ -288,16 +284,16 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
-        return_value=set(),
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_result_has_three_items(
-        self, mock_article_proc, mock_migrated, mock_get_stored, mock_store
+        self, mock_article_proc, mock_migrated, mock_get_pids, mock_store
     ):
         """Result should have MISSING, MATCHED, and EXCEEDING items."""
-        self.classic_website_config.pid_list = {"S0001-37652000000100001"}
+        classic_pids = {"S0001-37652000000100001"}
+        mock_get_pids.side_effect = [set(), classic_pids]
 
         migrated_stub = Mock()
         migrated_stub.data = {"some": "data"}
@@ -321,17 +317,16 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
-        return_value=set(),
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_empty_data_dict_treated_as_missing(
-        self, mock_article_proc, mock_migrated, mock_get_stored, mock_store
+        self, mock_article_proc, mock_migrated, mock_get_pids, mock_store
     ):
         """MigratedArticle with data={} should be treated as missing (not migrated)."""
         classic_pids = {"S0001-37652000000100001"}
-        self.classic_website_config.pid_list = classic_pids
+        mock_get_pids.side_effect = [set(), classic_pids]
 
         migrated_stub = Mock()
         migrated_stub.data = {}
@@ -362,17 +357,18 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
         self.collection = Mock()
         self.collection.acron = "scl"
         self.classic_website_config = Mock()
+        self.classic_website_config.pid_list_path = "/some/pid_list.txt"
 
     @patch(
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list"
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_diff_mode_processes_only_added_pids(
-        self, mock_article_proc, mock_migrated, mock_get_stored, mock_store
+        self, mock_article_proc, mock_migrated, mock_get_pids, mock_store
     ):
         """In diff mode, only new PIDs (current - previous) should be processed."""
         previous_pids = {"S0001-37652000000100001"}
@@ -380,8 +376,7 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
             "S0001-37652000000100001",
             "S0001-37652000000100002",
         }
-        mock_get_stored.return_value = previous_pids
-        self.classic_website_config.pid_list = current_pids
+        mock_get_pids.side_effect = [previous_pids, current_pids]
 
         migrated_stub = Mock()
         migrated_stub.data = None
@@ -407,14 +402,14 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list"
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.UnexpectedEvent")
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_diff_mode_marks_removed_pids_as_exceeding(
         self, mock_article_proc, mock_migrated, mock_unexpected_event,
-        mock_get_stored, mock_store
+        mock_get_pids, mock_store
     ):
         """In diff mode, removed PIDs should be marked as exceeding."""
         previous_pids = {
@@ -422,8 +417,7 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
             "S0001-37652000000100099",
         }
         current_pids = {"S0001-37652000000100001"}
-        mock_get_stored.return_value = previous_pids
-        self.classic_website_config.pid_list = current_pids
+        mock_get_pids.side_effect = [previous_pids, current_pids]
 
         migrated_stub = Mock()
         migrated_stub.data = {"some": "data"}
@@ -448,17 +442,16 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list"
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_diff_mode_no_changes_returns_zero_counts(
-        self, mock_article_proc, mock_migrated, mock_get_stored, mock_store
+        self, mock_article_proc, mock_migrated, mock_get_pids, mock_store
     ):
         """When previous = current (no diff), no PIDs should be processed."""
         same_pids = {"S0001-37652000000100001"}
-        mock_get_stored.return_value = same_pids
-        self.classic_website_config.pid_list = same_pids
+        mock_get_pids.side_effect = [same_pids, same_pids]
 
         result = track_classic_website_article_pids(
             self.user, self.collection, self.classic_website_config
@@ -475,21 +468,20 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list"
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_force_update_processes_all_pids(
-        self, mock_article_proc, mock_migrated, mock_get_stored, mock_store
+        self, mock_article_proc, mock_migrated, mock_get_pids, mock_store
     ):
         """With force_update=True, all PIDs should be processed regardless of previous version."""
-        previous_pids = {"S0001-37652000000100001"}
         current_pids = {
             "S0001-37652000000100001",
             "S0001-37652000000100002",
         }
-        mock_get_stored.return_value = previous_pids
-        self.classic_website_config.pid_list = current_pids
+        # force_update=True: _get_migrated_file_pids called only once (for current)
+        mock_get_pids.return_value = current_pids
 
         migrated_stub = Mock()
         migrated_stub.data = None
@@ -511,27 +503,27 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
         self.assertIsNotNone(result)
         # All 2 PIDs should be processed (not just the diff)
         self.assertEqual(result["items"][0]["total"], 2)  # missing
-        # _get_stored_pid_list should NOT be called with force_update=True
-        mock_get_stored.assert_not_called()
+        # With force_update, _get_migrated_file_pids called once (only for current)
+        self.assertEqual(mock_get_pids.call_count, 1)
 
     @patch(
         "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
     )
     @patch(
-        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
-        return_value=set(),
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_migrated_file_pids"
     )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_first_run_without_previous_processes_all(
-        self, mock_article_proc, mock_migrated, mock_get_stored, mock_store
+        self, mock_article_proc, mock_migrated, mock_get_pids, mock_store
     ):
         """First run (no previous MigratedFile) should process all PIDs."""
         current_pids = {
             "S0001-37652000000100001",
             "S0001-37652000000100002",
         }
-        self.classic_website_config.pid_list = current_pids
+        # First call: empty (no previous), second call: current PIDs
+        mock_get_pids.side_effect = [set(), current_pids]
 
         migrated_stub = Mock()
         migrated_stub.data = {"some": "data"}
