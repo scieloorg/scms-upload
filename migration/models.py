@@ -594,7 +594,7 @@ class MigratedFile(CommonControlField):
         )
 
     def get_lines(self):
-        """Read file content and return non-empty whitespace-split tokens."""
+        """Read file content and return whitespace-split tokens."""
         if self.file:
             self.file.seek(0)
             content = self.file.read().decode("utf-8")
