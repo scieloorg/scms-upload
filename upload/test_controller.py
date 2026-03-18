@@ -300,7 +300,6 @@ class UploadIssueDataCheckerTestCase(unittest.TestCase):
         mock_fetch.side_effect = FetchIssueDataException("Connection refused")
 
         mock_qs = MagicMock()
-        mock_qs.count.return_value = 0
         mock_qs.exists.return_value = False
         mock_qs.order_by.return_value = []
         mock_upload_issue_cls.objects.filter.return_value = mock_qs
