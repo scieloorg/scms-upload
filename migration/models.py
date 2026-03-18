@@ -176,6 +176,30 @@ class ClassicWebsiteConfiguration(CommonControlField):
 
     base_form_class = CoreAdminModelForm
 
+    def get_pid_list(self):
+        """
+        Reads and returns a set of article PIDs from the file
+        indicated by pid_list_path.
+        """
+        if not self.pid_list_path:
+            return set()
+        try:
+            with open(self.pid_list_path, "r") as fp:
+                return set(fp.read().split())
+        except FileNotFoundError:
+            logging.warning(
+                "pid_list_path file not found: %s", self.pid_list_path
+            )
+        except Exception as e:
+            logging.exception(
+                "Error reading pid_list_path %s: %s", self.pid_list_path, e
+            )
+        return set()
+
+    @property
+    def pid_list(self):
+        return self.get_pid_list()
+
 
 class MigratedData(CommonControlField):
     collection = models.ForeignKey(
@@ -575,6 +599,11 @@ class MigratedFile(CommonControlField):
         return bool(
             self.file_datetime_iso and self.file_datetime_iso == file_datetime_iso
         )
+
+    def get_lines(self):
+        """Read file content and return whitespace-split tokens."""
+        with open(self.file.path, mode="r", encoding="utf-8") as fp:
+            return fp.read().split()
 
     @property
     def text(self):
