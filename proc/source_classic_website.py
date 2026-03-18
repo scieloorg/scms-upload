@@ -453,13 +453,11 @@ class ClassicWebsiteArticlePidTracker:
             return set()
         try:
             migrated_file = MigratedFile.get(self.collection, self.pid_list_path)
-            if migrated_file.file:
-                content = migrated_file.file.read().decode("utf-8")
-                return {
-                    line.strip()
-                    for line in content.splitlines()
-                    if len(line.strip()) == PID_V2_LENGTH
-                }
+            return {
+                line
+                for line in migrated_file.get_lines()
+                if len(line) == PID_V2_LENGTH
+            }
         except MigratedFile.DoesNotExist:
             pass
         except Exception as e:

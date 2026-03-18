@@ -597,6 +597,13 @@ class MigratedFile(CommonControlField):
             self.file_datetime_iso and self.file_datetime_iso == file_datetime_iso
         )
 
+    def get_lines(self):
+        """Read file content and return stripped non-empty lines."""
+        if self.file:
+            content = self.file.read().decode("utf-8")
+            return [line.strip() for line in content.splitlines() if line.strip()]
+        return []
+
     @property
     def text(self):
         try:
