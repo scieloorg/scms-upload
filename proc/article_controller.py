@@ -261,7 +261,7 @@ def track_classic_website_article_pids(
     new_pids = set(tracker.update_pid_status(classic_website_pids))
     tracker.bulk_create(new_pids)
     
-    data = {}
+    data = {"collection": collection.acron}
     for item in ArticleProc.objects.filter(collection=collection).values("pid_status").annotate(
         total=Count("pid")
     ):
