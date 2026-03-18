@@ -427,6 +427,7 @@ class ClassicWebsiteArticlePidTracker:
         self.user = user
         self.collection = collection
         self.classic_website_config = classic_website_config
+        self.pid_list_path = classic_website_config.pid_list_path
         self.force_update = force_update
         self.missing_total = 0
         self.matched_total = 0
@@ -448,11 +449,10 @@ class ClassicWebsiteArticlePidTracker:
         Returns a set of PIDs parsed from the stored file content,
         or an empty set if no previous version exists.
         """
-        pid_list_path = self.classic_website_config.pid_list_path
-        if not pid_list_path:
+        if not self.pid_list_path:
             return set()
         try:
-            migrated_file = MigratedFile.get(self.collection, pid_list_path)
+            migrated_file = MigratedFile.get(self.collection, self.pid_list_path)
             if migrated_file.file:
                 content = migrated_file.file.read().decode("utf-8")
                 return {
@@ -464,21 +464,22 @@ class ClassicWebsiteArticlePidTracker:
             pass
         except Exception as e:
             logging.exception(
-                "Error reading stored PID list for %s: %s", pid_list_path, e
+                "Error reading stored PID list for %s: %s",
+                self.pid_list_path,
+                e,
             )
         return set()
 
     def _store_pid_list(self):
         """Store/update the current PID list file as a MigratedFile instance."""
-        pid_list_path = self.classic_website_config.pid_list_path
-        if not pid_list_path:
+        if not self.pid_list_path:
             return
         try:
             MigratedFile.create_or_update(
                 user=self.user,
                 collection=self.collection,
-                original_path=pid_list_path,
-                source_path=pid_list_path,
+                original_path=self.pid_list_path,
+                source_path=self.pid_list_path,
                 component_type="pid_list",
                 force_update=self.force_update,
             )
@@ -491,7 +492,7 @@ class ClassicWebsiteArticlePidTracker:
                     "task": self.TASK_NAME,
                     "step": "store_pid_list",
                     "collection": self.collection.acron,
-                    "pid_list_path": pid_list_path,
+                    "pid_list_path": self.pid_list_path,
                 },
             )
 
@@ -579,7 +580,11 @@ class ClassicWebsiteArticlePidTracker:
             self.exceeding_total += len(batch)
 
     def _detect_exceeding_full_mode(self, classic_pids):
-        """Full mode: scan all ArticleProcs and MigratedArticles not in classic PID list."""
+        """Full mode: scan all ArticleProcs not in classic PID list.
+
+        Also delegates to _detect_exceeding_migrated_articles for
+        MigratedArticle scanning.
+        """
         exceeding_pids_batch = []
         for article_proc in (
             ArticleProc.objects.filter(collection=self.collection)
