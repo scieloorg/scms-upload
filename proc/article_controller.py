@@ -190,14 +190,6 @@ def publish_collection_articles(
 
 
 class ClassicWebsiteArticlePidTracker:
-    """Tracks PIDs between the classic website PID list and ArticleProc records.
-
-    Stores the PID list as a MigratedFile instance. On subsequent runs,
-    retrieves the previous version via get_lines(), computes a diff,
-    and processes only the differences. Use force_update=True to process
-    the full list.
-    """
-
     TASK_NAME = "proc.source_classic_website.track_classic_website_article_pids"
 
     def __init__(self, user, collection):
@@ -205,63 +197,73 @@ class ClassicWebsiteArticlePidTracker:
         self.collection = collection
 
     def create_article_proc_for_pids(self, pids):
-        for pid in pids:
-            if not ArticleProc.objects.filter(collection=self.collection, pid=pid).exists():
-                yield ArticleProc(
-                    pid=pid,
-                    collection=self.collection,
-                    creator=self.user,
-                    pid_status=migration_choices.PID_STATUS_MISSING,
-                )
+        if not pids:
+            return []
+        registered_pids = set(
+            ArticleProc.objects.filter(
+                collection=self.collection, pid__in=pids
+            ).values_list("pid", flat=True)
+        )
+        todo = set(pids) - registered_pids
+        for pid in todo:
+            yield ArticleProc(
+                pid=pid,
+                collection=self.collection,
+                creator=self.user,
+                pid_status=migration_choices.PID_STATUS_MISSING,
+            )
 
     def update_pid_status(self, classic_website_pids):
 
         pids = set(classic_website_pids)
 
         qs = ArticleProc.objects.filter(
-            ~Q(pid_status__in=[migration_choices.PID_STATUS_EXCEEDING]),
             collection=self.collection
+        ).exclude(
+            pid_status__in=[
+                migration_choices.PID_STATUS_EXCEEDING,
+            ]
         )
         
         qs.filter(
-            ~Q(pid_status__in=[migration_choices.PID_STATUS_MATCHED]),
             migrated_data__isnull=False,
+        ).exclude(
+            pid_status__in=[migration_choices.PID_STATUS_MATCHED]
         ).update(pid_status=migration_choices.PID_STATUS_MATCHED)
-        x = qs.filter(pid_status=migration_choices.PID_STATUS_MATCHED).values_list("pid", flat=True)
-        pids = pids - set(x)
+        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_MATCHED).values_list("pid", flat=True))
 
         qs.filter(
-            ~Q(pid_status__in=[migration_choices.PID_STATUS_MISSING]),
             migrated_data__isnull=True,
+        ).exclude(
+            pid_status__in=[migration_choices.PID_STATUS_MISSING],
         ).update(pid_status=migration_choices.PID_STATUS_MISSING)
-        x = qs.filter(pid_status=migration_choices.PID_STATUS_MISSING).values_list("pid", flat=True)
-        pids = pids - set(x)
+        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_MISSING).values_list("pid", flat=True))
 
-        qs.filter(
-            ~Q(pid_status__in=[migration_choices.PID_STATUS_MATCHED, migration_choices.PID_STATUS_MISSING]),
+        qs.exclude(
+            pid_status__in=[migration_choices.PID_STATUS_MATCHED,
+                            migration_choices.PID_STATUS_MISSING]
         ).update(pid_status=migration_choices.PID_STATUS_EXCEEDING)
-        x = qs.filter(pid_status=migration_choices.PID_STATUS_EXCEEDING).values_list("pid", flat=True)
-        pids = pids - set(x)
+        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_EXCEEDING).values_list("pid", flat=True))
 
         return pids
     
     def bulk_create(self, new_pids):
-        ArticleProc.objects.bulk_create(self.create_article_proc_for_pids(new_pids), batch_size=500)
+        if new_pids:
+            ArticleProc.objects.bulk_create(self.create_article_proc_for_pids(new_pids), batch_size=500)
 
 
 def track_classic_website_article_pids(
     user, collection, classic_website_config,
 ):
-    """Compares the PID list from the classic website with ArticleProc records.
-
-    Delegates to ClassicWebsiteArticlePidTracker.run().
-    """
     tracker = ClassicWebsiteArticlePidTracker(user, collection)
     classic_website_pids = set(classic_website_config.get_pid_list())
 
     new_pids = set(tracker.update_pid_status(classic_website_pids))
     tracker.bulk_create(new_pids)
     
-    return ArticleProc.objects.filter(collection=collection).values("pid_status").annotate(
+    data = {}
+    for item in ArticleProc.objects.filter(collection=collection).values("pid_status").annotate(
         total=Count("pid")
-    )
+    ):
+        data[item["pid_status"]] = item["total"]
+    return data
