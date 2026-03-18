@@ -226,7 +226,6 @@ class IssueDataChecker:
         # 3. consulta dados locais novamente após a tentativa de busca remota
         try:
             issue = self.get_local()
-            logging.info(f"issue: {issue}")
             return issue
         except Issue.DoesNotExist:
             return None
@@ -250,7 +249,7 @@ class IssueDataChecker:
         for item in items.order_by("-publication_year"):
             issues.append(
                 {
-                    "publication_year": self.publication_year,
+                    "publication_year": item.publication_year,
                     "volume": item.volume,
                     "number": item.number,
                     "supplement": item.supplement,
