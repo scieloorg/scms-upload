@@ -15,8 +15,13 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         self.collection.acron = "scl"
         self.classic_website_config = Mock()
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list", return_value=set())
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
+        return_value=set(),
+    )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_returns_none_when_no_classic_pids(
@@ -28,8 +33,13 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         )
         self.assertIsNone(result)
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list", return_value=set())
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
+        return_value=set(),
+    )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_sets_missing_status_when_no_data(
@@ -68,8 +78,13 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         # Verify bulk update was called for missing status
         mock_article_proc.objects.filter.return_value.update.assert_called()
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list", return_value=set())
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
+        return_value=set(),
+    )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_sets_matched_status_when_has_data(
@@ -107,8 +122,13 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         # Verify bulk update was called for matched status
         mock_article_proc.objects.filter.return_value.update.assert_called()
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list", return_value=set())
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
+        return_value=set(),
+    )
     @patch("proc.source_classic_website.UnexpectedEvent")
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
@@ -151,8 +171,13 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         # Verify UnexpectedEvent was created for exceeding PID
         mock_unexpected_event.create.assert_called()
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list", return_value=set())
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
+        return_value=set(),
+    )
     @patch("proc.source_classic_website.UnexpectedEvent")
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
@@ -191,8 +216,13 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         self.assertIsNotNone(result)
         mock_unexpected_event.create.assert_called()
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list", return_value=set())
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
+        return_value=set(),
+    )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_links_migrated_data_to_article_proc(
@@ -224,8 +254,13 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         # save() is called to persist the migrated_data link
         article_proc_stub.save.assert_called_once()
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list", return_value=set())
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
+        return_value=set(),
+    )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_result_contains_collection_acron(
@@ -249,8 +284,13 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         )
         self.assertEqual(result["collection"], "scl")
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list", return_value=set())
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
+        return_value=set(),
+    )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_result_has_three_items(
@@ -277,8 +317,13 @@ class TestTrackClassicWebsiteArticlePids(TestCase):
         types = [item["type"] for item in result["items"]]
         self.assertEqual(types, ["MISSING", "MATCHED", "EXCEEDING"])
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list", return_value=set())
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
+        return_value=set(),
+    )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_empty_data_dict_treated_as_missing(
@@ -318,8 +363,12 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
         self.collection.acron = "scl"
         self.classic_website_config = Mock()
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list")
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list"
+    )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_diff_mode_processes_only_added_pids(
@@ -354,8 +403,12 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
             mock_migrated.create_or_update_migrated_data.call_count, 1
         )
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list")
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list"
+    )
     @patch("proc.source_classic_website.UnexpectedEvent")
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
@@ -391,8 +444,12 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
         # Verify UnexpectedEvent was created
         mock_unexpected_event.create.assert_called()
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list")
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list"
+    )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_diff_mode_no_changes_returns_zero_counts(
@@ -414,8 +471,12 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
         # No MigratedArticle creation should happen
         mock_migrated.create_or_update_migrated_data.assert_not_called()
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list")
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list"
+    )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_force_update_processes_all_pids(
@@ -453,8 +514,13 @@ class TestTrackClassicWebsiteArticlePidsDiffMode(TestCase):
         # _get_stored_pid_list should NOT be called with force_update=True
         mock_get_stored.assert_not_called()
 
-    @patch("proc.source_classic_website._store_pid_list")
-    @patch("proc.source_classic_website._get_stored_pid_list", return_value=set())
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._store_pid_list"
+    )
+    @patch(
+        "proc.source_classic_website.ClassicWebsiteArticlePidTracker._get_stored_pid_list",
+        return_value=set(),
+    )
     @patch("proc.source_classic_website.MigratedArticle")
     @patch("proc.source_classic_website.ArticleProc")
     def test_first_run_without_previous_processes_all(
