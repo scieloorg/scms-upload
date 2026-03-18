@@ -1,13 +1,8 @@
 import os
 import logging
-import sys
-import traceback
 
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-from packtools.sps.models.dates import ArticleDates
-from packtools.sps.models.front_articlemeta_issue import ArticleMetaIssue
-from packtools.sps.models.journal_meta import ISSN, Title
 from packtools.sps.pid_provider.xml_sps_lib import GetXMLItemsError, XMLWithPre
 
 from article import choices as article_choices
@@ -17,13 +12,10 @@ from journal.models import Journal
 from package.models import update_zip_file
 from pid_provider.requester import PidRequester
 from proc.controller import (
-    fetch_and_create_journal,
-    fetch_and_create_issues,
-    FetchJournalDataException,
-    FetchIssueDataException,
+    JournalDataChecker,
+    IssueDataChecker,
 )
 
-from tracker.models import UnexpectedEvent
 from upload.models import (
     Package,
     ValidationReport,
@@ -40,59 +32,20 @@ class UnexpectedPackageError(Exception): ...
 class PackageDataError(Exception): ...
 
 
-class JournalDataChecker:
-    """Consulta e valida dados de journal usando dados locais e API do core."""
+class UploadJournalDataChecker(JournalDataChecker):
+    """Extensão de JournalDataChecker com funcionalidades específicas do fluxo de upload."""
 
-    def __init__(self, xmltree, user):
-        self._user = user
-        self._parse_xml(xmltree)
-        self.core_communication_error = False
+    @classmethod
+    def from_xmltree(cls, xmltree, user):
+        """Cria instância a partir de xmltree."""
+        from packtools.sps.models.journal_meta import ISSN, Title
 
-    def _parse_xml(self, xmltree):
-        """Extrai dados de journal do XML."""
         xml = Title(xmltree)
-        self.journal_title = xml.journal_title
-
+        journal_title = xml.journal_title
         xml = ISSN(xmltree)
-        self.issn_electronic = xml.epub
-        self.issn_print = xml.ppub
-
-    def get_local(self):
-        """Consulta dados locais de journal."""
-        return Journal.get_registered(
-            self.journal_title, self.issn_electronic, self.issn_print
-        )
-
-    def fetch_from_core(self):
-        """Consulta dados remotos de journal e atualiza os dados locais."""
-        try:
-            fetch_and_create_journal(
-                self._user,
-                issn_electronic=self.issn_electronic,
-                issn_print=self.issn_print,
-                force_update=True,
-            )
-        except FetchJournalDataException as e:
-            self.core_communication_error = True
-            logging.warning(f"Core API communication failure for journal: {e}")
-
-    def get_or_fetch(self):
-        """Consulta dados locais; se inexistentes, consulta o core e tenta novamente."""
-        # 1. consulta dados locais de journal
-        try:
-            return self.get_local()
-        except Journal.DoesNotExist:
-            pass
-
-        # 2. dados locais inexistentes, consulta dados remotos de journal
-        # e atualiza os dados locais com os dados remotos
-        self.fetch_from_core()
-
-        # 3. consulta dados locais novamente após a tentativa de busca remota
-        try:
-            return self.get_local()
-        except Journal.DoesNotExist:
-            return None
+        issn_electronic = xml.epub
+        issn_print = xml.ppub
+        return cls(journal_title, issn_electronic, issn_print, user)
 
     def _build_similar_journals_msg(self):
         """Monta mensagem com journals similares para diagnóstico."""
@@ -148,87 +101,27 @@ class JournalDataChecker:
             response["core_communication_error"] = True
         self.raise_error()
 
-    def refresh(self, response):
-        """Consulta dados remotos de journal e atualiza response."""
-        self.fetch_from_core()
-        if self.core_communication_error:
-            response["core_communication_error"] = True
-            return
 
-        # consulta dados locais após a atualização remota
-        try:
-            response["journal"] = self.get_local()
-        except Journal.DoesNotExist:
-            pass
+class UploadIssueDataChecker(IssueDataChecker):
+    """Extensão de IssueDataChecker com funcionalidades específicas do fluxo de upload."""
 
+    @classmethod
+    def from_xmltree(cls, xmltree, user, journal):
+        """Cria instância a partir de xmltree."""
+        from packtools.sps.models.dates import ArticleDates
+        from packtools.sps.models.front_articlemeta_issue import ArticleMetaIssue
 
-class IssueDataChecker:
-    """Consulta e valida dados de issue usando dados locais e API do core."""
-
-    def __init__(self, xmltree, user, journal):
-        self._user = user
-        self._journal = journal
-        self._parse_xml(xmltree)
-        self.core_communication_error = False
-
-    def _parse_xml(self, xmltree):
-        """Extrai dados de issue do XML."""
         xml = ArticleDates(xmltree)
         try:
-            self.publication_year = xml.collection_date["year"]
+            publication_year = xml.collection_date["year"]
         except (TypeError, KeyError, ValueError):
             try:
-                self.publication_year = xml.article_date["year"]
+                publication_year = xml.article_date["year"]
             except (TypeError, KeyError, ValueError):
-                self.publication_year = None
+                publication_year = None
 
         xml = ArticleMetaIssue(xmltree)
-        self.volume = xml.volume
-        self.suppl = xml.suppl
-        self.number = xml.number
-
-    def get_local(self):
-        """Consulta dados locais de issue."""
-        return Issue.get(
-            journal=self._journal,
-            volume=self.volume,
-            supplement=self.suppl,
-            number=self.number,
-        )
-
-    def fetch_from_core(self):
-        """Consulta dados remotos de issue e atualiza os dados locais."""
-        try:
-            fetch_and_create_issues(
-                self._journal,
-                self.publication_year,
-                self.volume,
-                self.suppl,
-                self.number,
-                self._user,
-            )
-        except FetchIssueDataException as e:
-            self.core_communication_error = True
-            logging.warning(f"Core API communication failure for issue: {e}")
-
-    def get_or_fetch(self):
-        """Consulta dados locais; se inexistentes, consulta o core e tenta novamente."""
-        # 1. consulta dados locais de issue
-        try:
-            return self.get_local()
-        except Issue.DoesNotExist:
-            pass
-
-        # 2. dados locais inexistentes, consulta dados remotos de issue
-        # e atualiza os dados locais com os dados remotos
-        self.fetch_from_core()
-
-        # 3. consulta dados locais novamente após a tentativa de busca remota
-        try:
-            issue = self.get_local()
-            return issue
-        except Issue.DoesNotExist:
-            return None
+        return cls(journal, publication_year, xml.volume, xml.suppl, xml.number, user)
 
     def _build_similar_issues_msg(self):
         """Monta mensagem com issues similares para diagnóstico."""
@@ -242,7 +135,7 @@ class IssueDataChecker:
             items = Issue.objects.filter(
                 Q(publication_year=self.publication_year), journal=self._journal
             )
-        if not items or not items.count():
+        if items is None or not items.exists():
             items = Issue.objects.filter(journal=self._journal)
 
         issues = []
@@ -268,7 +161,6 @@ class IssueDataChecker:
             "suppl": self.suppl,
             "publication_year": self.publication_year,
         }
-        logging.info(f"IssueDataChecker.raise_error {data}")
         similar_issues = self._build_similar_issues_msg()
 
         if self.core_communication_error:
@@ -298,19 +190,6 @@ class IssueDataChecker:
         if self.core_communication_error:
             response["core_communication_error"] = True
         self.raise_error()
-
-    def refresh(self, response):
-        """Consulta dados remotos de issue e atualiza response."""
-        self.fetch_from_core()
-        if self.core_communication_error:
-            response["core_communication_error"] = True
-            return
-
-        # consulta dados locais após a atualização remota
-        try:
-            response["issue"] = self.get_local()
-        except Issue.DoesNotExist:
-            pass
 
 
 def get_last_package(article_id, **kwargs):
@@ -443,20 +322,22 @@ def _check_article_and_journal(package, xml_with_pre, user):
         # verifica se journal e issue estão registrados
         xmltree = xml_with_pre.xmltree
 
-        journal_checker = JournalDataChecker(xmltree, user)
+        journal_checker = UploadJournalDataChecker.from_xmltree(xmltree, user)
         journal_checker.check(response)
-        logging.info(f"JournalDataChecker.check: {response}")
+        logging.info(f"UploadJournalDataChecker.check: {response}")
 
-        issue_checker = IssueDataChecker(xmltree, user, response["journal"])
+        issue_checker = UploadIssueDataChecker.from_xmltree(
+            xmltree, user, response["journal"]
+        )
         issue_checker.check(response)
-        logging.info(f"IssueDataChecker.check: {response}")
+        logging.info(f"UploadIssueDataChecker.check: {response}")
 
         # verifica a consistência dos dados de journal e issue
         # no XML e na base de dados
-        _check_xml_and_registered_data_compability(
+        _check_xml_and_registered_data_compatibility(
             response, journal_checker, issue_checker
         )
-        logging.info(f"_check_xml_and_registered_data_compability: {response}")
+        logging.info(f"_check_xml_and_registered_data_compatibility: {response}")
 
         response["package_status"] = choices.PS_ENQUEUED_FOR_VALIDATION
 
@@ -533,7 +414,7 @@ def _archive_pending_correction_package(response, name):
     )
 
 
-def _check_xml_and_registered_data_compability(
+def _check_xml_and_registered_data_compatibility(
     response, journal_checker, issue_checker
 ):
     article = response["article"]

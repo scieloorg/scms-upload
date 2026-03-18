@@ -34,6 +34,8 @@ from proc.source_core_api import (
     FetchIssueDataException,
     FetchJournalDataException,
     FetchMultipleJournalsError,
+    IssueDataChecker,
+    JournalDataChecker,
     UnableToGetJournalDataFromCoreError,
     create_or_update_issue,
     create_or_update_journal,
@@ -48,6 +50,9 @@ __all__ = [
     "create_or_update_issue",
     "fetch_and_create_journal",
     "fetch_and_create_issues",
+    # Core API classes
+    "JournalDataChecker",
+    "IssueDataChecker",
     # Classic Website functions
     "create_or_update_migrated_journal",
     "create_or_update_migrated_issue",

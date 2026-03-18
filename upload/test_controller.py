@@ -19,9 +19,9 @@ sys.modules.setdefault("pid_provider.requester", MagicMock())
 
 from upload.controller import (
     PackageDataError,
-    JournalDataChecker,
-    IssueDataChecker,
-    _check_xml_and_registered_data_compability,
+    UploadJournalDataChecker,
+    UploadIssueDataChecker,
+    _check_xml_and_registered_data_compatibility,
 )
 
 
@@ -37,33 +37,19 @@ class IssueDoesNotExist(Exception):
     pass
 
 
-class JournalDataCheckerTestCase(unittest.TestCase):
-    """Test cases for JournalDataChecker local-first lookup with core fallback."""
+class UploadJournalDataCheckerTestCase(unittest.TestCase):
+    """Test cases for UploadJournalDataChecker local-first lookup with core fallback."""
 
-    @patch("upload.controller.ISSN")
-    @patch("upload.controller.Title")
-    @patch("upload.controller.Journal")
-    def test_check_returns_journal_from_local_data(
-        self, mock_journal_cls, mock_title, mock_issn
-    ):
+    @patch("proc.source_core_api.Journal")
+    def test_check_returns_journal_from_local_data(self, mock_journal_cls):
         """Test that local data is used first without querying core API."""
-        mock_title_instance = Mock()
-        mock_title_instance.journal_title = "Test Journal"
-        mock_title.return_value = mock_title_instance
-
-        mock_issn_instance = Mock()
-        mock_issn_instance.epub = "1234-5678"
-        mock_issn_instance.ppub = "8765-4321"
-        mock_issn.return_value = mock_issn_instance
-
         mock_journal = Mock()
         mock_journal_cls.get_registered.return_value = mock_journal
 
         response = {}
-        xmltree = Mock()
         user = Mock()
 
-        checker = JournalDataChecker(xmltree, user)
+        checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
         checker.check(response)
 
         self.assertEqual(response["journal"], mock_journal)
@@ -71,23 +57,12 @@ class JournalDataCheckerTestCase(unittest.TestCase):
             "Test Journal", "1234-5678", "8765-4321"
         )
 
-    @patch("upload.controller.fetch_and_create_journal")
-    @patch("upload.controller.ISSN")
-    @patch("upload.controller.Title")
-    @patch("upload.controller.Journal")
+    @patch("proc.source_core_api.fetch_and_create_journal")
+    @patch("proc.source_core_api.Journal")
     def test_check_fetches_from_core_when_local_not_found(
-        self, mock_journal_cls, mock_title, mock_issn, mock_fetch
+        self, mock_journal_cls, mock_fetch
     ):
         """Test that core API is queried when local data doesn't exist."""
-        mock_title_instance = Mock()
-        mock_title_instance.journal_title = "Test Journal"
-        mock_title.return_value = mock_title_instance
-
-        mock_issn_instance = Mock()
-        mock_issn_instance.epub = "1234-5678"
-        mock_issn_instance.ppub = "8765-4321"
-        mock_issn.return_value = mock_issn_instance
-
         mock_journal = Mock()
         mock_journal_cls.DoesNotExist = JournalDoesNotExist
         # First call: DoesNotExist, second call after core fetch: returns journal
@@ -97,10 +72,9 @@ class JournalDataCheckerTestCase(unittest.TestCase):
         ]
 
         response = {}
-        xmltree = Mock()
         user = Mock()
 
-        checker = JournalDataChecker(xmltree, user)
+        checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
         checker.check(response)
 
         self.assertEqual(response["journal"], mock_journal)
@@ -111,67 +85,45 @@ class JournalDataCheckerTestCase(unittest.TestCase):
             force_update=True,
         )
 
-    @patch("upload.controller.fetch_and_create_journal")
-    @patch("upload.controller.ISSN")
-    @patch("upload.controller.Title")
     @patch("upload.controller.Journal")
+    @patch("proc.source_core_api.fetch_and_create_journal")
+    @patch("proc.source_core_api.Journal")
     def test_check_raises_error_with_core_failure_message_when_core_unreachable(
-        self, mock_journal_cls, mock_title, mock_issn, mock_fetch
+        self, mock_journal_cls, mock_fetch, mock_upload_journal_cls
     ):
         """Test that core communication failure is reported when core is unreachable."""
-        from upload.controller import FetchJournalDataException
-
-        mock_title_instance = Mock()
-        mock_title_instance.journal_title = "Test Journal"
-        mock_title.return_value = mock_title_instance
-
-        mock_issn_instance = Mock()
-        mock_issn_instance.epub = "1234-5678"
-        mock_issn_instance.ppub = "8765-4321"
-        mock_issn.return_value = mock_issn_instance
+        from proc.source_core_api import FetchJournalDataException
 
         mock_journal_cls.DoesNotExist = JournalDoesNotExist
         mock_journal_cls.get_registered.side_effect = JournalDoesNotExist()
-        mock_journal_cls.get_similar_items.return_value = []
+        mock_upload_journal_cls.get_similar_items.return_value = []
         mock_fetch.side_effect = FetchJournalDataException("Connection refused")
 
         response = {}
-        xmltree = Mock()
         user = Mock()
 
-        checker = JournalDataChecker(xmltree, user)
+        checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
         with self.assertRaises(PackageDataError) as context:
             checker.check(response)
 
         self.assertIn("CORE COMMUNICATION FAILURE", str(context.exception))
         self.assertTrue(response.get("core_communication_error"))
 
-    @patch("upload.controller.fetch_and_create_journal")
-    @patch("upload.controller.ISSN")
-    @patch("upload.controller.Title")
     @patch("upload.controller.Journal")
+    @patch("proc.source_core_api.fetch_and_create_journal")
+    @patch("proc.source_core_api.Journal")
     def test_check_raises_error_without_core_failure_when_journal_not_registered(
-        self, mock_journal_cls, mock_title, mock_issn, mock_fetch
+        self, mock_journal_cls, mock_fetch, mock_upload_journal_cls
     ):
         """Test that a normal error is raised when journal is not registered (core works fine)."""
-        mock_title_instance = Mock()
-        mock_title_instance.journal_title = "Test Journal"
-        mock_title.return_value = mock_title_instance
-
-        mock_issn_instance = Mock()
-        mock_issn_instance.epub = "1234-5678"
-        mock_issn_instance.ppub = "8765-4321"
-        mock_issn.return_value = mock_issn_instance
-
         mock_journal_cls.DoesNotExist = JournalDoesNotExist
         mock_journal_cls.get_registered.side_effect = JournalDoesNotExist()
-        mock_journal_cls.get_similar_items.return_value = []
+        mock_upload_journal_cls.get_similar_items.return_value = []
 
         response = {}
-        xmltree = Mock()
         user = Mock()
 
-        checker = JournalDataChecker(xmltree, user)
+        checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
         with self.assertRaises(PackageDataError) as context:
             checker.check(response)
 
@@ -179,150 +131,125 @@ class JournalDataCheckerTestCase(unittest.TestCase):
         self.assertIn("registered journal", str(context.exception))
         self.assertFalse(response.get("core_communication_error"))
 
-    @patch("upload.controller.ISSN")
-    @patch("upload.controller.Title")
-    @patch("upload.controller.Journal")
-    def test_check_does_not_call_core_when_local_found(
-        self, mock_journal_cls, mock_title, mock_issn
-    ):
+    @patch("proc.source_core_api.Journal")
+    def test_check_does_not_call_core_when_local_found(self, mock_journal_cls):
         """Test that core API is NOT called when local data exists."""
-        mock_title_instance = Mock()
-        mock_title_instance.journal_title = "Test Journal"
-        mock_title.return_value = mock_title_instance
-
-        mock_issn_instance = Mock()
-        mock_issn_instance.epub = "1234-5678"
-        mock_issn_instance.ppub = "8765-4321"
-        mock_issn.return_value = mock_issn_instance
-
         mock_journal = Mock()
         mock_journal_cls.get_registered.return_value = mock_journal
 
         response = {}
-        xmltree = Mock()
         user = Mock()
 
-        with patch("upload.controller.fetch_and_create_journal") as mock_fetch:
-            checker = JournalDataChecker(xmltree, user)
+        with patch("proc.source_core_api.fetch_and_create_journal") as mock_fetch:
+            checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
             checker.check(response)
             mock_fetch.assert_not_called()
 
-    @patch("upload.controller.Journal")
-    @patch("upload.controller.fetch_and_create_journal")
-    @patch("upload.controller.ISSN")
-    @patch("upload.controller.Title")
-    def test_refresh_updates_response_on_success(
-        self, mock_title, mock_issn, mock_fetch, mock_journal_cls
-    ):
+    @patch("proc.source_core_api.Journal")
+    @patch("proc.source_core_api.fetch_and_create_journal")
+    def test_refresh_updates_response_on_success(self, mock_fetch, mock_journal_cls):
         """Test that successful core fetch updates the journal in response."""
-        mock_title_instance = Mock()
-        mock_title_instance.journal_title = "Test Journal"
-        mock_title.return_value = mock_title_instance
-
-        mock_issn_instance = Mock()
-        mock_issn_instance.epub = "1234-5678"
-        mock_issn_instance.ppub = "8765-4321"
-        mock_issn.return_value = mock_issn_instance
-
         mock_journal = Mock()
         mock_journal_cls.get_registered.return_value = mock_journal
 
         response = {"journal": None}
-        xmltree = Mock()
         user = Mock()
 
-        checker = JournalDataChecker(xmltree, user)
+        checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
         checker.refresh(response)
 
         self.assertEqual(response["journal"], mock_journal)
         self.assertFalse(response.get("core_communication_error"))
 
-    @patch("upload.controller.fetch_and_create_journal")
-    @patch("upload.controller.ISSN")
-    @patch("upload.controller.Title")
-    def test_refresh_sets_error_flag_on_core_failure(
-        self, mock_title, mock_issn, mock_fetch
-    ):
+    @patch("proc.source_core_api.fetch_and_create_journal")
+    def test_refresh_sets_error_flag_on_core_failure(self, mock_fetch):
         """Test that core API failure sets the core_communication_error flag."""
-        from upload.controller import FetchJournalDataException
-
-        mock_title_instance = Mock()
-        mock_title_instance.journal_title = "Test Journal"
-        mock_title.return_value = mock_title_instance
-
-        mock_issn_instance = Mock()
-        mock_issn_instance.epub = "1234-5678"
-        mock_issn_instance.ppub = "8765-4321"
-        mock_issn.return_value = mock_issn_instance
+        from proc.source_core_api import FetchJournalDataException
 
         mock_fetch.side_effect = FetchJournalDataException("Timeout")
 
         response = {"journal": None}
-        xmltree = Mock()
         user = Mock()
 
-        checker = JournalDataChecker(xmltree, user)
+        checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
         checker.refresh(response)
 
         self.assertTrue(response.get("core_communication_error"))
 
-    @patch("upload.controller.ISSN")
-    @patch("upload.controller.Title")
-    @patch("upload.controller.Journal")
-    def test_get_or_fetch_returns_local_journal(
-        self, mock_journal_cls, mock_title, mock_issn
-    ):
+    @patch("proc.source_core_api.Journal")
+    def test_get_or_fetch_returns_local_journal(self, mock_journal_cls):
         """Test get_or_fetch returns journal from local data."""
-        mock_title_instance = Mock()
-        mock_title_instance.journal_title = "Test Journal"
-        mock_title.return_value = mock_title_instance
-
-        mock_issn_instance = Mock()
-        mock_issn_instance.epub = "1234-5678"
-        mock_issn_instance.ppub = "8765-4321"
-        mock_issn.return_value = mock_issn_instance
-
         mock_journal = Mock()
         mock_journal_cls.get_registered.return_value = mock_journal
 
-        xmltree = Mock()
         user = Mock()
 
-        checker = JournalDataChecker(xmltree, user)
+        checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
         result = checker.get_or_fetch()
 
         self.assertEqual(result, mock_journal)
 
-
-class IssueDataCheckerTestCase(unittest.TestCase):
-    """Test cases for IssueDataChecker local-first lookup with core fallback."""
-
-    @patch("upload.controller.ArticleMetaIssue")
-    @patch("upload.controller.ArticleDates")
-    @patch("upload.controller.Issue")
-    def test_check_returns_issue_from_local_data(
-        self, mock_issue_cls, mock_dates, mock_meta_issue
+    @patch("proc.source_core_api.fetch_and_create_journal")
+    @patch("proc.source_core_api.Journal")
+    def test_core_communication_error_resets_on_successful_fetch(
+        self, mock_journal_cls, mock_fetch
     ):
+        """Test that core_communication_error is reset when fetch succeeds."""
+        from proc.source_core_api import FetchJournalDataException
+
+        mock_journal_cls.DoesNotExist = JournalDoesNotExist
+        user = Mock()
+
+        checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
+
+        # First fetch fails
+        mock_fetch.side_effect = FetchJournalDataException("Timeout")
+        checker.fetch_from_core()
+        self.assertTrue(checker.core_communication_error)
+
+        # Second fetch succeeds
+        mock_fetch.side_effect = None
+        checker.fetch_from_core()
+        self.assertFalse(checker.core_communication_error)
+
+    @patch("packtools.sps.models.journal_meta.ISSN")
+    @patch("packtools.sps.models.journal_meta.Title")
+    def test_from_xmltree_creates_checker(self, mock_title_cls, mock_issn_cls):
+        """Test that from_xmltree correctly creates a checker from XML data."""
+        mock_title = Mock()
+        mock_title.journal_title = "Test Journal"
+        mock_title_cls.return_value = mock_title
+
+        mock_issn = Mock()
+        mock_issn.epub = "1234-5678"
+        mock_issn.ppub = "8765-4321"
+        mock_issn_cls.return_value = mock_issn
+
+        xmltree = Mock()
+        user = Mock()
+
+        checker = UploadJournalDataChecker.from_xmltree(xmltree, user)
+
+        self.assertEqual(checker.journal_title, "Test Journal")
+        self.assertEqual(checker.issn_electronic, "1234-5678")
+        self.assertEqual(checker.issn_print, "8765-4321")
+        self.assertIsInstance(checker, UploadJournalDataChecker)
+
+
+class UploadIssueDataCheckerTestCase(unittest.TestCase):
+    """Test cases for UploadIssueDataChecker local-first lookup with core fallback."""
+
+    @patch("proc.source_core_api.Issue")
+    def test_check_returns_issue_from_local_data(self, mock_issue_cls):
         """Test that local data is used first without querying core API."""
-        mock_dates_instance = Mock()
-        mock_dates_instance.collection_date = {"year": "2024"}
-        mock_dates.return_value = mock_dates_instance
-
-        mock_meta = Mock()
-        mock_meta.volume = "10"
-        mock_meta.suppl = None
-        mock_meta.number = "1"
-        mock_meta_issue.return_value = mock_meta
-
         mock_issue = Mock()
         mock_issue_cls.get.return_value = mock_issue
 
         mock_journal = Mock()
         response = {"journal": mock_journal}
-        xmltree = Mock()
         user = Mock()
 
-        checker = IssueDataChecker(xmltree, user, mock_journal)
+        checker = UploadIssueDataChecker(mock_journal, "2024", "10", None, "1", user)
         checker.check(response)
 
         self.assertEqual(response["issue"], mock_issue)
@@ -333,24 +260,12 @@ class IssueDataCheckerTestCase(unittest.TestCase):
             number="1",
         )
 
-    @patch("upload.controller.fetch_and_create_issues")
-    @patch("upload.controller.ArticleMetaIssue")
-    @patch("upload.controller.ArticleDates")
-    @patch("upload.controller.Issue")
+    @patch("proc.source_core_api.fetch_and_create_issues")
+    @patch("proc.source_core_api.Issue")
     def test_check_fetches_from_core_when_local_not_found(
-        self, mock_issue_cls, mock_dates, mock_meta_issue, mock_fetch
+        self, mock_issue_cls, mock_fetch
     ):
         """Test that core API is queried when local data doesn't exist."""
-        mock_dates_instance = Mock()
-        mock_dates_instance.collection_date = {"year": "2024"}
-        mock_dates.return_value = mock_dates_instance
-
-        mock_meta = Mock()
-        mock_meta.volume = "10"
-        mock_meta.suppl = None
-        mock_meta.number = "1"
-        mock_meta_issue.return_value = mock_meta
-
         mock_issue = Mock()
         mock_issue_cls.DoesNotExist = IssueDoesNotExist
         # First call: DoesNotExist, second call after core fetch: returns issue
@@ -361,10 +276,9 @@ class IssueDataCheckerTestCase(unittest.TestCase):
 
         mock_journal = Mock()
         response = {"journal": mock_journal}
-        xmltree = Mock()
         user = Mock()
 
-        checker = IssueDataChecker(xmltree, user, mock_journal)
+        checker = UploadIssueDataChecker(mock_journal, "2024", "10", None, "1", user)
         checker.check(response)
 
         self.assertEqual(response["issue"], mock_issue)
@@ -372,143 +286,137 @@ class IssueDataCheckerTestCase(unittest.TestCase):
             mock_journal, "2024", "10", None, "1", user
         )
 
-    @patch("upload.controller.fetch_and_create_issues")
-    @patch("upload.controller.ArticleMetaIssue")
-    @patch("upload.controller.ArticleDates")
     @patch("upload.controller.Issue")
+    @patch("proc.source_core_api.fetch_and_create_issues")
+    @patch("proc.source_core_api.Issue")
     def test_check_raises_error_with_core_failure_message_when_core_unreachable(
-        self, mock_issue_cls, mock_dates, mock_meta_issue, mock_fetch
+        self, mock_issue_cls, mock_fetch, mock_upload_issue_cls
     ):
         """Test that core communication failure is reported when core is unreachable."""
-        from upload.controller import FetchIssueDataException
-
-        mock_dates_instance = Mock()
-        mock_dates_instance.collection_date = {"year": "2024"}
-        mock_dates.return_value = mock_dates_instance
-
-        mock_meta = Mock()
-        mock_meta.volume = "10"
-        mock_meta.suppl = None
-        mock_meta.number = "1"
-        mock_meta_issue.return_value = mock_meta
+        from proc.source_core_api import FetchIssueDataException
 
         mock_issue_cls.DoesNotExist = IssueDoesNotExist
         mock_issue_cls.get.side_effect = IssueDoesNotExist()
         mock_fetch.side_effect = FetchIssueDataException("Connection refused")
 
-        mock_journal = Mock()
         mock_qs = MagicMock()
         mock_qs.count.return_value = 0
+        mock_qs.exists.return_value = False
         mock_qs.order_by.return_value = []
-        mock_issue_cls.objects.filter.return_value = mock_qs
+        mock_upload_issue_cls.objects.filter.return_value = mock_qs
 
+        mock_journal = Mock()
         response = {"journal": mock_journal}
-        xmltree = Mock()
         user = Mock()
 
-        checker = IssueDataChecker(xmltree, user, mock_journal)
+        checker = UploadIssueDataChecker(mock_journal, "2024", "10", None, "1", user)
         with self.assertRaises(PackageDataError) as context:
             checker.check(response)
 
         self.assertIn("CORE COMMUNICATION FAILURE", str(context.exception))
         self.assertTrue(response.get("core_communication_error"))
 
-    @patch("upload.controller.ArticleMetaIssue")
-    @patch("upload.controller.ArticleDates")
-    @patch("upload.controller.Issue")
-    def test_check_does_not_call_core_when_local_found(
-        self, mock_issue_cls, mock_dates, mock_meta_issue
-    ):
+    @patch("proc.source_core_api.Issue")
+    def test_check_does_not_call_core_when_local_found(self, mock_issue_cls):
         """Test that core API is NOT called when local data exists."""
-        mock_dates_instance = Mock()
-        mock_dates_instance.collection_date = {"year": "2024"}
-        mock_dates.return_value = mock_dates_instance
-
-        mock_meta = Mock()
-        mock_meta.volume = "10"
-        mock_meta.suppl = None
-        mock_meta.number = "1"
-        mock_meta_issue.return_value = mock_meta
-
         mock_issue = Mock()
         mock_issue_cls.get.return_value = mock_issue
 
         mock_journal = Mock()
         response = {"journal": mock_journal}
-        xmltree = Mock()
         user = Mock()
 
-        with patch("upload.controller.fetch_and_create_issues") as mock_fetch:
-            checker = IssueDataChecker(xmltree, user, mock_journal)
+        with patch("proc.source_core_api.fetch_and_create_issues") as mock_fetch:
+            checker = UploadIssueDataChecker(mock_journal, "2024", "10", None, "1", user)
             checker.check(response)
             mock_fetch.assert_not_called()
 
-    @patch("upload.controller.Issue")
-    @patch("upload.controller.fetch_and_create_issues")
-    @patch("upload.controller.ArticleMetaIssue")
-    @patch("upload.controller.ArticleDates")
-    def test_refresh_updates_response_on_success(
-        self, mock_dates, mock_meta_issue, mock_fetch, mock_issue_cls
-    ):
+    @patch("proc.source_core_api.Issue")
+    @patch("proc.source_core_api.fetch_and_create_issues")
+    def test_refresh_updates_response_on_success(self, mock_fetch, mock_issue_cls):
         """Test that successful core fetch updates the issue in response."""
-        mock_dates_instance = Mock()
-        mock_dates_instance.collection_date = {"year": "2024"}
-        mock_dates.return_value = mock_dates_instance
-
-        mock_meta = Mock()
-        mock_meta.volume = "10"
-        mock_meta.suppl = None
-        mock_meta.number = "1"
-        mock_meta_issue.return_value = mock_meta
-
         mock_issue = Mock()
         mock_issue_cls.get.return_value = mock_issue
 
         mock_journal = Mock()
         response = {"journal": mock_journal, "issue": None}
-        xmltree = Mock()
         user = Mock()
 
-        checker = IssueDataChecker(xmltree, user, mock_journal)
+        checker = UploadIssueDataChecker(mock_journal, "2024", "10", None, "1", user)
         checker.refresh(response)
 
         self.assertEqual(response["issue"], mock_issue)
         self.assertFalse(response.get("core_communication_error"))
 
-    @patch("upload.controller.fetch_and_create_issues")
-    @patch("upload.controller.ArticleMetaIssue")
-    @patch("upload.controller.ArticleDates")
-    def test_refresh_sets_error_flag_on_core_failure(
-        self, mock_dates, mock_meta_issue, mock_fetch
-    ):
+    @patch("proc.source_core_api.fetch_and_create_issues")
+    def test_refresh_sets_error_flag_on_core_failure(self, mock_fetch):
         """Test that core API failure sets the core_communication_error flag."""
-        from upload.controller import FetchIssueDataException
-
-        mock_dates_instance = Mock()
-        mock_dates_instance.collection_date = {"year": "2024"}
-        mock_dates.return_value = mock_dates_instance
-
-        mock_meta = Mock()
-        mock_meta.volume = "10"
-        mock_meta.suppl = None
-        mock_meta.number = "1"
-        mock_meta_issue.return_value = mock_meta
+        from proc.source_core_api import FetchIssueDataException
 
         mock_fetch.side_effect = FetchIssueDataException("Timeout")
 
         mock_journal = Mock()
         response = {"journal": mock_journal, "issue": None}
-        xmltree = Mock()
         user = Mock()
 
-        checker = IssueDataChecker(xmltree, user, mock_journal)
+        checker = UploadIssueDataChecker(mock_journal, "2024", "10", None, "1", user)
         checker.refresh(response)
 
         self.assertTrue(response.get("core_communication_error"))
 
+    @patch("proc.source_core_api.fetch_and_create_issues")
+    @patch("proc.source_core_api.Issue")
+    def test_core_communication_error_resets_on_successful_fetch(
+        self, mock_issue_cls, mock_fetch
+    ):
+        """Test that core_communication_error is reset when fetch succeeds."""
+        from proc.source_core_api import FetchIssueDataException
 
-class CheckXmlAndRegisteredDataCompabilityTestCase(unittest.TestCase):
-    """Test cases for _check_xml_and_registered_data_compability()."""
+        mock_issue_cls.DoesNotExist = IssueDoesNotExist
+        mock_journal = Mock()
+        user = Mock()
+
+        checker = UploadIssueDataChecker(mock_journal, "2024", "10", None, "1", user)
+
+        # First fetch fails
+        mock_fetch.side_effect = FetchIssueDataException("Timeout")
+        checker.fetch_from_core()
+        self.assertTrue(checker.core_communication_error)
+
+        # Second fetch succeeds
+        mock_fetch.side_effect = None
+        checker.fetch_from_core()
+        self.assertFalse(checker.core_communication_error)
+
+    @patch("packtools.sps.models.front_articlemeta_issue.ArticleMetaIssue")
+    @patch("packtools.sps.models.dates.ArticleDates")
+    def test_from_xmltree_creates_checker(self, mock_dates_cls, mock_meta_cls):
+        """Test that from_xmltree correctly creates a checker from XML data."""
+        mock_dates = Mock()
+        mock_dates.collection_date = {"year": "2024"}
+        mock_dates_cls.return_value = mock_dates
+
+        mock_meta = Mock()
+        mock_meta.volume = "10"
+        mock_meta.suppl = None
+        mock_meta.number = "1"
+        mock_meta_cls.return_value = mock_meta
+
+        xmltree = Mock()
+        user = Mock()
+        mock_journal = Mock()
+
+        checker = UploadIssueDataChecker.from_xmltree(xmltree, user, mock_journal)
+
+        self.assertEqual(checker.publication_year, "2024")
+        self.assertEqual(checker.volume, "10")
+        self.assertEqual(checker.number, "1")
+        self.assertIsNone(checker.suppl)
+        self.assertIsInstance(checker, UploadIssueDataChecker)
+
+
+class CheckXmlAndRegisteredDataCompatibilityTestCase(unittest.TestCase):
+    """Test cases for _check_xml_and_registered_data_compatibility()."""
 
     def test_no_article_does_nothing(self):
         """Test that function returns without error when there is no article."""
@@ -516,7 +424,7 @@ class CheckXmlAndRegisteredDataCompabilityTestCase(unittest.TestCase):
         journal_checker = Mock()
         issue_checker = Mock()
 
-        _check_xml_and_registered_data_compability(
+        _check_xml_and_registered_data_compatibility(
             response, journal_checker, issue_checker
         )
 
@@ -536,7 +444,7 @@ class CheckXmlAndRegisteredDataCompabilityTestCase(unittest.TestCase):
         journal_checker = Mock()
         issue_checker = Mock()
 
-        _check_xml_and_registered_data_compability(
+        _check_xml_and_registered_data_compatibility(
             response, journal_checker, issue_checker
         )
 
@@ -559,7 +467,7 @@ class CheckXmlAndRegisteredDataCompabilityTestCase(unittest.TestCase):
         issue_checker = Mock()
 
         with self.assertRaises(PackageDataError):
-            _check_xml_and_registered_data_compability(
+            _check_xml_and_registered_data_compatibility(
                 response, journal_checker, issue_checker
             )
 
@@ -590,7 +498,7 @@ class CheckXmlAndRegisteredDataCompabilityTestCase(unittest.TestCase):
 
         journal_checker.refresh.side_effect = refresh_side_effect
 
-        _check_xml_and_registered_data_compability(
+        _check_xml_and_registered_data_compatibility(
             response, journal_checker, issue_checker
         )
 
@@ -618,7 +526,7 @@ class CheckXmlAndRegisteredDataCompabilityTestCase(unittest.TestCase):
         journal_checker.refresh.side_effect = refresh_side_effect
 
         with self.assertRaises(PackageDataError) as context:
-            _check_xml_and_registered_data_compability(
+            _check_xml_and_registered_data_compatibility(
                 response, journal_checker, issue_checker
             )
 
@@ -643,7 +551,7 @@ class CheckXmlAndRegisteredDataCompabilityTestCase(unittest.TestCase):
         issue_checker = Mock()
 
         with self.assertRaises(PackageDataError):
-            _check_xml_and_registered_data_compability(
+            _check_xml_and_registered_data_compatibility(
                 response, journal_checker, issue_checker
             )
 
