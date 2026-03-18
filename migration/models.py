@@ -178,18 +178,14 @@ class ClassicWebsiteConfiguration(CommonControlField):
 
     def get_pid_list(self):
         """
-        Reads and returns a set of 23-character article PIDs from the file
+        Reads and returns a set of article PIDs from the file
         indicated by pid_list_path.
         """
-        pids = set()
         if not self.pid_list_path:
-            return pids
+            return set()
         try:
             with open(self.pid_list_path, "r") as fp:
-                for line in fp:
-                    pid = line.strip()
-                    if len(pid) == 23:
-                        pids.add(pid)
+                return set(fp.read().split())
         except FileNotFoundError:
             logging.warning(
                 "pid_list_path file not found: %s", self.pid_list_path
@@ -198,7 +194,7 @@ class ClassicWebsiteConfiguration(CommonControlField):
             logging.exception(
                 "Error reading pid_list_path %s: %s", self.pid_list_path, e
             )
-        return pids
+        return set()
 
     @property
     def pid_list(self):
@@ -598,11 +594,11 @@ class MigratedFile(CommonControlField):
         )
 
     def get_lines(self):
-        """Read file content and return stripped non-empty lines."""
+        """Read file content and return non-empty whitespace-split tokens."""
         if self.file:
             self.file.seek(0)
             content = self.file.read().decode("utf-8")
-            return [line.strip() for line in content.splitlines() if line.strip()]
+            return content.split()
         return []
 
     @property

@@ -561,7 +561,6 @@ class TestClassicWebsiteConfigurationPidList(TestCase):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("S0001-37652000000100001\n")
             f.write("S0001-37652000000100002\n")
-            f.write("short\n")
             f.write("S0001-37652000000100003\n")
             temp_path = f.name
         try:
