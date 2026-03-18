@@ -16,3 +16,15 @@ MIGRATION_STATUS = (
     (MS_IMPORTED, _("Imported")),
     (MS_PUBLISHED, _("Published")),
 )
+
+
+PID_STATUS_MISSING = "missing"
+PID_STATUS_MATCHED = "matched"
+PID_STATUS_EXCEEDING = "exceeding"
+PID_STATUS_UNKNOWN = "unknown"
+
+PID_STATUS = (
+    (PID_STATUS_MISSING, _("Missing")),
+    (PID_STATUS_MATCHED, _("Matched")),
+    (PID_STATUS_EXCEEDING, _("Exceeding")),
+    (PID_STATUS_UNKNOWN, _("Unknown")),
