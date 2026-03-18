@@ -28,3 +28,4 @@ PID_STATUS = (
     (PID_STATUS_MATCHED, _("Matched")),
     (PID_STATUS_EXCEEDING, _("Exceeding")),
     (PID_STATUS_UNKNOWN, _("Unknown")),
+)
