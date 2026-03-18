@@ -16,7 +16,14 @@ from issue.models import Issue
 from journal.models import Journal
 from package.models import update_zip_file
 from pid_provider.requester import PidRequester
-from proc.controller import create_or_update_journal, create_or_update_issue
+from proc.controller import (
+    create_or_update_journal,
+    create_or_update_issue,
+    fetch_and_create_journal,
+    fetch_and_create_issues,
+    FetchJournalDataException,
+    FetchIssueDataException,
+)
 
 from tracker.models import UnexpectedEvent
 from upload.models import (
@@ -172,7 +179,7 @@ def _check_article_and_journal(package, xml_with_pre, user):
 
         # verifica a consistência dos dados de journal e issue
         # no XML e na base de dados
-        _check_xml_and_registered_data_compability(response)
+        _check_xml_and_registered_data_compability(response, xmltree, user)
         logging.info(f"_check_xml_and_registered_data_compability: {response}")
 
         response["package_status"] = choices.PS_ENQUEUED_FOR_VALIDATION
@@ -258,34 +265,75 @@ def _check_journal(response, xmltree, user):
     issn_electronic = xml.epub
     issn_print = xml.ppub
 
-    response["journal"] = create_or_update_journal(
-        journal_title, issn_electronic, issn_print, user
-    )
+    # Step 1: Try local data first
+    try:
+        response["journal"] = Journal.get_registered(
+            journal_title, issn_electronic, issn_print
+        )
+        return
+    except Journal.DoesNotExist:
+        pass
 
-    if not response["journal"]:
-        data = {
-            "journal_title": journal_title,
-            "issn_electronic": issn_electronic,
-            "issn_print": issn_print,
-        }
-        similar_journals = []
-        for j in Journal.get_similar_items(journal_title, issn_electronic, issn_print):
-            similar_journals.append(
-                {
-                    "journal_title": j.title,
-                    "issn_electronic": j.official_journal.issn_electronic,
-                    "issn_print": j.official_journal.issn_print,
-                }
-            )
-        if similar_journals:
-            similar_journals = _("Registered journals: {}. ").format(similar_journals)
-        else:
-            similar_journals = _("Found no registered journal. ")
+    # Step 2: Local data not found, try fetching from core API
+    # and updating local data
+    core_communication_error = False
+    try:
+        fetch_and_create_journal(
+            user,
+            issn_electronic=issn_electronic,
+            issn_print=issn_print,
+            force_update=True,
+        )
+    except FetchJournalDataException as e:
+        core_communication_error = True
+        logging.warning(f"Core API communication failure for journal: {e}")
+
+    # Step 3: Try local again after remote fetch attempt
+    try:
+        response["journal"] = Journal.get_registered(
+            journal_title, issn_electronic, issn_print
+        )
+        return
+    except Journal.DoesNotExist:
+        pass
+
+    # Step 4: Failed - build error message
+    response["journal"] = None
+    data = {
+        "journal_title": journal_title,
+        "issn_electronic": issn_electronic,
+        "issn_print": issn_print,
+    }
+    similar_journals = []
+    for j in Journal.get_similar_items(journal_title, issn_electronic, issn_print):
+        similar_journals.append(
+            {
+                "journal_title": j.title,
+                "issn_electronic": j.official_journal.issn_electronic,
+                "issn_print": j.official_journal.issn_print,
+            }
+        )
+    if similar_journals:
+        similar_journals = _("Registered journals: {}. ").format(similar_journals)
+    else:
+        similar_journals = _("Found no registered journal. ")
+
+    if core_communication_error:
+        response["core_communication_error"] = True
         raise PackageDataError(
             _(
-                "Journal in XML must be a registered journal. Journal in XML: {}. {}. Register the journal on core.scielo.org"
+                "CORE COMMUNICATION FAILURE: Could not verify journal data. "
+                "The core API is unreachable. "
+                "Journal in XML: {}. {}"
             ).format(data, similar_journals)
         )
+    raise PackageDataError(
+        _(
+            "Journal in XML must be a registered journal. "
+            "Journal in XML: {}. {}. "
+            "Register the journal on core.scielo.org"
+        ).format(data, similar_journals)
+    )
 
 
 def _check_issue(response, xmltree, user):
@@ -299,69 +347,207 @@ def _check_issue(response, xmltree, user):
             publication_year = None
 
     xml = ArticleMetaIssue(xmltree)
-    response["issue"] = create_or_update_issue(
-        response["journal"], publication_year, xml.volume, xml.suppl, xml.number, user
-    )
-    logging.info(f"issue: {response['issue']}")
-    if not response["issue"]:
-        data = {
-            "journal": response["journal"],
-            "volume": xml.volume,
-            "number": xml.number,
-            "suppl": xml.suppl,
-            "publication_year": publication_year,
-        }
-        logging.info(f"_check_issue {data}")
-        items = None
-        if publication_year and xml.volume:
-            items = Issue.objects.filter(
-                Q(publication_year=publication_year) | Q(volume=xml.volume),
-                journal=response["journal"],
-            )
-        elif publication_year:
-            items = Issue.objects.filter(
-                Q(publication_year=publication_year), journal=response["journal"]
-            )
-        if not items or not items.count():
-            items = Issue.objects.filter(journal=response["journal"])
 
-        issues = []
-        for item in items.order_by("-publication_year"):
-            issues.append(
-                {
-                    "publication_year": publication_year,
-                    "volume": item.volume,
-                    "number": item.number,
-                    "supplement": item.supplement,
-                }
-            )
-        if issues:
-            issues = _("Registered issues: {}. ").format(issues)
-        else:
-            issues = _("{} has no registered issues").format(response["journal"])
+    # Step 1: Try local data first
+    try:
+        response["issue"] = Issue.get(
+            journal=response["journal"],
+            volume=xml.volume,
+            supplement=xml.suppl,
+            number=xml.number,
+        )
+        return
+    except Issue.DoesNotExist:
+        pass
+
+    # Step 2: Local data not found, try fetching from core API
+    # and updating local data
+    core_communication_error = False
+    try:
+        fetch_and_create_issues(
+            response["journal"],
+            publication_year,
+            xml.volume,
+            xml.suppl,
+            xml.number,
+            user,
+        )
+    except FetchIssueDataException as e:
+        core_communication_error = True
+        logging.warning(f"Core API communication failure for issue: {e}")
+
+    # Step 3: Try local again after remote fetch attempt
+    try:
+        response["issue"] = Issue.get(
+            journal=response["journal"],
+            volume=xml.volume,
+            supplement=xml.suppl,
+            number=xml.number,
+        )
+        logging.info(f"issue: {response['issue']}")
+        return
+    except Issue.DoesNotExist:
+        pass
+
+    # Step 4: Failed - build error message
+    response["issue"] = None
+    data = {
+        "journal": response["journal"],
+        "volume": xml.volume,
+        "number": xml.number,
+        "suppl": xml.suppl,
+        "publication_year": publication_year,
+    }
+    logging.info(f"_check_issue {data}")
+    items = None
+    if publication_year and xml.volume:
+        items = Issue.objects.filter(
+            Q(publication_year=publication_year) | Q(volume=xml.volume),
+            journal=response["journal"],
+        )
+    elif publication_year:
+        items = Issue.objects.filter(
+            Q(publication_year=publication_year), journal=response["journal"]
+        )
+    if not items or not items.count():
+        items = Issue.objects.filter(journal=response["journal"])
+
+    issues = []
+    for item in items.order_by("-publication_year"):
+        issues.append(
+            {
+                "publication_year": publication_year,
+                "volume": item.volume,
+                "number": item.number,
+                "supplement": item.supplement,
+            }
+        )
+    if issues:
+        issues = _("Registered issues: {}. ").format(issues)
+    else:
+        issues = _("{} has no registered issues").format(response["journal"])
+
+    if core_communication_error:
+        response["core_communication_error"] = True
         raise PackageDataError(
             _(
-                "Issue in XML must be a registered issue. Issue in XML {}. {}. Register the issue on core.scielo.org"
+                "CORE COMMUNICATION FAILURE: Could not verify issue data. "
+                "The core API is unreachable. "
+                "Issue in XML: {}. {}"
             ).format(data, issues)
         )
+    raise PackageDataError(
+        _(
+            "Issue in XML must be a registered issue. "
+            "Issue in XML {}. {}. "
+            "Register the issue on core.scielo.org"
+        ).format(data, issues)
+    )
 
 
-def _check_xml_and_registered_data_compability(response):
+def _check_xml_and_registered_data_compability(response, xmltree, user):
     article = response["article"]
 
     if article:
         journal = response["journal"]
         if not journal == article.journal:
-            raise PackageDataError(
-                _("{} (registered, {}) differs from {} (XML, {})").format(
+            # Divergence detected - try refreshing journal data from core
+            _refresh_journal_from_core(response, xmltree, user)
+            journal = response["journal"]
+
+            # Re-check after refresh
+            if not journal == article.journal:
+                error_msg = _("{} (registered, {}) differs from {} (XML, {})").format(
                     article.journal, article.journal.id, journal, journal.id
                 )
-            )
+                if response.get("core_communication_error"):
+                    error_msg = _(
+                        "CORE COMMUNICATION FAILURE: {}. "
+                        "Could not refresh data from core API"
+                    ).format(error_msg)
+                raise PackageDataError(error_msg)
 
         issue = response["issue"]
         if not issue == article.issue:
-            raise PackageDataError(
-                _("{} (registered, {}) differs from {} (XML, {})").format(
+            # Divergence detected - try refreshing issue data from core
+            _refresh_issue_from_core(response, xmltree, user)
+            issue = response["issue"]
+
+            # Re-check after refresh
+            if not issue == article.issue:
+                error_msg = _("{} (registered, {}) differs from {} (XML, {})").format(
                     article.issue, article.issue.id, issue, issue.id
                 )
-            )
+                if response.get("core_communication_error"):
+                    error_msg = _(
+                        "CORE COMMUNICATION FAILURE: {}. "
+                        "Could not refresh data from core API"
+                    ).format(error_msg)
+                raise PackageDataError(error_msg)
+
+
+def _refresh_journal_from_core(response, xmltree, user):
+    """Try to refresh journal data from core API and re-lookup."""
+    xml = ISSN(xmltree)
+    issn_electronic = xml.epub
+    issn_print = xml.ppub
+    journal_title = Title(xmltree).journal_title
+
+    try:
+        fetch_and_create_journal(
+            user,
+            issn_electronic=issn_electronic,
+            issn_print=issn_print,
+            force_update=True,
+        )
+    except FetchJournalDataException as e:
+        logging.warning(f"Core API failure during journal refresh: {e}")
+        response["core_communication_error"] = True
+        return
+
+    # Re-lookup journal after refresh
+    try:
+        response["journal"] = Journal.get_registered(
+            journal_title, issn_electronic, issn_print
+        )
+    except Journal.DoesNotExist:
+        pass
+
+
+def _refresh_issue_from_core(response, xmltree, user):
+    """Try to refresh issue data from core API and re-lookup."""
+    xml = ArticleDates(xmltree)
+    try:
+        publication_year = xml.collection_date["year"]
+    except (TypeError, KeyError, ValueError):
+        try:
+            publication_year = xml.article_date["year"]
+        except (TypeError, KeyError, ValueError):
+            publication_year = None
+
+    xml = ArticleMetaIssue(xmltree)
+
+    try:
+        fetch_and_create_issues(
+            response["journal"],
+            publication_year,
+            xml.volume,
+            xml.suppl,
+            xml.number,
+            user,
+        )
+    except FetchIssueDataException as e:
+        logging.warning(f"Core API failure during issue refresh: {e}")
+        response["core_communication_error"] = True
+        return
+
+    # Re-lookup issue after refresh
+    try:
+        response["issue"] = Issue.get(
+            journal=response["journal"],
+            volume=xml.volume,
+            supplement=xml.suppl,
+            number=xml.number,
+        )
+    except Issue.DoesNotExist:
+        pass
