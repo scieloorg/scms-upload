@@ -137,6 +137,46 @@ class JournalDataChecker:
         except Journal.DoesNotExist:
             pass
 
+    @staticmethod
+    def ensure_proc_exists(user, journal):
+        """
+        Verifica e garante a existência de JournalProc para o journal.
+
+        Args:
+            user: O usuário que executa a operação
+            journal: O journal que deve ter um JournalProc
+
+        Returns:
+            True se JournalProc existe
+
+        Raises:
+            JournalProc.DoesNotExist: Se não foi possível criar JournalProc
+        """
+        if (
+            journal.missing_fields
+            or not JournalProc.objects.filter(
+                journal=journal, acron__isnull=False
+            ).exists()
+        ):
+            create_or_update_journal(
+                journal_title=journal.title,
+                issn_electronic=journal.official_journal.issn_electronic,
+                issn_print=journal.official_journal.issn_print,
+                user=user,
+                force_update=True,
+            )
+
+        journal_proc = JournalProc.objects.filter(
+            journal=journal, acron__isnull=False
+        ).first()
+        if journal_proc:
+            if not journal.journal_acron:
+                journal.journal_acron = journal_proc.acron
+                journal.save()
+            return True
+
+        raise JournalProc.DoesNotExist(f"JournalProc does not exist: {journal}")
+
 
 def create_or_update_journal(
     journal_title, issn_electronic, issn_print, user, force_update=None
@@ -523,6 +563,39 @@ class IssueDataChecker:
             response["issue"] = self.get_local()
         except Issue.DoesNotExist:
             pass
+
+    @staticmethod
+    def ensure_proc_exists(user, issue):
+        """
+        Verifica e garante a existência de IssueProc para o issue.
+
+        Args:
+            user: O usuário que executa a operação
+            issue: O issue que deve ter um IssueProc
+
+        Returns:
+            True se IssueProc existe
+
+        Raises:
+            IssueProc.DoesNotExist: Se não foi possível criar IssueProc
+        """
+        if IssueProc.objects.filter(issue=issue).exists():
+            return True
+
+        create_or_update_issue(
+            journal=issue.journal,
+            pub_year=issue.publication_year,
+            volume=issue.volume,
+            suppl=issue.supplement,
+            number=issue.number,
+            user=user,
+            force_update=True,
+        )
+
+        if IssueProc.objects.filter(issue=issue).exists():
+            return True
+
+        raise IssueProc.DoesNotExist(f"IssueProc does not exist: {issue}")
 
 
 def create_or_update_issue(
