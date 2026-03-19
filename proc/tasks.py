@@ -1482,33 +1482,14 @@ def task_exclude_article_repetition(self, journal_proc_id, qa_api_data=None, pub
 
         issues = set()
 
-        try:
-            events = Article.exclude_articles_with_invalid_pid_v2(journal)
-            task_exec.add_event(events)
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            task_exec.add_exception(
-                {
-                    "exclude_articles_with_invalid_pid_v2": str(e),
-                    "traceback": traceback.format_exc(),
-                }
-            )
+        results = Article.exclude_inconvenient_articles(journal, user, timeout)
+        for event in results["events"]:
+            task_exec.add_event(event)
+        for key, value in results["numbers"].items():
+            task_exec.add_number(key, value)
+        for exc in results["exceptions"]:
+            task_exec.add_exception(exc)
 
-        for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
-            repeated_items = Article.get_repeated_items(field_name, journal)
-            task_exec.add_number(f"repeated_by_{field_name}", repeated_items.count())
-            for repeated_value in repeated_items:
-                try:
-                    events = Article.exclude_repetitions(user, field_name, repeated_value, timeout=timeout)
-                    task_exec.add_event(events)
-                except Exception as e:
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    task_exec.add_exception(
-                        {
-                            f"repeated_by_{field_name}": repeated_value,
-                            "traceback": traceback.format_exc(),
-                        }
-                    )
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()

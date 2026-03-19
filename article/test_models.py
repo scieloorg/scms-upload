@@ -143,6 +143,65 @@ class ArticleExcludeArticlesWithInvalidPidV2TestCase(unittest.TestCase):
         )
 
 
+class ArticleExcludeInconvenientArticlesTestCase(unittest.TestCase):
+    """Test cases for Article.exclude_inconvenient_articles()."""
+
+    @patch("article.models.Article.exclude_repetitions")
+    @patch("article.models.Article.get_repeated_items")
+    @patch("article.models.Article.exclude_articles_with_invalid_pid_v2")
+    def test_calls_both_operations(self, mock_invalid, mock_repeated, mock_exclude_rep):
+        """Calls both invalid pid_v2 and repetition removal."""
+        mock_invalid.return_value = ["invalid pid_v2 event"]
+
+        mock_repeated_qs = MagicMock()
+        mock_repeated_qs.count.return_value = 0
+        mock_repeated_qs.__iter__ = Mock(return_value=iter([]))
+        mock_repeated.return_value = mock_repeated_qs
+
+        mock_journal = Mock()
+        mock_user = Mock()
+
+        results = Article.exclude_inconvenient_articles(mock_journal, mock_user)
+
+        mock_invalid.assert_called_once_with(mock_journal)
+        self.assertEqual(mock_repeated.call_count, 2)
+        self.assertIn("invalid pid_v2 event", results["events"])
+
+    @patch("article.models.Article.exclude_repetitions")
+    @patch("article.models.Article.get_repeated_items")
+    @patch("article.models.Article.exclude_articles_with_invalid_pid_v2")
+    def test_collects_repetition_events(self, mock_invalid, mock_repeated, mock_exclude_rep):
+        """Collects events from repetition removal."""
+        mock_invalid.return_value = []
+        mock_exclude_rep.return_value = ["repetition event"]
+
+        mock_repeated_qs = MagicMock()
+        mock_repeated_qs.count.return_value = 1
+        mock_repeated_qs.__iter__ = Mock(return_value=iter(["value1"]))
+        mock_repeated.return_value = mock_repeated_qs
+
+        results = Article.exclude_inconvenient_articles(Mock(), Mock())
+
+        self.assertIn("repetition event", results["events"])
+
+    @patch("article.models.Article.exclude_repetitions")
+    @patch("article.models.Article.get_repeated_items")
+    @patch("article.models.Article.exclude_articles_with_invalid_pid_v2")
+    def test_captures_exceptions(self, mock_invalid, mock_repeated, mock_exclude_rep):
+        """Captures exceptions without stopping execution."""
+        mock_invalid.side_effect = Exception("test error")
+
+        mock_repeated_qs = MagicMock()
+        mock_repeated_qs.count.return_value = 0
+        mock_repeated_qs.__iter__ = Mock(return_value=iter([]))
+        mock_repeated.return_value = mock_repeated_qs
+
+        results = Article.exclude_inconvenient_articles(Mock(), Mock())
+
+        self.assertEqual(len(results["exceptions"]), 1)
+        self.assertIn("test error", results["exceptions"][0]["exclude_articles_with_invalid_pid_v2"])
+
+
 class ArticleGetTestCase(unittest.TestCase):
     """Test cases for Article.get() handling of duplicate records."""
 
