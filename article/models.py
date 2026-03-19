@@ -477,6 +477,82 @@ class Article(ClusterableModel, CommonControlField):
             .values_list(field_name, flat=True)
         )
 
+    def has_valid_pid_v2(self):
+        """
+        For migrated articles, check if pid_v2 last 5 digits match
+        the position (order) value padded with zeros on the left.
+        Only applicable to migrated articles where position fits in 5 digits.
+        """
+        try:
+            if not self.pid_v2 or self.position is None:
+                return True
+            if len(self.pid_v2) < 5:
+                return True
+            if self.position > 99999:
+                return True
+            expected_suffix = str(self.position).zfill(5)
+            actual_suffix = self.pid_v2[-5:]
+            return actual_suffix == expected_suffix
+        except (TypeError, IndexError):
+            return True
+
+    @classmethod
+    def exclude_articles_with_invalid_pid_v2(cls, journal=None):
+        """
+        Find and delete migrated articles whose pid_v2 last 5 digits
+        don't match their position (order) value padded with zeros.
+        This only applies to migrated articles.
+        """
+        from package.choices import PKG_ORIGIN_MIGRATION
+
+        if journal:
+            queryset = cls.objects.filter(journal=journal)
+        else:
+            queryset = cls.objects.all()
+
+        queryset = queryset.filter(
+            sps_pkg__origin=PKG_ORIGIN_MIGRATION,
+            pid_v2__isnull=False,
+            position__isnull=False,
+        ).select_related('sps_pkg', 'pp_xml')
+
+        events = []
+        sps_pkg_ids = set()
+        pp_xml_ids = set()
+        article_ids = []
+
+        for article in queryset:
+            if not article.has_valid_pid_v2():
+                events.append(
+                    f"Invalid pid_v2: {article.pid_v2} "
+                    f"(position={article.position}, "
+                    f"expected suffix={str(article.position).zfill(5)}, "
+                    f"actual suffix={article.pid_v2[-5:]})"
+                )
+                article_ids.append(article.id)
+                if article.sps_pkg_id:
+                    sps_pkg_ids.add(article.sps_pkg_id)
+                if article.pp_xml_id:
+                    pp_xml_ids.add(article.pp_xml_id)
+
+        if not article_ids:
+            events.append("No migrated articles with invalid pid_v2 found")
+            return events
+
+        with transaction.atomic():
+            deleted_articles, _ = cls.objects.filter(id__in=article_ids).delete()
+            events.append(f"Articles deletados: {deleted_articles}")
+
+            if sps_pkg_ids:
+                deleted_sps, _ = SPSPkg.objects.filter(id__in=sps_pkg_ids).delete()
+                events.append(f"SPSPkg deletados: {deleted_sps}")
+
+            if pp_xml_ids:
+                deleted_pp, _ = PidProviderXML.objects.filter(id__in=pp_xml_ids).delete()
+                events.append(f"PidProviderXML deletados: {deleted_pp}")
+
+        return events
+
     @classmethod
     def select_articles(cls, journal_id_list=None, issue_id_list=None):
         kwargs = {}
