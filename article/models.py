@@ -566,6 +566,49 @@ class Article(ClusterableModel, CommonControlField):
         return events
 
     @classmethod
+    def exclude_inconvenient_articles(cls, journal, user, timeout=None):
+        """
+        Remove all inconvenient article records in a unified operation:
+        1. Migrated articles with invalid pid_v2 (suffix doesn't match order from v121)
+        2. Duplicate articles (repeated pid_v2 or sps_pkg_name)
+        """
+        results = {
+            "events": [],
+            "numbers": {},
+            "exceptions": [],
+        }
+
+        try:
+            events = cls.exclude_articles_with_invalid_pid_v2(journal)
+            results["events"].extend(events)
+        except Exception as e:
+            results["exceptions"].append(
+                {
+                    "exclude_articles_with_invalid_pid_v2": str(e),
+                    "traceback": traceback.format_exc(),
+                }
+            )
+
+        for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
+            repeated_items = cls.get_repeated_items(field_name, journal)
+            results["numbers"][f"repeated_by_{field_name}"] = repeated_items.count()
+            for repeated_value in repeated_items:
+                try:
+                    events = cls.exclude_repetitions(
+                        user, field_name, repeated_value, timeout=timeout
+                    )
+                    results["events"].extend(events)
+                except Exception as e:
+                    results["exceptions"].append(
+                        {
+                            f"repeated_by_{field_name}": repeated_value,
+                            "traceback": traceback.format_exc(),
+                        }
+                    )
+
+        return results
+
+    @classmethod
     def select_articles(cls, journal_id_list=None, issue_id_list=None):
         kwargs = {}
         if journal_id_list:
