@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock, Mock, patch, call
+from unittest.mock import MagicMock, Mock, patch
 
 from article.models import Article
 
@@ -69,20 +69,24 @@ class ArticleExcludeArticlesWithInvalidPidV2TestCase(unittest.TestCase):
         mock_migrated_data.document = mock_document
 
         mock_article_proc = Mock()
-        mock_article_proc.article = mock_article
+        mock_article_proc.sps_pkg_id = sps_pkg_id
         mock_article_proc.migrated_data = mock_migrated_data
-        return mock_article_proc
+        return mock_article_proc, mock_article
 
     @patch("article.models.Article.objects")
     def test_no_invalid_articles(self, mock_objects):
         """No articles deleted when all have valid pid_v2."""
-        mock_article_proc = self._make_article_proc(
+        mock_article_proc, mock_article = self._make_article_proc(
             article_id=1, pid_v2="S0034-77442021000600036", order="36"
         )
 
         mock_ap_qs = MagicMock()
         mock_ap_qs.filter.return_value = mock_ap_qs
         mock_ap_qs.select_related.return_value = [mock_article_proc]
+
+        mock_article_qs = MagicMock()
+        mock_article_qs.only.return_value = [mock_article]
+        mock_objects.filter.return_value = mock_article_qs
 
         with patch("proc.models.ArticleProc.objects", mock_ap_qs):
             events = Article.exclude_articles_with_invalid_pid_v2()
@@ -95,7 +99,7 @@ class ArticleExcludeArticlesWithInvalidPidV2TestCase(unittest.TestCase):
     @patch("article.models.Article.objects")
     def test_deletes_invalid_article(self, mock_objects, mock_sps_pkg, mock_pp_xml, mock_transaction):
         """Deletes migrated article with invalid pid_v2."""
-        mock_article_proc = self._make_article_proc(
+        mock_article_proc, mock_article = self._make_article_proc(
             article_id=42, pid_v2="S0034-77442021060626158", order="36",
             sps_pkg_id=10, pp_xml_id=20
         )
@@ -104,9 +108,14 @@ class ArticleExcludeArticlesWithInvalidPidV2TestCase(unittest.TestCase):
         mock_ap_qs.filter.return_value = mock_ap_qs
         mock_ap_qs.select_related.return_value = [mock_article_proc]
 
+        mock_article_qs = MagicMock()
+        mock_article_qs.only.return_value = [mock_article]
+
         mock_delete_qs = MagicMock()
         mock_delete_qs.delete.return_value = (1, {})
-        mock_objects.filter.return_value = mock_delete_qs
+
+        # First call: bulk fetch articles; subsequent calls: delete operations
+        mock_objects.filter.side_effect = [mock_article_qs, mock_delete_qs]
 
         mock_sps_pkg_qs = MagicMock()
         mock_sps_pkg_qs.delete.return_value = (1, {})

@@ -515,6 +515,17 @@ class Article(ClusterableModel, CommonControlField):
             **filters
         ).select_related("migrated_data", "sps_pkg")
 
+        # Bulk-fetch Article records to avoid N+1 queries via ArticleProc.article
+        sps_pkg_id_list = [
+            ap.sps_pkg_id for ap in article_procs if ap.sps_pkg_id
+        ]
+        articles_by_sps_pkg = {}
+        if sps_pkg_id_list:
+            for article in Article.objects.filter(
+                sps_pkg_id__in=sps_pkg_id_list
+            ).only("id", "pid_v2", "sps_pkg_id", "pp_xml_id"):
+                articles_by_sps_pkg[article.sps_pkg_id] = article
+
         events = []
         sps_pkg_ids = set()
         pp_xml_ids = set()
@@ -522,7 +533,7 @@ class Article(ClusterableModel, CommonControlField):
 
         for article_proc in article_procs:
             try:
-                article = article_proc.article
+                article = articles_by_sps_pkg.get(article_proc.sps_pkg_id)
                 if not article or not article.pid_v2:
                     continue
 
@@ -531,10 +542,14 @@ class Article(ClusterableModel, CommonControlField):
                     continue
 
                 if not cls.has_valid_pid_v2(article.pid_v2, order):
+                    try:
+                        expected_suffix = str(int(str(order).strip())).zfill(5)
+                    except (TypeError, ValueError):
+                        expected_suffix = str(order)
                     events.append(
                         f"Invalid pid_v2: {article.pid_v2} "
                         f"(order={order}, "
-                        f"expected suffix={str(int(order)).zfill(5)}, "
+                        f"expected suffix={expected_suffix}, "
                         f"actual suffix={article.pid_v2[-5:]})"
                     )
                     article_ids.append(article.id)

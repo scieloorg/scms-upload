@@ -1480,8 +1480,6 @@ def task_exclude_article_repetition(self, journal_proc_id, qa_api_data=None, pub
         response = Article.fix_sps_pkg_names(journal_articles_to_fix_sps_pkg_names_qs)
         task_exec.add_event(f"fixed sps_pkg_names: {response}")
 
-        issues = set()
-
         results = Article.exclude_inconvenient_articles(journal, user, timeout)
         for event in results["events"]:
             task_exec.add_event(event)
