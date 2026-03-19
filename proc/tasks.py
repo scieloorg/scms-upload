@@ -1481,6 +1481,19 @@ def task_exclude_article_repetition(self, journal_proc_id, qa_api_data=None, pub
         task_exec.add_event(f"fixed sps_pkg_names: {response}")
 
         issues = set()
+
+        try:
+            events = Article.exclude_articles_with_invalid_pid_v2(journal)
+            task_exec.add_event(events)
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            task_exec.add_exception(
+                {
+                    "exclude_articles_with_invalid_pid_v2": str(e),
+                    "traceback": traceback.format_exc(),
+                }
+            )
+
         for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
             repeated_items = Article.get_repeated_items(field_name, journal)
             task_exec.add_number(f"repeated_by_{field_name}", repeated_items.count())
