@@ -477,63 +477,75 @@ class Article(ClusterableModel, CommonControlField):
             .values_list(field_name, flat=True)
         )
 
-    def has_valid_pid_v2(self):
+    @staticmethod
+    def has_valid_pid_v2(pid_v2, order):
         """
-        For migrated articles, check if pid_v2 last 5 digits match
-        the position (order) value padded with zeros on the left.
-        Only applicable to migrated articles where position fits in 5 digits.
+        Check if pid_v2 last 5 digits match the order value
+        (from MigratedArticle.document.order / v121) padded with zeros.
         """
         try:
-            if not self.pid_v2 or self.position is None:
+            if not pid_v2 or not order:
                 return True
-            if len(self.pid_v2) < 5:
+            if len(pid_v2) < 5:
                 return True
-            if self.position > 99999:
-                return True
-            expected_suffix = str(self.position).zfill(5)
-            actual_suffix = self.pid_v2[-5:]
+            expected_suffix = str(int(str(order).strip())).zfill(5)
+            actual_suffix = pid_v2[-5:]
             return actual_suffix == expected_suffix
-        except (TypeError, IndexError):
+        except (TypeError, IndexError, ValueError):
             return True
 
     @classmethod
     def exclude_articles_with_invalid_pid_v2(cls, journal=None):
         """
         Find and delete migrated articles whose pid_v2 last 5 digits
-        don't match their position (order) value padded with zeros.
-        This only applies to migrated articles.
+        don't match the order (v121) from MigratedArticle.document.order.
+        Uses ArticleProc.migrated_data to access the migration data.
+        Only applies to migrated articles.
         """
-        from package.choices import PKG_ORIGIN_MIGRATION
+        from proc.models import ArticleProc
 
+        filters = {
+            "migrated_data__isnull": False,
+            "sps_pkg__isnull": False,
+        }
         if journal:
-            queryset = cls.objects.filter(journal=journal)
-        else:
-            queryset = cls.objects.all()
+            filters["issue_proc__journal_proc__journal"] = journal
 
-        queryset = queryset.filter(
-            sps_pkg__origin=PKG_ORIGIN_MIGRATION,
-            pid_v2__isnull=False,
-            position__isnull=False,
-        ).select_related('sps_pkg', 'pp_xml')
+        article_procs = ArticleProc.objects.filter(
+            **filters
+        ).select_related("migrated_data", "sps_pkg")
 
         events = []
         sps_pkg_ids = set()
         pp_xml_ids = set()
         article_ids = []
 
-        for article in queryset:
-            if not article.has_valid_pid_v2():
-                events.append(
-                    f"Invalid pid_v2: {article.pid_v2} "
-                    f"(position={article.position}, "
-                    f"expected suffix={str(article.position).zfill(5)}, "
-                    f"actual suffix={article.pid_v2[-5:]})"
+        for article_proc in article_procs:
+            try:
+                article = article_proc.article
+                if not article or not article.pid_v2:
+                    continue
+
+                order = article_proc.migrated_data.document.order
+                if not order:
+                    continue
+
+                if not cls.has_valid_pid_v2(article.pid_v2, order):
+                    events.append(
+                        f"Invalid pid_v2: {article.pid_v2} "
+                        f"(order={order}, "
+                        f"expected suffix={str(int(order)).zfill(5)}, "
+                        f"actual suffix={article.pid_v2[-5:]})"
+                    )
+                    article_ids.append(article.id)
+                    if article.sps_pkg_id:
+                        sps_pkg_ids.add(article.sps_pkg_id)
+                    if article.pp_xml_id:
+                        pp_xml_ids.add(article.pp_xml_id)
+            except Exception as e:
+                logging.exception(
+                    f"Error checking pid_v2 for ArticleProc {article_proc}: {e}"
                 )
-                article_ids.append(article.id)
-                if article.sps_pkg_id:
-                    sps_pkg_ids.add(article.sps_pkg_id)
-                if article.pp_xml_id:
-                    pp_xml_ids.add(article.pp_xml_id)
 
         if not article_ids:
             events.append("No migrated articles with invalid pid_v2 found")
