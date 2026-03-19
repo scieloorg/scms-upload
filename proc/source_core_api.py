@@ -4,6 +4,7 @@ Módulo responsável pela busca e processamento de dados da API Core externa.
 
 import logging
 import sys
+from abc import ABC, abstractmethod
 
 from django.conf import settings
 from django.db.models import Q
@@ -64,8 +65,8 @@ class FetchIssueDataException(ProcBaseException):
     pass
 
 
-class BaseDataChecker:
-    """Classe base com lógica comum de consulta local-first com fallback ao core."""
+class BaseDataChecker(ABC):
+    """Classe base abstrata com lógica comum de consulta local-first com fallback ao core."""
 
     model = None  # Journal ou Issue — definido nas subclasses
     key = None  # "journal" ou "issue" — definido nas subclasses
@@ -74,13 +75,13 @@ class BaseDataChecker:
         self._user = user
         self.core_communication_error = False
 
+    @abstractmethod
     def get_local(self):
         """Consulta dados locais. Deve ser implementado pelas subclasses."""
-        raise NotImplementedError
 
+    @abstractmethod
     def fetch_from_core(self, **kwargs):
         """Consulta dados remotos e atualiza os dados locais. Deve ser implementado pelas subclasses."""
-        raise NotImplementedError
 
     def get_or_fetch(self):
         """Consulta dados locais; se inexistentes, consulta o core e tenta novamente."""
