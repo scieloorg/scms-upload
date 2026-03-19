@@ -35,18 +35,6 @@ class PackageDataError(Exception): ...
 class UploadJournalDataChecker(JournalDataChecker):
     """Extensão de JournalDataChecker com funcionalidades específicas do fluxo de upload."""
 
-    @classmethod
-    def from_xmltree(cls, xmltree, user):
-        """Cria instância a partir de xmltree."""
-        from packtools.sps.models.journal_meta import ISSN, Title
-
-        xml = Title(xmltree)
-        journal_title = xml.journal_title
-        xml = ISSN(xmltree)
-        issn_electronic = xml.epub
-        issn_print = xml.ppub
-        return cls(journal_title, issn_electronic, issn_print, user)
-
     def _build_similar_journals_msg(self):
         """Monta mensagem com journals similares para diagnóstico."""
         similar_journals = []
@@ -104,24 +92,6 @@ class UploadJournalDataChecker(JournalDataChecker):
 
 class UploadIssueDataChecker(IssueDataChecker):
     """Extensão de IssueDataChecker com funcionalidades específicas do fluxo de upload."""
-
-    @classmethod
-    def from_xmltree(cls, xmltree, user, journal):
-        """Cria instância a partir de xmltree."""
-        from packtools.sps.models.dates import ArticleDates
-        from packtools.sps.models.front_articlemeta_issue import ArticleMetaIssue
-
-        xml = ArticleDates(xmltree)
-        try:
-            publication_year = xml.collection_date["year"]
-        except (TypeError, KeyError, ValueError):
-            try:
-                publication_year = xml.article_date["year"]
-            except (TypeError, KeyError, ValueError):
-                publication_year = None
-
-        xml = ArticleMetaIssue(xmltree)
-        return cls(journal, publication_year, xml.volume, xml.suppl, xml.number, user)
 
     def _build_similar_issues_msg(self):
         """Monta mensagem com issues similares para diagnóstico."""
