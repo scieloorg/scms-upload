@@ -64,15 +64,67 @@ class FetchIssueDataException(ProcBaseException):
     pass
 
 
-class JournalDataChecker:
+class BaseDataChecker:
+    """Classe base com lógica comum de consulta local-first com fallback ao core."""
+
+    model = None  # Journal ou Issue — definido nas subclasses
+    key = None  # "journal" ou "issue" — definido nas subclasses
+
+    def __init__(self, user):
+        self._user = user
+        self.core_communication_error = False
+
+    def get_local(self):
+        """Consulta dados locais. Deve ser implementado pelas subclasses."""
+        raise NotImplementedError
+
+    def fetch_from_core(self, **kwargs):
+        """Consulta dados remotos e atualiza os dados locais. Deve ser implementado pelas subclasses."""
+        raise NotImplementedError
+
+    def get_or_fetch(self):
+        """Consulta dados locais; se inexistentes, consulta o core e tenta novamente."""
+        # 1. consulta dados locais
+        try:
+            return self.get_local()
+        except self.model.DoesNotExist:
+            pass
+
+        # 2. dados locais inexistentes, consulta dados remotos
+        # e atualiza os dados locais com os dados remotos
+        self.fetch_from_core()
+
+        # 3. consulta dados locais novamente após a tentativa de busca remota
+        try:
+            return self.get_local()
+        except self.model.DoesNotExist:
+            return None
+
+    def refresh(self, response):
+        """Consulta dados remotos e atualiza response."""
+        self.fetch_from_core()
+        if self.core_communication_error:
+            response["core_communication_error"] = True
+            return
+
+        # consulta dados locais após a atualização remota
+        try:
+            response[self.key] = self.get_local()
+        except self.model.DoesNotExist:
+            pass
+
+
+class JournalDataChecker(BaseDataChecker):
     """Consulta e valida dados de journal usando dados locais e API do core."""
 
+    model = Journal
+    key = "journal"
+
     def __init__(self, journal_title, issn_electronic, issn_print, user):
+        super().__init__(user)
         self.journal_title = journal_title
         self.issn_electronic = issn_electronic
         self.issn_print = issn_print
-        self._user = user
-        self.core_communication_error = False
 
     @classmethod
     def from_xmltree(cls, xmltree, user):
@@ -105,37 +157,6 @@ class JournalDataChecker:
         except FetchJournalDataException as e:
             self.core_communication_error = True
             logging.warning(f"Core API communication failure for journal: {e}")
-
-    def get_or_fetch(self):
-        """Consulta dados locais; se inexistentes, consulta o core e tenta novamente."""
-        # 1. consulta dados locais de journal
-        try:
-            return self.get_local()
-        except Journal.DoesNotExist:
-            pass
-
-        # 2. dados locais inexistentes, consulta dados remotos de journal
-        # e atualiza os dados locais com os dados remotos
-        self.fetch_from_core()
-
-        # 3. consulta dados locais novamente após a tentativa de busca remota
-        try:
-            return self.get_local()
-        except Journal.DoesNotExist:
-            return None
-
-    def refresh(self, response):
-        """Consulta dados remotos de journal e atualiza response."""
-        self.fetch_from_core()
-        if self.core_communication_error:
-            response["core_communication_error"] = True
-            return
-
-        # consulta dados locais após a atualização remota
-        try:
-            response["journal"] = self.get_local()
-        except Journal.DoesNotExist:
-            pass
 
     @staticmethod
     def ensure_proc_exists(user, journal):
@@ -478,17 +499,19 @@ def process_journal_result(
     return journal
 
 
-class IssueDataChecker:
+class IssueDataChecker(BaseDataChecker):
     """Consulta e valida dados de issue usando dados locais e API do core."""
 
+    model = Issue
+    key = "issue"
+
     def __init__(self, journal, publication_year, volume, suppl, number, user):
+        super().__init__(user)
         self._journal = journal
         self.publication_year = publication_year
         self.volume = volume
         self.suppl = suppl
         self.number = number
-        self._user = user
-        self.core_communication_error = False
 
     @classmethod
     def from_xmltree(cls, xmltree, user, journal):
@@ -532,37 +555,6 @@ class IssueDataChecker:
         except FetchIssueDataException as e:
             self.core_communication_error = True
             logging.warning(f"Core API communication failure for issue: {e}")
-
-    def get_or_fetch(self):
-        """Consulta dados locais; se inexistentes, consulta o core e tenta novamente."""
-        # 1. consulta dados locais de issue
-        try:
-            return self.get_local()
-        except Issue.DoesNotExist:
-            pass
-
-        # 2. dados locais inexistentes, consulta dados remotos de issue
-        # e atualiza os dados locais com os dados remotos
-        self.fetch_from_core()
-
-        # 3. consulta dados locais novamente após a tentativa de busca remota
-        try:
-            return self.get_local()
-        except Issue.DoesNotExist:
-            return None
-
-    def refresh(self, response):
-        """Consulta dados remotos de issue e atualiza response."""
-        self.fetch_from_core()
-        if self.core_communication_error:
-            response["core_communication_error"] = True
-            return
-
-        # consulta dados locais após a atualização remota
-        try:
-            response["issue"] = self.get_local()
-        except Issue.DoesNotExist:
-            pass
 
     @staticmethod
     def ensure_proc_exists(user, issue):

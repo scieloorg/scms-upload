@@ -75,6 +75,7 @@ class UploadJournalDataCheckerTestCase(unittest.TestCase):
         user = Mock()
 
         checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
+        checker.model = mock_journal_cls
         checker.check(response)
 
         self.assertEqual(response["journal"], mock_journal)
@@ -103,6 +104,7 @@ class UploadJournalDataCheckerTestCase(unittest.TestCase):
         user = Mock()
 
         checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
+        checker.model = mock_journal_cls
         with self.assertRaises(PackageDataError) as context:
             checker.check(response)
 
@@ -124,6 +126,7 @@ class UploadJournalDataCheckerTestCase(unittest.TestCase):
         user = Mock()
 
         checker = UploadJournalDataChecker("Test Journal", "1234-5678", "8765-4321", user)
+        checker.model = mock_journal_cls
         with self.assertRaises(PackageDataError) as context:
             checker.check(response)
 
@@ -279,6 +282,7 @@ class UploadIssueDataCheckerTestCase(unittest.TestCase):
         user = Mock()
 
         checker = UploadIssueDataChecker(mock_journal, "2024", "10", None, "1", user)
+        checker.model = mock_issue_cls
         checker.check(response)
 
         self.assertEqual(response["issue"], mock_issue)
@@ -309,6 +313,7 @@ class UploadIssueDataCheckerTestCase(unittest.TestCase):
         user = Mock()
 
         checker = UploadIssueDataChecker(mock_journal, "2024", "10", None, "1", user)
+        checker.model = mock_issue_cls
         with self.assertRaises(PackageDataError) as context:
             checker.check(response)
 

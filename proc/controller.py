@@ -30,6 +30,7 @@ from proc.source_classic_website import (
 
 # Imports da API Core
 from proc.source_core_api import (
+    BaseDataChecker,
     FetchIssueDataException,
     FetchJournalDataException,
     FetchMultipleJournalsError,
@@ -50,6 +51,7 @@ __all__ = [
     "fetch_and_create_journal",
     "fetch_and_create_issues",
     # Core API classes
+    "BaseDataChecker",
     "JournalDataChecker",
     "IssueDataChecker",
     # Classic Website functions
