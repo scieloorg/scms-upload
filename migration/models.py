@@ -264,8 +264,9 @@ class MigratedData(CommonControlField):
         force_update=False,
     ):
         try:
-            if data:
-                classic_ws_obj = cls.get_data_from_classic_website(data)
+            if not data:
+                raise ValueError(f"register_classic_website_data {collection} {pid}: no data")
+            classic_ws_obj = cls.get_data_from_classic_website(data)
         except Exception as e:
             classic_ws_obj = None
 
@@ -673,29 +674,43 @@ class MigratedArticle(MigratedData):
     ]
 
     def __str__(self):
-        document = self.document
-        return f"{document.journal.acronym} {document.issue.issue_label} {document.filename_without_extension}"
+       return self.path
 
     @classmethod
     def get_data_from_classic_website(cls, data):
+        if not data:
+            return None
         return classic_ws.Document(data)
 
     @property
     def document(self):
+        if not self.data:
+            return
         return classic_ws.Document(self.data)
 
     @property
     def n_paragraphs(self):
+        if not self.document:
+            return None
         return len(self.document.p_records or [])
 
     @property
     def pkg_name(self):
-        return self.document.filename_without_extension
+        try:
+            return self.document.filename_without_extension
+        except AttributeError:
+            return None
 
     @property
     def path(self):
         document = self.document
-        return f"{document.journal.acronym}/{document.issue.issue_label}/{document.filename_without_extension}"
+        try:
+            return f"{document.journal.acronym}/{document.issue.issue_label}/{document.filename_without_extension}"
+        except AttributeError:
+            journal = self.pid[1:10]
+            issue = self.pid[10:18]
+            article = self.pid[-5:]
+            return f"{journal}/{issue}/{article}"
 
 
 class JournalAcronIdFile(CommonControlField, ClusterableModel):
