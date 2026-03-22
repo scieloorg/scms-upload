@@ -477,6 +477,152 @@ class Article(ClusterableModel, CommonControlField):
             .values_list(field_name, flat=True)
         )
 
+    @staticmethod
+    def has_valid_pid_v2(pid_v2, order):
+        """
+        Check if pid_v2 last 5 digits match the order value
+        (from MigratedArticle.document.order / v121) padded with zeros.
+        """
+        try:
+            if not pid_v2 or not order:
+                return True
+            if len(pid_v2) < 5:
+                return True
+            expected_suffix = str(int(str(order).strip())).zfill(5)
+            actual_suffix = pid_v2[-5:]
+            return actual_suffix == expected_suffix
+        except (TypeError, IndexError, ValueError):
+            return True
+
+    @classmethod
+    def exclude_articles_with_invalid_pid_v2(cls, journal=None):
+        """
+        Find and delete migrated articles whose pid_v2 last 5 digits
+        don't match the order (v121) from MigratedArticle.document.order.
+        Uses ArticleProc.migrated_data to access the migration data.
+        Only applies to migrated articles.
+        """
+        from proc.models import ArticleProc
+
+        filters = {
+            "migrated_data__isnull": False,
+            "sps_pkg__isnull": False,
+        }
+        if journal:
+            filters["issue_proc__journal_proc__journal"] = journal
+
+        article_procs = ArticleProc.objects.filter(
+            **filters
+        ).select_related("migrated_data", "sps_pkg")
+
+        # Bulk-fetch Article records to avoid N+1 queries via ArticleProc.article
+        sps_pkg_id_list = [
+            ap.sps_pkg_id for ap in article_procs if ap.sps_pkg_id
+        ]
+        articles_by_sps_pkg = {}
+        if sps_pkg_id_list:
+            for article in Article.objects.filter(
+                sps_pkg_id__in=sps_pkg_id_list
+            ).only("id", "pid_v2", "sps_pkg_id", "pp_xml_id"):
+                articles_by_sps_pkg[article.sps_pkg_id] = article
+
+        events = []
+        sps_pkg_ids = set()
+        pp_xml_ids = set()
+        article_ids = []
+
+        for article_proc in article_procs:
+            try:
+                article = articles_by_sps_pkg.get(article_proc.sps_pkg_id)
+                if not article or not article.pid_v2:
+                    continue
+
+                order = article_proc.migrated_data.document.order
+                if not order:
+                    continue
+
+                if not cls.has_valid_pid_v2(article.pid_v2, order):
+                    try:
+                        expected_suffix = str(int(str(order).strip())).zfill(5)
+                    except (TypeError, ValueError):
+                        expected_suffix = str(order)
+                    events.append(
+                        f"Invalid pid_v2: {article.pid_v2} "
+                        f"(order={order}, "
+                        f"expected suffix={expected_suffix}, "
+                        f"actual suffix={article.pid_v2[-5:]})"
+                    )
+                    article_ids.append(article.id)
+                    if article.sps_pkg_id:
+                        sps_pkg_ids.add(article.sps_pkg_id)
+                    if article.pp_xml_id:
+                        pp_xml_ids.add(article.pp_xml_id)
+            except Exception as e:
+                logging.exception(
+                    f"Error checking pid_v2 for ArticleProc {article_proc}: {e}"
+                )
+
+        if not article_ids:
+            events.append("No migrated articles with invalid pid_v2 found")
+            return events
+
+        with transaction.atomic():
+            deleted_articles, _ = cls.objects.filter(id__in=article_ids).delete()
+            events.append(f"Articles deletados: {deleted_articles}")
+
+            if sps_pkg_ids:
+                deleted_sps, _ = SPSPkg.objects.filter(id__in=sps_pkg_ids).delete()
+                events.append(f"SPSPkg deletados: {deleted_sps}")
+
+            if pp_xml_ids:
+                deleted_pp, _ = PidProviderXML.objects.filter(id__in=pp_xml_ids).delete()
+                events.append(f"PidProviderXML deletados: {deleted_pp}")
+
+        return events
+
+    @classmethod
+    def exclude_inconvenient_articles(cls, journal, user, timeout=None):
+        """
+        Remove all inconvenient article records in a unified operation:
+        1. Migrated articles with invalid pid_v2 (suffix doesn't match order from v121)
+        2. Duplicate articles (repeated pid_v2 or sps_pkg_name)
+        """
+        results = {
+            "events": [],
+            "numbers": {},
+            "exceptions": [],
+        }
+
+        try:
+            events = cls.exclude_articles_with_invalid_pid_v2(journal)
+            results["events"].extend(events)
+        except Exception as e:
+            results["exceptions"].append(
+                {
+                    "exclude_articles_with_invalid_pid_v2": str(e),
+                    "traceback": traceback.format_exc(),
+                }
+            )
+
+        for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
+            repeated_items = cls.get_repeated_items(field_name, journal)
+            results["numbers"][f"repeated_by_{field_name}"] = repeated_items.count()
+            for repeated_value in repeated_items:
+                try:
+                    events = cls.exclude_repetitions(
+                        user, field_name, repeated_value, timeout=timeout
+                    )
+                    results["events"].extend(events)
+                except Exception as e:
+                    results["exceptions"].append(
+                        {
+                            f"repeated_by_{field_name}": repeated_value,
+                            "traceback": traceback.format_exc(),
+                        }
+                    )
+
+        return results
+
     @classmethod
     def select_articles(cls, journal_id_list=None, issue_id_list=None):
         kwargs = {}
