@@ -65,7 +65,10 @@ class ArticleSnippetViewSet(SnippetViewSet):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.distinct()
+        try:
+            return qs.distinct()
+        except AttributeError:
+            return qs
 
 
 class RelatedItemSnippetViewSet(SnippetViewSet):
@@ -125,7 +128,10 @@ class RequestArticleChangeSnippetViewSet(SnippetViewSet):
         # if self.permission_helper.user_can_make_article_change(request.user, None):
         #     return qs
 
-        return qs.distinct()
+        try:
+            return qs.distinct()
+        except AttributeError:
+            return qs
 
 
 class ArticleSnippetViewSetGroup(SnippetViewSetGroup):
