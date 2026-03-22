@@ -4,6 +4,7 @@ Módulo responsável pela busca e processamento de dados da API Core externa.
 
 import logging
 import sys
+from abc import ABC, abstractmethod
 
 from django.conf import settings
 from django.db.models import Q
@@ -64,6 +65,141 @@ class FetchIssueDataException(ProcBaseException):
     pass
 
 
+class BaseDataChecker(ABC):
+    """Classe base abstrata com lógica comum de consulta local-first com fallback ao core."""
+
+    model = None  # Journal ou Issue — definido nas subclasses
+    key = None  # "journal" ou "issue" — definido nas subclasses
+
+    def __init__(self, user):
+        self._user = user
+        self.core_communication_error = False
+
+    @abstractmethod
+    def get_local(self):
+        """Consulta dados locais. Deve ser implementado pelas subclasses."""
+
+    @abstractmethod
+    def fetch_from_core(self, **kwargs):
+        """Consulta dados remotos e atualiza os dados locais. Deve ser implementado pelas subclasses."""
+
+    def get_or_fetch(self):
+        """Consulta dados locais; se inexistentes, consulta o core e tenta novamente."""
+        # 1. consulta dados locais
+        try:
+            return self.get_local()
+        except self.model.DoesNotExist:
+            pass
+
+        # 2. dados locais inexistentes, consulta dados remotos
+        # e atualiza os dados locais com os dados remotos
+        self.fetch_from_core()
+
+        # 3. consulta dados locais novamente após a tentativa de busca remota
+        try:
+            return self.get_local()
+        except self.model.DoesNotExist:
+            return None
+
+    def refresh(self, response):
+        """Consulta dados remotos e atualiza response."""
+        self.fetch_from_core()
+        if self.core_communication_error:
+            response["core_communication_error"] = True
+            return
+
+        # consulta dados locais após a atualização remota
+        try:
+            response[self.key] = self.get_local()
+        except self.model.DoesNotExist:
+            pass
+
+
+class JournalDataChecker(BaseDataChecker):
+    """Consulta e valida dados de journal usando dados locais e API do core."""
+
+    model = Journal
+    key = "journal"
+
+    def __init__(self, journal_title, issn_electronic, issn_print, user):
+        super().__init__(user)
+        self.journal_title = journal_title
+        self.issn_electronic = issn_electronic
+        self.issn_print = issn_print
+
+    @classmethod
+    def from_xmltree(cls, xmltree, user):
+        """Cria instância a partir de xmltree."""
+        from packtools.sps.models.journal_meta import ISSN, Title
+
+        xml = Title(xmltree)
+        journal_title = xml.journal_title
+        xml = ISSN(xmltree)
+        issn_electronic = xml.epub
+        issn_print = xml.ppub
+        return cls(journal_title, issn_electronic, issn_print, user)
+
+    def get_local(self):
+        """Consulta dados locais de journal."""
+        return Journal.get_registered(
+            self.journal_title, self.issn_electronic, self.issn_print
+        )
+
+    def fetch_from_core(self, force_update=True):
+        """Consulta dados remotos de journal e atualiza os dados locais."""
+        self.core_communication_error = False
+        try:
+            fetch_and_create_journal(
+                self._user,
+                issn_electronic=self.issn_electronic,
+                issn_print=self.issn_print,
+                force_update=force_update,
+            )
+        except FetchJournalDataException as e:
+            self.core_communication_error = True
+            logging.warning(f"Core API communication failure for journal: {e}")
+
+    @staticmethod
+    def ensure_proc_exists(user, journal):
+        """
+        Verifica e garante a existência de JournalProc para o journal.
+
+        Args:
+            user: O usuário que executa a operação
+            journal: O journal que deve ter um JournalProc
+
+        Returns:
+            True se JournalProc existe
+
+        Raises:
+            JournalProc.DoesNotExist: Se não foi possível criar JournalProc
+        """
+        if (
+            journal.missing_fields
+            or not JournalProc.objects.filter(
+                journal=journal, acron__isnull=False
+            ).exists()
+        ):
+            create_or_update_journal(
+                journal_title=journal.title,
+                issn_electronic=journal.official_journal.issn_electronic,
+                issn_print=journal.official_journal.issn_print,
+                user=user,
+                force_update=True,
+            )
+
+        journal_proc = JournalProc.objects.filter(
+            journal=journal, acron__isnull=False
+        ).first()
+        if journal_proc:
+            if not journal.journal_acron:
+                journal.journal_acron = journal_proc.acron
+                journal.save()
+            return True
+
+        raise JournalProc.DoesNotExist(f"JournalProc does not exist: {journal}")
+
+
 def create_or_update_journal(
     journal_title, issn_electronic, issn_print, user, force_update=None
 ):
@@ -80,9 +216,12 @@ def create_or_update_journal(
             | Q(journal__official_journal__issn_print=issn_print)
         ).exists()
     )
+
+    checker = JournalDataChecker(journal_title, issn_electronic, issn_print, user)
+
     if not force_update:
         try:
-            return Journal.get_registered(journal_title, issn_electronic, issn_print)
+            return checker.get_local()
         except Journal.DoesNotExist:
             pass
 
@@ -99,7 +238,7 @@ def create_or_update_journal(
         pass
 
     try:
-        return Journal.get_registered(journal_title, issn_electronic, issn_print)
+        return checker.get_local()
     except Journal.DoesNotExist as exc:
         return None
 
@@ -361,6 +500,97 @@ def process_journal_result(
     return journal
 
 
+class IssueDataChecker(BaseDataChecker):
+    """Consulta e valida dados de issue usando dados locais e API do core."""
+
+    model = Issue
+    key = "issue"
+
+    def __init__(self, journal, publication_year, volume, suppl, number, user):
+        super().__init__(user)
+        self._journal = journal
+        self.publication_year = publication_year
+        self.volume = volume
+        self.suppl = suppl
+        self.number = number
+
+    @classmethod
+    def from_xmltree(cls, xmltree, user, journal):
+        """Cria instância a partir de xmltree."""
+        from packtools.sps.models.dates import ArticleDates
+        from packtools.sps.models.front_articlemeta_issue import ArticleMetaIssue
+
+        xml = ArticleDates(xmltree)
+        try:
+            publication_year = xml.collection_date["year"]
+        except (TypeError, KeyError, ValueError):
+            try:
+                publication_year = xml.article_date["year"]
+            except (TypeError, KeyError, ValueError):
+                publication_year = None
+
+        xml = ArticleMetaIssue(xmltree)
+        return cls(journal, publication_year, xml.volume, xml.suppl, xml.number, user)
+
+    def get_local(self):
+        """Consulta dados locais de issue."""
+        return Issue.get(
+            journal=self._journal,
+            volume=self.volume,
+            supplement=self.suppl,
+            number=self.number,
+        )
+
+    def fetch_from_core(self):
+        """Consulta dados remotos de issue e atualiza os dados locais."""
+        self.core_communication_error = False
+        try:
+            fetch_and_create_issues(
+                self._journal,
+                self.publication_year,
+                self.volume,
+                self.suppl,
+                self.number,
+                self._user,
+            )
+        except FetchIssueDataException as e:
+            self.core_communication_error = True
+            logging.warning(f"Core API communication failure for issue: {e}")
+
+    @staticmethod
+    def ensure_proc_exists(user, issue):
+        """
+        Verifica e garante a existência de IssueProc para o issue.
+
+        Args:
+            user: O usuário que executa a operação
+            issue: O issue que deve ter um IssueProc
+
+        Returns:
+            True se IssueProc existe
+
+        Raises:
+            IssueProc.DoesNotExist: Se não foi possível criar IssueProc
+        """
+        if IssueProc.objects.filter(issue=issue).exists():
+            return True
+
+        create_or_update_issue(
+            journal=issue.journal,
+            pub_year=issue.publication_year,
+            volume=issue.volume,
+            suppl=issue.supplement,
+            number=issue.number,
+            user=user,
+            force_update=True,
+        )
+
+        if IssueProc.objects.filter(issue=issue).exists():
+            return True
+
+        raise IssueProc.DoesNotExist(f"IssueProc does not exist: {issue}")
+
+
 def create_or_update_issue(
     journal, pub_year, volume, suppl, number, user, force_update=None
 ):
@@ -381,14 +611,11 @@ def create_or_update_issue(
         ).exists()
     )
 
+    checker = IssueDataChecker(journal, pub_year, volume, suppl, number, user)
+
     if not force_update:
         try:
-            return Issue.get(
-                journal=journal,
-                volume=volume,
-                supplement=suppl,
-                number=number,
-            )
+            return checker.get_local()
         except Issue.DoesNotExist:
             pass
 
@@ -399,12 +626,7 @@ def create_or_update_issue(
         pass
 
     try:
-        return Issue.get(
-            journal=journal,
-            volume=volume,
-            supplement=suppl,
-            number=number,
-        )
+        return checker.get_local()
     except Issue.DoesNotExist as exc:
         return None
 
