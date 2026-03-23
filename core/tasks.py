@@ -29,7 +29,7 @@ RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY = {
 
 @celery_app.task(bind=True)
 def try_fetch_and_register_press_release(
-    self, journal_acronym=None, pressrelease_lang=None, username=None, user_id=None
+    self, journal_acronym=None, pressrelease_lang=None, username=None, user_id=None, verify=False
 ):
     query_condition = Q(journal_acron=journal_acronym) if journal_acronym else Q()
     journals_query = Journal.objects.filter(query_condition)
@@ -49,7 +49,7 @@ def try_fetch_and_register_press_release(
                 )
 
                 response = fetch_data(
-                    press_release_url_by_lang, json=False, timeout=2, verify=False
+                    press_release_url_by_lang, json=False, timeout=2, verify=verify
                 )
                 content = feedparser.parse(response)
 
