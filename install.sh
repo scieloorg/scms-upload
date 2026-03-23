@@ -23,7 +23,7 @@ echo "Checking directory $UPLOAD_DIR$ENV_FILES_DIR ..."
 
 if [ ! -d "$UPLOAD_DIR/$ENV_FILES_DIR" ]; then
     echo "Installing version $1 ..."
-    git clone --no-checkout --filter=blob:none --depth=1 --branch "$1" --sparse https://github.com/scieloorg/scms-upload $UPLOAD_DIR
+    git clone --no-checkout --filter=blob:none --depth=1 --branch "$1" --sparse https://github.com/scieloorg/scms-upload "$UPLOAD_DIR"
     cd "$UPLOAD_DIR"
     git sparse-checkout init --cone
     git sparse-checkout set .envs/.production-template compose/production/postgres/maintenance Makefile production.yml
@@ -49,7 +49,7 @@ if [ "$IS_UPDATE" -eq 1 ]; then
 else
     # For installation: make Docker login and build DB
     read -p "Enter the Docker login user: " DOCKER_USER
-    docker login -u $DOCKER_USER
+    docker login -u "$DOCKER_USER"
     make build compose=production.yml
     make django_migrate compose=production.yml
 fi
