@@ -2,21 +2,29 @@
 
 ## Propósito
 
-La tarea `proc.tasks.task_track_classic_website_article_pids` compara los PIDs de
-artículos registrados en el sitio web clásico de SciELO (leídos desde un archivo
-de texto indicado en `ClassicWebsiteConfiguration.pid_list_path`) con los registros
-`ArticleProc` ya almacenados en el sistema. A continuación, actualiza el campo
-`pid_status` de cada registro:
+La tarea `proc.tasks.task_track_classic_website_article_pids` permite
+**identificar la completitud de la migración desde el sitio web clásico de
+SciELO**. Para ello, compara la lista completa de PIDs de artículos del sitio
+web clásico (leída desde el archivo de texto configurado en
+`ClassicWebsiteConfiguration.pid_list_path`) con cada registro `ArticleProc`
+que ya ha sido creado en el sistema.
+
+Después de la comparación, la tarea actualiza el campo `pid_status` de cada
+registro `ArticleProc` de la colección para que pueda ver rápidamente cuánto
+de la migración se ha completado y qué artículos aún requieren atención:
 
 | Estado | Significado |
 |---|---|
-| **matched** | El PID existe tanto en el sitio web clásico como en `ArticleProc` con `migrated_data` vinculado. |
-| **missing** | El PID existe en `ArticleProc` pero no tiene `migrated_data` vinculado. |
-| **exceeding** | El PID está presente en `ArticleProc` pero no fue encontrado en la lista de PIDs del sitio web clásico. |
+| **matched** | El PID existe en la lista del sitio web clásico **y** el `ArticleProc` correspondiente ya tiene `migrated_data` vinculado. La migración de este artículo está completa. |
+| **missing** | El PID existe en la lista del sitio web clásico **y** existe un `ArticleProc`, pero **no** tiene `migrated_data` vinculado. El artículo aún no ha sido migrado. |
+| **exceeding** | El `ArticleProc` existe en el sistema pero su PID **no** fue encontrado en la lista de PIDs del sitio web clásico. Puede ser un registro que ya no existe en el sitio web clásico. |
 
-Los PIDs nuevos encontrados en el archivo del sitio web clásico que aún no tienen
-un registro `ArticleProc` correspondiente se crean automáticamente con estado
-**missing**.
+Los PIDs nuevos encontrados en el archivo del sitio web clásico que aún no
+tienen un registro `ArticleProc` correspondiente se crean automáticamente con
+estado **missing**.
+
+Al ejecutar esta tarea periódicamente puede monitorear el progreso de la
+migración e identificar artículos que aún requieren migración o investigación.
 
 ### Prerrequisitos
 
@@ -66,13 +74,22 @@ parámetros que acepta la tarea:
 }
 ```
 
-#### Parámetros disponibles
+### Argumentos de la tarea
 
-| Parámetro | Tipo | Obligatorio | Descripción |
-|---|---|---|---|
-| `username` | string | **sí** | Nombre de usuario del usuario Django que se registrará como creador de cualquier nuevo registro `ArticleProc`. |
-| `user_id` | integer | no | Alternativa a `username`. Si se proporcionan ambos, `user_id` tiene prioridad. |
-| `collection_acron` | string | no | Acrónimo de la colección a procesar (por ejemplo, `"scl"` para Brasil). Si se omite, se procesan **todas** las colecciones. |
+La tabla a continuación lista **todos** los argumentos aceptados por la tarea.
+En django_celery_beat deben proporcionarse como un objeto JSON en el campo
+**Keyword arguments**.
+
+| Argumento | Tipo | Obligatorio | Valor por defecto | Descripción |
+|---|---|---|---|---|
+| `username` | string | **sí** ¹ | — | Nombre de usuario del usuario Django que se registrará como creador de cualquier nuevo registro `ArticleProc`. |
+| `user_id` | integer | **sí** ¹ | `None` | ID numérico del usuario Django. Puede usarse en lugar de `username`. |
+| `collection_acron` | string | no | `None` | Acrónimo de la colección a procesar (por ejemplo, `"scl"` para Brasil). Si se omite, se procesan **todas** las colecciones configuradas. |
+
+> ¹ Al menos uno de `username` o `user_id` **debe** proporcionarse. Si se
+> proporcionan ambos, `user_id` tiene prioridad.
+
+#### Advertencias
 
 > **⚠️ Crítico:** El `username` o `user_id` debe corresponder a un usuario
 > existente. Si el usuario no se encuentra, la tarea registrará un error y
@@ -112,9 +129,9 @@ En la barra lateral del panel de administración de Wagtail, vaya a
 Navegue a la lista de **ArticleProc** en el panel de administración y filtre
 por `pid_status` para verificar la distribución:
 
-- **matched** – artículos vinculados exitosamente.
-- **missing** – artículos que necesitan atención (sin `migrated_data`).
-- **exceeding** – artículos en el sistema pero no en la lista de PIDs del
+- **matched** – artículos cuya migración está completa.
+- **missing** – artículos que aún necesitan ser migrados (sin `migrated_data`).
+- **exceeding** – artículos en el sistema pero no presentes en la lista de PIDs del
   sitio web clásico.
 
 ### 3. Django shell / verificación programática

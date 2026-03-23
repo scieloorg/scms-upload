@@ -2,19 +2,28 @@
 
 ## Purpose
 
-The task `proc.tasks.task_track_classic_website_article_pids` compares the article
-PIDs registered in the classic SciELO website (read from a text file listed in
-`ClassicWebsiteConfiguration.pid_list_path`) with the `ArticleProc` records already
-stored in the system. It then updates each record's `pid_status` field:
+The task `proc.tasks.task_track_classic_website_article_pids` allows you to
+**identify the completeness of the migration from the classic SciELO website**.
+It does so by comparing the complete list of article PIDs from the classic
+website (read from the text file configured in
+`ClassicWebsiteConfiguration.pid_list_path`) against each `ArticleProc` record
+that has already been created in the system.
+
+After the comparison, the task updates the `pid_status` field of every
+`ArticleProc` record in the collection so that you can quickly see how much of
+the migration has been completed and which articles still need attention:
 
 | Status | Meaning |
 |---|---|
-| **matched** | The PID exists in both the classic website and in `ArticleProc` with linked `migrated_data`. |
-| **missing** | The PID exists in `ArticleProc` but has no linked `migrated_data`. |
-| **exceeding** | The PID is present in `ArticleProc` but was not found in the classic website PID list. |
+| **matched** | The PID exists in the classic website list **and** the corresponding `ArticleProc` already has linked `migrated_data`. The migration of this article is complete. |
+| **missing** | The PID exists in the classic website list **and** an `ArticleProc` exists, but it does **not** have linked `migrated_data`. The article has not been migrated yet. |
+| **exceeding** | The `ArticleProc` exists in the system but its PID was **not** found in the classic website PID list. It may be a record that no longer exists in the classic website. |
 
 New PIDs found in the classic website file that do not yet have a corresponding
 `ArticleProc` record are automatically created with status **missing**.
+
+By running this task periodically you can monitor migration progress and
+identify articles that still require migration or investigation.
 
 ### Prerequisites
 
@@ -63,13 +72,22 @@ parameters the task accepts:
 }
 ```
 
-#### Available parameters
+### Task arguments
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `username` | string | **yes** | Username of the Django user that will be recorded as the creator of any new `ArticleProc` records. |
-| `user_id` | integer | no | Alternative to `username`. If both are provided, `user_id` takes precedence. |
-| `collection_acron` | string | no | Acronym of the collection to process (e.g. `"scl"` for Brazil). If omitted, **all** collections are processed. |
+The table below lists **all** arguments accepted by the task. In
+django_celery_beat they must be supplied as a JSON object in the
+**Keyword arguments** field.
+
+| Argument | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `username` | string | **yes** ¹ | — | Username of the Django user that will be recorded as the creator of any new `ArticleProc` records. |
+| `user_id` | integer | **yes** ¹ | `None` | Numeric ID of the Django user. Can be used instead of `username`. |
+| `collection_acron` | string | no | `None` | Acronym of the collection to process (e.g. `"scl"` for Brazil). When omitted, **all** configured collections are processed. |
+
+> ¹ At least one of `username` or `user_id` **must** be provided. If both are
+> supplied, `user_id` takes precedence.
+
+#### Warnings
 
 > **⚠️ Critical:** The `username` or `user_id` must correspond to an existing user.
 > If the user is not found, the task will log an error and skip processing.
@@ -107,9 +125,9 @@ Look for entries with the name
 Navigate to the **ArticleProc** listing in the admin panel and filter by
 `pid_status` to verify the distribution:
 
-- **matched** – articles successfully linked.
-- **missing** – articles that need attention (no `migrated_data`).
-- **exceeding** – articles in the system but not in the classic website PID list.
+- **matched** – articles whose migration is complete.
+- **missing** – articles that still need to be migrated (no `migrated_data`).
+- **exceeding** – articles in the system but not present in the classic website PID list.
 
 ### 3. Django shell / programmatic check
 
