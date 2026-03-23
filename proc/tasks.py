@@ -357,6 +357,7 @@ def task_publish_journals(
     collection_acron=None,
     journal_acron=None,
     force_update=False,
+    verify=False,
 ):
     task_params = {
         "task": "proc.tasks.task_publish_journals",
@@ -379,6 +380,7 @@ def task_publish_journals(
                 api_data = get_api_data(collection, "journal", website_kind)
                 if not api_data or api_data.get("error"):
                     continue
+                api_data["verify"] = verify
                 task_exec = TaskExecution(
                     name="proc.tasks.task_publish_journals",
                     item=f"{collection_acron}-{journal_acron} {website_kind}",
@@ -652,6 +654,7 @@ def task_publish_issues(
     issue_folder=None,
     publication_year=None,
     force_update=False,
+    verify=False,
 ):
     task_params = {
        "collection_acron": collection_acron,
@@ -676,6 +679,7 @@ def task_publish_issues(
                 api_data = get_api_data(collection, "issue", website_kind)
                 if not api_data or api_data.get("error"):
                     continue
+                api_data["verify"] = verify
                 task_exec = TaskExecution(
                     name="proc.tasks.task_publish_issues",
                     item=f"{collection_acron}-{journal_acron}-{issue_folder}-{publication_year} {website_kind}",
@@ -1207,6 +1211,7 @@ def task_publish_articles(
     issue_folder=None,
     publication_year=None,
     force_update=False,
+    verify=False,
 ):
     task_params = {
         "user_id": user_id,
@@ -1234,6 +1239,7 @@ def task_publish_articles(
                 api_data = get_api_data(collection, "article", website_kind)
                 if not api_data or api_data.get("error"):
                     continue
+                api_data["verify"] = verify
 
                 task_exec = TaskExecution(
                     name="proc.tasks.task_publish_articles",
