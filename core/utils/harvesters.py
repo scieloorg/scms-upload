@@ -34,7 +34,10 @@ class OPACHarvester:
             limit: Número de documentos por página
             timeout: Timeout em segundos para requisições
         """
+        if not domain.startswith("http"):
+            domain = f"http://{domain}"
         self.domain = domain
+
         self.collection_acron = collection_acron
         self.from_date = from_date or "2000-01-01"
         self.until_date = until_date or datetime.now(timezone.utc).isoformat()[:10]
@@ -66,7 +69,7 @@ class OPACHarvester:
             try:
                 # Constrói URL
                 url = (
-                    f"https://{self.domain}/api/v1/counter_dict?"
+                    f"{self.domain}/api/v1/counter_dict?"
                     f"end_date={self.until_date}&begin_date={self.from_date}"
                     f"&limit={self.limit}&page={page}"
                 )
@@ -74,7 +77,8 @@ class OPACHarvester:
                 logger.info(f"Fetching OPAC documents from: {url}")
 
                 # Faz requisição
-                response = fetch_data(url, json=True, timeout=self.timeout, verify=True)
+                response = fetch_data(url, json=True, timeout=self.timeout)
+                
 
                 # Define total de páginas na primeira iteração
                 if total_pages is None:
@@ -95,7 +99,7 @@ class OPACHarvester:
 
                     # Constrói URL do XML
                     journal_acron = item["journal_acronym"]
-                    xml_url = f"https://{self.domain}/j/{journal_acron}/a/{pid_v3}/?format=xml"
+                    xml_url = f"{self.domain}/j/{journal_acron}/a/{pid_v3}/?format=xml"
 
                     # Extrai data de origem
                     origin_date = self._parse_gmt_date(
