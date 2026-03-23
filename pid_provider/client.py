@@ -36,6 +36,7 @@ class PidProviderAPIClient:
         timeout=None,
         api_username=None,
         api_password=None,
+        verify=False,
     ):
         self.token = None
         self.pid_provider_api_post_xml = pid_provider_api_post_xml
@@ -43,6 +44,7 @@ class PidProviderAPIClient:
         self.api_username = api_username
         self.api_password = api_password
         self.timeout = timeout or 120
+        self.verify = verify
 
     @property
     def enabled(self):
@@ -205,7 +207,7 @@ class PidProviderAPIClient:
                     files=files,
                     headers=header,
                     timeout=timeout,
-                    verify=False,
+                    verify=self.verify,
                     json=True,
                 )
         except Exception as e:
@@ -299,7 +301,7 @@ class PidProviderAPIClient:
                 data={"pid_v3": pid_v3, "correct_pid_v2": correct_pid_v2},
                 headers=header,
                 timeout=timeout,
-                verify=False,
+                verify=self.verify,
                 json=True,
             )
         except Exception as e:
