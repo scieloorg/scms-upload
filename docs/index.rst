@@ -13,13 +13,12 @@ Welcome to SciELO Upload 's documentation!
    howto
    users
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Task Guides / Guías de Tareas / Guias de Tarefas:
+Task Guides / Guías de Tareas / Guias de Tarefas
+----------------------------------------------------------------------
 
-   guide_task_load_records_en
-   guide_task_load_records_es
-   guide_task_load_records_pt_br
+- `English <guide_task_load_records_en.md>`_
+- `Español <guide_task_load_records_es.md>`_
+- `Português <guide_task_load_records_pt_br.md>`_
 
 
 
