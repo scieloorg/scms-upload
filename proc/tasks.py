@@ -948,6 +948,14 @@ def task_migrate_and_publish_articles_by_journal(
         task_exec.add_event(f"Select journal issues which docs_status or files_status in {status} and/or has articles to process")
 
         events = []
+        article_issue_proc_list = ArticleProc.objects.filter(issue_proc__journal_proc=journal_proc).filter(
+            Q(migration_status__in=status)
+            | Q(xml_status__in=status)
+            | Q(sps_pkg_status__in=status)
+            | Q(qa_ws_status__in=status)
+            | Q(public_ws_status__in=status)
+        ).values_list("issue_proc__id", "issue_proc__pid").distinct()
+
         issue_proc_list = IssueProc.get_id_and_pid_list_to_process(
             journal_proc,
             issue_folder,
@@ -956,7 +964,9 @@ def task_migrate_and_publish_articles_by_journal(
             status,
             events,
         )
-        total_issues_to_process = issue_proc_list.count()
+
+        issue_proc_list = set(issue_proc_list) | set(article_issue_proc_list)
+        total_issues_to_process = len(issue_proc_list)
         task_exec.add_event(events)
         task_exec.add_number("total_issues_to_process", total_issues_to_process)
         task_exec.total_to_process = total_issues_to_process
