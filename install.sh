@@ -19,7 +19,7 @@ UPLOAD_DIR=./upload
 ENV_FILES_DIR=.envs/.production
 IS_UPDATE=0
 
-echo "Checking directory $UPLOAD_DIR$ENV_FILES_DIR ..."
+echo "Checking directory $UPLOAD_DIR/$ENV_FILES_DIR ..."
 
 if [ ! -d "$UPLOAD_DIR/$ENV_FILES_DIR" ]; then
     echo "Installing version $1 ..."
