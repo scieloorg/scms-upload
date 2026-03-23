@@ -2,21 +2,29 @@
 
 ## Propósito
 
-A tarefa `proc.tasks.task_track_classic_website_article_pids` compara os PIDs de
-artigos registrados no site clássico do SciELO (lidos a partir de um arquivo de
-texto indicado em `ClassicWebsiteConfiguration.pid_list_path`) com os registros
-`ArticleProc` já armazenados no sistema. Em seguida, atualiza o campo
-`pid_status` de cada registro:
+A tarefa `proc.tasks.task_track_classic_website_article_pids` permite
+**identificar a completude da migração a partir do site clássico do SciELO**.
+Para isso, compara a lista completa de PIDs de artigos do site clássico (lida
+a partir do arquivo de texto configurado em
+`ClassicWebsiteConfiguration.pid_list_path`) com cada registro `ArticleProc`
+já criado no sistema.
+
+Após a comparação, a tarefa atualiza o campo `pid_status` de cada registro
+`ArticleProc` da coleção para que você possa verificar rapidamente o quanto da
+migração já foi concluído e quais artigos ainda precisam de atenção:
 
 | Status | Significado |
 |---|---|
-| **matched** | O PID existe tanto no site clássico quanto em `ArticleProc` com `migrated_data` vinculado. |
-| **missing** | O PID existe em `ArticleProc`, mas não possui `migrated_data` vinculado. |
-| **exceeding** | O PID está presente em `ArticleProc`, mas não foi encontrado na lista de PIDs do site clássico. |
+| **matched** | O PID existe na lista do site clássico **e** o `ArticleProc` correspondente já possui `migrated_data` vinculado. A migração deste artigo está completa. |
+| **missing** | O PID existe na lista do site clássico **e** um `ArticleProc` existe, porém **não** possui `migrated_data` vinculado. O artigo ainda não foi migrado. |
+| **exceeding** | O `ArticleProc` existe no sistema, mas o PID **não** foi encontrado na lista de PIDs do site clássico. Pode ser um registro que não existe mais no site clássico. |
 
 PIDs novos encontrados no arquivo do site clássico que ainda não possuem um
 registro `ArticleProc` correspondente são criados automaticamente com status
 **missing**.
+
+Ao executar esta tarefa periodicamente, é possível acompanhar o progresso da
+migração e identificar artigos que ainda precisam ser migrados ou investigados.
 
 ### Pré-requisitos
 
@@ -66,13 +74,22 @@ parâmetros que a tarefa aceita:
 }
 ```
 
-#### Parâmetros disponíveis
+### Argumentos da tarefa
 
-| Parâmetro | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| `username` | string | **sim** | Nome de usuário do usuário Django que será registrado como criador de quaisquer novos registros `ArticleProc`. |
-| `user_id` | integer | não | Alternativa ao `username`. Se ambos forem fornecidos, `user_id` tem prioridade. |
-| `collection_acron` | string | não | Acrônimo da coleção a ser processada (por exemplo, `"scl"` para Brasil). Se omitido, **todas** as coleções serão processadas. |
+A tabela abaixo lista **todos** os argumentos aceitos pela tarefa. No
+django_celery_beat eles devem ser fornecidos como um objeto JSON no campo
+**Keyword arguments**.
+
+| Argumento | Tipo | Obrigatório | Valor padrão | Descrição |
+|---|---|---|---|---|
+| `username` | string | **sim** ¹ | — | Nome de usuário do usuário Django que será registrado como criador de quaisquer novos registros `ArticleProc`. |
+| `user_id` | integer | **sim** ¹ | `None` | ID numérico do usuário Django. Pode ser usado no lugar do `username`. |
+| `collection_acron` | string | não | `None` | Acrônimo da coleção a ser processada (por exemplo, `"scl"` para Brasil). Se omitido, **todas** as coleções configuradas serão processadas. |
+
+> ¹ Pelo menos um entre `username` ou `user_id` **deve** ser fornecido. Se
+> ambos forem informados, `user_id` tem prioridade.
+
+#### Avisos
 
 > **⚠️ Crítico:** O `username` ou `user_id` deve corresponder a um usuário
 > existente. Se o usuário não for encontrado, a tarefa registrará um erro
@@ -112,9 +129,9 @@ Na barra lateral do painel de administração do Wagtail, acesse
 Navegue até a listagem de **ArticleProc** no painel de administração e filtre
 por `pid_status` para verificar a distribuição:
 
-- **matched** – artigos vinculados com sucesso.
-- **missing** – artigos que precisam de atenção (sem `migrated_data`).
-- **exceeding** – artigos no sistema, mas não na lista de PIDs do site clássico.
+- **matched** – artigos cuja migração está completa.
+- **missing** – artigos que ainda precisam ser migrados (sem `migrated_data`).
+- **exceeding** – artigos no sistema, mas não presentes na lista de PIDs do site clássico.
 
 ### 3. Django shell / verificação programática
 
