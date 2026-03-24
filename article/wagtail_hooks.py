@@ -63,6 +63,13 @@ class ArticleSnippetViewSet(SnippetViewSet):
     )
     # inspect_view_fields não é usado em SnippetViewSet, use inspect_view_class customizada
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        try:
+            return qs.distinct()
+        except AttributeError:
+            return qs
+
 
 class RelatedItemSnippetViewSet(SnippetViewSet):
     model = RelatedItem
@@ -121,7 +128,10 @@ class RequestArticleChangeSnippetViewSet(SnippetViewSet):
         # if self.permission_helper.user_can_make_article_change(request.user, None):
         #     return qs
 
-        return qs
+        try:
+            return qs.distinct()
+        except AttributeError:
+            return qs
 
 
 class ArticleSnippetViewSetGroup(SnippetViewSetGroup):

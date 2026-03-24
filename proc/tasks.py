@@ -19,8 +19,8 @@ from proc.controller import (
     create_or_update_migrated_journal,
     fetch_and_create_journal,
     migrate_issue,
-    migrate_journal,
 )
+from proc.article_controller import track_classic_website_article_pids
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue, sync_issue
@@ -356,6 +356,7 @@ def task_publish_journals(
     collection_acron=None,
     journal_acron=None,
     force_update=False,
+    verify=False,
 ):
     task_params = {
         "task": "proc.tasks.task_publish_journals",
@@ -378,6 +379,7 @@ def task_publish_journals(
                 api_data = get_api_data(collection, "journal", website_kind)
                 if not api_data or api_data.get("error"):
                     continue
+                api_data["verify"] = verify
                 task_exec = TaskExecution(
                     name="proc.tasks.task_publish_journals",
                     item=f"{collection_acron}-{journal_acron} {website_kind}",
@@ -651,6 +653,7 @@ def task_publish_issues(
     issue_folder=None,
     publication_year=None,
     force_update=False,
+    verify=False,
 ):
     task_params = {
        "collection_acron": collection_acron,
@@ -676,6 +679,7 @@ def task_publish_issues(
                 api_data = get_api_data(collection, "issue", website_kind)
                 if not api_data or api_data.get("error"):
                     continue
+                api_data["verify"] = verify
                 task_exec = TaskExecution(
                     name="proc.tasks.task_publish_issues",
                     item=f"{collection_acron}-{journal_acron}-{issue_folder}-{publication_year} {website_kind}",
@@ -944,6 +948,14 @@ def task_migrate_and_publish_articles_by_journal(
         task_exec.add_event(f"Select journal issues which docs_status or files_status in {status} and/or has articles to process")
 
         events = []
+        article_issue_proc_list = ArticleProc.objects.filter(issue_proc__journal_proc=journal_proc).filter(
+            Q(migration_status__in=status)
+            | Q(xml_status__in=status)
+            | Q(sps_pkg_status__in=status)
+            | Q(qa_ws_status__in=status)
+            | Q(public_ws_status__in=status)
+        ).values_list("issue_proc__id", "issue_proc__pid").distinct()
+
         issue_proc_list = IssueProc.get_id_and_pid_list_to_process(
             journal_proc,
             issue_folder,
@@ -952,7 +964,9 @@ def task_migrate_and_publish_articles_by_journal(
             status,
             events,
         )
-        total_issues_to_process = issue_proc_list.count()
+
+        issue_proc_list = set(issue_proc_list) | set(article_issue_proc_list)
+        total_issues_to_process = len(issue_proc_list)
         task_exec.add_event(events)
         task_exec.add_number("total_issues_to_process", total_issues_to_process)
         task_exec.total_to_process = total_issues_to_process
@@ -1207,6 +1221,7 @@ def task_publish_articles(
     issue_folder=None,
     publication_year=None,
     force_update=False,
+    verify=False,
 ):
     task_params = {
         "user_id": user_id,
@@ -1234,6 +1249,7 @@ def task_publish_articles(
                 api_data = get_api_data(collection, "article", website_kind)
                 if not api_data or api_data.get("error"):
                     continue
+                api_data["verify"] = verify
 
                 task_exec = TaskExecution(
                     name="proc.tasks.task_publish_articles",
@@ -1480,22 +1496,14 @@ def task_exclude_article_repetition(self, journal_proc_id, qa_api_data=None, pub
         response = Article.fix_sps_pkg_names(journal_articles_to_fix_sps_pkg_names_qs)
         task_exec.add_event(f"fixed sps_pkg_names: {response}")
 
-        issues = set()
-        for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
-            repeated_items = Article.get_repeated_items(field_name, journal)
-            task_exec.add_number(f"repeated_by_{field_name}", repeated_items.count())
-            for repeated_value in repeated_items:
-                try:
-                    events = Article.exclude_repetitions(user, field_name, repeated_value, timeout=timeout)
-                    task_exec.add_event(events)
-                except Exception as e:
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    task_exec.add_exception(
-                        {
-                            f"repeated_by_{field_name}": repeated_value,
-                            "traceback": traceback.format_exc(),
-                        }
-                    )
+        results = Article.exclude_inconvenient_articles(journal, user, timeout)
+        for event in results["events"]:
+            task_exec.add_event(event)
+        for key, value in results["numbers"].items():
+            task_exec.add_number(key, value)
+        for exc in results["exceptions"]:
+            task_exec.add_exception(exc)
+
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1581,6 +1589,36 @@ def task_remove_duplicate_issues(
                 )
         task_exec.finish()
         
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        task_exec.finish(exception=e, exc_traceback=exc_traceback)
+
+
+@celery_app.task(bind=True)
+def task_track_classic_website_article_pids(
+    self, username, user_id=None, collection_acron=None,
+):
+    task_params = {
+        "username": username,
+        "collection_acron": collection_acron,
+    }
+    task_exec = TaskExecution(
+        name="proc.tasks.task_track_classic_website_article_pids",
+        item=f"{collection_acron or 'all'}",
+        params=task_params,
+    )
+    try:
+        user = _get_user(user_id=user_id, username=username)
+        for collection in _get_collections(collection_acron):
+            classic_website_config = controller.get_classic_website_config(
+                collection.acron
+            )
+            result = track_classic_website_article_pids(
+                user, collection, classic_website_config,
+            )
+            if result:
+                task_exec.add_event(result)
+        task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         task_exec.finish(exception=e, exc_traceback=exc_traceback)

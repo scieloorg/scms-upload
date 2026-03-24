@@ -44,6 +44,9 @@ SINCHRONIZE_TO_PID_PROVIDER_MINUTES = MINUTES[10]
 FETCH_AND_CREATE_JOURNAL_MINUTES = MINUTES[10]
 FETCH_AND_CREATE_JOURNAL_PRIORITY = 1
 
+PRESS_RELEASE_MINUTES = MINUTES[10]
+PRESS_RELEASE_PRIORITY = 1
+
 TITLE_DB_MIGRATION_PRIORITY = 0
 ISSUE_DB_MIGRATION_PRIORITY = 0
 ARTICLE_DB_MIGRATION_PRIORITY = 4
@@ -105,6 +108,7 @@ def schedule_publication_subtasks(username):
 def schedule_subtasks(username):
     enabled = False
     _schedule_fetch_and_create_journal(username, enabled)  # Nova tarefa adicionada
+    _schedule_try_fetch_and_register_press_release(username, enabled)
 
 
 def _schedule_check_article_availability(username, enabled=False):
@@ -299,6 +303,7 @@ def _schedule_publish_journals(username, enabled=False):
             collection_acron=None,
             journal_acron=None,
             force_update=False,
+            verify=False,
         ),
         description=_("Publica periódicos"),
         priority=TITLE_DB_MIGRATION_PRIORITY,
@@ -324,6 +329,7 @@ def _schedule_publish_issues(username, enabled=False):
             journal_acron=None,
             publication_year=None,
             force_update=False,
+            verify=False,
         ),
         description=_("Publica fascículos"),
         priority=ISSUE_DB_MIGRATION_PRIORITY,
@@ -345,6 +351,7 @@ def _schedule_publish_articles(username, enabled=False):
             journal_acron=None,
             publication_year=None,
             force_update=False,
+            verify=False,
         ),
         description=_("Publica artigos"),
         priority=ARTICLE_DB_MIGRATION_PRIORITY,
@@ -380,4 +387,28 @@ def _schedule_fetch_and_create_journal(username, enabled=False):
         day_of_week="*",
         hour="*",
         minute=FETCH_AND_CREATE_JOURNAL_MINUTES,
+    )
+
+
+def _schedule_try_fetch_and_register_press_release(username, enabled=False):
+    """
+    Agenda a tarefa de buscar e registrar press releases
+    Deixa a tarefa desabilitada por padrão
+    """
+    schedule_task(
+        task="core.tasks.try_fetch_and_register_press_release",
+        name="try_fetch_and_register_press_release",
+        kwargs=dict(
+            username=username,
+            journal_acronym=None,
+            pressrelease_lang=None,
+            verify=False,
+        ),
+        description=_("Busca e registra press releases"),
+        priority=PRESS_RELEASE_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=PRESS_RELEASE_MINUTES,
     )
