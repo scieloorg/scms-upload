@@ -60,6 +60,10 @@ def reverse_migration(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    # Disable atomic transactions to allow the deletes to commit before creating the index
+    # This prevents PostgreSQL "pending trigger events" error when creating the unique constraint
+    atomic = False
+    
     dependencies = [
         ("htmlxml", "0004_alter_bodyandbackfile_file_and_more"),
     ]
