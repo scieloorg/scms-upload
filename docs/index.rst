@@ -16,9 +16,9 @@ Welcome to SciELO Upload 's documentation!
 Task Guides / Guías de Tareas / Guias de Tarefas
 ----------------------------------------------------------------------
 
-- `English <guide_task_load_records_en.md>`_
-- `Español <guide_task_load_records_es.md>`_
-- `Português <guide_task_load_records_pt_br.md>`_
+- `English <pid_provider/guide_task_load_records_en.md>`_
+- `Español <pid_provider/guide_task_load_records_es.md>`_
+- `Português <pid_provider/guide_task_load_records_pt_br.md>`_
 
 
 
