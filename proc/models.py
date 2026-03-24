@@ -28,10 +28,12 @@ from collection import choices as collection_choices
 from collection.models import Collection
 from core.models import CommonControlField
 from core.utils.file_utils import delete_files
+from core.utils.sanitize import sanitize_for_json
 from htmlxml.models import HTMLXML
 from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
 from journal.models import Journal
+from migration import choices as migration_choices
 from migration.controller import (
     PkgZipBuilder,
     XMLVersionXmlWithPreError,
@@ -57,6 +59,7 @@ from tracker.models import UnexpectedEvent, format_traceback
 
 class NoDocumentRecordsToMigrateError(Exception):
     ...
+
 
 class Operation(CommonControlField):
 
@@ -169,7 +172,7 @@ class Operation(CommonControlField):
         try:
             json.dumps(detail)
         except Exception as exc_detail:
-            detail = str(detail)
+            detail = sanitize_for_json(detail)
 
         self.detail = detail
         self.completed = completed
@@ -1538,6 +1541,14 @@ class ArticleProc(BaseProc, ClusterableModel):
         blank=True,
         null=True,
     )
+    pid_status = models.CharField(
+        _("PID Status"),
+        max_length=10,
+        choices=migration_choices.PID_STATUS,
+        default=migration_choices.PID_STATUS_UNKNOWN,
+        blank=True,
+        null=True,
+    )
     processed_xml = models.FileField(
         _("Processed XML"),
         upload_to=proc_directory_path,
@@ -1556,6 +1567,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         AutocompletePanel("sps_pkg", read_only=True),
     ]
     panel_status = [
+        FieldPanel("pid_status"),
         FieldPanel("xml_status"),
         FieldPanel("sps_pkg_status"),
         FieldPanel("migration_status"),
@@ -1582,6 +1594,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         ordering = ["-updated"]
         indexes = [
             models.Index(fields=["pkg_name"]),
+            models.Index(fields=["pid_status"]),
             models.Index(fields=["xml_status"]),
             models.Index(fields=["sps_pkg_status"]),
         ]

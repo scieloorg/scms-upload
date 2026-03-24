@@ -176,6 +176,30 @@ class ClassicWebsiteConfiguration(CommonControlField):
 
     base_form_class = CoreAdminModelForm
 
+    def get_pid_list(self):
+        """
+        Reads and returns a set of article PIDs from the file
+        indicated by pid_list_path.
+        """
+        if not self.pid_list_path:
+            return set()
+        try:
+            with open(self.pid_list_path, "r") as fp:
+                return set(fp.read().split())
+        except FileNotFoundError:
+            logging.warning(
+                "pid_list_path file not found: %s", self.pid_list_path
+            )
+        except Exception as e:
+            logging.exception(
+                "Error reading pid_list_path %s: %s", self.pid_list_path, e
+            )
+        return set()
+
+    @property
+    def pid_list(self):
+        return self.get_pid_list()
+
 
 class MigratedData(CommonControlField):
     collection = models.ForeignKey(
@@ -240,8 +264,9 @@ class MigratedData(CommonControlField):
         force_update=False,
     ):
         try:
-            if data:
-                classic_ws_obj = cls.get_data_from_classic_website(data)
+            if not data:
+                raise ValueError(f"register_classic_website_data {collection} {pid}: no data")
+            classic_ws_obj = cls.get_data_from_classic_website(data)
         except Exception as e:
             classic_ws_obj = None
 
@@ -287,6 +312,13 @@ class MigratedData(CommonControlField):
             obj = cls.objects.get(collection=collection, pid=pid)
             if obj.is_up_to_date(isis_updated_date, data) and not force_update:
                 return obj
+            obj.updated_by = user
+        except cls.MultipleObjectsReturned:
+            qs = cls.objects.filter(collection=collection, pid=pid).order_by("-updated")
+            obj = qs.first()
+            if obj is None:
+                raise cls.DoesNotExist
+            qs.exclude(pk=obj.pk).delete()
             obj.updated_by = user
         except cls.DoesNotExist:
             obj = cls()
@@ -569,6 +601,11 @@ class MigratedFile(CommonControlField):
             self.file_datetime_iso and self.file_datetime_iso == file_datetime_iso
         )
 
+    def get_lines(self):
+        """Read file content and return whitespace-split tokens."""
+        with open(self.file.path, mode="r", encoding="utf-8") as fp:
+            return fp.read().split()
+
     @property
     def text(self):
         try:
@@ -637,29 +674,43 @@ class MigratedArticle(MigratedData):
     ]
 
     def __str__(self):
-        document = self.document
-        return f"{document.journal.acronym} {document.issue.issue_label} {document.filename_without_extension}"
+       return self.path
 
     @classmethod
     def get_data_from_classic_website(cls, data):
+        if not data:
+            return None
         return classic_ws.Document(data)
 
     @property
     def document(self):
+        if not self.data:
+            return
         return classic_ws.Document(self.data)
 
     @property
     def n_paragraphs(self):
+        if not self.document:
+            return None
         return len(self.document.p_records or [])
 
     @property
     def pkg_name(self):
-        return self.document.filename_without_extension
+        try:
+            return self.document.filename_without_extension
+        except AttributeError:
+            return None
 
     @property
     def path(self):
         document = self.document
-        return f"{document.journal.acronym}/{document.issue.issue_label}/{document.filename_without_extension}"
+        try:
+            return f"{document.journal.acronym}/{document.issue.issue_label}/{document.filename_without_extension}"
+        except AttributeError:
+            journal = self.pid[1:10]
+            issue = self.pid[10:18]
+            article = self.pid[-5:]
+            return f"{journal}/{issue}/{article}"
 
 
 class JournalAcronIdFile(CommonControlField, ClusterableModel):

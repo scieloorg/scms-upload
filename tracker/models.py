@@ -15,6 +15,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
+from core.utils.sanitize import sanitize_for_json
 from tracker import choices
 
 
@@ -162,7 +163,7 @@ class UnexpectedEvent(models.Model):
                 json.dumps(detail)
                 obj.detail = detail
             except Exception as e:
-                obj.detail = str(detail)
+                obj.detail = sanitize_for_json(detail)
 
             if exc_traceback:
                 obj.traceback = traceback.format_tb(exc_traceback)
@@ -249,7 +250,7 @@ class TaskTracker(BaseEvent):
         try:
             json.dumps(detail)
         except Exception as exc_detail:
-            detail = str(detail)
+            detail = sanitize_for_json(detail)
 
         if detail:
             self.detail = detail

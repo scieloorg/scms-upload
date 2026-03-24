@@ -42,7 +42,8 @@ class PublicationAPI:
         password=None,
         timeout=None,
         token=None,
-        enabled=None
+        enabled=None,
+        verify=False,
     ):
         self.timeout = timeout or 15
         self.post_data_url = post_data_url
@@ -51,6 +52,7 @@ class PublicationAPI:
         self.password = password
         self.token = token
         self.enabled = enabled
+        self.verify = verify
         if not token and enabled:
             self.get_token()
 
@@ -63,6 +65,7 @@ class PublicationAPI:
             password=self.password,
             token=self.token,
             enabled=self.enabled,
+            verify=self.verify,
         )
 
     def post_data(self, payload, kwargs=None):
@@ -147,7 +150,7 @@ class PublicationAPI:
             data=json.dumps(payload),
             headers=header,
             timeout=self.timeout,
-            verify=False,
+            verify=self.verify,
             json=True,
         )
 
