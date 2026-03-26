@@ -51,7 +51,7 @@ class PublicationAPI:
         self.password = password
         self.token = token
         self.enabled = enabled
-        if not token and enabled:
+        if not token:
             self.get_token()
 
     @property
@@ -72,8 +72,6 @@ class PublicationAPI:
         # logging.info(f"payload={payload}")
         response = None
         try:
-            if not self.enabled:
-                raise ValueError(_("Website enabled is False ({})").format(self.post_data_url))
             if not self.token:
                 self.get_token()
             response = self._post_data(payload, self.token, kwargs)
@@ -118,6 +116,8 @@ class PublicationAPI:
         )
         # logging.info(resp)
         self.token = resp.get("token")
+        if not self.token:
+            raise Exception(f"Failed to get token from {self.get_token_url} with username {self.username}: {resp}")
         return self.token
 
     def _post_data(self, payload, token, kwargs=None):
