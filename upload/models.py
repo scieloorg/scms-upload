@@ -48,13 +48,11 @@ from proc.source_core_api import create_or_update_issue
 from team.models import CollectionTeamMember
 from upload import choices
 from upload.forms import (
-    ReadyToPublishPackageForm,
     QAPackageForm,
-    UploadPackageForm,
+    ReadyToPublishPackageForm,
     UploadValidatorForm,
     ValidationResultForm,
-    XMLErrorReportForm,
-    PackageZipForm,
+    XMLErrorReportForm
 )
 from upload.permission_helper import ACCESS_ALL_PACKAGES, ASSIGN_PACKAGE, FINISH_DEPOSIT
 from upload.utils import file_utils
@@ -124,7 +122,6 @@ class PackageZip(CommonControlField):
         FieldPanel("show_package_validations"),
     ]
 
-    base_form_class = PackageZipForm
 
     class Meta:
         verbose_name = _("Zip file")
@@ -134,6 +131,19 @@ class PackageZip(CommonControlField):
                 fields=[
                     "name",
                 ]
+            ),
+        ]
+        permissions = [
+            ("access_all_packages", _("Can access all packages")),
+            ("assign_package", _("Can assign package")),
+            ("finish_deposit", _("Can finish deposit")),
+            (
+                "send_validation_error_resolution",
+                _("Can send validation error resolution"),
+            ),
+            (
+                "analyse_validation_error_resolution",
+                _("Can analyse validation error resolution"),
             ),
         ]
 
@@ -314,7 +324,6 @@ class Package(CommonControlField, ClusterableModel):
             ObjectList(panel_event, heading=_("Events")),
         ]
     )
-    base_form_class = UploadPackageForm
 
     class Meta:
         verbose_name = _("Package admin")
@@ -1337,7 +1346,7 @@ class QAPackage(Package):
     QA can approve or reject
 
     """
-
+    base_form_class = QAPackageForm
     panel_id = [
         AutocompletePanel("article", read_only=False),
     ]
@@ -1369,7 +1378,6 @@ class QAPackage(Package):
             ObjectList(panel_event, heading=_("Events")),
         ]
     )
-    base_form_class = QAPackageForm
 
     class Meta:
         proxy = True
@@ -1381,7 +1389,7 @@ class ReadyToPublishPackage(Package):
     """
     Package ready to publish
     """
-
+    base_form_class = ReadyToPublishPackageForm
     panel_id = [
         AutocompletePanel("article", read_only=False),
     ]
@@ -1422,7 +1430,6 @@ class ReadyToPublishPackage(Package):
         ]
     )
 
-    base_form_class = ReadyToPublishPackageForm
 
     class Meta:
         proxy = True
@@ -1449,8 +1456,8 @@ class BaseValidationResult(CommonControlField):
         null=True,
         blank=True,
     )
-
     base_form_class = ValidationResultForm
+
     panels = [
         FieldPanel("subject", read_only=True),
         FieldPanel("status", read_only=True),
@@ -1667,6 +1674,8 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
         blank=True,
     )
 
+    base_form_class = XMLErrorReportForm
+
     panels = [
         FieldPanel("status", read_only=True),
         FieldPanel("advice", read_only=True),
@@ -1742,7 +1751,6 @@ class BaseValidationReport(CommonControlField):
         blank=False,
     )
     ValidationResultClass = BaseValidationResult
-    base_form_class = ValidationResultForm
 
     panels = [
         AutocompletePanel("package", read_only=True),
@@ -1969,7 +1977,6 @@ class XMLErrorReport(BaseValidationReport, ClusterableModel):
         ]
     )
 
-    base_form_class = XMLErrorReportForm
     ValidationResultClass = XMLError
 
     class Meta:
@@ -2050,6 +2057,7 @@ class UploadValidator(CommonControlField):
     )
     validation_params = models.JSONField(null=True, blank=True)
 
+    base_form_class = UploadValidatorForm
     panels = [
         FieldPanel("max_xml_warnings_percentage"),
         FieldPanel("max_xml_errors_percentage"),
@@ -2058,7 +2066,6 @@ class UploadValidator(CommonControlField):
         FieldPanel("publication_rule"),
         FieldPanel("validation_params"),
     ]
-    base_form_class = UploadValidatorForm
 
     # def __str__(self):
     #     if self.collection:
