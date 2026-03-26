@@ -11,17 +11,6 @@ from team.models import CollectionTeamMember
 from upload import choices
 
 
-class PackageZipForm(CoreAdminModelForm):
-    def save_all(self, user):
-        pkg_zip = super().save_all(user)
-
-        pkg_zip.name, ext = os.path.splitext(os.path.basename(pkg_zip.file.name))
-        logging.info(pkg_zip.name)
-        self.save()
-
-        return pkg_zip
-
-
 class UploadPackageForm(CoreAdminModelForm): ...
 
 
