@@ -561,7 +561,7 @@ class Package(CommonControlField, ClusterableModel):
                 user = self.updated_by or self.creator
                 # é desejável que o artigo seja publicado diretamente
                 # prepare_to_publish verficará se há impedimentos
-                detail = None
+                detail = {}
                 event = None
                 event = self.start(user, "process_system_decision")
 
@@ -956,9 +956,8 @@ class Package(CommonControlField, ClusterableModel):
             save = True
 
         if comments:
-            if not self.qa_comment:
-                self.qa_comment = ""
-            self.qa_comment += "\n".join(comments)
+            self.qa_comment = self.qa_comment or ""
+            self.qa_comment += "\n".join(str(c) for c in comments)
             save = True
 
         if save:
@@ -1001,7 +1000,7 @@ class Package(CommonControlField, ClusterableModel):
 
     def add_pid_v2(self, user, xml_with_pre):
         try:
-            detail = None
+            detail = {}
             pid_v2_gen = None
             event = self.start(user, "add_pid_v2")
             pid_v2_gen = PidV2Generator(xml_with_pre)
