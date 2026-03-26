@@ -221,10 +221,13 @@ def publish_article_on_website(
             username=website.api_username,
             password=website.api_password,
             timeout=15,
+            enabled=website.enabled,
         )
         api.get_token()
         api_data = api.data
     except WebSiteConfiguration.DoesNotExist as exc:
+        return
+    except Exception as exc:
         return
 
     journal_proc = issue_proc.journal_proc
