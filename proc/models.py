@@ -108,33 +108,28 @@ class Operation(CommonControlField):
 
     @classmethod
     def create(cls, user, proc, name):
-        name = name[:64]
-        cls.exclude_events(user, proc, name)
         obj = cls()
         obj.proc = proc
         obj.name = name
         obj.creator = user
         obj.save()
         return obj
-        # try:
-        #     return cls.objects.get(proc=proc, name=name)
-        # except cls.MultipleObjectsReturned:
-        #     return cls.objects.filter(proc=proc, name=name).order_by("-created").first()
-        # except cls.DoesNotExist:
-        #     obj = cls()
-        #     obj.proc = proc
-        #     obj.name = name
-        #     obj.creator = user
-        #     obj.save()
-        #     return obj
 
     @classmethod
     def exclude_events(cls, user, proc, name):
         # apaga todas as ocorrências que foram armazenadas no arquivo
         try:
-            cls.objects.filter(proc=proc, name=name).delete()
+            event = cls.objects.get(proc=proc, name=name)
+        except cls.MultipleObjectsReturned:
+            event = cls.objects.filter(proc=proc, name=name).order_by("-created").first()
+        except cls.DoesNotExist:
+            return
+        
+        try:
+            cls.objects.filter(proc=proc, created__gte=event.created).delete()
+            logging.info(f"Deleted events for proc {proc} and name {name} starting from {event.created}")
         except Exception as e:
-            pass
+            logging.info(f"Error deleting events for proc {proc} and name {name}: {e}")
 
     @classmethod
     def start(
@@ -143,6 +138,9 @@ class Operation(CommonControlField):
         proc,
         name=None,
     ):
+        logging.info(f"Starting operation {name} for proc {proc} by user {user}")
+        name = name[:64]
+        cls.exclude_events(user, proc, name)
         return cls.create(user, proc, name)
 
     def finish(
