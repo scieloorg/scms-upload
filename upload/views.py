@@ -1,10 +1,14 @@
 import logging
+import os
 
 from django.contrib import messages
-from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
-from wagtail_modeladmin.views import CreateView, EditView, InspectView
+
+from wagtail.snippets.views.snippets import CreateView, EditView, InspectView
+
+from core.views import UserTrackingCreateView, UserTrackingEditView
 
 from article.models import Article
 from issue.models import Issue
@@ -22,42 +26,214 @@ from upload.utils.xml_utils import XMLFormatError
 from team.models import has_permission
 
 
-class PackageZipCreateView(CreateView):
-    def form_valid(self, form):
-        if not has_permission(self.request.user):
-            messages.error(
-                self.request,
-                _("Operation not available"),
-            )
-            return HttpResponseRedirect(self.get_success_url())
+# ===================================================================
+# Create / Edit Views customizadas
+# ===================================================================
 
-        pkg_zip = form.save_all(self.request.user)
-        task_receive_packages.apply_async(
-            kwargs=dict(
-                user_id=self.request.user.id,
-                pkg_zip_id=pkg_zip.id,
+
+class PackageZipCreateView(UserTrackingCreateView):
+    """
+    Upload de pacote ZIP.
+
+    Sobrescreve post() porque precisa:
+    1. Checar permissão antes do save
+    2. Disparar task assíncrona após o save
+    3. Redirecionar condicionalmente
+    """
+
+    def post(self, request, *args, **kwargs):
+        if not has_permission(request.user):
+            messages.error(request, _("Operation not available"))
+            return redirect(self.get_add_url())
+
+        self.form = self.get_form()
+        if self.form.is_valid():
+            pkg_zip = self.save_instance()
+            pkg_zip.name, ext = os.path.splitext(os.path.basename(pkg_zip.file.name))
+            pkg_zip.save()
+
+            task_receive_packages.apply_async(
+                kwargs=dict(
+                    user_id=request.user.id,
+                    pkg_zip_id=pkg_zip.id,
+                )
             )
-        )
-        if pkg_zip.show_package_validations:
-            return redirect(f"/admin/upload/package?q={pkg_zip.name}")
+
+            if pkg_zip.show_package_validations:
+                return redirect(f"/admin/upload/package?q={pkg_zip.name}")
+            else:
+                return redirect(self.get_success_url())
         else:
-            return HttpResponseRedirect(self.get_success_url())
+            return self.form_invalid(self.form)
+
+
+class XMLInfoReportEditView(UserTrackingEditView):
+    """
+    Edição de XMLInfoReport.
+
+    Sobrescreve post() para redirect customizado após save.
+    """
+
+    fields = ["package"]
+
+    def post(self, request, *args, **kwargs):
+        self.form = self.get_form()
+        if self.form.is_valid():
+            self.save_instance()
+            messages.success(request, _("Success ..."))
+            return redirect(self.get_success_url())
+        else:
+            return self.form_invalid(self.form)
+
+    def get_success_url(self):
+        report = self.instance
+        return f"/admin/upload/package/inspect/{report.package.id}/?#xi"
+
+
+class ValidationReportEditView(XMLInfoReportEditView):
+    def get_success_url(self):
+        report = self.instance
+        return f"/admin/upload/package/inspect/{report.package.id}/?#vr{report.id}"
+
+
+class XMLErrorReportEditView(XMLInfoReportEditView):
+    def get_success_url(self):
+        report = self.instance
+        return f"/admin/upload/package/inspect/{report.package.id}/?#xer{report.id}"
+
+    def post(self, request, *args, **kwargs):
+        if not has_permission(request.user):
+            messages.error(request, _("Operation not available"))
+            return redirect(self.get_success_url())
+
+        self.form = self.get_form()
+        if self.form.is_valid():
+            self.form.save_all(request.user)
+            self.save_instance()
+            return redirect(self.get_success_url())
+        else:
+            return self.form_invalid(self.form)
+
+
+class UploadValidatorEditView(UserTrackingEditView):
+    """
+    Sobrescreve post() para checar permissão antes do save.
+    """
+
+    def post(self, request, *args, **kwargs):
+        if not has_permission(request.user):
+            messages.error(request, _("Operation not available"))
+            return redirect(self.get_success_url())
+
+        self.form = self.get_form()
+        if self.form.is_valid():
+            self.save_instance()
+            return redirect(self.get_success_url())
+        else:
+            return self.form_invalid(self.form)
+
+
+# ===================================================================
+# Mixin e views de decisão de publicação
+# ===================================================================
+
+
+class PackageDecisionMixin:
+    """
+    Mixin para processar decisões de publicação de pacotes.
+
+    Sobrescreve post() porque precisa:
+    1. Checar permissão
+    2. Salvar com tracking de updated_by
+    3. Disparar tasks condicionais
+    4. Processar decisão de QA
+    5. Redirecionar com mensagem de sucesso/erro
+    """
+
+    success_message = _("The decision was executed as planned")
+    error_message = _("There was an impediment to executing the decision.")
+    permission_error_message = _("Operation not available")
+
+    def get_task_function(self):
+        """Pode ser sobrescrito se diferentes views usarem tasks diferentes."""
+        return task_publish_article
+
+    def process_decision(self, package, user, force_journal, force_issue):
+        """Pode ser sobrescrito para customizar o processamento."""
+        return package.process_qa_decision(
+            user, self.get_task_function(), force_journal, force_issue
+        )
+
+    def post(self, request, *args, **kwargs):
+        if not has_permission(request.user):
+            messages.error(request, self.permission_error_message)
+            return redirect(self.get_success_url())
+
+        self.form = self.get_form()
+        if not self.form.is_valid():
+            return self.form_invalid(self.form)
+
+        # save_instance() seta updated_by e salva
+        package = self.save_instance()
+
+        user = request.user
+        force_journal_publication = self.form.cleaned_data.get("force_journal_publication")
+        if force_journal_publication and package.journal:
+            task_complete_journal_data.delay(
+                user_id=user.id,
+                username=user.username,
+                journal_id=package.journal.id,
+            )
+        force_issue_publication = self.form.cleaned_data.get("force_issue_publication")
+        if force_issue_publication and package.issue:
+            task_complete_issue_data.delay(
+                user_id=user.id,
+                username=user.username,
+                issue_id=package.issue.id,
+            )
+
+        if self.process_decision(
+            package,
+            user,
+            force_journal_publication,
+            force_issue_publication,
+        ):
+            messages.success(request, self.success_message)
+            return redirect(self.get_success_url())
+        else:
+            messages.error(request, self.error_message)
+            return self.form_invalid(self.form)
+
+
+class QAPackageEditView(PackageDecisionMixin, UserTrackingEditView):
+    pass
+
+
+class ReadyToPublishPackageEditView(PackageDecisionMixin, UserTrackingEditView):
+    success_message = _("Article successfully published")
+    error_message = _("Failed to publish the article. Please try again.")
+
+
+# ===================================================================
+# Inspect View
+# ===================================================================
 
 
 class PackageAdminInspectView(InspectView):
+    """
+    MIGRAÇÃO: InspectView do wagtail.snippets tem a mesma interface
+    que a do ModelAdmin para get_context_data().
+    """
+
     def get_optimized_package_filepath_and_directory(self):
-        # Obtém caminho do pacote otimizado
         _path = package_utils.generate_filepath_with_new_extension(
             self.instance.file.name,
             ".optz",
             True,
         )
-
-        # Obtém diretório em que o pacote otimizado foi extraído
         _directory = file_utils.get_file_url(
             dirname="", filename=file_utils.get_filename_from_filepath(_path)
         )
-
         return _path, _directory
 
     def set_pdf_paths(self, data, optz_dir):
@@ -106,135 +282,21 @@ class PackageAdminInspectView(InspectView):
             "blocking_errors": blocking_errors,
         }
 
-        # optz_file_path, optz_dir = self.get_optimized_package_filepath_and_directory()
-        # data["optimized_pkg"] = optz_file_path
-        # self.set_pdf_paths(data, optz_dir)
-
         return super().get_context_data(**data)
 
 
-class XMLInfoReportEditView(EditView):
-
-    fields = ["package"]
-
-    def form_valid(self, form):
-
-        report = form.save_all(self.request.user)
-
-        messages.success(
-            self.request,
-            _("Success ..."),
-        )
-
-        # dispara a tarefa que realiza as validações de
-        # assets, renditions, XML content etc
-        return redirect(self.get_package_url())
-
-    def get_package_url(self):
-        report = self.instance
-        return f"/admin/upload/package/inspect/{report.package.id}/?#xi"
-
-
-class ValidationReportEditView(XMLInfoReportEditView):
-    def get_package_url(self):
-        report = self.instance
-        return f"/admin/upload/package/inspect/{report.package.id}/?#vr{report.id}"
-
-
-class XMLErrorReportEditView(XMLInfoReportEditView):
-    def get_package_url(self):
-        report = self.instance
-        return f"/admin/upload/package/inspect/{report.package.id}/?#xer{report.id}"
-
-
-class PackageDecisionMixin:
-    """Mixin configurável para processar decisões de publicação de pacotes"""
-
-    # Atributos que podem ser sobrescritos nas classes filhas
-    success_message = _("The decision was executed as planned")
-    error_message = _("There was an impediment to executing the decision.")
-    permission_error_message = _("Operation not available")
-
-    def get_task_function(self):
-        """Pode ser sobrescrito se diferentes views usarem tasks diferentes"""
-        return task_publish_article
-
-    def process_decision(self, package, user, force_journal, force_issue):
-        """Pode ser sobrescrito para customizar o processamento"""
-        return package.process_qa_decision(
-            user, self.get_task_function(), force_journal, force_issue
-        )
-
-    def form_valid(self, form):
-        if not has_permission(self.request.user):
-            messages.error(self.request, self.permission_error_message)
-            return HttpResponseRedirect(self.get_success_url())
-
-        package = form.save_all(self.request.user)
-
-        user = self.request.user
-        force_journal_publication = form.cleaned_data.get("force_journal_publication")
-        if force_journal_publication and package.journal:
-            task_complete_journal_data.delay(
-                user_id=user.id,
-                username=user.username,
-                journal_id=package.journal.id,
-            )
-        force_issue_publication = form.cleaned_data.get("force_issue_publication")
-        if force_issue_publication and package.issue:
-            task_complete_issue_data.delay(
-                user_id=user.id,
-                username=user.username,
-                issue_id=package.issue.id,
-            )
-
-        if self.process_decision(
-            package,
-            self.request.user,
-            force_journal_publication,
-            force_issue_publication,
-        ):
-            messages.success(self.request, self.success_message)
-            return HttpResponseRedirect(self.get_success_url())
-        else:
-            messages.error(self.request, self.error_message)
-            return self.form_invalid(form)
-
-
-class QAPackageEditView(PackageDecisionMixin, EditView):
-    # Usando as mensagens padrão
-    pass
-
-
-class ReadyToPublishPackageEditView(PackageDecisionMixin, EditView):
-    # Exemplo de customização de mensagens
-    success_message = _("Article successfully published")
-    error_message = _("Failed to publish the article. Please try again.")
-
-
-class UploadValidatorEditView(EditView):
-    def form_valid(self, form):
-        if not has_permission(self.request.user):
-            messages.error(
-                self.request,
-                _("Operation not available"),
-            )
-            return HttpResponseRedirect(self.get_success_url())
-        obj = form.save_all(self.request.user)
-        return HttpResponseRedirect(self.get_success_url())
+# ===================================================================
+# Function-based views (sem mudança na migração)
+# ===================================================================
 
 
 def finish_deposit(request):
-    """
-    This view function enables the user to finish deposit of a package through the graphic-interface.
-    """
     package_id = request.GET.get("package_id")
 
     if package_id:
         package = get_object_or_404(Package, pk=package_id)
 
         if package.finish_deposit(task_publish_article):
-            # muda o status para a próxima etapa
             messages.success(request, _("Package has been deposited"))
             return redirect("/admin/upload/package/")
 
@@ -258,9 +320,6 @@ def finish_deposit(request):
 
 
 def download_errors(request):
-    """
-    This view function enables the user to finish deposit of a package through the graphic-interface.
-    """
     package_id = request.GET.get("package_id")
 
     if package_id:
@@ -278,9 +337,6 @@ def download_errors(request):
 
 
 def display_xml(request):
-    """
-    This view function enables the user to see a preview of HTML
-    """
     package_id = request.GET.get("package_id")
 
     if package_id:
@@ -295,9 +351,6 @@ def display_xml(request):
 
 
 def preview_document(request):
-    """
-    This view function enables the user to see a preview of HTML
-    """
     package_id = request.GET.get("package_id")
 
     if package_id:
@@ -317,9 +370,6 @@ def preview_document(request):
 
 
 def assign(request):
-    """
-    Assign review to a team member or decide about the package
-    """
     package_id = request.GET.get("package_id")
     user = request.user
 
@@ -328,14 +378,6 @@ def assign(request):
     elif package_id:
         package = get_object_or_404(Package, pk=package_id)
         is_reassign = package.assignee is not None
-
-        # package.assignee = user
-        # package.save()
-
-        # if not is_reassign:
-        #     messages.success(request, _("Package has been assigned with success."))
-        # else:
-        #     messages.warning(request, _("Package has been reassigned with success."))
 
     return redirect(f"/admin/upload/qapackage/edit/{package_id}")
 
