@@ -97,6 +97,49 @@ class SanitizeForJsonTest(unittest.TestCase):
         json.dumps(result)  # Must not raise
         self.assertNotIn("\ud800", result)
 
+    def test_django_lazy_proxy_converted_to_string(self):
+        """Django lazy translation objects (__proxy__) must be converted to str."""
+        from django.utils.translation import gettext_lazy as _
+
+        lazy_text = _("Select journals by collection")
+        result = sanitize_for_json(lazy_text)
+        self.assertIsInstance(result, str)
+        json.dumps(result)  # Must not raise
+
+    def test_list_with_lazy_proxy_converted(self):
+        """A list containing a lazy proxy object must be fully serializable."""
+        from django.utils.translation import gettext_lazy as _
+
+        data = [_("Select journals by collection"), "normal string", 42]
+        result = sanitize_for_json(data)
+        json_str = json.dumps(result)  # Must not raise
+        parsed = json.loads(json_str)
+        self.assertIsInstance(parsed[0], str)
+        self.assertEqual(parsed[1], "normal string")
+        self.assertEqual(parsed[2], 42)
+
+    def test_dict_with_lazy_proxy_value_converted(self):
+        """A dict containing a lazy proxy value must be fully serializable."""
+        from django.utils.translation import gettext_lazy as _
+
+        data = {"events": [_("Select journals by collection")], "count": 1}
+        result = sanitize_for_json(data)
+        json_str = json.dumps(result)  # Must not raise
+        parsed = json.loads(json_str)
+        self.assertIsInstance(parsed["events"][0], str)
+        self.assertEqual(parsed["count"], 1)
+
+    def test_unknown_object_converted_to_string(self):
+        """Any unknown non-JSON-serializable object is converted to its str repr."""
+
+        class CustomObj:
+            def __str__(self):
+                return "custom"
+
+        result = sanitize_for_json(CustomObj())
+        self.assertEqual(result, "custom")
+        json.dumps(result)  # Must not raise
+
 
 if __name__ == "__main__":
     unittest.main()
