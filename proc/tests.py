@@ -104,6 +104,7 @@ class SanitizeForJsonTest(unittest.TestCase):
         lazy_text = _("Select journals by collection")
         result = sanitize_for_json(lazy_text)
         self.assertIsInstance(result, str)
+        self.assertEqual(result, "Select journals by collection")
         json.dumps(result)  # Must not raise
 
     def test_list_with_lazy_proxy_converted(self):

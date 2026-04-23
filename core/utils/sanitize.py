@@ -21,6 +21,9 @@ def sanitize_for_json(obj):
         return {sanitize_for_json(k): sanitize_for_json(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [sanitize_for_json(item) for item in obj]
+    # Preserve native JSON scalar types as-is.  This guard is required for
+    # booleans in particular: without it, True/False would be converted to the
+    # strings 'True'/'False' instead of the JSON literals true/false.
     if isinstance(obj, (int, float, bool, type(None))):
         return obj
     # Convert any other non-JSON-serializable type (e.g. Django lazy __proxy__
