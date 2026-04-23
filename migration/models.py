@@ -870,15 +870,6 @@ class IdFileRecord(CommonControlField, Orderable):
     data = models.JSONField()
     item_pid = models.CharField(_("PID"), max_length=23)
     item_type = models.CharField(_("Type"), max_length=10)
-    # issue_folder = models.CharField(_("Issue folder"), max_length=30)
-    # article_filename = models.CharField(
-    #     _("Filename"), max_length=40, null=True, blank=True
-    # )
-    # article_filetype = models.CharField(
-    #     _("File type"), max_length=4, null=True, blank=True
-    # )
-    # processing_date = models.CharField(max_length=8, null=True, blank=True)
-    # deleted = models.BooleanField(default=False)
     todo = models.BooleanField(default=True)
 
     panels = [
@@ -1047,3 +1038,10 @@ class IdFileRecord(CommonControlField, Orderable):
         if not force_update:
             params["todo"] = True
         return cls.objects.filter(item_type="article", **params)
+
+    @classmethod
+    def add_issue_folder(cls, issue_pid, issue_folder):
+        return cls.objects.filter(
+            Q(item_pid__startswith=f"S{issue_pid}") | Q(item_pid=issue_pid),
+            issue_folder__in=["", None]
+        ).update(issue_folder=issue_folder)

@@ -3,7 +3,6 @@ import sys
 import traceback
 
 from django.contrib.auth import get_user_model
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from article.models import Article
@@ -665,6 +664,7 @@ def task_publish_issues(
     }
     
     try:
+        user = _get_user(user_id, username)
         params = {}
         if journal_acron:
             params["journal_proc__acron"] = journal_acron

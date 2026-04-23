@@ -1,0 +1,13 @@
+{% extends "modeladmin/listing_results.html" %}
+{% extends "modeladmin/index_results.html" %}
+{% load i18n wagtailadmin_tags %}
+
+ssssssssss
+{% block no_results_message %}
+    {% fragment as no_results_message %}
+        
+        {{ no_results_text|capfirst }}
+    {% endfragment %}
+
+    <p>{{ no_results_message }}</p>
+{% endblock %}

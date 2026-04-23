@@ -38,11 +38,4 @@ class Migration(migrations.Migration):
             model_name="article",
             name="article_art_pid_v3_2370cc_idx",
         ),
-        migrations.AlterField(
-            model_name="article",
-            name="pid_v3",
-            field=models.CharField(
-                blank=True, max_length=23, null=True, unique=True, verbose_name="PID v3"
-            ),
-        ),
     ]

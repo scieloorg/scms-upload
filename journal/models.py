@@ -21,7 +21,7 @@ from journal.exceptions import (
     MissionGetError,
     SubjectCreationOrUpdateError,
 )
-from journal.forms import OfficialJournalForm
+from journal.forms import OfficialJournalForm, JournalTOCForm
 from location.models import Location
 
 

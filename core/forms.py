@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from wagtail.admin.forms import WagtailAdminModelForm
 
@@ -9,10 +9,10 @@ class CoreAdminModelForm(WagtailAdminModelForm):
 
         if self.instance.pk is None:
             model_with_creator.creator = user
-            model_with_creator.created = datetime.utcnow()
+            model_with_creator.created = datetime.now(timezone.utc)
         else:
             model_with_creator.updated_by = user
-            model_with_creator.updated = datetime.utcnow()
+            model_with_creator.updated = datetime.now(timezone.utc)
         self.save()
 
         return model_with_creator

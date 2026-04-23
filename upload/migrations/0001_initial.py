@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         ("article", "0002_remove_articleauthor_author_and_more"),
         ("collection", "0003_websiteconfigurationendpoint"),
         ("issue", "0004_issue_issue_pid_suffix_issue_order_toc_tocsection"),
-        ("journal", "0005_journaltoc_alter_journal_official_journal_and_more"),
+        ("journal", "0005_officialjournal_next_journal_title_and_more"),
         ("package", "0003_remove_spspkg_components_remove_spspkg_scheduled_and_more"),
         ("proc", "0006_issueproc_resumption_date"),
         ("team", "0001_initial"),

@@ -1,99 +1,86 @@
-# button_helper.py - ATUALIZADO
+"""
+Botões customizados na listagem de snippets do módulo Upload.
+
+Usa core.snippet_buttons para registro genérico e
+upload.permissions para regras de negócio.
+"""
+
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-# Mudança: wagtail.contrib.modeladmin -> wagtail_modeladmin
-from wagtail_modeladmin.helpers import ButtonHelper
+
+from core.snippet_buttons import register_snippet_buttons, make_button
 from . import choices
+from .permission_helper import UploadPermissions
 
 
-class UploadButtonHelper(ButtonHelper):
-    index_button_classnames = ["button", "button-small", "button-secondary"]
-    btn_default_classnames = [
-        "button-small",
-        "icon",
-    ]
+# ---------------------------------------------------------------
+# Lazy import para evitar import circular
+# ---------------------------------------------------------------
+_BUTTON_MODELS = None
 
-    def get_buttons_for_obj(
-        self, obj, exclude=None, classnames_add=None, classnames_exclude=None
-    ):
-        """
-        This function is used to gather all available buttons.
-        We append our custom button to the btns list.
-        """
-        ph = self.permission_helper
-        usr = self.request.user
-        url_name = self.request.resolver_match.url_name
-        print(f"urlname: {url_name}")
-        analyst_team_member = ph.user_is_analyst_team_member(usr, obj)
-        
-        exclude = ["delete"]
-        if not analyst_team_member:
-            exclude.append("edit")
-            
-        if url_name.endswith("_modeladmin_inspect"):
-            exclude.append("inspect")
-            
-        btns = super().get_buttons_for_obj(
-            obj, exclude, classnames_add, classnames_exclude
+
+def _get_button_models():
+    global _BUTTON_MODELS
+    if _BUTTON_MODELS is None:
+        from .models import (
+            Package,
+            QAPackage,
+            ReadyToPublishPackage,
+            ArchivedPackage,
         )
-        
-        if not obj.is_validation_finished:
-            return btns
-            
-        classnames = []
-        if url_name.endswith("_modeladmin_inspect"):
-            classnames.extend(ButtonHelper.inspect_button_classnames)
-        if url_name.endswith("_modeladmin_index"):
-            classnames.extend(UploadButtonHelper.index_button_classnames)
-            
-        self.add_finish_deposit_button(btns, obj, classnames, url_name)
-        
-        if analyst_team_member:
-            self.add_assign_button(btns, obj, classnames)
-            self.add_archive_button(btns, obj, classnames)
-            
-        return btns
+        _BUTTON_MODELS = (Package, QAPackage, ReadyToPublishPackage, ArchivedPackage)
+    return _BUTTON_MODELS
 
-    def add_assign_button(self, btns, obj, classnames, label=None):
-        status = (
+
+# ---------------------------------------------------------------
+# Gerador de botões condicionais
+# ---------------------------------------------------------------
+def _upload_buttons(obj, user):
+    """
+    Gera botões condicionais baseados em status e permissão.
+    Equivalente ao antigo UploadButtonHelper.get_buttons_for_obj().
+    """
+    is_staff = UploadPermissions.user_is_staff(user)
+
+    # Só mostra botões customizados se a validação terminou
+    if hasattr(obj, "is_validation_finished") and not obj.is_validation_finished:
+        return
+
+    # Botão: Finalizar depósito
+    if obj.status == choices.PS_VALIDATED_WITH_ERRORS:
+        yield make_button(
+            _("Finish deposit"),
+            reverse("upload:finish_deposit") + f"?package_id={obj.id}",
+            priority=10,
+        )
+
+    # Botões exclusivos de analista (staff)
+    if is_staff:
+        # Aceitar / Rejeitar / Delegar
+        if obj.status in (
             choices.PS_PENDING_QA_DECISION,
             choices.PS_VALIDATED_WITH_ERRORS,
-        )
-        if obj.status in status:
-            text = label or _("Accept / Reject the package or delegate it")
-            btns.append(
-                {
-                    "url": reverse("upload:assign") + "?package_id=%s" % str(obj.id),
-                    "label": text,
-                    "classname": self.finalise_classname(classnames),
-                    "title": text,
-                }
+        ):
+            yield make_button(
+                _("Accept / Reject the package or delegate it"),
+                reverse("upload:assign") + f"?package_id={obj.id}",
+                priority=20,
             )
 
-    def add_finish_deposit_button(self, btns, obj, classnames, url_name):
-        status = (choices.PS_VALIDATED_WITH_ERRORS,)
-        if obj.status in status and url_name == "upload_package_modeladmin_inspect":
-            text = _("Finish deposit")
-            btns.append(
-                {
-                    "url": reverse("upload:finish_deposit")
-                    + "?package_id=%s" % str(obj.id),
-                    "label": text,
-                    "classname": self.finalise_classname(classnames),
-                    "title": text,
-                }
+        # Arquivar
+        if obj.status == choices.PS_UNEXPECTED:
+            yield make_button(
+                _("Archive"),
+                reverse("upload:archive_package") + f"?package_id={obj.id}",
+                priority=30,
             )
 
-    def add_archive_button(self, btns, obj, classnames, label=None):
-        status = (choices.PS_UNEXPECTED,)
-        if obj.status in status:
-            text = label or _("Archive")
-            btns.append(
-                {
-                    "url": reverse("upload:archive_package")
-                    + "?package_id=%s" % str(obj.id),
-                    "label": text,
-                    "classname": self.finalise_classname(classnames),
-                    "title": text,
-                }
-            )
+
+# ---------------------------------------------------------------
+# Registro do hook
+# ---------------------------------------------------------------
+register_snippet_buttons(
+    model_or_models=_get_button_models(),
+    access_check=UploadPermissions.user_can_access,
+    button_generator=_upload_buttons,
+)

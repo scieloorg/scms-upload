@@ -15,6 +15,9 @@ from proc.controller import (
     JournalDataChecker,
     IssueDataChecker,
 )
+from upload.utils import file_utils, xml_utils
+
+pp = PidRequester()
 
 from upload.models import (
     Package,
@@ -291,6 +294,7 @@ def _check_article_and_journal(package, xml_with_pre, user):
 
         # verifica se journal e issue estão registrados
         xmltree = xml_with_pre.xmltree
+
 
         journal_checker = UploadJournalDataChecker.from_xmltree(xmltree, user)
         journal_checker.check(response)

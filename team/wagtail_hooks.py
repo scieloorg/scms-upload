@@ -3,8 +3,11 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from config.menu import get_menu_order
-from core.views import CommonControlFieldCreateView
-from core.forms import CoreAdminModelForm
+from core.views import UserTrackingCreateView, UserTrackingEditView
+from core.permission_helper import (
+    ReadOnlyPolicy,
+    StaffWritePolicy,
+)
 from .models import (
     CollectionTeamMember,
     Company,
@@ -12,16 +15,33 @@ from .models import (
     JournalCompanyContract,
     JournalTeamMember,
 )
+from .permission_helper import (
+    user_is_collection_staff,
+    user_can_manage_journals,
+    get_user_journal_ids,
+    get_user_company_ids,
+)
+
+
+# ===================================================================
+# ViewSets — Collection (somente super gerencia)
+# ===================================================================
 
 
 class CollectionTeamMemberViewSet(SnippetViewSet):
+    """
+    view: qualquer logado (filtrado por collection do usuário)
+    add/change: só super
+    delete: só super
+    """
     model = CollectionTeamMember
+    permission_policy = ReadOnlyPolicy(CollectionTeamMember)
     menu_label = _("Collection Team Members")
     menu_icon = "group"
     add_to_settings_menu = False
     exclude_from_explorer = False
-    base_form_class = CoreAdminModelForm
-    add_view_class = CommonControlFieldCreateView
+    add_view_class = UserTrackingCreateView
+    edit_view_class = UserTrackingEditView
 
     list_display = (
         "user",
@@ -43,17 +63,28 @@ class CollectionTeamMemberViewSet(SnippetViewSet):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
+        # Usuário vê apenas membros das suas collections
         return CollectionTeamMember.members(request.user)
 
 
+# ===================================================================
+# ViewSets — Company (somente super gerencia, view filtrada)
+# ===================================================================
+
+
 class CompanyViewSet(SnippetViewSet):
+    """
+    view: qualquer logado (staff vê todas, company member vê a sua)
+    add/change/delete: só super
+    """
     model = Company
+    permission_policy = ReadOnlyPolicy(Company)
     menu_label = _("Companies")
     menu_icon = "group"
     add_to_settings_menu = False
     exclude_from_explorer = False
-    add_view_class = CommonControlFieldCreateView
-    base_form_class = CoreAdminModelForm
+    add_view_class = UserTrackingCreateView
+    edit_view_class = UserTrackingEditView
 
     list_display = (
         "name",
@@ -71,40 +102,29 @@ class CompanyViewSet(SnippetViewSet):
         "url",
     )
 
-
-class JournalTeamMemberViewSet(SnippetViewSet):
-    model = JournalTeamMember
-    menu_label = _("Journal Team Members")
-    menu_icon = "user"
-    add_to_settings_menu = False
-    exclude_from_explorer = False
-    add_view_class = CommonControlFieldCreateView
-    base_form_class = CoreAdminModelForm
-
-    list_display = (
-        "user",
-        "journal",
-        "role",
-        "is_active_member",
-        "created",
-    )
-    list_filter = ("role", "is_active_member", "created")
-    search_fields = (
-        "user__username",
-        "user__email",
-        "user__name",
-        "journal__title",
-    )
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        company_ids = get_user_company_ids(request.user)
+        if company_ids is None:
+            return qs  # super ou staff: vê todas
+        if company_ids:
+            return qs.filter(id__in=company_ids)
+        return qs.none()
 
 
 class CompanyTeamMemberViewSet(SnippetViewSet):
+    """
+    view: qualquer logado (filtrado pela company do usuário)
+    add/change/delete: só super
+    """
     model = CompanyTeamMember
+    permission_policy = ReadOnlyPolicy(CompanyTeamMember)
     menu_label = _("Company Team Members")
     menu_icon = "user"
     add_to_settings_menu = False
     exclude_from_explorer = False
-    add_view_class = CommonControlFieldCreateView
-    base_form_class = CoreAdminModelForm
+    add_view_class = UserTrackingCreateView
+    edit_view_class = UserTrackingEditView
 
     list_display = (
         "user",
@@ -121,15 +141,82 @@ class CompanyTeamMemberViewSet(SnippetViewSet):
         "company__name",
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        company_ids = get_user_company_ids(request.user)
+        if company_ids is None:
+            return qs  # super ou staff: vê todos
+        if company_ids:
+            return qs.filter(company_id__in=company_ids)
+        return qs.none()
+
+
+# ===================================================================
+# ViewSets — Journal (staff + journal admin gerenciam)
+# ===================================================================
+
+
+class JournalTeamMemberViewSet(SnippetViewSet):
+    """
+    view: qualquer logado (filtrado por journals acessíveis)
+    add/change: super + collection staff + journal admin
+    delete: só super
+    """
+    model = JournalTeamMember
+    permission_policy = StaffWritePolicy(
+        JournalTeamMember,
+        staff_check=user_can_manage_journals,
+    )
+    menu_label = _("Journal Team Members")
+    menu_icon = "user"
+    add_to_settings_menu = False
+    exclude_from_explorer = False
+    add_view_class = UserTrackingCreateView
+    edit_view_class = UserTrackingEditView
+
+    list_display = (
+        "user",
+        "journal",
+        "role",
+        "is_active_member",
+        "created",
+    )
+    list_filter = ("role", "is_active_member", "created")
+    search_fields = (
+        "user__username",
+        "user__email",
+        "user__name",
+        "journal__title",
+    )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        journal_ids = get_user_journal_ids(request.user)
+        if journal_ids is None:
+            return qs  # superuser: vê todos
+        if journal_ids:
+            return qs.filter(journal_id__in=journal_ids)
+        return qs.none()
+
 
 class JournalCompanyContractViewSet(SnippetViewSet):
+    """
+    view: super + collection staff + journal admin (filtrado por journals)
+    add/change: super + collection staff + journal admin
+    delete: só super
+    """
     model = JournalCompanyContract
+    permission_policy = StaffWritePolicy(
+        JournalCompanyContract,
+        access_check=user_can_manage_journals,
+        staff_check=user_can_manage_journals,
+    )
     menu_label = _("Journal-Company Contracts")
     menu_icon = "doc-full"
     add_to_settings_menu = False
     exclude_from_explorer = False
-    add_view_class = CommonControlFieldCreateView
-    base_form_class = CoreAdminModelForm
+    add_view_class = UserTrackingCreateView
+    edit_view_class = UserTrackingEditView
 
     list_display = (
         "journal",
@@ -144,11 +231,22 @@ class JournalCompanyContractViewSet(SnippetViewSet):
         "company__name",
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        journal_ids = get_user_journal_ids(request.user)
+        if journal_ids is None:
+            return qs  # superuser: vê todos
+        if journal_ids:
+            return qs.filter(journal_id__in=journal_ids)
+        return qs.none()
+
+
+# ===================================================================
+# Grupo de menu
+# ===================================================================
+
 
 class TeamViewSetGroup(SnippetViewSetGroup):
-    """
-    Group of ViewSets for Team Management
-    """
     items = [
         CollectionTeamMemberViewSet,
         CompanyViewSet,
@@ -162,4 +260,3 @@ class TeamViewSetGroup(SnippetViewSetGroup):
 
 
 register_snippet(TeamViewSetGroup)
-
