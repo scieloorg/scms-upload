@@ -1046,12 +1046,12 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             if score > 50:
                 matched.append((score, item.updated.isoformat(), item.id))
 
-        if results.count() > 1 or not matched:
+        if not matched:
             detail = {
                 "xml_adapter_data": xml_adapter.data,
                 "data": data,
                 "matched": matched,
-            } 
+            }
             UnexpectedEvent.create(
                 item=xml_adapter.sps_pkg_name,
                 action="PidProviderXML.best_matches",
