@@ -2,9 +2,10 @@ from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail.snippets.models import register_snippet
-from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
+from wagtail.snippets.views.snippets import SnippetViewSetGroup
 
 from config.menu import get_menu_order
+from core.views import CommonControlFieldViewSet
 from files_storage.wagtail_hooks import MinioConfigurationViewSet
 from migration.wagtail_hooks import ClassicWebsiteConfigurationViewSet
 from team.models import get_user_membership_ids
@@ -12,7 +13,7 @@ from team.models import get_user_membership_ids
 from .models import Collection, WebSiteConfiguration
 
 
-class CollectionViewSet(SnippetViewSet):
+class CollectionViewSet(CommonControlFieldViewSet):
     model = Collection
     menu_label = _("Collections")
     menu_icon = "doc-full"
@@ -42,7 +43,7 @@ class CollectionViewSet(SnippetViewSet):
         return qs.none()
 
 
-class WebSiteConfigurationViewSet(SnippetViewSet):
+class WebSiteConfigurationViewSet(CommonControlFieldViewSet):
     model = WebSiteConfiguration
     menu_label = _("New WebSites Configurations")
     menu_icon = "doc-full"
