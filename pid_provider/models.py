@@ -939,7 +939,20 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         q_ids = qbuilder.identifier_queries
         q_journal = qbuilder.issn_query
         q_issue = Q(**qbuilder.issue_params)
-        return cls.objects.filter(q_ids | (q_journal & q_issue)).distinct()
+        # When identifier-based queries yield results, use them exclusively.
+        # Mixing identifier results with the broader journal+issue query would
+        # include unrelated records from the same issue, causing spurious
+        # MultipleObjectsReturned events even when the document is found.
+        # The exists() check is intentional: it decides whether to fall back to
+        # the journal+issue query.  The queryset is later re-evaluated by the
+        # caller (best_matches uses .iterator(), get_record uses .exists()), so
+        # two DB round-trips are expected – a lightweight EXISTS followed by the
+        # full SELECT – which is an acceptable trade-off for correctness here.
+        if q_ids:
+            id_results = cls.objects.filter(q_ids).distinct()
+            if id_results.exists():
+                return id_results
+        return cls.objects.filter(q_journal & q_issue).distinct()
 
     @classmethod
     @profile_classmethod
