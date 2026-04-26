@@ -1894,10 +1894,10 @@ class ArticleProc(BaseProc, ClusterableModel):
         exclude_issue_proc_id_list = exclude_issue_proc_id_list or []
         
         params = {}
-        if journal_proc_id_list:
-            params["journal_proc__id__in"] = journal_proc_id_list
         if issue_proc_id_list:
             params["issue_proc__id__in"] = issue_proc_id_list
+        elif journal_proc_id_list:
+            params["issue_proc__journal_proc__id__in"] = journal_proc_id_list
         
         return cls.objects.filter(
             Q(migration_status__in=status_list)
