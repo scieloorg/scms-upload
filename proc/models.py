@@ -1884,19 +1884,21 @@ class ArticleProc(BaseProc, ClusterableModel):
         cls,
         journal_proc_id_list=None,
         issue_proc_id_list=None,
+        exclude_issue_proc_id_list=None,
         status_list=None,
         force_update=False,
     ):  
         status_list = tracker_choices.get_valid_status(status_list, force_update)
         journal_proc_id_list = journal_proc_id_list or []
         issue_proc_id_list = issue_proc_id_list or []
+        exclude_issue_proc_id_list = exclude_issue_proc_id_list or []
         
         params = {}
         if journal_proc_id_list:
             params["journal_proc__id__in"] = journal_proc_id_list
         if issue_proc_id_list:
             params["issue_proc__id__in"] = issue_proc_id_list
-
+        
         return cls.objects.filter(
             Q(migration_status__in=status_list)
             | Q(xml_status__in=status_list)
@@ -1904,7 +1906,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             | Q(qa_ws_status__in=status_list)
             | Q(public_ws_status__in=status_list),
             **params,
-        )
+        ).exclude(issue_proc__id__in=exclude_issue_proc_id_list)
 
     @classmethod
     def filter_by_status(cls, STATUS):
