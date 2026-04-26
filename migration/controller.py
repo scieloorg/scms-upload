@@ -768,7 +768,7 @@ def import_journal_acron_id_records(
             if item["item_type"] == "article":
                 issue_pids.add(item["item_pid"][1:-5])
 
-        selected_issue_procs = journal_proc.issue_proc_set.filter(
+        selected_issue_procs = journal_proc.issueproc_set.filter(
             pid__in=issue_pids,
         )
         selected_issue_procs.exclude(
