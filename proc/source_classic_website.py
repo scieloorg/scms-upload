@@ -257,7 +257,7 @@ def create_or_update_journal_acron_id_file(
     logging.info(f"create_or_update_journal_acron_id_file - JournalProc params: collection={collection.acron}, journal_filter={journal_filter} - {items.count()} items found")
     for journal_proc in items:
         logging.info(f"create_or_update_journal_acron_id_file - JournalProc {journal_proc}")
-        controller.register_acron_id_file_content(
+        controller.import_journal_acron_id_records(
             user,
             journal_proc,
             force_update=force_update,
@@ -359,7 +359,7 @@ def migrate_document_records(
     # )
 
 
-def get_files_from_classic_website(
+def migrate_document_files(
     user,
     collection_acron=None,
     journal_acron=None,
@@ -389,10 +389,10 @@ def get_files_from_classic_website(
         "journal_proc",
         "issue",
     ).filter(**params)
-    logging.info(f"get_files_from_classic_website - IssueProc params: {params} - {items.count()} items found")
+    logging.info(f"migrate_document_files - IssueProc params: {params} - {items.count()} items found")
     for issue_proc in items:
-        logging.info(f"get_files_from_classic_website - IssueProc {issue_proc}")
-        issue_proc.get_files_from_classic_website(
+        logging.info(f"migrate_document_files - IssueProc {issue_proc}")
+        issue_proc.migrate_document_files(
             user, force_update, controller.migrate_issue_files
         )
         ArticleProc.mark_for_reprocessing(issue_proc)
