@@ -19,11 +19,8 @@ from proc.publisher import (
 # Imports do Classic Website
 from proc.source_classic_website import (
     create_collection_procs_from_pid_list,
-    create_or_update_journal_acron_id_file,
     create_or_update_migrated_issue,
     create_or_update_migrated_journal,
-    migrate_document_files,
-    migrate_document_records,
     migrate_issue,
     migrate_journal,
 )
