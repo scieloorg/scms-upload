@@ -963,7 +963,7 @@ def task_migrate_and_publish_articles_by_journal(
                 force_update=force_migrate_document_records or force_migrate_document_files,
                 to_migrate_articles=True,
             )
-            issue_proc_id_list = selected_issue_procs.values_list("id", flat=True)
+            issue_proc_id_list = list(selected_issue_procs.values_list("id", flat=True))
             issue_proc_and_related_article_proc_id_list = {
                 issue_proc_id: [] for issue_proc_id in (issue_proc_id_list or [])
             }
