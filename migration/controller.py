@@ -752,7 +752,6 @@ def import_journal_acron_id_records(
 
         issue_pids = set()
 
-        total_id_file_records_to_migrate = 0
         for item in get_bases_work_acron_id_file_records(
             user,
             source_path,
@@ -767,7 +766,6 @@ def import_journal_acron_id_records(
                 **item,
             )
             if item["item_type"] == "article":
-                total_id_file_records_to_migrate += 1
                 issue_pids.add(item["item_pid"][1:-5])
 
         selected_issue_procs = journal_proc.issue_proc_set.filter(
@@ -790,6 +788,7 @@ def import_journal_acron_id_records(
 
         qs = journal_id_file.id_file_records.filter(item_type="article")
         total_id_file_records = qs.count()
+        total_id_file_records_to_migrate = qs.filter(todo=True).count()
     
         stats["total_id_file_records"] = total_id_file_records
         stats["total_id_file_records_to_migrate"] = total_id_file_records_to_migrate
