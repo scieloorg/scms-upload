@@ -16,6 +16,7 @@ class UnexpectedEventViewSet(SnippetViewSet):
     list_per_page = 10
     
     list_display = [
+        'severity',
         'item',
         'action', 
         'exception_type',
@@ -24,6 +25,7 @@ class UnexpectedEventViewSet(SnippetViewSet):
     ]
     
     list_filter = [
+        'severity',
         'action',
         'exception_type',
         'created',
@@ -39,6 +41,7 @@ class UnexpectedEventViewSet(SnippetViewSet):
     # Campos para a view de inspeção (read-only)
     inspect_view_enabled = True
     inspect_view_fields = [
+        'severity',
         'action',
         'item',
         'exception_type',
