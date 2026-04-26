@@ -56,10 +56,7 @@ __all__ = [
     "create_or_update_migrated_issue",
     "create_collection_procs_from_pid_list",
     "migrate_journal",
-    "create_or_update_journal_acron_id_file",
     "migrate_issue",
-    "migrate_document_records",
-    "migrate_document_files",
     # Publication functions
     "publish_journals",
     "publish_issues",
