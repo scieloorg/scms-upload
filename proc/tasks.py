@@ -940,6 +940,7 @@ def task_migrate_and_publish_articles_by_journal(
         task_exec.add_event("Read journal acron id file")
         response = controller.import_journal_acron_id_records(
             user,
+            ArticleProc,
             journal_proc,
             force_update=force_import_acron_id_file,
         )

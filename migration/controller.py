@@ -703,6 +703,7 @@ def get_migrated_xml_with_pre(article_proc):
 
 def import_journal_acron_id_records(
     user,
+    article_proc_model,
     journal_proc,
     force_update,
 ):
@@ -777,9 +778,6 @@ def import_journal_acron_id_records(
         ).update(
             docs_status=tracker_choices.PROGRESS_STATUS_REPROC,
             updated_by=user,
-        )
-        article_proc_model = (
-            selected_issue_procs.model.articleproc_set.rel.related_model
         )
         article_proc_model.objects.filter(
             issue_proc__in=selected_issue_procs
