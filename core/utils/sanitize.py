@@ -1,3 +1,6 @@
+import json
+
+
 def sanitize_for_json(obj):
     """Recursively sanitize data to make it JSON-serializable.
 
@@ -21,11 +24,12 @@ def sanitize_for_json(obj):
         return {sanitize_for_json(k): sanitize_for_json(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [sanitize_for_json(item) for item in obj]
-    # Preserve native JSON scalar types as-is.  This guard is required for
-    # booleans in particular: without it, True/False would be converted to the
-    # strings 'True'/'False' instead of the JSON literals true/false.
-    if isinstance(obj, (int, float, bool, type(None))):
+    # For any other type, test JSON serializability directly.  If the object
+    # serializes fine (int, float, bool, None, …) return it unchanged.
+    # Otherwise convert to string and re-sanitize to also catch surrogate code
+    # points that __str__() might produce (e.g. Django lazy __proxy__).
+    try:
+        json.dumps(obj)
         return obj
-    # Convert any other non-JSON-serializable type (e.g. Django lazy __proxy__
-    # objects from gettext_lazy) to its string representation.
-    return str(obj)
+    except (TypeError, ValueError):
+        return sanitize_for_json(str(obj))
