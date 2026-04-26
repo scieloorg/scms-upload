@@ -1,6 +1,7 @@
 import logging
 import sys
 import traceback
+import json
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -93,12 +94,26 @@ class TaskExecution:
 
         self.stats["total_to_process"] = self.total_to_process
         self.stats["total_processed"] = self.total_processed
+
         detail = {
             "params": self.params,
             "stats": self.stats,
             "events": self.events,
             "exceptions": self.exceptions,
         }
+        # adiciona este tratamento para garantir que o detail seja serializável, evitando que a task fique travada tentando salvar um detail com dados não serializáveis
+        try:
+            json.dumps(detail)
+        except Exception as exc_detail:
+            fixed_detail = {}
+            for key, value in detail.items():
+                try:
+                    json.dumps(value)
+                    fixed_detail[key] = value
+                except Exception:
+                    fixed_detail[key] = str(value)
+            detail = fixed_detail
+
         self.task_tracker.finish(
             completed=completed,
             exception=exception,
