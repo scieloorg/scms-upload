@@ -949,37 +949,37 @@ def task_migrate_and_publish_articles_by_journal(
         total_processed = 0
         total_to_process = 0
 
-        if not issue_proc_id_list:
+        selected_issue_procs = None
+        if issue_proc_id_list:
+            issue_proc_and_related_article_proc_id_list = {
+                issue_proc_id: [] for issue_proc_id in issue_proc_id_list
+            }
+        else:
+            # identifica os issue_procs para processar com base nos status
             selected_issue_procs = IssueProc.select_items(
                 journal_proc_id_list=[journal_proc_id],
                 status_list=status,
                 force_update=force_migrate_document_records or force_migrate_document_files,
                 to_migrate_articles=True,
             )
-            selected_article_issue_proc_ids = ArticleProc.select_items(
+            issue_proc_id_list = selected_issue_procs.values_list("id", flat=True)
+            issue_proc_and_related_article_proc_id_list = {
+                issue_proc_id: [] for issue_proc_id in (issue_proc_id_list or [])
+            }
+
+            # identifica os article_procs e respectivo issue_proc_id para processar com base nos status dos article_proc
+            selected_article_proc_items = ArticleProc.select_items(
                 journal_proc_id_list=[journal_proc_id],
+                exclude_issue_proc_id_list=list(issue_proc_id_list),
                 status_list=status,
                 force_update=force_update,
-            ).values_list("issue_proc_id", flat=True).distinct()
-            issue_proc_id_list = list(
-                set(selected_issue_procs.values_list("id", flat=True)).union(
-                    set(selected_article_issue_proc_ids)
-                )
-            )
-        items_to_process = {
-            issue_proc_id: None for issue_proc_id in (issue_proc_id_list or [])
-        }
+            ).values_list("issue_proc_id", "id").distinct()
 
-        selected_article_proc_items = ArticleProc.select_items(
-            issue_proc_id_list=issue_proc_id_list,
-            status_list=status,
-            force_update=force_update,
-        ).values_list("issue_proc_id", "id").distinct()
-        for issue_proc_id, article_proc_id in selected_article_proc_items:
-            items_to_process.setdefault(issue_proc_id, []).append(article_proc_id)
+            for issue_proc_id, article_proc_id in selected_article_proc_items:
+                issue_proc_and_related_article_proc_id_list.setdefault(issue_proc_id, []).append(article_proc_id)
 
-        total_to_process = len(items_to_process)
-        for issue_proc_id, article_proc_id_list in items_to_process.items():
+        total_to_process = len(issue_proc_and_related_article_proc_id_list)
+        for issue_proc_id, article_proc_id_list in issue_proc_and_related_article_proc_id_list.items():
             total_processed += 1
             task_migrate_and_publish_articles_by_issue.delay(
                 user_id=user_id,
@@ -1043,7 +1043,16 @@ def task_migrate_and_publish_articles_by_issue(
 
         task_exec.item = str(issue_proc)
 
-        if not article_proc_id_list:
+        if article_proc_id_list:
+            # supõe-se que os registros e arquivos já foram migrados
+            # (issue_proc.docs_status e issue_proc.files_status estão como DONE)
+            total_articles_to_process = len(article_proc_id_list)
+            article_procs = ArticleProc.objects.select_related(
+                "issue_proc",
+            ).filter(
+                id__in=article_proc_id_list
+            )
+        else:
             task_exec.add_event("Migrate document records")
             total_migrated_records = issue_proc.migrate_document_records(user, force_migrate_document_records)
             task_exec.add_number("total_migrated_records", total_migrated_records)
@@ -1054,22 +1063,11 @@ def task_migrate_and_publish_articles_by_issue(
             )
             task_exec.add_number("total_migrated_files", total_migrated_files)
 
-        if article_proc_id_list:
-            total_articles_to_process = len(article_proc_id_list)
-            article_procs = ArticleProc.objects.select_related(
-                "issue_proc",
-            ).filter(
-                id__in=article_proc_id_list
-            )
-        else:
             task_exec.add_event("Select articles to migrate")
-            article_procs = ArticleProc.objects.select_related(
-                "issue_proc",
-            ).filter(
-                Q(migration_status__in=status)
-                | Q(xml_status__in=status)
-                | Q(sps_pkg_status__in=status),
-                issue_proc=issue_proc,
+            article_procs = ArticleProc.select_items(
+                issue_proc_id_list=[issue_proc_id],
+                status_list=status,
+                force_update=force_update,
             )
             total_articles_to_process = article_procs.count()
         task_exec.total_to_process = total_articles_to_process
