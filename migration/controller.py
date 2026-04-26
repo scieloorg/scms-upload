@@ -779,7 +779,7 @@ def import_journal_acron_id_records(
             updated_by=user,
         )
         article_proc_model = (
-            selected_issue_procs.model.article_proc_set.rel.related_model
+            selected_issue_procs.model.articleproc_set.rel.related_model
         )
         article_proc_model.objects.filter(
             issue_proc__in=selected_issue_procs
