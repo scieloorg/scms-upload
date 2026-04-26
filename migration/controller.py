@@ -701,7 +701,7 @@ def get_migrated_xml_with_pre(article_proc):
         )
 
 
-def register_acron_id_file_content(
+def import_journal_acron_id_records(
     user,
     journal_proc,
     force_update,
@@ -748,6 +748,10 @@ def register_acron_id_file_content(
             )
 
         logging.info(f"Updating IdFileRecord from {source_path}")
+
+        issue_pids = set()
+
+        total_id_file_records_to_migrate = 0
         for item in get_bases_work_acron_id_file_records(
             user,
             source_path,
@@ -760,18 +764,33 @@ def register_acron_id_file_content(
                 user,
                 journal_id_file,
                 **item,
-            )        
+            )
+            if item["item_type"] == "article":
+                total_id_file_records_to_migrate += 1
+                issue_pids.add(item["item_pid"][1:-5])
+
+        selected_issue_procs = journal_proc.issue_proc_set.filter(
+            pid__in=issue_pids,
+        )
+        selected_issue_procs.exclude(
+            docs_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+        ).update(
+            docs_status=tracker_choices.PROGRESS_STATUS_REPROC,
+            updated_by=user,
+        )
+        for issue_proc in selected_issue_procs:
+            issue_proc.article_proc_set.exclude(
+                xml_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+            ).update(
+                xml_status=tracker_choices.PROGRESS_STATUS_REPROC,
+                updated_by=user,
+            )
 
         qs = journal_id_file.id_file_records.filter(item_type="article")
         total_id_file_records = qs.count()
-        article_pids = list(qs.filter(todo=True).values_list("item_pid", flat=True).distinct())
-        
-        stats["total_id_file_records_resulting"] = total_id_file_records
-        stats["total_id_file_records_to_migrate_resulting"] = len(article_pids)
-        stats["total_id_file_records_new"] = journal_id_file.id_file_records.filter(
-            updated__gte=datetime_now,
-        ).count()
-        detail["article_pids"] = article_pids
+    
+        stats["total_id_file_records"] = total_id_file_records
+        stats["total_id_file_records_to_migrate"] = total_id_file_records_to_migrate
         detail["stats"] = stats
         detail["output"] = output
         return detail
