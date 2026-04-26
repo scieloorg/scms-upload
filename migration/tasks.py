@@ -438,7 +438,7 @@
 #     try:
 #         user = _get_user(user_id, username)
 #         item = IssueProc.objects.get(pk=item_id)
-#         item.get_files_from_classic_website(
+#         item.migrate_document_files(
 #             user, force_update, controller.import_one_issue_files
 #         )
 #     except Exception as e:
