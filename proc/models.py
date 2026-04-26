@@ -500,7 +500,7 @@ class BaseProc(CommonControlField):
                     obj.migration_status == tracker_choices.PROGRESS_STATUS_TODO
                 ),
                 message=None,
-                detail={"migrated_data": str(obj.migrated_data)},
+                detail=obj.migrated_data.data,
             )
             return obj
         except Exception as e:
