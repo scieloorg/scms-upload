@@ -778,13 +778,17 @@ def import_journal_acron_id_records(
             docs_status=tracker_choices.PROGRESS_STATUS_REPROC,
             updated_by=user,
         )
-        for issue_proc in selected_issue_procs:
-            issue_proc.article_proc_set.exclude(
-                xml_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
-            ).update(
-                xml_status=tracker_choices.PROGRESS_STATUS_REPROC,
-                updated_by=user,
-            )
+        article_proc_model = (
+            selected_issue_procs.model.article_proc_set.rel.related_model
+        )
+        article_proc_model.objects.filter(
+            issue_proc__in=selected_issue_procs
+        ).exclude(
+            xml_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+        ).update(
+            xml_status=tracker_choices.PROGRESS_STATUS_REPROC,
+            updated_by=user,
+        )
 
         qs = journal_id_file.id_file_records.filter(item_type="article")
         total_id_file_records = qs.count()

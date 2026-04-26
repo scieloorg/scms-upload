@@ -956,8 +956,16 @@ def task_migrate_and_publish_articles_by_journal(
                 force_update=force_migrate_document_records or force_migrate_document_files,
                 to_migrate_articles=True,
             )
-            issue_proc_id_list = selected_issue_procs.values_list("id", flat=True)
-        
+            selected_article_issue_proc_ids = ArticleProc.select_items(
+                journal_proc_id_list=[journal_proc_id],
+                status_list=status,
+                force_update=force_update,
+            ).values_list("issue_proc_id", flat=True).distinct()
+            issue_proc_id_list = list(
+                set(selected_issue_procs.values_list("id", flat=True)).union(
+                    set(selected_article_issue_proc_ids)
+                )
+            )
         items_to_process = {
             issue_proc_id: None for issue_proc_id in (issue_proc_id_list or [])
         }
