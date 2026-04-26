@@ -97,6 +97,12 @@ class BaseEvent(models.Model):
 class UnexpectedEvent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created = models.DateTimeField(verbose_name=_("Creation date"), auto_now_add=True)
+    severity = models.CharField(
+        _("Severity"),
+        max_length=10,
+        choices=choices.UNEXPECTED_EVENT_SEVERITY_CHOICES,
+        default=choices.EXCEPTION,
+    )
     exception_type = models.TextField(_("Exception Type"), null=True, blank=True)
     exception_msg = models.TextField(_("Exception Msg"), null=True, blank=True)
     traceback = models.JSONField(null=True, blank=True)
@@ -119,6 +125,10 @@ class UnexpectedEvent(models.Model):
             models.Index(fields=["exception_type"]),
             models.Index(fields=["item"]),
             models.Index(fields=["action"]),
+            models.Index(
+                fields=["severity"],
+                name="tracker_unexpectedevent_severity_idx",
+            ),
         ]
         ordering = ["-created"]
 
@@ -133,6 +143,7 @@ class UnexpectedEvent(models.Model):
             created=self.created.isoformat(),
             item=self.item,
             action=self.action,
+            severity=self.severity,
             exception_type=self.exception_type,
             exception_msg=self.exception_msg,
             traceback=json.dumps(self.traceback),
@@ -148,6 +159,7 @@ class UnexpectedEvent(models.Model):
         item=None,
         action=None,
         detail=None,
+        severity=None,
     ):
         try:
             exception = exception or e
@@ -157,6 +169,7 @@ class UnexpectedEvent(models.Model):
             obj = cls()
             obj.item = item
             obj.action = action
+            obj.severity = severity or choices.EXCEPTION
             obj.exception_msg = str(exception)
             obj.exception_type = str(type(exception))
             try:

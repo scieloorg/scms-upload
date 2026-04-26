@@ -38,6 +38,7 @@ from pid_provider.query_params import (
     zero_to_none,
     QueryBuilderPidProviderXML,
 )
+from tracker import choices as tracker_choices
 from tracker.models import BaseEvent, EventSaveError, UnexpectedEvent
 
 try:
@@ -1070,6 +1071,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 action="PidProviderXML.best_matches",
                 exception=cls.MultipleObjectsReturned,
                 detail=detail,
+                severity=tracker_choices.WARNING,
             )
         return matched
 
