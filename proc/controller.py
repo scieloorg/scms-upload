@@ -22,7 +22,7 @@ from proc.source_classic_website import (
     create_or_update_journal_acron_id_file,
     create_or_update_migrated_issue,
     create_or_update_migrated_journal,
-    get_files_from_classic_website,
+    migrate_document_files,
     migrate_document_records,
     migrate_issue,
     migrate_journal,
@@ -62,7 +62,7 @@ __all__ = [
     "create_or_update_journal_acron_id_file",
     "migrate_issue",
     "migrate_document_records",
-    "get_files_from_classic_website",
+    "migrate_document_files",
     # Publication functions
     "publish_journals",
     "publish_issues",
