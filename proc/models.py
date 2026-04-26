@@ -404,7 +404,7 @@ class BaseProc(CommonControlField):
     def __str__(self):
         return f"{self.collection} {self.pid}"
 
-    def set_status(self):
+    def propagate_reproc_or_todo_status(self):
         if self.migration_status == tracker_choices.PROGRESS_STATUS_REPROC:
             self.qa_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
 
@@ -555,7 +555,7 @@ class BaseProc(CommonControlField):
                 )
 
     @classmethod
-    def get_queryset_to_process(cls, STATUS):
+    def filter_by_status(cls, STATUS):
         return (
             Q(migration_status__in=STATUS)
             | Q(qa_ws_status__in=STATUS)
@@ -580,7 +580,7 @@ class BaseProc(CommonControlField):
         if params is None:
             params = {}
 
-        q = cls.get_queryset_to_process(STATUS)
+        q = cls.filter_by_status(STATUS)
 
         return cls.objects.filter(
             q,
@@ -953,6 +953,24 @@ class JournalProc(BaseProc, ClusterableModel):
                 acron=item.journal_acron,
             )
 
+    @classmethod
+    def select_items(
+        cls,
+        collection_acron_list=None,
+        journal_acron_list=None,
+    ):  
+        collection_acron_list = collection_acron_list or []
+        journal_acron_list = journal_acron_list or []
+
+        params = {}
+        if collection_acron_list:
+            params["collection__acron__in"] = collection_acron_list
+        if journal_acron_list:
+            params["acron__in"] = journal_acron_list
+        return cls.objects.filter(
+            **params,
+        )
+
     @property
     def completeness(self):
         return {
@@ -967,7 +985,6 @@ class JournalProc(BaseProc, ClusterableModel):
     @property
     def issn_electronic(self):
         return self.journal and self.journal.issn_electronic
-
 
 ################################################
 class IssueGetOrCreateError(Exception): ...
@@ -1074,7 +1091,7 @@ class IssueProc(BaseProc, ClusterableModel):
         issue_proc.save()
         return issue_proc
 
-    def set_status(self):
+    def propagate_reproc_or_todo_status(self):
         # Propaga status para QA e Public WS
         if self.migration_status == tracker_choices.PROGRESS_STATUS_REPROC:
             self.qa_ws_status = tracker_choices.PROGRESS_STATUS_REPROC
@@ -1155,9 +1172,50 @@ class IssueProc(BaseProc, ClusterableModel):
                     journal_proc, issue_folder, type(e), e
                 )
             )
+        
+    @classmethod
+    def select_items(
+        cls,
+        collection_acron_list=None,
+        journal_acron_list=None,
+        journal_proc_id_list=None,
+        publication_year=None,
+        issue_folder=None,
+        status_list=None,
+        force_update=False,
+        to_migrate_articles=False,
+    ):  
+        status_list = tracker_choices.get_valid_status(status_list, force_update)
+        collection_acron_list = collection_acron_list or []
+        journal_acron_list = journal_acron_list or []
+        journal_proc_id_list = journal_proc_id_list or []
+        params = {}
+        if collection_acron_list:
+            params["journal_proc__collection__acron__in"] = collection_acron_list
+        if journal_acron_list:
+            params["journal_proc__acron__in"] = journal_acron_list
+        if journal_proc_id_list:
+            params["journal_proc__id__in"] = journal_proc_id_list
+        if issue_folder:
+            params["issue_folder"] = issue_folder
+        if publication_year:
+            params["issue__publication_year"] = publication_year
+
+        if to_migrate_articles:
+            return cls.objects.filter(
+                Q(docs_status__in=status_list)
+                | Q(files_status__in=status_list),
+                **params,
+            )
+        return cls.objects.filter(
+            Q(migration_status__in=status_list)
+            | Q(qa_ws_status__in=status_list)
+            | Q(public_ws_status__in=status_list),
+            **params,
+        )
 
     @classmethod
-    def get_queryset_to_process(cls, STATUS):
+    def filter_by_status(cls, STATUS):
         return (
             Q(migration_status__in=STATUS)
             | Q(qa_ws_status__in=STATUS)
@@ -1211,11 +1269,11 @@ class IssueProc(BaseProc, ClusterableModel):
             **params,
         )
 
-    def get_files_from_classic_website(
+    def migrate_document_files(
         self, user, force_update, migrate_issue_files_function
     ):
         try:
-            operation = self.start(user, "get_files_from_classic_website")
+            operation = self.start(user, "migrate_document_files")
             if self.files_status == tracker_choices.PROGRESS_STATUS_DONE and not force_update:
                 operation.finish(
                     user,
@@ -1258,7 +1316,7 @@ class IssueProc(BaseProc, ClusterableModel):
             return self.issue_files.count()
 
         except Exception as e:
-            logging.exception(f"Exception: get_files_from_classic_website: {e}")
+            logging.exception(f"Exception: migrate_document_files: {e}")
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.files_status = tracker_choices.PROGRESS_STATUS_BLOCKED
             self.save()
@@ -1346,7 +1404,7 @@ class IssueProc(BaseProc, ClusterableModel):
             q,
             journal_proc=journal_proc,
         ).values_list("id", "pid")
-
+    
     def migrate_document_records(self, user, force_update=None):
         try:
             total = 0
@@ -1359,20 +1417,20 @@ class IssueProc(BaseProc, ClusterableModel):
             if not self.journal_proc:
                 raise ValueError(f"IssueProc ({self}) has no journal_proc")
 
-            total_document_records = IdFileRecord.document_records_to_migrate(
-                collection=self.collection,
-                issue_pid=self.pid,
-                force_update=True,  # todos os registros encontrados em acron.id no momento
-            ).count()
-            detail["total_document_records"] = total_document_records
-
-            force_update = ArticleProc.objects.filter(issue_proc=self).count() < total_document_records
-
             id_file_records = IdFileRecord.document_records_to_migrate(
                 collection=self.collection,
                 issue_pid=self.pid,
-                force_update=force_update,
+                force_update=True,  # todos os registros encontrados em acron.id no momento
             )
+            total_document_records = id_file_records.count()
+            detail["total_document_records"] = total_document_records
+
+            if not force_update:
+                force_update = ArticleProc.objects.filter(issue_proc=self).count() < total_document_records
+            if not force_update:
+                # obtém somente os registros por fazer (todo=True)
+                id_file_records = id_file_records.filter(todo=True)
+
             detail["total_document_records_to_migrate"] = id_file_records.count()
             if detail["total_document_records_to_migrate"] == 0:
                 raise NoDocumentRecordsToMigrateError("No document records to migrate")
@@ -1600,20 +1658,12 @@ class ArticleProc(BaseProc, ClusterableModel):
         ]
 
     @classmethod
-    def mark_for_reprocessing(cls, issue_proc, article_pids=None):
+    def mark_for_reprocessing(cls, issue_proc, article_pids=None, article_proc_ids=None):
         params = {"issue_proc": issue_proc}
         if article_pids:
             params["pid__in"] = article_pids
-        if issue_proc.docs_status not in (
-            tracker_choices.PROGRESS_STATUS_DONE,
-            tracker_choices.PROGRESS_STATUS_PENDING,
-        ):
-            return
-        if issue_proc.files_status not in (
-            tracker_choices.PROGRESS_STATUS_DONE,
-            tracker_choices.PROGRESS_STATUS_PENDING,
-        ):
-            return
+        if article_proc_ids:
+            params["id__in"] = article_proc_ids
         cls.objects.filter(**params).update(
             xml_status=tracker_choices.PROGRESS_STATUS_REPROC,
             sps_pkg_status=tracker_choices.PROGRESS_STATUS_REPROC,
@@ -1622,7 +1672,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC,
         )
 
-    def set_status(self):
+    def propagate_reproc_or_todo_status(self):
         if self.xml_status == tracker_choices.PROGRESS_STATUS_REPROC:
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_REPROC
 
@@ -1666,6 +1716,10 @@ class ArticleProc(BaseProc, ClusterableModel):
             self.pkg_name = pkg_name
             self.main_lang = main_lang
             self.migration_status = migration_status or self.migration_status
+            self.xml_status = tracker_choices.PROGRESS_STATUS_TODO
+            self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_TODO
+            self.qa_ws_status = tracker_choices.PROGRESS_STATUS_TODO
+            self.public_ws_status = tracker_choices.PROGRESS_STATUS_TODO
             self.save()
 
         except Exception as e:
@@ -1826,7 +1880,34 @@ class ArticleProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
-    def get_queryset_to_process(cls, STATUS):
+    def select_items(
+        cls,
+        journal_proc_id_list=None,
+        issue_proc_id_list=None,
+        status_list=None,
+        force_update=False,
+    ):  
+        status_list = tracker_choices.get_valid_status(status_list, force_update)
+        journal_proc_id_list = journal_proc_id_list or []
+        issue_proc_id_list = issue_proc_id_list or []
+        
+        params = {}
+        if journal_proc_id_list:
+            params["journal_proc__id__in"] = journal_proc_id_list
+        if issue_proc_id_list:
+            params["issue_proc__id__in"] = issue_proc_id_list
+
+        return cls.objects.filter(
+            Q(migration_status__in=status_list)
+            | Q(xml_status__in=status_list)
+            | Q(sps_pkg_status__in=status_list)
+            | Q(qa_ws_status__in=status_list)
+            | Q(public_ws_status__in=status_list),
+            **params,
+        )
+
+    @classmethod
+    def filter_by_status(cls, STATUS):
         return (
             Q(migration_status__in=STATUS)
             | Q(qa_ws_status__in=STATUS)
@@ -2081,12 +2162,18 @@ class ArticleProc(BaseProc, ClusterableModel):
     def migrate_article(self, user, force_update):
         if force_update:
             self.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
-            self.set_status()
+            self.propagate_reproc_or_todo_status()
         if not self.get_xml(user):
             return None
         if not self.generate_sps_package(user):
             return None
-        return self.create_or_update_item(user, force_update, create_or_update_article)
+        article = self.create_or_update_item(user, force_update, create_or_update_article)
+        if not article:
+            return None
+        self.qa_ws_status = tracker_choices.PROGRESS_STATUS_TODO
+        self.public_ws_status = tracker_choices.PROGRESS_STATUS_TODO
+        self.save()
+        return article
 
     def synchronize(self, user):
         try:
