@@ -215,7 +215,9 @@ def task_load_record_from_xml_url(
         # Usa PidProvider para processar XML e criar registro em PidProviderXML
         pid_provider = PidProvider()
         
-        # provide_pid_for_xml_uri cria/atualiza PidProviderXML mas não cria Article
+        # provide_pid_for_xml_uri cria/atualiza PidProviderXML mas não cria Article.
+        # Como os XMLs são coletados do site oficial do SciELO (OPAC), os registros
+        # já estão, por definição, registrados no Core; portanto, registered_in_core=True.
         result = pid_provider.provide_pid_for_xml_uri(
             xml_uri=xml_url,
             name=f"{collection_acron}_{pid_v3}",
@@ -223,7 +225,7 @@ def task_load_record_from_xml_url(
             origin_date=origin_date,
             force_update=force_update,
             is_published=None,
-            registered_in_core=False,
+            registered_in_core=True,
             auto_solve_pid_conflict=False,
         )
 
