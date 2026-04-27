@@ -1,11 +1,11 @@
 from django.utils.translation import gettext_lazy as _
-from wagtail.snippets.views.snippets import SnippetViewSet
 
 from config.menu import get_menu_order
+from core.views import CommonControlFieldViewSet
 from files_storage.models import MinioConfiguration
 
 
-class MinioConfigurationViewSet(SnippetViewSet):
+class MinioConfigurationViewSet(CommonControlFieldViewSet):
     model = MinioConfiguration
     menu_label = _("Minio Configuration")
     menu_icon = "folder"

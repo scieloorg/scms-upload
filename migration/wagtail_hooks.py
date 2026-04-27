@@ -6,6 +6,7 @@ from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 from wagtail.snippets.models import register_snippet
 
 from config.menu import get_menu_order
+from core.views import CommonControlFieldViewSet
 from migration.models import (
     ClassicWebsiteConfiguration,
     IdFileRecord,
@@ -17,7 +18,7 @@ from migration.models import (
 )
 
 
-class ClassicWebsiteConfigurationViewSet(SnippetViewSet):
+class ClassicWebsiteConfigurationViewSet(CommonControlFieldViewSet):
     model = ClassicWebsiteConfiguration
     menu_label = _("Classic Website Configuration")
     menu_icon = "doc-full"
