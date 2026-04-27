@@ -515,15 +515,17 @@ class Article(ClusterableModel, CommonControlField):
             **filters
         ).select_related("migrated_data", "sps_pkg")
 
-        # Bulk-fetch Article records to avoid N+1 queries via ArticleProc.article
-        sps_pkg_id_list = [
-            ap.sps_pkg_id for ap in article_procs if ap.sps_pkg_id
-        ]
+        # Bulk-fetch Article records to avoid N+1 queries via ArticleProc.article.
+        # Uso values_list para não materializar os ArticleProc só para extrair o id.
+        sps_pkg_id_list = list(
+            article_procs.exclude(sps_pkg_id__isnull=True)
+            .values_list("sps_pkg_id", flat=True)
+        )
         articles_by_sps_pkg = {}
         if sps_pkg_id_list:
             for article in Article.objects.filter(
                 sps_pkg_id__in=sps_pkg_id_list
-            ).only("id", "pid_v2", "sps_pkg_id", "pp_xml_id"):
+            ).only("id", "pid_v2", "sps_pkg_id", "pp_xml_id").iterator(chunk_size=500):
                 articles_by_sps_pkg[article.sps_pkg_id] = article
 
         events = []
@@ -531,7 +533,9 @@ class Article(ClusterableModel, CommonControlField):
         pp_xml_ids = set()
         article_ids = []
 
-        for article_proc in article_procs:
+        # iterator(): processa ArticleProcs em chunks para evitar manter
+        # todos os objetos (com select_related) em memória simultaneamente.
+        for article_proc in article_procs.iterator(chunk_size=500):
             try:
                 article = articles_by_sps_pkg.get(article_proc.sps_pkg_id)
                 if not article or not article.pid_v2:
@@ -651,29 +655,54 @@ class Article(ClusterableModel, CommonControlField):
 
     @classmethod
     def fix_sps_pkg_names(cls, items):
-        response = []
-        for item in items:
-            data = {}
+        """
+        Itera o queryset em chunks (sem materializar tudo em memória) e
+        retorna apenas contadores agregados. Para periódicos grandes a
+        versão anterior, que retornava 1 dict por artigo, levava o
+        celeryworker a OOM ao serializar a lista inteira como string em
+        um evento da TaskExecution.
+        """
+        summary = {
+            "total": 0,
+            "sps_pkg_fixed": 0,
+            "sps_pkg_errors": 0,
+            "pp_xml_fixed": 0,
+            "pp_xml_errors": 0,
+            "exceptions": 0,
+        }
+        # iterator(): evita o cache do queryset; chunk_size limita o
+        # número de objetos vivos simultaneamente em memória.
+        for item in items.iterator(chunk_size=200):
+            summary["total"] += 1
             try:
-                data["pid_v3"] = item.pid_v3
-                data["pid_v2"] = item.pid_v2
-                
+                sps_pkg_name = None
                 try:
-                    data["sps_pkg__pkg_name"] = item.sps_pkg.sps_pkg_name
-                    data["sps_pkg__pkg_name_fixed"] = item.fix_sps_pkg_name()
-                except Exception as e:
-                    data["sps_pkg__pkg_name_exception"] = traceback.format_exc()
+                    sps_pkg_name = item.sps_pkg.sps_pkg_name
+                    item.fix_sps_pkg_name()
+                    summary["sps_pkg_fixed"] += 1
+                except Exception:
+                    summary["sps_pkg_errors"] += 1
+                    logging.exception(
+                        "fix_sps_pkg_names: erro em sps_pkg de Article id=%s",
+                        getattr(item, "id", None),
+                    )
 
                 try:
-                    data["pp_xml__pkg_name"] = item.pp_xml.pkg_name
-                    data["pp_xml__pkg_name_fixed"] = item.pp_xml.fix_pkg_name(data.get("sps_pkg__pkg_name"))
-                except Exception as e:
-                    data["pp_xml__pkg_name_exception"] = traceback.format_exc()
-
-            except Exception as e:
-                data["exception"] = traceback.format_exc()
-            response.append(data)
-        return response
+                    item.pp_xml.fix_pkg_name(sps_pkg_name)
+                    summary["pp_xml_fixed"] += 1
+                except Exception:
+                    summary["pp_xml_errors"] += 1
+                    logging.exception(
+                        "fix_sps_pkg_names: erro em pp_xml de Article id=%s",
+                        getattr(item, "id", None),
+                    )
+            except Exception:
+                summary["exceptions"] += 1
+                logging.exception(
+                    "fix_sps_pkg_names: erro em Article id=%s",
+                    getattr(item, "id", None),
+                )
+        return summary
 
     def fix_sps_pkg_name(self):
         if self.sps_pkg:
@@ -774,7 +803,9 @@ class Article(ClusterableModel, CommonControlField):
             queryset = queryset.filter(**filters)
         else:
             queryset = queryset.all()
-        for item in queryset:
+        # iterator(): chamada dentro do loop em exclude_inconvenient_articles;
+        # sem isso, o cache do queryset Django acumula todos os Article em memória.
+        for item in queryset.iterator(chunk_size=200):
             try:
                 item.availability_status.first().retry(user, timeout, force_update=True)
             except Exception:

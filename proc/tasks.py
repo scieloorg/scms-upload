@@ -1496,10 +1496,9 @@ def task_exclude_article_repetition(self, journal_proc_id, qa_api_data=None, pub
         user = _get_user(user_id=user_id, username=username)
         journal_proc = JournalProc.objects.get(id=journal_proc_id)
         journal = journal_proc.journal
-        collection = journal_proc.collection
 
-        task_exec.item = str(journal_proc)
         journal_proc_str = str(journal_proc)
+        task_exec.item = journal_proc_str
 
         journal_articles_qs = Article.objects.filter(journal=journal)
         task_exec.add_number("total_articles_in_journal", journal_articles_qs.count())
@@ -1511,6 +1510,8 @@ def task_exclude_article_repetition(self, journal_proc_id, qa_api_data=None, pub
         )
         response = Article.fix_sps_pkg_names(journal_articles_to_fix_sps_pkg_names_qs)
         task_exec.add_event(f"fixed sps_pkg_names: {response}")
+        for key, value in response.items():
+            task_exec.add_number(f"fix_sps_pkg_names__{key}", value)
 
         results = Article.exclude_inconvenient_articles(journal, user, timeout)
         for event in results["events"]:
