@@ -217,33 +217,39 @@ class ClassicWebsiteArticlePidTracker:
 
         pids = set(classic_website_pids)
 
-        qs = ArticleProc.objects.filter(
-            collection=self.collection
-        ).exclude(
-            pid_status__in=[
-                migration_choices.PID_STATUS_EXCEEDING,
-            ]
-        )
-        
+        qs = ArticleProc.objects.filter(collection=self.collection)
+
         qs.filter(
+            pid__in=pids,
             migrated_data__isnull=False,
         ).exclude(
-            pid_status__in=[migration_choices.PID_STATUS_MATCHED]
+            pid_status=migration_choices.PID_STATUS_MATCHED,
         ).update(pid_status=migration_choices.PID_STATUS_MATCHED)
-        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_MATCHED).values_list("pid", flat=True))
+        pids = pids - set(
+            qs.filter(
+                pid__in=pids,
+                pid_status=migration_choices.PID_STATUS_MATCHED,
+            ).values_list("pid", flat=True)
+        )
 
         qs.filter(
+            pid__in=pids,
             migrated_data__isnull=True,
         ).exclude(
-            pid_status__in=[migration_choices.PID_STATUS_MISSING],
+            pid_status=migration_choices.PID_STATUS_MISSING,
         ).update(pid_status=migration_choices.PID_STATUS_MISSING)
-        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_MISSING).values_list("pid", flat=True))
+        pids = pids - set(
+            qs.filter(
+                pid__in=pids,
+                pid_status=migration_choices.PID_STATUS_MISSING,
+            ).values_list("pid", flat=True)
+        )
 
         qs.exclude(
-            pid_status__in=[migration_choices.PID_STATUS_MATCHED,
-                            migration_choices.PID_STATUS_MISSING]
+            pid__in=set(classic_website_pids),
+        ).exclude(
+            pid_status=migration_choices.PID_STATUS_EXCEEDING,
         ).update(pid_status=migration_choices.PID_STATUS_EXCEEDING)
-        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_EXCEEDING).values_list("pid", flat=True))
 
         return pids
     
