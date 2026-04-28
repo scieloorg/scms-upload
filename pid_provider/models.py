@@ -1086,8 +1086,12 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     def _add_dates(self, xml_adapter, origin_date, available_since):
         # evita que artigos WIP fique disponíveis antes de estarem públicos
         try:
+            # Usa get_complete_publication_date para evitar logs de erro do
+            # packtools quando a data de publicação no XML é incompleta
+            # (ex.: <pub-date> apenas com <year> e <season>, sem mes/dia).
+            # Mesmo padrão adotado em proc/models.py e package/models.py.
             self.available_since = available_since or (
-                xml_adapter.xml_with_pre.article_publication_date
+                xml_adapter.xml_with_pre.get_complete_publication_date()
             )
         except Exception as e:
             # packtools error
