@@ -406,6 +406,17 @@ class Article(ClusterableModel, CommonControlField):
     def display_sections(self):
         return str(self.multilingual_sections)
 
+    @property
+    def display_collections(self):
+        if not self.journal_id:
+            return ""
+        acrons = (
+            self.journal.journal_collections.filter(collection__isnull=False)
+            .values_list("collection__acron", flat=True)
+            .distinct()
+        )
+        return ", ".join(sorted(a for a in acrons if a))
+
     def update_status(self, new_status=None, rollback=False):
         # AS_UPDATE_SUBMITTED = "update-submitted"
         # AS_ERRATUM_SUBMITTED = "erratum-submitted"
