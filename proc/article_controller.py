@@ -248,46 +248,37 @@ class ClassicWebsiteArticlePidTracker:
         """
         # Materializa a entrada uma única vez para suportar iteráveis de uso
         # único (ex.: generators) e evitar re-iterações inconsistentes.
-        # `all_pids` é a lista completa de PIDs do site clássico e é reusada
-        # na etapa EXCEEDING; `pids` representa o conjunto "restante" (PIDs
-        # ainda sem ArticleProc correspondente) e é o valor de retorno.
+        # `all_pids` é a fonte de verdade usada por **todas** as etapas de
+        # classificação; o conjunto "restante" para retorno é computado
+        # apenas no final, a partir dos PIDs que efetivamente têm
+        # `ArticleProc` na coleção.
         all_pids = set(classic_website_pids)
-        pids = set(all_pids)
 
         qs = ArticleProc.objects.filter(collection=self.collection)
 
-        # MATCHED: PID consta na lista do site clássico E o artigo já foi migrado
+        # MATCHED: PID consta na lista do site clássico E o artigo já foi
+        # migrado. Sempre filtra por `all_pids` (não por um conjunto
+        # "restante"), para garantir que cada ArticleProc seja avaliado
+        # contra a fonte de verdade independentemente de seu estado
+        # anterior.
         qs.filter(
-            pid__in=pids,
+            pid__in=all_pids,
             migrated_data__isnull=False,
         ).exclude(
             pid_status=migration_choices.PID_STATUS_MATCHED,
         ).update(pid_status=migration_choices.PID_STATUS_MATCHED)
-        # Remove os PIDs já cobertos por ArticleProc matched para que o
-        # conjunto restante represente PIDs ainda sem ArticleProc.
-        pids = pids - set(
-            qs.filter(
-                pid__in=pids,
-                pid_status=migration_choices.PID_STATUS_MATCHED,
-            ).values_list("pid", flat=True)
-        )
 
         # MISSING: PID consta na lista do site clássico, mas o artigo
-        # ainda não foi migrado (sem `migrated_data`).
+        # ainda não foi migrado (sem `migrated_data`). Também filtra
+        # diretamente por `all_pids` para que registros cujo
+        # `migrated_data` tenha sido perdido (ex.: `on_delete=SET_NULL`)
+        # sejam reclassificados de `matched` para `missing`.
         qs.filter(
-            pid__in=pids,
+            pid__in=all_pids,
             migrated_data__isnull=True,
         ).exclude(
             pid_status=migration_choices.PID_STATUS_MISSING,
         ).update(pid_status=migration_choices.PID_STATUS_MISSING)
-        # Remove também os PIDs marcados como missing; o que sobrar em
-        # `pids` são PIDs sem nenhum ArticleProc na coleção.
-        pids = pids - set(
-            qs.filter(
-                pid__in=pids,
-                pid_status=migration_choices.PID_STATUS_MISSING,
-            ).values_list("pid", flat=True)
-        )
 
         # EXCEEDING: ArticleProc cujo PID NÃO está na lista do site
         # clássico — marcado explicitamente, em vez de depender do
@@ -300,7 +291,13 @@ class ClassicWebsiteArticlePidTracker:
             pid_status=migration_choices.PID_STATUS_EXCEEDING,
         ).update(pid_status=migration_choices.PID_STATUS_EXCEEDING)
 
-        return pids
+        # Retorna apenas os PIDs da entrada que **não** correspondem a
+        # nenhum ArticleProc existente na coleção (independentemente do
+        # `pid_status`), para que o chamador crie os registros faltantes.
+        existing_pids = set(
+            qs.filter(pid__in=all_pids).values_list("pid", flat=True)
+        )
+        return all_pids - existing_pids
     
     def bulk_create(self, new_pids):
         if new_pids:
