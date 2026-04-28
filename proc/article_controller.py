@@ -246,57 +246,92 @@ class ClassicWebsiteArticlePidTracker:
             set[str]: PIDs que estão em `classic_website_pids` mas ainda
             não possuem um `ArticleProc` correspondente.
         """
-        # Materializa a entrada uma única vez para suportar iteráveis de uso
-        # único (ex.: generators) e evitar re-iterações inconsistentes.
-        # `all_pids` é a fonte de verdade usada por **todas** as etapas de
-        # classificação; o conjunto "restante" para retorno é computado
-        # apenas no final, a partir dos PIDs que efetivamente têm
-        # `ArticleProc` na coleção.
-        all_pids = set(classic_website_pids)
+        # A lista de PIDs do site clássico pode ser muito grande (centenas
+        # de milhares de itens). Para preservar memória e evitar passar
+        # cláusulas `IN (...)` enormes para o banco — que podem estourar o
+        # limite de parâmetros e tornar as queries lentas — esta
+        # implementação:
+        #
+        # 1. Reaproveita a entrada se já for `set`/`frozenset`, evitando
+        #    uma cópia integral. Caso contrário materializa uma única vez
+        #    (suportando generators e demais iteráveis de uso único).
+        # 2. Itera os `ArticleProc` da coleção em streaming
+        #    (`.iterator(chunk_size=...)`) — só o filtro indexado por
+        #    `collection` vai ao banco, sem `pid__in` gigante.
+        # 3. Decide o status alvo de cada `ArticleProc` em Python
+        #    consultando `pid in all_pids` (O(1) em set) e o
+        #    `migrated_data_id`. Coleta apenas os PKs que precisam mudar.
+        # 4. Aplica os UPDATEs em lotes pequenos por PK, mantendo a
+        #    quantidade de parâmetros por query previsível.
+        # 5. Computa o retorno (PIDs da entrada sem `ArticleProc`
+        #    correspondente) durante a mesma varredura, sem uma query
+        #    extra com `pid__in=all_pids`.
+        if isinstance(classic_website_pids, (set, frozenset)):
+            all_pids = classic_website_pids
+        else:
+            all_pids = set(classic_website_pids)
 
-        qs = ArticleProc.objects.filter(collection=self.collection)
+        MATCHED = migration_choices.PID_STATUS_MATCHED
+        MISSING = migration_choices.PID_STATUS_MISSING
+        EXCEEDING = migration_choices.PID_STATUS_EXCEEDING
 
-        # MATCHED: PID consta na lista do site clássico E o artigo já foi
-        # migrado. Sempre filtra por `all_pids` (não por um conjunto
-        # "restante"), para garantir que cada ArticleProc seja avaliado
-        # contra a fonte de verdade independentemente de seu estado
-        # anterior.
-        qs.filter(
-            pid__in=all_pids,
-            migrated_data__isnull=False,
-        ).exclude(
-            pid_status=migration_choices.PID_STATUS_MATCHED,
-        ).update(pid_status=migration_choices.PID_STATUS_MATCHED)
+        to_matched = []
+        to_missing = []
+        to_exceeding = []
+        existing_pids = set()
 
-        # MISSING: PID consta na lista do site clássico, mas o artigo
-        # ainda não foi migrado (sem `migrated_data`). Também filtra
-        # diretamente por `all_pids` para que registros cujo
-        # `migrated_data` tenha sido perdido (ex.: `on_delete=SET_NULL`)
-        # sejam reclassificados de `matched` para `missing`.
-        qs.filter(
-            pid__in=all_pids,
-            migrated_data__isnull=True,
-        ).exclude(
-            pid_status=migration_choices.PID_STATUS_MISSING,
-        ).update(pid_status=migration_choices.PID_STATUS_MISSING)
-
-        # EXCEEDING: ArticleProc cujo PID NÃO está na lista do site
-        # clássico — marcado explicitamente, em vez de depender do
-        # "resto" das etapas anteriores. Reusa `all_pids` (materializado
-        # no início) para não depender de uma segunda iteração de
-        # `classic_website_pids`, que poderia estar exaurida.
-        qs.exclude(
-            pid__in=all_pids,
-        ).exclude(
-            pid_status=migration_choices.PID_STATUS_EXCEEDING,
-        ).update(pid_status=migration_choices.PID_STATUS_EXCEEDING)
-
-        # Retorna apenas os PIDs da entrada que **não** correspondem a
-        # nenhum ArticleProc existente na coleção (independentemente do
-        # `pid_status`), para que o chamador crie os registros faltantes.
-        existing_pids = set(
-            qs.filter(pid__in=all_pids).values_list("pid", flat=True)
+        # Streaming dos ArticleProc da coleção; só carrega os campos
+        # necessários para a decisão.
+        rows = (
+            ArticleProc.objects
+            .filter(collection=self.collection)
+            .values_list("pk", "pid", "pid_status", "migrated_data_id")
+            .iterator(chunk_size=2000)
         )
+
+        for pk, pid, current_status, migrated_data_id in rows:
+            if pid in all_pids:
+                # Marca como existente para excluir do retorno (o que
+                # sobrar em `all_pids - existing_pids` são PIDs sem
+                # ArticleProc, que o chamador irá criar).
+                existing_pids.add(pid)
+                # MATCHED: PID consta na lista do site clássico E o
+                # artigo já foi migrado.
+                # MISSING: PID consta na lista, mas `migrated_data`
+                # ainda é NULL (inclui o caso em que era MATCHED e o
+                # `MigratedData` foi removido via `on_delete=SET_NULL`).
+                target = MATCHED if migrated_data_id is not None else MISSING
+            else:
+                # EXCEEDING: ArticleProc cujo PID NÃO está na lista do
+                # site clássico. Avaliado independentemente do
+                # `pid_status` anterior, permitindo reclassificar
+                # registros previamente EXCEEDING.
+                target = EXCEEDING
+
+            if current_status == target:
+                continue
+
+            if target == MATCHED:
+                to_matched.append(pk)
+            elif target == MISSING:
+                to_missing.append(pk)
+            else:
+                to_exceeding.append(pk)
+
+        # Aplica os updates em lotes pequenos por PK para manter cada
+        # cláusula `IN (...)` com tamanho previsível.
+        base = ArticleProc.objects.filter(collection=self.collection)
+        batch_size = 1000
+        for pks, status in (
+            (to_matched, MATCHED),
+            (to_missing, MISSING),
+            (to_exceeding, EXCEEDING),
+        ):
+            for start in range(0, len(pks), batch_size):
+                base.filter(pk__in=pks[start:start + batch_size]).update(
+                    pid_status=status
+                )
+
         return all_pids - existing_pids
     
     def bulk_create(self, new_pids):
