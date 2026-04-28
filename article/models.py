@@ -640,7 +640,7 @@ class Article(ClusterableModel, CommonControlField):
                 except PidProviderXML.DoesNotExist:
                     return False
             sps_pkg__pkg_name = self.sps_pkg.xml_with_pre.sps_pkg_name
-            pp_xml__pkg_name = self.pp_xml.xml_with_pre.spspkg_name
+            pp_xml__pkg_name = self.pp_xml.xml_with_pre.sps_pkg_name
             return self.pkg_name == pp_xml__pkg_name == sps_pkg__pkg_name
         except Exception as e:
             if self.pp_xml is not None:
