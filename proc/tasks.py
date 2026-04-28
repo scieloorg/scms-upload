@@ -1486,7 +1486,7 @@ def task_exclude_article_repetition_by_issue(self, issue_proc_id, username=None,
     1. Corrige nomes de sps_pkg de artigos de suplemento do fascículo que
        estejam sem o sufixo "-s" (fix_sps_pkg_names).
     2. Exclui artigos "inconvenientes" — duplicatas ou registros que não
-       devem estar associados ao periódico (exclude_inconvenient_articles).
+       devem estar associados ao fascículo (exclude_inconvenient_articles).
 
     Args:
         issue_proc_id: ID do IssueProc a processar.
