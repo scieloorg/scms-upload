@@ -214,36 +214,83 @@ class ClassicWebsiteArticlePidTracker:
             )
 
     def update_pid_status(self, classic_website_pids):
+        """
+        Atualiza o `pid_status` dos `ArticleProc` da coleção comparando os
+        PIDs registrados no banco com a lista de PIDs do site clássico
+        (`classic_website_pids`).
 
+        Regras de classificação:
+            - `matched`: PID está em `classic_website_pids` **e** o
+              `ArticleProc` já possui `migrated_data` (artigo migrado com
+              sucesso).
+            - `missing`: PID está em `classic_website_pids` **mas** o
+              `ArticleProc` ainda não possui `migrated_data` (artigo
+              presente no site clássico, mas pendente de migração).
+            - `exceeding`: PID **não** está em `classic_website_pids`
+              (existe no `ArticleProc` mas não no site clássico — ou seja,
+              está "sobrando" em relação à fonte de verdade).
+
+        Observações importantes:
+            - O queryset base não exclui registros previamente marcados
+              como `EXCEEDING`, permitindo que sejam reclassificados caso
+              passem a constar na lista de entrada.
+            - O retorno é o conjunto de PIDs da entrada que **não**
+              correspondem a nenhum `ArticleProc` existente — usado pelo
+              chamador para criar os registros faltantes.
+
+        Parâmetros:
+            classic_website_pids (iterable[str]): PIDs vindos do site
+                clássico (fonte de verdade) para a coleção corrente.
+
+        Retorno:
+            set[str]: PIDs que estão em `classic_website_pids` mas ainda
+            não possuem um `ArticleProc` correspondente.
+        """
         pids = set(classic_website_pids)
 
-        qs = ArticleProc.objects.filter(
-            collection=self.collection
-        ).exclude(
-            pid_status__in=[
-                migration_choices.PID_STATUS_EXCEEDING,
-            ]
-        )
-        
+        qs = ArticleProc.objects.filter(collection=self.collection)
+
+        # MATCHED: PID consta na lista do site clássico E o artigo já foi migrado
         qs.filter(
+            pid__in=pids,
             migrated_data__isnull=False,
         ).exclude(
-            pid_status__in=[migration_choices.PID_STATUS_MATCHED]
+            pid_status=migration_choices.PID_STATUS_MATCHED,
         ).update(pid_status=migration_choices.PID_STATUS_MATCHED)
-        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_MATCHED).values_list("pid", flat=True))
+        # Remove os PIDs já cobertos por ArticleProc matched para que o
+        # conjunto restante represente PIDs ainda sem ArticleProc.
+        pids = pids - set(
+            qs.filter(
+                pid__in=pids,
+                pid_status=migration_choices.PID_STATUS_MATCHED,
+            ).values_list("pid", flat=True)
+        )
 
+        # MISSING: PID consta na lista do site clássico, mas o artigo
+        # ainda não foi migrado (sem `migrated_data`).
         qs.filter(
+            pid__in=pids,
             migrated_data__isnull=True,
         ).exclude(
-            pid_status__in=[migration_choices.PID_STATUS_MISSING],
+            pid_status=migration_choices.PID_STATUS_MISSING,
         ).update(pid_status=migration_choices.PID_STATUS_MISSING)
-        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_MISSING).values_list("pid", flat=True))
+        # Remove também os PIDs marcados como missing; o que sobrar em
+        # `pids` são PIDs sem nenhum ArticleProc na coleção.
+        pids = pids - set(
+            qs.filter(
+                pid__in=pids,
+                pid_status=migration_choices.PID_STATUS_MISSING,
+            ).values_list("pid", flat=True)
+        )
 
+        # EXCEEDING: ArticleProc cujo PID NÃO está na lista do site
+        # clássico — marcado explicitamente, em vez de depender do
+        # "resto" das etapas anteriores.
         qs.exclude(
-            pid_status__in=[migration_choices.PID_STATUS_MATCHED,
-                            migration_choices.PID_STATUS_MISSING]
+            pid__in=set(classic_website_pids),
+        ).exclude(
+            pid_status=migration_choices.PID_STATUS_EXCEEDING,
         ).update(pid_status=migration_choices.PID_STATUS_EXCEEDING)
-        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_EXCEEDING).values_list("pid", flat=True))
 
         return pids
     
