@@ -465,9 +465,9 @@ class Article(ClusterableModel, CommonControlField):
             yield f"{website_url}/scielo.php?script=sci_pdf&pid={pid_v2}&tlng={lang}"
     
     @classmethod
-    def get_repeated_items(cls, field_name, journal=None):
-        if journal:
-            queryset = cls.objects.filter(journal=journal)
+    def get_repeated_items(cls, field_name, issue=None):
+        if issue:
+            queryset = cls.objects.filter(issue=issue)
         else:
             queryset = cls.objects.all()
         return (
@@ -495,7 +495,7 @@ class Article(ClusterableModel, CommonControlField):
             return True
 
     @classmethod
-    def exclude_articles_with_invalid_pid_v2(cls, journal=None):
+    def exclude_articles_with_invalid_pid_v2(cls, issue=None):
         """
         Find and delete migrated articles whose pid_v2 last 5 digits
         don't match the order (v121) from MigratedArticle.document.order.
@@ -508,8 +508,8 @@ class Article(ClusterableModel, CommonControlField):
             "migrated_data__isnull": False,
             "sps_pkg__isnull": False,
         }
-        if journal:
-            filters["issue_proc__journal_proc__journal"] = journal
+        if issue:
+            filters["issue_proc__issue"] = issue
 
         article_procs = ArticleProc.objects.filter(
             **filters
@@ -581,7 +581,7 @@ class Article(ClusterableModel, CommonControlField):
         return events
 
     @classmethod
-    def exclude_inconvenient_articles(cls, journal, user, timeout=None):
+    def exclude_inconvenient_articles(cls, issue, user, timeout=None):
         """
         Remove all inconvenient article records in a unified operation:
         1. Migrated articles with invalid pid_v2 (suffix doesn't match order from v121)
@@ -594,7 +594,7 @@ class Article(ClusterableModel, CommonControlField):
         }
 
         try:
-            events = cls.exclude_articles_with_invalid_pid_v2(journal)
+            events = cls.exclude_articles_with_invalid_pid_v2(issue)
             results["events"].extend(events)
         except Exception as e:
             results["exceptions"].append(
@@ -605,7 +605,7 @@ class Article(ClusterableModel, CommonControlField):
             )
 
         for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
-            repeated_items = cls.get_repeated_items(field_name, journal)
+            repeated_items = cls.get_repeated_items(field_name, issue)
             results["numbers"][f"repeated_by_{field_name}"] = repeated_items.count()
             for repeated_value in repeated_items:
                 try:
@@ -640,7 +640,7 @@ class Article(ClusterableModel, CommonControlField):
                 except PidProviderXML.DoesNotExist:
                     return False
             sps_pkg__pkg_name = self.sps_pkg.xml_with_pre.sps_pkg_name
-            pp_xml__pkg_name = self.pp_xml.xml_with_pre.spspkg_name
+            pp_xml__pkg_name = self.pp_xml.xml_with_pre.sps_pkg_name
             return self.pkg_name == pp_xml__pkg_name == sps_pkg__pkg_name
         except Exception as e:
             if self.pp_xml is not None:
@@ -650,7 +650,17 @@ class Article(ClusterableModel, CommonControlField):
             return False
 
     @classmethod
-    def fix_sps_pkg_names(cls, items):
+    def fix_sps_pkg_names(cls, issue):
+        # Seleciona artigos do fascículo de suplemento cujo
+        # sps_pkg_name não contém "-s", indicando nome incorreto
+        items = cls.objects.filter(
+            issue=issue,
+            sps_pkg__isnull=False,
+            issue__supplement__isnull=False,
+        ).exclude(
+            Q(sps_pkg__sps_pkg_name__contains="-s"),
+        )
+
         response = []
         for item in items:
             data = {}

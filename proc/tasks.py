@@ -943,15 +943,6 @@ def task_migrate_and_publish_articles_by_journal(
 
         user = _get_user(user_id, username)
 
-        task_exclude_article_repetition(
-            journal_proc_id,
-            qa_api_data=None,
-            public_api_data=None,
-            username=user.username,
-            user_id=user.id,
-            timeout=None,
-        )
-
         task_exec.add_event("Read journal acron id file")
         response = controller.import_journal_acron_id_records(
             user,
@@ -1058,6 +1049,13 @@ def task_migrate_and_publish_articles_by_issue(
         status = tracker_choices.get_valid_status(status, force_update)
 
         task_exec.item = str(issue_proc)
+
+        # corrige defeito de repetição de artigos, executando de forma síncrona
+        task_exclude_article_repetition_by_issue(
+            issue_proc_id=issue_proc_id,
+            username=username,
+            user_id=user_id,
+        )
 
         if article_proc_id_list:
             # supõe-se que os registros e arquivos já foram migrados
@@ -1480,39 +1478,46 @@ def task_fetch_and_create_journal(
 
 
 @celery_app.task(bind=True)
-def task_exclude_article_repetition(self, journal_proc_id, qa_api_data=None, public_api_data=None, username=None, user_id=None, timeout=None):
+def task_exclude_article_repetition_by_issue(self, issue_proc_id, username=None, user_id=None, timeout=None):
+    """
+    Remove artigos duplicados e inconsistentes de um fascículo.
+
+    Para o IssueProc indicado:
+    1. Corrige nomes de sps_pkg de artigos de suplemento do fascículo que
+       estejam sem o sufixo "-s" (fix_sps_pkg_names).
+    2. Exclui artigos "inconvenientes" — duplicatas ou registros que não
+       devem estar associados ao fascículo (exclude_inconvenient_articles).
+
+    Args:
+        issue_proc_id: ID do IssueProc a processar.
+        username: Nome do usuário responsável pela operação.
+        user_id: ID do usuário responsável pela operação.
+        timeout: Tempo máximo (segundos) para a etapa de exclusão; None = sem limite.
+    """
     task_params = {
-        "journal_proc_id": journal_proc_id,
-        "qa_api_data": bool(qa_api_data),
-        "public_api_data": bool(public_api_data),
+        "issue_proc_id": issue_proc_id,
     }
-    journal_proc_str = str(journal_proc_id)
+    issue_proc_str = str(issue_proc_id)
     task_exec = TaskExecution(
-        name="task_exclude_article_repetition",
-        item=journal_proc_str,
+        name="task_exclude_article_repetition_by_issue",
+        item=issue_proc_str,
         params=task_params,
     )
     try:
         user = _get_user(user_id=user_id, username=username)
-        journal_proc = JournalProc.objects.get(id=journal_proc_id)
-        journal = journal_proc.journal
-        collection = journal_proc.collection
+        issue_proc = IssueProc.objects.select_related(
+            "issue",
+        ).get(id=issue_proc_id)
+        issue = issue_proc.issue
 
-        task_exec.item = str(journal_proc)
-        journal_proc_str = str(journal_proc)
+        task_exec.item = str(issue_proc)
+        issue_proc_str = str(issue_proc)
 
-        journal_articles_qs = Article.objects.filter(journal=journal)
-        task_exec.add_number("total_articles_in_journal", journal_articles_qs.count())
-
-        journal_articles_to_fix_sps_pkg_names_qs = journal_articles_qs.filter(
-            Q(issue__supplement__isnull=True),
-            ~Q(sps_pkg__sps_pkg_name__contains="-s"),
-            sps_pkg__isnull=False,
-        )
-        response = Article.fix_sps_pkg_names(journal_articles_to_fix_sps_pkg_names_qs)
+        response = Article.fix_sps_pkg_names(issue)
         task_exec.add_event(f"fixed sps_pkg_names: {response}")
 
-        results = Article.exclude_inconvenient_articles(journal, user, timeout)
+        # Remove artigos duplicados ou indevidos; propaga eventos, números e exceções
+        results = Article.exclude_inconvenient_articles(issue, user, timeout)
         for event in results["events"]:
             task_exec.add_event(event)
         for key, value in results["numbers"].items():
@@ -1530,8 +1535,8 @@ def task_exclude_article_repetition(self, journal_proc_id, qa_api_data=None, pub
             )
         except Exception:
             UnexpectedEvent.create(
-                item=journal_proc_str,
-                action="proc.tasks.task_exclude_article_repetition",
+                item=issue_proc_str,
+                action="proc.tasks.task_exclude_article_repetition_by_issue",
                 e=e,
                 exc_traceback=exc_traceback,
                 detail=task_params,
