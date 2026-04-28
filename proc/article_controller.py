@@ -246,7 +246,13 @@ class ClassicWebsiteArticlePidTracker:
             set[str]: PIDs que estão em `classic_website_pids` mas ainda
             não possuem um `ArticleProc` correspondente.
         """
-        pids = set(classic_website_pids)
+        # Materializa a entrada uma única vez para suportar iteráveis de uso
+        # único (ex.: generators) e evitar re-iterações inconsistentes.
+        # `all_pids` é a lista completa de PIDs do site clássico e é reusada
+        # na etapa EXCEEDING; `pids` representa o conjunto "restante" (PIDs
+        # ainda sem ArticleProc correspondente) e é o valor de retorno.
+        all_pids = set(classic_website_pids)
+        pids = set(all_pids)
 
         qs = ArticleProc.objects.filter(collection=self.collection)
 
@@ -285,9 +291,11 @@ class ClassicWebsiteArticlePidTracker:
 
         # EXCEEDING: ArticleProc cujo PID NÃO está na lista do site
         # clássico — marcado explicitamente, em vez de depender do
-        # "resto" das etapas anteriores.
+        # "resto" das etapas anteriores. Reusa `all_pids` (materializado
+        # no início) para não depender de uma segunda iteração de
+        # `classic_website_pids`, que poderia estar exaurida.
         qs.exclude(
-            pid__in=set(classic_website_pids),
+            pid__in=all_pids,
         ).exclude(
             pid_status=migration_choices.PID_STATUS_EXCEEDING,
         ).update(pid_status=migration_choices.PID_STATUS_EXCEEDING)
