@@ -51,7 +51,7 @@ class ArticleSnippetViewSet(SnippetViewSet):
         "updated",
         # "updated_by",
     )
-    list_filter = ("status", "journal__journal_collections__collection", "journal")
+    list_filter = ("status", "sps_pkg__articleproc__collection", "journal")
     search_fields = (
         "sps_pkg__sps_pkg_name",
         "pid_v2",
@@ -61,8 +61,8 @@ class ArticleSnippetViewSet(SnippetViewSet):
         "journal__official_journal__issn_print",
         "journal__official_journal__issn_electronic",
         "title_with_lang__text",
-        "journal__journal_collections__collection__acron",
-        "journal__journal_collections__collection__name",
+        "sps_pkg__articleproc__collection__acron",
+        "sps_pkg__articleproc__collection__name",
     )
     # inspect_view_fields não é usado em SnippetViewSet, use inspect_view_class customizada
 

@@ -308,17 +308,20 @@ class Journal(CommonControlField, ClusterableModel):
     @property
     def collections(self):
         from collection.models import Collection
+        from proc.models import JournalProc
 
         return Collection.objects.filter(
-            id__in=self.journal_collections.filter(
-                collection__isnull=False
+            id__in=JournalProc.objects.filter(
+                journal=self, collection__isnull=False
             ).values_list("collection_id", flat=True)
         ).distinct()
 
     @property
     def collections_acron(self):
+        from proc.models import JournalProc
+
         acrons = (
-            self.journal_collections.filter(collection__isnull=False)
+            JournalProc.objects.filter(journal=self, collection__isnull=False)
             .values_list("collection__acron", flat=True)
             .distinct()
         )
@@ -326,8 +329,10 @@ class Journal(CommonControlField, ClusterableModel):
 
     @property
     def collections_name(self):
+        from proc.models import JournalProc
+
         names = (
-            self.journal_collections.filter(collection__isnull=False)
+            JournalProc.objects.filter(journal=self, collection__isnull=False)
             .values_list("collection__name", flat=True)
             .distinct()
         )

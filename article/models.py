@@ -408,9 +408,18 @@ class Article(ClusterableModel, CommonControlField):
 
     @property
     def display_collections(self):
-        if not self.journal_id:
+        from proc.models import ArticleProc
+
+        if not self.sps_pkg_id:
             return ""
-        return ", ".join(self.journal.collections_acron)
+        acrons = (
+            ArticleProc.objects.filter(
+                sps_pkg_id=self.sps_pkg_id, collection__isnull=False
+            )
+            .values_list("collection__acron", flat=True)
+            .distinct()
+        )
+        return ", ".join(sorted(a for a in acrons if a))
 
     def update_status(self, new_status=None, rollback=False):
         # AS_UPDATE_SUBMITTED = "update-submitted"
