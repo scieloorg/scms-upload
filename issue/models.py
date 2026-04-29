@@ -72,35 +72,30 @@ class Issue(CommonControlField, IssuePublicationDate):
     @property
     def collections(self):
         from collection.models import Collection
-        from proc.models import IssueProc
 
-        return Collection.objects.filter(
-            id__in=IssueProc.objects.filter(
-                issue=self, collection__isnull=False
-            ).values_list("collection_id", flat=True)
-        ).distinct()
+        return Collection.objects.filter(issueproc__issue=self).distinct()
 
     @property
     def collections_acron(self):
-        from proc.models import IssueProc
+        from collection.models import Collection
 
-        acrons = (
-            IssueProc.objects.filter(issue=self, collection__isnull=False)
-            .values_list("collection__acron", flat=True)
+        return list(
+            Collection.objects.filter(issueproc__issue=self)
+            .values_list("acron", flat=True)
             .distinct()
+            .order_by("acron")
         )
-        return sorted(a for a in acrons if a)
 
     @property
     def collections_name(self):
-        from proc.models import IssueProc
+        from collection.models import Collection
 
-        names = (
-            IssueProc.objects.filter(issue=self, collection__isnull=False)
-            .values_list("collection__name", flat=True)
+        return list(
+            Collection.objects.filter(issueproc__issue=self)
+            .values_list("name", flat=True)
             .distinct()
+            .order_by("name")
         )
-        return sorted(n for n in names if n)
 
     @property
     def data(self):
