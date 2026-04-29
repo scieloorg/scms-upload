@@ -476,6 +476,11 @@ class BaseProc(CommonControlField):
         try:
             obj = None
             operation = None
+            detail = {
+                "collection": collection.acron,
+                "pid": pid,
+                "had_data": bool(data),
+            }
             obj = cls.get_or_create(user, collection, pid)
             if (
                 obj.migration_status != tracker_choices.PROGRESS_STATUS_TODO
@@ -484,15 +489,18 @@ class BaseProc(CommonControlField):
                 return obj
 
             operation = obj.start(user, f"get data from classic website {pid}")
-            obj.migrated_data = cls.MigratedDataClass.register_classic_website_data(
-                user,
-                collection,
-                pid,
-                data,
-                content_type,
-                force_update,
-            )
-            obj.migration_status = obj.migrated_data.migration_status
+
+            if data:
+                obj.migrated_data = cls.MigratedDataClass.register_classic_website_data(
+                    user,
+                    collection,
+                    pid,
+                    data,
+                    content_type,
+                    force_update,
+                )
+                obj.migration_status = obj.migrated_data.migration_status
+                detail = obj.migrated_data.data
             obj.save()
             operation.finish(
                 user,
@@ -500,7 +508,7 @@ class BaseProc(CommonControlField):
                     obj.migration_status == tracker_choices.PROGRESS_STATUS_TODO
                 ),
                 message=None,
-                detail=obj.migrated_data.data,
+                detail=detail,
             )
             return obj
         except Exception as e:
@@ -1448,8 +1456,12 @@ class IssueProc(BaseProc, ClusterableModel):
                         journal_data,
                         issue_data,
                     )
-                    article_proc = self.create_or_update_article_proc(
-                        user, record.item_pid, data["data"], force_update
+                    article_proc = ArticleProc.create_or_update(
+                        issue_proc=self,
+                        user=user,
+                        pid=record.item_pid,
+                        data=data["data"],
+                        force_update=force_update,
                     )
                     total += 1
                     if not article_proc:
@@ -1501,35 +1513,6 @@ class IssueProc(BaseProc, ClusterableModel):
         if total_migrated_articles == total_document_records:
             return tracker_choices.PROGRESS_STATUS_DONE
         return tracker_choices.PROGRESS_STATUS_PENDING
-
-    def create_or_update_article_proc(self, user, pid, data, force_update):
-        article_proc = ArticleProc.register_classic_website_data(
-            user=user,
-            collection=self.collection,
-            pid=pid,
-            data=data,
-            content_type="article",
-            force_update=force_update,
-        )
-        if not article_proc:
-            raise ArticleProc.DoesNotExist(f"Unable to create ArticleProc for {pid}")
-
-        migrated_article = article_proc.migrated_data
-        document = migrated_article.document
-
-        if not migrated_article.file_type:
-            migrated_article.file_type = document.file_type
-            migrated_article.save()
-
-        article_proc.update(
-            issue_proc=self,
-            pkg_name=document.filename_without_extension,
-            migration_status=tracker_choices.PROGRESS_STATUS_TODO,
-            user=user,
-            main_lang=document.original_language,
-            force_update=force_update,
-        )
-        return article_proc
 
     @staticmethod
     def get_issue_pid(issue):
@@ -1658,6 +1641,42 @@ class ArticleProc(BaseProc, ClusterableModel):
         ]
 
     @classmethod
+    def create_or_update(cls, issue_proc, user, pid, data, force_update):
+        article_proc = cls.register_classic_website_data(
+            user=user,
+            collection=issue_proc.collection,
+            pid=pid,
+            data=data,
+            content_type="article",
+            force_update=force_update,
+        )
+        if not article_proc:
+            raise cls.DoesNotExist(f"Unable to create ArticleProc for {pid}")
+
+        pkg_name = None
+        main_lang = None
+        migrated_article = article_proc.migrated_data
+
+        if migrated_article:
+            document = migrated_article.document
+            pkg_name = document.filename_without_extension
+            main_lang = document.original_language
+
+            if not migrated_article.file_type:
+                migrated_article.file_type = document.file_type
+                migrated_article.save()
+        
+        article_proc.update(
+            issue_proc=issue_proc,
+            pkg_name=pkg_name,
+            migration_status=tracker_choices.PROGRESS_STATUS_TODO,
+            user=user,
+            main_lang=main_lang,
+            force_update=force_update,
+        )
+        return article_proc
+
+    @classmethod
     def mark_for_reprocessing(cls, issue_proc, article_pids=None, article_proc_ids=None):
         params = {"issue_proc": issue_proc}
         if article_pids:
@@ -1716,6 +1735,8 @@ class ArticleProc(BaseProc, ClusterableModel):
             self.pkg_name = pkg_name
             self.main_lang = main_lang
             self.migration_status = migration_status or self.migration_status
+            if not self.migrated_data or not self.migrated_data.data:
+                self.pid_status = migration_choices.PID_STATUS_MISSING
             self.xml_status = tracker_choices.PROGRESS_STATUS_TODO
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_TODO
             self.qa_ws_status = tracker_choices.PROGRESS_STATUS_TODO
