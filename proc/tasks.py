@@ -847,8 +847,10 @@ def task_migrate_and_publish_articles(
                 force_update=force_migrate_document_records or force_migrate_document_files,
                 to_migrate_articles=True,
             )
-            issue_proc_ids = selected_issue_procs.values_list("journal_proc_id", "id").distinct()
-            
+            issue_proc_ids = selected_issue_procs.values_list(
+                "journal_proc_id", "id"
+            ).distinct().iterator(chunk_size=1000)
+
             for journal_proc_id, issue_proc_id in issue_proc_ids:
                 items_to_process.setdefault(journal_proc_id, []).append(issue_proc_id)
         else:
@@ -856,7 +858,7 @@ def task_migrate_and_publish_articles(
             journal_proc_ids = JournalProc.select_items(
                 collection_acron_list=collection_acron_list,
                 journal_acron_list=journal_acron_list,
-            ).values_list("id", flat=True)
+            ).values_list("id", flat=True).iterator(chunk_size=1000)
             items_to_process = {journal_proc_id: None for journal_proc_id in journal_proc_ids}
 
         total_journals_to_process = len(items_to_process)
@@ -869,7 +871,11 @@ def task_migrate_and_publish_articles(
 
         task_exec.total_to_process = total_journals_to_process
         total_processed = 0
-        for journal_proc_id, issue_proc_id_list in items_to_process.items():
+        # Drena items_to_process ao dispatchar para liberar progressivamente
+        # as listas de issue_proc_ids (potencialmente grandes em coleções com
+        # muitos journals × issues), em vez de mantê-lo inteiro em RAM.
+        while items_to_process:
+            journal_proc_id, issue_proc_id_list = items_to_process.popitem()
             kwargs = {}
             kwargs.update(kwargs_)
             kwargs["journal_proc_id"] = journal_proc_id
@@ -951,8 +957,6 @@ def task_migrate_and_publish_articles_by_journal(
             force_update=force_import_acron_id_file,
         )
 
-        qa_api_data = get_api_data(journal_proc.collection, "issue", "QA")
-        public_api_data = get_api_data(journal_proc.collection, "issue", "PUBLIC")
         total_processed = 0
         total_to_process = 0
 
@@ -980,14 +984,21 @@ def task_migrate_and_publish_articles_by_journal(
                 exclude_issue_proc_id_list=list(issue_proc_id_list),
                 status_list=status,
                 force_update=force_update,
-            ).values_list("issue_proc_id", "id").distinct()
+            ).values_list("issue_proc_id", "id").distinct().iterator(chunk_size=1000)
 
             for issue_proc_id, article_proc_id in selected_article_proc_items:
                 issue_proc_and_related_article_proc_id_list.setdefault(issue_proc_id, []).append(article_proc_id)
 
         total_to_process = len(issue_proc_and_related_article_proc_id_list)
-        for issue_proc_id, article_proc_id_list in issue_proc_and_related_article_proc_id_list.items():
+        # Drena o dict ao dispatchar para liberar progressivamente as listas
+        # de article_proc_ids (que podem somar muitos inteiros para journals
+        # grandes), em vez de mantê-lo inteiro em RAM até o fim do loop.
+        while issue_proc_and_related_article_proc_id_list:
+            issue_proc_id, article_proc_id_list = issue_proc_and_related_article_proc_id_list.popitem()
             total_processed += 1
+            # qa_api_data/public_api_data não são propagados: task_sync_issue
+            # (despachada por _by_issue) cacheia get_api_data internamente,
+            # evitando login HTTP redundante e mensagens grandes no broker.
             task_migrate_and_publish_articles_by_issue.delay(
                 user_id=user_id,
                 username=username,
@@ -997,9 +1008,7 @@ def task_migrate_and_publish_articles_by_journal(
                 force_update=force_update,
                 force_migrate_document_records=force_migrate_document_records,
                 force_migrate_document_files=force_migrate_document_files,
-                qa_api_data=qa_api_data,
-                public_api_data=public_api_data,
-        )   
+        )
         task_exec.total_processed = total_processed
         task_exec.total_to_process = total_to_process
         task_exec.finish()
@@ -1023,9 +1032,20 @@ def task_migrate_and_publish_articles_by_issue(
     force_update=False,
     force_migrate_document_records=False,
     force_migrate_document_files=False,
-    qa_api_data=None,
-    public_api_data=None,
+    # qa_api_data e public_api_data foram removidos: nunca eram lidos no
+    # corpo da função e infláveis (token + credenciais) no payload Celery.
+    # Aceitos como **kwargs para compatibilidade com mensagens já enfileiradas.
+    **legacy_kwargs,
 ):
+    # Sinaliza kwargs inesperados (típos, etc.) sem quebrar; ignora os legacy
+    # conhecidos (qa_api_data/public_api_data).
+    _LEGACY_IGNORED = {"qa_api_data", "public_api_data"}
+    unknown_kwargs = [k for k in legacy_kwargs if k not in _LEGACY_IGNORED]
+    if unknown_kwargs:
+        logging.warning(
+            "task_migrate_and_publish_articles_by_issue: ignoring unknown kwargs %s",
+            unknown_kwargs,
+        )
     task_params = {
         "user_id": user_id,
         "username": username,
@@ -1062,7 +1082,8 @@ def task_migrate_and_publish_articles_by_issue(
             # (issue_proc.docs_status e issue_proc.files_status estão como DONE)
             total_articles_to_process = len(article_proc_id_list)
             article_procs = ArticleProc.objects.select_related(
-                "issue_proc",
+                "issue_proc", "issue_proc__journal_proc",
+                "collection", "sps_pkg",
             ).filter(
                 id__in=article_proc_id_list
             )
@@ -1082,6 +1103,9 @@ def task_migrate_and_publish_articles_by_issue(
                 issue_proc_id_list=[issue_proc_id],
                 status_list=status,
                 force_update=force_update,
+            ).select_related(
+                "issue_proc", "issue_proc__journal_proc",
+                "collection", "sps_pkg",
             )
             total_articles_to_process = article_procs.count()
         task_exec.total_to_process = total_articles_to_process
@@ -1089,7 +1113,9 @@ def task_migrate_and_publish_articles_by_issue(
         task_exec.add_event("Migrate articles")
         total_processed = 0
         exceptions = {}
-        for article_proc in article_procs:
+        # iterator(chunk_size) evita carregar todos os ArticleProc em memória,
+        # reduzindo RAM no worker quando o issue tem muitos artigos.
+        for article_proc in article_procs.iterator(chunk_size=100):
             try:
                 article = article_proc.migrate_article(user, force_update)
                 total_processed += 1
@@ -1099,17 +1125,11 @@ def task_migrate_and_publish_articles_by_issue(
                 task_exec.add_exception(exceptions[article_proc.pid])
 
         task_exec.total_processed = total_processed
-            
-        article_ids_to_publish = ArticleProc.objects.select_related(
-            "issue_proc", "sps_pkg",
-        ).filter(
-            Q(qa_ws_status__in=status) | Q(public_ws_status__in=status),
-            issue_proc=issue_proc,
-            sps_pkg__pid_v3__isnull=False,
-        ).values_list("id", flat=True)
-        total_articles_to_publish = article_ids_to_publish.count()
-        task_exec.add_number("total_articles_to_publish", total_articles_to_publish)
 
+        # task_sync_issue é sempre despachada para QA e PUBLIC: além de publicar
+        # artigos pendentes, ela garante que não haja duplicidade no site —
+        # condição que não pode ser determinada antecipadamente sem consultar o
+        # próprio site.
         for website_label in (QA, PUBLIC):
             task_exec.add_event(f"Schedule Publish articles / sync issue tasks for {website_label}")
             task_sync_issue.apply_async(
@@ -1172,15 +1192,16 @@ def task_sync_issue(
         elif website_kind == PUBLIC:
             query_by_status = Q(public_ws_status__in=status)
 
-        article_ids_to_publish = ArticleProc.objects.select_related(
-            "issue_proc", "sps_pkg",
-        ).filter(
+        article_ids_qs = ArticleProc.objects.filter(
             query_by_status,
             issue_proc=issue_proc,
             sps_pkg__pid_v3__isnull=False,
         ).values_list("id", flat=True)
 
-        task_exec.total_to_process = article_ids_to_publish.count()
+        # .count() + .iterator() em vez de list(qs): evita carregar todos os
+        # IDs de artigos do issue em RAM (issues grandes podem ter milhares).
+        # Custo: 1 SELECT COUNT(*) extra; ganho: footprint constante no loop.
+        task_exec.total_to_process = article_ids_qs.count()
         total_processed = 0
 
         api_data = get_api_data(issue_proc.collection, "article", website_kind)
@@ -1189,7 +1210,7 @@ def task_sync_issue(
             task_exec.finish()
             return
 
-        for article_proc_id in article_ids_to_publish:
+        for article_proc_id in article_ids_qs.iterator(chunk_size=500):
             try:
                 # executa de forma síncrona para evitar muitos processos em paralelo, o que pode causar lentidão e instabilidade no ambiente de origem (ex: site clássico)
                 task_publish_article(
