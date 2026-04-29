@@ -407,18 +407,44 @@ class Article(ClusterableModel, CommonControlField):
         return str(self.multilingual_sections)
 
     @property
-    def display_collections(self):
+    def collections(self):
         from collection.models import Collection
 
-        if not self.sps_pkg_id:
-            return ""
-        acrons = (
-            Collection.objects.filter(articleproc__sps_pkg_id=self.sps_pkg_id)
+        return Collection.objects.filter(
+            articleproc__sps_pkg=self.sps_pkg,
+        ).distinct()
+
+    @property
+    def collections_acron(self):
+        from collection.models import Collection
+
+        return list(
+            Collection.objects.filter(
+                articleproc__sps_pkg=self.sps_pkg,
+            )
             .values_list("acron", flat=True)
             .distinct()
             .order_by("acron")
         )
-        return ", ".join(a for a in acrons if a)
+
+    @property
+    def collections_name(self):
+        from collection.models import Collection
+
+        return list(
+            Collection.objects.filter(
+                articleproc__sps_pkg=self.sps_pkg,
+            )
+            .values_list("name", flat=True)
+            .distinct()
+            .order_by("name")
+        )
+
+    @property
+    def display_collections(self):
+        if not self.sps_pkg_id:
+            return ""
+        return ", ".join(self.collections_acron)
 
     def update_status(self, new_status=None, rollback=False):
         # AS_UPDATE_SUBMITTED = "update-submitted"
