@@ -6,6 +6,7 @@ from publication.api import publication as publication_module
 from publication.api.publication import (
     clear_api_data_cache,
     get_api_data,
+    invalidate_api_data_cache,
 )
 
 
@@ -88,3 +89,20 @@ class GetApiDataCacheTest(unittest.TestCase):
             get_api_data(collection, "issue", "QA")
 
         self.assertEqual(mocked.call_count, 2)
+
+    def test_invalidate_cache_forces_relogin_for_specific_key(self):
+        collection_a = _FakeCollection(pk=5)
+        collection_b = _FakeCollection(pk=6)
+        with patch.object(
+            publication_module,
+            "get_api",
+            return_value={"token": "t"},
+        ) as mocked:
+            get_api_data(collection_a, "issue", "QA")
+            get_api_data(collection_b, "issue", "QA")
+            # Invalida apenas a entrada de A; B segue cacheada.
+            invalidate_api_data_cache(collection_a, "issue", "QA")
+            get_api_data(collection_a, "issue", "QA")  # re-login
+            get_api_data(collection_b, "issue", "QA")  # cache hit
+
+        self.assertEqual(mocked.call_count, 3)
