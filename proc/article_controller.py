@@ -228,15 +228,14 @@ class ClassicWebsiteArticlePidTracker:
             return []
         for pid in new_pids:
             # Cria ou recupera o ArticleProc para este PID dentro da coleção
-            article_proc = ArticleProc.create_or_update(
-                issue_proc=self,
-                user=self.user,
+            yield ArticleProc(
+                creator=self.user,
+                collection=self.collection,
                 pid=pid,
                 data=None,
                 force_update=False,
+                pid_status=migration_choices.PID_STATUS_MISSING,
             )
-            if article_proc:
-                yield article_proc
 
     def update_pid_status(self, classic_website_pids):
         """
