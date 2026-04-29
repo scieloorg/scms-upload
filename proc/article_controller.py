@@ -232,8 +232,6 @@ class ClassicWebsiteArticlePidTracker:
                 creator=self.user,
                 collection=self.collection,
                 pid=pid,
-                data=None,
-                force_update=False,
                 pid_status=migration_choices.PID_STATUS_MISSING,
             )
 
