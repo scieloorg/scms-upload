@@ -306,6 +306,34 @@ class Journal(CommonControlField, ClusterableModel):
         return self.official_journal.issn_electronic
 
     @property
+    def collections(self):
+        from collection.models import Collection
+
+        return Collection.objects.filter(
+            id__in=self.journal_collections.filter(
+                collection__isnull=False
+            ).values_list("collection_id", flat=True)
+        ).distinct()
+
+    @property
+    def collections_acron(self):
+        acrons = (
+            self.journal_collections.filter(collection__isnull=False)
+            .values_list("collection__acron", flat=True)
+            .distinct()
+        )
+        return sorted(a for a in acrons if a)
+
+    @property
+    def collections_name(self):
+        names = (
+            self.journal_collections.filter(collection__isnull=False)
+            .values_list("collection__name", flat=True)
+            .distinct()
+        )
+        return sorted(n for n in names if n)
+
+    @property
     def first_letters(self):
         return "".join(
             word[0]

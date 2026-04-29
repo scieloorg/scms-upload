@@ -410,12 +410,7 @@ class Article(ClusterableModel, CommonControlField):
     def display_collections(self):
         if not self.journal_id:
             return ""
-        acrons = (
-            self.journal.journal_collections.filter(collection__isnull=False)
-            .values_list("collection__acron", flat=True)
-            .distinct()
-        )
-        return ", ".join(sorted(a for a in acrons if a))
+        return ", ".join(self.journal.collections_acron)
 
     def update_status(self, new_status=None, rollback=False):
         # AS_UPDATE_SUBMITTED = "update-submitted"

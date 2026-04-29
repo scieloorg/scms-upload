@@ -70,6 +70,26 @@ class Issue(CommonControlField, IssuePublicationDate):
         return "".join([f"{prefix}{value}" for value, prefix in labels if value])
 
     @property
+    def collections(self):
+        from collection.models import Collection
+
+        if not self.journal_id:
+            return Collection.objects.none()
+        return self.journal.collections
+
+    @property
+    def collections_acron(self):
+        if not self.journal_id:
+            return []
+        return self.journal.collections_acron
+
+    @property
+    def collections_name(self):
+        if not self.journal_id:
+            return []
+        return self.journal.collections_name
+
+    @property
     def data(self):
         return dict(
             journal=self.journal.data,
