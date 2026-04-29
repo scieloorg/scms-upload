@@ -1116,36 +1116,21 @@ def task_migrate_and_publish_articles_by_issue(
 
         task_exec.total_processed = total_processed
 
-        # Materializa uma única vez para evitar count() + iteração separados.
-        article_ids_to_publish = list(
-            ArticleProc.objects.filter(
-                Q(qa_ws_status__in=status) | Q(public_ws_status__in=status),
-                issue_proc=issue_proc,
-                sps_pkg__pid_v3__isnull=False,
-            ).values_list("id", flat=True)
-        )
-        total_articles_to_publish = len(article_ids_to_publish)
-        task_exec.add_number("total_articles_to_publish", total_articles_to_publish)
-
-        # Só agenda task_sync_issue se há artigos a publicar; caso contrário
-        # cada despacho dispararia get_api_data (login HTTP) e queries
-        # redundantes só para descobrir que não há trabalho.
-        if total_articles_to_publish:
-            for website_label in (QA, PUBLIC):
-                task_exec.add_event(f"Schedule Publish articles / sync issue tasks for {website_label}")
-                task_sync_issue.apply_async(
-                    kwargs=dict(
-                        user_id=user_id,
-                        username=username,
-                        issue_proc_id=issue_proc.id,
-                        website_kind=website_label,
-                        status=status,
-                        force_update=force_update,
-                    )
+        # task_sync_issue é sempre despachada para QA e PUBLIC: além de publicar
+        # artigos pendentes, ela garante que não haja duplicidade no site —
+        # condição que não pode ser determinada antecipadamente sem consultar o
+        # próprio site.
+        for website_label in (QA, PUBLIC):
+            task_exec.add_event(f"Schedule Publish articles / sync issue tasks for {website_label}")
+            task_sync_issue.apply_async(
+                kwargs=dict(
+                    user_id=user_id,
+                    username=username,
+                    issue_proc_id=issue_proc.id,
+                    website_kind=website_label,
+                    status=status,
+                    force_update=force_update,
                 )
-        else:
-            task_exec.add_event(
-                f"Skip task_sync_issue for issue_proc {issue_proc.id}: no articles to publish"
             )
 
         task_exec.finish()
