@@ -241,11 +241,12 @@ class ClassicWebsiteArticlePidTracker:
         ).values_list("pid", flat=True))
         pids_to_check = pids_to_check - migrated_and_matched_pids
 
-        # 2. Promove para MATCHED os registros que estavam MISSING mas já
+        # 2. Promove para MATCHED os registros que estavam com status diferente de MATCHED mas já
         #    possuem dados migrados e constam na lista do site clássico.
         migrated_pids = set(qs.filter(
             migrated_data__isnull=False,
-            pid_status=migration_choices.PID_STATUS_MISSING,
+        ).exclude(
+            pid_status=migration_choices.PID_STATUS_MATCHED,
         ).values_list("pid", flat=True))
         matched_pids = pids_to_check.intersection(migrated_pids)
         qs.filter(pid__in=matched_pids).update(pid_status=migration_choices.PID_STATUS_MATCHED)
@@ -259,7 +260,11 @@ class ClassicWebsiteArticlePidTracker:
 
         exceding_pids = unmatched_pids - pids_to_check
         if exceding_pids:
-            qs.filter(pid__in=exceding_pids).update(pid_status=migration_choices.PID_STATUS_EXCEEDING)
+            qs.filter(
+                pid__in=exceding_pids,
+            ).exclude(
+                pid_status=migration_choices.PID_STATUS_EXCEEDING
+            ).update(pid_status=migration_choices.PID_STATUS_EXCEEDING)
 
         # Retorna os PIDs que ainda não têm registro na base (precisam ser criados)
         return pids_to_check - unmatched_pids
