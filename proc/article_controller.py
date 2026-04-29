@@ -196,16 +196,10 @@ class ClassicWebsiteArticlePidTracker:
         self.user = user
         self.collection = collection
 
-    def create_article_proc_for_pids(self, pids):
-        if not pids:
+    def create_article_proc_for_pids(self, new_pids):
+        if not new_pids:
             return []
-        registered_pids = set(
-            ArticleProc.objects.filter(
-                collection=self.collection, pid__in=pids
-            ).values_list("pid", flat=True)
-        )
-        todo = set(pids) - registered_pids
-        for pid in todo:
+        for pid in new_pids:
             yield ArticleProc(
                 pid=pid,
                 collection=self.collection,
@@ -214,38 +208,61 @@ class ClassicWebsiteArticlePidTracker:
             )
 
     def update_pid_status(self, classic_website_pids):
+        """
+        Reconcilia os PIDs do site clássico com os registros de ArticleProc
+        da coleção, atualizando o campo pid_status conforme necessário.
 
-        pids = set(classic_website_pids)
+        Regras aplicadas, em ordem:
+        1. PIDs já MATCHED com dados migrados são considerados concluídos e
+           removidos do conjunto de verificação (nenhuma ação necessária).
+        2. PIDs MISSING que agora possuem dados migrados são promovidos para
+           MATCHED.
+        3. PIDs presentes nos registros da base mas ausentes no site clássico
+           (excedentes) são marcados como EXCEEDING.
 
+        Args:
+            classic_website_pids: Conjunto (set) de PIDs provenientes do
+                site clássico para esta coleção.
+
+        Returns:
+            set: PIDs do site clássico que ainda não possuem registro
+                correspondente na base e precisam ser criados (novos PIDs).
+        """
         qs = ArticleProc.objects.filter(
-            collection=self.collection
-        ).exclude(
-            pid_status__in=[
-                migration_choices.PID_STATUS_EXCEEDING,
-            ]
+            collection=self.collection,
         )
-        
-        qs.filter(
+        pids_to_check = classic_website_pids
+
+        # 1. Remove do conjunto de verificação os PIDs que já estão MATCHED
+        #    e possuem dados migrados — não há nada mais a fazer para eles.
+        migrated_and_matched_pids = set(qs.filter(
             migrated_data__isnull=False,
-        ).exclude(
-            pid_status__in=[migration_choices.PID_STATUS_MATCHED]
-        ).update(pid_status=migration_choices.PID_STATUS_MATCHED)
-        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_MATCHED).values_list("pid", flat=True))
+            pid_status=migration_choices.PID_STATUS_MATCHED,
+        ).values_list("pid", flat=True))
+        pids_to_check = pids_to_check - migrated_and_matched_pids
 
-        qs.filter(
-            migrated_data__isnull=True,
-        ).exclude(
-            pid_status__in=[migration_choices.PID_STATUS_MISSING],
-        ).update(pid_status=migration_choices.PID_STATUS_MISSING)
-        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_MISSING).values_list("pid", flat=True))
+        # 2. Promove para MATCHED os registros que estavam MISSING mas já
+        #    possuem dados migrados e constam na lista do site clássico.
+        migrated_pids = set(qs.filter(
+            migrated_data__isnull=False,
+            pid_status=migration_choices.PID_STATUS_MISSING,
+        ).values_list("pid", flat=True))
+        matched_pids = pids_to_check.intersection(migrated_pids)
+        qs.filter(pid__in=matched_pids).update(pid_status=migration_choices.PID_STATUS_MATCHED)
+        pids_to_check = pids_to_check - matched_pids
 
-        qs.exclude(
-            pid_status__in=[migration_choices.PID_STATUS_MATCHED,
-                            migration_choices.PID_STATUS_MISSING]
-        ).update(pid_status=migration_choices.PID_STATUS_EXCEEDING)
-        pids = pids - set(qs.filter(pid_status=migration_choices.PID_STATUS_EXCEEDING).values_list("pid", flat=True))
+        # 3. Marca como EXCEEDING os registros que existem na base mas não
+        #    constam mais no site clássico (foram removidos ou são inválidos).
+        unmatched_pids = set(qs.exclude(
+            pid_status=migration_choices.PID_STATUS_MATCHED,
+        ).values_list("pid", flat=True))
 
-        return pids
+        exceding_pids = unmatched_pids - pids_to_check
+        if exceding_pids:
+            qs.filter(pid__in=exceding_pids).update(pid_status=migration_choices.PID_STATUS_EXCEEDING)
+
+        # Retorna os PIDs que ainda não têm registro na base (precisam ser criados)
+        return pids_to_check - unmatched_pids
     
     def bulk_create(self, new_pids):
         if new_pids:
