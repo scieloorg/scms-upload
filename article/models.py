@@ -15,6 +15,7 @@ from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
+from migration.models import MigratedArticle
 from article.forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from collection.models import Language
 from core.models import CommonControlField, HTMLTextModel
@@ -217,21 +218,28 @@ class Article(ClusterableModel, CommonControlField):
 
     @classmethod
     def create_or_update(cls, user, sps_pkg, issue=None, journal=None, position=None):
-        if not sps_pkg or sps_pkg.pid_v3 is None:
-            raise ValueError("create_article requires sps_pkg with pid_v3")
+        if not sps_pkg:
+            raise ValueError("create_article requires sps_pkg with pid_v2")
 
+        xml_with_pre = sps_pkg.xml_with_pre
+        if not xml_with_pre:
+            raise ValueError(f"SPSPkg {sps_pkg} is missing xml_with_pre")
+        
+        pid_v2 = xml_with_pre.v2
+        if not pid_v2:
+            raise ValueError(f"SPSPkg {sps_pkg} xml_with_pre is missing pid_v2")
         try:
-            obj = cls.get(sps_pkg.pid_v3)
+            # usa pid_v2 para evitar duplicação por usar o pid_v3 como chave única, e o pid_v2 é o mesmo para artigos duplicados
+            obj = cls.objects.get(pid_v2=pid_v2)
             obj.updated_by = user
         except cls.DoesNotExist:
             obj = cls()
             obj.pid_v3 = sps_pkg.pid_v3
+            obj.pid_v2 = pid_v2
             obj.creator = user
 
         obj.sps_pkg = sps_pkg
-
-        xml_with_pre = sps_pkg.xml_with_pre
-        obj.pid_v2 = xml_with_pre.v2
+        obj.pid_v2 = pid_v2
         obj.article_type = xml_with_pre.xmltree.find(".").get("article-type")
 
         if journal:
@@ -477,23 +485,6 @@ class Article(ClusterableModel, CommonControlField):
             .values_list(field_name, flat=True)
         )
 
-    @staticmethod
-    def has_valid_pid_v2(pid_v2, order):
-        """
-        Check if pid_v2 last 5 digits match the order value
-        (from MigratedArticle.document.order / v121) padded with zeros.
-        """
-        try:
-            if not pid_v2 or not order:
-                return True
-            if len(pid_v2) < 5:
-                return True
-            expected_suffix = str(int(str(order).strip())).zfill(5)
-            actual_suffix = pid_v2[-5:]
-            return actual_suffix == expected_suffix
-        except (TypeError, IndexError, ValueError):
-            return True
-
     @classmethod
     def exclude_articles_with_invalid_pid_v2(cls, issue=None):
         """
@@ -505,6 +496,7 @@ class Article(ClusterableModel, CommonControlField):
         from proc.models import ArticleProc
 
         filters = {
+            "pid_v2__isnull": False,
             "migrated_data__isnull": False,
             "sps_pkg__isnull": False,
         }
@@ -521,7 +513,7 @@ class Article(ClusterableModel, CommonControlField):
         ]
         articles_by_sps_pkg = {}
         if sps_pkg_id_list:
-            for article in Article.objects.filter(
+            for article in Article.objects.select_related("sps_pkg", "pp_xml").filter(
                 sps_pkg_id__in=sps_pkg_id_list
             ).only("id", "pid_v2", "sps_pkg_id", "pp_xml_id"):
                 articles_by_sps_pkg[article.sps_pkg_id] = article
@@ -536,29 +528,15 @@ class Article(ClusterableModel, CommonControlField):
                 article = articles_by_sps_pkg.get(article_proc.sps_pkg_id)
                 if not article or not article.pid_v2:
                     continue
-
-                order = article_proc.migrated_data.document.order
-                if not order:
-                    continue
-
-                if not cls.has_valid_pid_v2(article.pid_v2, order):
-                    try:
-                        expected_suffix = str(int(str(order).strip())).zfill(5)
-                    except (TypeError, ValueError):
-                        expected_suffix = str(order)
-                    events.append(
-                        f"Invalid pid_v2: {article.pid_v2} "
-                        f"(order={order}, "
-                        f"expected suffix={expected_suffix}, "
-                        f"actual suffix={article.pid_v2[-5:]})"
-                    )
+                if MigratedArticle.valid_pid(article.pid_v2):
+                    # houve um erro o sistema de migração que criou pid_v2 aleatoriamente no lugar de usar o pid_v2 original
                     article_ids.append(article.id)
                     if article.sps_pkg_id:
                         sps_pkg_ids.add(article.sps_pkg_id)
                     if article.pp_xml_id:
                         pp_xml_ids.add(article.pp_xml_id)
             except Exception as e:
-                logging.exception(
+                events.append(
                     f"Error checking pid_v2 for ArticleProc {article_proc}: {e}"
                 )
 
