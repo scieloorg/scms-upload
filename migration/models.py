@@ -714,14 +714,9 @@ class MigratedArticle(MigratedData):
 
     @classmethod
     def valid_pid(cls, pid):
-        try:
-            MigratedArticle.objects.get(pid=pid)
-            return True
-        except MigratedArticle.DoesNotExist:
+        if not pid or len(pid) != 23:
             return False
-        except MigratedArticle.MultipleObjectsReturned:
-            # ok, pois significa que é válido
-            return True
+        return MigratedArticle.objects.filter(pid=pid).exists()
 
 
 class JournalAcronIdFile(CommonControlField, ClusterableModel):
