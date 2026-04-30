@@ -232,6 +232,11 @@ class Article(ClusterableModel, CommonControlField):
             # usa pid_v2 para evitar duplicação por usar o pid_v3 como chave única, e o pid_v2 é o mesmo para artigos duplicados
             obj = cls.objects.get(pid_v2=pid_v2)
             obj.updated_by = user
+        except cls.MultipleObjectsReturned:
+            items = cls.objects.filter(pid_v2=pid_v2).order_by("-updated")
+            obj = items.first()
+            for item in items[1:]:
+                item.delete()
         except cls.DoesNotExist:
             obj = cls()
             obj.pid_v3 = sps_pkg.pid_v3
@@ -262,6 +267,35 @@ class Article(ClusterableModel, CommonControlField):
         obj.add_article_titles(user)
         obj.add_doi_with_lang(user, xml_with_pre.article_doi_with_lang)
         return obj
+
+    def delete(self, using=None, keep_parents=False):
+        """
+        Remove o artigo e seus objetos auxiliares exclusivos.
+
+        Antes de excluir o registro de Article, preserva referências para
+        SPSPkg e PidProviderXML (cujos FKs são SET_NULL e não seriam
+        removidos automaticamente). Após a exclusão do Article — que
+        aciona CASCADE em ArticleDOIWithLang, ArticleTitle, RelatedItem e
+        RequestArticleChange — os objetos auxiliares são deletados.
+
+        Args:
+            using: Alias do banco de dados a utilizar (repassado ao super).
+            keep_parents: Se True, mantém registros pai em herança multi-tabela.
+        """
+        # Preserva referências antes de a exclusão zerá-las (SET_NULL)
+        sps_pkg = self.sps_pkg
+        pp_xml = self.pp_xml
+
+        with transaction.atomic():
+            # Exclui o Article e todos os relacionamentos CASCADE
+            super().delete(using=using, keep_parents=keep_parents)
+
+            # Remove SPSPkg e PidProviderXML que pertenciam exclusivamente
+            # a este artigo e não seriam limpos pelo CASCADE
+            if sps_pkg:
+                sps_pkg.delete()
+            if pp_xml:
+                pp_xml.delete()
 
     def add_doi_with_lang(self, user, article_doi_with_lang):
         for item in article_doi_with_lang:
@@ -496,7 +530,7 @@ class Article(ClusterableModel, CommonControlField):
         from proc.models import ArticleProc
 
         filters = {
-            "pid_v2__isnull": False,
+            "pid__isnull": False,
             "migrated_data__isnull": False,
             "sps_pkg__isnull": False,
         }
@@ -528,7 +562,7 @@ class Article(ClusterableModel, CommonControlField):
                 article = articles_by_sps_pkg.get(article_proc.sps_pkg_id)
                 if not article or not article.pid_v2:
                     continue
-                if MigratedArticle.valid_pid(article.pid_v2):
+                if not MigratedArticle.valid_pid(article.pid_v2):
                     # houve um erro o sistema de migração que criou pid_v2 aleatoriamente no lugar de usar o pid_v2 original
                     article_ids.append(article.id)
                     if article.sps_pkg_id:
