@@ -2,91 +2,79 @@ import unittest
 from unittest.mock import MagicMock, Mock, patch
 
 from article.models import Article
+from migration.models import MigratedArticle
 
 
-class ArticleHasValidPidV2TestCase(unittest.TestCase):
-    """Test cases for Article.has_valid_pid_v2() static method."""
+class MigratedArticleValidPidTestCase(unittest.TestCase):
+    """Test cases for MigratedArticle.valid_pid() class method.
 
-    def test_valid_pid_v2_matching_order(self):
-        """pid_v2 last 5 digits match order zero-padded."""
-        self.assertTrue(Article.has_valid_pid_v2("S0034-77442021000600036", "00036"))
+    A PID é válido se, e somente se, tem exatamente 23 caracteres e existe
+    um registro MigratedArticle correspondente no banco de dados.
+    """
 
-    def test_valid_pid_v2_matching_order_without_leading_zeros(self):
-        """pid_v2 last 5 digits match order even when order has no leading zeros."""
-        self.assertTrue(Article.has_valid_pid_v2("S0034-77442021000600036", "36"))
+    PID_23 = "S0034-77442021000600036"  # exatamente 23 caracteres
 
-    def test_invalid_pid_v2_not_matching_order(self):
-        """pid_v2 last 5 digits don't match order."""
-        self.assertFalse(Article.has_valid_pid_v2("S0034-77442021060626158", "36"))
+    @patch("migration.models.MigratedArticle.objects")
+    def test_valid_pid_length_23_exists_in_db(self, mock_objects):
+        """Returns True when pid has 23 chars and exists in DB."""
+        mock_objects.filter.return_value.exists.return_value = True
+        self.assertTrue(MigratedArticle.valid_pid(self.PID_23))
 
-    def test_valid_when_pid_v2_is_none(self):
-        """Returns True when pid_v2 is None (can't validate)."""
-        self.assertTrue(Article.has_valid_pid_v2(None, "36"))
+    @patch("migration.models.MigratedArticle.objects")
+    def test_invalid_pid_not_in_db(self, mock_objects):
+        """Returns False when pid has 23 chars but does not exist in DB."""
+        mock_objects.filter.return_value.exists.return_value = False
+        self.assertFalse(MigratedArticle.valid_pid(self.PID_23))
 
-    def test_valid_when_order_is_none(self):
-        """Returns True when order is None (can't validate)."""
-        self.assertTrue(Article.has_valid_pid_v2("S0034-77442021000600036", None))
+    def test_invalid_when_pid_is_none(self):
+        """Returns False when pid is None (falsy)."""
+        self.assertFalse(MigratedArticle.valid_pid(None))
 
-    def test_valid_when_order_is_empty(self):
-        """Returns True when order is empty string (can't validate)."""
-        self.assertTrue(Article.has_valid_pid_v2("S0034-77442021000600036", ""))
+    def test_invalid_when_pid_is_empty(self):
+        """Returns False when pid is empty string (falsy)."""
+        self.assertFalse(MigratedArticle.valid_pid(""))
 
-    def test_valid_with_order_zero(self):
-        """Order 0 matches suffix 00000."""
-        self.assertTrue(Article.has_valid_pid_v2("S003477442021000600000", "0"))
+    def test_invalid_when_pid_too_short(self):
+        """Returns False when pid has fewer than 23 chars."""
+        self.assertFalse(MigratedArticle.valid_pid(self.PID_23[:-1]))  # 22 chars
 
-    def test_invalid_with_order_1(self):
-        """Order 1 should match suffix 00001, not 26158."""
-        self.assertFalse(Article.has_valid_pid_v2("S0034-77442021060626158", "1"))
-
-    def test_valid_when_pid_v2_too_short(self):
-        """Returns True when pid_v2 has fewer than 5 chars."""
-        self.assertTrue(Article.has_valid_pid_v2("S034", "36"))
-
-    def test_valid_when_pid_v2_is_empty(self):
-        """Returns True when pid_v2 is empty string."""
-        self.assertTrue(Article.has_valid_pid_v2("", "36"))
-
-    def test_valid_when_order_is_non_numeric(self):
-        """Returns True when order is non-numeric (can't validate)."""
-        self.assertTrue(Article.has_valid_pid_v2("S0034-77442021000600036", "abc"))
+    def test_invalid_when_pid_too_long(self):
+        """Returns False when pid has more than 23 chars."""
+        self.assertFalse(MigratedArticle.valid_pid(self.PID_23 + "0"))  # 24 chars
 
 
 class ArticleExcludeArticlesWithInvalidPidV2TestCase(unittest.TestCase):
     """Test cases for Article.exclude_articles_with_invalid_pid_v2()."""
 
-    def _make_article_proc(self, article_id, pid_v2, order, sps_pkg_id=1, pp_xml_id=1):
+    def _make_article_proc(self, article_id, pid_v2, sps_pkg_id=1, pp_xml_id=1):
         mock_article = Mock()
         mock_article.id = article_id
         mock_article.pid_v2 = pid_v2
         mock_article.sps_pkg_id = sps_pkg_id
         mock_article.pp_xml_id = pp_xml_id
 
-        mock_document = Mock()
-        mock_document.order = order
-
-        mock_migrated_data = Mock()
-        mock_migrated_data.document = mock_document
-
         mock_article_proc = Mock()
         mock_article_proc.sps_pkg_id = sps_pkg_id
-        mock_article_proc.migrated_data = mock_migrated_data
         return mock_article_proc, mock_article
 
+    @patch("migration.models.MigratedArticle.valid_pid", return_value=True)
     @patch("article.models.Article.objects")
-    def test_no_invalid_articles(self, mock_objects):
+    def test_no_invalid_articles(self, mock_article_objects, mock_valid_pid):
         """No articles deleted when all have valid pid_v2."""
         mock_article_proc, mock_article = self._make_article_proc(
-            article_id=1, pid_v2="S0034-77442021000600036", order="36"
+            article_id=1, pid_v2="S0034-77442021000600036"
         )
 
         mock_ap_qs = MagicMock()
         mock_ap_qs.filter.return_value = mock_ap_qs
         mock_ap_qs.select_related.return_value = [mock_article_proc]
 
-        mock_article_qs = MagicMock()
-        mock_article_qs.only.return_value = [mock_article]
-        mock_objects.filter.return_value = mock_article_qs
+        # Article.objects.select_related(...).filter(...).only(...) chain
+        mock_article_filter_qs = MagicMock()
+        mock_article_filter_qs.only.return_value = [mock_article]
+        mock_article_select_qs = MagicMock()
+        mock_article_select_qs.filter.return_value = mock_article_filter_qs
+        mock_article_objects.select_related.return_value = mock_article_select_qs
 
         with patch("proc.models.ArticleProc.objects", mock_ap_qs):
             events = Article.exclude_articles_with_invalid_pid_v2()
@@ -96,11 +84,12 @@ class ArticleExcludeArticlesWithInvalidPidV2TestCase(unittest.TestCase):
     @patch("article.models.transaction")
     @patch("article.models.PidProviderXML")
     @patch("article.models.SPSPkg")
+    @patch("migration.models.MigratedArticle.valid_pid", return_value=False)
     @patch("article.models.Article.objects")
-    def test_deletes_invalid_article(self, mock_objects, mock_sps_pkg, mock_pp_xml, mock_transaction):
+    def test_deletes_invalid_article(self, mock_article_objects, mock_valid_pid, mock_sps_pkg, mock_pp_xml, mock_transaction):
         """Deletes migrated article with invalid pid_v2."""
         mock_article_proc, mock_article = self._make_article_proc(
-            article_id=42, pid_v2="S0034-77442021060626158", order="36",
+            article_id=42, pid_v2="S0034-77442021060626158",
             sps_pkg_id=10, pp_xml_id=20
         )
 
@@ -108,14 +97,17 @@ class ArticleExcludeArticlesWithInvalidPidV2TestCase(unittest.TestCase):
         mock_ap_qs.filter.return_value = mock_ap_qs
         mock_ap_qs.select_related.return_value = [mock_article_proc]
 
-        mock_article_qs = MagicMock()
-        mock_article_qs.only.return_value = [mock_article]
+        # Article.objects.select_related(...).filter(...).only(...) — bulk-fetch articles
+        mock_article_filter_qs = MagicMock()
+        mock_article_filter_qs.only.return_value = [mock_article]
+        mock_article_select_qs = MagicMock()
+        mock_article_select_qs.filter.return_value = mock_article_filter_qs
+        mock_article_objects.select_related.return_value = mock_article_select_qs
 
+        # Article.objects.filter(id__in=...).delete() — delete invalid articles
         mock_delete_qs = MagicMock()
         mock_delete_qs.delete.return_value = (1, {})
-
-        # First call: bulk fetch articles; subsequent calls: delete operations
-        mock_objects.filter.side_effect = [mock_article_qs, mock_delete_qs]
+        mock_article_objects.filter.return_value = mock_delete_qs
 
         mock_sps_pkg_qs = MagicMock()
         mock_sps_pkg_qs.delete.return_value = (1, {})
@@ -131,24 +123,24 @@ class ArticleExcludeArticlesWithInvalidPidV2TestCase(unittest.TestCase):
         with patch("proc.models.ArticleProc.objects", mock_ap_qs):
             events = Article.exclude_articles_with_invalid_pid_v2()
 
-        self.assertTrue(any("Invalid pid_v2" in e for e in events))
         self.assertTrue(any("Articles deletados" in e for e in events))
 
-    def test_with_journal_filter(self):
-        """Filters ArticleProc by journal when provided."""
-        mock_journal = Mock()
+    def test_with_issue_filter(self):
+        """Filters ArticleProc by issue when provided."""
+        mock_issue = Mock()
 
         mock_ap_qs = MagicMock()
         mock_ap_qs.filter.return_value = mock_ap_qs
         mock_ap_qs.select_related.return_value = []
 
         with patch("proc.models.ArticleProc.objects", mock_ap_qs):
-            events = Article.exclude_articles_with_invalid_pid_v2(journal=mock_journal)
+            events = Article.exclude_articles_with_invalid_pid_v2(issue=mock_issue)
 
         mock_ap_qs.filter.assert_called_once_with(
+            pid__isnull=False,
             migrated_data__isnull=False,
             sps_pkg__isnull=False,
-            issue_proc__journal_proc__journal=mock_journal,
+            issue_proc__issue=mock_issue,
         )
 
 
@@ -167,12 +159,12 @@ class ArticleExcludeInconvenientArticlesTestCase(unittest.TestCase):
         mock_repeated_qs.__iter__ = Mock(return_value=iter([]))
         mock_repeated.return_value = mock_repeated_qs
 
-        mock_journal = Mock()
+        mock_issue = Mock()
         mock_user = Mock()
 
-        results = Article.exclude_inconvenient_articles(mock_journal, mock_user)
+        results = Article.exclude_inconvenient_articles(mock_issue, mock_user)
 
-        mock_invalid.assert_called_once_with(mock_journal)
+        mock_invalid.assert_called_once_with(mock_issue)
         self.assertEqual(mock_repeated.call_count, 2)
         self.assertIn("invalid pid_v2 event", results["events"])
 
