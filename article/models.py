@@ -235,6 +235,7 @@ class Article(ClusterableModel, CommonControlField):
         except cls.MultipleObjectsReturned:
             items = cls.objects.filter(pid_v2=pid_v2).order_by("-updated")
             obj = items.first()
+            obj.updated_by = user
             for item in items[1:]:
                 item.delete()
         except cls.DoesNotExist:
@@ -267,35 +268,6 @@ class Article(ClusterableModel, CommonControlField):
         obj.add_article_titles(user)
         obj.add_doi_with_lang(user, xml_with_pre.article_doi_with_lang)
         return obj
-
-    def delete(self, using=None, keep_parents=False):
-        """
-        Remove o artigo e seus objetos auxiliares exclusivos.
-
-        Antes de excluir o registro de Article, preserva referências para
-        SPSPkg e PidProviderXML (cujos FKs são SET_NULL e não seriam
-        removidos automaticamente). Após a exclusão do Article — que
-        aciona CASCADE em ArticleDOIWithLang, ArticleTitle, RelatedItem e
-        RequestArticleChange — os objetos auxiliares são deletados.
-
-        Args:
-            using: Alias do banco de dados a utilizar (repassado ao super).
-            keep_parents: Se True, mantém registros pai em herança multi-tabela.
-        """
-        # Preserva referências antes de a exclusão zerá-las (SET_NULL)
-        sps_pkg = self.sps_pkg
-        pp_xml = self.pp_xml
-
-        with transaction.atomic():
-            # Exclui o Article e todos os relacionamentos CASCADE
-            super().delete(using=using, keep_parents=keep_parents)
-
-            # Remove SPSPkg e PidProviderXML que pertenciam exclusivamente
-            # a este artigo e não seriam limpos pelo CASCADE
-            if sps_pkg:
-                sps_pkg.delete()
-            if pp_xml:
-                pp_xml.delete()
 
     def add_doi_with_lang(self, user, article_doi_with_lang):
         for item in article_doi_with_lang:
