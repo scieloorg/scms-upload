@@ -712,6 +712,12 @@ class MigratedArticle(MigratedData):
             article = self.pid[-5:]
             return f"{journal}/{issue}/{article}"
 
+    @classmethod
+    def valid_pid(cls, pid):
+        if not pid or len(pid) != 23:
+            return False
+        return MigratedArticle.objects.filter(pid=pid).exists()
+
 
 class JournalAcronIdFile(CommonControlField, ClusterableModel):
     collection = models.ForeignKey(
