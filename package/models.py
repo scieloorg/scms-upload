@@ -575,7 +575,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     registered_in_core=response.get("registered_in_core"),
                 )
 
-                if response.get("xml_changed") or response.get("apply_xml_changes"):
+                if response.get("changed"):
                     update_zip_file(zip_xml_file_path, response["filename"], xml_with_pre)
 
                 operation.finish(
