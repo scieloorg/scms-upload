@@ -1,5 +1,6 @@
+import django_filters
 from django.conf import settings
-from django.contrib import messages
+from django.contrib.admin import SimpleListFilter
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
@@ -8,19 +9,41 @@ from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from article.views import (
     ArticleAdminInspectView,
-    ArticleCreateView,
     RelatedItemCreateView,
     RequestArticleChangeCreateView,
 )
 from config.menu import get_menu_order
-
-from .button_helper import ArticleButtonHelper, RequestArticleChangeButtonHelper
+from collection.models import Collection
 from .models import Article, RelatedItem, RequestArticleChange
-from .permission_helper import ArticlePermissionHelper
+from article import choices
 
 # from upload import exceptions as upload_exceptions
 # from upload.models import Package
 # from upload.tasks import get_or_create_package
+
+
+class ArticleFilterSet(django_filters.FilterSet):
+    journal__journal_acron = django_filters.CharFilter(
+        field_name="journal__journal_acron",
+        label=_("Journal Acronym"),
+        lookup_expr="exact",
+    )
+    status = django_filters.ChoiceFilter(
+        field_name="status",
+        label=_("Status"),
+        choices=choices.ARTICLE_STATUS,  # ajuste para o nome real das choices
+    )
+    collection = django_filters.ModelChoiceFilter(
+        field_name="journal__journalproc__collection",
+        label=_("Collection"),
+        queryset=Collection.objects.filter(
+            journalproc__journal__article__isnull=False
+        ).distinct(),
+    )
+
+    class Meta:
+        model = Article
+        fields = []
 
 
 class ArticleSnippetViewSet(SnippetViewSet):
@@ -36,26 +59,22 @@ class ArticleSnippetViewSet(SnippetViewSet):
     add_to_settings_menu = False
     # exclude_from_explorer = False  # Não aplicável a SnippetViewSet
     list_per_page = 20
-
     list_display = (
         "__str__",
         "pid_v3",
         "pid_v2",
         "status",
         "display_collections",
-        "display_sections",
-        "fpage",
-        "position",
         "first_pubdate_iso",
-        "created",
         "updated",
         # "updated_by",
     )
-    list_filter = ("status", "sps_pkg__articleproc__collection", "journal")
+    filterset_class = ArticleFilterSet
     search_fields = (
         "sps_pkg__sps_pkg_name",
         "pid_v2",
         "pid_v3",
+        "issue",
         "issue__publication_year",
         "journal__official_journal__title",
         "journal__official_journal__issn_print",
