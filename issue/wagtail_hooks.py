@@ -83,15 +83,15 @@ class TOCSnippetViewSet(SnippetViewSet):
     # Configuração de listagem
     list_display = [
         "issue",
-        "creator",
-        "created",
-        "updated_by",
+        "issue__publication_year",
+        "issue__volume",
         "updated",
     ]
     
-    list_filter = ["ordered", "created", "updated"]
+    list_filter = ["issue__journal__journal_acron", "issue__publication_year", "ordered", "created", "updated"]
     
     search_fields = [
+        "issue__journal__journalproc__acron",
         "issue__journal__title",
         "issue__journal__official_journal__title",
         "issue__volume",
