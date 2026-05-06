@@ -259,10 +259,10 @@ class Article(ClusterableModel, CommonControlField):
                 obj = cls.delete_items_duplicated_by_pid_v2(pid_v2)
             except cls.DoesNotExist:
                 obj = cls()
+                obj.creator = user
                 
         obj.pid_v3 = sps_pkg.pid_v3
         obj.pid_v2 = sps_pkg.pid_v2
-        obj.creator = user
         obj.sps_pkg = sps_pkg
         obj.article_type = xml_with_pre.xmltree.find(".").get("article-type")
 
