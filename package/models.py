@@ -422,17 +422,18 @@ class SPSPkg(CommonControlField, ClusterableModel):
     @classmethod
     def _get_or_create(cls, user, pid_v3, sps_pkg_name, registered_in_core):
         try:
-            obj = cls.objects.get(pid_v3=pid_v3)
-            obj.updated_by = user
+            obj = cls.objects.get(sps_pkg_name=sps_pkg_name)            
         except cls.MultipleObjectsReturned:
-            obj = cls.objects.filter(pid_v3=pid_v3, sps_pkg_name=sps_pkg_name).order_by("-updated").first()
-            obj.updated_by = user
+            items = cls.objects.filter(sps_pkg_name=sps_pkg_name).order_by("-updated")
+            obj = items.first()
+            items.exclude(id=obj.id).delete()
         except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
-            obj.pid_v3 = pid_v3
-        obj.sps_pkg_name = sps_pkg_name
+            obj.sps_pkg_name = sps_pkg_name
+        obj.pid_v3 = pid_v3
         obj.registered_in_core = registered_in_core
+        obj.updated_by = user
         obj.save()
         return obj
 
@@ -574,7 +575,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     registered_in_core=response.get("registered_in_core"),
                 )
 
-                if response.get("changed"):
+                if response.get("xml_changed") or response.get("apply_xml_changes"):
                     update_zip_file(zip_xml_file_path, response["filename"], xml_with_pre)
 
                 operation.finish(
