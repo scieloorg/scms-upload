@@ -215,6 +215,30 @@ class Article(ClusterableModel, CommonControlField):
                 qs.exclude(pk=obj.pk).delete()
                 return obj
         raise ValueError("Article.get requires pid_v3")
+    
+    @classmethod
+    def delete_items_duplicated_by_pid_v2(cls, pid_v2):
+        try:
+            return cls.objects.get(pid_v2=pid_v2)
+        except cls.MultipleObjectsReturned:
+            items = cls.objects.filter(pid_v2=pid_v2).order_by("-updated")
+            obj = items.first()
+            items.exclude(id=obj.id).delete()
+            return obj
+        except cls.DoesNotExist:
+            raise
+
+    @classmethod
+    def delete_items_duplicated_by_sps_pkg_name(cls, sps_pkg_name):
+        try:
+            return cls.objects.get(sps_pkg__sps_pkg_name=sps_pkg_name)
+        except cls.MultipleObjectsReturned:
+            items = cls.objects.filter(sps_pkg__sps_pkg_name=sps_pkg_name).order_by("-updated")
+            obj = items.first()
+            items.exclude(id=obj.id).delete()
+            return obj
+        except cls.DoesNotExist:
+            raise
 
     @classmethod
     def create_or_update(cls, user, sps_pkg, issue=None, journal=None, position=None):
@@ -229,23 +253,17 @@ class Article(ClusterableModel, CommonControlField):
         if not pid_v2:
             raise ValueError(f"SPSPkg {sps_pkg} xml_with_pre is missing pid_v2")
         try:
-            # usa pid_v2 para evitar duplicação por usar o pid_v3 como chave única, e o pid_v2 é o mesmo para artigos duplicados
-            obj = cls.objects.get(pid_v2=pid_v2)
-            obj.updated_by = user
-        except cls.MultipleObjectsReturned:
-            items = cls.objects.filter(pid_v2=pid_v2).order_by("-updated")
-            obj = items.first()
-            obj.updated_by = user
-            for item in items[1:]:
-                item.delete()
+            obj = cls.delete_items_duplicated_by_sps_pkg_name(sps_pkg.sps_pkg_name)
         except cls.DoesNotExist:
-            obj = cls()
-            obj.pid_v3 = sps_pkg.pid_v3
-            obj.pid_v2 = pid_v2
-            obj.creator = user
-
+            try:
+                obj = cls.delete_items_duplicated_by_pid_v2(pid_v2)
+            except cls.DoesNotExist:
+                obj = cls()
+                
+        obj.pid_v3 = sps_pkg.pid_v3
+        obj.pid_v2 = sps_pkg.pid_v2
+        obj.creator = user
         obj.sps_pkg = sps_pkg
-        obj.pid_v2 = pid_v2
         obj.article_type = xml_with_pre.xmltree.find(".").get("article-type")
 
         if journal:
