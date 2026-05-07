@@ -74,7 +74,6 @@ class ArticleSnippetViewSet(SnippetViewSet):
         "sps_pkg__sps_pkg_name",
         "pid_v2",
         "pid_v3",
-        "issue",
         "issue__publication_year",
         "journal__official_journal__title",
         "journal__official_journal__issn_print",
