@@ -69,7 +69,7 @@ minio==7.2.8  # Mantendo versão maior
 # ========================================
 # XML Processing & Data Parsing
 # ========================================
-lxml==5.3.0  # https://github.com/lxml/lxml - Mantendo versão maior
+lxml==6.1.0  # https://github.com/lxml/lxml - Mantendo versão maior
 feedparser==6.0.11
 langdetect==1.0.9
 
