@@ -86,6 +86,7 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
         publication_rule=None,
         website_url=None,
         timeout=None,
+        retry=False,
     ):
         try:
             obj = cls.get(article=article)
@@ -95,40 +96,60 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
             if published_by or publication_rule:
                 obj.save()
             if website_url:
-                obj.create_or_update_urls(user, website_url, timeout)
+                obj.create_or_update_urls(user, website_url, timeout, retry=retry)
             return obj
         except cls.DoesNotExist:
             return cls.create(
                 user, article, published_by, publication_rule, website_url, timeout
             )
 
-    def create_or_update_urls(self, user, website_url, timeout=None):
-        for url in self.article.get_urls(website_url):
+    def create_or_update_urls(self, user, website_url, timeout=None, retry=False):
+        for item in self.article.get_webpage_items(website_url):
+            url = item.get("url")
+            if not url:
+                continue
             ScieloURLStatus.create_or_update(
                 user=user,
                 article=self.article,
                 url=url,
                 timeout=timeout,
+                retry=retry,
             )
-        self.check_is_completed()
+        self.update_completed()
 
-    def retry(self, user, timeout=None, force_update=None):
-        for scielo_url_status in self.scielo_url.all():
-            if not scielo_url_status.available or force_update:
-                scielo_url_status.update(
-                    user=user,
-                    timeout=timeout,
-                )
-        self.check_is_completed()
+    def update_urls_status(self, user, timeout=None, force_update=None):
+        filters = {}
+        if not force_update:
+            filters["available__in"] = (False, None)
+        for scielo_url_status in self.scielo_url.filter(**filters).all():
+            scielo_url_status.update(
+                user=user,
+                timeout=timeout,
+                retry=force_update
+            )
+        self.update_completed()
 
-    def check_is_completed(self):
-        if self.scielo_url.count():
-            completed = not self.scielo_url.filter(available=False).exists()
-        else:
-            completed = False
+    def update_completed(self):
+        completed = self.scielo_url.exclude(available=False).exists()
         if self.completed != completed:
             self.completed = completed
             self.save()
+
+    @property
+    def data(self):
+        return {
+            "article": self.article.pid_v3 if self.article else None,
+            "completed": self.completed,
+            "published_by": self.published_by,
+            "publication_rule": self.publication_rule,
+            "urls": [
+                {
+                    "url": url_status.url,
+                    "available": url_status.available,
+                }
+                for url_status in self.scielo_url.all()
+            ],
+        }
 
 
 class ScieloURLStatus(CommonControlField, Orderable):
@@ -176,16 +197,18 @@ class ScieloURLStatus(CommonControlField, Orderable):
         article,
         url,
         timeout=None,
+        retry=False,
     ):
         try:
             obj = cls.get(url=url)
-            obj.update(user, timeout)
+            obj.update(user, timeout, retry)
             return obj
         except cls.DoesNotExist:
             return cls.create(article=article, url=url, user=user, timeout=timeout or 2)
 
-    def update(self, user, timeout=None):
-        self.available = check_url(self.url, timeout)
+    def update(self, user, timeout=None, retry=False):
+        if not self.available or retry:
+            self.available = check_url(self.url, timeout)
         self.updated_by = user
         self.save()
 
