@@ -847,12 +847,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 content = item["content"].encode("utf-8")
             except KeyError:
                 content = None
-            # PreviewArticlePage.create_or_update(
-            #     user,
-            #     self,
-            #     lang=Language.get_or_create(creator=user, code2=lang),
-            #     content=content,
-            # )
             response = self.upload_to_the_cloud(
                 user,
                 item["filename"],
