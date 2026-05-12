@@ -24,8 +24,10 @@ from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article.models import Article
+from article.page_checker import check_content, check_url
+from article import choices as article_choices
 from collection import choices as collection_choices
-from collection.models import Collection
+from collection.models import Collection, WebSiteConfiguration
 from core.models import CommonControlField
 from core.utils.file_utils import delete_files
 from core.utils.sanitize import sanitize_for_json
@@ -34,6 +36,7 @@ from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
 from journal.models import Journal
 from migration import choices as migration_choices
+from migration.models import ClassicWebsiteConfiguration
 from migration.controller import (
     PkgZipBuilder,
     XMLVersionXmlWithPreError,
@@ -1640,6 +1643,15 @@ class ArticleProc(BaseProc, ClusterableModel):
             models.Index(fields=["sps_pkg_status"]),
         ]
 
+    @staticmethod
+    def get_pid_status_total(collection):
+        data = {"collection": collection.acron}
+        for item in ArticleProc.objects.filter(collection=collection).values(
+            "pid_status"
+        ).annotate(total=Count("pid")):
+            data[item["pid_status"]] = item["total"]
+        return data
+
     @classmethod
     def create_or_update(cls, issue_proc, user, pid, data, force_update):
         article_proc = cls.register_classic_website_data(
@@ -2216,3 +2228,144 @@ class ArticleProc(BaseProc, ClusterableModel):
                 exc_traceback=exc_traceback,
                 exception=e,
             )
+
+    @property
+    def classic_website_url(self):
+        config = ClassicWebsiteConfiguration.objects.get(collection=self.collection)
+        return config.url
+
+    @property
+    def public_website_url(self):
+        return WebSiteConfiguration.get_website_url(self.collection)
+
+    @classmethod
+    def items_to_check_url_and_content(cls, collection=None, force_update=False):
+        exclude_list = (
+            migration_choices.PID_STATUS_MISSING,
+            migration_choices.PID_STATUS_EXCEEDING,
+            migration_choices.PID_STATUS_UNKNOWN,
+            migration_choices.PID_STATUS_PUBLIC_VALID,
+        )
+        if force_update:
+            exclude_list = (
+                migration_choices.PID_STATUS_MISSING,
+                migration_choices.PID_STATUS_EXCEEDING,
+                migration_choices.PID_STATUS_UNKNOWN,
+            )
+        params = {}
+        if collection:
+            params = {"collection": collection}
+        if exclude_list:
+            return cls.objects.filter(
+                **params,
+            ).exclude(
+                pid_status__in=exclude_list,
+            )
+        return cls.objects.filter(
+            **params
+        )
+
+    def check_published_pid_v2(self, user, timeout=10, force_update=False):
+        try:
+            detail = {"pid_status": self.pid_status, "force_update": force_update}
+
+            if self.pid_status == migration_choices.PID_STATUS_PUBLIC_VALID:
+                if not force_update:
+                    return detail
+
+            if not self.article:
+                raise ValueError("No article found for this ArticleProc")
+
+            article_metadata = self.article.get_metadata_by_lang()
+            if not article_metadata:
+                raise ValueError("metadata não encontrado para o artigo")
+
+            response = self.check_classic_website_content(
+                timeout, article_metadata_by_lang=article_metadata, force_update=force_update)
+            
+            if response.get("error"):
+                detail.update(response)
+                return detail
+
+            if not self.public_website_url:
+                raise ValueError("public_website_url não configurada")
+
+            response = self.article.check_availability(
+                user,
+                self.public_website_url,
+                model_ArticleAvailability=None,
+                timeout=timeout,
+                published_by="MIGRATION",
+                publication_rule="MIGRATION",
+                collection=self.collection,
+                force_update=force_update,
+                article_metadata=article_metadata,
+            )
+            status = response.get("status")
+            if status == article_choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE:
+                self.pid_status = migration_choices.PID_STATUS_PUBLIC_VALID
+            elif status == article_choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE:
+                self.pid_status = migration_choices.PID_STATUS_PUBLIC_NOT_FOUND
+            elif status == article_choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT:
+                self.pid_status = migration_choices.PID_STATUS_PUBLIC_VALID
+            elif status == article_choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH:
+                self.pid_status = migration_choices.PID_STATUS_PUBLIC_MISMATCHED
+            
+            detail.update(response)
+            detail["pid_status"] = self.pid_status
+            return detail
+        except Exception as e:
+            detail["error"] = str(e)
+            return detail
+
+    def check_classic_website_content(self, timeout, article_metadata_by_lang=None, force_update=None):
+        try:
+            if not self.classic_website_url:
+                raise ValueError("classic_website_url não configurada")
+            items = self.article.get_webpage_items(self.classic_website_url, new=False, pdf=False)
+
+            item = list(items)[0] if items else None
+            if not item:
+                return {"error": "No webpage items found for the article on the classic website"}
+        
+            url = item.get("url")
+            lang = item.get("lang")
+
+            detail = {
+                "url": url,
+                "format": item.get("format"),
+                "lang": lang,
+                "status": self.pid_status,
+                "force_update": force_update,
+                "pid_status": self.pid_status,
+            }
+
+            if self.pid_status == migration_choices.PID_STATUS_CLASSIC_MATCHED:
+                if not force_update:
+                    return detail
+            
+            response = check_url(url, timeout)
+            content = response.get("content")
+            if not content:
+                raise ValueError("No content retrieved from URL")
+            
+            self.pid_status = migration_choices.PID_STATUS_CLASSIC_FOUND
+
+            article_metadata_by_lang = article_metadata_by_lang or self.article.get_metadata_by_lang()
+            article_metadata = article_metadata_by_lang.get(lang)
+
+            response = check_content(article_metadata, content)
+            if response.get("error"):
+                raise ValueError(response["error"])
+            rate = response.get("rate", 0)
+            if rate > 0.8:
+                self.pid_status = migration_choices.PID_STATUS_CLASSIC_MATCHED
+            else:
+                self.pid_status = migration_choices.PID_STATUS_CLASSIC_MISMATCHED
+            detail.update(response)
+        except Exception as e:
+            detail = {"error": str(e)}
+            self.pid_status = migration_choices.PID_STATUS_CLASSIC_NOT_FOUND
+        self.save()
+        detail["pid_status"] = self.pid_status
+        return detail
