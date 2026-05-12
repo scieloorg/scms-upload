@@ -33,6 +33,7 @@ class Collection(CommonControlField):
         _("Collection Acronym"), max_length=16, null=True, blank=True
     )
     name = models.CharField(_("Collection Name"), max_length=64, null=True, blank=True)
+    url = models.URLField(_("Collection URL"), max_length=255, null=True, blank=True)
 
     base_form_class = CoreAdminModelForm
 
@@ -215,6 +216,28 @@ class WebSiteConfiguration(CommonControlField, ClusterableModel):
         obj.endpoint.set(data)
         obj.save()
         return obj
+    
+    @staticmethod
+    def get_website_url(collection, purpose=choices.PUBLIC, only_enabled=False):
+        params = {"enabled": True} if only_enabled else {}
+        try:            
+            ws = WebSiteConfiguration.objects.get(
+                collection=collection, purpose=purpose,
+                **params
+            )
+            return ws.url
+        except WebSiteConfiguration.MultipleObjectsReturned:
+            ws = WebSiteConfiguration.objects.filter(
+                collection=collection, purpose=purpose,
+                **params
+            ).first()
+            return ws.url
+        except WebSiteConfiguration.DoesNotExist:            
+            raise
+
+    @property
+    def public_website_url(self):
+        return self.get_website_url(self.collection)
 
 
 class Language(CommonControlField):
