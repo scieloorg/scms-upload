@@ -18,7 +18,6 @@ from proc.publisher import (
 
 # Imports do Classic Website
 from proc.source_classic_website import (
-    create_collection_procs_from_pid_list,
     create_or_update_migrated_issue,
     create_or_update_migrated_journal,
     migrate_issue,
@@ -54,7 +53,6 @@ __all__ = [
     # Classic Website functions
     "create_or_update_migrated_journal",
     "create_or_update_migrated_issue",
-    "create_collection_procs_from_pid_list",
     "migrate_journal",
     "migrate_issue",
     # Publication functions
