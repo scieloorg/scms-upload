@@ -16,8 +16,9 @@ from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from migration.models import MigratedArticle
+from article.page_checker import check_url, check_content, format_url, format_classic_url
 from article.forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
-from collection.models import Language
+from collection.models import Language, Collection
 from core.models import CommonControlField, HTMLTextModel
 from doi.models import DOIWithLang
 from issue.models import TOC, Issue, TocSection
@@ -25,7 +26,6 @@ from journal.models import Journal, JournalSection, OfficialJournal
 from package.models import SPSPkg
 from pid_provider.models import PidProviderXML
 from pid_provider.choices import PPXML_STATUS_INVALID
-from tracker import choices as tracker_choices
 from . import choices
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
 
@@ -517,25 +517,41 @@ class Article(ClusterableModel, CommonControlField):
     def get_zip_filename_and_content(self):
         return self.sps_pkg.get_zip_filename_and_content()
 
-    def get_urls(self, website_url):
+    def get_webpage_items(self, website_url, classic=True, new=True, html=True, pdf=True):
         journal_acron = self.journal.journal_acron
         pid_v2 = self.pid_v2
         pid_v3 = self.pid_v3
 
-        for item in self.htmls:
-            lang = item.get("lang")
-            if not lang:
-                continue
-            yield f"{website_url}/j/{journal_acron}/a/{pid_v3}/?lang={lang}"
-            yield f"{website_url}/scielo.php?script=sci_arttext&pid={pid_v2}&tlng={lang}"
+        htmls = []
+        pdfs = []
 
-        for item in self.pdfs:
+        if html:
+            htmls = self.htmls
+        if pdf:
+            pdfs = self.pdfs
+
+        for item in htmls:
             lang = item.get("lang")
             if not lang:
                 continue
-            yield f"{website_url}/j/{journal_acron}/a/{pid_v3}/?lang={lang}&format=pdf"
-            yield f"{website_url}/scielo.php?script=sci_pdf&pid={pid_v2}&tlng={lang}"
-    
+            if new:
+                url = format_url(website_url, pid_v3, journal_acron, format="html", lang_code=lang)
+                yield {"url": url, "format": "html", "lang": lang, "website": "new"}
+            if classic:
+                url = format_classic_url(website_url, pid_v2=pid_v2, format="html", lang_code=lang)
+                yield {"url": url, "format": "html", "lang": lang, "website": "classic"}
+
+        for item in pdfs:
+            lang = item.get("lang")
+            if not lang:
+                continue
+            if new:
+                url = format_url(website_url, pid_v3, journal_acron, format="pdf", lang_code=lang)
+                yield {"url": url, "format": "pdf", "lang": lang, "website": "new"}
+            if classic:
+                url = format_classic_url(website_url, pid_v2=pid_v2, format="pdf", lang_code=lang)
+                yield {"url": url, "format": "pdf", "lang": lang, "website": "classic"}
+
     @classmethod
     def get_repeated_items(cls, field_name, issue=None):
         if issue:
@@ -797,16 +813,37 @@ class Article(ClusterableModel, CommonControlField):
         
         return events
 
+    def is_completed(self, collection=None):
+        params = {}
+        if collection:
+            params["collection"] = collection
+        if self.article_webpages.exists():
+            return not self.article_webpages.exclude(
+                status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+            ).filter(**params).exists()
+        if self.availability_status.exists():
+            return not self.availability_status.exclude(
+                available=True
+            ).filter(**params).exists()
+        return False
+
+    def check_is_public(self, collection=None):
+        params = {}
+        if collection:
+            params["collection"] = collection
+        if self.article_webpages.exists():
+            return self.article_webpages.filter(
+                status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+            ).exists()
+        return self.availability_status.filter(
+            available=True
+        ).exists()
+        
     @classmethod
     def choose_item_to_keep(cls, queryset):
         result = {}
         for item in queryset.order_by("-updated"):
-            valid = item.is_valid_record()
-            try:
-                published = item.availability_status.first().completed
-            except AttributeError:
-                published = False
-            result.setdefault((published, valid), []).append(item)
+            result.setdefault((item.check_is_public(), item.is_valid_record()), []).append(item)
         status = (
             (True, True),
             (True, False),
@@ -818,6 +855,51 @@ class Article(ClusterableModel, CommonControlField):
             if len(items) >= 1:
                 return items[0].id
 
+    def check_availability(
+        self,
+        user,
+        website_url,
+        model_ArticleAvailability=None,
+        timeout=None,
+        published_by=None,
+        publication_rule=None,
+        collection=None,
+        force_update=False,
+        article_metadata=None,
+    ):
+        response = None
+        webpages = []
+        # preservar o legado de publication.models.ArticleAvailability, mas sem criar dependência direta
+        if model_ArticleAvailability:
+            article_ = model_ArticleAvailability.create_or_update(
+                user,
+                self,
+                published_by=published_by,
+                publication_rule=publication_rule,
+                website_url=website_url,
+                timeout=timeout,
+            )
+            response = article_.data
+            completed = article_.completed
+
+        article_metadata = article_metadata or self.get_metadata_by_lang()
+        for item in self.get_webpage_items(website_url):
+            lang = item.get("lang")
+            page = ArticleWebPage.create_or_update(
+                user,
+                self,
+                collection,
+                item.get("url"),
+                item.get("format"),
+                lang,
+                timeout=timeout,
+                force_update=force_update,
+                article_metadata=article_metadata.get(lang),
+            )
+            webpages.append(page.detail)
+        completed = self.is_completed(collection)       
+        return {"completed": completed, "webpages": webpages, "response": response}
+    
     @classmethod
     def update_availability_status(cls, user, timeout=None, queryset=None, filters=None):
         if not queryset:
@@ -826,11 +908,115 @@ class Article(ClusterableModel, CommonControlField):
             queryset = queryset.filter(**filters)
         else:
             queryset = queryset.all()
-        for item in queryset:
-            try:
-                item.availability_status.first().retry(user, timeout, force_update=True)
-            except Exception:
-                pass
+        for article in queryset:
+            article.update_article_availability_status(user, timeout=timeout)
+
+    def update_article_availability_status(self, user, timeout=None):
+        article_metadata = self.get_metadata_by_lang()
+        for webpage in self.article_webpages.all():
+            webpage.check_availability(
+                timeout,
+                article_metadata=article_metadata.get(webpage.lang.code2),
+                force_update=True,
+            )
+        # FIXME - future deprecated availability_status relationship
+        for avail in self.availability_status.all():
+            avail.update_urls_status(user, timeout=timeout, force_update=True)
+
+    def get_metadata_by_lang(self):
+        langs = self.article_langs
+        metadata = {}
+        for lang in langs:
+            metadata[lang] = self.get_metadata_items(lang)
+        return metadata
+        
+    def get_metadata_items(self, lang=None):
+        """
+        Retorna lista de tuplas (label, valor) com os metadados do artigo,
+        pronta para ser usada com check_metadata / compute_rate.
+ 
+        Parameters
+        ----------
+        lang : str, optional
+            Código de idioma (ex: "pt", "en", "es").
+            Quando informado, filtra títulos, DOIs e seções pelo idioma.
+            Campos sem idioma (PIDs, paginação, autores) são sempre incluídos.
+ 
+        Returns
+        -------
+        list[tuple]
+            Ex: [
+                ("title.1", "Acesso aberto..."),
+                ("doi.1", "10.1590/..."),
+                ("author.1", "Maria da Silva"),
+                ("section.1", "Artigos Originais"),
+                ("pid_v2", "S0001-37652021000100101"),
+                ...
+            ]
+        """
+        items = []
+        lang_filter = {"language__code2": lang} if lang else {}
+ 
+        # Títulos
+        for i, title in enumerate(self.title_with_lang.filter(**lang_filter), 1):
+            if title.text:
+                items.append((f"title.{i}", title.text))
+ 
+        # DOIs
+        doi_lang_filter = {"lang__code2": lang} if lang else {}
+        for i, doi in enumerate(self.doi_with_lang.filter(**doi_lang_filter), 1):
+            if doi.doi:
+                items.append((f"doi.{i}", doi.doi))
+ 
+        # Seções
+        for i, section in enumerate(self.sections.filter(**lang_filter), 1):
+            if section.text:
+                items.append((f"section.{i}", section.text))
+ 
+        # PIDs
+        if self.pid_v2:
+            items.append(("pid_v2", self.pid_v2))
+        if self.pid_v3:
+            items.append(("pid_v3", self.pid_v3))
+ 
+        # Paginação / elocation
+        if self.elocation_id:
+            items.append(("elocation_id", self.elocation_id))
+        if self.fpage:
+            items.append(("fpage", self.fpage))
+        if self.lpage:
+            items.append(("lpage", self.lpage))
+ 
+        # Autores (do XML via sps_pkg — independente de idioma)
+        try:
+            xmltree = self.sps_pkg.xml_with_pre.xmltree
+            contribs = xmltree.findall(
+                ".//front/article-meta/contrib-group/contrib[@contrib-type='author']"
+            )
+            for i, contrib in enumerate(contribs, 1):
+                # usa somente surname pois não é possível garantir a ordem de given-names e surname
+                surname = contrib.findtext("name/surname") or ""
+                if surname:
+                    items.append((f"author.{i}", surname))
+        except (AttributeError, TypeError):
+            pass
+ 
+        return items
+    
+    def availability_stats(self, collection):
+        total = self.article_webpages.filter(collection=collection).count()
+        if not total:
+            return {}
+        stats = (
+            self.article_webpages
+            .filter(collection=collection)
+            .values("status")
+            .annotate(count=Count("id"))
+        )
+        return {
+            item["status"]: round(item["count"] * 100 / total, 1)
+            for item in stats
+        }
 
 
 class ArticleDOIWithLang(Orderable, DOIWithLang):
@@ -975,3 +1161,159 @@ class RequestArticleChange(CommonControlField):
         return f"{self.article}"
 
     base_form_class = RequestArticleChangeForm
+
+
+class ArticleWebPage(CommonControlField):
+    article = ParentalKey(
+        Article,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="article_webpages",
+    )
+    collection = models.ForeignKey(
+        Collection,
+        verbose_name=_("Collection"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    fmt = models.CharField(_("Format"), max_length=4, null=True, blank=True)
+    lang = models.ForeignKey(
+        Language,
+        verbose_name=_("Language"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    url = models.CharField(_("URL"), max_length=265, null=True, blank=True)
+
+    status = models.CharField(
+        _("Status"), max_length=16, null=True, blank=True, choices=choices.ARTICLE_WEBPAGE_STATUS,
+        default=choices.ARTICLE_WEBPAGE_STATUS_NOT_CHECKED,
+    )
+    detail = models.JSONField(_("Detail"), null=True, blank=True)
+    panels = [
+        FieldPanel("article", read_only=True),
+        FieldPanel("collection", read_only=True),
+        FieldPanel("url", read_only=True),
+        FieldPanel("fmt", read_only=True),
+        FieldPanel("lang", read_only=True),
+        FieldPanel("status", read_only=True),
+        FieldPanel("detail", read_only=True),
+    ]
+
+    class Meta:
+        unique_together = ("article", "collection", "url", "fmt", "lang")
+        indexes = [
+            models.Index(fields=["url"]),
+            models.Index(fields=["article", "collection", "fmt", "lang"]),
+        ]
+
+    @classmethod
+    def get(cls, article, collection, url, fmt, lang=None):
+        return cls.objects.get(
+            article=article,
+            collection=collection,
+            url=url,
+            fmt=fmt,
+            lang=lang,
+        )
+
+    @classmethod
+    def create(
+        cls,
+        user,
+        article,
+        collection,
+        url,
+        fmt,
+        lang,
+        timeout=None,
+        article_metadata=None,
+    ):
+        try:
+            obj = cls(
+                article=article,
+                collection=collection,
+                url=url,
+                fmt=fmt,
+                lang=lang,
+                creator=user,
+            )
+            obj.check_availability(timeout, article_metadata)
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(article, collection, url, fmt, lang)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        user,
+        article,
+        collection,
+        url,
+        fmt,
+        lang,
+        timeout=None,
+        force_update=False,
+        article_metadata=None,
+    ):
+        try:
+            if lang:
+                lang = Language.objects.filter(code2=lang).first()
+            obj = cls.get(article, collection, url, fmt, lang)
+            obj.check_availability(timeout, article_metadata, force_update)
+            obj.updated_by = user
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(
+                user=user,
+                article=article,
+                collection=collection,
+                url=url,
+                fmt=fmt,
+                lang=lang,
+                timeout=timeout,
+                article_metadata=article_metadata,
+            )
+
+    def check_availability(self, timeout, article_metadata=None, force_update=None):
+        detail = {
+            "url": self.url,
+            "format": self.fmt,
+            "lang": self.lang.code2 if self.lang else None,
+            "status": self.status,
+            "force_update": force_update,
+        }
+
+        if self.status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT:
+            if not force_update:
+                return detail
+            
+        try:
+            response = check_url(self.url, timeout)
+            content = response.get("content")
+            if not content:
+                raise ValueError("No content retrieved from URL")
+            
+            self.status = choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE
+
+            response = check_content(article_metadata, content)
+            if response.get("error"):
+                raise ValueError(response["error"])
+            rate = response.get("rate", 0)
+            if rate > 0.8:
+                self.status = choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+            else:
+                self.status = choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH
+            detail.update(response)
+        except Exception as e:
+            detail = {"error": str(e)}
+            self.status = choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE
+        self.detail = detail
+        self.save()
+        detail["status"] = self.status
+        return detail
