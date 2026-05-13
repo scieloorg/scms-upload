@@ -1587,7 +1587,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     )
     pid_status = models.CharField(
         _("PID Status"),
-        max_length=10,
+        max_length=14,
         choices=migration_choices.PID_STATUS,
         default=migration_choices.PID_STATUS_UNKNOWN,
         blank=True,
