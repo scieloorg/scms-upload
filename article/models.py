@@ -114,11 +114,18 @@ class Article(ClusterableModel, CommonControlField):
         FieldPanel("fpage", read_only=True),
         FieldPanel("lpage", read_only=True),
     ]
+    panel_webpages = MultiFieldPanel(
+        heading=_("Article webpages"), classname="collapsible"
+    )
+    panel_webpages.children = [
+        InlinePanel("article_webpages", label="Webpages"),
+    ]
 
     panels = [
         panel_article_ids,
         panel_article_details,
         FieldPanel("issue", classname="collapsible", read_only=True),
+        panel_webpages,
     ]
 
     base_form_class = ArticleForm
