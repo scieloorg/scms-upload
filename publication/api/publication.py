@@ -1,6 +1,8 @@
+import copy
 import json
 import logging
 import sys
+import time
 import traceback
 import urllib
 
@@ -20,13 +22,59 @@ def get_api(collection, content_type, website_kind):
     return {"error": f"Website {collection} {website_kind} is not enabled ({api_data})"}
 
 
+# Cache em processo para api_data (inclui token). Objetivo: solicitar token
+# apenas 1x por (collection, content_type, website_kind) e revalidar somente
+# quando expirar. Estratégia:
+#   - TTL longo (alinhado ao lifetime típico de JWT) como teto de segurança,
+#     evitando reter tokens indefinidamente em workers de longa duração;
+#   - invalidação explícita via invalidate_api_data_cache(...) — chamadores
+#     que detectarem falha de autenticação no PublicationAPI.post_data podem
+#     purgar a entrada e forçar novo login na próxima chamada.
+# Observação: PublicationAPI.post_data já refaz get_token() na própria
+# instância ao receber falha, então um token expirado entre a leitura do
+# cache e o uso resulta em 1 retry interno (não em erro propagado).
+_API_DATA_CACHE = {}
+_API_DATA_CACHE_TTL = 3600  # segundos (1h); ajustar via clear/invalidate se necessário
+
+
+def _api_data_cache_key(collection, content_type, website_kind):
+    return (getattr(collection, "pk", None), content_type, website_kind)
+
+
+def clear_api_data_cache():
+    """Limpa todo o cache em processo de api_data (uso em testes/admin)."""
+    _API_DATA_CACHE.clear()
+
+
+def invalidate_api_data_cache(collection, content_type, website_kind=None):
+    """Invalida uma entrada específica do cache.
+
+    Deve ser chamado por consumidores ao detectar falha de autenticação
+    (token expirado/revogado) no resultado de PublicationAPI.post_data,
+    para forçar novo login na próxima chamada de get_api_data.
+    """
+    _API_DATA_CACHE.pop(
+        _api_data_cache_key(collection, content_type, website_kind), None
+    )
+
+
 def get_api_data(collection, content_type, website_kind=None):
+    key = _api_data_cache_key(collection, content_type, website_kind)
+    cached = _API_DATA_CACHE.get(key)
+    now = time.time()
+    if cached and now - cached[0] < _API_DATA_CACHE_TTL:
+        # deepcopy: defesa contra mutação de estruturas aninhadas pelos
+        # chamadores (ex.: api_data["verify"] = verify em task_publish_articles).
+        return copy.deepcopy(cached[1])
     try:
-        return get_api(collection, content_type, website_kind)
+        data = get_api(collection, content_type, website_kind)
     except WebSiteConfiguration.DoesNotExist:
         return {"error": f"Website does not exist: {collection} {website_kind}"}
     except Exception as e:
         return {"error": f"Unable to get API data for {content_type} {collection} {website_kind}: {type(e)} {e}"}
+    if isinstance(data, dict) and not data.get("error") and key[0] is not None:
+        _API_DATA_CACHE[key] = (now, copy.deepcopy(data))
+    return data
 
 
 class PublicationAPI:
