@@ -117,8 +117,8 @@ def _schedule_check_article_availability(username, enabled=False):
     Deixa a tarefa desabilitada
     """
     schedule_task(
-        task="publication.tasks.task_check_article_availability",
-        name="task_check_article_availability",
+        task="publication.tasks.task_check_articles_availability",
+        name="task_check_articles_availability",
         kwargs=dict(
             username=username,
             issn_print=None,
