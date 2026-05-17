@@ -226,9 +226,9 @@ def process_article_availability(
     try:
         user = _get_user(user_id=user_id, username=username)
         article = Article.objects.get(pid_v3=pid_v3)
+        
         logging.info(f"{domain} {pid_v3}")
-        obj = ArticleAvailability.create_or_update(user, article)
-        obj.create_or_update_urls(user, website_url=domain, timeout=timeout)
+        article.check_availability(user, domain, ArticleAvailability, timeout=timeout)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(

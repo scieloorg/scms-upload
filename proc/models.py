@@ -23,9 +23,11 @@ from wagtail.admin.panels import (
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
-from article.models import Article
+from article.models import Article, ArticleWebPage
+from article.page_checker import check_content, check_url
+from article import choices as article_choices
 from collection import choices as collection_choices
-from collection.models import Collection
+from collection.models import Collection, WebSiteConfiguration
 from core.models import CommonControlField
 from core.utils.file_utils import delete_files
 from core.utils.sanitize import sanitize_for_json
@@ -34,6 +36,7 @@ from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
 from journal.models import Journal
 from migration import choices as migration_choices
+from migration.models import ClassicWebsiteConfiguration
 from migration.controller import (
     PkgZipBuilder,
     XMLVersionXmlWithPreError,
@@ -62,6 +65,21 @@ class NoDocumentRecordsToMigrateError(Exception):
 
 
 class Operation(CommonControlField):
+    """
+    Modelo que registra operações executadas durante o processamento.
+    
+    Armazena informações sobre operações de processamento, incluindo nome,
+    status de conclusão e detalhes da execução (erros, mensagens, etc).
+    
+    Attributes
+    ----------
+    name : CharField
+        Nome descritivo da operação (ex: 'migrate_document_files').
+    completed : BooleanField
+        Indica se a operação foi concluída com sucesso.
+    detail : JSONField
+        Dados estruturados com detalhes da operação (erros, traceback, etc).
+    """
 
     name = models.CharField(
         _("Name"),
@@ -111,6 +129,23 @@ class Operation(CommonControlField):
 
     @classmethod
     def create(cls, user, proc, name):
+        """
+        Cria um novo registro de operação.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que cria a operação.
+        proc : BaseProc
+            Processo/procedimento associado à operação.
+        name : str
+            Nome da operação (será truncado para 64 caracteres).
+            
+        Returns
+        -------
+        Operation
+            Operação criada.
+        """
         name = name[:64]
         cls.exclude_events(user, proc, name)
         obj = cls()
@@ -158,6 +193,29 @@ class Operation(CommonControlField):
         exc_traceback=None,
         detail=None,
     ):
+        """
+        Finaliza a operação com os resultados.
+        
+        Armazena informações sobre o resultado da operação, incluindo
+        exceções, traceback e mensagens de status.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que finaliza a operação.
+        completed : bool
+            Indica se a operação foi concluída com sucesso.
+        exception : Exception, optional
+            Exceção capturada durante a operação.
+        message_type : str, optional
+            Tipo de mensagem (ex: 'warning', 'error').
+        message : str, optional
+            Mensagem descritiva do resultado.
+        exc_traceback : traceback, optional
+            Objeto de traceback da exceção.
+        detail : dict, optional
+            Dicionário adicional com detalhes.
+        """
         detail = detail or {}
         if exception:
             detail["exception_message"] = str(exception)
@@ -190,6 +248,27 @@ def proc_report_directory_path(instance, filename):
 
 
 class ProcReport(CommonControlField):
+    """
+    Modelo que armazena relatórios de processamento.
+    
+    Gera e armazena relatórios de processamento de journais, fascículos
+    e artigos, permitindo rastreamento histórico das operações.
+    
+    Attributes
+    ----------
+    collection : ForeignKey
+        Coleção relacionada ao relatório.
+    pid : CharField
+        Identificador do item (journal, issue ou article).
+    task_name : CharField
+        Nome da tarefa/operação que gerou o relatório.
+    file : FileField
+        Arquivo do relatório armazenado.
+    report_date : CharField
+        Data/identificação do relatório no formato ISO.
+    item_type : CharField
+        Tipo de item (journal, issue ou article).
+    """
     collection = models.ForeignKey(
         Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -336,7 +415,40 @@ class ArticleProcResult(Operation, Orderable):
 
 
 class BaseProc(CommonControlField):
-    """ """
+    """
+    Classe base abstrata para processos de migração e publicação.
+    
+    Define a estrutura comum para JournalProc, IssueProc e ArticleProc,
+    gerenciando status de migração e publicação em websites.
+    
+    Attributes
+    ----------
+    collection : ForeignKey
+        Coleção SciELO relacionada.
+    pid : CharField
+        Identificador persistente do item.
+    migration_status : CharField
+        Status da migração (TODO, DOING, DONE, BLOCKED, etc).
+    qa_ws_status : CharField
+        Status da publicação no website QA.
+    public_ws_status : CharField
+        Status da publicação no website público.
+    
+    Methods
+    -------
+    get(collection, pid)
+        Obtém um processo por collection e pid.
+    get_or_create(user, collection, pid)
+        Obtém ou cria um processo.
+    create(user, collection, pid)
+        Cria um novo processo.
+    register_classic_website_data(user, collection, pid, data, content_type, force_update)
+        Registra dados do website clássico.
+    register_pid(user, collection, pid, force_update)
+        Registra um PID para migração.
+    publish(user, api_publish_callable, website_kind, api_data, force_update, content_type)
+        Publica o item em um website específico.
+    """
 
     collection = models.ForeignKey(
         Collection, on_delete=models.SET_NULL, null=True, blank=True
@@ -579,7 +691,26 @@ class BaseProc(CommonControlField):
     @classmethod
     def items_to_process(cls, collection, content_type, params, force_update):
         """
-        BaseProc.items_to_process
+        Obtém itens prontos para processar.
+        
+        Filtra itens baseado no status de processamento, retornando aqueles
+        que estão em status TODO ou REPROC (ou FORCE_UPDATE se force_update=True).
+        
+        Parameters
+        ----------
+        collection : Collection
+            Coleção a filtrar.
+        content_type : str
+            Tipo de conteúdo a processar.
+        params : dict
+            Parâmetros adicionais de filtro.
+        force_update : bool
+            Se True, inclui itens em status DONE para reprocessamento.
+            
+        Returns
+        -------
+        QuerySet
+            Itens prontos para processar.
         """
         STATUS = tracker_choices.PROGRESS_STATUS_REGULAR_TODO
         if force_update:
@@ -671,7 +802,24 @@ class BaseProc(CommonControlField):
     @classmethod
     def items_to_publish_on_qa(cls, content_type, force_update=None, params=None):
         """
-        BaseProc
+        Obtém itens prontos para publicar no website QA.
+        
+        Filtra itens que completaram a migração e estão prontos para
+        publicação no website QA.
+        
+        Parameters
+        ----------
+        content_type : str
+            Tipo de conteúdo ('journal', 'issue', 'article').
+        force_update : bool, optional
+            Se True, inclui itens já publicados para reprocessamento.
+        params : dict, optional
+            Parâmetros adicionais de filtro.
+            
+        Returns
+        -------
+        QuerySet
+            Itens prontos para publicação em QA.
         """
         params = params or {}
         params["migrated_data__content_type"] = content_type
@@ -699,12 +847,39 @@ class BaseProc(CommonControlField):
     def publish(
         self,
         user,
-        callable_publish,
+        api_publish_callable,
         website_kind=None,
         api_data=None,
         force_update=None,
         content_type=None,
     ):
+        """
+        Publica o item em um website específico.
+        
+        Coordena a publicação do item (journal, issue ou article) em um
+        website específico (QA ou Público), atualizando o status e
+        capturando erros.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que executa a publicação.
+        api_publish_callable : callable
+            Função que faz a chamada à API de publicação.
+        website_kind : str, optional
+            Tipo de website ('qa' ou 'public'). Padrão: 'qa'.
+        api_data : dict, optional
+            Dados da API para publicação. Se None, é obtido via get_api_data().
+        force_update : bool, optional
+            Se True, força a publicação mesmo já publicado.
+        content_type : str, optional
+            Tipo de conteúdo ('journal', 'issue', 'article').
+            
+        Returns
+        -------
+        dict
+            Resposta da publicação contendo status, detalhes e possíveis erros.
+        """
         try:
             website_kind = website_kind or collection_choices.QA
             detail = {
@@ -760,7 +935,7 @@ class BaseProc(CommonControlField):
             if api_data.get("error"):
                 resp.update(api_data)
             else:
-                response = callable_publish(self, api_data)
+                response = api_publish_callable(self, api_data)
                 resp.update(response)
 
             completed = bool(resp.get("result") == "OK")
@@ -790,7 +965,17 @@ class BaseProc(CommonControlField):
 
     def update_publication_stage(self, website_kind, completed):
         """
-        Estabele o próxim estágio, após ser publicado no QA ou no Público
+        Atualiza o estágio de publicação após publicar em um website.
+        
+        Define o novo status após publicação: DONE se bem-sucedido,
+        REPROC se houver falhas.
+        
+        Parameters
+        ----------
+        website_kind : str
+            Tipo de website ('qa' ou 'public').
+        completed : bool
+            Indica se a publicação foi bem-sucedida.
         """
         if completed:
             status = tracker_choices.PROGRESS_STATUS_DONE
@@ -852,7 +1037,32 @@ class BaseProc(CommonControlField):
 
 
 class JournalProc(BaseProc, ClusterableModel):
-    """ """
+    """
+    Modelo para processar periódicos na migração.
+    
+    Gerencia o status de migração e publicação de periódicos,
+    armazenando informações sobre o periódico e seus fascículos.
+    
+    Attributes
+    ----------
+    migrated_data : ForeignKey
+        Referência aos dados migrados do periódico (MigratedJournal).
+    acron : CharField
+        Acrônimo do periódico.
+    title : CharField
+        Título completo do periódico.
+    availability_status : CharField
+        Status de disponibilidade do periódico.
+    journal : ForeignKey
+        Referência ao objeto Journal após migração.
+    
+    Methods
+    -------
+    update(user, migration_status, journal, acron, title, availability_status)
+        Atualiza os dados do periódico.
+    issues_with_modified_articles()
+        Itera sobre fascículos que têm artigos modificados.
+    """
 
     migrated_data = models.ForeignKey(
         MigratedJournal, on_delete=models.SET_NULL, null=True, blank=True
@@ -1019,7 +1229,36 @@ def is_out_of_date(file_path, file_date):
 
 
 class IssueProc(BaseProc, ClusterableModel):
-    """ """
+    """
+    Modelo para processar fascículos na migração.
+    
+    Gerencia a migração de fascículos, incluindo seus arquivos,
+    registros de documentos e status de publicação.
+    
+    Attributes
+    ----------
+    migrated_data : ForeignKey
+        Referência aos dados migrados do fascículo (MigratedIssue).
+    journal_proc : ForeignKey
+        Referência ao JournalProc do periódico.
+    issue : ForeignKey
+        Referência ao objeto Issue após migração.
+    issue_folder : CharField
+        Nome da pasta do fascículo no repositório de migração.
+    issue_files : ManyToManyField
+        Arquivos migrados associados ao fascículo.
+    files_status : CharField
+        Status da migração de arquivos do fascículo.
+    docs_status : CharField
+        Status da migração dos registros de documentos (artigos).
+    
+    Methods
+    -------
+    migrate_document_files(user, force_update, migrate_issue_files_function)
+        Migra os arquivos do fascículo.
+    migrate_document_records(user, force_update)
+        Migra os registros de documentos (artigos) do fascículo.
+    """
 
     migrated_data = models.ForeignKey(
         MigratedIssue, on_delete=models.SET_NULL, null=True, blank=True
@@ -1192,10 +1431,17 @@ class IssueProc(BaseProc, ClusterableModel):
         status_list=None,
         force_update=False,
         to_migrate_articles=False,
+        collection_acron=None,
+        journal_acron=None,
+        issue_proc_id=None,
     ):  
         status_list = tracker_choices.get_valid_status(status_list, force_update)
         collection_acron_list = collection_acron_list or []
+        if collection_acron:
+            collection_acron_list.append(collection_acron)
         journal_acron_list = journal_acron_list or []
+        if journal_acron:
+            journal_acron_list.append(journal_acron)
         journal_proc_id_list = journal_proc_id_list or []
         params = {}
         if collection_acron_list:
@@ -1208,6 +1454,8 @@ class IssueProc(BaseProc, ClusterableModel):
             params["issue_folder"] = issue_folder
         if publication_year:
             params["issue__publication_year"] = publication_year
+        if issue_proc_id:
+            params["issue_proc_id"] = issue_proc_id
 
         if to_migrate_articles:
             return cls.objects.filter(
@@ -1247,8 +1495,27 @@ class IssueProc(BaseProc, ClusterableModel):
         cls, collection, journal_acron, publication_year=None, force_update=None
     ):
         """
-        Muda o status de PROGRESS_STATUS_REPROC para PROGRESS_STATUS_TODO
-        E se force_update = True, muda o status de PROGRESS_STATUS_DONE para PROGRESS_STATUS_TODO
+        Obtém fascículos com arquivos a migrar.
+        
+        Filtra fascículos que precisam migrar seus arquivos, alterando
+        o status de REPROC para TODO. Se force_update=True, também
+        inclui fascículos com status DONE.
+        
+        Parameters
+        ----------
+        collection : Collection
+            Coleção a processar.
+        journal_acron : str
+            Acrônimo do periódico.
+        publication_year : int, optional
+            Ano de publicação para filtrar.
+        force_update : bool, optional
+            Se True, inclui itens já migrados.
+            
+        Returns
+        -------
+        QuerySet
+            Fascículos prontos para migração de arquivos.
         """
         q = Q(files_status=tracker_choices.PROGRESS_STATUS_REPROC)
         if force_update:
@@ -1280,6 +1547,26 @@ class IssueProc(BaseProc, ClusterableModel):
     def migrate_document_files(
         self, user, force_update, migrate_issue_files_function
     ):
+        """
+        Migra os arquivos associados ao fascículo.
+        
+        Processa e migra todos os arquivos (imagens, PDFs, etc) associados
+        ao fascículo, organizando-os no repositório de destino.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que executa a migração.
+        force_update : bool
+            Se True, reprocessa todos os arquivos.
+        migrate_issue_files_function : callable
+            Função que realiza a migração dos arquivos.
+            
+        Returns
+        -------
+        int
+            Número de arquivos migrados.
+        """
         try:
             operation = self.start(user, "migrate_document_files")
             if self.files_status == tracker_choices.PROGRESS_STATUS_DONE and not force_update:
@@ -1338,8 +1625,27 @@ class IssueProc(BaseProc, ClusterableModel):
     @classmethod
     def docs_to_migrate(cls, collection, journal_acron, publication_year, force_update):
         """
-        Muda o status de PROGRESS_STATUS_REPROC para PROGRESS_STATUS_TODO
-        E se force_update = True, muda o status de PROGRESS_STATUS_DONE para PROGRESS_STATUS_TODO
+        Obtém fascículos com documentos (artigos) a migrar.
+        
+        Filtra fascículos que precisam migrar seus registros de documentos,
+        alterando o status de REPROC para TODO. Se force_update=True, também
+        inclui fascículos com status DONE.
+        
+        Parameters
+        ----------
+        collection : Collection
+            Coleção a processar.
+        journal_acron : str
+            Acrônimo do periódico.
+        publication_year : int
+            Ano de publicação para filtrar.
+        force_update : bool
+            Se True, inclui itens já migrados.
+            
+        Returns
+        -------
+        QuerySet
+            Fascículos prontos para migração de documentos.
         """
         q = Q(docs_status=tracker_choices.PROGRESS_STATUS_REPROC)
         if force_update:
@@ -1414,6 +1720,24 @@ class IssueProc(BaseProc, ClusterableModel):
         ).values_list("id", "pid")
     
     def migrate_document_records(self, user, force_update=None):
+        """
+        Migra os registros de documentos (artigos) do fascículo.
+        
+        Processa os registros de documentos do arquivo acron.id, criando
+        ou atualizando ArticleProc para cada artigo.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que executa a migração.
+        force_update : bool, optional
+            Se True, reprocessa todos os registros.
+            
+        Returns
+        -------
+        int
+            Número de artigos migrados.
+        """
         try:
             total = 0
             total_document_records = 0
@@ -1541,8 +1865,46 @@ def proc_directory_path(instance, filename):
 
 
 class ArticleProc(BaseProc, ClusterableModel):
-    # Armazena os IDs dos artigos no contexto de cada coleção
-    # serve para conseguir recuperar artigos pelo ID do site clássico
+    """
+    Modelo para processar artigos na migração.
+    
+    Gerencia o fluxo completo de migração de artigos, desde a extração
+    do XML até a publicação nos websites QA e público.
+    
+    Attributes
+    ----------
+    migrated_data : ForeignKey
+        Referência aos dados migrados do artigo (MigratedArticle).
+    issue_proc : ForeignKey
+        Referência ao IssueProc do fascículo.
+    pkg_name : CharField
+        Nome do pacote do artigo.
+    main_lang : CharField
+        Idioma principal do artigo.
+    sps_pkg : ForeignKey
+        Referência ao pacote SPS gerado.
+    xml_status : CharField
+        Status da extração/processamento do XML.
+    sps_pkg_status : CharField
+        Status da criação do pacote SPS.
+    pid_status : CharField
+        Status de validação do PID.
+    processed_xml : FileField
+        Arquivo XML processado e salvo.
+    
+    Methods
+    -------
+    get_xml(user)
+        Extrai e processa o XML do artigo.
+    generate_sps_package(user)
+        Gera o pacote SPS a partir do XML processado.
+    migrate_article(user, force_update)
+        Executa o fluxo completo de migração do artigo.
+    synchronize(user)
+        Sincroniza o pacote SPS com o sistema CORE.
+    check_classic_website_content(user, timeout, article_metadata_by_lang, force_update)
+        Verifica disponibilidade no website clássico.
+    """
     migrated_data = models.ForeignKey(
         MigratedArticle, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -1584,7 +1946,7 @@ class ArticleProc(BaseProc, ClusterableModel):
     )
     pid_status = models.CharField(
         _("PID Status"),
-        max_length=10,
+        max_length=14,
         choices=migration_choices.PID_STATUS,
         default=migration_choices.PID_STATUS_UNKNOWN,
         blank=True,
@@ -1639,6 +2001,15 @@ class ArticleProc(BaseProc, ClusterableModel):
             models.Index(fields=["xml_status"]),
             models.Index(fields=["sps_pkg_status"]),
         ]
+
+    @staticmethod
+    def get_pid_status_total(collection):
+        data = {"collection": collection.acron}
+        for item in ArticleProc.objects.filter(collection=collection).values(
+            "pid_status"
+        ).annotate(total=Count("pid")):
+            data[item["pid_status"]] = item["total"]
+        return data
 
     @classmethod
     def create_or_update(cls, issue_proc, user, pid, data, force_update):
@@ -1751,6 +2122,22 @@ class ArticleProc(BaseProc, ClusterableModel):
             )
 
     def get_xml(self, user):
+        """
+        Extrai e processa o XML do artigo.
+        
+        Obtém o XML do arquivo migrado (nativo ou convertido de HTML),
+        aplica correções e normaliza os dados de publicação.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que executa a operação.
+            
+        Returns
+        -------
+        bool
+            True se XML foi processado com sucesso, False caso contrário.
+        """
         try:
             detail = {}
             operation = self.start(user, "get xml")
@@ -1802,6 +2189,22 @@ class ArticleProc(BaseProc, ClusterableModel):
             return self.xml_status == tracker_choices.PROGRESS_STATUS_TODO
 
     def get_xml_from_native(self, detail):
+        """
+        Extrai e processa XML nativo do artigo.
+        
+        Processa o XML nativo, aplicando correções como fix_inline_graphic
+        e normalizando datas de publicação.
+        
+        Parameters
+        ----------
+        detail : dict
+            Dicionário para armazenar detalhes do processamento.
+            
+        Returns
+        -------
+        XMLWithPre
+            Objeto XML processado.
+        """
         try:
             xml_with_pre = list(XMLWithPre.create(path=self.migrated_xml.file.path))[0]
         except IndexError as e:
@@ -1831,6 +2234,24 @@ class ArticleProc(BaseProc, ClusterableModel):
         return xml_with_pre
     
     def get_xml_from_html(self, user, detail):
+        """
+        Converte HTML do artigo para XML.
+        
+        Utiliza o módulo HTMLXML para converter o conteúdo HTML do
+        artigo migrado para formato XML válido.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que executa a conversão.
+        detail : dict
+            Dicionário para armazenar detalhes da conversão.
+            
+        Returns
+        -------
+        str
+            Caminho do arquivo XML gerado.
+        """
         migrated_data = self.migrated_data
         classic_ws_doc = migrated_data.document
         htmlxml = HTMLXML.create_or_update(
@@ -1903,9 +2324,15 @@ class ArticleProc(BaseProc, ClusterableModel):
     @classmethod
     def select_items(
         cls,
+        collection_acron=None,
+        journal_acron=None,
+        issue_folder=None,
+        publication_year=None,
+        issue_proc_id=None,
         journal_proc_id_list=None,
         issue_proc_id_list=None,
         exclude_issue_proc_id_list=None,
+        article_proc_id_list=None,
         status_list=None,
         force_update=False,
     ):  
@@ -1915,10 +2342,22 @@ class ArticleProc(BaseProc, ClusterableModel):
         exclude_issue_proc_id_list = exclude_issue_proc_id_list or []
         
         params = {}
+        if collection_acron:
+            params["collection__acron"] = collection_acron
+        if journal_acron:
+            params["issue_proc__journal_proc__acron"] = journal_acron
+        if journal_proc_id_list:
+            params["issue_proc__journal_proc__id__in"] = journal_proc_id_list
+        if publication_year:
+            params["issue_proc__issue__publication_year"] = publication_year
+        if issue_folder:
+            params["issue_proc__issue_folder"] = issue_folder
+        if issue_proc_id:
+            params["issue_proc__id"] = issue_proc_id
         if issue_proc_id_list:
             params["issue_proc__id__in"] = issue_proc_id_list
-        elif journal_proc_id_list:
-            params["issue_proc__journal_proc__id__in"] = journal_proc_id_list
+        if article_proc_id_list:
+            params["id__in"] = article_proc_id_list
         
         return cls.objects.filter(
             Q(migration_status__in=status_list)
@@ -1959,8 +2398,29 @@ class ArticleProc(BaseProc, ClusterableModel):
         force_update=None,
     ):
         """
-        Muda o status de REPROC para TODO
-        E se force_update = True, muda o status de DONE para TODO
+        Obtém artigos prontos para extração de XML.
+        
+        Filtra artigos que precisam processar seu XML, alterando o status
+        de REPROC para TODO. Se force_update=True, também inclui artigos
+        com status DONE.
+        
+        Parameters
+        ----------
+        collection_acron : str, optional
+            Acrônimo da coleção.
+        journal_acron : str, optional
+            Acrônimo do periódico.
+        publication_year : int, optional
+            Ano de publicação.
+        issue_folder : str, optional
+            Pasta do fascículo.
+        force_update : bool, optional
+            Se True, inclui artigos já processados.
+            
+        Returns
+        -------
+        QuerySet
+            Artigos prontos para extração de XML.
         """
         params = {}
         params["issue_proc__files_status"] = tracker_choices.PROGRESS_STATUS_DONE
@@ -2008,8 +2468,28 @@ class ArticleProc(BaseProc, ClusterableModel):
         force_update,
     ):
         """
-        Muda o status de REPROC para TODO
-        E se force_update = True, muda o status de DONE para TODO
+        Obtém artigos prontos para gerar pacote SPS.
+        
+        Filtra artigos que já possuem XML processado e precisam gerar
+        o pacote SPS, alterando o status de REPROC para TODO.
+        
+        Parameters
+        ----------
+        collection_acron : str
+            Acrônimo da coleção.
+        journal_acron : str
+            Acrônimo do periódico.
+        publication_year : int
+            Ano de publicação.
+        issue_folder : str
+            Pasta do fascículo.
+        force_update : bool
+            Se True, inclui artigos já processados.
+            
+        Returns
+        -------
+        QuerySet
+            Artigos prontos para geração de pacote SPS.
         """
         params = {}
         params["xml_status"] = tracker_choices.PROGRESS_STATUS_DONE
@@ -2095,6 +2575,22 @@ class ArticleProc(BaseProc, ClusterableModel):
         self,
         user,
     ):
+        """
+        Gera o pacote SPS (Scientific Publishing System).
+        
+        Cria um pacote SPS contendo o XML processado, rendições (PDFs)
+        e traduções (HTMLs) do artigo.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que executa a geração do pacote.
+            
+        Returns
+        -------
+        bool
+            True se o pacote foi gerado com sucesso, False caso contrário.
+        """
         try:
             operation = self.start(user, "generate_sps_package")
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DOING
@@ -2183,6 +2679,24 @@ class ArticleProc(BaseProc, ClusterableModel):
             logging.info(f"Not found ArticleProc.article: {sps_pkg} {e}")
 
     def migrate_article(self, user, force_update):
+        """
+        Executa o fluxo completo de migração do artigo.
+        
+        Coordena a migração completa: extração de XML, geração de pacote SPS
+        e criação do registro do artigo no sistema.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que executa a migração.
+        force_update : bool
+            Se True, reprocessa o artigo completamente.
+            
+        Returns
+        -------
+        Article or None
+            Artigo criado/atualizado ou None se houve erro.
+        """
         if force_update:
             self.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
             self.propagate_reproc_or_todo_status()
@@ -2199,6 +2713,16 @@ class ArticleProc(BaseProc, ClusterableModel):
         return article
 
     def synchronize(self, user):
+        """
+        Sincroniza o pacote SPS com o sistema CORE.
+        
+        Registra o pacote SPS no sistema CORE de publicação.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que executa a sincronização.
+        """
         try:
             self.sps_pkg_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
@@ -2216,3 +2740,225 @@ class ArticleProc(BaseProc, ClusterableModel):
                 exc_traceback=exc_traceback,
                 exception=e,
             )
+
+    @property
+    def classic_website_url(self):
+        config = ClassicWebsiteConfiguration.objects.get(collection=self.collection)
+        return config.url
+
+    @property
+    def public_website_url(self):
+        try:
+            return WebSiteConfiguration.get_website_url(self.collection)
+        except Exception:
+            return None
+
+    @property
+    def public_website(self):
+        try:
+            return WebSiteConfiguration.get(self.collection, collection_choices.PUBLIC)
+        except Exception:
+            return None
+
+    @property
+    def qa_website_url(self):
+        try:
+            return WebSiteConfiguration.get_website_url(self.collection, collection_choices.QA)
+        except Exception:
+            return None
+
+    @property
+    def qa_website(self):
+        try:
+            return WebSiteConfiguration.get(self.collection, collection_choices.QA)
+        except Exception:
+            return None
+
+    @classmethod
+    def items_to_check_url_and_content(cls, collection=None, force_update=False):
+        exclude_list = (
+            migration_choices.PID_STATUS_MISSING,
+            migration_choices.PID_STATUS_EXCEEDING,
+            migration_choices.PID_STATUS_UNKNOWN,
+            migration_choices.PID_STATUS_PUBLIC_VALID,
+        )
+        if force_update:
+            exclude_list = (
+                migration_choices.PID_STATUS_MISSING,
+                migration_choices.PID_STATUS_EXCEEDING,
+                migration_choices.PID_STATUS_UNKNOWN,
+            )
+        params = {}
+        if collection:
+            params = {"collection": collection}
+        if exclude_list:
+            return cls.objects.filter(
+                **params,
+            ).exclude(
+                pid_status__in=exclude_list,
+            )
+        return cls.objects.filter(
+            **params
+        )
+
+    def create_article_webpages(self, user):
+        """
+        Cria páginas web do artigo nos websites QA e público.
+        
+        Gera URLs de acesso ao artigo para serem armazenadas como
+        ArticleWebPage para rastreamento e validação.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que executa a operação.
+        """
+        if not self.article:
+            return
+        if self.qa_website:
+            self.article.create_or_update_urls(
+                user,
+                self.qa_website,
+            )
+        if self.public_website:
+            self.article.create_or_update_urls(
+                user,
+                self.public_website,
+            )
+
+    def check_classic_website_content(self, user, timeout, article_metadata_by_lang=None, force_update=None):
+        """
+        Verifica disponibilidade e conteúdo no website clássico.
+        
+        Tenta acessar o artigo no website clássico e valida se o conteúdo
+        contém os metadados esperados.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que executa a verificação.
+        timeout : int
+            Timeout em segundos para requisições HTTP.
+        article_metadata_by_lang : dict, optional
+            Metadados do artigo por idioma. Se None, é extraído do artigo.
+        force_update : bool, optional
+            Se True, ignora cache e refaz verificação.
+            
+        Returns
+        -------
+        dict
+            Resposta contendo pid_status e detalhes da verificação.
+        """
+        try:
+            response = {
+                "force_update": force_update,
+                "pid_status": self.pid_status,
+            }
+            if self.pid_status == migration_choices.PID_STATUS_CLASSIC_MATCHED:
+                if not force_update:
+                    return response
+
+            if not self.classic_website_url:
+                raise ValueError("classic_website_url não configurada")
+            
+            article_metadata_by_lang = article_metadata_by_lang or self.article.get_metadata_by_lang()
+
+            for item in self.article.get_html_urls(
+                self.classic_website_url, classic=True, new=False, only_first=True,
+            ):
+                response = self.check_classic_page_url_and_content(
+                    item["url"],
+                    timeout,
+                    article_metadata_by_lang.get(item["lang"])
+                )
+            
+            if not response or response.get("error"):
+                for item in self.article.get_pdf_urls(
+                    self.classic_website_url, classic=True, new=False, only_first=True,
+                ):
+                    response = self.check_classic_page_url_and_content(
+                        item["url"],
+                        timeout,
+                        article_metadata_by_lang.get(item["lang"])
+                    )
+
+        except Exception as e:
+            response = {
+                "error": str(e),
+                "pid_status": migration_choices.PID_STATUS_CLASSIC_NOT_FOUND
+            }
+        self.set_pid_status(user, response.get("pid_status"))
+        return response
+    
+    def check_classic_page_url_and_content(self, url, timeout, article_metadata):
+        # html ou pdf url
+        response = check_url(url, timeout)
+        content = response.get("content")
+        if not content:
+            response["pid_status"] = migration_choices.PID_STATUS_CLASSIC_NOT_FOUND
+            return response
+        
+        response["pid_status"] = migration_choices.PID_STATUS_CLASSIC_FOUND
+        response = check_content(article_metadata, content)
+        if response.get("error"):
+            return response
+
+        rate = response.get("rate", 0)
+        if rate > 0.8:
+            response["pid_status"] = migration_choices.PID_STATUS_CLASSIC_MATCHED
+        else:
+            response["pid_status"] = migration_choices.PID_STATUS_CLASSIC_MISMATCHED
+        return response
+    
+    def set_pid_status(self, user, pid_status):
+        if pid_status != self.pid_status:
+            self.pid_status = pid_status
+            self.updated_by = user
+            self.save()
+
+    def available_status_delete(self, website_url):
+        """
+        Remove registros legados de ArticleAvailability/ScieloURLStatus.
+        Chamado após migração bem-sucedida para ArticleWebPage.
+        """
+        try:
+            article = self.article
+            if not article:
+                return
+            # availability_status é related_name (ForeignKey unique)
+            aa = getattr(article, 'availability_status', None)
+            if aa:
+                if website_url:
+                    aa.scielo_url.filter(url__startswith=website_url).delete()
+                if not aa.scielo_url.exists():
+                    aa.delete()
+        except Exception:
+            pass  # legado pode já ter sido removido
+
+    def all_webpage_available(self, website=None, website_id=None):
+        article = self.article
+        if not article:
+            return False
+        params = {}
+        if website:
+            params["website"] = website
+        if website_id:
+            params["website_id"] = website_id
+            
+        qs = self.article.article_webpages.filter(
+           **params,
+        )
+        if not qs.exists():
+            return False
+        return not qs.exclude(
+            status=article_choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+        ).exists()
+    
+    def any_webpage_available(self, website):
+        collection = self.collection
+        article = self.article
+        qs = self.article.article_webpages.filter(
+            website=website,
+        )
+        return qs.filter(status=article_choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE).exists()
+

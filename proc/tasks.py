@@ -1,3 +1,56 @@
+"""
+Tasks Celery do módulo proc.
+
+Organização hierárquica das tasks de migração e publicação:
+
+  Journals:
+    task_migrate_and_publish_journals
+      └─ task_migrate_and_publish_journals_by_collection (por coleção)
+    task_publish_journals
+      └─ task_publish_journal (por periódico)
+
+  Issues:
+    task_migrate_and_publish_issues
+      └─ task_migrate_and_publish_issues_by_collection (por coleção)
+    task_publish_issues
+      └─ task_publish_issue (por fascículo)
+
+  Articles:
+    task_migrate_and_publish_articles
+      └─ task_migrate_and_publish_articles_by_journal (por periódico)
+          └─ task_migrate_and_publish_articles_by_issue (por fascículo)
+              └─ task_publish_issue_articles (publica artigos + sincroniza issue)
+                  ├─ task_publish_article (por artigo, síncrono)
+                  │   └─ task_check_article_webpages (verifica disponibilidade)
+                  │       ├─ task_check_article_page_availability (por webpage, síncrono)
+                  │       └─ task_update_article_proc_availability (callback)
+                  └─ task_sync_issue (sincroniza fascículo no site)
+
+  Publicação avulsa (somente publicação, sem migração):
+    task_publish_articles
+      └─ task_publish_issue_articles (por fascículo)
+
+  Verificação de disponibilidade (em lote):
+    task_check_articles_availability
+      └─ task_check_article_webpages (por artigo × website)
+          ├─ task_check_article_page_availability (por webpage)
+          └─ task_update_article_proc_availability (callback)
+
+  Rastreamento de PIDs do site clássico:
+    task_track_classic_website_article_pids
+      └─ task_track_classic_website_article_pids_for_collection (por coleção)
+          └─ task_track_article_page_url_and_content (por artigo)
+
+  Verificação no site clássico (migração):
+    task_check_classic_website_article
+
+  Utilitários:
+    task_fetch_and_create_journal
+    task_exclude_invalid_issue_articles
+    task_remove_duplicate_issues
+    task_check_main_article_page_availability
+"""
+
 import logging
 import sys
 import traceback
@@ -7,38 +60,63 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from article.models import Article
+from article.models import Article, ArticleWebPage
+from article import choices as article_choices
 from journal.models import Journal
 from issue.models import Issue
 from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from migration import controller
-
+from migration import choices as migration_choices
 from proc.controller import (
-    create_collection_procs_from_pid_list,
     create_or_update_migrated_issue,
     create_or_update_migrated_journal,
     fetch_and_create_journal,
     migrate_issue,
 )
-from proc.article_controller import track_classic_website_article_pids
+from proc.article_controller import ClassicWebsiteArticlePidTracker
 from proc.models import ArticleProc, IssueProc, JournalProc
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue, sync_issue
 from publication.api.journal import publish_journal
-from publication.api.publication import get_api, get_api_data
-from publication.models import ArticleAvailability
+from publication.api.publication import get_api_data
 from tracker import choices as tracker_choices
 from tracker.models import TaskTracker, UnexpectedEvent
 
 User = get_user_model()
 
 class NothingToProcess(Exception):
+    """Sinaliza que não há itens pendentes para processamento."""
     ...
 
 
 class TaskExecution:
+    """
+    Wrapper para TaskTracker que acumula eventos, estatísticas e exceções
+    durante a execução de uma task, e persiste tudo ao finalizar.
+
+    Uso típico::
+
+        task_exec = TaskExecution(name="minha.task", item="col-jrn", params={...})
+        try:
+            # lógica da task
+            task_exec.total_to_process = n
+            for item in items:
+                process(item)
+                task_exec.total_processed += 1
+            task_exec.finish()
+        except Exception as e:
+            task_exec.finish(exception=e, exc_traceback=...)
+
+    Attributes:
+        params: Dicionário de parâmetros da task (persistido no detail).
+        task_tracker: Instância de TaskTracker subjacente.
+        events: Lista de strings descritivas acumuladas durante execução.
+        stats: Dicionário nome→número com métricas coletadas.
+        exceptions: Lista de dicionários {"type": ..., "message": ...}.
+    """
+
     def __init__(self, name, item, params):
         self.params = params
         self.task_tracker = TaskTracker.create(
@@ -74,18 +152,32 @@ class TaskExecution:
         self.task_tracker.total_processed = value
 
     def add_exception(self, exception):
+        """Registra uma exceção capturada (sem interromper a task)."""
         self.exceptions.append({"type": str(type(exception)), "message": str(exception)})
 
     def add_event(self, event):
+        """Registra um ou mais eventos descritivos (string ou lista de strings)."""
         if isinstance(event, list):
             self.events.extend(event)
         else:
             self.events.append(event)
 
     def add_number(self, name, number):
+        """Registra uma métrica numérica no dicionário ``stats``."""
         self.stats[name] = number
 
     def finish(self, exception=None, exc_traceback=None):
+        """
+        Persiste o resultado da execução no TaskTracker.
+
+        Monta o ``detail`` com params, stats, events e exceptions.
+        Caso o ``detail`` não seja serializável como JSON (ex: objetos
+        lazy translation), faz fallback convertendo cada valor para string.
+
+        Args:
+            exception: Exceção capturada (se houver).
+            exc_traceback: Traceback associado à exceção.
+        """
         if exception or exc_traceback or self.exceptions:
             completed = False
         else:
@@ -123,6 +215,12 @@ class TaskExecution:
 
 
 def _get_user(user_id, username):
+    """
+    Obtém usuário por ID ou username.
+
+    Retorna None se ambos forem None ou se o usuário não for encontrado.
+    Em caso de erro, registra UnexpectedEvent e retorna None.
+    """
     try:
         if user_id:
             return User.objects.get(pk=user_id)
@@ -144,6 +242,11 @@ def _get_user(user_id, username):
 
 
 def _get_collections(collection_acron):
+    """
+    Retorna iterator de coleções filtradas por acrônimo, ou todas se None.
+
+    Em caso de erro, registra UnexpectedEvent e retorna lista vazia.
+    """
     try:
         if collection_acron:
             return Collection.objects.filter(acron=collection_acron).iterator()
@@ -176,6 +279,10 @@ def task_migrate_and_publish(
     force_import_acron_id_file=False,
     force_migrate_document_records=False,
 ):
+    """
+    Descontinuada. Usar task_migrate_and_publish_journals,
+    task_migrate_and_publish_issues e task_migrate_and_publish_articles.
+    """
     logging.info("task_migrate_and_publish is discontinued")
     logging.info("Use task_migrate_and_publish_journals")
     logging.info("Use task_migrate_and_publish_issues")
@@ -195,6 +302,13 @@ def task_migrate_and_publish_journals(
     valid_status=None,
     force_import_acron_id_file=False,
 ):
+    """
+    Ponto de entrada para migração e publicação de periódicos.
+
+    Itera sobre as coleções selecionadas e agenda
+    ``task_migrate_and_publish_journals_by_collection`` (assíncrono)
+    para cada uma.
+    """
     try:
         task_params = {
             "task": "proc.tasks.task_migrate_and_publish_journals",
@@ -238,6 +352,17 @@ def task_migrate_and_publish_journals_by_collection(
     status=None,
     force_import_acron_id_file=False,
 ):
+    """
+    Migra e publica periódicos de uma coleção.
+
+    Etapas:
+    1. Importa dados do site clássico (create_or_update_migrated_journal).
+    2. Filtra JournalProcs com status pendente (migration, qa_ws, public_ws).
+    3. Para cada JournalProc:
+       a. Cria/atualiza o Journal via controller.
+       b. Se necessário, sincroniza com a Core API (fetch_and_create_journal).
+       c. Agenda task_publish_journal para QA e PUBLIC.
+    """
     task_params = {
         "task": "proc.tasks.task_migrate_and_publish_journals",
         "user_id": user_id,
@@ -374,6 +499,15 @@ def task_publish_journals(
     force_update=False,
     verify=False,
 ):
+    """
+    Agenda publicação de periódicos pendentes nos sites QA e PUBLIC.
+
+    Para cada coleção e website_kind, seleciona JournalProcs com status
+    pendente (via ``JournalProc.items_to_publish``) e agenda
+    ``task_publish_journal`` individualmente.
+
+    Não executa migração — apenas publicação.
+    """
     task_params = {
         "task": "proc.tasks.task_publish_journals",
         "user_id": user_id,
@@ -455,6 +589,11 @@ def task_publish_journal(
     api_data=None,
     force_update=None,
 ):
+    """
+    Publica um periódico individual no site QA ou PUBLIC via API.
+
+    Delega para ``journal_proc.publish(publish_journal, ...)``.
+    """
     try:
         user = _get_user(user_id, username)
         journal_proc = JournalProc.objects.get(pk=journal_proc_id)
@@ -505,6 +644,13 @@ def task_migrate_and_publish_issues(
     force_update=False,
     force_migrate_document_records=False,
 ):
+    """
+    Ponto de entrada para migração e publicação de fascículos.
+
+    Itera sobre as coleções selecionadas e agenda
+    ``task_migrate_and_publish_issues_by_collection`` (assíncrono)
+    para cada uma.
+    """
     task_params = {
         "user_id": user_id,
         "username": username,
@@ -546,6 +692,18 @@ def task_migrate_and_publish_issues_by_collection(
     force_update=False,
     force_migrate_document_records=False,
 ):
+    """
+    Migra e publica fascículos de uma coleção.
+
+    Etapas:
+    1. Importa dados de fascículos do site clássico
+       (create_or_update_migrated_issue).
+    2. Filtra IssueProcs com status pendente (migration, docs, files,
+       qa_ws, public_ws).
+    3. Para cada IssueProc:
+       a. Executa migrate_issue (cria/atualiza Issue).
+       b. Agenda task_publish_issue para QA e PUBLIC.
+    """
     task_params = {
         "user_id": user_id,
         "username": username,
@@ -671,6 +829,15 @@ def task_publish_issues(
     force_update=False,
     verify=False,
 ):
+    """
+    Agenda publicação de fascículos pendentes nos sites QA e PUBLIC.
+
+    Para cada coleção e website_kind, seleciona IssueProcs com status
+    pendente (via ``IssueProc.items_to_publish``) e agenda
+    ``task_publish_issue`` individualmente.
+
+    Não executa migração — apenas publicação.
+    """
     task_params = {
        "collection_acron": collection_acron,
         "journal_acron": journal_acron,
@@ -747,6 +914,11 @@ def task_publish_issue(
     api_data=None,
     force_update=None,
 ):
+    """
+    Publica um fascículo individual no site QA ou PUBLIC via API.
+
+    Delega para ``issue_proc.publish(publish_issue, ...)``.
+    """
     try:
         user = _get_user(user_id, username)
         issue_proc = IssueProc.objects.get(pk=issue_proc_id)
@@ -759,6 +931,7 @@ def task_publish_issue(
             api_data=api_data,
             force_update=force_update,
         )
+        event.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         try:
@@ -804,6 +977,17 @@ def task_migrate_and_publish_articles(
     force_migrate_document_files=False,
     skip_migrate_pending_document_records=False,
 ):
+    """
+    Ponto de entrada para migração e publicação de artigos.
+
+    Estratégia de seleção:
+    - Se ``publication_year`` ou ``issue_folder`` fornecidos: seleciona
+      IssueProcs específicos e agrupa por journal_proc_id.
+    - Caso contrário: seleciona todos os JournalProcs das coleções.
+
+    Agenda ``task_migrate_and_publish_articles_by_journal`` para cada
+    periódico identificado.
+    """
     task_params = {
         "user_id": user_id,
         "username": username,
@@ -915,6 +1099,19 @@ def task_migrate_and_publish_articles_by_journal(
     force_migrate_document_records=False,
     force_migrate_document_files=False,
 ):
+    """
+    Migra e publica artigos de um periódico.
+
+    Etapas:
+    1. Importa registros de acron_id do site clássico
+       (controller.import_journal_acron_id_records).
+    2. Identifica fascículos a processar:
+       - Se ``issue_proc_id_list`` fornecida: usa diretamente.
+       - Senão: seleciona IssueProcs com status pendente e complementa
+         com ArticleProcs pendentes de issues já processados.
+    3. Agenda ``task_migrate_and_publish_articles_by_issue`` para cada
+       fascículo.
+    """
     
     task_params = {
         "user_id": user_id,
@@ -1026,6 +1223,19 @@ def task_migrate_and_publish_articles_by_issue(
     qa_api_data=None,
     public_api_data=None,
 ):
+    """
+    Migra e publica artigos de um fascículo.
+
+    Etapas:
+    1. Remove artigos duplicados/inconsistentes via
+       ``task_exclude_invalid_issue_articles`` (síncrono).
+    2. Se ``article_proc_id_list`` fornecida: usa diretamente (pressupõe
+       que registros e arquivos já foram migrados).
+       Senão: migra registros e arquivos do site clássico, depois seleciona
+       ArticleProcs pendentes.
+    3. Migra cada artigo (``article_proc.migrate_article``).
+    4. Agenda ``task_publish_issue_articles`` para publicação e sincronização.
+    """
     task_params = {
         "user_id": user_id,
         "username": username,
@@ -1051,21 +1261,23 @@ def task_migrate_and_publish_articles_by_issue(
         task_exec.item = str(issue_proc)
 
         # corrige defeito de repetição de artigos, executando de forma síncrona
-        task_exclude_article_repetition_by_issue(
+        task_exclude_invalid_issue_articles(
             issue_proc_id=issue_proc_id,
             username=username,
             user_id=user_id,
+            public_api_data=public_api_data
         )
 
+        total_articles_to_process = 0
         if article_proc_id_list:
             # supõe-se que os registros e arquivos já foram migrados
             # (issue_proc.docs_status e issue_proc.files_status estão como DONE)
-            total_articles_to_process = len(article_proc_id_list)
             article_procs = ArticleProc.objects.select_related(
                 "issue_proc",
             ).filter(
                 id__in=article_proc_id_list
             )
+            total_articles_to_process = article_procs.count()
         else:
             task_exec.add_event("Migrate document records")
             total_migrated_records = issue_proc.migrate_document_records(user, force_migrate_document_records)
@@ -1099,30 +1311,126 @@ def task_migrate_and_publish_articles_by_issue(
                 task_exec.add_exception(exceptions[article_proc.pid])
 
         task_exec.total_processed = total_processed
-            
-        article_ids_to_publish = ArticleProc.objects.select_related(
+        task_exec.add_number("total_processed", total_processed)
+
+        task_exec.add_event(f"Schedule article publication {issue_proc} ({total_processed})")
+        task_publish_issue_articles.delay(
+            user_id=user_id,
+            username=username,
+            issue_proc_id=issue_proc_id,
+            status=status,
+            force_update=force_update,
+        )
+
+        task_exec.finish()
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        task_exec.finish(
+            exception=e,
+            exc_traceback=exc_traceback,
+        )
+
+
+@celery_app.task(bind=True)
+def task_publish_issue_articles(
+    self,
+    user_id=None,
+    username=None,
+    issue_proc_id=None,
+    status=None,
+    force_update=False,
+):
+    """
+    Publica artigos de um fascículo e sincroniza o fascículo no site.
+
+    Para cada WebSiteConfiguration habilitado da coleção:
+    1. Filtra ArticleProcs com pid_v3 e status pendente no website_kind.
+    2. Publica cada artigo via ``task_publish_article`` — chamada direta
+       (síncrona), não ``.delay()``, para evitar sobrecarga no ambiente
+       de origem (ex: site clássico).
+    3. Agenda ``task_sync_issue`` (assíncrono) para sincronizar o
+       fascículo no site.
+    """
+    task_params = {
+        "user_id": user_id,
+        "username": username,
+        "issue_proc_id": issue_proc_id,
+        "status": status,
+        "force_update": force_update,
+    }
+    task_exec = TaskExecution(
+        name="proc.tasks.task_publish_issue_articles",
+        item=f"{issue_proc_id}",
+        params=task_params,
+    )
+    try:
+        user = _get_user(user_id, username)
+        issue_proc = IssueProc.objects.select_related(
+            "collection", "journal_proc", "issue"
+        ).get(id=issue_proc_id)
+        
+        task_exec.item = f"{issue_proc}"
+        
+        status = tracker_choices.get_valid_status(status, force_update)
+        task_exec.add_event(f"Publishing {issue_proc} articles which status is {status}")
+
+        articles = ArticleProc.objects.select_related(
             "issue_proc", "sps_pkg",
         ).filter(
-            Q(qa_ws_status__in=status) | Q(public_ws_status__in=status),
             issue_proc=issue_proc,
             sps_pkg__pid_v3__isnull=False,
         ).values_list("id", flat=True)
-        total_articles_to_publish = article_ids_to_publish.count()
-        task_exec.add_number("total_articles_to_publish", total_articles_to_publish)
 
-        for website_label in (QA, PUBLIC):
-            task_exec.add_event(f"Schedule Publish articles / sync issue tasks for {website_label}")
-            task_sync_issue.apply_async(
-                kwargs=dict(
-                    user_id=user_id,
-                    username=username,
-                    issue_proc_id=issue_proc.id,
-                    website_kind=website_label,
-                    status=status,
-                    force_update=force_update,
-                )
+        collection = issue_proc.collection
+        total_processed = 0
+        total_to_process = 0
+        for website in WebSiteConfiguration.objects.filter(
+            collection=collection,
+            enabled=True,
+        ):
+            api_data = website.get_data(content_type="article")
+            website_kind = website.purpose
+        
+            query_by_status = Q()
+            if website_kind == QA:
+                query_by_status = Q(qa_ws_status__in=status)
+            elif website_kind == PUBLIC:
+                query_by_status = Q(public_ws_status__in=status)
+
+            article_ids_to_publish = articles.filter(
+                query_by_status
             )
+            total_to_process += article_ids_to_publish.count()
 
+            for article_proc_id in article_ids_to_publish:
+                # executa de forma síncrona para evitar muitos processos em paralelo, o que pode causar lentidão e instabilidade no ambiente de origem (ex: site clássico)
+                try:
+                    # publica (síncrono dentro de task_publish_article)
+                    task_publish_article(
+                        user_id=user_id,
+                        username=username,
+                        website_id=website.id,
+                        website_kind=website_kind,
+                        article_proc_id=article_proc_id,
+                        api_data=api_data,
+                        force_update=force_update,
+                    )
+                    total_processed += 1
+                except Exception as e:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    task_exec.add_exception(traceback.format_exc())
+
+            task_exec.add_event(f"Schedule sync_issue {issue_proc} {website_kind}")
+            task_sync_issue.delay(
+                user_id=user_id,
+                username=username,
+                website_kind=website_kind,
+                issue_proc_id=issue_proc_id,
+                api_data=api_data,
+            )
+            task_exec.add_event(f"Scheduled sync_issue {issue_proc} {website_kind}")
+        task_exec.total_to_process = total_to_process
+        task_exec.total_processed = total_processed
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1139,16 +1447,22 @@ def task_sync_issue(
     username=None,
     issue_proc_id=None,
     website_kind=None,
-    status=None,
-    force_update=False,
+    api_data=None,
 ):
+    """
+    Sincroniza um fascículo no site (QA ou PUBLIC).
+
+    Chama ``sync_issue(issue_proc, api_data)`` para atualizar o
+    fascículo no website após a publicação dos artigos.
+
+    Nota: a docstring original repetia incorretamente a descrição de
+    task_publish_issue_articles. Esta task apenas sincroniza o fascículo.
+    """
     task_params = {
         "user_id": user_id,
         "username": username,
         "issue_proc_id": issue_proc_id,
         "website_kind": website_kind,
-        "status": status,
-        "force_update": force_update,
     }
     task_exec = TaskExecution(
         name="proc.tasks.task_sync_issue",
@@ -1157,65 +1471,11 @@ def task_sync_issue(
     )
     try:
         user = _get_user(user_id, username)
-        issue_proc = IssueProc.objects.select_related(
-            "collection", "journal_proc", "issue"
-        ).get(id=issue_proc_id)
-        
-        task_exec.item = f"{issue_proc} {website_kind}"
-        
-        status = tracker_choices.get_valid_status(status, force_update)
-        task_exec.add_event(f"Publishing articles for {website_kind} with status {status}")
-
-        query_by_status = Q()
-        if website_kind == QA:
-            query_by_status = Q(qa_ws_status__in=status)
-        elif website_kind == PUBLIC:
-            query_by_status = Q(public_ws_status__in=status)
-
-        article_ids_to_publish = ArticleProc.objects.select_related(
-            "issue_proc", "sps_pkg",
-        ).filter(
-            query_by_status,
-            issue_proc=issue_proc,
-            sps_pkg__pid_v3__isnull=False,
-        ).values_list("id", flat=True)
-
-        task_exec.total_to_process = article_ids_to_publish.count()
-        total_processed = 0
-
-        api_data = get_api_data(issue_proc.collection, "article", website_kind)
-        if not api_data or api_data.get("error"):
-            task_exec.add_event(f"API data not available for {website_kind} {api_data}")
-            task_exec.finish()
-            return
-
-        for article_proc_id in article_ids_to_publish:
-            try:
-                # executa de forma síncrona para evitar muitos processos em paralelo, o que pode causar lentidão e instabilidade no ambiente de origem (ex: site clássico)
-                task_publish_article(
-                    user_id=user_id,
-                    username=username,
-                    website_kind=website_kind,
-                    article_proc_id=article_proc_id,
-                    api_data=api_data,
-                    force_update=force_update,
-                )
-                total_processed += 1
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                task_exec.add_exception(traceback.format_exc())
-        task_exec.total_processed = total_processed
-
-        api_data = get_api_data(issue_proc.collection, "issue", website_kind)
-        if not api_data or api_data.get("error"):
-            task_exec.add_event(f"API data not available for {website_kind} {api_data}")
-            task_exec.finish()
-            return
-
-        task_exec.add_event(f"Syncing issue in {website_kind} website")
+        issue_proc = IssueProc.objects.get(id=issue_proc_id)
+        task_exec.item = f"{issue_proc}"
+        task_exec.add_event(f"Syncing {issue_proc} {website_kind} website")
         sync_issue(issue_proc, api_data)
-        task_exec.add_event(f"Issue synced in {website_kind} website")
-        
+        task_exec.add_event(f"Issue synced {website_kind} website")
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1234,9 +1494,20 @@ def task_publish_articles(
     journal_acron=None,
     issue_folder=None,
     publication_year=None,
+    issue_proc_id=None,
     force_update=False,
+    status=None,
     verify=False,
+    timeout=None,
 ):
+    """
+    Agenda publicação de artigos pendentes nos sites QA e PUBLIC.
+
+    Seleciona IssueProcs pelos filtros e agenda
+    ``task_publish_issue_articles`` para cada um.
+
+    Não executa migração — apenas publicação.
+    """
     task_params = {
         "user_id": user_id,
         "username": username,
@@ -1247,51 +1518,34 @@ def task_publish_articles(
         "force_update": force_update,
     }
     title = f"{collection_acron}-{journal_acron}-{issue_folder}-{publication_year}"
+    task_exec = TaskExecution(
+        name="proc.tasks.task_publish_articles",
+        item=title,
+        params=task_params,
+    )
     try:
-        params = {}
-        total_scheduled = 0
-
-        if journal_acron:
-            params["issue_proc__journal_proc__acron"] = journal_acron
-        if issue_folder:
-            params["issue_proc__issue_folder"] = issue_folder
-        if publication_year:
-            params["issue_proc__issue__publication_year"] = publication_year
-
-        for collection in _get_collections(collection_acron):
-            for website_kind in (QA, PUBLIC):
-                api_data = get_api_data(collection, "article", website_kind)
-                if not api_data or api_data.get("error"):
-                    continue
-                api_data["verify"] = verify
-
-                task_exec = TaskExecution(
-                    name="proc.tasks.task_publish_articles",
-                    item=f"{title} {website_kind}",
-                    params=task_params,
-                )
-                items_to_publish = ArticleProc.items_to_publish(
-                    website_kind=website_kind,
-                    content_type="article",
-                    collection=collection,
-                    force_update=force_update,
-                    params=params,
-                )
-                total_scheduled = 0
-                task_exec.total_to_process = items_to_publish.count()
-                for article_proc in items_to_publish:
-                    task_publish_article.delay(
-                        user_id=user_id,
-                        username=username,
-                        website_kind=website_kind,
-                        article_proc_id=article_proc.id,
-                        api_data=api_data,
-                        force_update=force_update,
-                    )
-                    total_scheduled += 1
-                task_exec.total_processed = total_scheduled
-                task_exec.finish()
-
+        
+        issue_procs = IssueProc.select_items(
+            collection_acron=collection_acron,
+            journal_acron=journal_acron,
+            issue_folder=issue_folder,
+            publication_year=publication_year,
+            issue_proc_id=issue_proc_id,
+            force_update=force_update,
+            status_list=status,
+        )
+        total = issue_procs.count()
+        task_exec.add_event(f"Publishing articles of {total} issues")
+        
+        for issue_proc in issue_procs:
+            task_publish_issue_articles.delay(
+                user_id=user_id,
+                username=username,
+                issue_proc_id=issue_proc.id,
+                status=status,
+                force_update=force_update,
+            )
+        task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -1309,10 +1563,21 @@ def task_publish_article(
     user_id=None,
     username=None,
     website_kind=None,
+    website_id=None,
     article_proc_id=None,
     api_data=None,
     force_update=None,
+    timeout=None,
 ):
+    """
+    Publica um artigo individual no site QA ou PUBLIC.
+
+    Etapas:
+    1. Publica o artigo via ``article_proc.publish(publish_article, ...)``.
+    2. Se publicação bem-sucedida (``response["completed"]``), agenda
+       ``task_check_article_webpages`` (assíncrono) para verificar
+       disponibilidade das URLs geradas.
+    """
     user = None
     detail = {"published": False, "available": False}
     article_proc = None
@@ -1335,19 +1600,15 @@ def task_publish_article(
         detail["available"] = False
         
         if response.get("completed"):
-            obj = ArticleAvailability.create_or_update(
-                user,
-                article_proc.article,
-                published_by="MIGRATION",
-                publication_rule="MIGRATION",
+            task_check_article_webpages.delay(
+                user_id=user_id,
+                username=username,
+                article_proc_id=article_proc_id,
+                article_id=article_proc.article.id,
+                website_id=website_id,
+                timeout=timeout,
+                force_update=force_update,
             )
-            for website in WebSiteConfiguration.objects.filter(
-                collection=article_proc.collection,
-                purpose=website_kind,
-            ):
-                obj.create_or_update_urls(user, website.url)
-
-            detail["available"] = obj.completed
             
         event.finish(user, detail=detail, completed=True)
         
@@ -1374,65 +1635,6 @@ def task_publish_article(
 
 
 @celery_app.task(bind=True)
-def task_create_procs_from_pid_list(
-    self, username, user_id=None, collection_acron=None, force_update=None
-):
-    user = _get_user(user_id=user_id, username=username)
-    try:
-        for collection in _get_collections(collection_acron):
-            task_create_collection_procs_from_pid_list.apply_async(
-                kwargs=dict(
-                    username=user.username,
-                    collection_acron=collection.acron,
-                    force_update=force_update,
-                )
-            )
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "function": "proc.tasks.task_create_procs_from_pid_list",
-                "collection_acron": collection_acron,
-            },
-        )
-
-
-@celery_app.task(bind=True)
-def task_create_collection_procs_from_pid_list(
-    self, username, collection_acron, force_update
-):
-    task_params = {
-        "username": username,
-        "collection_acron": collection_acron,
-        "force_update": force_update,
-    }
-    task_exec = TaskExecution(
-        name="proc.tasks.task_create_collection_procs_from_pid_list",
-        item=f"{collection_acron}",
-        params=task_params,
-    )
-    try:
-        user = _get_user(user_id=None, username=username)
-        classic_website_config = controller.get_classic_website_config(collection_acron)
-        collection = classic_website_config.collection
-        create_collection_procs_from_pid_list(
-            user,
-            classic_website_config.collection,
-            classic_website_config.pid_list_path,
-            force_update,
-        )
-        task_exec.finish()
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        task_exec.finish(
-            exception=e,
-            exc_traceback=exc_traceback,
-        )
-
-
-@celery_app.task(bind=True)
 def task_fetch_and_create_journal(
     self,
     user_id,
@@ -1442,6 +1644,11 @@ def task_fetch_and_create_journal(
     issn_print=None,
     force_update=None,
 ):
+    """
+    Busca dados de periódico na Core API e cria/atualiza o registro local.
+
+    Delega para ``fetch_and_create_journal()``.
+    """
     task_params = {
         "task": "proc.tasks.task_fetch_and_create_journal",
         "user_id": user_id,
@@ -1478,28 +1685,32 @@ def task_fetch_and_create_journal(
 
 
 @celery_app.task(bind=True)
-def task_exclude_article_repetition_by_issue(self, issue_proc_id, username=None, user_id=None, timeout=None):
+def task_exclude_invalid_issue_articles(self, issue_proc_id, username=None, user_id=None, timeout=None, public_api_data=None):
     """
     Remove artigos duplicados e inconsistentes de um fascículo.
 
-    Para o IssueProc indicado:
-    1. Corrige nomes de sps_pkg de artigos de suplemento do fascículo que
-       estejam sem o sufixo "-s" (fix_sps_pkg_names).
-    2. Exclui artigos "inconvenientes" — duplicatas ou registros que não
-       devem estar associados ao fascículo (exclude_inconvenient_articles).
+    Etapas:
+    1. Corrige nomes de sps_pkg de artigos de suplemento que estejam
+       sem o sufixo "-s" (``Article.fix_sps_pkg_names``).
+    2. Exclui artigos duplicados ou que não devem estar associados ao
+       fascículo (``Article.exclude_inconvenient_articles``).
 
     Args:
         issue_proc_id: ID do IssueProc a processar.
         username: Nome do usuário responsável pela operação.
         user_id: ID do usuário responsável pela operação.
-        timeout: Tempo máximo (segundos) para a etapa de exclusão; None = sem limite.
+        timeout: Tempo máximo (segundos) para a etapa de exclusão;
+            None = sem limite.
+        public_api_data: Dados da API pública (não utilizado diretamente
+            nesta task, mas presente na assinatura por consistência com
+            o caller).
     """
     task_params = {
         "issue_proc_id": issue_proc_id,
     }
     issue_proc_str = str(issue_proc_id)
     task_exec = TaskExecution(
-        name="task_exclude_article_repetition_by_issue",
+        name="task_exclude_invalid_issue_articles",
         item=issue_proc_str,
         params=task_params,
     )
@@ -1536,7 +1747,7 @@ def task_exclude_article_repetition_by_issue(self, issue_proc_id, username=None,
         except Exception:
             UnexpectedEvent.create(
                 item=issue_proc_str,
-                action="proc.tasks.task_exclude_article_repetition_by_issue",
+                action="proc.tasks.task_exclude_invalid_issue_articles",
                 e=e,
                 exc_traceback=exc_traceback,
                 detail=task_params,
@@ -1551,10 +1762,14 @@ def task_remove_duplicate_issues(
     journal_id=None,
 ):
     """
-    Remove Issue duplicados.
-    
-    Args:
-        dry_run: Se True, apenas identifica duplicatas sem remover.
+    Remove Issues duplicados de um periódico (ou de todos).
+
+    Identifica Issues com mesmos campos-chave via ``Issue.get_duplicates``.
+    Para cada grupo de duplicatas, mantém o mais recente (por ``updated``)
+    e para os demais:
+    - Migra Articles para o Issue mantido.
+    - Atualiza IssueProc para apontar ao Issue mantido.
+    - Exclui o Issue duplicado.
     """
     task_params = {
         "user_id": user_id,
@@ -1617,11 +1832,22 @@ def task_remove_duplicate_issues(
 
 @celery_app.task(bind=True)
 def task_track_classic_website_article_pids(
-    self, username, user_id=None, collection_acron=None,
+    self,
+    username,
+    user_id=None,
+    collection_acron=None,
+    timeout=None,
 ):
+    """
+    Ponto de entrada para rastreamento de PIDs de artigos do site clássico.
+
+    Agenda ``task_track_classic_website_article_pids_for_collection``
+    para cada coleção (ou para a coleção especificada).
+    """
     task_params = {
         "username": username,
         "collection_acron": collection_acron,
+        "timeout": timeout,
     }
     task_exec = TaskExecution(
         name="proc.tasks.task_track_classic_website_article_pids",
@@ -1630,16 +1856,401 @@ def task_track_classic_website_article_pids(
     )
     try:
         user = _get_user(user_id=user_id, username=username)
+
         for collection in _get_collections(collection_acron):
-            classic_website_config = controller.get_classic_website_config(
-                collection.acron
+            task_track_classic_website_article_pids_for_collection.delay(
+                username=username,
+                user_id=user_id,
+                collection_acron=collection.acron,
+                timeout=timeout,
             )
-            result = track_classic_website_article_pids(
-                user, collection, classic_website_config,
-            )
-            if result:
-                task_exec.add_event(result)
+
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         task_exec.finish(exception=e, exc_traceback=exc_traceback)
+
+
+@celery_app.task(bind=True)
+def task_track_classic_website_article_pids_for_collection(
+    self,
+    username,
+    user_id=None,
+    collection_acron=None,
+    timeout=None,
+    force_check=None,
+):
+    """
+    Rastreia PIDs e verifica URLs/conteúdo dos artigos de uma coleção.
+
+    Etapas:
+    1. Reconcilia PIDs do site clássico com ArticleProcs via
+       ``ClassicWebsiteArticlePidTracker.update_pid_status``.
+    2. Para cada artigo com verificação pendente, agenda
+       ``task_track_article_page_url_and_content`` (assíncrono).
+    """
+    task_params = {
+        "username": username,
+        "collection_acron": collection_acron,
+        "timeout": timeout,
+    }
+    task_exec = TaskExecution(
+        name="proc.tasks.task_track_classic_website_article_pids_for_collection",
+        item=collection_acron,
+        params=task_params,
+    )
+    try:
+        user = _get_user(user_id=user_id, username=username)
+
+        collection = Collection.objects.get(acron=collection_acron)
+        tracker = ClassicWebsiteArticlePidTracker(user, collection)
+        result = tracker.update_pid_status()
+        task_exec.add_event(result)
+
+        for item in ArticleProc.items_to_check_url_and_content(collection, force_check):
+            task_track_article_page_url_and_content.delay(
+                user_id=user_id,
+                username=username,
+                item_id=item.id,
+                timeout=timeout,
+            )
+
+        task_exec.finish()
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        task_exec.finish(exception=e, exc_traceback=exc_traceback)
+
+
+@celery_app.task(bind=True)
+def task_check_article_webpages(
+    self,
+    user_id=None,
+    username=None,
+    article_proc_id=None,
+    article_id=None,
+    website_id=None,
+    timeout=None,
+    force_update=None,
+):
+    """
+    Garante existência de ArticleWebPages e verifica disponibilidade.
+
+    Etapas:
+    1. Cria/atualiza webpages para o artigo no website
+       (``article.create_or_update_urls``).
+    2. Calcula metadata por idioma uma vez
+       (``article.get_metadata_by_lang``).
+    3. Para cada webpage pendente, executa
+       ``task_check_article_page_availability`` (síncrono).
+    4. Se ``article_proc_id`` presente (artigos migrados), agenda
+       ``task_update_article_proc_availability`` (assíncrono) como
+       callback para atualizar pid_status.
+    """
+    try:
+        user = _get_user(user_id, username)
+        article = Article.objects.select_related("journal").get(id=article_id)
+
+        website = WebSiteConfiguration.objects.select_related("collection").get(
+            id=website_id,
+        )
+        # cria/atualiza webpages (idempotente)
+        article.create_or_update_urls(user, website)
+
+        # calcula metadata uma vez
+        article_metadata = article.get_metadata_by_lang()
+
+        # seleciona webpages a verificar
+        wp_filter = {"website": website}
+        excluded_items = {}
+        if not force_update:
+            excluded_items["status"] = article_choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE
+
+        for webpage in article.article_webpages.filter(**wp_filter).exclude(**excluded_items):
+            lang_code = webpage.lang.code2 if webpage.lang else None
+            # executar sincronamente
+            task_check_article_page_availability(
+                user_id=user_id,
+                username=username,
+                webpage_id=webpage.id,
+                article_metadata=article_metadata.get(lang_code),
+                timeout=timeout,
+                force_update=force_update,
+            )
+
+        # callback pós-migração
+        if article_proc_id:
+            task_update_article_proc_availability.delay(
+                user_id=user_id,
+                username=username,
+                article_proc_id=article_proc_id,
+                website_id=website.id,
+        )
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "publication.tasks.task_check_article_webpages",
+                "article_id": article_id,
+                "article_proc_id": article_proc_id,
+                "website_id": website_id,
+            },
+        )
+
+
+# ============================================================
+# VERIFICAÇÃO ATÔMICA POR WEBPAGE
+# ============================================================
+
+@celery_app.task(bind=True)
+def task_check_article_page_availability(
+    self,
+    user_id=None,
+    username=None,
+    webpage_id=None,
+    article_metadata=None,
+    timeout=None,
+    force_update=None,
+):
+    """
+    Verifica disponibilidade e conteúdo de uma única ArticleWebPage.
+
+    Delega para ``webpage.check_availability(user, timeout,
+    article_metadata, force_update)``.
+
+    Raises:
+        ValueError: Se ``webpage_id`` não fornecido.
+    """
+    try:
+        if not webpage_id:
+            raise ValueError("webpage_id must be provided")
+        user = _get_user(user_id, username)
+        webpage = ArticleWebPage.objects.get(id=webpage_id)
+        webpage.check_availability(user, timeout, article_metadata, force_update)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "publication.tasks.task_check_article_page_availability",
+                "webpage_id": webpage_id,
+            },
+        )
+
+
+# ============================================================
+# CALLBACK PÓS-MIGRAÇÃO
+# ============================================================
+
+@celery_app.task(bind=True)
+def task_update_article_proc_availability(
+    self,
+    user_id=None,
+    username=None,
+    article_proc_id=None,
+    website_id=None,
+):
+    """
+    Callback pós-verificação: atualiza pid_status no ArticleProc.
+
+    Se todas as webpages do artigo estão disponíveis no website,
+    atualiza ``article_proc.pid_status`` para ``PID_STATUS_PUBLIC_VALID``.
+    """
+    try:
+        user = _get_user(user_id, username)
+        article_proc = ArticleProc.objects.select_related(
+            "collection", "sps_pkg",
+        ).get(pk=article_proc_id)
+
+        if article_proc.all_webpage_available(website_id=website_id):
+            from migration.choices import PID_STATUS_PUBLIC_VALID
+            article_proc.set_pid_status(user, PID_STATUS_PUBLIC_VALID)
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "publication.tasks.task_update_article_proc_availability",
+                "article_proc_id": article_proc_id,
+            },
+        )
+
+
+# ============================================================
+# VERIFICAÇÃO EM LOTE (busca por filtros)
+# ============================================================
+
+@celery_app.task(bind=True)
+def task_check_articles_availability(
+    self,
+    username,
+    user_id=None,
+    issn_print=None,
+    issn_electronic=None,
+    issue_folder=None,
+    publication_year=None,
+    article_pid_v3=None,
+    article_id=None,
+    article_proc_id=None,
+    collection_acron=None,
+    website_id=None,
+    timeout=None,
+    force_update=None,
+):
+    """
+    Verificação em lote: busca artigos por filtros e agenda verificação.
+
+    Monta query dinâmica com os filtros fornecidos (ISSN, issue_folder,
+    publication_year, pid_v3, article_id, collection_acron) e para cada
+    par (artigo, website habilitado) agenda
+    ``task_check_article_webpages`` (assíncrono).
+    """
+    try:
+        article_params = {}
+        j_query = Q()
+
+        if article_id:
+            article_params["id"] = article_id
+        if article_pid_v3:
+            article_params["pid_v3"] = article_pid_v3
+        if publication_year:
+            article_params["issue__publication_year"] = publication_year
+        if issue_folder:
+            article_params["issue__issue_folder"] = issue_folder
+
+        if collection_acron or issn_electronic or issn_print:
+            j_params = {}
+            if collection_acron:
+                j_params["collection__acron"] = collection_acron
+            if issn_print:
+                j_query |= Q(journal__official_journal__issn_print=issn_print)
+            if issn_electronic:
+                j_query |= Q(journal__official_journal__issn_electronic=issn_electronic)
+
+            article_params["journal__id__in"] = JournalProc.objects.filter(
+                j_query, **j_params
+            ).values_list("journal__id", flat=True).distinct()
+
+        ws_filter = {"enabled": True}
+        if collection_acron:
+            ws_filter["collection__acron"] = collection_acron
+        if website_id:
+            ws_filter["id"] = website_id
+
+        for website in WebSiteConfiguration.objects.filter(**ws_filter).select_related("collection"):
+            for article_id in Article.objects.filter(
+                journal__isnull=False, **article_params
+            ).values_list("id", flat=True):
+                task_check_article_webpages.apply_async(
+                    kwargs=dict(
+                        user_id=user_id,
+                        username=username,
+                        article_id=article_id,
+                        article_proc_id=article_proc_id,
+                        website_id=website.id,
+                        timeout=timeout,
+                        force_update=force_update,
+                    )
+                )
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "publication.tasks.task_check_articles_availability",
+            },
+        )
+
+
+# ============================================================
+# VERIFICAÇÃO NO SITE CLÁSSICO (somente migração)
+# ============================================================
+
+@celery_app.task(bind=True)
+def task_check_classic_website_article(
+    self,
+    user_id=None,
+    username=None,
+    article_proc_id=None,
+    timeout=None,
+    force_update=None,
+):
+    """
+    Confronta metadados do artigo com a página do site clássico.
+
+    Passo extra de migração que verifica se o conteúdo da página HTML
+    do site clássico confere com os metadados do artigo migrado.
+
+    Atualiza ``article_proc.pid_status`` conforme resultado:
+    - ``CLASSIC_MATCHED``: conteúdo confere.
+    - ``CLASSIC_MISMATCHED``: conteúdo diverge.
+    - ``CLASSIC_NOT_FOUND``: página não encontrada.
+
+    Returns:
+        Resultado da verificação (dicionário retornado por
+        ``article_proc.check_classic_website_content``), ou None em
+        caso de erro.
+    """
+    try:
+        user = _get_user(user_id, username)
+        article_proc = ArticleProc.objects.select_related(
+            "collection", "sps_pkg", "issue_proc__journal_proc",
+        ).get(pk=article_proc_id)
+
+        article = article_proc.article
+        if not article:
+            raise ValueError(f"ArticleProc {article_proc_id} has no article")
+
+        article_metadata_by_lang = article.get_metadata_by_lang()
+        response = article_proc.check_classic_website_content(
+            user, timeout, article_metadata_by_lang, force_update,
+        )
+
+        return response
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "publication.tasks.task_check_classic_website_article",
+                "article_proc_id": article_proc_id,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_check_main_article_page_availability(
+    self,
+    article_id,
+    website_id,
+):
+    """
+    Verifica se alguma webpage do artigo está disponível no website.
+
+    Returns:
+        True se ao menos uma webpage está disponível, False caso
+        contrário, ou None em caso de erro.
+    """
+    try:
+        article = Article.objects.get(id=article_id)
+        return article.any_webpage_available(website=website_id)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "publication.tasks.task_check_main_article_page_availability",
+                "article_id": article_id,
+                "website_id": website_id,
+            },
+        )

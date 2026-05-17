@@ -714,7 +714,7 @@
 #                     JournalProc,
 #                     force_update,
 #                 )
-#             # TODO journal_proc.publish(user, callable_publish, website_kind)
+#             # TODO journal_proc.publish(user, api_publish_callable, website_kind)
 
 #     except Exception as e:
 #         exc_type, exc_value, exc_traceback = sys.exc_info()
