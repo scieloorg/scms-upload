@@ -18,6 +18,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 from migration.models import MigratedArticle
 from article.page_checker import check_url, check_content, format_url, format_classic_url
 from article.forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
+from collection.choices import PUBLIC
 from collection.models import Language, Collection
 from core.models import CommonControlField, HTMLTextModel
 from doi.models import DOIWithLang
@@ -34,9 +35,35 @@ User = get_user_model()
 
 class Article(ClusterableModel, CommonControlField):
     """
+    Modelo que representa um artigo no contexto de Upload.
+    
     No contexto de Upload, Article deve conter o mínimo de campos,
-    suficiente para o processo de ingresso / validações,
-    pois os dados devem ser obtidos do XML
+    suficiente para o processo de ingresso/validações, pois os dados
+    devem ser obtidos do XML.
+    
+    Attributes
+    ----------
+    pid_v3 : CharField
+        Identificador persistente versão 3 (único).
+    pid_v2 : CharField
+        Identificador persistente versão 2.
+    sps_pkg : ForeignKey
+        Referência ao pacote SPS que contém o artigo.
+    pp_xml : ForeignKey
+        Referência ao registro no PidProvider XML.
+    article_type : CharField
+        Tipo do artigo (ex: research-article, editorial, etc).
+    status : CharField
+        Status do artigo no fluxo de publicação.
+    issue : ForeignKey
+        Referência ao fascículo que contém o artigo.
+    journal : ForeignKey
+        Referência ao periódico.
+    
+    Methods
+    -------
+    create_or_update(user, sps_pkg, issue=None, journal=None, position=None)
+        Cria ou atualiza um artigo a partir de um pacote SPS.
     """
 
     pp_xml = models.ForeignKey(
@@ -80,6 +107,7 @@ class Article(ClusterableModel, CommonControlField):
         _("Elocation ID"), max_length=64, blank=True, null=True
     )
     fpage = models.CharField(_("First page"), max_length=16, blank=True, null=True)
+    fpage_seq = models.CharField(_("First page seq"), max_length=16, blank=True, null=True)
     lpage = models.CharField(_("Last page"), max_length=16, blank=True, null=True)
 
     # External models
@@ -152,7 +180,10 @@ class Article(ClusterableModel, CommonControlField):
         return str(self)
 
     def __str__(self):
-        return self.sps_pkg.sps_pkg_name
+        try:
+            return self.sps_pkg.sps_pkg_name
+        except AttributeError:
+            return self.pid_v3 or self.pid_v2 or f"Article {self.pk}"
 
     @property
     def pdfs(self):
@@ -211,6 +242,29 @@ class Article(ClusterableModel, CommonControlField):
 
     @classmethod
     def get(cls, pid_v3):
+        """
+        Obtém um artigo pelo PID v3, removendo duplicatas se necessário.
+        
+        Se múltiplos artigos existem com o mesmo pid_v3, mantém o mais
+        recentemente atualizado e deleta os demais.
+        
+        Parameters
+        ----------
+        pid_v3 : str
+            Identificador persistente versão 3.
+            
+        Returns
+        -------
+        Article
+            Artigo correspondente ao pid_v3.
+            
+        Raises
+        ------
+        ValueError
+            Se pid_v3 não foi informado.
+        Article.DoesNotExist
+            Se nenhum artigo é encontrado com o pid_v3.
+        """
         if pid_v3:
             try:
                 return cls.objects.get(pid_v3=pid_v3)
@@ -249,6 +303,36 @@ class Article(ClusterableModel, CommonControlField):
 
     @classmethod
     def create_or_update(cls, user, sps_pkg, issue=None, journal=None, position=None):
+        """
+        Cria ou atualiza um artigo a partir de um pacote SPS.
+        
+        Processa o pacote SPS para extrair informações do XML, cria ou
+        atualiza o artigo e seus relacionamentos (títulos, seções, DOIs,
+        etc).
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que está criando/atualizando o artigo.
+        sps_pkg : SPSPkg
+            Pacote SPS que contém o artigo.
+        issue : Issue, optional
+            Fascículo do artigo. Se não informado, será obtido do XML.
+        journal : Journal, optional
+            Periódico do artigo. Se não informado, será obtido do XML.
+        position : int, optional
+            Posição do artigo no fascículo.
+            
+        Returns
+        -------
+        Article
+            Artigo criado ou atualizado.
+            
+        Raises
+        ------
+        ValueError
+            Se sps_pkg não é informado ou está inválido.
+        """
         if not sps_pkg:
             raise ValueError("create_article requires sps_pkg with pid_v2")
 
@@ -325,6 +409,12 @@ class Article(ClusterableModel, CommonControlField):
         # self.related_items.add(item)
 
     def add_pages(self):
+        """
+        Extrai informações de paginação do XML do pacote SPS.
+        
+        Popula os campos de primeira página, última página e elocation_id
+        a partir dos dados extraídos do XML do pacote.
+        """
         xml_with_pre = self.sps_pkg.xml_with_pre
         self.fpage = xml_with_pre.fpage
         self.fpage_seq = xml_with_pre.fpage_seq
@@ -332,6 +422,17 @@ class Article(ClusterableModel, CommonControlField):
         self.elocation_id = xml_with_pre.elocation_id
 
     def add_issue(self, user):
+        """
+        Obtém e associa o fascículo do artigo baseado no XML.
+        
+        Extrai as informações de volume, suplemento e número do XML
+        do pacote SPS e localiza ou cria o fascículo correspondente.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que está realizando a operação.
+        """
         xml_with_pre = self.sps_pkg.xml_with_pre
         self.issue = Issue.get(
             journal=self.journal,
@@ -341,6 +442,17 @@ class Article(ClusterableModel, CommonControlField):
         )
 
     def add_journal(self, user):
+        """
+        Obtém e associa o periódico do artigo baseado no XML.
+        
+        Extrai as informações ISSN do XML do pacote SPS e localiza
+        ou cria o periódico correspondente.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que está realizando a operação.
+        """
         xml_with_pre = self.sps_pkg.xml_with_pre
         self.journal = Journal.get(
             official_journal=OfficialJournal.get(
@@ -350,6 +462,18 @@ class Article(ClusterableModel, CommonControlField):
         )
 
     def add_article_titles(self, user):
+        """
+        Extrai e armazena títulos do artigo em múltiplos idiomas.
+        
+        Processa os títulos do XML do pacote SPS, cria ou obtém as
+        linguagens correspondentes, e associa os títulos ao artigo.
+        Remove títulos anteriores antes de adicionar novos.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que está realizando a operação.
+        """
         titles = ArticleTitles(
             xmltree=self.sps_pkg.xml_with_pre.xmltree,
         ).article_title_list
@@ -378,6 +502,19 @@ class Article(ClusterableModel, CommonControlField):
                 logging.exception(e)
 
     def add_sections(self, user):
+        """
+        Extrai e associa seções do artigo a partir do XML.
+        
+        Processa as seções do XML do pacote SPS, cria ou obtém as
+        linguagens correspondentes, associa as seções ao artigo e
+        atualiza a tabela de conteúdo (TOC) do fascículo.
+        Remove seções anteriores antes de adicionar novas.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que está realizando a operação.
+        """
         self.sections.all().delete()
 
         xml_sections = ArticleTocSections(
@@ -524,40 +661,47 @@ class Article(ClusterableModel, CommonControlField):
     def get_zip_filename_and_content(self):
         return self.sps_pkg.get_zip_filename_and_content()
 
-    def get_webpage_items(self, website_url, classic=True, new=True, html=True, pdf=True):
-        journal_acron = self.journal.journal_acron
+    def get_html_urls(self, website_url, classic=True, new=True, only_first=None):
         pid_v2 = self.pid_v2
         pid_v3 = self.pid_v3
+        journal_acron = None
+        if new:
+            journal_acron = self.journal.journal_acron
 
-        htmls = []
-        pdfs = []
-
-        if html:
-            htmls = self.htmls
-        if pdf:
-            pdfs = self.pdfs
-
-        for item in htmls:
+        for item in self.htmls:
             lang = item.get("lang")
             if not lang:
                 continue
-            if new:
-                url = format_url(website_url, pid_v3, journal_acron, format="html", lang_code=lang)
-                yield {"url": url, "format": "html", "lang": lang, "website": "new"}
             if classic:
                 url = format_classic_url(website_url, pid_v2=pid_v2, format="html", lang_code=lang)
                 yield {"url": url, "format": "html", "lang": lang, "website": "classic"}
+            if new:
+                url = format_url(website_url, pid_v3, journal_acron, format="html", lang_code=lang)
+                yield {"url": url, "format": "html", "lang": lang, "website": "new"}
+            if only_first:
+                return
 
-        for item in pdfs:
+    def get_pdf_urls(self, website_url, classic=True, new=True, only_first=None):
+        pid_v2 = self.pid_v2
+        pid_v3 = self.pid_v3
+        
+        for item in self.pdfs:
             lang = item.get("lang")
             if not lang:
                 continue
-            if new:
-                url = format_url(website_url, pid_v3, journal_acron, format="pdf", lang_code=lang)
-                yield {"url": url, "format": "pdf", "lang": lang, "website": "new"}
             if classic:
                 url = format_classic_url(website_url, pid_v2=pid_v2, format="pdf", lang_code=lang)
                 yield {"url": url, "format": "pdf", "lang": lang, "website": "classic"}
+            if new:
+                journal_acron = self.journal.journal_acron
+                url = format_url(website_url, pid_v3, journal_acron, format="pdf", lang_code=lang)
+                yield {"url": url, "format": "pdf", "lang": lang, "website": "new"}
+            if only_first:
+                return
+
+    def get_webpage_items(self, website_url):
+        yield from self.get_html_urls(website_url)
+        yield from self.get_pdf_urls(website_url)
 
     @classmethod
     def get_repeated_items(cls, field_name, issue=None):
@@ -575,10 +719,23 @@ class Article(ClusterableModel, CommonControlField):
     @classmethod
     def exclude_articles_with_invalid_pid_v2(cls, issue=None):
         """
-        Find and delete migrated articles whose pid_v2 last 5 digits
-        don't match the order (v121) from MigratedArticle.document.order.
-        Uses ArticleProc.migrated_data to access the migration data.
-        Only applies to migrated articles.
+        Remove artigos migrados com pid_v2 inválido.
+        
+        Localiza e deleta artigos migrados cujos últimos 5 dígitos do
+        pid_v2 não correspondem à ordem (v121) do documento em
+        MigratedArticle.document.order. Usa ArticleProc.migrated_data
+        para acessar os dados de migração. Aplicável apenas a artigos
+        migrados.
+        
+        Parameters
+        ----------
+        issue : Issue, optional
+            Se fornecido, filtra apenas artigos deste fascículo.
+            
+        Returns
+        -------
+        list[str]
+            Lista de eventos/mensagens descrevendo as ações realizadas.
         """
         from proc.models import ArticleProc
 
@@ -648,43 +805,59 @@ class Article(ClusterableModel, CommonControlField):
     @classmethod
     def exclude_inconvenient_articles(cls, issue, user, timeout=None):
         """
-        Remove all inconvenient article records in a unified operation:
-        1. Migrated articles with invalid pid_v2 (suffix doesn't match order from v121)
-        2. Duplicate articles (repeated pid_v2 or sps_pkg_name)
+        Orquestra a limpeza de artigos problemáticos em um fascículo.
+        
+        Executa as seguintes operações em fases:
+        1. Remove artigos migrados com pid_v2 inválido
+        2. Remove duplicatas por pid_v2 e sps_pkg_name
+        
+        Parameters
+        ----------
+        issue : Issue
+            Fascículo a ser processado.
+        user : User
+            Usuário que autoriza a limpeza.
+        timeout : int, optional
+            Timeout em segundos para verificações HTTP.
+            
+        Returns
+        -------
+        dict
+            Dicionário contendo:
+            - events: lista de eventos/mensagens de ação
+            - numbers: contagem de itens repetidos por campo
+            - exceptions: lista de exceções capturadas durante o processo
         """
-        results = {
-            "events": [],
-            "numbers": {},
-            "exceptions": [],
-        }
+        results = {"events": [], "numbers": {}, "exceptions": []}
 
+        # Fase 1: pid_v2 inválidos (artigos migrados com erro)
         try:
             events = cls.exclude_articles_with_invalid_pid_v2(issue)
             results["events"].extend(events)
         except Exception as e:
-            results["exceptions"].append(
-                {
-                    "exclude_articles_with_invalid_pid_v2": str(e),
-                    "traceback": traceback.format_exc(),
-                }
-            )
+            results["exceptions"].append({
+                "step": "exclude_articles_with_invalid_pid_v2",
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            })
 
+        # Fase 2: duplicatas
         for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
-            repeated_items = cls.get_repeated_items(field_name, issue)
-            results["numbers"][f"repeated_by_{field_name}"] = repeated_items.count()
-            for repeated_value in repeated_items:
+            repeated_values = list(cls.get_repeated_items(field_name, issue))
+            results["numbers"][f"repeated_by_{field_name}"] = len(repeated_values)
+
+            for value in repeated_values:
                 try:
                     events = cls.exclude_repetitions(
-                        user, field_name, repeated_value, timeout=timeout
+                        user, field_name, value, timeout=timeout
                     )
                     results["events"].extend(events)
                 except Exception as e:
-                    results["exceptions"].append(
-                        {
-                            f"repeated_by_{field_name}": repeated_value,
-                            "traceback": traceback.format_exc(),
-                        }
-                    )
+                    results["exceptions"].append({
+                        "step": f"repeated_by_{field_name}",
+                        "value": value,
+                        "traceback": traceback.format_exc(),
+                    })
 
         return results
 
@@ -704,9 +877,10 @@ class Article(ClusterableModel, CommonControlField):
                     self.pp_xml = PidProviderXML.get_by_pid_v3(self.pid_v3)
                 except PidProviderXML.DoesNotExist:
                     return False
-            sps_pkg__pkg_name = self.sps_pkg.xml_with_pre.sps_pkg_name
-            pp_xml__pkg_name = self.pp_xml.xml_with_pre.sps_pkg_name
-            return self.pkg_name == pp_xml__pkg_name == sps_pkg__pkg_name
+            sps_pkg__pkg_name = self.sps_pkg.sps_pkg_name
+            sps_pkg__xml_with_pre__pkg_name = self.sps_pkg.xml_with_pre.sps_pkg_name
+            pp_xml__xml_with_pre__pkg_name = self.pp_xml.xml_with_pre.sps_pkg_name
+            return sps_pkg__pkg_name == pp_xml__xml_with_pre__pkg_name == sps_pkg__xml_with_pre__pkg_name
         except Exception as e:
             if self.pp_xml is not None:
                 if self.pp_xml.proc_status != PPXML_STATUS_INVALID:
@@ -757,178 +931,247 @@ class Article(ClusterableModel, CommonControlField):
     @classmethod
     def exclude_repetitions(cls, user, field_name, field_value, timeout=None):
         """
-        Remove artigos duplicados baseado em um campo específico,
-        mantendo o artigo mais relevante (publicado e válido tem prioridade).
+        Remove artigos duplicados para um dado campo.
+        
+        Remove artigos duplicados para um campo específico (pid_v2 ou
+        sps_pkg_name). Mantém exatamente 1 artigo, descartando os demais
+        mesmo que vários estejam publicados no site público.
+
+        Processo em 4 fases:
+        1. Ranking SQL com status persistido (annote para ranking)
+        2. Check HTTP apenas dos 2 melhores candidatos
+        3. Decisão final com status atualizado
+        4. Deleção em bulk dos demais
+        
+        Parameters
+        ----------
+        user : User
+            Usuário responsável pela ação.
+        field_name : str
+            Nome do campo a verificar (ex: "pid_v2" ou "sps_pkg__sps_pkg_name").
+        field_value : str
+            Valor do campo que identifica duplicatas.
+        timeout : int, optional
+            Timeout em segundos para verificações HTTP.
+            
+        Returns
+        -------
+        list[str]
+            Lista de eventos/mensagens descrevendo o processo.
         """
         repeated_items = cls.objects.filter(**{field_name: field_value})
         total_initial = repeated_items.count()
-        
+
         if total_initial <= 1:
-            return [f"{field_name}='{field_value}': {total_initial} artigo(s), nenhuma ação necessária"]
-        
+            return [
+                f"{field_name}='{field_value}': {total_initial} artigo(s), "
+                "nenhuma ação necessária"
+            ]
+
         events = [f"{field_name}='{field_value}': {total_initial} artigos encontrados"]
-        
-        # Atualiza status de disponibilidade antes de decidir qual manter
-        cls.update_availability_status(user, timeout, repeated_items)
-        
-        # Recarrega queryset após atualização de status
+
+        # ── Fase 1: pré-ranking via SQL ──
+        candidate_ids = list(
+            repeated_items
+            .annotate(
+                has_valid_public_webpage=models.Exists(
+                    ArticleWebPage.objects.filter(
+                        article_id=models.OuterRef("pk"),
+                        status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT,
+                        website__purpose=PUBLIC,
+                    )
+                ),
+                has_pp_xml=models.Case(
+                    models.When(pp_xml__isnull=False, then=True),
+                    default=False,
+                    output_field=models.BooleanField(),
+                ),
+            )
+            .order_by("-has_valid_public_webpage", "-has_pp_xml", "-updated")
+            .values_list("id", flat=True)[:2]
+        )
+
+        # ── Fase 2: check HTTP só dos finalistas ──
+        # Confirma o estado real antes de decidir.
+        # Se o 1º candidato cai, o 2º assume.
+        for article in cls.objects.filter(id__in=candidate_ids):
+            for check_fn, params in article.get_check_url_and_params(
+                user, timeout=timeout, force_update=True
+            ):
+                try:
+                    check_fn(**params)
+                except Exception as e:
+                    logging.exception(e)
+
+        events.append(
+            f"Disponibilidade verificada para {len(candidate_ids)} finalista(s)"
+        )
+
+        # ── Fase 3: decisão com status atualizado ──
         repeated_items = cls.objects.filter(**{field_name: field_value})
-        
         item_to_keep_id = cls.choose_item_to_keep(repeated_items)
+
         if not item_to_keep_id:
-            # Fallback: mantém o mais recentemente atualizado
-            item_to_keep_id = repeated_items.order_by('-updated').values_list('id', flat=True).first()
-        
+            item_to_keep_id = (
+                repeated_items.order_by("-updated")
+                .values_list("id", flat=True)
+                .first()
+            )
+
         if not item_to_keep_id:
             events.append("Erro: nenhum item encontrado para manter")
             return events
-        
+
         events.append(f"Artigo mantido: ID {item_to_keep_id}")
-        
-        # Coleta IDs relacionados em uma única passagem
-        items_to_delete = repeated_items.exclude(id=item_to_keep_id).select_related('sps_pkg', 'pp_xml')
-        
-        sps_pkg_ids = set()
-        pp_xml_ids = set()
-        article_ids = []
-        
-        for item in items_to_delete:
-            article_ids.append(item.id)
-            if item.sps_pkg_id:
-                sps_pkg_ids.add(item.sps_pkg_id)
-            if item.pp_xml_id:
-                pp_xml_ids.add(item.pp_xml_id)
-        
+
+        # ── Fase 4: deleção em bulk ──
+        items_to_delete = repeated_items.exclude(id=item_to_keep_id)
+
+        sps_pkg_ids = set(
+            items_to_delete
+            .exclude(sps_pkg__isnull=True)
+            .values_list("sps_pkg_id", flat=True)
+        )
+        pp_xml_ids = set(
+            items_to_delete
+            .exclude(pp_xml__isnull=True)
+            .values_list("pp_xml_id", flat=True)
+        )
+        article_ids = list(items_to_delete.values_list("id", flat=True))
+
         total_to_delete = len(article_ids)
         events.append(f"Artigos a deletar: {total_to_delete}")
-        
+
         if not total_to_delete:
             return events
-        
-        # Executa deleções em transação atômica
+
         with transaction.atomic():
             deleted_articles, _ = cls.objects.filter(id__in=article_ids).delete()
             events.append(f"Articles deletados: {deleted_articles}")
-            
+
             if sps_pkg_ids:
                 deleted_sps, _ = SPSPkg.objects.filter(id__in=sps_pkg_ids).delete()
                 events.append(f"SPSPkg deletados: {deleted_sps}")
-            
+
             if pp_xml_ids:
-                deleted_pp, _ = PidProviderXML.objects.filter(id__in=pp_xml_ids).delete()
+                deleted_pp, _ = PidProviderXML.objects.filter(
+                    id__in=pp_xml_ids
+                ).delete()
                 events.append(f"PidProviderXML deletados: {deleted_pp}")
-        
+
         return events
-
-    def is_completed(self, collection=None):
-        params = {}
-        if collection:
-            params["collection"] = collection
-        if self.article_webpages.exists():
-            return not self.article_webpages.exclude(
-                status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
-            ).filter(**params).exists()
-        if self.availability_status.exists():
-            return not self.availability_status.exclude(
-                available=True
-            ).filter(**params).exists()
-        return False
-
-    def check_is_public(self, collection=None):
-        params = {}
-        if collection:
-            params["collection"] = collection
-        if self.article_webpages.exists():
-            return self.article_webpages.filter(
-                status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
-            ).exists()
-        return self.availability_status.filter(
-            available=True
-        ).exists()
         
     @classmethod
     def choose_item_to_keep(cls, queryset):
-        result = {}
-        for item in queryset.order_by("-updated"):
-            result.setdefault((item.check_is_public(), item.is_valid_record()), []).append(item)
-        status = (
-            (True, True),
-            (True, False),
-            (False, True),
-            (False, False),
-        )
-        for key in status:
-            items = result.get(key) or []
-            if len(items) >= 1:
-                return items[0].id
+        """
+        Escolhe qual artigo duplicado deve ser mantido.
+        
+        Dado um queryset de artigos duplicados, retorna o ID do único
+        que deve ser mantido. Entre múltiplos artigos publicados no
+        site público, escolhe o mais confiável. Os demais serão deletados.
 
-    def check_availability(
+        Critérios de seleção (em ordem de prioridade):
+        1. Webpage com conteúdo válido no site público
+        2. Registro no PidProvider (pp_xml existe)
+        3. Mais recentemente atualizado
+        
+        Parameters
+        ----------
+        queryset : QuerySet
+            QuerySet de artigos duplicados.
+            
+        Returns
+        -------
+        int or None
+            ID do artigo que deve ser mantido, ou None se nenhum encontrado.
+        """
+        return (
+            queryset
+            .annotate(
+                has_valid_public_webpage=models.Exists(
+                    ArticleWebPage.objects.filter(
+                        article_id=models.OuterRef("pk"),
+                        status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT,
+                        website__purpose=PUBLIC,
+                    )
+                ),
+                has_pp_xml=models.Case(
+                    models.When(pp_xml__isnull=False, then=True),
+                    default=False,
+                    output_field=models.BooleanField(),
+                ),
+            )
+            .order_by(
+                "-has_valid_public_webpage",
+                "-has_pp_xml",
+                "-updated",
+            )
+            .values_list("id", flat=True)
+            .first()
+        )
+
+    def create_or_update_urls(
         self,
         user,
-        website_url,
-        model_ArticleAvailability=None,
-        timeout=None,
-        published_by=None,
-        publication_rule=None,
-        collection=None,
+        website,
+    ):
+        qs = self.article_webpages.filter(
+            article=self,
+            website=website,
+        )
+        webpage_items = list(self.get_webpage_items(website.url))
+        ids = set()
+        for item in webpage_items:
+            lang = item.get("lang")
+            ids.add(
+                ArticleWebPage.create_or_update(
+                    user,
+                    self,
+                    website,
+                    item.get("url"),
+                    item.get("format"),
+                    lang,
+                ).id
+            )
+        qs.exclude(id__in=ids).delete()
+
+    def get_main_article_url(self, website_url):
+        return format_url(website_url, self.pid_v3, self.journal.journal_acron)
+
+    def get_webpage_id_and_lang_items(self, collection=None, website=None):
+        params = {}
+        if collection:
+            params["website__collection"] = collection
+        if website:
+            params["website"] = website
+        ids = set()
+        for webpage in self.article_webpages.filter(**params):
+            ids.add((webpage.id, webpage.lang.code2))
+        return ids
+
+    def get_check_url_and_params(
+        self,
+        user,
         force_update=False,
         article_metadata=None,
+        timeout=None,
+        website=None,
     ):
-        response = None
-        webpages = []
-        # preservar o legado de publication.models.ArticleAvailability, mas sem criar dependência direta
-        if model_ArticleAvailability:
-            article_ = model_ArticleAvailability.create_or_update(
-                user,
-                self,
-                published_by=published_by,
-                publication_rule=publication_rule,
-                website_url=website_url,
-                timeout=timeout,
-            )
-            response = article_.data
-            completed = article_.completed
-
         article_metadata = article_metadata or self.get_metadata_by_lang()
-        for item in self.get_webpage_items(website_url):
-            lang = item.get("lang")
-            page = ArticleWebPage.create_or_update(
-                user,
-                self,
-                collection,
-                item.get("url"),
-                item.get("format"),
-                lang,
-                timeout=timeout,
-                force_update=force_update,
-                article_metadata=article_metadata.get(lang),
-            )
-            webpages.append(page.detail)
-        completed = self.is_completed(collection)       
-        return {"completed": completed, "webpages": webpages, "response": response}
-    
-    @classmethod
-    def update_availability_status(cls, user, timeout=None, queryset=None, filters=None):
-        if not queryset:
-            queryset = cls.objects
-        if filters:
-            queryset = queryset.filter(**filters)
-        else:
-            queryset = queryset.all()
-        for article in queryset:
-            article.update_article_availability_status(user, timeout=timeout)
-
-    def update_article_availability_status(self, user, timeout=None):
-        article_metadata = self.get_metadata_by_lang()
-        for webpage in self.article_webpages.all():
-            webpage.check_availability(
-                timeout,
-                article_metadata=article_metadata.get(webpage.lang.code2),
-                force_update=True,
-            )
-        # FIXME - future deprecated availability_status relationship
-        for avail in self.availability_status.all():
-            avail.update_urls_status(user, timeout=timeout, force_update=True)
+        excluded_items = {}
+        if not force_update:
+            excluded_items["status"] = choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+        
+        webpages = self.article_webpages.exclude(**excluded_items)
+        if website:
+            webpages = webpages.filter(website=website)
+        for webpage in webpages:
+            yield webpage.check_availability, {
+                "user": user,
+                "timeout": timeout,
+                "article_metadata": article_metadata.get(webpage.lang.code2),
+                "force_update": force_update,
+            }
 
     def get_metadata_by_lang(self):
         langs = self.article_langs
@@ -939,8 +1182,11 @@ class Article(ClusterableModel, CommonControlField):
         
     def get_metadata_items(self, lang=None):
         """
-        Retorna lista de tuplas (label, valor) com os metadados do artigo,
-        pronta para ser usada com check_metadata / compute_rate.
+        Retorna lista de tuplas (label, valor) com os metadados do artigo.
+        
+        Extrai os metadados do artigo (títulos, DOIs, seções, PIDs,
+        paginação, autores) pronta para ser usada com check_metadata ou
+        compute_rate.
  
         Parameters
         ----------
@@ -952,7 +1198,9 @@ class Article(ClusterableModel, CommonControlField):
         Returns
         -------
         list[tuple]
-            Ex: [
+            Lista de tuplas (label, valor) com os metadados.
+            Exemplo:
+            [
                 ("title.1", "Acesso aberto..."),
                 ("doi.1", "10.1590/..."),
                 ("author.1", "Maria da Silva"),
@@ -1010,14 +1258,64 @@ class Article(ClusterableModel, CommonControlField):
  
         return items
     
-    def availability_stats(self, collection):
-        total = self.article_webpages.filter(collection=collection).count()
+    def check_webpages_availability(self, user, website, timeout=None, force_update=None):
+        article_metadata_by_lang = self.get_metadata_by_lang()
+        for webpage in self.article_webpages.filter(website=website):
+            article_metadata = article_metadata_by_lang.get(webpage.lang.code2)
+            webpage.check_availability(
+                user, timeout, article_metadata, force_update)
+
+    def all_webpages_available(self, collection=None, website=None):
+        # collection (PUBLIC e QA)
+        # website (PUBLIC ou QA)
+        params = {}
+        if website:
+            params["website"] = website
+        if collection:
+            params["website__collection"] = collection
+        if self.article_webpages.exists():
+            return not self.article_webpages.exclude(
+                status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+            ).filter(**params).exists()
+        return False
+
+    def any_webpage_available(self, website=None, website_id=None, collection=None):
+        # está presente em algum website
+        params = {}
+        if website_id:
+            params["website_id"] = website_id
+        if website:
+            params["website"] = website
+        if collection:
+            params["website__collection"] = collection
+        return self.article_webpages.filter(
+            status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT,
+            **params,
+        ).exists()
+
+    def public_webpages(self, collection=None):
+        # está presente em no PUBLIC website
+        params = {}
+        if collection:
+            params["website__collection"] = collection
+        params["website__purpose"] = PUBLIC
+        return self.article_webpages.filter(
+            status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT,
+            **params
+        ).exists()
+
+    def get_availability_stats(self, collection=None, website=None):
+        params = {}
+        if website:
+            params["website"] = website
+        if collection:
+            params["website__collection"] = collection
+        qs = self.article_webpages.filter(**params)
+        total = len(qs)
         if not total:
             return {}
         stats = (
-            self.article_webpages
-            .filter(collection=collection)
-            .values("status")
+            qs.values("status")
             .annotate(count=Count("id"))
         )
         return {
@@ -1027,6 +1325,30 @@ class Article(ClusterableModel, CommonControlField):
 
 
 class ArticleDOIWithLang(Orderable, DOIWithLang):
+    """
+    Modelo que associa DOIs com idiomas específicos a um artigo.
+    
+    Permite que um artigo tenha múltiplos DOIs, cada um vinculado a um
+    idioma específico.
+    
+    Attributes
+    ----------
+    article : ParentalKey
+        Referência ao artigo relacionado.
+    doi : CharField
+        Identificador de objeto digital (herança de DOIWithLang).
+    lang : ForeignKey
+        Idioma associado ao DOI (herança de DOIWithLang).
+    
+    Methods
+    -------
+    get(article=None, doi=None, lang=None)
+        Obtém DOI(s) com base nos parâmetros.
+    create(user, article=None, doi=None, lang=None)
+        Cria um novo DOI para o artigo.
+    get_or_create(user, article=None, doi=None, lang=None)
+        Obtém ou cria um DOI para o artigo.
+    """
     article = ParentalKey(
         "Article", on_delete=models.CASCADE, related_name="doi_with_lang"
     )
@@ -1099,6 +1421,20 @@ class ArticleDOIWithLang(Orderable, DOIWithLang):
 
 
 class ArticleTitle(HTMLTextModel, CommonControlField):
+    """
+    Modelo que armazena títulos de artigos em diferentes idiomas.
+    
+    Associa um título HTML a um artigo e seu idioma correspondente.
+    
+    Attributes
+    ----------
+    parent : ParentalKey
+        Referência ao artigo relacionado.
+    text : TextField
+        Texto do título em HTML (herança de HTMLTextModel).
+    language : ForeignKey
+        Idioma do título (herança de HTMLTextModel).
+    """
     parent = ParentalKey(
         "Article", on_delete=models.CASCADE, related_name="title_with_lang"
     )
@@ -1110,6 +1446,27 @@ class ArticleTitle(HTMLTextModel, CommonControlField):
 
 
 class RelatedItem(CommonControlField):
+    """
+    Modelo que representa relacionamentos entre artigos.
+    
+    Define relacionamentos entre um artigo de origem e um artigo de
+    destino, com um tipo de relacionamento específico (ex: erratum,
+    correction, etc).
+    
+    Attributes
+    ----------
+    item_type : CharField
+        Tipo do relacionamento (ex: erratum, correction, original-article).
+    source_article : ForeignKey
+        Artigo de origem do relacionamento.
+    target_article : ForeignKey
+        Artigo de destino do relacionamento.
+    
+    Methods
+    -------
+    __str__()
+        Retorna representação textual do relacionamento.
+    """
     item_type = models.CharField(
         _("Related item type"),
         max_length=32,
@@ -1145,6 +1502,26 @@ class RelatedItem(CommonControlField):
 
 
 class RequestArticleChange(CommonControlField):
+    """
+    Modelo que representa solicitações de alteração em artigos.
+    
+    Permite solicitar alterações/atualizações em um artigo, como
+    errata ou correções, com comentários detalhados sobre a mudança.
+    
+    Attributes
+    ----------
+    change_type : CharField
+        Tipo de alteração solicitada (ex: erratum, update, correction).
+    comment : TextField
+        Comentários descrevendo a alteração solicitada.
+    article : ForeignKey
+        Artigo que será alterado.
+    
+    Methods
+    -------
+    __str__()
+        Retorna representação textual da solicitação.
+    """
 
     change_type = models.CharField(
         _("Change type"),
@@ -1171,6 +1548,40 @@ class RequestArticleChange(CommonControlField):
 
 
 class ArticleWebPage(CommonControlField):
+    """
+    Modelo que representa páginas web de artigos publicados.
+    
+    Armazena URLs de apresentação de artigos em websites específicos,
+    com informações de formato, idioma e status de disponibilidade.
+    
+    Attributes
+    ----------
+    article : ParentalKey
+        Referência ao artigo.
+    website : ForeignKey
+        Configuração do website onde o artigo é publicado.
+    fmt : CharField
+        Formato do conteúdo (ex: "html", "pdf").
+    lang : ForeignKey
+        Idioma da página.
+    url : CharField
+        URL da página.
+    status : CharField
+        Status da página (disponível, indisponível, conteúdo inválido, etc).
+    detail : JSONField
+        Detalhes do último check de disponibilidade.
+    
+    Methods
+    -------
+    get(article, website, url, fmt, lang=None)
+        Obtém uma página específica.
+    create(user, article, website, url, fmt, lang)
+        Cria uma nova página.
+    create_or_update(user, article, website, url, fmt, lang)
+        Cria ou atualiza uma página.
+    check_availability(user, timeout, article_metadata=None, force_update=None)
+        Verifica disponibilidade da URL e valida conteúdo.
+    """
     article = ParentalKey(
         Article,
         on_delete=models.CASCADE,
@@ -1178,12 +1589,13 @@ class ArticleWebPage(CommonControlField):
         blank=True,
         related_name="article_webpages",
     )
-    collection = models.ForeignKey(
-        Collection,
-        verbose_name=_("Collection"),
+    website = models.ForeignKey(
+        'collection.WebSiteConfiguration',
+        verbose_name=_("Website"),
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        help_text=_("Website configuration where this article webpage is published"),
     )
     fmt = models.CharField(_("Format"), max_length=4, null=True, blank=True)
     lang = models.ForeignKey(
@@ -1194,15 +1606,15 @@ class ArticleWebPage(CommonControlField):
         on_delete=models.SET_NULL,
     )
     url = models.CharField(_("URL"), max_length=265, null=True, blank=True)
-
     status = models.CharField(
         _("Status"), max_length=16, null=True, blank=True, choices=choices.ARTICLE_WEBPAGE_STATUS,
         default=choices.ARTICLE_WEBPAGE_STATUS_NOT_CHECKED,
     )
     detail = models.JSONField(_("Detail"), null=True, blank=True)
+    
     panels = [
         FieldPanel("article", read_only=True),
-        FieldPanel("collection", read_only=True),
+        FieldPanel("website", read_only=True),
         FieldPanel("url", read_only=True),
         FieldPanel("fmt", read_only=True),
         FieldPanel("lang", read_only=True),
@@ -1211,17 +1623,17 @@ class ArticleWebPage(CommonControlField):
     ]
 
     class Meta:
-        unique_together = ("article", "collection", "url", "fmt", "lang")
+        unique_together = ("article", "website", "url", "fmt", "lang")
         indexes = [
             models.Index(fields=["url"]),
-            models.Index(fields=["article", "collection", "fmt", "lang"]),
+            models.Index(fields=["article", "website", "fmt", "lang"]),
         ]
 
     @classmethod
-    def get(cls, article, collection, url, fmt, lang=None):
+    def get(cls, article, website, url, fmt, lang=None):
         return cls.objects.get(
             article=article,
-            collection=collection,
+            website=website,
             url=url,
             fmt=fmt,
             lang=lang,
@@ -1232,62 +1644,74 @@ class ArticleWebPage(CommonControlField):
         cls,
         user,
         article,
-        collection,
+        website,
         url,
         fmt,
         lang,
-        timeout=None,
-        article_metadata=None,
     ):
         try:
             obj = cls(
                 article=article,
-                collection=collection,
+                website=website,
                 url=url,
                 fmt=fmt,
                 lang=lang,
                 creator=user,
             )
-            obj.check_availability(timeout, article_metadata)
             obj.save()
             return obj
         except IntegrityError:
-            return cls.get(article, collection, url, fmt, lang)
+            return cls.get(article, website, url, fmt, lang)
 
     @classmethod
     def create_or_update(
         cls,
         user,
         article,
-        collection,
+        website,
         url,
         fmt,
         lang,
-        timeout=None,
-        force_update=False,
-        article_metadata=None,
     ):
         try:
             if lang:
                 lang = Language.objects.filter(code2=lang).first()
-            obj = cls.get(article, collection, url, fmt, lang)
-            obj.check_availability(timeout, article_metadata, force_update)
-            obj.updated_by = user
-            obj.save()
-            return obj
+            return cls.get(article, website, url, fmt, lang)
         except cls.DoesNotExist:
             return cls.create(
                 user=user,
                 article=article,
-                collection=collection,
+                website=website,
                 url=url,
                 fmt=fmt,
                 lang=lang,
-                timeout=timeout,
-                article_metadata=article_metadata,
             )
 
-    def check_availability(self, timeout, article_metadata=None, force_update=None):
+    def check_availability(self, user, timeout, article_metadata=None, force_update=None):
+        """
+        Verifica disponibilidade e validade do conteúdo da página.
+        
+        Acessa a URL da página, verifica se está disponível e valida
+        se o conteúdo contém os metadados esperados do artigo. Atualiza
+        o status da página com o resultado da verificação.
+        
+        Parameters
+        ----------
+        user : User
+            Usuário que está realizando a verificação.
+        timeout : int
+            Timeout em segundos para a requisição HTTP.
+        article_metadata : list[tuple], optional
+            Metadados do artigo para validação de conteúdo.
+            Se não fornecido, será extraído do artigo.
+        force_update : bool, optional
+            Se True, ignora status anterior e refaz a verificação.
+            
+        Returns
+        -------
+        dict
+            Dicionário com detalhes da verificação (URL, status, erros, taxa de acurácia).
+        """
         detail = {
             "url": self.url,
             "format": self.fmt,
@@ -1308,6 +1732,11 @@ class ArticleWebPage(CommonControlField):
             
             self.status = choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE
 
+            if not article_metadata:
+                article_metadata = self.article.get_metadata_items(self.lang.code2 if self.lang else None)
+            if not article_metadata:
+                raise ValueError("No article metadata available for content check")
+            
             response = check_content(article_metadata, content)
             if response.get("error"):
                 raise ValueError(response["error"])
@@ -1321,6 +1750,7 @@ class ArticleWebPage(CommonControlField):
             detail = {"error": str(e)}
             self.status = choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE
         self.detail = detail
+        self.updated_by = user
         self.save()
         detail["status"] = self.status
         return detail
