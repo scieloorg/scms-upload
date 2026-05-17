@@ -47,7 +47,8 @@ def check_content(article_metadata, content):
         try:
             content = content.split("<body", 1)[0]
         except (AttributeError, IndexError):
-            pass  # Se não conseguir dividir, continua com o conteúdo original
+            # Se não conseguir dividir, continua com o conteúdo original
+            content = " ".join(content.split())[:3000]
         result = check_metadata(article_metadata, content)
 
         numbers = compute_rate(result)
