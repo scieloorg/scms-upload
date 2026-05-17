@@ -59,6 +59,7 @@ def schedule_article_publication(
     return scheduled
 
 
+# sem uso?
 def migrate_collection_articles(user, collection_acron, items, force_update):
     statistics = {
         "total_articles_to_process": 0,
