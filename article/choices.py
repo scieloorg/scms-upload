@@ -133,15 +133,33 @@ ARTICLE_STATUS = (
 )
 
 
+ARTICLE_WEBPAGE_STATUS_PARTIAL = "partial-checked"
 ARTICLE_WEBPAGE_STATUS_UNAVAILABLE = "unavailable"
 ARTICLE_WEBPAGE_STATUS_AVAILABLE = "available"
 ARTICLE_WEBPAGE_STATUS_VALID_CONTENT = "valid_content"
 ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH = "content_mismatch"
 ARTICLE_WEBPAGE_STATUS_NOT_CHECKED = "not-checked"
 ARTICLE_WEBPAGE_STATUS = (
+    (ARTICLE_WEBPAGE_STATUS_PARTIAL, _("Partially checked")),
     (ARTICLE_WEBPAGE_STATUS_AVAILABLE, _("Available")),
     (ARTICLE_WEBPAGE_STATUS_UNAVAILABLE, _("Unavailable")),
     (ARTICLE_WEBPAGE_STATUS_VALID_CONTENT, _("Valid content")),
     (ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH, _("Content mismatch")),
     (ARTICLE_WEBPAGE_STATUS_NOT_CHECKED, _("Not checked")),
+)
+
+# ============================================================
+# Adicionar ao article/choices.py
+# ============================================================
+
+# Purpose de ArticleWebPage (substitui a distinção entre
+# ArticleWebsite + ClassicArticleWebPage)
+ARTICLE_WEBPAGE_PURPOSE_PUBLIC = "PUBLIC"
+ARTICLE_WEBPAGE_PURPOSE_QA = "QA"
+ARTICLE_WEBPAGE_PURPOSE_CLASSIC = "CLASSIC"
+
+ARTICLE_WEBPAGE_PURPOSE = (
+    (ARTICLE_WEBPAGE_PURPOSE_PUBLIC, "Public"),
+    (ARTICLE_WEBPAGE_PURPOSE_QA, "QA"),
+    (ARTICLE_WEBPAGE_PURPOSE_CLASSIC, "Classic"),
 )
