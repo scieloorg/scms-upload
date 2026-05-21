@@ -69,6 +69,7 @@ from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from migration import controller
 from migration import choices as migration_choices
+from package.models import SPSPkg
 from proc.controller import (
     create_or_update_migrated_issue,
     create_or_update_migrated_journal,
@@ -1115,6 +1116,14 @@ def task_migrate_and_publish_articles_by_journal(
             article_proc_id_list,
         ) in issue_proc_and_related_article_proc_id_list.items():
             total_processed += 1
+            # executa sincronamente a eliminação de registros ArticleProc e Article cujo conteúdo é defeituoso
+            task_exclude_invalid_issue_articles(
+                issue_proc_id=issue_proc_id,
+                username=username,
+                user_id=user_id,
+                public_api_data=public_api_data,
+            )
+
             task_migrate_and_publish_articles_by_issue.delay(
                 user_id=user_id,
                 username=username,
@@ -1181,13 +1190,6 @@ def task_migrate_and_publish_articles_by_issue(
         status = tracker_choices.get_valid_status(status, force_update)
 
         task_exec.item = str(issue_proc)
-
-        task_exclude_invalid_issue_articles(
-            issue_proc_id=issue_proc_id,
-            username=username,
-            user_id=user_id,
-            public_api_data=public_api_data,
-        )
 
         total_articles_to_process = 0
         if article_proc_id_list:
@@ -1614,16 +1616,11 @@ def task_exclude_invalid_issue_articles(
         task_exec.item = str(issue_proc)
         issue_proc_str = str(issue_proc)
 
-        results = Article.exclude_invalid_issue_articles(
-            issue, user, timeout
-        )
-        for event in results["events"]:
-            task_exec.add_event(event)
-        for key, value in results["numbers"].items():
-            task_exec.add_number(key, value)
-        for exc in results["exceptions"]:
-            task_exec.add_exception(exc)
-
+        response = ArticleProc.exclude_invalid_items(user, issue_proc.issue)
+        # {"sps_pkg_id_list": sps_pkg_id_list, "deleted": items}
+        task_exec.add_event(response)
+        response = Article.exclude_invalid_records(user, issue, response.get("sps_pkg_id_list"), timeout=timeout)
+        task_exec.add_event(response)
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
