@@ -1621,6 +1621,10 @@ def task_exclude_invalid_issue_articles(
         task_exec.add_event(response)
         response = Article.exclude_invalid_records(user, issue, response.get("sps_pkg_id_list"), timeout=timeout)
         task_exec.add_event(response)
+        if response.get("sps_pkg_ids"):
+            response = ArticleProc.exclude_invalid_items(user, issue_proc.issue)
+            # {"sps_pkg_id_list": sps_pkg_id_list, "deleted": items}
+            task_exec.add_event(response)
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()

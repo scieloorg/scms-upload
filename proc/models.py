@@ -2555,8 +2555,6 @@ class ArticleProc(BaseProc, ClusterableModel):
 
     @classmethod
     def exclude_invalid_items(cls, user, issue):
-        cls.objects.filter(sps_pkg__isnull=True).delete()
-
         # obtém sps_pkg_ids cujo pid_v2 não corresponde ao ArticleProc.pid
         sps_pkg_id_list = ArticleProc.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
 
@@ -2566,7 +2564,9 @@ class ArticleProc(BaseProc, ClusterableModel):
         # obtém novamente sps_pkg_ids cujo pid_v2 não corresponde ao ArticleProc.pid
         sps_pkg_id_list = ArticleProc.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
 
-        qs = cls.objects.filter(sps_pkg_id__in=sps_pkg_id_list)
+        qs = cls.objects.filter(
+            Q(sps_pkg_id__in=sps_pkg_id_list)|Q(sps_pkg__isnull=True)
+        )
         items = qs.values("pid", "sps_pkg__sps_pkg_name")
         qs.delete()
         return {"sps_pkg_id_list": sps_pkg_id_list, "deleted": items}
