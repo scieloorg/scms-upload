@@ -699,12 +699,16 @@ class Article(ClusterableModel, CommonControlField):
         e delega a criação das ArticleWebPages.
         """
         items = []
-        if not self.article_collections.exists() or force_update:
-            for journal_proc in self.journal.journalproc_set.all():
-                collection = journal_proc.collection
-                art_col = ArticleCollection.get_or_create(user, self, collection)
-                art_col.create_or_update_pages(user)
-                items.append(art_col)
+        
+        if not list(self.webpages) or not self.article_collections.exists() or force_update:
+            try:
+                for journal_proc in self.journal.journalproc_set.all():
+                    collection = journal_proc.collection
+                    art_col = ArticleCollection.get_or_create(user, self, collection)
+                    art_col.create_or_update_pages(user)
+                    items.append(art_col)
+            except Exception as e:
+                logging.exception(e)
         return items
 
     # ── Convenience: acesso a ArticleCollection ──
@@ -749,14 +753,6 @@ class Article(ClusterableModel, CommonControlField):
 
         if self.pid_v2:
             items.append(("pid_v2", self.pid_v2))
-        if self.pid_v3:
-            items.append(("pid_v3", self.pid_v3))
-        if self.elocation_id:
-            items.append(("elocation_id", self.elocation_id))
-        if self.fpage:
-            items.append(("fpage", self.fpage))
-        if self.lpage:
-            items.append(("lpage", self.lpage))
 
         try:
             xmltree = self.sps_pkg.xml_with_pre.xmltree
@@ -772,6 +768,12 @@ class Article(ClusterableModel, CommonControlField):
             pass
 
         return items
+
+    @property
+    def webpages(self):
+        for art_col in self.article_collections.all():
+            for page in art_col.pages.all():
+                yield page.data
 
     def check_availability(self, user, collection=None, collection_id=None, purpose=None, force_update=None, timeout=None):
         """
@@ -789,33 +791,33 @@ class Article(ClusterableModel, CommonControlField):
             qs = qs.filter(collection_id=collection_id)
         if collection:
             qs = qs.filter(collection=collection)
+        logging.info("article_collections: {}".format(qs.count()))
+        response = []
         for art_col in qs:
-            yield from art_col.check_pages(
+            if not art_col.pages.exists() and not force_update:
+                force_update = True
+            for resp in art_col.check_pages(
                 user=user, purpose=purpose, force_update=force_update, timeout=timeout
-            )
+            ):
+                response.append(resp)
+        return response
 
+    def _available_on_website(self, collection, purpose=None):
+        article_collection = self.article_collections.filter(
+            collection=collection
+        ).first()
+        if not article_collection:
+            return {"valid": False, "new_pid_status": None}
+        status = article_collection.get_compiled_status(purpose)
+        valid = status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+        return {"valid": valid, "new_pid_status": get_pid_status_from_webpage_status(status)}
+        
     def available_on_classic_website(self, collection=None):
-        params = {}
-        if collection:
-            params["collection"] = collection
-        status = self.article_collections.filter(
-            purpose=choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC,
-            **params
-        ).first().status 
-        valid = status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
-        return {"valid": valid, "new_pid_status": get_pid_status_from_webpage_status(status)}
-        
+        return self._available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC)
+
     def available_on_public_website(self, collection=None):
-        params = {}
-        if collection:
-            params["collection"] = collection
-        status = self.article_collections.filter(
-            purpose=choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC,
-            **params,
-        ).first().status 
-        valid = status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
-        return {"valid": valid, "new_pid_status": get_pid_status_from_webpage_status(status)}
-        
+        return self._available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC)
+ 
     @classmethod
     def get_repeated_values(cls, field_name, queryset=None, issue=None):
         if not queryset:
@@ -855,7 +857,7 @@ class Article(ClusterableModel, CommonControlField):
             qs = qs.filter(sps_pkg__id__in=sps_pkg_id_list)
             if qs.exists():
                 sps_pkg_names = []
-                for pp_xml_id, sps_pkg_name, sps_pkg_id in qs.values_list("id", "pp_xml_id", "sps_pkg_name", "sps_pkg_id"):
+                for pp_xml_id, sps_pkg_name, sps_pkg_id in qs.values_list("pp_xml_id", "sps_pkg_name", "sps_pkg_id"):
                     ppxml_to_delete.add(pp_xml_id)
                     sps_pkg_to_delete.add(sps_pkg_id)
                     sps_pkg_names.append(sps_pkg_name)
@@ -931,9 +933,9 @@ class Article(ClusterableModel, CommonControlField):
         # pode adicioná-lo ao dicionário ou retornar uma tupla. 
         # Como o seu esqueleto final pedia apenas o retorno do dicionário, mantive assim:
         if ppxml_to_delete:
-            PidProviderXML.objecsts.filter(id__in=ppxml_to_delete).delete()
+            PidProviderXML.objects.filter(id__in=ppxml_to_delete).delete()
         if sps_pkg_to_delete:
-            SPSPkg.objecsts.filter(id__in=sps_pkg_to_delete).delete()
+            SPSPkg.objects.filter(id__in=sps_pkg_to_delete).delete()
         items_to_delete["ppxml_ids"] = ppxml_to_delete
         items_to_delete["sps_pkg_ids"] = sps_pkg_to_delete
         
@@ -1143,21 +1145,27 @@ class ArticleCollection(CommonControlField):
 
     def update_aggregate_status(self, user):
         """Recalcula status a partir das ArticleWebPage filhas."""
-        pages = self.pages.all()
-        status = set(pages.values_list("status").distinct())
-        if not status:
-            self.status = choices.ARTICLE_WEBPAGE_STATUS_NOT_CHECKED
-        elif len(status) == 1:
-            self.status = status[0]
-        elif choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT in status:
-            self.status = choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
-        elif choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH in status:
-            self.status = choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH
-        elif choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE in status:
-            self.status = choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE
-        elif choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE in status:
-            self.status = choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE
+        self.status = self.get_compiled_status()
+        self.updated_by = user
         self.save(update_fields=["status", "updated_by"])
+
+    def get_compiled_status(self, purpose=None):
+        """Recalcula status a partir das ArticleWebPage filhas."""
+        purpose = purpose or choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC
+        selected_pages = self.pages.filter(purpose=purpose)
+        status = list(selected_pages.values_list("status", flat=True).distinct())
+        if not status:
+            return choices.ARTICLE_WEBPAGE_STATUS_NOT_CHECKED
+        if len(status) == 1:
+            return status[0]
+        if choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT in status:
+            return choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+        if choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH in status:
+            return choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH
+        if choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE in status:
+            return choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE
+        if choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE in status:
+            return choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE
 
     # ── get_or_create ──
 
@@ -1301,6 +1309,7 @@ class ArticleCollection(CommonControlField):
         purpose : str, optional
             Se informado, verifica apenas páginas desse purpose.
         """
+        response = []
         article_metadata = self.article.get_metadata_by_lang()
 
         pages = self.pages.all()
@@ -1310,15 +1319,17 @@ class ArticleCollection(CommonControlField):
             pages = pages.exclude(
                 status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
             )
-
         for page in pages.select_related("lang"):
             lang_code = page.lang.code2 if page.lang else None
-            yield page.check_page(
-                user,
-                timeout,
-                article_metadata=article_metadata.get(lang_code),
-                force_update=force_update,
+            response.append(
+                page.check_page(
+                    user,
+                    timeout,
+                    article_metadata=article_metadata.get(lang_code),
+                    force_update=force_update,
+                )
             )
+        return response
 
 
 # ============================================================
@@ -1341,12 +1352,14 @@ class ArticleWebPage(CommonControlField):
         ArticleCollection,
         on_delete=models.CASCADE,
         related_name="pages",
+        null=True, blank=True,
     )
     purpose = models.CharField(
         _("Purpose"),
         max_length=8,
         choices=choices.ARTICLE_WEBPAGE_PURPOSE,
         help_text=_("Distinguishes between public, QA, and classic website pages."),
+        null=True, blank=True,
     )
     fmt = models.CharField(_("Format"), max_length=4, null=True, blank=True)
     lang = models.ForeignKey(
@@ -1356,7 +1369,7 @@ class ArticleWebPage(CommonControlField):
         blank=True,
         on_delete=models.SET_NULL,
     )
-    url = models.CharField(_("URL"), max_length=265)
+    url = models.CharField(_("URL"), max_length=265, null=True, blank=True,)
     status = models.CharField(
         _("Status"),
         max_length=16,
@@ -1437,7 +1450,7 @@ class ArticleWebPage(CommonControlField):
             "status": self.status,
             "force_update": force_update,
         }
-
+        logging.info(f"Checking page {self.url} force_update={force_update} status={self.status}")
         if self.status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT:
             if not force_update:
                 return detail
@@ -1465,7 +1478,7 @@ class ArticleWebPage(CommonControlField):
  
             detail.update(response)
             rate = response.get("rate", 0)
-            if rate > 0.8:
+            if rate >= 0.5:
                 self.status = choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
             else:
                 detail["content"] = content
@@ -1482,7 +1495,7 @@ class ArticleWebPage(CommonControlField):
 
         detail["status"] = self.status
         detail["valid"] = (self.status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT)
-        
+        logging.info(f"Checked page {self.url}: {detail}")
         return detail
 
     # ── Factory ──
