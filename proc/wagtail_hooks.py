@@ -218,9 +218,9 @@ class ArticleProcViewSet(CommonControlFieldViewSet):
     list_display = [
         "__str__",
         "pid_status",
-        "migration_status",
         "xml_status",
         "sps_pkg_status",
+        "migration_status",
         "qa_ws_status",
         "public_ws_status",
         "updated",
