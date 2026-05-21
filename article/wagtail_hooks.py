@@ -14,7 +14,7 @@ from article.views import (
 )
 from config.menu import get_menu_order
 from collection.models import Collection
-from .models import Article, RelatedItem, RequestArticleChange
+from .models import Article, ArticleWebPage, RelatedItem, RequestArticleChange
 from article import choices
 
 # from upload import exceptions as upload_exceptions
@@ -155,12 +155,79 @@ class RequestArticleChangeSnippetViewSet(SnippetViewSet):
             return qs
 
 
+class ArticleWebPageFilterSet(django_filters.FilterSet):
+    purpose = django_filters.ChoiceFilter(
+        field_name="purpose",
+        label=_("Purpose"),
+        choices=choices.ARTICLE_WEBPAGE_PURPOSE,
+    )
+    status = django_filters.ChoiceFilter(
+        field_name="status",
+        label=_("Status"),
+        choices=choices.ARTICLE_WEBPAGE_STATUS,
+    )
+    fmt = django_filters.CharFilter(
+        field_name="fmt",
+        label=_("Format"),
+        lookup_expr="exact",
+    )
+    collection = django_filters.ModelChoiceFilter(
+        field_name="article_collection__collection",
+        label=_("Collection"),
+        queryset=Collection.objects.all(),
+    )
+
+    class Meta:
+        model = ArticleWebPage
+        fields = []
+
+
+class ArticleWebPageSnippetViewSet(SnippetViewSet):
+    model = ArticleWebPage
+    menu_label = _("Web Pages")
+    menu_icon = "globe"
+    menu_order = 300
+    add_to_settings_menu = False
+    inspect_view_enabled = True
+    list_per_page = 20
+
+    list_display = (
+        "url",
+        "purpose",
+        "fmt",
+        "lang",
+        "status",
+        "article_collection",
+        "updated",
+    )
+    filterset_class = ArticleWebPageFilterSet
+    search_fields = (
+        "url",
+        "article_collection__article__pid_v3",
+        "article_collection__article__pid_v2",
+        "article_collection__article__sps_pkg__sps_pkg_name",
+    )
+    ordering = ["-updated"]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        try:
+            return qs.select_related(
+                "article_collection__article",
+                "article_collection__collection",
+                "lang",
+            ).distinct()
+        except AttributeError:
+            return qs
+
+
 class ArticleSnippetViewSetGroup(SnippetViewSetGroup):
     menu_label = _("Articles")
     menu_icon = "folder-open-inverse"
     menu_order = get_menu_order("article")
     items = (
         ArticleSnippetViewSet,
+        ArticleWebPageSnippetViewSet,
         # RelatedItemSnippetViewSet,
         # omitir temporariamente RequestArticleChangeSnippetViewSet,
         # ApprovedArticleSnippetViewSet,
