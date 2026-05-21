@@ -68,6 +68,22 @@ def get_pid_status_from_webpage_status(article_status: str) -> str:
 # ============================================================
 
 
+class ArticleQuerySet(models.QuerySet):
+    """QuerySet customizado para Article com select_related otimizado."""
+    
+    def with_sps_pkg(self):
+        """Inclui select_related de sps_pkg por padrão."""
+        return self.select_related("sps_pkg")
+
+
+class ArticleManager(models.Manager):
+    """Manager customizado para Article com select_related otimizado."""
+    
+    def get_queryset(self):
+        """Por padrão, inclui select_related de sps_pkg em todas as queries."""
+        return ArticleQuerySet(self.model, using=self._db).select_related("sps_pkg", "journal", "issue")
+
+
 class Article(ClusterableModel, CommonControlField):
     """
     Modelo que representa um artigo no contexto de Upload.
@@ -76,6 +92,9 @@ class Article(ClusterableModel, CommonControlField):
     suficiente para o processo de ingresso/validações, pois os dados
     devem ser obtidos do XML.
     """
+
+    # Manager customizado com select_related otimizado
+    objects = ArticleManager()
 
     pp_xml = models.ForeignKey(
         PidProviderXML,
@@ -253,44 +272,37 @@ class Article(ClusterableModel, CommonControlField):
     # ── get / dedup ──
 
     @classmethod
-    def get(cls, pid_v3):
+    def get(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None):
+        params = {}
+        if pid_v2:
+            params["pid_v2"] = pid_v2
         if pid_v3:
-            try:
-                return cls.objects.get(pid_v3=pid_v3)
-            except cls.MultipleObjectsReturned:
-                qs = cls.objects.filter(pid_v3=pid_v3).order_by("-updated")
-                obj = qs.first()
-                if obj is None:
-                    raise cls.DoesNotExist
-                qs.exclude(pk=obj.pk).delete()
-                return obj
-        raise ValueError("Article.get requires pid_v3")
+            params["pid_v3"] = pid_v3
+        if sps_pkg_name:
+            params["sps_pkg__sps_pkg_name"] = sps_pkg_name
 
+        if not params:
+            raise ValueError("Article.get requires pid_v3 or pid_v2 or sps_pkg_name")
+        
+        return cls.objects.get(**params)
+    
     @classmethod
-    def delete_items_duplicated_by_pid_v2(cls, pid_v2):
-        try:
-            return cls.objects.get(pid_v2=pid_v2)
-        except cls.MultipleObjectsReturned:
-            items = cls.objects.filter(pid_v2=pid_v2).order_by("-updated")
-            obj = items.first()
-            items.exclude(id=obj.id).delete()
-            return obj
-        except cls.DoesNotExist:
-            raise
-
-    @classmethod
-    def delete_items_duplicated_by_sps_pkg_name(cls, sps_pkg_name):
-        try:
-            return cls.objects.get(sps_pkg__sps_pkg_name=sps_pkg_name)
-        except cls.MultipleObjectsReturned:
-            items = cls.objects.filter(
-                sps_pkg__sps_pkg_name=sps_pkg_name
-            ).order_by("-updated")
-            obj = items.first()
-            items.exclude(id=obj.id).delete()
-            return obj
-        except cls.DoesNotExist:
-            raise
+    def get_first(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, delete=False):
+        q = Q()
+        if pid_v2:
+            q |= Q(pid_v2=pid_v2)
+        if sps_pkg_name:
+            q |= Q(sps_pkg__sps_pkg_name=sps_pkg_name)
+        qs = cls.objects.filter(q).order_by("-updated")
+        obj = qs.first()
+        if obj is None:
+            qs = cls.objects.filter(pid_v3=pid_v3).order_by("-updated")
+            obj = qs.first()
+            if obj is None:
+                raise cls.DoesNotExist            
+        if delete:
+            qs.exclude(pk=obj.pk).delete()
+        return obj
 
     # ── create_or_update ──
 
@@ -304,18 +316,17 @@ class Article(ClusterableModel, CommonControlField):
             raise ValueError(f"SPSPkg {sps_pkg} is missing xml_with_pre")
 
         pid_v2 = xml_with_pre.v2
+        pid_v3 = sps_pkg.pid_v3
         if not pid_v2:
             raise ValueError(f"SPSPkg {sps_pkg} xml_with_pre is missing pid_v2")
-        try:
-            obj = cls.delete_items_duplicated_by_sps_pkg_name(sps_pkg.sps_pkg_name)
-        except cls.DoesNotExist:
-            try:
-                obj = cls.delete_items_duplicated_by_pid_v2(pid_v2)
-            except cls.DoesNotExist:
-                obj = cls()
-                obj.creator = user
 
-        obj.pid_v3 = sps_pkg.pid_v3
+        try:
+            obj = cls.get_first(sps_pkg.sps_pkg_name, pid_v2, pid_v3, delete=True)
+        except cls.DoesNotExist:
+            obj = cls()
+            obj.creator = user
+
+        obj.pid_v3 = pid_v3
         obj.pid_v2 = pid_v2
         obj.sps_pkg = sps_pkg
         obj.article_type = xml_with_pre.xmltree.find(".").get("article-type")
@@ -625,164 +636,30 @@ class Article(ClusterableModel, CommonControlField):
     # ── repetitions / dedup ──
 
     @classmethod
-    def get_repeated_items(cls, field_name, issue=None):
-        if issue:
-            queryset = cls.objects.filter(issue=issue)
-        else:
-            queryset = cls.objects.all()
-        return (
-            queryset.values(field_name)
-            .annotate(total=Count("id"))
-            .filter(total__gt=1)
-            .values_list(field_name, flat=True)
-        )
-
-    @classmethod
-    def exclude_articles_with_invalid_pid_v2(cls, issue=None):
-        from proc.models import ArticleProc
-
-        filters = {
-            "pid__isnull": False,
-            "migrated_data__isnull": False,
-            "sps_pkg__isnull": False,
-        }
-        if issue:
-            filters["issue_proc__issue"] = issue
-
-        article_procs = ArticleProc.objects.filter(
-            **filters
-        ).select_related("migrated_data", "sps_pkg")
-
-        sps_pkg_id_list = [
-            ap.sps_pkg_id for ap in article_procs if ap.sps_pkg_id
-        ]
-        articles_by_sps_pkg = {}
-        if sps_pkg_id_list:
-            for article in (
-                Article.objects.select_related("sps_pkg", "pp_xml")
-                .filter(sps_pkg_id__in=sps_pkg_id_list)
-                .only("id", "pid_v2", "sps_pkg_id", "pp_xml_id")
-            ):
-                articles_by_sps_pkg[article.sps_pkg_id] = article
-
-        events = []
-        sps_pkg_ids = set()
-        pp_xml_ids = set()
-        article_ids = []
-
-        for article_proc in article_procs:
-            try:
-                article = articles_by_sps_pkg.get(article_proc.sps_pkg_id)
-                if not article or not article.pid_v2:
-                    continue
-                if not MigratedArticle.valid_pid(article.pid_v2):
-                    article_ids.append(article.id)
-                    if article.sps_pkg_id:
-                        sps_pkg_ids.add(article.sps_pkg_id)
-                    if article.pp_xml_id:
-                        pp_xml_ids.add(article.pp_xml_id)
-            except Exception as e:
-                events.append(
-                    f"Error checking pid_v2 for ArticleProc {article_proc}: {e}"
-                )
-
-        if not article_ids:
-            events.append("No migrated articles with invalid pid_v2 found")
-            return events
-
-        with transaction.atomic():
-            deleted_articles, _ = cls.objects.filter(id__in=article_ids).delete()
-            events.append(f"Articles deletados: {deleted_articles}")
-            if sps_pkg_ids:
-                deleted_sps, _ = SPSPkg.objects.filter(
-                    id__in=sps_pkg_ids
-                ).delete()
-                events.append(f"SPSPkg deletados: {deleted_sps}")
-            if pp_xml_ids:
-                deleted_pp, _ = PidProviderXML.objects.filter(
-                    id__in=pp_xml_ids
-                ).delete()
-                events.append(f"PidProviderXML deletados: {deleted_pp}")
-
-        return events
-
-    @classmethod
-    def exclude_inconvenient_articles(cls, issue, user, timeout=None):
-        results = {"events": [], "numbers": {}, "exceptions": []}
-
-        try:
-            events = cls.exclude_articles_with_invalid_pid_v2(issue)
-            results["events"].extend(events)
-        except Exception as e:
-            results["exceptions"].append(
-                {
-                    "step": "exclude_articles_with_invalid_pid_v2",
-                    "error": str(e),
-                    "traceback": traceback.format_exc(),
-                }
-            )
-
-        for field_name in ("pid_v2", "sps_pkg__sps_pkg_name"):
-            repeated_values = list(cls.get_repeated_items(field_name, issue))
-            results["numbers"][f"repeated_by_{field_name}"] = len(repeated_values)
-            for value in repeated_values:
-                try:
-                    events = cls.exclude_repetitions(
-                        user, field_name, value, timeout=timeout
-                    )
-                    results["events"].extend(events)
-                except Exception as e:
-                    results["exceptions"].append(
-                        {
-                            "step": f"repeated_by_{field_name}",
-                            "value": value,
-                            "traceback": traceback.format_exc(),
-                        }
-                    )
-
-        return results
-
-    @classmethod
-    def select_articles(cls, journal_id_list=None, issue_id_list=None):
+    def select_items(
+        cls,
+        journal_id_list=None,
+        issue_id_list=None,
+        sps_pkg_list=None
+    ):
         kwargs = {}
         if journal_id_list:
             kwargs["journal__id__in"] = journal_id_list
         if issue_id_list:
             kwargs["issue__id__in"] = issue_id_list
-        return cls.objects.filter(**kwargs).values_list("id", flat=True)
-
-    def is_valid_record(self):
-        try:
-            if self.pp_xml is None:
-                try:
-                    self.pp_xml = PidProviderXML.get_by_pid_v3(self.pid_v3)
-                except PidProviderXML.DoesNotExist:
-                    return False
-            sps_pkg__pkg_name = self.sps_pkg.sps_pkg_name
-            sps_pkg__xml_with_pre__pkg_name = (
-                self.sps_pkg.xml_with_pre.sps_pkg_name
-            )
-            pp_xml__xml_with_pre__pkg_name = (
-                self.pp_xml.xml_with_pre.sps_pkg_name
-            )
-            return (
-                sps_pkg__pkg_name
-                == pp_xml__xml_with_pre__pkg_name
-                == sps_pkg__xml_with_pre__pkg_name
-            )
-        except Exception as e:
-            if self.pp_xml is not None:
-                if self.pp_xml.proc_status != PPXML_STATUS_INVALID:
-                    self.pp_xml.proc_status = PPXML_STATUS_INVALID
-                    self.pp_xml.save()
-            return False
+        if sps_pkg_list:
+            kwargs["sps_pkg__id__in"] = sps_pkg_list
+        return cls.objects.filter(**kwargs)
 
     @classmethod
-    def fix_sps_pkg_names(cls, issue):
-        items = cls.objects.filter(
-            issue=issue,
+    def fix_sps_pkg_names(cls, items=None):
+        if not items:
+            items = cls.objects
+        items.filter(
             sps_pkg__isnull=False,
             issue__supplement__isnull=False,
+        ).select_related(
+            "sps_pkg", "pp_xml",
         ).exclude(
             Q(sps_pkg__sps_pkg_name__contains="-s"),
         )
@@ -814,131 +691,6 @@ class Article(ClusterableModel, CommonControlField):
         if self.sps_pkg:
             return self.sps_pkg.fix_sps_pkg_name()
 
-    @classmethod
-    def exclude_repetitions(cls, user, field_name, field_value, timeout=None):
-        """
-        Remove artigos duplicados para um dado campo.
-
-        Usa o status agregado de ArticleCollection para ranking.
-        """
-        repeated_items = cls.objects.filter(**{field_name: field_value})
-        total_initial = repeated_items.count()
-
-        if total_initial <= 1:
-            return [
-                f"{field_name}='{field_value}': {total_initial} artigo(s), "
-                "nenhuma ação necessária"
-            ]
-
-        events = [
-            f"{field_name}='{field_value}': {total_initial} artigos encontrados"
-        ]
-
-        # ── Fase 1: pré-ranking via SQL usando ArticleCollection ──
-        candidate_ids = list(
-            repeated_items.annotate(
-                has_valid_collection=models.Exists(
-                    ArticleCollection.objects.filter(
-                        article_id=models.OuterRef("pk"),
-                        status=choices.ARTICLE_COLLECTION_STATUS_VALID,
-                    )
-                ),
-                has_pp_xml=models.Case(
-                    models.When(pp_xml__isnull=False, then=True),
-                    default=False,
-                    output_field=models.BooleanField(),
-                ),
-            )
-            .order_by("-has_valid_collection", "-has_pp_xml", "-updated")
-            .values_list("id", flat=True)[:2]
-        )
-
-        # ── Fase 2: check HTTP dos finalistas ──
-        for article in cls.objects.filter(id__in=candidate_ids):
-            for art_col in article.article_collections.all():
-                art_col.check_pages(
-                    user=user, timeout=timeout, force_update=True
-                )
-
-        events.append(
-            f"Disponibilidade verificada para {len(candidate_ids)} finalista(s)"
-        )
-
-        # ── Fase 3: decisão ──
-        repeated_items = cls.objects.filter(**{field_name: field_value})
-        item_to_keep_id = cls.choose_item_to_keep(repeated_items)
-
-        if not item_to_keep_id:
-            item_to_keep_id = (
-                repeated_items.order_by("-updated")
-                .values_list("id", flat=True)
-                .first()
-            )
-
-        if not item_to_keep_id:
-            events.append("Erro: nenhum item encontrado para manter")
-            return events
-
-        events.append(f"Artigo mantido: ID {item_to_keep_id}")
-
-        # ── Fase 4: deleção em bulk ──
-        items_to_delete = repeated_items.exclude(id=item_to_keep_id)
-        sps_pkg_ids = set(
-            items_to_delete.exclude(sps_pkg__isnull=True).values_list(
-                "sps_pkg_id", flat=True
-            )
-        )
-        pp_xml_ids = set(
-            items_to_delete.exclude(pp_xml__isnull=True).values_list(
-                "pp_xml_id", flat=True
-            )
-        )
-        article_ids = list(items_to_delete.values_list("id", flat=True))
-        total_to_delete = len(article_ids)
-        events.append(f"Artigos a deletar: {total_to_delete}")
-
-        if not total_to_delete:
-            return events
-
-        with transaction.atomic():
-            deleted_articles, _ = cls.objects.filter(
-                id__in=article_ids
-            ).delete()
-            events.append(f"Articles deletados: {deleted_articles}")
-            if sps_pkg_ids:
-                deleted_sps, _ = SPSPkg.objects.filter(
-                    id__in=sps_pkg_ids
-                ).delete()
-                events.append(f"SPSPkg deletados: {deleted_sps}")
-            if pp_xml_ids:
-                deleted_pp, _ = PidProviderXML.objects.filter(
-                    id__in=pp_xml_ids
-                ).delete()
-                events.append(f"PidProviderXML deletados: {deleted_pp}")
-
-        return events
-
-    @classmethod
-    def choose_item_to_keep(cls, queryset):
-        return (
-            queryset.annotate(
-                has_valid_collection=models.Exists(
-                    ArticleCollection.objects.filter(
-                        article_id=models.OuterRef("pk"),
-                        status=choices.ARTICLE_COLLECTION_STATUS_VALID,
-                    )
-                ),
-                has_pp_xml=models.Case(
-                    models.When(pp_xml__isnull=False, then=True),
-                    default=False,
-                    output_field=models.BooleanField(),
-                ),
-            )
-            .order_by("-has_valid_collection", "-has_pp_xml", "-updated")
-            .values_list("id", flat=True)
-            .first()
-        )
-
     # ── ArticleCollection: ponto de entrada ──
 
     def create_or_update_article_collections(self, user, force_update=None):
@@ -946,13 +698,14 @@ class Article(ClusterableModel, CommonControlField):
         Obtém ou cria ArticleCollection para cada coleção do journal
         e delega a criação das ArticleWebPages.
         """
-        art_col = None
+        items = []
         if not self.article_collections.exists() or force_update:
             for journal_proc in self.journal.journalproc_set.all():
                 collection = journal_proc.collection
                 art_col = ArticleCollection.get_or_create(user, self, collection)
                 art_col.create_or_update_pages(user)
-        return art_col
+                items.append(art_col)
+        return items
 
     # ── Convenience: acesso a ArticleCollection ──
 
@@ -1020,7 +773,7 @@ class Article(ClusterableModel, CommonControlField):
 
         return items
 
-    def check_availability(self, user, collection=None, collection_id=None, purpose=None):
+    def check_availability(self, user, collection=None, collection_id=None, purpose=None, force_update=None, timeout=None):
         """
         Verifica disponibilidade das páginas do artigo.
 
@@ -1038,26 +791,155 @@ class Article(ClusterableModel, CommonControlField):
             qs = qs.filter(collection=collection)
         for art_col in qs:
             yield from art_col.check_pages(
-                user=user, purpose=purpose,
+                user=user, purpose=purpose, force_update=force_update, timeout=timeout
             )
 
-    def get_classic_website_availability(self, collection):
+    def available_on_classic_website(self, collection=None):
+        params = {}
+        if collection:
+            params["collection"] = collection
         status = self.article_collections.filter(
-            collection=collection,
             purpose=choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC,
+            **params
         ).first().status 
-        valid = status == choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE
+        valid = status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
         return {"valid": valid, "new_pid_status": get_pid_status_from_webpage_status(status)}
         
-    def get_public_website_availability(self, collection):
+    def available_on_public_website(self, collection=None):
+        params = {}
+        if collection:
+            params["collection"] = collection
         status = self.article_collections.filter(
-            collection=collection,
             purpose=choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC,
+            **params,
         ).first().status 
-        valid = status == choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE
+        valid = status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
         return {"valid": valid, "new_pid_status": get_pid_status_from_webpage_status(status)}
         
+    @classmethod
+    def get_repeated_values(cls, field_name, queryset=None, issue=None):
+        if not queryset:
+            queryset = cls.objects
+        params = {}
+        if issue:
+            params["issue"] = issue
+        queryset = queryset.filter(**params)
+        return (
+            queryset.values(field_name)
+            .annotate(total=Count("id"))
+            .filter(total__gt=1)
+            .values_list(field_name, flat=True)
+        )
 
+    @classmethod
+    def exclude_invalid_records(cls, user, issue, sps_pkg_id_list, timeout=None):
+        total_deletado = 0
+        
+        # Estrutura exata solicitada por você
+        items_to_delete = {
+            "sps_pkg_with_invalid_pid_v2": [],
+            "ppxml_invalid": [],
+            "repeated_sps_pkg_name": [],
+            "repeated_pid_v2": [],
+            "ppxml_ids": [],
+            "sps_pkg_ids": [],
+        }
+        ppxml_to_delete = set()
+        sps_pkg_to_delete = set()
+        
+        events = []
+
+        qs = cls.objects.select_related("pp_xml", "sps_pkg").filter(issue=issue)
+        
+        if sps_pkg_id_list:
+            qs = qs.filter(sps_pkg__id__in=sps_pkg_id_list)
+            if qs.exists():
+                sps_pkg_names = []
+                for pp_xml_id, sps_pkg_name, sps_pkg_id in qs.values_list("id", "pp_xml_id", "sps_pkg_name", "sps_pkg_id"):
+                    ppxml_to_delete.add(pp_xml_id)
+                    sps_pkg_to_delete.add(sps_pkg_id)
+                    sps_pkg_names.append(sps_pkg_name)
+                items_to_delete["sps_pkg_with_invalid_pid_v2"] = sps_pkg_names
+                qtd_deleted, _ = qs.delete()
+                total_deletado += qtd_deleted
+
+        # 1. Remoção por falta de pp_xml
+        qs = cls.objects.select_related("pp_xml").filter(issue=issue)
+        sps_pkg_names = []
+        article_ids = set()
+        for item in qs:
+            try:
+                xml_with_pre = item.pp_xml.xml_with_pre
+            except Exception:
+                article_ids.add(item.id)
+                ppxml_to_delete.add(item.pp_xml.id)
+                sps_pkg_to_delete.add(item.sps_pkg.id)
+                sps_pkg_names.append(item.sps_pkg_name)
+        if article_ids:
+            items_to_delete["ppxml_invalid"] = sps_pkg_names
+            qtd_deleted, _ = qs.filter(id__in=article_ids).delete()
+            total_deletado += qtd_deleted
+
+        # 2. Remoção por duplicidade
+        for field_name in ("sps_pkg_name", "pid_v2"):
+            qs = cls.objects.select_related("journal").filter(issue=issue)
+            
+            multiple_values = cls.get_repeated_values(field_name, qs)
+            
+            for value in list(multiple_values or []):
+                
+                # Filtra os registros que possuem este valor específico duplicado
+                duplicados = qs.filter(**{field_name: value}).order_by("-update")
+                
+                if not duplicados.exists():
+                    continue
+                
+                # Define o fallback (mais recente) caso nenhum seja válido na API
+                keep = duplicados.first()
+                
+                for item in duplicados:
+                    try:
+                        item.create_or_update_article_collections(user)
+                        item.check_availability(user, force_update=True, timeout=timeout)
+                        response = item.available_on_public_website()
+                        events.append(_("Checking {} is available. Result: {}").format(item, response))
+                        
+                        if response.get("valid"):
+                            keep = item
+                            break
+                    except Exception as e:
+                        events.append(_("Checking {} is available. Result: {}").format(item, e))
+                
+                # Separa os que serão deletados
+                remover_qs = duplicados.exclude(id=keep.id)
+                
+                if remover_qs.exists():
+                    sps_pkg_names = []
+                    for pp_xml_id, sps_pkg_name, sps_pkg_id in remover_qs.values_list("pp_xml_id", "sps_pkg_name", "sps_pkg_id"):
+                        ppxml_to_delete.add(pp_xml_id)
+                        sps_pkg_to_delete.add(sps_pkg_id)
+                        sps_pkg_names.append(sps_pkg_name)
+                    
+                    # Alimenta a chave dinâmica: "repeated_sps_pkg_name" ou "repeated_pid_v2"
+                    items_to_delete[f"repeated_{field_name}"].append((value, sps_pkg_names))
+                    
+                    # Executa a deleção e soma ao totalizador
+                    qtd_deletada, _ = remover_qs.delete()
+                    total_deletado += qtd_deletada
+
+        # Se você precisar retornar o total_deletado junto com o dicionário, 
+        # pode adicioná-lo ao dicionário ou retornar uma tupla. 
+        # Como o seu esqueleto final pedia apenas o retorno do dicionário, mantive assim:
+        if ppxml_to_delete:
+            PidProviderXML.objecsts.filter(id__in=ppxml_to_delete).delete()
+        if sps_pkg_to_delete:
+            SPSPkg.objecsts.filter(id__in=sps_pkg_to_delete).delete()
+        items_to_delete["ppxml_ids"] = ppxml_to_delete
+        items_to_delete["sps_pkg_ids"] = sps_pkg_to_delete
+        
+        return items_to_delete
+
+ 
 # ============================================================
 # Article DOI / Title / RelatedItem / RequestChange
 # ============================================================
@@ -1235,8 +1117,8 @@ class ArticleCollection(CommonControlField):
     status = models.CharField(
         _("Status"),
         max_length=16,
-        choices=choices.ARTICLE_COLLECTION_STATUS,
-        default=choices.ARTICLE_COLLECTION_STATUS_NOT_CHECKED,
+        choices=choices.ARTICLE_WEBPAGE_STATUS,
+        default=choices.ARTICLE_WEBPAGE_STATUS_NOT_CHECKED,
     )
 
     panels = [
@@ -1259,18 +1141,23 @@ class ArticleCollection(CommonControlField):
 
     # ── Status agregado ──
 
-    def update_aggregate_status(self):
+    def update_aggregate_status(self, user):
         """Recalcula status a partir das ArticleWebPage filhas."""
         pages = self.pages.all()
-        if not pages.exists():
+        status = set(pages.values_list("status").distinct())
+        if not status:
             self.status = choices.ARTICLE_WEBPAGE_STATUS_NOT_CHECKED
-        elif pages.exclude(
-            status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
-        ).exists():
-            self.status = choices.ARTICLE_WEBPAGE_STATUS_PARTIAL
-        else:
+        elif len(status) == 1:
+            self.status = status[0]
+        elif choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT in status:
+            self.status = choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+        elif choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH in status:
+            self.status = choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH
+        elif choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE in status:
             self.status = choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE
-        self.save(update_fields=["status", "updated"])
+        elif choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE in status:
+            self.status = choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE
+        self.save(update_fields=["status", "updated_by"])
 
     # ── get_or_create ──
 
@@ -1505,9 +1392,9 @@ class ArticleWebPage(CommonControlField):
 
     # ── Propagação ──
 
-    def propagate_status(self):
+    def propagate_status(self, user):
         """Propaga status para o ArticleCollection pai."""
-        self.article_collection.update_aggregate_status()
+        self.article_collection.update_aggregate_status(user)
 
     # ── URL update ──
 
@@ -1591,7 +1478,7 @@ class ArticleWebPage(CommonControlField):
         self.detail = detail
         self.updated_by = user
         self.save()
-        self.propagate_status()
+        self.propagate_status(user)
 
         detail["status"] = self.status
         detail["valid"] = (self.status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT)
