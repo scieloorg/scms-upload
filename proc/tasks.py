@@ -2077,12 +2077,12 @@ def task_check_migrated_article(
             raise ValueError(
                 f"ArticleProc {article_proc_id} has no article"
             )
-        response = article.get_classic_website_availability(article_proc.collection)
+        response = article.available_on_classic_website(article_proc.collection)
         article_proc.set_pid_status(user, response.get("new_pid_status"))
         if not response.get("valid"):
             return
             
-        response = article.get_classic_website_availability(article_proc.collection)
+        response = article.available_on_public_website(article_proc.collection)
         article_proc.set_pid_status(user, response.get("new_pid_status"))
 
     except Exception as e:
