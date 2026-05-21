@@ -23,11 +23,9 @@ from wagtail.admin.panels import (
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
-from article.models import Article, ArticleCollection, ArticleWebPage
-from article.page_checker import check_content, check_url
-from article import choices as article_choices
+from article.models import Article
 from collection import choices as collection_choices
-from collection.models import Collection, WebSiteConfiguration
+from collection.models import Collection
 from core.models import CommonControlField
 from core.utils.file_utils import delete_files
 from core.utils.sanitize import sanitize_for_json
@@ -36,7 +34,6 @@ from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
 from journal.models import Journal
 from migration import choices as migration_choices
-from migration.models import ClassicWebsiteConfiguration
 from migration.controller import (
     PkgZipBuilder,
     XMLVersionXmlWithPreError,
@@ -2273,11 +2270,10 @@ class ArticleProc(BaseProc, ClusterableModel):
                 )
             )
 
-    # ── select / filter ──
-
     @classmethod
     def select_items(
         cls,
+        qs=None,
         collection_acron=None,
         journal_acron=None,
         issue_folder=None,
@@ -2289,13 +2285,17 @@ class ArticleProc(BaseProc, ClusterableModel):
         article_proc_id_list=None,
         status_list=None,
         force_update=False,
+        sps_pkg_id_list=None,
     ):
+        status = status_list
         status_list = tracker_choices.get_valid_status(status_list, force_update)
         journal_proc_id_list = journal_proc_id_list or []
         issue_proc_id_list = issue_proc_id_list or []
         exclude_issue_proc_id_list = exclude_issue_proc_id_list or []
 
         params = {}
+        if sps_pkg_id_list:
+            params["sps_pkg_id__in"] = sps_pkg_id_list
         if collection_acron:
             params["collection__acron"] = collection_acron
         if journal_acron:
@@ -2313,14 +2313,24 @@ class ArticleProc(BaseProc, ClusterableModel):
         if article_proc_id_list:
             params["id__in"] = article_proc_id_list
 
-        return cls.objects.filter(
-            Q(migration_status__in=status_list)
-            | Q(xml_status__in=status_list)
-            | Q(sps_pkg_status__in=status_list)
-            | Q(qa_ws_status__in=status_list)
-            | Q(public_ws_status__in=status_list),
+        qs_status = Q()
+        if status:
+            qs_status = (
+                Q(migration_status__in=status_list)
+                | Q(xml_status__in=status_list)
+                | Q(sps_pkg_status__in=status_list)
+                | Q(qa_ws_status__in=status_list)
+                | Q(public_ws_status__in=status_list)
+            )
+
+        qs = qs or cls.objects
+        qs = qs.filter(
+            qs_status,
             **params,
-        ).exclude(issue_proc__id__in=exclude_issue_proc_id_list)
+        )
+        if exclude_issue_proc_id_list:
+            return qs.exclude(issue_proc__id__in=exclude_issue_proc_id_list)
+        return qs
 
     @classmethod
     def filter_by_status(cls, STATUS):
@@ -2524,6 +2534,43 @@ class ArticleProc(BaseProc, ClusterableModel):
                 user, correct_pid_v2=self.migrated_data.pid
             )
 
+    @classmethod
+    def get_sps_pkg_ids_which_pid_v2_is_incorrect(cls, items=None, issue=None):
+        if issue and not items:
+            items = cls.objects.filter(
+                pid__isnull=False,
+                migrated_data__isnull=False,
+                sps_pkg__pid_v2__isnull=False,
+                issue_proc__issue=issue,
+            )
+        if not items.exists():
+            return set()
+
+        from django.db.models import F
+        return set(
+            items
+            .exclude(migrated_data__pid=F("sps_pkg__pid_v2"))
+            .values_list("sps_pkg_id", flat=True)
+        )
+
+    @classmethod
+    def exclude_invalid_items(cls, user, issue):
+        cls.objects.filter(sps_pkg__isnull=True).delete()
+
+        # obtém sps_pkg_ids cujo pid_v2 não corresponde ao ArticleProc.pid
+        sps_pkg_id_list = ArticleProc.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
+
+        # completa sps_pkg.pid_v2 com os valores de sps_pkg.xml_with_pre.v2
+        SPSPkg.complete_pid_v2(user, sps_pkg_id_list=sps_pkg_id_list)
+
+        # obtém novamente sps_pkg_ids cujo pid_v2 não corresponde ao ArticleProc.pid
+        sps_pkg_id_list = ArticleProc.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
+
+        qs = cls.objects.filter(sps_pkg_id__in=sps_pkg_id_list)
+        items = qs.values("pid", "sps_pkg__sps_pkg_name")
+        qs.delete()
+        return {"sps_pkg_id_list": sps_pkg_id_list, "deleted": items}
+
     def update_sps_pkg_status(self):
         if self.sps_pkg:
             if self.sps_pkg.registered_in_core:
@@ -2548,7 +2595,6 @@ class ArticleProc(BaseProc, ClusterableModel):
                 return Article.objects.get(sps_pkg=sps_pkg)
         except (AttributeError, Article.DoesNotExist) as e:
             logging.info(f"Not found ArticleProc.article: {sps_pkg} {e}")
-
 
     # ── migration flow ──
 
