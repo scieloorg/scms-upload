@@ -172,7 +172,7 @@ class ArticleWebPageFilterSet(django_filters.FilterSet):
         lookup_expr="exact",
     )
     collection = django_filters.ModelChoiceFilter(
-        field_name="article_collection__collection",
+        field_name="collection",
         label=_("Collection"),
         queryset=Collection.objects.all(),
     )
@@ -197,15 +197,16 @@ class ArticleWebPageSnippetViewSet(SnippetViewSet):
         "fmt",
         "lang",
         "status",
-        "article_collection",
+        "article",
+        "collection",
         "updated",
     )
     filterset_class = ArticleWebPageFilterSet
     search_fields = (
         "url",
-        "article_collection__article__pid_v3",
-        "article_collection__article__pid_v2",
-        "article_collection__article__sps_pkg__sps_pkg_name",
+        "article__pid_v3",
+        "article__pid_v2",
+        "article__sps_pkg__sps_pkg_name",
     )
     ordering = ["-updated"]
 
@@ -213,8 +214,8 @@ class ArticleWebPageSnippetViewSet(SnippetViewSet):
         qs = super().get_queryset(request)
         try:
             return qs.select_related(
-                "article_collection__article",
-                "article_collection__collection",
+                "article",
+                "collection",
                 "lang",
             ).distinct()
         except AttributeError:
