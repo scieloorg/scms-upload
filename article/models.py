@@ -857,10 +857,12 @@ class Article(ClusterableModel, CommonControlField):
             qs = qs.filter(sps_pkg__id__in=sps_pkg_id_list)
             if qs.exists():
                 sps_pkg_names = []
-                for pp_xml_id, sps_pkg_name, sps_pkg_id in qs.values_list("pp_xml_id", "sps_pkg_name", "sps_pkg_id"):
-                    ppxml_to_delete.add(pp_xml_id)
-                    sps_pkg_to_delete.add(sps_pkg_id)
-                    sps_pkg_names.append(sps_pkg_name)
+                for pp_xml_id, sps_pkg_name, sps_pkg_id in qs.values_list("pp_xml_id", "sps_pkg__sps_pkg_name", "sps_pkg_id"):
+                    if pp_xml_id:
+                        ppxml_to_delete.add(pp_xml_id)
+                    if sps_pkg_id:
+                        sps_pkg_to_delete.add(sps_pkg_id)
+                        sps_pkg_names.append(sps_pkg_name)
                 items_to_delete["sps_pkg_with_invalid_pid_v2"] = sps_pkg_names
                 qtd_deleted, _ = qs.delete()
                 total_deletado += qtd_deleted
@@ -874,16 +876,18 @@ class Article(ClusterableModel, CommonControlField):
                 xml_with_pre = item.pp_xml.xml_with_pre
             except Exception:
                 article_ids.add(item.id)
-                ppxml_to_delete.add(item.pp_xml.id)
-                sps_pkg_to_delete.add(item.sps_pkg.id)
-                sps_pkg_names.append(item.sps_pkg_name)
+                if item.pp_xml:
+                    ppxml_to_delete.add(item.pp_xml.id)
+                if item.sps_pkg:
+                    sps_pkg_to_delete.add(item.sps_pkg.id)
+                    sps_pkg_names.append(item.sps_pkg.sps_pkg_name)
         if article_ids:
             items_to_delete["ppxml_invalid"] = sps_pkg_names
             qtd_deleted, _ = qs.filter(id__in=article_ids).delete()
             total_deletado += qtd_deleted
 
         # 2. Remoção por duplicidade
-        for field_name in ("sps_pkg_name", "pid_v2"):
+        for field_name in ("sps_pkg__sps_pkg_name", "pid_v2"):
             qs = cls.objects.select_related("journal").filter(issue=issue)
             
             multiple_values = cls.get_repeated_values(field_name, qs)
@@ -917,10 +921,12 @@ class Article(ClusterableModel, CommonControlField):
                 
                 if remover_qs.exists():
                     sps_pkg_names = []
-                    for pp_xml_id, sps_pkg_name, sps_pkg_id in remover_qs.values_list("pp_xml_id", "sps_pkg_name", "sps_pkg_id"):
-                        ppxml_to_delete.add(pp_xml_id)
-                        sps_pkg_to_delete.add(sps_pkg_id)
-                        sps_pkg_names.append(sps_pkg_name)
+                    for pp_xml_id, sps_pkg_name, sps_pkg_id in remover_qs.values_list("pp_xml_id", "sps_pkg__sps_pkg_name", "sps_pkg_id"):
+                        if pp_xml_id:
+                            ppxml_to_delete.add(pp_xml_id)
+                        if sps_pkg_id:
+                            sps_pkg_to_delete.add(sps_pkg_id)
+                            sps_pkg_names.append(sps_pkg_name)
                     
                     # Alimenta a chave dinâmica: "repeated_sps_pkg_name" ou "repeated_pid_v2"
                     items_to_delete[f"repeated_{field_name}"].append((value, sps_pkg_names))
@@ -1222,7 +1228,7 @@ class ArticleCollection(CommonControlField):
             purpose = ws_config.purpose  # "PUBLIC" ou "QA"
             for item in article.get_webpage_items(ws_config.url, purpose):
                 page = ArticleWebPage.get_or_create_from_item(
-                    user, self, item
+                    user, self.article, self.collection, item
                 )
                 existing_ids.add(page.id)
 
@@ -1234,7 +1240,7 @@ class ArticleCollection(CommonControlField):
                 classic_ws.url, purpose
             ):
                 page = ArticleWebPage.get_or_create_from_item(
-                    user, self, item
+                    user, self.article, self.collection, item
                 )
                 existing_ids.add(page.id)
                 # obter apenas 1
@@ -1243,7 +1249,7 @@ class ArticleCollection(CommonControlField):
                 classic_ws.url, purpose
             ):
                 page = ArticleWebPage.get_or_create_from_item(
-                    user, self, item
+                    user, self.article, self.collection, item
                 )
                 # obter apenas 1
                 existing_ids.add(page.id)
@@ -1251,6 +1257,13 @@ class ArticleCollection(CommonControlField):
         # Remove páginas órfãs
         self.pages.exclude(id__in=existing_ids).delete()
        
+    @property
+    def pages(self):
+        return ArticleWebPage.objects.filter(
+            collection=self.collection,
+            article=self.article,
+        )
+
     # ── Disponibilidade: queries ──
 
     @property
@@ -1348,8 +1361,20 @@ class ArticleWebPage(CommonControlField):
     Propagação de status: Page → ArticleCollection.
     """
 
-    article_collection = models.ForeignKey(
-        ArticleCollection,
+    # article_collection = models.ForeignKey(
+    #     ArticleCollection,
+    #     on_delete=models.CASCADE,
+    #     related_name="pages",
+    #     null=True, blank=True,
+    # )
+    article = models.ForeignKey(
+        Article,
+        on_delete=models.CASCADE,
+        related_name="pages",
+        null=True, blank=True,
+    )
+    collection = models.ForeignKey(
+        Collection,
         on_delete=models.CASCADE,
         related_name="pages",
         null=True, blank=True,
@@ -1381,7 +1406,8 @@ class ArticleWebPage(CommonControlField):
     detail = models.JSONField(_("Detail"), null=True, blank=True)
 
     panels = [
-        FieldPanel("article_collection", read_only=True),
+        FieldPanel("article", read_only=True),
+        FieldPanel("collection", read_only=True),
         FieldPanel("purpose", read_only=True),
         FieldPanel("url", read_only=True),
         FieldPanel("fmt", read_only=True),
@@ -1393,10 +1419,12 @@ class ArticleWebPage(CommonControlField):
     class Meta:
         verbose_name = _("Article web page")
         verbose_name_plural = _("Article web pages")
-        unique_together = ("article_collection", "purpose", "fmt", "lang")
+        unique_together = [
+            ("article", "collection", "purpose", "fmt", "lang")
+        ]
         indexes = [
-            models.Index(fields=["article_collection", "status"]),
-            models.Index(fields=["article_collection", "purpose"]),
+            models.Index(fields=["article", "collection", "status"]),
+            models.Index(fields=["article", "collection", "purpose"]),
             models.Index(fields=["purpose", "status"]),
         ]
 
@@ -1407,7 +1435,10 @@ class ArticleWebPage(CommonControlField):
 
     def propagate_status(self, user):
         """Propaga status para o ArticleCollection pai."""
-        self.article_collection.update_aggregate_status(user)
+        ArticleCollection.objects.get(
+            collection=self.collection,
+            article=self.article,
+        ).update_aggregate_status(user)
 
     # ── URL update ──
 
@@ -1464,7 +1495,7 @@ class ArticleWebPage(CommonControlField):
             self.status = choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE
 
             if not article_metadata:
-                article = self.article_collection.article
+                article = self.article
                 lang_code = self.lang.code2 if self.lang else None
                 article_metadata = article.get_metadata_items(lang_code)
             if not article_metadata:
@@ -1501,7 +1532,7 @@ class ArticleWebPage(CommonControlField):
     # ── Factory ──
 
     @classmethod
-    def get_or_create_from_item(cls, user, article_collection, item):
+    def get_or_create_from_item(cls, user, article, collection, item):
         """
         Cria ou atualiza uma ArticleWebPage a partir de um dict de URL.
 
@@ -1516,7 +1547,8 @@ class ArticleWebPage(CommonControlField):
         """
         lang_obj = Language.objects.filter(code2=item["lang"]).first()
         page, created = cls.objects.get_or_create(
-            article_collection=article_collection,
+            article=article,
+            collection=collection,
             purpose=item["purpose"],
             fmt=item["format"],
             lang=lang_obj,
