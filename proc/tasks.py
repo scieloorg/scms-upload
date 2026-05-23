@@ -1501,6 +1501,7 @@ def task_publish_article(
                 website_id=website_id,
                 timeout=timeout,
                 force_update=force_update,
+                article_proc_id=article_proc_id,
             )
 
         event.finish(user, detail=detail, completed=True)
@@ -1725,6 +1726,7 @@ def task_track_classic_website_article_pids(
     user_id=None,
     collection_acron=None,
     timeout=None,
+    force_update=None,
 ):
     """
     Agenda rastreamento de PIDs do site clássico para cada coleção.
@@ -1736,6 +1738,7 @@ def task_track_classic_website_article_pids(
         "username": username,
         "collection_acron": collection_acron,
         "timeout": timeout,
+        "force_update": force_update,
     }
     task_exec = TaskExecution(
         name="proc.tasks.task_track_classic_website_article_pids",
@@ -1750,6 +1753,7 @@ def task_track_classic_website_article_pids(
                 user_id=user_id,
                 collection_acron=collection.acron,
                 timeout=timeout,
+                force_update=force_update,
             )
         task_exec.finish()
     except Exception as e:
@@ -1764,7 +1768,7 @@ def task_track_classic_website_article_pids_for_collection(
     user_id=None,
     collection_acron=None,
     timeout=None,
-    force_check=None,
+    force_update=None,
 ):
     """
     Rastreia PIDs do site clássico para uma coleção e agenda verificação.
@@ -1792,13 +1796,14 @@ def task_track_classic_website_article_pids_for_collection(
         task_exec.add_event(result)
 
         for item in ArticleProc.items_to_check_url_and_content(
-            collection, force_check
+            collection, force_update
         ):
             task_check_migrated_article.delay(
                 user_id=user_id,
                 username=username,
                 article_proc_id=item.id,
                 timeout=timeout,
+                force_update=force_update,
             )
 
         task_exec.finish()
@@ -1823,6 +1828,7 @@ def task_check_article_webpages(
     collection_acron=None,
     timeout=None,
     force_update=None,
+    article_proc_id=None,
 ):
     """
     Cria/atualiza ArticleCollections do artigo e verifica disponibilidade de páginas.
@@ -1835,14 +1841,29 @@ def task_check_article_webpages(
     """
     try:
         user = _get_user(user_id, username)
+        event = None
+        article_proc = ArticleProc.objects.get(pk=article_proc_id)
+        event = article_proc.start(
+            user, f"check availability {article_proc.collection} {website_kind}"
+        )
+
         article = Article.objects.select_related("journal").get(
             id=article_id
         )
         article.create_or_update_article_collections(user)
-        article.check_availability(user, collection_id=collection_id, purpose=website_kind)
+        collection = article_proc.collection
+        response = article.available_on_public_website(collection)
+        if not response.get("valid"):
+            response = article.check_availability(user, collection_id=collection_id, purpose=website_kind)
+            response = article.available_on_public_website(collection)
 
+        article_proc.set_pid_status(response.get("new_pid_status"))
+        event.finish(user, completed=True, detail=response)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
+        if event:
+            event.finish(user, exception=e, exc_traceback=exc_traceback)
+            return
         UnexpectedEvent.create(
             e=e,
             exc_traceback=exc_traceback,
