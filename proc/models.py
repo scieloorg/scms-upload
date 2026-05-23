@@ -454,7 +454,7 @@ class BaseProc(CommonControlField):
     pid = models.CharField(_("PID"), max_length=23, null=True, blank=True)
 
     migration_status = models.CharField(
-        _("Migration Status"),
+        _("Registration Status"),
         max_length=8,
         choices=tracker_choices.PROGRESS_STATUS,
         default=tracker_choices.PROGRESS_STATUS_TODO,
@@ -2419,14 +2419,11 @@ class ArticleProc(BaseProc, ClusterableModel):
             migration_choices.PID_STATUS_MISSING,
             migration_choices.PID_STATUS_EXCEEDING,
             migration_choices.PID_STATUS_UNKNOWN,
-            migration_choices.PID_STATUS_PUBLIC_VALID,
         )
         if force_update:
-            exclude_list = (
-                migration_choices.PID_STATUS_MISSING,
-                migration_choices.PID_STATUS_EXCEEDING,
-                migration_choices.PID_STATUS_UNKNOWN,
-            )
+            exclude_list = list(exclude_list)
+            exclude_list.append(migration_choices.PID_STATUS_PUBLIC_VALID)
+
         params = {}
         if collection:
             params["collection"] = collection
@@ -2632,7 +2629,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             )
 
     def set_pid_status(self, user, pid_status):
-        if pid_status != self.pid_status:
+        if pid_status and pid_status != self.pid_status:
             self.pid_status = pid_status
             self.updated_by = user
             self.save()
