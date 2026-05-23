@@ -87,17 +87,17 @@ class WebSiteConfiguration(CommonControlField, ClusterableModel):
     collection = models.ForeignKey(
         Collection, null=True, blank=True, on_delete=models.SET_NULL
     )
-    url = models.URLField(_("Website URL"), max_length=255, null=True, blank=True)
-    api_url_article = models.URLField(
+    url = models.CharField(_("Website URL"), max_length=255, null=True, blank=True)
+    api_url_article = models.CharField(
         _("Article API URL"), max_length=255, null=True, blank=True
     )
-    api_url_issue = models.URLField(
+    api_url_issue = models.CharField(
         _("Issue API URL"), max_length=255, null=True, blank=True
     )
-    api_url_journal = models.URLField(
+    api_url_journal = models.CharField(
         _("Journal API URL"), max_length=255, null=True, blank=True
     )
-    api_get_token_url = models.URLField(
+    api_get_token_url = models.CharField(
         _("Get token API URL"), max_length=255, null=True, blank=True
     )
     api_username = models.CharField(max_length=64, null=True, blank=True)
@@ -326,7 +326,7 @@ class WebSiteConfigurationEndpoint(CommonControlField):
         related_name="endpoint",
     )
     name = models.CharField(_("Endpoint name"), max_length=255, null=True, blank=True)
-    url = models.URLField(_("Endpoint URL"), max_length=128, null=True, blank=True)
+    url = models.CharField(_("Endpoint URL"), max_length=128, null=True, blank=True)
     enabled = models.BooleanField(default=False)
 
     panels = [
