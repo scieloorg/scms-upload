@@ -33,7 +33,6 @@ class Collection(CommonControlField):
         _("Collection Acronym"), max_length=16, null=True, blank=True
     )
     name = models.CharField(_("Collection Name"), max_length=64, null=True, blank=True)
-    url = models.URLField(_("Collection URL"), max_length=255, null=True, blank=True)
 
     base_form_class = CoreAdminModelForm
 

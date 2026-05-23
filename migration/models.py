@@ -65,6 +65,7 @@ class ClassicWebsiteConfiguration(CommonControlField):
     collection = models.ForeignKey(
         Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
+    url = models.URLField(_("Collection URL"), max_length=255, null=True, blank=True)
 
     title_path = models.CharField(
         _("Title path"),
@@ -199,16 +200,6 @@ class ClassicWebsiteConfiguration(CommonControlField):
     @property
     def pid_list(self):
         return self.get_pid_list()
-
-    @property
-    def url(self):
-        try:
-            url = self.collection.url
-            if url:
-                return url
-        except AttributeError:
-            pass
-        raise ValueError(f"Collection {self.collection} does not have a URL defined")
 
 
 class MigratedData(CommonControlField):
