@@ -288,6 +288,8 @@ class SPSPkgComponent(FileLocation, Orderable):
 
 class SPSPkg(CommonControlField, ClusterableModel):
     pid_v3 = models.CharField(max_length=23, null=True, blank=True)
+    pid_v2 = models.CharField(max_length=23, null=True, blank=True)
+    
     sps_pkg_name = models.CharField(_("SPS Name"), max_length=100, null=True, blank=True)
 
     # zip
@@ -420,7 +422,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             return False
 
     @classmethod
-    def _get_or_create(cls, user, pid_v3, sps_pkg_name, registered_in_core):
+    def _get_or_create(cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2):
         try:
             obj = cls.objects.get(sps_pkg_name=sps_pkg_name)            
         except cls.MultipleObjectsReturned:
@@ -432,6 +434,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             obj.creator = user
             obj.sps_pkg_name = sps_pkg_name
         obj.pid_v3 = pid_v3
+        obj.pid_v2 = pid_v2
         obj.registered_in_core = registered_in_core
         obj.updated_by = user
         obj.save()
@@ -573,6 +576,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     pid_v3=response["v3"],
                     sps_pkg_name=response["pkg_name"],
                     registered_in_core=response.get("registered_in_core"),
+                    pid_v2=response["v2"],
                 )
 
                 if response.get("changed"):
@@ -847,12 +851,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 content = item["content"].encode("utf-8")
             except KeyError:
                 content = None
-            # PreviewArticlePage.create_or_update(
-            #     user,
-            #     self,
-            #     lang=Language.get_or_create(creator=user, code2=lang),
-            #     content=content,
-            # )
             response = self.upload_to_the_cloud(
                 user,
                 item["filename"],
@@ -912,3 +910,29 @@ class SPSPkg(CommonControlField, ClusterableModel):
             return pub_date
         # em caso de data incompleta, tenta retornar a data completa, completando com 06 o mes ausente e com 15 o dia ausente
         return xml_with_pre.get_complete_publication_date()
+    
+    @classmethod
+    def complete_pid_v2(cls, user, sps_pkg_id_list=None):
+        filters = {
+            "pid_v2__isnull": True,
+        }
+        if sps_pkg_id_list:
+            filters["sps_pkg_id__in"] = sps_pkg_id_list
+
+        # 1. Buscamos os objetos (o select_related é essencial aqui para evitar o problema de N+1)
+        items_to_update = []
+        queryset = cls.objects.filter(**filters)
+
+        for item in queryset:
+            # 2. Atualizamos o valor na instância em memória
+            # Certifique-se de que o caminho 'sps_pkg.xml_with_pre.v2' está correto
+            try:
+                item.pid_v2 = item.xml_with_pre.v2
+                item.updated_by = user
+                items_to_update.append(item)
+            except Exception:
+                pass
+
+        # 4. Salvamos tudo em uma única consulta ao banco
+        if items_to_update:
+            cls.objects.bulk_update(items_to_update, ["pid_v2", "updated_by"])

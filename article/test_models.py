@@ -145,7 +145,7 @@ class ArticleExcludeArticlesWithInvalidPidV2TestCase(unittest.TestCase):
 
 
 class ArticleExcludeInconvenientArticlesTestCase(unittest.TestCase):
-    """Test cases for Article.exclude_inconvenient_articles()."""
+    """Test cases for Article.exclude_invalid_records()."""
 
     @patch("article.models.Article.exclude_repetitions")
     @patch("article.models.Article.get_repeated_items")
@@ -162,7 +162,7 @@ class ArticleExcludeInconvenientArticlesTestCase(unittest.TestCase):
         mock_issue = Mock()
         mock_user = Mock()
 
-        results = Article.exclude_inconvenient_articles(mock_issue, mock_user)
+        results = Article.exclude_invalid_records(mock_issue, mock_user)
 
         mock_invalid.assert_called_once_with(mock_issue)
         self.assertEqual(mock_repeated.call_count, 2)
@@ -181,7 +181,7 @@ class ArticleExcludeInconvenientArticlesTestCase(unittest.TestCase):
         mock_repeated_qs.__iter__ = Mock(return_value=iter(["value1"]))
         mock_repeated.return_value = mock_repeated_qs
 
-        results = Article.exclude_inconvenient_articles(Mock(), Mock())
+        results = Article.exclude_invalid_records(Mock(), Mock())
 
         self.assertIn("repetition event", results["events"])
 
@@ -197,7 +197,7 @@ class ArticleExcludeInconvenientArticlesTestCase(unittest.TestCase):
         mock_repeated_qs.__iter__ = Mock(return_value=iter([]))
         mock_repeated.return_value = mock_repeated_qs
 
-        results = Article.exclude_inconvenient_articles(Mock(), Mock())
+        results = Article.exclude_invalid_records(Mock(), Mock())
 
         self.assertEqual(len(results["exceptions"]), 1)
         self.assertIn("test error", results["exceptions"][0]["exclude_articles_with_invalid_pid_v2"])

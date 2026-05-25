@@ -65,6 +65,7 @@ class ClassicWebsiteConfiguration(CommonControlField):
     collection = models.ForeignKey(
         Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
+    url = models.CharField(_("Collection URL"), max_length=255, null=True, blank=True)
 
     title_path = models.CharField(
         _("Title path"),

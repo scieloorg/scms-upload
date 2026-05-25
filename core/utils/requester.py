@@ -82,7 +82,7 @@ def post_data(
         requests.exceptions.MissingSchema,
         requests.exceptions.InvalidURL,
     ) as exc:
-        raise NonRetryableError(exc) from exc
+        raise NonRetryableError() from exc
     try:
         response.raise_for_status()
     except requests.HTTPError as exc:
