@@ -33,34 +33,31 @@ from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
 
 User = get_user_model()
 
-# Constantes de Entrada (Webpage Status)
-ARTICLE_WEBPAGE_STATUS_UNAVAILABLE = "unavailable"
-ARTICLE_WEBPAGE_STATUS_AVAILABLE = "available"
-ARTICLE_WEBPAGE_STATUS_VALID_CONTENT = "valid_content"
-ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH = "content_mismatch"
-ARTICLE_WEBPAGE_STATUS_NOT_CHECKED = "not-checked"
 
-# Constantes de Saída (PID Status)
-PID_STATUS_CLASSIC_MATCHED = "classic_ok"
-PID_STATUS_CLASSIC_MISMATCHED = "classic_nok"
-PID_STATUS_CLASSIC_NOT_FOUND = "classic_nfound"
-PID_STATUS_CLASSIC_FOUND = "classic_found"
-
-
-def get_pid_status_from_webpage_status(article_status: str) -> str:
+def get_pid_status_from_webpage_status(website, article_status: str) -> str:
     """
     Realiza a correspondência entre o status da página e o status do PID.
     """
     mapping = {
-        choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE: migration_choices.PID_STATUS_CLASSIC_FOUND,
-        choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT: migration_choices.PID_STATUS_CLASSIC_MATCHED,
-        choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH: migration_choices.PID_STATUS_CLASSIC_MISMATCHED,
-        choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE: migration_choices.PID_STATUS_CLASSIC_NOT_FOUND,
-        choices.ARTICLE_WEBPAGE_STATUS_NOT_CHECKED: migration_choices.PID_STATUS_UNKNOWN,
+        "CLASSIC": {
+            choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE: migration_choices.PID_STATUS_CLASSIC_FOUND,
+            choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT: migration_choices.PID_STATUS_CLASSIC_MATCHED,
+            choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH: migration_choices.PID_STATUS_CLASSIC_MISMATCHED,
+            choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE: migration_choices.PID_STATUS_CLASSIC_NOT_FOUND,
+            choices.ARTICLE_WEBPAGE_STATUS_NOT_CHECKED: migration_choices.PID_STATUS_UNKNOWN,
+        },
+        "PUBLIC": {
+            choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE: migration_choices.PID_STATUS_PUBLISHED,
+            choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT: migration_choices.PID_STATUS_PUBLIC_VALID,
+            choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH: migration_choices.PID_STATUS_PUBLIC_MISMATCHED,
+            choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE: migration_choices.PID_STATUS_PUBLIC_NOT_FOUND,
+            choices.ARTICLE_WEBPAGE_STATUS_NOT_CHECKED: migration_choices.PID_STATUS_UNKNOWN,
+        },
     }
 
+
     # Retorna o valor mapeado ou o status de 'not found' por padrão
-    return mapping.get(article_status, migration_choices.PID_STATUS_UNKNOWN)
+    return mapping.get(website).get(article_status, migration_choices.PID_STATUS_UNKNOWN)
 
 
 # ============================================================
@@ -175,7 +172,8 @@ class Article(ClusterableModel, CommonControlField):
         heading=_("Collections"), classname="collapsible"
     )
     panel_collections.children = [
-        InlinePanel("article_collections", label="Collections"),
+        InlinePanel(relation_name="article_collections", label="Collections"),
+        InlinePanel(relation_name="pages", label=_("Web pages")),
     ]
 
     panels = [
@@ -810,7 +808,7 @@ class Article(ClusterableModel, CommonControlField):
             return {"valid": False, "new_pid_status": None}
         status = article_collection.get_compiled_status(purpose)
         valid = status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
-        return {"valid": valid, "new_pid_status": get_pid_status_from_webpage_status(status)}
+        return {"valid": valid, "new_pid_status": get_pid_status_from_webpage_status(purpose, status)}
         
     def available_on_classic_website(self, collection=None):
         return self._available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC)
@@ -1111,7 +1109,7 @@ class ArticleCollection(CommonControlField):
     ArticleWebsite e ClassicArticleWebPage.
     """
 
-    article = models.ForeignKey(
+    article = ParentalKey(
         Article,
         on_delete=models.CASCADE,
         related_name="article_collections",
@@ -1119,7 +1117,7 @@ class ArticleCollection(CommonControlField):
     collection = models.ForeignKey(
         Collection,
         on_delete=models.CASCADE,
-        related_name="article_collections",
+        # related_name="article_collections",
     )
 
     status = models.CharField(
@@ -1367,7 +1365,7 @@ class ArticleWebPage(CommonControlField):
     #     related_name="pages",
     #     null=True, blank=True,
     # )
-    article = models.ForeignKey(
+    article = ParentalKey(
         Article,
         on_delete=models.CASCADE,
         related_name="pages",
@@ -1376,7 +1374,7 @@ class ArticleWebPage(CommonControlField):
     collection = models.ForeignKey(
         Collection,
         on_delete=models.CASCADE,
-        related_name="pages",
+        # related_name="pages",
         null=True, blank=True,
     )
     purpose = models.CharField(
