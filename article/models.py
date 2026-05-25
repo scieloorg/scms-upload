@@ -800,12 +800,19 @@ class Article(ClusterableModel, CommonControlField):
                 response.append(resp)
         return response
 
+    @property
+    def availability(self):
+        data = []
+        for item in ArticleWebPage.objects.filter(article=self):
+            data.append(item.detail)
+        return data
+
     def _available_on_website(self, collection, purpose=None):
         article_collection = self.article_collections.filter(
             collection=collection
         ).first()
         if not article_collection:
-            return {"valid": False, "new_pid_status": None}
+            return {"valid": None, "new_pid_status": None, "error": "No collection", "collecion": collection.acron, "purpose": purpose}
         status = article_collection.get_compiled_status(purpose)
         valid = status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
         return {"valid": valid, "new_pid_status": get_pid_status_from_webpage_status(purpose, status)}
@@ -1460,6 +1467,7 @@ class ArticleWebPage(CommonControlField):
             "purpose": self.purpose,
             "status": self.status,
             "valid": self.status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT,
+            "detail": self.detail,
         }
 
     def check_page(
