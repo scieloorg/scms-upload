@@ -232,7 +232,7 @@ class WebSiteConfiguration(CommonControlField, ClusterableModel):
             ).first()
             return ws.url
         except WebSiteConfiguration.DoesNotExist:            
-            raise
+            raise WebSiteConfiguration.DoesNotExist(f"{collection} {purpose}")
 
     @property
     def public_website_url(self):
