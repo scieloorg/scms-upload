@@ -1498,7 +1498,6 @@ def task_publish_article(
                 collection_id=article_proc.collection.id,
                 website_kind=website_kind,
                 article_id=article_proc.article.id,
-                website_id=website_id,
                 timeout=timeout,
                 force_update=force_update,
                 article_proc_id=article_proc_id,
@@ -1857,7 +1856,7 @@ def task_check_article_webpages(
             response = article.check_availability(user, collection_id=collection_id, purpose=website_kind)
             response = article.available_on_public_website(collection)
 
-        article_proc.set_pid_status(response.get("new_pid_status"))
+        article_proc.set_pid_status(user, response.get("new_pid_status"))
         event.finish(user, completed=True, detail=response)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
