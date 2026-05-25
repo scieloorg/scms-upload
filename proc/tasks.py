@@ -1851,13 +1851,20 @@ def task_check_article_webpages(
         )
         article.create_or_update_article_collections(user)
         collection = article_proc.collection
+        data = {}
+        responses = []
         response = article.available_on_public_website(collection)
-        if not response.get("valid"):
-            response = article.check_availability(user, collection_id=collection_id, purpose=website_kind)
-            response = article.available_on_public_website(collection)
+        responses.append(response)
 
+        response = article.check_availability(user, collection_id=collection_id, purpose=website_kind)
+        response = article.available_on_public_website(collection)
+        responses.append(response)
+
+        data["responses"] = responses
+        data["detail"] = article.availability
+    
         article_proc.set_pid_status(user, response.get("new_pid_status"))
-        event.finish(user, completed=True, detail=response)
+        event.finish(user, completed=True, detail=data)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         if event:
