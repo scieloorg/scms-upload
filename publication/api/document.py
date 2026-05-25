@@ -1,7 +1,3 @@
-import json
-import logging
-from datetime import datetime
-
 from django.utils.translation import gettext_lazy as _
 
 from publication.api.publication import PublicationAPI

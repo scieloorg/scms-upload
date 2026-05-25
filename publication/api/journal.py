@@ -1,4 +1,5 @@
 import logging
+import re
 
 from django.utils.translation import gettext_lazy as _
 
@@ -200,6 +201,20 @@ class JournalPayload:
         # Sponsors
         self.data["sponsors"].append({"name": sponsor})
 
+    @staticmethod
+    def _clean_br_tags(text):
+        """
+        Replace <br>, <br/>, <br /> HTML tags with ", " and clean up
+        resulting duplicate commas and extra whitespace.
+        """
+        if not text:
+            return text
+        # Replace <br> variants (case insensitive) with ", "
+        text = re.sub(r"<br\s*/?>", ", ", text, flags=re.IGNORECASE)
+        # Collapse sequences of commas and whitespace (e.g. ", , " -> ", ")
+        text = re.sub(r"(\s*,\s*)+", ", ", text)
+        return text.strip(", ")
+
     def add_contact(self, name, email, address, city, state, country):
         # email to contact
         # self.data["editor_email"] = email
@@ -210,7 +225,7 @@ class JournalPayload:
         # self.data["publisher_country"] = country
         self.data["contact"] = {
             "email": email,
-            "address": address,
+            "address": self._clean_br_tags(address),
         }
 
     def add_logo_url(self, logo_url):

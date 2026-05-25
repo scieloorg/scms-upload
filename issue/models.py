@@ -70,6 +70,34 @@ class Issue(CommonControlField, IssuePublicationDate):
         return "".join([f"{prefix}{value}" for value, prefix in labels if value])
 
     @property
+    def collections(self):
+        from collection.models import Collection
+
+        return Collection.objects.filter(issueproc__issue=self).distinct()
+
+    @property
+    def collections_acron(self):
+        from collection.models import Collection
+
+        return list(
+            Collection.objects.filter(issueproc__issue=self)
+            .values_list("acron", flat=True)
+            .distinct()
+            .order_by("acron")
+        )
+
+    @property
+    def collections_name(self):
+        from collection.models import Collection
+
+        return list(
+            Collection.objects.filter(issueproc__issue=self)
+            .values_list("name", flat=True)
+            .distinct()
+            .order_by("name")
+        )
+
+    @property
     def data(self):
         return dict(
             journal=self.journal.data,

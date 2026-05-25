@@ -1,14 +1,12 @@
 import logging
 
 from django.contrib import messages
-from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
 from wagtail_modeladmin.views import CreateView, EditView, InspectView
 
-from article.models import Article
-from issue.models import Issue
-from upload.models import Package, choices
+from upload.models import Package, PkgValidationResult, choices
 from upload.tasks import (
     task_receive_packages,
     task_publish_article,
@@ -17,7 +15,7 @@ from upload.tasks import (
 )
 from upload.utils import file_utils
 from upload.utils import package_utils
-from upload.utils.package_utils import coerce_package_and_errors, render_html
+from upload.utils.package_utils import render_html
 from upload.utils.xml_utils import XMLFormatError
 from team.models import has_permission
 
@@ -82,6 +80,12 @@ class PackageAdminInspectView(InspectView):
             data["pdfs"] = []
 
     def get_context_data(self):
+        blocking_errors = list(
+            PkgValidationResult.objects.filter(
+                report__package=self.instance,
+                status=choices.VALIDATION_RESULT_BLOCKING,
+            ).values_list("message", flat=True)
+        )
         data = {
             "pkg_zip_name": self.instance.pkg_zip.name,
             "linked": self.instance.linked.all(),
@@ -97,6 +101,7 @@ class PackageAdminInspectView(InspectView):
             "xml_info_reports": list(self.instance.xml_info_reports),
             "summary": self.instance.summary,
             "xml": self.instance.xml,
+            "blocking_errors": blocking_errors,
         }
 
         # optz_file_path, optz_dir = self.get_optimized_package_filepath_and_directory()

@@ -288,6 +288,8 @@ class SPSPkgComponent(FileLocation, Orderable):
 
 class SPSPkg(CommonControlField, ClusterableModel):
     pid_v3 = models.CharField(max_length=23, null=True, blank=True)
+    pid_v2 = models.CharField(max_length=23, null=True, blank=True)
+    
     sps_pkg_name = models.CharField(_("SPS Name"), max_length=100, null=True, blank=True)
 
     # zip
@@ -420,19 +422,21 @@ class SPSPkg(CommonControlField, ClusterableModel):
             return False
 
     @classmethod
-    def _get_or_create(cls, user, pid_v3, sps_pkg_name, registered_in_core):
+    def _get_or_create(cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2):
         try:
-            obj = cls.objects.get(pid_v3=pid_v3)
-            obj.updated_by = user
+            obj = cls.objects.get(sps_pkg_name=sps_pkg_name)            
         except cls.MultipleObjectsReturned:
-            obj = cls.objects.filter(pid_v3=pid_v3, sps_pkg_name=sps_pkg_name).order_by("-updated").first()
-            obj.updated_by = user
+            items = cls.objects.filter(sps_pkg_name=sps_pkg_name).order_by("-updated")
+            obj = items.first()
+            items.exclude(id=obj.id).delete()
         except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
-            obj.pid_v3 = pid_v3
-        obj.sps_pkg_name = sps_pkg_name
+            obj.sps_pkg_name = sps_pkg_name
+        obj.pid_v3 = pid_v3
+        obj.pid_v2 = pid_v2
         obj.registered_in_core = registered_in_core
+        obj.updated_by = user
         obj.save()
         return obj
 
@@ -572,6 +576,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     pid_v3=response["v3"],
                     sps_pkg_name=response["pkg_name"],
                     registered_in_core=response.get("registered_in_core"),
+                    pid_v2=response["v2"],
                 )
 
                 if response.get("changed"):
@@ -701,9 +706,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
             response = {}
 
             if content:
+                mimetype = mimetypes.types_map.get(ext.lower()) or "application/octet-stream"
                 response = minio_push_file_content(
                     content=content,
-                    mimetype=mimetypes.types_map[ext],
+                    mimetype=mimetype,
                     object_name=f"{self.subdir}/{filename}",
                 )
                 uri = response["uri"]
@@ -768,6 +774,12 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
                 else:
                     component = original_pkg_components.get(item) or {}
+                    if not ext:
+                        legacy_uri = component.get("legacy_uri")
+                        if legacy_uri:
+                            _, ext = os.path.splitext(legacy_uri)
+                            if ext:
+                                item = item + ext
                     result = self.upload_to_the_cloud(
                         user=user,
                         filename=item,
@@ -781,10 +793,12 @@ class SPSPkg(CommonControlField, ClusterableModel):
         return {"xml_with_pre": xml_with_pre, "items": items}
 
     def upload_xml_to_the_cloud(self, user, xml_with_pre):
-        replacements = {
-            item.basename: item.uri
-            for item in self.components.filter(uri__isnull=False).iterator()
-        }
+        replacements = {}
+        for item in self.components.filter(uri__isnull=False).iterator():
+            replacements[item.basename] = item.uri
+            name_without_ext, file_ext = os.path.splitext(item.basename)
+            if file_ext:
+                replacements[name_without_ext] = item.uri
         if replacements:
             xml_assets = ArticleAssets(xml_with_pre.xmltree)
             xml_assets.replace_names(replacements)
@@ -837,12 +851,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 content = item["content"].encode("utf-8")
             except KeyError:
                 content = None
-            # PreviewArticlePage.create_or_update(
-            #     user,
-            #     self,
-            #     lang=Language.get_or_create(creator=user, code2=lang),
-            #     content=content,
-            # )
             response = self.upload_to_the_cloud(
                 user,
                 item["filename"],
@@ -902,3 +910,29 @@ class SPSPkg(CommonControlField, ClusterableModel):
             return pub_date
         # em caso de data incompleta, tenta retornar a data completa, completando com 06 o mes ausente e com 15 o dia ausente
         return xml_with_pre.get_complete_publication_date()
+    
+    @classmethod
+    def complete_pid_v2(cls, user, sps_pkg_id_list=None):
+        filters = {
+            "pid_v2__isnull": True,
+        }
+        if sps_pkg_id_list:
+            filters["sps_pkg_id__in"] = sps_pkg_id_list
+
+        # 1. Buscamos os objetos (o select_related é essencial aqui para evitar o problema de N+1)
+        items_to_update = []
+        queryset = cls.objects.filter(**filters)
+
+        for item in queryset:
+            # 2. Atualizamos o valor na instância em memória
+            # Certifique-se de que o caminho 'sps_pkg.xml_with_pre.v2' está correto
+            try:
+                item.pid_v2 = item.xml_with_pre.v2
+                item.updated_by = user
+                items_to_update.append(item)
+            except Exception:
+                pass
+
+        # 4. Salvamos tudo em uma única consulta ao banco
+        if items_to_update:
+            cls.objects.bulk_update(items_to_update, ["pid_v2", "updated_by"])

@@ -561,7 +561,7 @@ class Package(CommonControlField, ClusterableModel):
                 user = self.updated_by or self.creator
                 # é desejável que o artigo seja publicado diretamente
                 # prepare_to_publish verficará se há impedimentos
-                detail = {}
+                detail = None
                 event = None
                 event = self.start(user, "process_system_decision")
 
@@ -1000,7 +1000,7 @@ class Package(CommonControlField, ClusterableModel):
 
     def add_pid_v2(self, user, xml_with_pre):
         try:
-            detail = {}
+            detail = None
             pid_v2_gen = None
             event = self.start(user, "add_pid_v2")
             pid_v2_gen = PidV2Generator(xml_with_pre)
@@ -1716,8 +1716,13 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
             .values("status", "reaction")
             .annotate(total=Count("id"))
         ):
-            items["total_" + item["status"].lower()] += item["total"]
-            items["total_" + item["reaction"]] += item["total"]
+            status_key = "total_" + (item.get("status") or "").lower()
+            if status_key not in items:
+                continue
+            items[status_key] += item["total"]
+            reaction_key = "total_" + (item.get("reaction") or "")
+            if reaction_key in items:
+                items[reaction_key] += item["total"]
             total += item["total"]
 
         items["total"] = total
