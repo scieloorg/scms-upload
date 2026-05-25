@@ -63,6 +63,16 @@ VALID_STATUS = PROGRESS_STATUS_FORCE_UPDATE + [PROGRESS_STATUS_DOING]
 
 
 def get_valid_status(status, force_update):
+    """
+    Retorna a lista de status a considerar no filtro de itens a processar.
+
+    - Se `status` for informado, verifica se os valores são válidos.
+    - Se `force_update` for True, retorna PROGRESS_STATUS_FORCE_UPDATE
+      (todos os status exceto DOING e IGNORED), permitindo reprocessar
+      inclusive itens já concluídos (DONE).
+    - Caso contrário, retorna PROGRESS_STATUS_REGULAR_TODO (REPROC + TODO),
+      processando apenas itens que ainda não foram concluídos.
+    """
     if status:
         status_list = set()
         if isinstance(status, str):
@@ -78,6 +88,15 @@ def get_valid_status(status, force_update):
 
 
 def allowed_to_run(status, force_update):
+    """
+    Indica se um item com o `status` dado pode ser executado.
+
+    - Permite executar itens com status DOING apenas quando `force_update`
+      é True (evita execuções concorrentes em condições normais).
+    - Permite executar itens cujo status está em PROGRESS_STATUS_FORCE_UPDATE
+      quando `force_update` é True, ou em PROGRESS_STATUS_REGULAR_TODO
+      independentemente de `force_update`.
+    """
     if force_update and status == PROGRESS_STATUS_DOING:
         return True
     return (

@@ -6,6 +6,7 @@ from wagtail import hooks
 
 from config.menu import get_menu_order
 from issue.views import IssueCreateView, TOCEditView
+from team.models import get_user_membership_ids
 from .models import TOC, Issue
 
 
@@ -57,6 +58,19 @@ class IssueSnippetViewSet(SnippetViewSet):
     list_export = ["csv", "xlsx"]
     export_filename = "issues"
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+
+        if user.is_superuser:
+            return qs
+
+        membership = get_user_membership_ids(user)
+        if membership.get("journal_list_ids"):
+            return qs.filter(journal__in=membership["journal_list_ids"]).distinct()
+
+        return qs.none()
+
 
 class TOCSnippetViewSet(SnippetViewSet):
     model = TOC
@@ -69,15 +83,15 @@ class TOCSnippetViewSet(SnippetViewSet):
     # Configuração de listagem
     list_display = [
         "issue",
-        "creator",
-        "created",
-        "updated_by",
+        "issue__publication_year",
+        "issue__volume",
         "updated",
     ]
     
-    list_filter = ["ordered", "created", "updated"]
+    list_filter = ["issue__journal__journal_acron", "issue__publication_year", "ordered", "created", "updated"]
     
     search_fields = [
+        "issue__journal__journalproc__acron",
         "issue__journal__title",
         "issue__journal__official_journal__title",
         "issue__volume",
@@ -98,6 +112,19 @@ class TOCSnippetViewSet(SnippetViewSet):
     # Configurações de exportação
     list_export = ["csv", "xlsx"]
     export_filename = "table_of_contents"
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        user = request.user
+
+        if user.is_superuser:
+            return qs
+
+        membership = get_user_membership_ids(user)
+        if membership.get("journal_list_ids"):
+            return qs.filter(issue__journal__in=membership["journal_list_ids"]).distinct()
+
+        return qs.none()
 
 
 # Grupo de Snippets para Issues

@@ -1,29 +1,19 @@
-from django.http import HttpResponseRedirect
 from django.utils.translation import gettext_lazy as _
-from wagtail_modeladmin.options import ModelAdmin, modeladmin_register
-from wagtail_modeladmin.views import CreateView
+from wagtail.snippets.models import register_snippet
+from wagtail.snippets.views.snippets import SnippetViewSet
 
 from config.menu import get_menu_order
 
 from .models import Location
 
 
-class LocationCreateView(CreateView):
-    def form_valid(self, form):
-        self.object = form.save_all(self.request.user)
-        return HttpResponseRedirect(self.get_success_url())
-
-
-class LocationAdmin(ModelAdmin):
+class LocationViewSet(SnippetViewSet):
     model = Location
-    create_view_class = LocationCreateView
     menu_label = _("Location")
     menu_icon = "folder"
     menu_order = get_menu_order("location")
-    add_to_settings_menu = False  # or True to add your model to the Settings sub-menu
-    exclude_from_explorer = (
-        False  # or True to exclude pages of this type from Wagtail's explorer view
-    )
+    add_to_settings_menu = False
+
     list_display = (
         "country",
         "state",
@@ -45,4 +35,4 @@ class LocationAdmin(ModelAdmin):
     export_filename = "locations"
 
 
-# modeladmin_register(LocationAdmin)
+register_snippet(LocationViewSet)

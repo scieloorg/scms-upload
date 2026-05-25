@@ -51,6 +51,17 @@
 {% block content %}
     {{ block.super }}
 
+    {% if blocking_errors %}
+    <div class="nice-padding">
+        {% for error in blocking_errors %}
+            <div class="help-block help-critical" style="border: 2px solid #cd3238; background-color: #fce4e4; padding: 15px; margin-bottom: 10px;">
+                <svg class="icon icon-warning icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
+                <p><strong>{{ error }}</strong></p>
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     {% if category != 'generated-by-the-system' %}
 
     <div class="nice-padding">

@@ -7,7 +7,6 @@ import sys
 
 from migration import controller
 from proc.models import ArticleProc, IssueProc, JournalProc
-from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
 
 
@@ -114,84 +113,6 @@ def create_or_update_migrated_issue(
             )
 
 
-def create_collection_procs_from_pid_list(
-    user,
-    collection,
-    pid_list_path,
-    force_update,
-):
-    """
-    Cria procs de collection baseado numa lista de PIDs.
-    Processa PIDs de artigos, issues e journals de forma hierárquica.
-    """
-    has_changes = controller.id_file_has_changes(
-        user,
-        collection,
-        pid_list_path,
-        force_update,
-    )
-    if not has_changes:
-        logging.info(f"skip reading {pid_list_path}")
-        return
-
-    try:
-        pid = None
-        journal_pids = set()
-        issue_pids = set()
-        with open(pid_list_path, "r") as fp:
-            pids = fp.readlines()
-
-        for pid in pids:
-            pid = pid.strip() or ""
-            if not len(pid) == 23:
-                continue
-
-            # Registra PID do artigo
-            ArticleProc.register_pid(
-                user,
-                collection,
-                pid,
-                force_update=False,
-            )
-
-            # Extrai e registra PID do issue
-            issue_pid = pid[1:-5]
-            if issue_pid not in issue_pids:
-                issue_pids.add(issue_pid)
-                IssueProc.register_pid(
-                    user,
-                    collection,
-                    issue_pid,
-                    force_update=False,
-                )
-
-                # Extrai e registra PID do journal
-                journal_pid = pid[1:10]
-                if journal_pid not in journal_pids:
-                    journal_pids.add(journal_pid)
-                    JournalProc.register_pid(
-                        user,
-                        collection,
-                        journal_pid,
-                        force_update=False,
-                    )
-
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "task": "proc.sources.classic_website.create_collection_procs_from_pid_list",
-                "user_id": user.id,
-                "username": user.username,
-                "collection": collection.acron,
-                "pid_list_path": pid_list_path,
-                "force_update": force_update,
-            },
-        )
-
-
 def migrate_journal(
     user,
     journal_proc,
@@ -241,27 +162,27 @@ def migrate_journal(
         )
 
 
-def create_or_update_journal_acron_id_file(
-    user, collection, journal_filter, force_update=None
-):
-    """
-    Cria ou atualiza arquivos de ID baseados em acrônimos de journals.
-    """
-    items = JournalProc.objects.select_related(
-        "collection",
-        "journal",
-    ).filter(
-        collection=collection,
-        **journal_filter,
-    )
-    logging.info(f"create_or_update_journal_acron_id_file - JournalProc params: collection={collection.acron}, journal_filter={journal_filter} - {items.count()} items found")
-    for journal_proc in items:
-        logging.info(f"create_or_update_journal_acron_id_file - JournalProc {journal_proc}")
-        controller.register_acron_id_file_content(
-            user,
-            journal_proc,
-            force_update=force_update,
-        )
+# def create_or_update_journal_acron_id_file(
+#     user, collection, journal_filter, force_update=None
+# ):
+#     """
+#     Cria ou atualiza arquivos de ID baseados em acrônimos de journals.
+#     """
+#     items = JournalProc.objects.select_related(
+#         "collection",
+#         "journal",
+#     ).filter(
+#         collection=collection,
+#         **journal_filter,
+#     )
+#     logging.info(f"create_or_update_journal_acron_id_file - JournalProc params: collection={collection.acron}, journal_filter={journal_filter} - {items.count()} items found")
+#     for journal_proc in items:
+#         logging.info(f"create_or_update_journal_acron_id_file - JournalProc {journal_proc}")
+#         controller.import_journal_acron_id_records(
+#             user,
+#             journal_proc,
+#             force_update=force_update,
+#         )
 
 
 def migrate_issue(user, issue_proc, force_update):
@@ -310,89 +231,89 @@ def migrate_issue(user, issue_proc, force_update):
         )
 
 
-def migrate_document_records(
-    user,
-    collection_acron=None,
-    journal_acron=None,
-    issue_folder=None,
-    publication_year=None,
-    status=None,
-    force_update=None,
-    skip_migrate_pending_document_records=None,
-):
-    """
-    Executa a migração de registros de documentos do site clássico.
-    """
-    params = {}
-    if collection_acron:
-        params["collection__acron"] = collection_acron
-    if journal_acron:
-        params["journal_proc__acron"] = journal_acron
-    if issue_folder:
-        params["issue_folder"] = str(issue_folder)
-    if publication_year:
-        params["issue__publication_year"] = str(publication_year)
-    if status:
-        params["docs_status__in"] = tracker_choices.get_valid_status(
-            status, force_update
-        )
+# def migrate_document_records(
+#     user,
+#     collection_acron=None,
+#     journal_acron=None,
+#     issue_folder=None,
+#     publication_year=None,
+#     status=None,
+#     force_update=None,
+#     skip_migrate_pending_document_records=None,
+# ):
+#     """
+#     Executa a migração de registros de documentos do site clássico.
+#     """
+#     params = {}
+#     if collection_acron:
+#         params["collection__acron"] = collection_acron
+#     if journal_acron:
+#         params["journal_proc__acron"] = journal_acron
+#     if issue_folder:
+#         params["issue_folder"] = str(issue_folder)
+#     if publication_year:
+#         params["issue__publication_year"] = str(publication_year)
+#     if status:
+#         params["docs_status__in"] = tracker_choices.get_valid_status(
+#             status, force_update
+#         )
 
-    logging.info(f"migrate_document_records - IssueProc params: {params}")
-    for issue_proc in IssueProc.objects.select_related(
-        "collection",
-        "journal_proc",
-        "issue",
-    ).filter(**params):
-        logging.info(f"migrate_document_records - IssueProc {issue_proc}")
-        issue_proc.migrate_document_records(user, force_update)
-        ArticleProc.mark_for_reprocessing(issue_proc)
+#     logging.info(f"migrate_document_records - IssueProc params: {params}")
+#     for issue_proc in IssueProc.objects.select_related(
+#         "collection",
+#         "journal_proc",
+#         "issue",
+#     ).filter(**params):
+#         logging.info(f"migrate_document_records - IssueProc {issue_proc}")
+#         issue_proc.migrate_document_records(user, force_update)
+#         ArticleProc.mark_for_reprocessing(issue_proc)
 
-    # if skip_migrate_pending_document_records:
-    #     return
+#     # if skip_migrate_pending_document_records:
+#     #     return
 
-    # IssueProc.migrate_pending_document_records(
-    #     user,
-    #     collection_acron,
-    #     journal_acron,
-    #     issue_folder,
-    #     publication_year,
-    # )
+#     # IssueProc.migrate_pending_document_records(
+#     #     user,
+#     #     collection_acron,
+#     #     journal_acron,
+#     #     issue_folder,
+#     #     publication_year,
+#     # )
 
 
-def get_files_from_classic_website(
-    user,
-    collection_acron=None,
-    journal_acron=None,
-    issue_folder=None,
-    publication_year=None,
-    status=None,
-    force_update=None,
-):
-    """
-    Obtém arquivos do site clássico para processamento.
-    """
-    params = {}
-    if collection_acron:
-        params["collection__acron"] = collection_acron
-    if journal_acron:
-        params["journal_proc__acron"] = journal_acron
-    if issue_folder:
-        params["issue_folder"] = str(issue_folder)
-    if publication_year:
-        params["issue__publication_year"] = str(publication_year)
-    if status:
-        params["files_status__in"] = tracker_choices.get_valid_status(
-            status, force_update
-        )
-    items = IssueProc.objects.select_related(
-        "collection",
-        "journal_proc",
-        "issue",
-    ).filter(**params)
-    logging.info(f"get_files_from_classic_website - IssueProc params: {params} - {items.count()} items found")
-    for issue_proc in items:
-        logging.info(f"get_files_from_classic_website - IssueProc {issue_proc}")
-        issue_proc.get_files_from_classic_website(
-            user, force_update, controller.migrate_issue_files
-        )
-        ArticleProc.mark_for_reprocessing(issue_proc)
+# def migrate_document_files(
+#     user,
+#     collection_acron=None,
+#     journal_acron=None,
+#     issue_folder=None,
+#     publication_year=None,
+#     status=None,
+#     force_update=None,
+# ):
+#     """
+#     Obtém arquivos do site clássico para processamento.
+#     """
+#     params = {}
+#     if collection_acron:
+#         params["collection__acron"] = collection_acron
+#     if journal_acron:
+#         params["journal_proc__acron"] = journal_acron
+#     if issue_folder:
+#         params["issue_folder"] = str(issue_folder)
+#     if publication_year:
+#         params["issue__publication_year"] = str(publication_year)
+#     if status:
+#         params["files_status__in"] = tracker_choices.get_valid_status(
+#             status, force_update
+#         )
+#     items = IssueProc.objects.select_related(
+#         "collection",
+#         "journal_proc",
+#         "issue",
+#     ).filter(**params)
+#     logging.info(f"migrate_document_files - IssueProc params: {params} - {items.count()} items found")
+#     for issue_proc in items:
+#         logging.info(f"migrate_document_files - IssueProc {issue_proc}")
+#         issue_proc.migrate_document_files(
+#             user, force_update, controller.migrate_issue_files
+#         )
+#         ArticleProc.mark_for_reprocessing(issue_proc)

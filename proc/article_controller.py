@@ -1,22 +1,19 @@
 import logging
 import sys
-from datetime import datetime
+
+from django.utils.translation import gettext_lazy as _
+
+from collection.models import WebSiteConfiguration
+from migration import choices as migration_choices
+from migration.models import ClassicWebsiteConfiguration
+from proc.models import ArticleProc
 
 
 def log_event(execution_log, level, event_type, message, extra_data=None):
     """
     Adiciona um evento ao log de execução
-
-    Args:
-        execution_log: Lista onde o evento será adicionado
-        level: Nível do log (info, warning, error)
-        event_type: Tipo do evento (initialization, migration_failed, etc)
-        message: Mensagem descritiva
-        **extra_data: Dados adicionais do evento
     """
-    event = {
-        "message": message,
-    }
+    event = {"message": message}
     if extra_data:
         event["data"] = extra_data
     execution_log.append(event)
@@ -31,21 +28,6 @@ def schedule_article_publication(
     public_api_data,
     force_update,
 ):
-    """
-    Agenda a publicação de um artigo nos websites QA e PUBLIC
-
-    Args:
-        task_publish_article: A task celery para publicação
-        article_proc_id: ID do ArticleProc
-        user_id: ID do usuário
-        username: Nome do usuário
-        qa_api_data: Dados da API QA
-        public_api_data: Dados da API PUBLIC
-        force_update: Flag para forçar atualização
-
-    Returns:
-        dict: Status de agendamento {"qa": bool, "public": bool}
-    """
     scheduled = {"qa": False, "public": False}
 
     if not qa_api_data.get("error"):
@@ -77,6 +59,7 @@ def schedule_article_publication(
     return scheduled
 
 
+# sem uso?
 def migrate_collection_articles(user, collection_acron, items, force_update):
     statistics = {
         "total_articles_to_process": 0,
@@ -87,14 +70,9 @@ def migrate_collection_articles(user, collection_acron, items, force_update):
     statistics["total_articles_to_process"] = articles_count
 
     log_event(
-        execution_log,
-        "info",
-        "articles_migration",
+        execution_log, "info", "articles_migration",
         f"Found {articles_count} articles to migrate",
-        dict(
-            collection=collection_acron,
-            count=articles_count,
-        ),
+        dict(collection=collection_acron, count=articles_count),
     )
     articles_migrated = 0
     for article_proc in items.iterator():
@@ -106,25 +84,15 @@ def migrate_collection_articles(user, collection_acron, items, force_update):
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             event = article_proc.start(user, "Migrate article error")
-            event.finish(
-                user,
-                completed=False,
-                exception=e,
-                exc_traceback=exc_traceback,
-            )
+            event.finish(user, completed=False, exception=e, exc_traceback=exc_traceback)
 
     statistics["total_articles_migrated"] = articles_migrated
     return statistics, execution_log
 
 
 def publish_collection_articles(
-    user,
-    collection_acron,
-    items,
-    task_publish_article,
-    qa_api_data,
-    public_api_data,
-    force_update,
+    user, collection_acron, items, task_publish_article,
+    qa_api_data, public_api_data, force_update,
 ):
     execution_log = []
     qa_scheduled = 0
@@ -133,13 +101,10 @@ def publish_collection_articles(
     articles_count = items.count()
 
     log_event(
-        execution_log,
-        "info",
-        "articles_publication",
+        execution_log, "info", "articles_publication",
         f"Found {articles_count} articles to publish",
         dict(
-            collection=collection_acron,
-            count=articles_count,
+            collection=collection_acron, count=articles_count,
             qa_api_data_error=qa_api_data.get("error"),
             public_api_data_error=public_api_data.get("error"),
         ),
@@ -150,35 +115,106 @@ def publish_collection_articles(
             try:
                 processed += 1
                 response = schedule_article_publication(
-                    task_publish_article,
-                    article_proc.id,
-                    user.id,
-                    user.username,
-                    qa_api_data,
-                    public_api_data,
-                    force_update,
+                    task_publish_article, article_proc.id,
+                    user.id, user.username, qa_api_data, public_api_data, force_update,
                 )
                 if response["qa"]:
                     qa_scheduled += 1
-
                 if response["public"]:
                     public_scheduled += 1
-
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 event = article_proc.start(user, "Schedule article publication error")
-                event.finish(
-                    user,
-                    completed=False,
-                    exception=e,
-                    exc_traceback=exc_traceback,
-                )
+                event.finish(user, completed=False, exception=e, exc_traceback=exc_traceback)
 
-    statistics = {}
-    statistics["total_articles_to_publish"] = articles_count
-    statistics["processed"] = processed
-    statistics["total_qa_scheduled"] = qa_scheduled
-    statistics["total_publich_scheduled"] = public_scheduled
-    statistics["qa_api_data_error"] = bool(qa_api_data.get("error"))
-    statistics["public_api_data_error"] = bool(public_api_data.get("error"))
+    statistics = {
+        "total_articles_to_publish": articles_count,
+        "processed": processed,
+        "total_qa_scheduled": qa_scheduled,
+        "total_public_scheduled": public_scheduled,
+        "qa_api_data_error": bool(qa_api_data.get("error")),
+        "public_api_data_error": bool(public_api_data.get("error")),
+    }
     return statistics, execution_log
+
+
+class ClassicWebsiteArticlePidTracker:
+    """
+    Rastreia e reconcilia PIDs do site clássico com ArticleProcs.
+
+    Fluxo: MISSING → MATCHED → PUBLISHED → CONTENT_VALID / CONTENT_UNMATCHED
+    """
+
+    COMPLETED_STATUSES = (
+        migration_choices.PID_STATUS_MATCHED,
+        migration_choices.PID_STATUS_PUBLISHED,
+        migration_choices.PID_STATUS_PUBLIC_VALID,
+        migration_choices.PID_STATUS_PUBLIC_MISMATCHED,
+    )
+
+    def __init__(self, user, collection, timeout=10):
+        self.user = user
+        self.collection = collection
+        self.config = ClassicWebsiteConfiguration.objects.get(collection=collection)
+        self.articles = ArticleProc.objects.filter(collection=collection)
+        self.classic_website_url = self.config.url
+        self.timeout = timeout
+
+    def update_pid_status(self):
+        qs = self.articles
+        pids_to_check = self.config.get_pid_list()
+        totals = {"input list total": len(pids_to_check)}
+        new_pids = set(self._update_pid_status(pids_to_check))
+        result = self.bulk_create(new_pids)
+        totals.update(result)
+        return totals
+
+    def create_article_proc_for_pids(self, new_pids):
+        if not new_pids:
+            return []
+        for pid in new_pids:
+            yield ArticleProc(
+                creator=self.user,
+                collection=self.collection,
+                pid=pid,
+                pid_status=migration_choices.PID_STATUS_MISSING,
+            )
+
+    def _update_pid_status(self, pids_to_check):
+        qs = self.articles
+        pids_to_check = set(pids_to_check)
+        migrated_and_completed_pids = set(qs.filter(
+            migrated_data__isnull=False,
+            pid_status__in=self.COMPLETED_STATUSES,
+        ).values_list("pid", flat=True))
+        pids_to_check = pids_to_check - migrated_and_completed_pids
+
+        migrated_pids = set(qs.filter(
+            migrated_data__isnull=False,
+        ).exclude(
+            pid_status__in=self.COMPLETED_STATUSES,
+        ).values_list("pid", flat=True))
+        matched_pids = pids_to_check.intersection(migrated_pids)
+        qs.filter(pid__in=matched_pids).update(
+            pid_status=migration_choices.PID_STATUS_MATCHED
+        )
+        pids_to_check = pids_to_check - matched_pids
+
+        registered_pids_except_completed = set(qs.exclude(
+            pid_status__in=self.COMPLETED_STATUSES,
+        ).values_list("pid", flat=True))
+
+        exceeding_pids = registered_pids_except_completed - pids_to_check
+        if exceeding_pids:
+            qs.filter(pid__in=exceeding_pids).exclude(
+                pid_status=migration_choices.PID_STATUS_EXCEEDING
+            ).update(pid_status=migration_choices.PID_STATUS_EXCEEDING)
+
+        return pids_to_check - registered_pids_except_completed
+
+    def bulk_create(self, new_pids, batch_size=500):
+        if new_pids:
+            ArticleProc.objects.bulk_create(
+                self.create_article_proc_for_pids(new_pids), batch_size
+            )
+        return ArticleProc.get_pid_status_total(self.collection)

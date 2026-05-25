@@ -80,6 +80,7 @@ def task_load_records_from_counter_dict(
     timeout=None,
     force_update=None,
     opac_domain=None,
+    stop=None,
 ):
     """
     Coleta documentos de uma coleção específica via endpoint counter_dict do OPAC.
@@ -100,6 +101,8 @@ def task_load_records_from_counter_dict(
         timeout (int, optional): Timeout em segundos para requisições HTTP
         force_update (bool, optional): Força atualização mesmo se já existe
         opac_domain (str, optional): Domínio do OPAC (default: "www.scielo.br")
+        stop (int, optional): Quantidade máxima de itens a coletar.
+            Se None, coleta todos os itens disponíveis.
 
     Returns:
         None
@@ -134,6 +137,7 @@ def task_load_records_from_counter_dict(
         )
 
         # Itera sobre documentos e dispara tarefas individuais
+        count = 0
         for document in harvester.harvest_documents():
             origin_date = document.get("origin_date")
             task_load_record_from_xml_url.delay(
@@ -145,6 +149,9 @@ def task_load_records_from_counter_dict(
                 origin_date=origin_date,
                 force_update=force_update,
             )
+            count += 1
+            if stop and count >= stop:
+                break
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -244,4 +251,5 @@ def task_load_record_from_xml_url(
                 "force_update": force_update,
             },
         )
+
 

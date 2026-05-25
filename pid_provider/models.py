@@ -1086,8 +1086,12 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     def _add_dates(self, xml_adapter, origin_date, available_since):
         # evita que artigos WIP fique disponíveis antes de estarem públicos
         try:
+            # Usa get_complete_publication_date para evitar logs de erro do
+            # packtools quando a data de publicação no XML é incompleta
+            # (ex.: <pub-date> apenas com <year> e <season>, sem mes/dia).
+            # Mesmo padrão adotado em proc/models.py e package/models.py.
             self.available_since = available_since or (
-                xml_adapter.xml_with_pre.article_publication_date
+                xml_adapter.xml_with_pre.get_complete_publication_date()
             )
         except Exception as e:
             # packtools error
@@ -1272,14 +1276,16 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @classmethod
     def get_by_pid_v3(cls, pid_v3, partial_pid_v2=None, pid_v2=None):
         params = {}
+        if pid_v3:
+            params["v3"] = pid_v3
         if pid_v2:
             params["v2"] = pid_v2
         if partial_pid_v2:
             params["v2__contains"] = partial_pid_v2
         try:
-            return cls.objects.get(v3=pid_v3, **params)
+            return cls.objects.get(**params)
         except cls.MultipleObjectsReturned as e:
-            return cls.objects.filter(v3=pid_v3, **params).order_by("-updated").first()
+            return cls.objects.filter(**params).order_by("-updated").first()
 
     @classmethod
     @profile_classmethod

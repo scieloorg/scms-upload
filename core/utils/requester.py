@@ -82,7 +82,7 @@ def post_data(
         requests.exceptions.MissingSchema,
         requests.exceptions.InvalidURL,
     ) as exc:
-        raise NonRetryableError(exc) from exc
+        raise NonRetryableError() from exc
     try:
         response.raise_for_status()
     except requests.HTTPError as exc:
@@ -161,4 +161,13 @@ def fetch_data(url, params=None, headers=None, json=False, timeout=2, verify=Tru
         else:
             raise
 
-    return response.content if not json else response.json()
+    if not json:
+        return response.content
+
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise NonRetryableError(
+            "Invalid JSON response (status=%s, length=%s) from %s: %s"
+            % (response.status_code, len(response.content), url, exc)
+        ) from exc

@@ -13,6 +13,13 @@ Welcome to SciELO Upload 's documentation!
    howto
    users
 
+Task Guides / Guías de Tareas / Guias de Tarefas
+----------------------------------------------------------------------
+
+- `English <pid_provider/guide_task_load_records_en.md>`_
+- `Español <pid_provider/guide_task_load_records_es.md>`_
+- `Português <pid_provider/guide_task_load_records_pt_br.md>`_
+
 
 
 Indices and tables

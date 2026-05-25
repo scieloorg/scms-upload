@@ -62,6 +62,21 @@ class CommonControlField(models.Model):
         abstract = True
 
 
+class VisualIdentityMixin(models.Model):
+    """
+    Mixin that provides url and logo fields for visual identity.
+    
+    Fields:
+        url: Website URL
+        logo: Logo image field
+    """
+    url = models.URLField(_("URL"), blank=True, null=True)
+    logo = models.ImageField(_("Logo"), blank=True, null=True, upload_to="logos/")
+
+    class Meta:
+        abstract = True
+
+
 class BaseTextModel(models.Model):
     language = models.ForeignKey(
         "collection.Language", null=True, blank=True, on_delete=models.SET_NULL

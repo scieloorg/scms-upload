@@ -1,5 +1,6 @@
+import django_filters
 from django.conf import settings
-from django.contrib import messages
+from django.contrib.admin import SimpleListFilter
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
@@ -8,19 +9,41 @@ from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from article.views import (
     ArticleAdminInspectView,
-    ArticleCreateView,
     RelatedItemCreateView,
     RequestArticleChangeCreateView,
 )
 from config.menu import get_menu_order
-
-from .button_helper import ArticleButtonHelper, RequestArticleChangeButtonHelper
-from .models import Article, RelatedItem, RequestArticleChange
-from .permission_helper import ArticlePermissionHelper
+from collection.models import Collection
+from .models import Article, ArticleWebPage, RelatedItem, RequestArticleChange
+from article import choices
 
 # from upload import exceptions as upload_exceptions
 # from upload.models import Package
 # from upload.tasks import get_or_create_package
+
+
+class ArticleFilterSet(django_filters.FilterSet):
+    journal__journal_acron = django_filters.CharFilter(
+        field_name="journal__journal_acron",
+        label=_("Journal Acronym"),
+        lookup_expr="exact",
+    )
+    status = django_filters.ChoiceFilter(
+        field_name="status",
+        label=_("Status"),
+        choices=choices.ARTICLE_STATUS,  # ajuste para o nome real das choices
+    )
+    collection = django_filters.ModelChoiceFilter(
+        field_name="journal__journalproc__collection",
+        label=_("Collection"),
+        queryset=Collection.objects.filter(
+            journalproc__journal__article__isnull=False
+        ).distinct(),
+    )
+
+    class Meta:
+        model = Article
+        fields = []
 
 
 class ArticleSnippetViewSet(SnippetViewSet):
@@ -36,21 +59,17 @@ class ArticleSnippetViewSet(SnippetViewSet):
     add_to_settings_menu = False
     # exclude_from_explorer = False  # Não aplicável a SnippetViewSet
     list_per_page = 20
-
     list_display = (
         "__str__",
         "pid_v3",
         "pid_v2",
         "status",
-        "display_sections",
-        "fpage",
-        "position",
+        "display_collections",
         "first_pubdate_iso",
-        "created",
         "updated",
         # "updated_by",
     )
-    list_filter = ("status", "journal")
+    filterset_class = ArticleFilterSet
     search_fields = (
         "sps_pkg__sps_pkg_name",
         "pid_v2",
@@ -60,8 +79,17 @@ class ArticleSnippetViewSet(SnippetViewSet):
         "journal__official_journal__issn_print",
         "journal__official_journal__issn_electronic",
         "title_with_lang__text",
+        "sps_pkg__articleproc__collection__acron",
+        "sps_pkg__articleproc__collection__name",
     )
     # inspect_view_fields não é usado em SnippetViewSet, use inspect_view_class customizada
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        try:
+            return qs.distinct()
+        except AttributeError:
+            return qs
 
 
 class RelatedItemSnippetViewSet(SnippetViewSet):
@@ -121,7 +149,77 @@ class RequestArticleChangeSnippetViewSet(SnippetViewSet):
         # if self.permission_helper.user_can_make_article_change(request.user, None):
         #     return qs
 
-        return qs
+        try:
+            return qs.distinct()
+        except AttributeError:
+            return qs
+
+
+class ArticleWebPageFilterSet(django_filters.FilterSet):
+    purpose = django_filters.ChoiceFilter(
+        field_name="purpose",
+        label=_("Purpose"),
+        choices=choices.ARTICLE_WEBPAGE_PURPOSE,
+    )
+    status = django_filters.ChoiceFilter(
+        field_name="status",
+        label=_("Status"),
+        choices=choices.ARTICLE_WEBPAGE_STATUS,
+    )
+    fmt = django_filters.CharFilter(
+        field_name="fmt",
+        label=_("Format"),
+        lookup_expr="exact",
+    )
+    collection = django_filters.ModelChoiceFilter(
+        field_name="collection",
+        label=_("Collection"),
+        queryset=Collection.objects.all(),
+    )
+
+    class Meta:
+        model = ArticleWebPage
+        fields = []
+
+
+class ArticleWebPageSnippetViewSet(SnippetViewSet):
+    model = ArticleWebPage
+    menu_label = _("Web Pages")
+    menu_icon = "globe"
+    menu_order = 300
+    add_to_settings_menu = False
+    inspect_view_enabled = True
+    list_per_page = 20
+
+    list_display = (
+        "url",
+        "purpose",
+        "fmt",
+        "lang",
+        "status",
+        "article",
+        "collection",
+        "updated",
+    )
+    filterset_class = ArticleWebPageFilterSet
+    search_fields = (
+        "url",
+        "article__pid_v3",
+        "article__pid_v2",
+        "article__sps_pkg__sps_pkg_name",
+    )
+    ordering = ["-updated"]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        try:
+            return qs.select_related(
+                "article",
+                "collection",
+                "lang",
+            ).distinct()
+        except AttributeError:
+            return qs
 
 
 class ArticleSnippetViewSetGroup(SnippetViewSetGroup):
@@ -130,6 +228,7 @@ class ArticleSnippetViewSetGroup(SnippetViewSetGroup):
     menu_order = get_menu_order("article")
     items = (
         ArticleSnippetViewSet,
+        ArticleWebPageSnippetViewSet,
         # RelatedItemSnippetViewSet,
         # omitir temporariamente RequestArticleChangeSnippetViewSet,
         # ApprovedArticleSnippetViewSet,
