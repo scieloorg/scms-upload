@@ -158,7 +158,6 @@ class ClassicWebsiteArticlePidTracker:
         self.config = ClassicWebsiteConfiguration.objects.get(collection=collection)
         self.articles = ArticleProc.objects.filter(collection=collection)
         self.classic_website_url = self.config.url
-        self.public_website_url = WebSiteConfiguration.get_website_url(collection)
         self.timeout = timeout
 
     def update_pid_status(self):
