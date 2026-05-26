@@ -1376,6 +1376,8 @@ def task_sync_issue(
         user = _get_user(user_id, username)
         issue_proc = IssueProc.objects.get(id=issue_proc_id)
         task_exec.item = f"{issue_proc}"
+        if not api_data:
+            api_data = get_api_data(issue_proc.collection, "issue", website_kind)
         sync_issue(issue_proc, api_data)
         task_exec.finish()
     except Exception as e:
@@ -1852,13 +1854,12 @@ def task_check_article_webpages(
         article.create_or_update_article_collections(user)
         collection = article_proc.collection
         data = {}
-        responses = []
-        response = article.available_on_public_website(collection)
-        responses.append(response)
-
-        response = article.check_availability(user, collection_id=collection_id, purpose=website_kind)
-        response = article.available_on_public_website(collection)
-        responses.append(response)
+        article.check_availability(user, collection_id=collection_id, purpose=website_kind)
+        responses = [
+            article.available_on_classic_website(collection),
+            article.available_on_public_website(collection),
+        ]
+        response = responses[-1]
 
         data["responses"] = responses
         data["detail"] = article.availability

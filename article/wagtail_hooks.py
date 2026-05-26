@@ -60,7 +60,7 @@ class ArticleSnippetViewSet(SnippetViewSet):
     # exclude_from_explorer = False  # Não aplicável a SnippetViewSet
     list_per_page = 20
     list_display = (
-        "__str__",
+        "sps_pkg__sps_pkg_name",
         "pid_v3",
         "pid_v2",
         "status",

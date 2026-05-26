@@ -804,7 +804,7 @@ class Article(ClusterableModel, CommonControlField):
     def availability(self):
         data = []
         for item in ArticleWebPage.objects.filter(article=self):
-            data.append(item.detail)
+            data.append(item.data)
         return data
 
     def _available_on_website(self, collection, purpose=None):
@@ -1479,14 +1479,7 @@ class ArticleWebPage(CommonControlField):
         Acessa a URL, verifica conteúdo contra os metadados do artigo,
         e propaga o status para o ArticleCollection pai.
         """
-        detail = {
-            "url": self.url,
-            "format": self.fmt,
-            "lang": self.lang.code2 if self.lang else None,
-            "purpose": self.purpose,
-            "status": self.status,
-            "force_update": force_update,
-        }
+        detail = {}
         logging.info(f"Checking page {self.url} force_update={force_update} status={self.status}")
         if self.status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT:
             if not force_update:
@@ -1529,11 +1522,8 @@ class ArticleWebPage(CommonControlField):
         self.updated_by = user
         self.save()
         self.propagate_status(user)
-
-        detail["status"] = self.status
-        detail["valid"] = (self.status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT)
         logging.info(f"Checked page {self.url}: {detail}")
-        return detail
+        return self.data
 
     # ── Factory ──
 

@@ -917,7 +917,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             "pid_v2__isnull": True,
         }
         if sps_pkg_id_list:
-            filters["sps_pkg_id__in"] = sps_pkg_id_list
+            filters["id__in"] = sps_pkg_id_list
 
         # 1. Buscamos os objetos (o select_related é essencial aqui para evitar o problema de N+1)
         items_to_update = []
