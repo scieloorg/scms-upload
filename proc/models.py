@@ -144,32 +144,19 @@ class Operation(CommonControlField):
             Operação criada.
         """
         name = name[:64]
-        cls.exclude_events(user, proc, name)
         obj = cls()
         obj.proc = proc
         obj.name = name
         obj.creator = user
         obj.save()
         return obj
-        # try:
-        #     return cls.objects.get(proc=proc, name=name)
-        # except cls.MultipleObjectsReturned:
-        #     return cls.objects.filter(proc=proc, name=name).order_by("-created").first()
-        # except cls.DoesNotExist:
-        #     obj = cls()
-        #     obj.proc = proc
-        #     obj.name = name
-        #     obj.creator = user
-        #     obj.save()
-        #     return obj
 
     @classmethod
     def exclude_events(cls, user, proc, name):
         # apaga todas as ocorrências que foram armazenadas no arquivo
-        try:
-            cls.objects.filter(proc=proc, name=name).delete()
-        except Exception as e:
-            pass
+        item = cls.objects.filter(proc=proc, name=name).order_by("-created").first()
+        if item:
+            cls.objects.filter(proc=proc, created__gte=item.created).order_by("-created").delete()
 
     @classmethod
     def start(
@@ -178,6 +165,8 @@ class Operation(CommonControlField):
         proc,
         name=None,
     ):
+        name = name[:64]
+        cls.exclude_events(user, proc, name)
         return cls.create(user, proc, name)
 
     def finish(
@@ -2418,9 +2407,8 @@ class ArticleProc(BaseProc, ClusterableModel):
         exclude_list = (
             migration_choices.PID_STATUS_MISSING,
             migration_choices.PID_STATUS_EXCEEDING,
-            migration_choices.PID_STATUS_UNKNOWN,
         )
-        if force_update:
+        if not force_update:
             exclude_list = list(exclude_list)
             exclude_list.append(migration_choices.PID_STATUS_PUBLIC_VALID)
 
@@ -2553,20 +2541,21 @@ class ArticleProc(BaseProc, ClusterableModel):
     @classmethod
     def exclude_invalid_items(cls, user, issue):
         # obtém sps_pkg_ids cujo pid_v2 não corresponde ao ArticleProc.pid
-        sps_pkg_id_list = ArticleProc.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
+        sps_pkg_id_list = cls.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
 
         # completa sps_pkg.pid_v2 com os valores de sps_pkg.xml_with_pre.v2
         SPSPkg.complete_pid_v2(user, sps_pkg_id_list=sps_pkg_id_list)
 
-        # obtém novamente sps_pkg_ids cujo pid_v2 não corresponde ao ArticleProc.pid
-        sps_pkg_id_list = ArticleProc.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
+        # obtém novamente sps_pkg_ids cujo pid_v2 não corresponde ao cls.pid
+        sps_pkg_id_list = cls.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
 
         qs = cls.objects.filter(
-            Q(sps_pkg_id__in=sps_pkg_id_list)|Q(sps_pkg__isnull=True)
+            Q(sps_pkg_id__in=sps_pkg_id_list)|Q(sps_pkg__isnull=True),
+            issue_proc__issue=issue,
         )
         items = qs.values("pid", "sps_pkg__sps_pkg_name")
         qs.delete()
-        return {"sps_pkg_id_list": sps_pkg_id_list, "deleted": items}
+        return {"sps_pkg_id_list": list(sps_pkg_id_list), "deleted": list(items)}
 
     def update_sps_pkg_status(self):
         if self.sps_pkg:
