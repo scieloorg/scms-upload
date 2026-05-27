@@ -1361,28 +1361,37 @@ def task_sync_issue(
     Chamada de forma assíncrona após ``task_publish_issue_articles``
     para garantir que o fascículo apareça corretamente no TOC do site.
     """
-    task_params = {
-        "user_id": user_id,
-        "username": username,
-        "issue_proc_id": issue_proc_id,
-        "website_kind": website_kind,
-    }
-    task_exec = TaskExecution(
-        name="proc.tasks.task_sync_issue",
-        item=f"{issue_proc_id}",
-        params=task_params,
-    )
     try:
         user = _get_user(user_id, username)
         issue_proc = IssueProc.objects.get(id=issue_proc_id)
-        task_exec.item = f"{issue_proc}"
+        event = issue_proc.start(user, f"proc.tasks.task_sync_issue {website_kind}")
         if not api_data:
             api_data = get_api_data(issue_proc.collection, "issue", website_kind)
-        sync_issue(issue_proc, api_data)
-        task_exec.finish()
+        response = sync_issue(issue_proc, api_data)
+        event.finish(user=user, completed=True, detail=response)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        task_exec.finish(exception=e, exc_traceback=exc_traceback)
+        try:
+            event.finish(
+                user=user,
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
+            )
+        except Exception:
+            UnexpectedEvent.create(
+                item=f"{issue_proc_id}",
+                action="proc.tasks.task_sync_issue",
+                e=e,
+                exc_traceback=exc_traceback,
+                detail={
+                    "task": "proc.tasks.task_sync_issue",
+                    "user_id": user_id,
+                    "username": username,
+                    "website_kind": website_kind,
+                    "issue_proc_id": issue_proc_id,
+                },
+            )
 
 
 @celery_app.task(bind=True)
@@ -1601,45 +1610,38 @@ def task_exclude_invalid_issue_articles(
     Chamada automaticamente por ``task_migrate_and_publish_articles_by_issue``
     antes de iniciar a migração dos artigos.
     """
-    task_params = {"issue_proc_id": issue_proc_id}
-    issue_proc_str = str(issue_proc_id)
-    task_exec = TaskExecution(
-        name="task_exclude_invalid_issue_articles",
-        item=issue_proc_str,
-        params=task_params,
-    )
     try:
+        item = issue_proc_id
+        detail = None
+        event = None
         user = _get_user(user_id=user_id, username=username)
         issue_proc = IssueProc.objects.select_related("issue").get(
             id=issue_proc_id
         )
+        item = str(issue_proc)
+        event = issue_proc.start(user, "Exclude invalid articles")
+        detail = []
         issue = issue_proc.issue
-
-        task_exec.item = str(issue_proc)
-        issue_proc_str = str(issue_proc)
-
-        response = ArticleProc.exclude_invalid_items(user, issue_proc.issue)
-        # {"sps_pkg_id_list": sps_pkg_id_list, "deleted": items}
-        task_exec.add_event(response)
+        response = ArticleProc.exclude_invalid_items(user, issue)
+        detail.append({"Model": "ArticleProc", "response": response})
         response = Article.exclude_invalid_records(user, issue, response.get("sps_pkg_id_list"), timeout=timeout)
-        task_exec.add_event(response)
-        if response.get("sps_pkg_ids"):
-            response = ArticleProc.exclude_invalid_items(user, issue_proc.issue)
-            # {"sps_pkg_id_list": sps_pkg_id_list, "deleted": items}
-            task_exec.add_event(response)
-        task_exec.finish()
+        detail.append({"Model": "Article", "response": response})
+        if response.get("deleted_sps_pkg_ids"):
+            response = ArticleProc.exclude_invalid_items(user, issue)
+            detail.append({"Model": "ArticleProc", "response": response})
+        event.finish(user, completed=True, detail=detail)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        try:
-            task_exec.finish(exception=e, exc_traceback=exc_traceback)
-        except Exception:
-            UnexpectedEvent.create(
-                item=issue_proc_str,
-                action="proc.tasks.task_exclude_invalid_issue_articles",
-                e=e,
-                exc_traceback=exc_traceback,
-                detail=task_params,
-            )
+        if event:
+            event.finish(user, exception=e, exc_traceback=exc_traceback)
+            return
+        UnexpectedEvent.create(
+            item=item,
+            action="proc.tasks.task_exclude_invalid_issue_articles",
+            e=e,
+            exc_traceback=exc_traceback,
+            detail=detail,
+        )
 
 
 @celery_app.task(bind=True)
@@ -1796,16 +1798,23 @@ def task_track_classic_website_article_pids_for_collection(
         result = tracker.update_pid_status()
         task_exec.add_event(result)
 
-        for item in ArticleProc.items_to_check_url_and_content(
+        for article_proc in ArticleProc.items_to_check_url_and_content(
             collection, force_update
         ):
-            task_check_migrated_article.delay(
-                user_id=user_id,
-                username=username,
-                article_proc_id=item.id,
-                timeout=timeout,
-                force_update=force_update,
-            )
+            for website in WebSiteConfiguration.objects.filter(
+                collection=collection, enabled=True
+            ):
+                website_kind = website.purpose
+                task_check_article_webpages.delay(
+                    user_id=user_id,
+                    username=username,
+                    collection_id=article_proc.collection.id,
+                    website_kind=website_kind,
+                    article_id=article_proc.article.id,
+                    timeout=timeout,
+                    force_update=force_update,
+                    article_proc_id=article_proc.id,
+                )
 
         task_exec.finish()
     except Exception as e:
@@ -1848,13 +1857,11 @@ def task_check_article_webpages(
             user, f"check availability {article_proc.collection} {website_kind}"
         )
 
-        article = Article.objects.select_related("journal").get(
-            id=article_id
-        )
+        article = article_proc.article
         article.create_or_update_article_collections(user)
         collection = article_proc.collection
         data = {}
-        article.check_availability(user, collection_id=collection_id, purpose=website_kind)
+        article.check_availability(user, collection_id=collection_id, purpose=website_kind, force_update=force_update)
         responses = [
             article.available_on_classic_website(collection),
             article.available_on_public_website(collection),
@@ -1862,9 +1869,12 @@ def task_check_article_webpages(
         response = responses[-1]
 
         data["responses"] = responses
-        data["detail"] = article.availability
+        data["availability"] = article.availability
+
+        for response in responses:
+            if response.get("valid"):
+                article_proc.set_pid_status(user, response.get("new_pid_status"))
     
-        article_proc.set_pid_status(user, response.get("new_pid_status"))
         event.finish(user, completed=True, detail=data)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1969,7 +1979,6 @@ def task_check_articles_availability(
     issue_folder=None,
     publication_year=None,
     article_pid_v3=None,
-    article_id=None,
     collection_acron=None,
     timeout=None,
     force_update=None,
@@ -2001,51 +2010,36 @@ def task_check_articles_availability(
     try:
         user = _get_user(user_id, username)
         article_params = {}
-        j_query = Q()
+        q = Q()
 
-        if article_id:
-            article_params["id"] = article_id
         if article_pid_v3:
-            article_params["pid_v3"] = article_pid_v3
+            article_params["sps_pkg__pid_v3"] = article_pid_v3
         if publication_year:
-            article_params["issue__publication_year"] = publication_year
+            article_params["issue_proc__issue__publication_year"] = publication_year
         if issue_folder:
-            article_params["issue__issue_folder"] = issue_folder
-
-        if collection_acron or issn_electronic or issn_print:
-            j_params = {}
-            if collection_acron:
-                j_params["collection__acron"] = collection_acron
-            if issn_print:
-                j_query |= Q(
-                    journal__official_journal__issn_print=issn_print
-                )
-            if issn_electronic:
-                j_query |= Q(
-                    journal__official_journal__issn_electronic=issn_electronic
-                )
-            article_params["journal__id__in"] = (
-                JournalProc.objects.filter(j_query, **j_params)
-                .values_list("journal__id", flat=True)
-                .distinct()
-            )
-        collection_id = None
+            article_params["issue_proc__issue__issue_folder"] = issue_folder
         if collection_acron:
-            collection_id = (
-                Collection.objects.filter(acron=collection_acron)
-                .values_list("id", flat=True)
-                .first()
+            article_params["collection__acron"] = collection_acron
+
+        q = Q()
+        if issn_print:
+            q |= Q(
+                issue_proc__journal_proc__journal__official_journal__issn_print=issn_print
+            )
+        if issn_electronic:
+            q |= Q(
+                issue_proc__journal_proc__journal__official_journal__issn_electronic=issn_electronic
             )
 
-        for article in Article.objects.filter(
-            journal__isnull=False, **article_params
+        for article_proc in ArticleProc.objects.filter(
+            q, **article_params
         ):
-            article.create_or_update_article_collections(user)
             task_check_article_webpages.delay(
                 user_id=user_id,
                 username=username,
-                article_id=article.id,
-                collection_id=collection_id,
+                article_proc_id=article_proc.id,
+                article_id=article_proc.article.id,
+                collection_id=article_proc.collection_id,
                 timeout=timeout,
                 force_update=force_update,
             )
@@ -2111,15 +2105,15 @@ def task_check_migrated_article(
 
         logging.info("pageslist(article.webpages): {}".format(list(article.webpages)))
         response = article.available_on_classic_website(article_proc.collection)
+        if response.get("valid"):
+            article_proc.set_pid_status(user, response.get("new_pid_status"))
         logging.info(
             f"Checked classic website for ArticleProc {article_proc_id}: {response}"
         )
-        article_proc.set_pid_status(user, response.get("new_pid_status"))
-        if not response.get("valid"):
-            return
-            
+
         response = article.available_on_public_website(article_proc.collection)
-        article_proc.set_pid_status(user, response.get("new_pid_status"))
+        if response.get("valid"):
+            article_proc.set_pid_status(user, response.get("new_pid_status"))
         logging.info(
             f"Checked public website for ArticleProc {article_proc_id}: {response}"
         )
