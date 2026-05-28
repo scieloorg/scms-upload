@@ -2037,6 +2037,11 @@ class ArticleProc(BaseProc, ClusterableModel):
             public_ws_status=tracker_choices.PROGRESS_STATUS_REPROC,
         )
 
+    @classmethod
+    def delete_queryset(cls, qs):
+        ArticleProcResult.objects.filter(proc__in=qs).delete()
+        qs.delete()
+
     # ── status propagation ──
 
     def propagate_reproc_or_todo_status(self):
@@ -2554,7 +2559,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             issue_proc__issue=issue,
         )
         items = qs.values("pid", "sps_pkg__sps_pkg_name")
-        qs.delete()
+        cls.delete_queryset(qs)
         return {"sps_pkg_id_list": list(sps_pkg_id_list), "deleted": list(items)}
 
     def update_sps_pkg_status(self):

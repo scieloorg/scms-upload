@@ -336,8 +336,16 @@ class Article(ClusterableModel, CommonControlField):
             if obj is None:
                 raise cls.DoesNotExist            
         if delete:
-            qs.exclude(pk=obj.pk).delete()
+            cls.delete_queryset(qs.exclude(pk=obj.pk))
         return obj
+
+    @classmethod
+    def delete_queryset(cls, qs):
+        ArticleDOIWithLang.objects.filter(article__in=qs).delete()
+        ArticleTitle.objects.filter(parent__in=qs).delete()
+        ArticleCollection.objects.filter(article__in=qs).delete()
+        ArticleWebPage.objects.filter(article__in=qs).delete()
+        return qs.delete()
 
     # ── create_or_update ──
 
@@ -914,7 +922,7 @@ class Article(ClusterableModel, CommonControlField):
                     sps_pkg_to_delete.add(sps_pkg_id)
                     sps_pkg_names.append(sps_pkg_name)
             response["sps_pkg_with_invalid_pid_v2"] = sps_pkg_names
-            qtd_deleted, _ = qs.delete()
+            qtd_deleted, _ = cls.delete_queryset(qs)
             total_deletado += qtd_deleted
 
         # 1. Remoção por falta de pp_xml
@@ -933,7 +941,7 @@ class Article(ClusterableModel, CommonControlField):
                     sps_pkg_names.append(item.sps_pkg.sps_pkg_name)
         if article_ids:
             response["ppxml_invalid"] = sps_pkg_names
-            qtd_deleted, _ = qs.filter(id__in=article_ids).delete()
+            qtd_deleted, _ = cls.delete_queryset(qs.filter(id__in=article_ids))
             total_deletado += qtd_deleted
 
         # 2. Remoção por duplicidade
@@ -982,23 +990,23 @@ class Article(ClusterableModel, CommonControlField):
                     response[f"repeated_{field_name}"].append((value, sps_pkg_names))
                     
                     # Executa a deleção e soma ao totalizador
-                    qtd_deletada, _ = remover_qs.delete()
+                    qtd_deletada, _ = cls.delete_queryset(remover_qs)
                     total_deletado += qtd_deletada
 
         # Se você precisar retornar o total_deletado junto com o dicionário, 
         # pode adicioná-lo ao dicionário ou retornar uma tupla. 
         # Como o seu esqueleto final pedia apenas o retorno do dicionário, mantive assim:
         if ppxml_to_delete:
-            PidProviderXML.objects.filter(id__in=ppxml_to_delete).delete()
+            PidProviderXML.delete_queryset(PidProviderXML.objects.filter(id__in=ppxml_to_delete))
         if sps_pkg_to_delete:
-            SPSPkg.objects.filter(id__in=sps_pkg_to_delete).delete()
+            SPSPkg.delete_queryset(SPSPkg.objects.filter(id__in=sps_pkg_to_delete))
         
         response["deleted_ppxml_ids"] = list(ppxml_to_delete)
         response["deleted_sps_pkg_ids"] = list(sps_pkg_to_delete)
         
         qs = cls.objects.filter(Q(sps_pkg__isnull=True) | Q(pp_xml__isnull=True), issue=issue)
         response["deleted_article_ids"] = list(qs.values_list("id", flat=True))
-        qtd_deleted, _ = qs.delete()
+        qtd_deleted, _ = cls.delete_queryset(qs)
         total_deletado += qtd_deleted
         
         response["total_deleted_items"] = total_deletado

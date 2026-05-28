@@ -566,6 +566,11 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         return cls.objects.filter(q, **params)
 
     @classmethod
+    def delete_queryset(cls, qs):
+        OtherPid.objects.filter(pid_provider_xml__in=qs).delete()
+        qs.delete()
+
+    @classmethod
     @profile_classmethod
     def public_items(cls, from_date):
         now = datetime.utcnow().isoformat()[:10]

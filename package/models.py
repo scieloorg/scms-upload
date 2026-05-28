@@ -408,6 +408,11 @@ class SPSPkg(CommonControlField, ClusterableModel):
     def get(cls, pid_v3):
         return cls.objects.get(pid_v3=pid_v3)
 
+    @classmethod
+    def delete_queryset(cls, qs):
+        SPSPkgComponent.objects.filter(sps_pkg__in=qs).delete()
+        qs.delete()
+
     def set_registered_in_core(self, value):
         PidRequester.set_registered_in_core(self.pid_v3, value)
 
@@ -428,7 +433,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         except cls.MultipleObjectsReturned:
             items = cls.objects.filter(sps_pkg_name=sps_pkg_name).order_by("-updated")
             obj = items.first()
-            items.exclude(id=obj.id).delete()
+            cls.delete_queryset(items.exclude(id=obj.id))
         except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
