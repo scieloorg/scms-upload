@@ -7,6 +7,7 @@ from .views import (
     finish_deposit,
     preview_document,
     archive_package,
+    batch_republish,
 )
 
 app_name = "upload"
@@ -18,4 +19,5 @@ urlpatterns = [
     path("download-errors", view=download_errors, name="download_errors"),
     path("xml", view=display_xml, name="display_xml"),
     path("archive", view=archive_package, name="archive_package"),
+    path("batch-republish", view=batch_republish, name="batch_republish"),
 ]
