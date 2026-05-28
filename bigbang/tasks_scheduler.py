@@ -47,6 +47,9 @@ FETCH_AND_CREATE_JOURNAL_PRIORITY = 1
 PRESS_RELEASE_MINUTES = MINUTES[10]
 PRESS_RELEASE_PRIORITY = 1
 
+REPUBLISH_ARTICLES_MINUTES = MINUTES[10]
+REPUBLISH_ARTICLES_PRIORITY = 4
+
 TITLE_DB_MIGRATION_PRIORITY = 0
 ISSUE_DB_MIGRATION_PRIORITY = 0
 ARTICLE_DB_MIGRATION_PRIORITY = 4
@@ -103,6 +106,7 @@ def schedule_publication_subtasks(username):
     _schedule_publish_articles(username)
     _schedule_publish_issues(username)
     _schedule_publish_journals(username)
+    _schedule_republish_articles(username)
 
 
 def schedule_subtasks(username):
@@ -411,4 +415,30 @@ def _schedule_try_fetch_and_register_press_release(username, enabled=False):
         day_of_week="*",
         hour="*",
         minute=PRESS_RELEASE_MINUTES,
+    )
+
+
+def _schedule_republish_articles(username, enabled=False):
+    schedule_task(
+        task="upload.tasks.task_republish_articles",
+        name="task_republish_articles",
+        kwargs=dict(
+            username=username,
+            issn_print=None,
+            issn_electronic=None,
+            issue_folder=None,
+            publication_year=None,
+            article_pid_v3=None,
+            article_id=None,
+            collection_acron=None,
+            timeout=None,
+            force_update=None,
+        ),
+        description=_("Republica artigos em lote"),
+        priority=REPUBLISH_ARTICLES_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=REPUBLISH_ARTICLES_MINUTES,
     )

@@ -32,7 +32,13 @@ def sync_issue(issue_proc, api_data):
         api = PublicationAPI(**api_data)
         if not api.post_data_url:
             return {}
-        api.post_data_url += "/sync"
+
+        url = api.post_data_url
+        if not url.endswith("/issue/sync"):
+            url = url.replace("/article", "/issue").replace("/journal", "/issue")
+            url += "/sync"
+
+        api.post_data_url = url
         issue_sync_payload = {
             "issue_id": issue_proc.bundle_id,
             "articles_id": issue.article_ids,

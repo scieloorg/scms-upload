@@ -11,7 +11,7 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.models.article_titles import ArticleTitles
 from packtools.sps.models.article_toc_sections import ArticleTocSections
-from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel, TabbedInterface, ObjectList
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
@@ -32,6 +32,24 @@ from . import choices
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
 
 User = get_user_model()
+
+
+def get_compiled_status(status_list):
+    """Recalcula status a partir das ArticleWebPage filhas."""
+    
+    if not status_list:
+        return choices.ARTICLE_WEBPAGE_STATUS_NOT_CHECKED
+    if len(status_list) == 1:
+        return status_list[0]
+    order = (
+        choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT,
+        choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH,
+        choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE,
+        choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE,
+    )
+    for item in order:
+        if item in status_list:
+            return item
 
 
 def get_pid_status_from_webpage_status(website, article_status: str) -> str:
@@ -57,7 +75,7 @@ def get_pid_status_from_webpage_status(website, article_status: str) -> str:
 
 
     # Retorna o valor mapeado ou o status de 'not found' por padrão
-    return mapping.get(website).get(article_status, migration_choices.PID_STATUS_UNKNOWN)
+    return mapping.get(website).get(article_status) or migration_choices.PID_STATUS_UNKNOWN
 
 
 # ============================================================
@@ -147,7 +165,6 @@ class Article(ClusterableModel, CommonControlField):
         related_name="related_to",
     )
     sections = models.ManyToManyField(JournalSection, verbose_name=_("sections"))
-
     panel_article_ids = MultiFieldPanel(
         heading="Article identifiers", classname="collapsible"
     )
@@ -168,20 +185,40 @@ class Article(ClusterableModel, CommonControlField):
         FieldPanel("fpage", read_only=True),
         FieldPanel("lpage", read_only=True),
     ]
+
     panel_collections = MultiFieldPanel(
         heading=_("Collections"), classname="collapsible"
     )
     panel_collections.children = [
         InlinePanel(relation_name="article_collections", label="Collections"),
+    ]
+    panel_webpages = MultiFieldPanel(
+        heading=_("Webpages"), classname="collapsible"
+    )
+    panel_webpages.children = [
         InlinePanel(relation_name="pages", label=_("Web pages")),
     ]
 
-    panels = [
-        panel_article_ids,
-        panel_article_details,
-        FieldPanel("issue", classname="collapsible", read_only=True),
-        panel_collections,
-    ]
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(
+                [panel_article_ids, panel_article_details],
+                heading="Article",
+            ),
+            ObjectList(
+                [FieldPanel("issue", read_only=True)],
+                heading="Issue",
+            ),
+            ObjectList(
+                [panel_collections],
+                heading="Collections",
+            ),
+            ObjectList(
+                [panel_webpages],
+                heading=_("Webpages"),
+            ),
+        ]
+    )
 
     base_form_class = ArticleForm
 
@@ -804,18 +841,21 @@ class Article(ClusterableModel, CommonControlField):
     def availability(self):
         data = []
         for item in ArticleWebPage.objects.filter(article=self):
-            data.append(item.detail)
+            data.append(item.data)
         return data
 
     def _available_on_website(self, collection, purpose=None):
-        article_collection = self.article_collections.filter(
-            collection=collection
-        ).first()
-        if not article_collection:
-            return {"valid": None, "new_pid_status": None, "error": "No collection", "collecion": collection.acron, "purpose": purpose}
-        status = article_collection.get_compiled_status(purpose)
+        status_list = list(self.pages.filter(collection=collection, purpose=purpose).values_list("status", flat=True))
+        status = get_compiled_status(status_list)
         valid = status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
-        return {"valid": valid, "new_pid_status": get_pid_status_from_webpage_status(purpose, status)}
+        return {
+            "collection": collection.acron,
+            "purpose": purpose,
+            "valid": valid,
+            "new_pid_status": get_pid_status_from_webpage_status(purpose, status),
+            "status_list": status_list,
+            "status": status,
+        }
         
     def available_on_classic_website(self, collection=None):
         return self._available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC)
@@ -843,34 +883,39 @@ class Article(ClusterableModel, CommonControlField):
         total_deletado = 0
         
         # Estrutura exata solicitada por você
-        items_to_delete = {
+        response = {
             "sps_pkg_with_invalid_pid_v2": [],
             "ppxml_invalid": [],
             "repeated_sps_pkg_name": [],
             "repeated_pid_v2": [],
-            "ppxml_ids": [],
-            "sps_pkg_ids": [],
+            "deleted_ppxml_ids": [],
+            "deleted_sps_pkg_ids": [],
+            "deleted_article_ids": [],
+            "total_deleted_items": 0
         }
         ppxml_to_delete = set()
         sps_pkg_to_delete = set()
         
         events = []
+        exceptions = []
 
         qs = cls.objects.select_related("pp_xml", "sps_pkg").filter(issue=issue)
-        
+        q = Q(sps_pkg__isnull=True)
         if sps_pkg_id_list:
-            qs = qs.filter(sps_pkg__id__in=sps_pkg_id_list)
-            if qs.exists():
-                sps_pkg_names = []
-                for pp_xml_id, sps_pkg_name, sps_pkg_id in qs.values_list("pp_xml_id", "sps_pkg__sps_pkg_name", "sps_pkg_id"):
-                    if pp_xml_id:
-                        ppxml_to_delete.add(pp_xml_id)
-                    if sps_pkg_id:
-                        sps_pkg_to_delete.add(sps_pkg_id)
-                        sps_pkg_names.append(sps_pkg_name)
-                items_to_delete["sps_pkg_with_invalid_pid_v2"] = sps_pkg_names
-                qtd_deleted, _ = qs.delete()
-                total_deletado += qtd_deleted
+            q |= Q(sps_pkg__id__in=sps_pkg_id_list)
+        
+        qs = qs.filter(q)
+        if qs.exists():
+            sps_pkg_names = []
+            for pp_xml_id, sps_pkg_name, sps_pkg_id in qs.values_list("pp_xml_id", "sps_pkg__sps_pkg_name", "sps_pkg_id"):
+                if pp_xml_id:
+                    ppxml_to_delete.add(pp_xml_id)
+                if sps_pkg_id:
+                    sps_pkg_to_delete.add(sps_pkg_id)
+                    sps_pkg_names.append(sps_pkg_name)
+            response["sps_pkg_with_invalid_pid_v2"] = sps_pkg_names
+            qtd_deleted, _ = qs.delete()
+            total_deletado += qtd_deleted
 
         # 1. Remoção por falta de pp_xml
         qs = cls.objects.select_related("pp_xml").filter(issue=issue)
@@ -887,7 +932,7 @@ class Article(ClusterableModel, CommonControlField):
                     sps_pkg_to_delete.add(item.sps_pkg.id)
                     sps_pkg_names.append(item.sps_pkg.sps_pkg_name)
         if article_ids:
-            items_to_delete["ppxml_invalid"] = sps_pkg_names
+            response["ppxml_invalid"] = sps_pkg_names
             qtd_deleted, _ = qs.filter(id__in=article_ids).delete()
             total_deletado += qtd_deleted
 
@@ -900,7 +945,7 @@ class Article(ClusterableModel, CommonControlField):
             for value in list(multiple_values or []):
                 
                 # Filtra os registros que possuem este valor específico duplicado
-                duplicados = qs.filter(**{field_name: value}).order_by("-update")
+                duplicados = qs.filter(**{field_name: value}).order_by("-updated")
                 
                 if not duplicados.exists():
                     continue
@@ -919,7 +964,7 @@ class Article(ClusterableModel, CommonControlField):
                             keep = item
                             break
                     except Exception as e:
-                        events.append(_("Checking {} is available. Result: {}").format(item, e))
+                        exceptions.append(_("Checking {} is available. Result: {}").format(item, e))
                 
                 # Separa os que serão deletados
                 remover_qs = duplicados.exclude(id=keep.id)
@@ -934,7 +979,7 @@ class Article(ClusterableModel, CommonControlField):
                             sps_pkg_names.append(sps_pkg_name)
                     
                     # Alimenta a chave dinâmica: "repeated_sps_pkg_name" ou "repeated_pid_v2"
-                    items_to_delete[f"repeated_{field_name}"].append((value, sps_pkg_names))
+                    response[f"repeated_{field_name}"].append((value, sps_pkg_names))
                     
                     # Executa a deleção e soma ao totalizador
                     qtd_deletada, _ = remover_qs.delete()
@@ -947,10 +992,19 @@ class Article(ClusterableModel, CommonControlField):
             PidProviderXML.objects.filter(id__in=ppxml_to_delete).delete()
         if sps_pkg_to_delete:
             SPSPkg.objects.filter(id__in=sps_pkg_to_delete).delete()
-        items_to_delete["ppxml_ids"] = ppxml_to_delete
-        items_to_delete["sps_pkg_ids"] = sps_pkg_to_delete
         
-        return items_to_delete
+        response["deleted_ppxml_ids"] = list(ppxml_to_delete)
+        response["deleted_sps_pkg_ids"] = list(sps_pkg_to_delete)
+        
+        qs = cls.objects.filter(Q(sps_pkg__isnull=True) | Q(pp_xml__isnull=True), issue=issue)
+        response["deleted_article_ids"] = list(qs.values_list("id", flat=True))
+        qtd_deleted, _ = qs.delete()
+        total_deletado += qtd_deleted
+        
+        response["total_deleted_items"] = total_deletado
+        response["events"] = events
+        response["exceptions"] = exceptions
+        return response
 
  
 # ============================================================
@@ -1156,27 +1210,13 @@ class ArticleCollection(CommonControlField):
 
     def update_aggregate_status(self, user):
         """Recalcula status a partir das ArticleWebPage filhas."""
-        self.status = self.get_compiled_status()
+        status_list = ArticleWebPage.objects.filter(
+            collection=self.collection,
+        ).values_list("status", flat=True)
+        
+        self.status = get_compiled_status(status_list)
         self.updated_by = user
         self.save(update_fields=["status", "updated_by"])
-
-    def get_compiled_status(self, purpose=None):
-        """Recalcula status a partir das ArticleWebPage filhas."""
-        purpose = purpose or choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC
-        selected_pages = self.pages.filter(purpose=purpose)
-        status = list(selected_pages.values_list("status", flat=True).distinct())
-        if not status:
-            return choices.ARTICLE_WEBPAGE_STATUS_NOT_CHECKED
-        if len(status) == 1:
-            return status[0]
-        if choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT in status:
-            return choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
-        if choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH in status:
-            return choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH
-        if choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE in status:
-            return choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE
-        if choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE in status:
-            return choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE
 
     # ── get_or_create ──
 
@@ -1436,15 +1476,6 @@ class ArticleWebPage(CommonControlField):
     def __str__(self):
         return f"{self.url} [{self.purpose}/{self.fmt}/{self.lang}] {self.status}"
 
-    # ── Propagação ──
-
-    def propagate_status(self, user):
-        """Propaga status para o ArticleCollection pai."""
-        ArticleCollection.objects.get(
-            collection=self.collection,
-            article=self.article,
-        ).update_aggregate_status(user)
-
     # ── URL update ──
 
     def update_url_if_changed(self, new_url, user):
@@ -1467,7 +1498,8 @@ class ArticleWebPage(CommonControlField):
             "purpose": self.purpose,
             "status": self.status,
             "valid": self.status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT,
-            "detail": self.detail,
+            "result": self.detail,
+            "updated": self.updated.isoformat(),
         }
 
     def check_page(
@@ -1479,61 +1511,52 @@ class ArticleWebPage(CommonControlField):
         Acessa a URL, verifica conteúdo contra os metadados do artigo,
         e propaga o status para o ArticleCollection pai.
         """
-        detail = {
-            "url": self.url,
-            "format": self.fmt,
-            "lang": self.lang.code2 if self.lang else None,
-            "purpose": self.purpose,
-            "status": self.status,
-            "force_update": force_update,
-        }
+        detail = {}
         logging.info(f"Checking page {self.url} force_update={force_update} status={self.status}")
         if self.status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT:
             if not force_update:
                 return detail
 
         try:
+            self.status = choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE
+    
             response = check_url(self.url, timeout)
             content = response.get("content")
-            if not content:
-                raise ValueError("No content retrieved from URL")
-
             self.status = choices.ARTICLE_WEBPAGE_STATUS_AVAILABLE
 
-            if not article_metadata:
-                article = self.article
-                lang_code = self.lang.code2 if self.lang else None
-                article_metadata = article.get_metadata_items(lang_code)
-            if not article_metadata:
-                raise ValueError(
-                    "No article metadata available for content check"
-                )
+            if self.fmt in ("html", "xml"):
+                if not article_metadata:
+                    article = self.article
+                    lang_code = self.lang.code2 if self.lang else None
+                    article_metadata = article.get_metadata_items(lang_code)
 
-            response = check_content(article_metadata, content)
-            if response.get("error"):
-                raise ValueError(response["error"])
- 
-            detail.update(response)
-            rate = response.get("rate", 0)
-            if rate >= 0.5:
-                self.status = choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
-            else:
-                detail["content"] = content
-                detail["article_metadata"] = article_metadata
-                self.status = choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH
+                response = check_content(article_metadata, content, self.fmt) 
+                detail.update(response)
+                try:
+                    rate = response["rate"]
+                except KeyError:
+                    raise Exception("Unable to check content")
+
+                if rate >= 0.5:
+                    self.status = choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+                else:
+                    # detail["content"] = content
+                    # detail["article_metadata"] = article_metadata
+                    self.status = choices.ARTICLE_WEBPAGE_STATUS_CONTENT_MISMATCH
         except Exception as e:
             detail["error"] = str(e)
-            self.status = choices.ARTICLE_WEBPAGE_STATUS_UNAVAILABLE
 
         self.detail = detail
         self.updated_by = user
-        self.save()
-        self.propagate_status(user)
 
-        detail["status"] = self.status
-        detail["valid"] = (self.status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT)
-        logging.info(f"Checked page {self.url}: {detail}")
-        return detail
+        try:
+            self.save()
+        except Exception as e:
+            logging.info(f"Erro ao salvar ARticleWebPage")
+            logging.exception(e)
+
+        logging.info(f"data: {self.data}")
+        return self.data
 
     # ── Factory ──
 
