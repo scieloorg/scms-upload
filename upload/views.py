@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
-from wagtail_modeladmin.views import CreateView, EditView, InspectView
+from wagtail.snippets.views.snippets import CreateView, EditView, InspectView
 
 from upload.models import Package, PkgValidationResult, choices
 from upload.tasks import (
@@ -12,6 +12,7 @@ from upload.tasks import (
     task_publish_article,
     task_complete_journal_data,
     task_complete_issue_data,
+    task_republish_articles,
 )
 from upload.utils import file_utils
 from upload.utils import package_utils
@@ -46,7 +47,7 @@ class PackageAdminInspectView(InspectView):
     def get_optimized_package_filepath_and_directory(self):
         # Obtém caminho do pacote otimizado
         _path = package_utils.generate_filepath_with_new_extension(
-            self.instance.file.name,
+            self.object.file.name,
             ".optz",
             True,
         )
@@ -61,10 +62,10 @@ class PackageAdminInspectView(InspectView):
     def set_pdf_paths(self, data, optz_dir):
         try:
             for rendition in package_utils.get_article_renditions_from_zipped_xml(
-                self.instance.file.name
+                self.object.file.name
             ):
                 package_files = file_utils.get_file_list_from_zip(
-                    self.instance.file.name
+                    self.object.file.name
                 )
                 document_name = package_utils.get_xml_filename(package_files)
                 rendition_name = package_utils.get_rendition_expected_name(
@@ -79,28 +80,28 @@ class PackageAdminInspectView(InspectView):
         except XMLFormatError:
             data["pdfs"] = []
 
-    def get_context_data(self):
+    def get_context_data(self, **kwargs):
         blocking_errors = list(
             PkgValidationResult.objects.filter(
-                report__package=self.instance,
+                report__package=self.object,
                 status=choices.VALIDATION_RESULT_BLOCKING,
             ).values_list("message", flat=True)
         )
         data = {
-            "pkg_zip_name": self.instance.pkg_zip.name,
-            "linked": self.instance.linked.all(),
+            "pkg_zip_name": self.object.pkg_zip.name,
+            "linked": self.object.linked.all(),
             "validation_results": {},
-            "package_id": self.instance.id,
-            "original_pkg": self.instance.file.name,
-            "status": self.instance.status,
-            "category": self.instance.category,
-            "languages": package_utils.get_languages(self.instance.file.name),
+            "package_id": self.object.id,
+            "original_pkg": self.object.file.name,
+            "status": self.object.status,
+            "category": self.object.category,
+            "languages": package_utils.get_languages(self.object.file.name),
             "pdfs": [],
-            "reports": list(self.instance.reports),
-            "xml_error_reports": list(self.instance.xml_error_reports),
-            "xml_info_reports": list(self.instance.xml_info_reports),
-            "summary": self.instance.summary,
-            "xml": self.instance.xml,
+            "reports": list(self.object.reports),
+            "xml_error_reports": list(self.object.xml_error_reports),
+            "xml_info_reports": list(self.object.xml_info_reports),
+            "summary": self.object.summary,
+            "xml": self.object.xml,
             "blocking_errors": blocking_errors,
         }
 
@@ -129,19 +130,19 @@ class XMLInfoReportEditView(EditView):
         return redirect(self.get_package_url())
 
     def get_package_url(self):
-        report = self.instance
+        report = self.object
         return f"/admin/upload/package/inspect/{report.package.id}/?#xi"
 
 
 class ValidationReportEditView(XMLInfoReportEditView):
     def get_package_url(self):
-        report = self.instance
+        report = self.object
         return f"/admin/upload/package/inspect/{report.package.id}/?#vr{report.id}"
 
 
 class XMLErrorReportEditView(XMLInfoReportEditView):
     def get_package_url(self):
-        report = self.instance
+        report = self.object
         return f"/admin/upload/package/inspect/{report.package.id}/?#xer{report.id}"
 
 
@@ -359,3 +360,46 @@ def archive_package(request):
                 ),
             )
     return redirect(f"/admin/upload/package/")
+
+
+def batch_republish(request):
+    """
+    Permite ao administrador agendar republicação em lote de artigos
+    no site QA ou PUBLIC, com filtros opcionais por ISSN, fascículo, etc.
+    """
+    from collection.choices import WEBSITE_KIND
+
+    if not has_permission(request.user):
+        messages.error(request, _("Operation not available"))
+        return redirect("/admin/snippets/upload/readytopublishpackage/")
+
+    if request.method == "POST":
+        website_kind = request.POST.get("website_kind") or None
+        issn_print = request.POST.get("issn_print") or None
+        issn_electronic = request.POST.get("issn_electronic") or None
+        issue_folder = request.POST.get("issue_folder") or None
+        publication_year = request.POST.get("publication_year") or None
+        collection_acron = request.POST.get("collection_acron") or None
+
+        task_republish_articles.delay(
+            username=request.user.username,
+            user_id=request.user.id,
+            website_kind=website_kind,
+            issn_print=issn_print,
+            issn_electronic=issn_electronic,
+            issue_folder=issue_folder,
+            publication_year=publication_year,
+            collection_acron=collection_acron,
+        )
+        messages.success(
+            request,
+            _("Batch republication scheduled for %(website)s website.")
+            % {"website": website_kind or _("all")},
+        )
+        return redirect("/admin/snippets/upload/readytopublishpackage/")
+
+    return render(
+        request,
+        "modeladmin/upload/package/batch_republish.html",
+        {"website_kinds": WEBSITE_KIND},
+    )
