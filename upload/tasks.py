@@ -601,13 +601,15 @@ def task_publish_article(
     Tarefa que publica artigos ingressados pelo Upload
     """
     try:
+
+        article = None
+        op_main = None
+        responses = []
+
         if not upload_package_id:
             raise ValueError("task_publish_article requires Upload Package ID")
 
         user = _get_user(user_id, username)
-        article = None
-        op_main = None
-        responses = []
 
         # Obter gerenciador e informações do artigo
         manager = Package.objects.get(pk=upload_package_id)
@@ -904,74 +906,63 @@ def task_republish_articles(
     collection_acron=None,
     timeout=None,
     force_update=None,
+    website_kind=None,
 ):
     """
-    Republica artigos em lote, eliminando duplicatas antes e sincronizando fascículos.
+    Republica artigos em lote a partir dos pacotes com status preview,
+    ready-to-preview ou published, eliminando duplicatas e sincronizando fascículos.
 
-    Para cada fascículo encontrado pelos filtros:
+    Os parâmetros opcionais restringem o conjunto de pacotes selecionados.
+    Para cada fascículo encontrado:
     1. Remove artigos duplicados/inválidos via Article.exclude_invalid_records.
     2. Agenda task_publish_article para cada artigo válido restante.
     3. Agenda task_sync_issue por IssueProc, despublicando artigos removidos.
-
-    Parameters
-    ----------
-    username / user_id : str / int
-        Identificação do usuário executor.
-    issn_print / issn_electronic : str, optional
-        Filtra por ISSN do periódico (OR lógico).
-    issue_folder / publication_year : str / int, optional
-        Filtra por fascículo ou ano de publicação.
-    article_pid_v3 / article_id : str / int, optional
-        Restringe a republicação a um artigo específico dentro dos fascículos.
-    collection_acron : str, optional
-        Restringe à coleção indicada.
-    timeout : int, optional
-        Timeout HTTP em segundos passado para as tarefas filhas.
-    force_update : bool, optional
-        Se True, força republicação mesmo de páginas já válidas.
     """
     try:
-
         user = _get_user(user_id, username)
 
-        article_params = {}
-        j_query = Q()
+        statuses = [
+            choices.PS_PREVIEW,
+            choices.PS_READY_TO_PREVIEW,
+            choices.PS_PUBLISHED,
+        ]
+
+        pkg_filter = Q(status__in=statuses, issue__isnull=False)
 
         if publication_year:
-            article_params["publication_year"] = publication_year
+            pkg_filter &= Q(article__issue__publication_year=publication_year)
         if issue_folder:
-            article_params["issue_folder"] = issue_folder
+            pkg_filter &= Q(article__issue__issue_folder=issue_folder)
 
-        if collection_acron or issn_electronic or issn_print:
+        if issn_print or issn_electronic:
             j_filter = Q()
             if issn_print:
-                j_filter |= Q(official_journal__issn_print=issn_print)
+                j_filter |= Q(journal__official_journal__issn_print=issn_print)
             if issn_electronic:
-                j_filter |= Q(official_journal__issn_electronic=issn_electronic)
-            if collection_acron:
-                j_filter &= Q(journalproc__collection__acron=collection_acron)
-            article_params["journal__in"] = Journal.objects.filter(j_filter)
+                j_filter |= Q(journal__official_journal__issn_electronic=issn_electronic)
+            pkg_filter &= j_filter
 
-        if article_id or article_pid_v3:
-            a_filter = Q()
-            if article_id:
-                a_filter &= Q(id=article_id)
-            if article_pid_v3:
-                a_filter &= Q(pid_v3=article_pid_v3)
-            issue_id_qs = (
-                Article.objects.filter(a_filter)
-                .values_list("issue_id", flat=True)
-                .distinct()
-            )
-            article_params["id__in"] = issue_id_qs
+        if collection_acron:
+            pkg_filter &= Q(journal__journalproc__collection__acron=collection_acron)
 
-        responses = []
-        for issue_id in Article.objects.filter(journal__isnull=False, **article_params).values_list("issue__id", flat=True).distinct():
+        if article_id:
+            pkg_filter &= Q(article__id=article_id)
+        if article_pid_v3:
+            pkg_filter &= Q(article__pid_v3=article_pid_v3)
+
+        issue_ids = (
+            Package.objects.filter(pkg_filter)
+            .values_list("issue_id", flat=True)
+            .distinct()
+        )
+
+        for issue_id in issue_ids:
             task_publish_issue_articles.delay(
                 issue_id=issue_id,
                 username=username,
                 user_id=user_id,
                 timeout=timeout,
+                website_kind=website_kind,
             )
 
     except Exception as e:
@@ -990,6 +981,7 @@ def task_republish_articles(
                 "collection_acron": collection_acron,
                 "timeout": timeout,
                 "force_update": force_update,
+                "website_kind": website_kind,
             },
         )
 
@@ -1001,6 +993,7 @@ def task_publish_issue_articles(
     username=None,
     user_id=None,
     timeout=None,
+    website_kind=None,
 ):
     try:
         task_params = {
@@ -1008,6 +1001,7 @@ def task_publish_issue_articles(
             "user_id": user_id,
             "username": username,
             "issue_id": issue_id,
+            "website_kind": website_kind,
         }
         task_exec = TaskExecution(
             name="upload.tasks.task_publish_issue_articles",
@@ -1026,16 +1020,17 @@ def task_publish_issue_articles(
 
         websites = set()
         for issue_proc in issue.issueproc_set.all():
-            
+
             event = issue_proc.start(user, "task_publish_issue_articles__sync_issue")
             sync_issue_response = []
-            for website in WebSiteConfiguration.objects.filter(
-                collection=issue_proc.collection, enabled=True
-            ):
+            ws_qs_filter = dict(collection=issue_proc.collection, enabled=True)
+            if website_kind:
+                ws_qs_filter["purpose"] = website_kind
+            for website in WebSiteConfiguration.objects.filter(**ws_qs_filter):
                 api_data = website.get_data(content_type="issue")
-                website_kind = website.purpose
-                websites.add(website_kind)
-            
+                ws_purpose = website.purpose
+                websites.add(ws_purpose)
+
                 response = sync_issue(issue_proc, api_data)
                 sync_issue_response.append(response)
                 task_exec.add_event(response)
