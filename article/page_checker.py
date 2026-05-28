@@ -1,7 +1,7 @@
 """
 Verifica a presença exata de metadados de artigo em um texto.
 """
-
+import logging
 import re
 import unicodedata
 from difflib import SequenceMatcher
@@ -38,37 +38,85 @@ def check_url(url, timeout):
         if not url:
             raise ValueError("check_page_url_and_content: URL is required for availability check.")
         content = fetch_data(url, timeout=timeout or 30)
-        if not content:
-            raise ValueError("check_page_url_and_content: No content fetched from URL.")
-        return {"content": content.decode("utf-8")}
+        return {"content": content}
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e), "function": "check_url"}
     
 
-def check_content(article_metadata, content):
+def clean_pdf_text(raw):
+    """
+    Limpa texto extraído de PDF para maximizar a chance de match
+    com metadados do artigo.
+    """
+    text = raw
+
+    # 1. Decodifica entidades HTML residuais (alguns extratores deixam)
+    text = unescape(text)
+
+    # 2. Remove hifenização de fim de linha: "publi-\ncação" → "publicação"
+    text = re.sub(r"(\w)-\s*\n\s*(\w)", r"\1\2", text)
+
+    # 3. Substitui quebras de linha por espaço
+    text = text.replace("\n", " ").replace("\r", " ")
+
+    # 4. Remove caracteres de controle (form feed, etc.)
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", " ", text)
+
+    # 5. Colapsa espaços múltiplos
+    text = re.sub(r"\s+", " ", text)
+
+    return text.strip()
+
+
+def check_content(article_metadata, content, format):
     try:
         if not article_metadata:
-            raise ValueError("check_page_url_and_content: Article metadata is required for availability check.")
+            raise ValueError("check_content: Article metadata is required for availability check.")
         if not content:
-            raise ValueError("check_page_url_and_content: Content is required for availability check.")
+            raise ValueError("check_content: Content is required for availability check.")
         try:
-            content = " ".join(content.split())
-            position = content.find("PID:")
-            if position:
-                content = content[:position+1000]
-        except (AttributeError, IndexError):
+            if format == "pdf":
+                # Decodifica bytes → str
+                if isinstance(content, bytes):
+                    content = content.decode("utf-8", errors="replace")
+                    if not content:
+                        raise ValueError("check_content: Unable to decode content for pdf")
+                logging.exception("check content 1111")
+
+                # Limpeza adequada para texto vindo de PDF
+                content = clean_pdf_text(content)
+                if not content:
+                    raise ValueError("check_content: Unable to clean pdf content")
+                logging.exception("check content 2222")
+            else:
+                content = content.decode("utf-8")
+                if not content:
+                    raise ValueError("check_content: Unable to decode content")
+                
+                logging.exception("check content 3333")
+                content = " ".join(content.split())
+                logging.exception("check content 4444")
+                if "PID:" in content:
+                    logging.exception("check content 5555")
+                    position = content.find("PID:")
+                    if position:
+                        logging.exception("check content 6666")
+                        content = content[:position+1000]
+                logging.exception("check content 7777") 
+        except (AttributeError, IndexError) as exc:
+            logging.exception(f"check content {exc}") 
             pass
         result = check_metadata(article_metadata, content)
-
         numbers = compute_rate(result)
-        rate = numbers.get("rate", 0)
-        return {
-            "result": result,
-            "numbers": numbers,
-            "rate": rate,
-        }
+        logging.info(f"check content: {result}")
+        logging.info(f"check content: {numbers}")
+        
+        response = {}
+        response["result"] = result
+        response.update(numbers)
+        return response
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e), "type": str(type(e))}
 
 
 def normalize(text):
@@ -148,6 +196,8 @@ def check_metadata(metadata, text):
     list[tuple]
         Lista de (label, valor, encontrado).
     """
+    if not text:
+        raise ValueError(f"check_metadata: Unable to check metadata because text is not provided")
     return [
         (label, value, is_found(value, text))
         for label, value in metadata
@@ -168,18 +218,18 @@ def compute_rate(items):
     -------
     dict
         {
-            "found_count": int,
-            "not_found_count": int,
+            "total_found": int,
+            "total_not_found": int,
             "total": int,
             "rate": float,
         }
     """
     total = len(items)
-    found_count = sum(1 for _, _, found in items if found)
+    total_found = sum(1 for _, _, found in items if found)
 
     return {
-        "found_count": found_count,
-        "not_found_count": total - found_count,
+        "total_found": total_found,
+        "total_not_found": total - total_found,
         "total": total,
-        "rate": found_count / total if total else 0.0,
+        "rate": total_found / total if total else 0.0,
     }

@@ -891,7 +891,7 @@ def task_check_articles_availability(
 
 
 @celery_app.task(bind=True)
-def task_upload_publish_articles(
+def task_republish_articles(
     self,
     username=None,
     user_id=None,
@@ -980,7 +980,7 @@ def task_upload_publish_articles(
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "task": "upload.tasks.task_upload_publish_articles",
+                "task": "upload.tasks.task_republish_articles",
                 "issn_print": issn_print,
                 "issn_electronic": issn_electronic,
                 "issue_folder": issue_folder,
