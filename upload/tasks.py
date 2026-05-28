@@ -14,10 +14,14 @@ from packtools.utils import SPPackage
 from article import choices as article_choices
 from article.models import Article
 from collection import choices as collection_choices
+from collection.models import WebSiteConfiguration
 from config import celery_app
 from issue.models import Issue
 from journal.models import Journal
 from proc.controller import ensure_journal_proc_exists, ensure_issue_proc_exists
+from proc.models import JournalProc, IssueProc
+from proc.tasks import TaskExecution
+from publication.api.issue import sync_issue
 from tracker.models import UnexpectedEvent
 from upload import choices
 from upload.controller import receive_package
@@ -26,10 +30,9 @@ from upload.models import Package, ValidationReport, PackageZip, UploadValidator
 from upload.validation.rendition_validation import validate_rendition
 from upload.validation.html_validation import validate_webpage
 from upload.validation.xml_data_checker import XMLDataChecker
-from publication.tasks import task_check_article_availability
-
 from upload import choices, controller, exceptions
 from upload.utils import file_utils, package_utils, xml_utils
+
 
 User = get_user_model()
 
@@ -601,17 +604,6 @@ def task_publish_article(
         if not upload_package_id:
             raise ValueError("task_publish_article requires Upload Package ID")
 
-        logging.info(
-            dict(
-                user_id=user_id,
-                username=username,
-                websites=websites,
-                article_proc_id=article_proc_id,
-                upload_package_id=upload_package_id,
-                publication_rule=publication_rule,
-            )
-        )
-
         user = _get_user(user_id, username)
         article = None
         op_main = None
@@ -622,16 +614,7 @@ def task_publish_article(
         logging.info(f"manager: {manager}")
         logging.info(f"article: {manager.article}")
 
-        if len(websites) > 1:
-            published_by = "SYSTEM"
-        elif manager.assignee:
-            published_by = manager.assignee.username or manager.assignee.id
-        elif manager.analyst:
-            published_by = manager.analyst.user.username or manager.analyst.user.id
-        elif manager.updated_by:
-            published_by = manager.updated_by.username or manager.updated_by.id
-        elif manager.creator:
-            published_by = manager.creator.username or manager.creator.id
+        published_by = manager.get_published_by(websites)
 
         article = manager.article
         journal = article.journal
@@ -645,7 +628,7 @@ def task_publish_article(
 
         responses = list(
             publication.publish_article_collection_websites(
-                user,
+                published_by,
                 manager,
                 websites,
                 force_journal_publication,
@@ -653,14 +636,20 @@ def task_publish_article(
             )
         )
         logging.info(f"responses: {responses}")
+
+        article.create_or_update_article_collections(user)
+        article.check_availability(user)
+            
+        data["responses"] = responses
+        data["availability"] = article.availability
         op_main.finish(
             user,
-            completed=bool(any([item["published"] for item in responses])),
+            completed=bool(any([item["valid"] for item in data["availability"]])),
             exception=None,
             message_type=None,
             message=None,
             exc_traceback=None,
-            detail=responses,
+            detail=data,
         )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -684,14 +673,7 @@ def task_publish_article(
                     websites=websites,
                 ),
             )
-    else:
-        task_check_article_availability.apply_async(
-            kwargs=dict(
-                username=user.username,
-                user_id=user.id,
-                article_pid_v3=article.pid_v3,
-            )
-        )
+
 
 
 @celery_app.task(bind=True)
@@ -743,4 +725,477 @@ def task_complete_issue_data(
                 item="issue",
                 issue_id=issue_id,
             ),
+        )
+
+
+
+############################################
+# AVAILABILITY CHECKS
+############################################
+
+
+@celery_app.task(bind=True)
+def task_check_article_webpages(
+    self,
+    user_id=None,
+    username=None,
+    article_id=None,
+    collection_id=None,
+    website_kind=None,
+    timeout=None,
+    force_update=None,
+):
+    """
+    Cria/atualiza ArticleCollections do artigo e verifica disponibilidade de páginas.
+
+    1. Recupera o Article pelo id.
+    2. Garante existência das ArticleCollections via
+       ``article.create_or_update_article_collections``.
+    3. Delega verificação para ``article.check_availability``, filtrada por
+       collection_id e website_kind.
+    4. Consulta disponibilidade no site público via
+       ``article.available_on_public_website``.
+
+    Versão Upload: sem dependência de ArticleProc.
+    """
+    try:
+        user = _get_user(user_id, username)
+        article = Article.objects.select_related("journal").get(id=article_id)
+        article.create_or_update_article_collections(user)
+
+        responses = []
+        response = article.check_availability(
+            user,
+            collection_id=collection_id,
+            purpose=website_kind,
+            timeout=timeout,
+            force_update=force_update,
+        )
+        responses.extend(response)
+
+        logging.info(
+            "task_check_article_webpages article=%s responses=%s",
+            article_id,
+            responses,
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "upload.tasks.task_check_article_webpages",
+                "article_id": article_id,
+                "collection_id": collection_id,
+                "website_kind": website_kind,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_check_articles_availability(
+    self,
+    username,
+    user_id=None,
+    issn_print=None,
+    issn_electronic=None,
+    issue_folder=None,
+    publication_year=None,
+    article_pid_v3=None,
+    article_id=None,
+    collection_acron=None,
+    timeout=None,
+    force_update=None,
+):
+    """
+    Verificação em lote: busca artigos ingressados pelo Upload por filtros e
+    agenda ``task_check_article_webpages`` para cada artigo encontrado.
+
+    Parameters
+    ----------
+    username / user_id : str / int
+        Identificação do usuário executor.
+    issn_print / issn_electronic : str, optional
+        Filtra por ISSN do periódico (OR lógico entre os dois).
+    issue_folder / publication_year : str / int, optional
+        Filtra por fascículo ou ano de publicação.
+    article_pid_v3 / article_id : str / int, optional
+        Filtra por artigo específico.
+    collection_acron : str, optional
+        Restringe a verificação à coleção indicada.
+    timeout : int, optional
+        Timeout HTTP em segundos passado para cada verificação.
+    force_update : bool, optional
+        Se True, re-verifica mesmo páginas já válidas.
+    """
+    try:
+        user = _get_user(user_id, username)
+        article_params = {}
+        j_query = Q()
+
+        if article_id:
+            article_params["id"] = article_id
+        if article_pid_v3:
+            article_params["pid_v3"] = article_pid_v3
+        if publication_year:
+            article_params["issue__publication_year"] = publication_year
+        if issue_folder:
+            article_params["issue__issue_folder"] = issue_folder
+
+        if collection_acron or issn_electronic or issn_print:
+            j_params = {}
+            if collection_acron:
+                j_params["collection__acron"] = collection_acron
+            if issn_print:
+                j_query |= Q(journal__official_journal__issn_print=issn_print)
+            if issn_electronic:
+                j_query |= Q(journal__official_journal__issn_electronic=issn_electronic)
+            article_params["journal__id__in"] = (
+                JournalProc.objects.filter(j_query, **j_params)
+                .values_list("journal__id", flat=True)
+                .distinct()
+            )
+
+        for article in Article.objects.filter(journal__isnull=False, **article_params):
+            task_check_article_webpages.delay(
+                user_id=user_id,
+                username=username,
+                article_id=article.id,
+                timeout=timeout,
+                force_update=force_update,
+            )
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "upload.tasks.task_check_articles_availability",
+                "issn_print": issn_print,
+                "issn_electronic": issn_electronic,
+                "issue_folder": issue_folder,
+                "publication_year": publication_year,
+                "article_pid_v3": article_pid_v3,
+                "article_id": article_id,
+                "collection_acron": collection_acron,
+                "timeout": timeout,
+                "force_update": force_update,
+            },
+        )
+
+
+############################################
+# BATCH REPUBLISH
+############################################
+
+
+@celery_app.task(bind=True)
+def task_upload_publish_articles(
+    self,
+    username=None,
+    user_id=None,
+    issn_print=None,
+    issn_electronic=None,
+    issue_folder=None,
+    publication_year=None,
+    article_pid_v3=None,
+    article_id=None,
+    collection_acron=None,
+    timeout=None,
+    force_update=None,
+):
+    """
+    Republica artigos em lote, eliminando duplicatas antes e sincronizando fascículos.
+
+    Para cada fascículo encontrado pelos filtros:
+    1. Remove artigos duplicados/inválidos via Article.exclude_invalid_records.
+    2. Agenda task_publish_article para cada artigo válido restante.
+    3. Agenda task_sync_issue por IssueProc, despublicando artigos removidos.
+
+    Parameters
+    ----------
+    username / user_id : str / int
+        Identificação do usuário executor.
+    issn_print / issn_electronic : str, optional
+        Filtra por ISSN do periódico (OR lógico).
+    issue_folder / publication_year : str / int, optional
+        Filtra por fascículo ou ano de publicação.
+    article_pid_v3 / article_id : str / int, optional
+        Restringe a republicação a um artigo específico dentro dos fascículos.
+    collection_acron : str, optional
+        Restringe à coleção indicada.
+    timeout : int, optional
+        Timeout HTTP em segundos passado para as tarefas filhas.
+    force_update : bool, optional
+        Se True, força republicação mesmo de páginas já válidas.
+    """
+    try:
+
+        user = _get_user(user_id, username)
+
+        article_params = {}
+        j_query = Q()
+
+        if publication_year:
+            article_params["publication_year"] = publication_year
+        if issue_folder:
+            article_params["issue_folder"] = issue_folder
+
+        if collection_acron or issn_electronic or issn_print:
+            j_filter = Q()
+            if issn_print:
+                j_filter |= Q(official_journal__issn_print=issn_print)
+            if issn_electronic:
+                j_filter |= Q(official_journal__issn_electronic=issn_electronic)
+            if collection_acron:
+                j_filter &= Q(journalproc__collection__acron=collection_acron)
+            article_params["journal__in"] = Journal.objects.filter(j_filter)
+
+        if article_id or article_pid_v3:
+            a_filter = Q()
+            if article_id:
+                a_filter &= Q(id=article_id)
+            if article_pid_v3:
+                a_filter &= Q(pid_v3=article_pid_v3)
+            issue_id_qs = (
+                Article.objects.filter(a_filter)
+                .values_list("issue_id", flat=True)
+                .distinct()
+            )
+            article_params["id__in"] = issue_id_qs
+
+        responses = []
+        for issue_id in Article.objects.filter(journal__isnull=False, **article_params).values_list("issue__id", flat=True).distinct():
+            task_publish_issue_articles.delay(
+                issue_id=issue_id,
+                username=username,
+                user_id=user_id,
+                timeout=timeout,
+            )
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "upload.tasks.task_upload_publish_articles",
+                "issn_print": issn_print,
+                "issn_electronic": issn_electronic,
+                "issue_folder": issue_folder,
+                "publication_year": publication_year,
+                "article_pid_v3": article_pid_v3,
+                "article_id": article_id,
+                "collection_acron": collection_acron,
+                "timeout": timeout,
+                "force_update": force_update,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_publish_issue_articles(
+    self,
+    issue_id,
+    username=None,
+    user_id=None,
+    timeout=None,
+):
+    try:
+        task_params = {
+            "task": "upload.tasks.task_publish_issue_articles",
+            "user_id": user_id,
+            "username": username,
+            "issue_id": issue_id,
+        }
+        task_exec = TaskExecution(
+            name="upload.tasks.task_publish_issue_articles",
+            item=issue_id,
+            params=task_params,
+        )
+        user = _get_user(user_id, username)
+        issue = Issue.objects.get(id=issue_id)
+    
+        task_exec.item = str(issue)
+
+        response = Article.exclude_invalid_records(
+            user, issue, sps_pkg_id_list=None, timeout=timeout
+        )
+        task_exec.add_event(response)
+
+        websites = set()
+        for issue_proc in issue.issueproc_set.all():
+            
+            event = issue_proc.start(user, "task_publish_issue_articles__sync_issue")
+            sync_issue_response = []
+            for website in WebSiteConfiguration.objects.filter(
+                collection=issue_proc.collection, enabled=True
+            ):
+                api_data = website.get_data(content_type="issue")
+                website_kind = website.purpose
+                websites.add(website_kind)
+            
+                response = sync_issue(issue_proc, api_data)
+                sync_issue_response.append(response)
+                task_exec.add_event(response)
+
+            event.finish(
+                user,
+                completed=bool(sync_issue_response),
+                exception=None,
+                message_type=None,
+                message=None,
+                exc_traceback=None,
+                detail=sync_issue_response,
+            )
+            task_exec.add_event(sync_issue_response)
+
+        exceptions = []
+        events = []
+        for article in issue.article_set.all():
+            try:
+                pkg = Package.objects.filter(article=article).order_by("-updated").first()
+
+                task_publish_article.delay(
+                    user_id,
+                    username,
+                    list(websites),
+                    upload_package_id=pkg.id if pkg else None,
+                )
+                events.append(f"Scheduled article publication {article} {websites}")
+            except Exception as e:
+                exceptions.append({"article": str(article), "type": str(type(e)), "msg": str(e)})
+        task_exec.add_event(events)
+        task_exec.add_event(exceptions)
+        task_exec.finish()
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        task_exec.finish(e, exc_traceback)
+
+
+############################################
+# DUPLICATE / INVALID ARTICLE REMOVAL
+############################################
+
+
+@celery_app.task(bind=True)
+def task_exclude_invalid_issue_articles(
+    self,
+    issue_id,
+    username=None,
+    user_id=None,
+    timeout=None,
+):
+    """
+    Remove artigos duplicados e inconsistentes de um fascículo.
+
+    Delega para ``Article.exclude_invalid_records``, que cuida de artigos
+    sem pp_xml, com sps_pkg_name repetido ou com pid_v2 repetido dentro
+    do mesmo fascículo.
+    """
+    task_params = {"issue_id": issue_id}
+    issue_str = str(issue_id)
+    try:
+        user = _get_user(user_id=user_id, username=username)
+        issue = Issue.objects.get(id=issue_id)
+        issue_str = str(issue)
+
+        response = Article.exclude_invalid_records(
+            user, issue, sps_pkg_id_list=None, timeout=timeout
+        )
+        logging.info(
+            "task_exclude_invalid_issue_articles issue=%s response=%s",
+            issue_str,
+            response,
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            item=issue_str,
+            action="upload.tasks.task_exclude_invalid_issue_articles",
+            e=e,
+            exc_traceback=exc_traceback,
+            detail=task_params,
+        )
+
+
+@celery_app.task(bind=True)
+def task_exclude_invalid_articles(
+    self,
+    username=None,
+    user_id=None,
+    journal_id=None,
+    issn_print=None,
+    issn_electronic=None,
+    publication_year=None,
+    issue_folder=None,
+    collection_acron=None,
+    timeout=None,
+):
+    """
+    Orquestra ``task_exclude_invalid_issue_articles`` para um conjunto de fascículos.
+
+    Filtra fascículos pelos critérios fornecidos e agenda
+    ``task_exclude_invalid_issue_articles`` para cada um.
+
+    Parameters
+    ----------
+    username / user_id : str / int
+        Identificação do usuário executor.
+    journal_id : int, optional
+        Filtra pelo id do periódico.
+    issn_print / issn_electronic : str, optional
+        Filtra por ISSN do periódico (OR lógico entre os dois, ignorado se
+        journal_id for fornecido).
+    publication_year / issue_folder : str, optional
+        Filtros de fascículo.
+    collection_acron : str, optional
+        Filtra periódicos pela coleção indicada.
+    timeout : int, optional
+        Timeout passado para cada tarefa filha.
+    """
+    try:
+        user = _get_user(user_id, username)
+        issue_params = {}
+
+        if publication_year:
+            issue_params["publication_year"] = publication_year
+        if issue_folder:
+            issue_params["issue_folder"] = issue_folder
+
+        if journal_id:
+            issue_params["journal__id"] = journal_id
+        elif issn_print or issn_electronic or collection_acron:
+            j_query = Q()
+            if issn_print:
+                j_query |= Q(official_journal__issn_print=issn_print)
+            if issn_electronic:
+                j_query |= Q(official_journal__issn_electronic=issn_electronic)
+            if collection_acron:
+                j_query &= Q(journalproc__collection__acron=collection_acron)
+            issue_params["journal__in"] = Journal.objects.filter(j_query)
+
+        for issue in Issue.objects.filter(**issue_params):
+            task_exclude_invalid_issue_articles.delay(
+                issue_id=issue.id,
+                user_id=user_id,
+                username=username,
+                timeout=timeout,
+            )
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "upload.tasks.task_exclude_invalid_articles",
+                "journal_id": journal_id,
+                "issn_print": issn_print,
+                "issn_electronic": issn_electronic,
+                "publication_year": publication_year,
+                "issue_folder": issue_folder,
+                "collection_acron": collection_acron,
+            },
         )
