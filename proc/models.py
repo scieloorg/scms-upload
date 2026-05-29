@@ -156,7 +156,8 @@ class Operation(CommonControlField):
         # apaga todas as ocorrências que foram armazenadas no arquivo
         item = cls.objects.filter(proc=proc, name=name).order_by("-created").first()
         if item:
-            cls.objects.filter(proc=proc, created__gte=item.created).order_by("-created").delete()
+            created = item.created
+            cls.objects.filter(proc=proc, created__gte=created).order_by("-created").delete()
 
     @classmethod
     def start(
