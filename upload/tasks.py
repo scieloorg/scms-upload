@@ -605,6 +605,7 @@ def task_publish_article(
         article = None
         op_main = None
         responses = []
+        data = {}
 
         if not upload_package_id:
             raise ValueError("task_publish_article requires Upload Package ID")
@@ -613,36 +614,29 @@ def task_publish_article(
 
         # Obter gerenciador e informações do artigo
         manager = Package.objects.get(pk=upload_package_id)
-        logging.info(f"manager: {manager}")
-        logging.info(f"article: {manager.article}")
-
-        published_by = manager.get_published_by(websites)
 
         article = manager.article
         journal = article.journal
         issue = article.issue
 
         # Iniciar operação principal
-        op_main = manager.start(user, f"Publishing article to {', '.join(websites)}")
+        op_main = manager.start(user, f"Publish article on {', '.join(websites)} and check availability")
 
         ensure_journal_proc_exists(user, journal)
         ensure_issue_proc_exists(user, issue)
 
-        responses = list(
-            publication.publish_article_collection_websites(
-                published_by,
-                manager,
-                websites,
-                force_journal_publication,
-                force_issue_publication,
-            )
+        responses = publication.publish_article_on_collection_websites(
+            user,
+            manager,
+            websites,
+            force_journal_publication,
+            force_issue_publication,
         )
-        logging.info(f"responses: {responses}")
 
         article.create_or_update_article_collections(user)
         article.check_availability(user)
             
-        data["responses"] = responses
+        data["publication"] = responses
         data["availability"] = article.availability
         op_main.finish(
             user,
@@ -907,6 +901,7 @@ def task_republish_articles(
     timeout=None,
     force_update=None,
     website_kind=None,
+    package_ids=None,
 ):
     """
     Republica artigos em lote a partir dos pacotes com status preview,
@@ -928,6 +923,9 @@ def task_republish_articles(
         ]
 
         pkg_filter = Q(status__in=statuses, issue__isnull=False)
+
+        if package_ids:
+            pkg_filter &= Q(id__in=package_ids)
 
         if publication_year:
             pkg_filter &= Q(article__issue__publication_year=publication_year)
@@ -982,6 +980,7 @@ def task_republish_articles(
                 "timeout": timeout,
                 "force_update": force_update,
                 "website_kind": website_kind,
+                "package_ids": package_ids,
             },
         )
 
@@ -1048,6 +1047,7 @@ def task_publish_issue_articles(
 
         exceptions = []
         events = []
+        websites = list(websites) or [website_kind]
         for article in issue.article_set.all():
             try:
                 pkg = Package.objects.filter(article=article).order_by("-updated").first()
@@ -1055,7 +1055,7 @@ def task_publish_issue_articles(
                 task_publish_article.delay(
                     user_id,
                     username,
-                    list(websites),
+                    websites,
                     upload_package_id=pkg.id if pkg else None,
                 )
                 events.append(f"Scheduled article publication {article} {websites}")
