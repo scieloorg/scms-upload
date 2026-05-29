@@ -362,10 +362,11 @@ def archive_package(request):
     return redirect(f"/admin/upload/package/")
 
 
-def batch_republish(request):
+def republish_selected(request):
     """
-    Permite ao administrador agendar republicação em lote de artigos
-    no site QA ou PUBLIC, com filtros opcionais por ISSN, fascículo, etc.
+    Agenda republicação de um conjunto específico de pacotes selecionados na listagem.
+    Os IDs dos pacotes chegam via GET (parâmetro package_ids, separados por vírgula)
+    na primeira exibição do formulário, e via POST (campo oculto) na confirmação.
     """
     from collection.choices import WEBSITE_KIND
 
@@ -375,31 +376,41 @@ def batch_republish(request):
 
     if request.method == "POST":
         website_kind = request.POST.get("website_kind") or None
-        issn_print = request.POST.get("issn_print") or None
-        issn_electronic = request.POST.get("issn_electronic") or None
-        issue_folder = request.POST.get("issue_folder") or None
-        publication_year = request.POST.get("publication_year") or None
-        collection_acron = request.POST.get("collection_acron") or None
+        package_ids_raw = request.POST.get("package_ids", "")
+        package_ids = [
+            int(pk) for pk in package_ids_raw.split(",") if pk.strip().isdigit()
+        ]
+
+        if not package_ids:
+            messages.error(request, _("No packages selected."))
+            return redirect("/admin/snippets/upload/readytopublishpackage/")
 
         task_republish_articles.delay(
             username=request.user.username,
             user_id=request.user.id,
             website_kind=website_kind,
-            issn_print=issn_print,
-            issn_electronic=issn_electronic,
-            issue_folder=issue_folder,
-            publication_year=publication_year,
-            collection_acron=collection_acron,
+            package_ids=package_ids,
         )
         messages.success(
             request,
-            _("Batch republication scheduled for %(website)s website.")
-            % {"website": website_kind or _("all")},
+            _("Batch republication of %(count)d package(s) scheduled for %(website)s website.")
+            % {"count": len(package_ids), "website": website_kind or _("all")},
         )
+        return redirect("/admin/snippets/upload/readytopublishpackage/")
+
+    package_ids_raw = request.GET.get("package_ids", "")
+    package_ids = [pk for pk in package_ids_raw.split(",") if pk.strip().isdigit()]
+
+    if not package_ids:
+        messages.error(request, _("No packages selected."))
         return redirect("/admin/snippets/upload/readytopublishpackage/")
 
     return render(
         request,
-        "modeladmin/upload/package/batch_republish.html",
-        {"website_kinds": WEBSITE_KIND},
+        "modeladmin/upload/package/republish_selected.html",
+        {
+            "website_kinds": WEBSITE_KIND,
+            "package_ids": ",".join(package_ids),
+            "package_count": len(package_ids),
+        },
     )
