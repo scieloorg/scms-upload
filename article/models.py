@@ -853,24 +853,43 @@ class Article(ClusterableModel, CommonControlField):
             data.append(item.data)
         return data
 
-    def _available_on_website(self, collection, purpose=None):
-        status_list = list(self.pages.filter(collection=collection, purpose=purpose).values_list("status", flat=True))
+    def is_available_on_website(self, collection=None, purpose=None):
+        pages = []
+        kwargs = {}
+        if purpose:
+            kwargs["purpose"] = purpose
+        if collection:
+            kwargs["collection"] = collection
+        items = self.pages.filter(**kwargs)
+        
+        status_list = list(items.values_list("status", flat=True).distinct())
         status = get_compiled_status(status_list)
         valid = status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+        
+        for item in items:
+            pages.append(item.data)
         return {
-            "collection": collection.acron,
+            "collection": collection and collection.acron,
             "purpose": purpose,
             "valid": valid,
-            "new_pid_status": get_pid_status_from_webpage_status(purpose, status),
             "status_list": status_list,
             "status": status,
+            "pages": pages,
         }
         
-    def available_on_classic_website(self, collection=None):
-        return self._available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC)
+    def available_on_classic_website(self, collection):
+        response = self.is_available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC)
+        response["new_pid_status"] = get_pid_status_from_webpage_status(
+            choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC, response["status"]
+        )
+        return response
 
-    def available_on_public_website(self, collection=None):
-        return self._available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC)
+    def available_on_public_website(self, collection):
+        response = self.is_available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC)
+        response["new_pid_status"] = get_pid_status_from_webpage_status(
+            choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC, response["status"]
+        )
+        return response
  
     @classmethod
     def get_repeated_values(cls, field_name, queryset=None, issue=None):
