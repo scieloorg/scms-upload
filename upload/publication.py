@@ -126,73 +126,71 @@ def ensure_published_issue(issue_proc, website, user, api_data, force_update=Non
 
 
 def publish_article_on_collection_websites(
-    user, manager, website_kinds, force_journal_publication, force_issue_publication
+    user, manager, collection, website_kinds, force_journal_publication, force_issue_publication
 ):
     responses = []
     journal = manager.journal
-    for issue_proc in IssueProc.objects.filter(
-        issue=manager.article.issue,
-    ):
-        if journal.missing_fields:
-            event = issue_proc.journal_proc.start(user, "Missing journal data")
-            event.finish(
-                user, detail={"journal_missing_fields": journal.missing_fields}
-            )
+    issue_proc = IssueProc.objects.filter(issue=manager.issue, collection=collection).first()
+    
+    if journal.missing_fields:
+        event = issue_proc.journal_proc.start(user, "Missing journal data")
+        event.finish(
+            user, detail={"journal_missing_fields": str(journal.missing_fields)}
+        )
 
-        collection = issue_proc.collection
-        qa_published = None
+    qa_published = None
 
-        if QA in website_kinds:
-            response = publish_article_on_website(
-                user,
-                manager,
-                issue_proc,
-                QA,
-                force_journal_publication,
-                force_issue_publication,
-            )
-            qa_published = response and response.get("completed")
-            resp = {
-                "collection": collection.acron,
-                "website": QA,
-                "published": qa_published,
-            }
-            resp.update(response)
-            responses.append(resp)
-            break
+    if QA in website_kinds:
+        response = publish_article_on_website(
+            user,
+            manager,
+            issue_proc,
+            QA,
+            force_journal_publication,
+            force_issue_publication,
+        )
+        qa_published = response and response.get("completed")
+        resp = {
+            "collection": collection.acron,
+            "website": QA,
+            "published": qa_published,
+        }
+        resp.update(response)
+        responses.append(resp)
+        return responses
         
-        if PUBLIC in website_kinds:
-            if not qa_published:
-                try:
-                    qa_website = WebSiteConfiguration.get(collection=collection, purpose=QA)
-                    qa_published = check_article_is_published(manager.article, qa_website)
-                    if not qa_published:
-                        resp = {
-                            "collection": collection.acron,
-                            "website": QA,
-                            "published": qa_published,
-                        }
-                        responses.append(resp)
-                        break
-                except WebSiteConfiguration.DoesNotExist as exc:
-                    # não existe um site para previsualizar, então permite publicar no site público
-                    pass
+    if PUBLIC in website_kinds:
+        if not qa_published:
+            try:
+                qa_website = WebSiteConfiguration.get(collection=collection, purpose=QA)
+                qa_published = check_article_is_published(manager.article, qa_website)
+                if not qa_published:
+                    resp = {
+                        "collection": collection.acron,
+                        "website": QA,
+                        "published": qa_published,
+                    }
+                    responses.append(resp)
+                    return responses
+            except WebSiteConfiguration.DoesNotExist as exc:
+                # não existe um site para previsualizar, então permite publicar no site público
+                pass
 
-            # artigo está publicado em qa ou não existe site qa
-            response = publish_article_on_website(
-                user,
-                manager,
-                issue_proc,
-                PUBLIC,
-                force_journal_publication,
-                force_issue_publication,
-            )
-            resp = {
-                "collection": collection.acron,
-                "website": PUBLIC,
-                "published": response and response.get("completed"),
-            }
-            responses.append(resp)
+        # artigo está publicado em qa ou não existe site qa
+        response = publish_article_on_website(
+            user,
+            manager,
+            issue_proc,
+            PUBLIC,
+            force_journal_publication,
+            force_issue_publication,
+        )
+        resp = {
+            "collection": collection.acron,
+            "website": PUBLIC,
+            "published": response and response.get("completed"),
+        }
+        responses.append(resp)
     return responses
 
 
