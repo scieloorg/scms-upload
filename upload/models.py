@@ -1329,19 +1329,6 @@ class Package(CommonControlField, ClusterableModel):
                     )
                 )
 
-    def get_published_by(self, websites):
-        if len(websites) > 1:
-            return "SYSTEM"
-        if self.assignee:
-            return self.assignee.username or self.assignee.id
-        if self.analyst:
-            return self.analyst.user.username or self.analyst.user.id
-        if self.updated_by:
-            return self.updated_by.username or self.updated_by.id
-        if self.creator:
-            return self.creator.username or self.creator.id
-
-
 
 class QAPackage(Package):
     """
