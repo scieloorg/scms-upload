@@ -200,7 +200,7 @@ def task_validate_assets(package_id, xml_path, package_files, xml_assets):
     # devido às tarefas serem executadas concorrentemente,
     # necessário verificar se todas tarefas finalizaram e
     # então finalizar o pacote
-    package.finish_reception(task_publish_article)
+    package.finish_reception(task_upload_workflow_publish_article)
     # if package.is_approved:
     #     task_process_approved_package.apply_async(
     #         kwargs=dict(package_id=package.id, package_status=package.status)
@@ -241,7 +241,7 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
         )
 
     report.finish_validations()
-    package.finish_reception(task_publish_article)
+    package.finish_reception(task_upload_workflow_publish_article)
     # devido às tarefas serem executadas concorrentemente,
     # necessário verificar se todas tarefas finalizaram e
     # então finalizar o pacote
@@ -285,7 +285,7 @@ def task_validate_renditions_content(package_id, xml_path):
             },
         )
     report.finish_validations()
-    package.finish_reception(task_publish_article)
+    package.finish_reception(task_upload_workflow_publish_article)
 
 
 @celery_app.task(bind=True, priority=0)
@@ -486,7 +486,7 @@ def task_validate_xml_structure(
         # devido às tarefas serem executadas concorrentemente,
         # necessário verificar se todas tarefas finalizaram e
         # então finalizar o pacote
-        package.finish_reception(task_publish_article)
+        package.finish_reception(task_upload_workflow_publish_article)
         # if package.is_approved:
         #     task_process_approved_package.apply_async(
         #         kwargs=dict(package_id=package.id)
@@ -524,7 +524,7 @@ def task_validate_xml_content(
 
         xml_data_checker = XMLDataChecker(package, journal, issue, params)
         xml_data_checker.validate()
-        package.finish_reception(task_publish_article)
+        package.finish_reception(task_upload_workflow_publish_article)
         operation.finish(package.creator, completed=True)
     except Exception as e:
         logging.exception(e)
@@ -582,11 +582,11 @@ def task_validate_webpages_content(package_id):
             },
         )
     report.finish_validations()
-    package.finish_reception(task_publish_article)
+    package.finish_reception(task_upload_workflow_publish_article)
 
 
 @celery_app.task(bind=True)
-def task_publish_article(
+def task_upload_workflow_publish_article(
     self,
     user_id,
     username,
@@ -602,13 +602,9 @@ def task_publish_article(
     """
     try:
 
-        article = None
-        op_main = None
-        responses = []
-        data = {}
-
+        manager = None
         if not upload_package_id:
-            raise ValueError("task_publish_article requires Upload Package ID")
+            raise ValueError("task_upload_workflow_publish_article requires Upload Package ID")
 
         user = _get_user(user_id, username)
 
@@ -619,28 +615,92 @@ def task_publish_article(
         journal = article.journal
         issue = article.issue
 
-        # Iniciar operação principal
-        op_main = manager.start(user, f"Publish article on {', '.join(websites)} and check availability")
-
         ensure_journal_proc_exists(user, journal)
         ensure_issue_proc_exists(user, issue)
+
+        article.create_or_update_article_collections(user)
+
+        for journal_proc in JournalProc.objects.filter(journal=journal).only("collection"):
+            # publica o artigo em cada coleção a que ele pertence
+            task_publish_article.delay(
+                user_id,
+                username,
+                websites,
+                article_proc_id=None,
+                upload_package_id=upload_package_id,
+                publication_rule=None,
+                collection_id=journal_proc.collection.id,
+                force_journal_publication=force_journal_publication,
+                force_issue_publication=force_issue_publication,
+            )
+
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            e=e,
+            exc_traceback=exc_traceback,
+            detail=dict(
+                task="task_upload_workflow_publish_article",
+                item=str(manager),
+                upload_package_id=upload_package_id,
+                websites=websites,
+            ),
+        )
+
+
+
+@celery_app.task(bind=True)
+def task_publish_article(
+    self,
+    user_id,
+    username,
+    websites,
+    article_proc_id=None,
+    upload_package_id=None,
+    publication_rule=None,
+    collection_id=None,
+    force_journal_publication=None,
+    force_issue_publication=None,
+):
+    """
+    Tarefa que publica artigos ingressados pelo Upload
+    """
+    try:
+
+        article = None
+        op_main = None
+        responses = []
+        data = {}
+
+        if not upload_package_id:
+            raise ValueError("task_upload_workflow_publish_article requires Upload Package ID")
+
+        user = _get_user(user_id, username)
+
+        # Obter gerenciador e informações do artigo
+        manager = Package.objects.get(pk=upload_package_id)
+
+        article = manager.article
+        collection = article.article_collections.filter(collection_id=collection_id).first().collection
+    
+        # Iniciar operação principal
+        op_main = manager.start(user, f"Publish article and check availability {collection} {websites}")
 
         responses = publication.publish_article_on_collection_websites(
             user,
             manager,
+            collection,
             websites,
             force_journal_publication,
             force_issue_publication,
         )
 
-        article.create_or_update_article_collections(user)
-        article.check_availability(user)
-            
         data["publication"] = responses
-        data["availability"] = article.availability
+        data["availability"] = article.is_available_on_website(collection)
+        logging.info(data)
         op_main.finish(
             user,
-            completed=bool(any([item["valid"] for item in data["availability"]])),
+            completed=data["availability"]["valid"],
             exception=None,
             message_type=None,
             message=None,
@@ -662,14 +722,13 @@ def task_publish_article(
                 e=e,
                 exc_traceback=exc_traceback,
                 detail=dict(
-                    task="task_publish_article",
+                    task="task_upload_workflow_publish_article",
                     item=str(manager),
                     article_proc_id=article_proc_id,
                     upload_package_id=upload_package_id,
                     websites=websites,
                 ),
             )
-
 
 
 @celery_app.task(bind=True)
@@ -910,7 +969,7 @@ def task_republish_articles(
     Os parâmetros opcionais restringem o conjunto de pacotes selecionados.
     Para cada fascículo encontrado:
     1. Remove artigos duplicados/inválidos via Article.exclude_invalid_records.
-    2. Agenda task_publish_article para cada artigo válido restante.
+    2. Agenda task_upload_workflow_publish_article para cada artigo válido restante.
     3. Agenda task_sync_issue por IssueProc, despublicando artigos removidos.
     """
     try:
@@ -1052,7 +1111,7 @@ def task_publish_issue_articles(
             try:
                 pkg = Package.objects.filter(article=article).order_by("-updated").first()
 
-                task_publish_article.delay(
+                task_upload_workflow_publish_article.delay(
                     user_id,
                     username,
                     websites,
