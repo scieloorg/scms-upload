@@ -9,7 +9,7 @@ from wagtail.snippets.views.snippets import CreateView, EditView, InspectView
 from upload.models import Package, PkgValidationResult, choices
 from upload.tasks import (
     task_receive_packages,
-    task_publish_article,
+    task_upload_workflow_publish_article,
     task_complete_journal_data,
     task_complete_issue_data,
     task_republish_articles,
@@ -156,7 +156,7 @@ class PackageDecisionMixin:
 
     def get_task_function(self):
         """Pode ser sobrescrito se diferentes views usarem tasks diferentes"""
-        return task_publish_article
+        return task_upload_workflow_publish_article
 
     def process_decision(self, package, user, force_journal, force_issue):
         """Pode ser sobrescrito para customizar o processamento"""
@@ -232,7 +232,7 @@ def finish_deposit(request):
     if package_id:
         package = get_object_or_404(Package, pk=package_id)
 
-        if package.finish_deposit(task_publish_article):
+        if package.finish_deposit(task_upload_workflow_publish_article):
             # muda o status para a próxima etapa
             messages.success(request, _("Package has been deposited"))
             return redirect("/admin/upload/package/")
