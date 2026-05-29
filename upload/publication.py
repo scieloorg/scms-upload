@@ -68,23 +68,21 @@ def ensure_published_journal(journal_proc, website, user, api_data, force_update
             journal_url = (
                 f"{website.url}/scielo.php?pid={journal_proc.pid}&script=sci_serial"
             )
-            return bool(fetch_data(journal_url))
-    except Exception as e:
-        pass
-
-    response = journal_proc.publish(
-        user,
-        publish_journal,
-        website_kind=website.purpose,
-        api_data=api_data,
-        force_update=True,
-        content_type="journal",
-    )
-    if not response or not response.get("completed"):
-        raise PublicationError(
-            f"Unable to publish {journal_proc} on {website.purpose}: {response}"
+            return {"journal": str(journal_proc), "published": bool(fetch_data(journal_url))}
+        response = journal_proc.publish(
+            user,
+            publish_journal,
+            website_kind=website.purpose,
+            api_data=api_data,
+            force_update=True,
+            content_type="journal",
         )
-    return response
+        if not response:
+            raise Exception(f"Unable to publish journal {journal_proc}")
+        response["published"] = response.get("completed")
+        return response
+    except Exception as e:
+        return {"error": f"journal {journal_proc} is not published. {e}"}
 
 
 def ensure_published_issue(issue_proc, website, user, api_data, force_update=None):
@@ -109,28 +107,28 @@ def ensure_published_issue(issue_proc, website, user, api_data, force_update=Non
             issue_url = (
                 f"{website.url}/scielo.php?pid={issue_proc.pid}&script=sci_issuetoc"
             )
-            return bool(fetch_data(issue_url))
-    except Exception as e:
-        pass
-
-    response = issue_proc.publish(
-        user,
-        publish_issue,
-        website_kind=website.purpose,
-        api_data=api_data,
-        force_update=True,
-        content_type="issue",
-    )
-    if not response or not response.get("completed"):
-        raise PublicationError(
-            f"Unable to publish {issue_proc} on {website.purpose}: {response}"
+            return {"issue": str(issue_proc), "published": bool(fetch_data(issue_url))}
+        response = issue_proc.publish(
+            user,
+            publish_issue,
+            website_kind=website.purpose,
+            api_data=api_data,
+            force_update=True,
+            content_type="issue",
         )
-    return response
+        if not response:
+            raise Exception(f"Unable to publish issue {issue_proc}")
+        response["published"] = response.get("completed")
+        return response
+    except Exception as e:
+        return {"error": f"issue {issue_proc} is not published. {e}"}
 
 
-def publish_article_collection_websites(
+
+def publish_article_on_collection_websites(
     user, manager, website_kinds, force_journal_publication, force_issue_publication
 ):
+    responses = []
     journal = manager.journal
     for issue_proc in IssueProc.objects.filter(
         issue=manager.article.issue,
@@ -145,7 +143,7 @@ def publish_article_collection_websites(
         qa_published = None
 
         if QA in website_kinds:
-            published_article = publish_article_on_website(
+            response = publish_article_on_website(
                 user,
                 manager,
                 issue_proc,
@@ -153,21 +151,35 @@ def publish_article_collection_websites(
                 force_journal_publication,
                 force_issue_publication,
             )
-            qa_published = published_article and published_article.get("completed")
-            yield {
+            qa_published = response and response.get("completed")
+            resp = {
                 "collection": collection.acron,
                 "website": QA,
-                "published": published_article and published_article.get("completed"),
+                "published": qa_published,
             }
-        else:
-            try:
-                qa_website = WebSiteConfiguration.get(collection=collection, purpose=QA)
-                qa_published = check_article_is_published(manager.article, qa_website)
-            except WebSiteConfiguration.DoesNotExist as exc:
-                qa_published = None
+            resp.update(response)
+            responses.append(resp)
+            break
+        
+        if PUBLIC in website_kinds:
+            if not qa_published:
+                try:
+                    qa_website = WebSiteConfiguration.get(collection=collection, purpose=QA)
+                    qa_published = check_article_is_published(manager.article, qa_website)
+                    if not qa_published:
+                        resp = {
+                            "collection": collection.acron,
+                            "website": QA,
+                            "published": qa_published,
+                        }
+                        responses.append(resp)
+                        break
+                except WebSiteConfiguration.DoesNotExist as exc:
+                    # não existe um site para previsualizar, então permite publicar no site público
+                    pass
 
-        if qa_published and PUBLIC in website_kinds:
-            published_article = publish_article_on_website(
+            # artigo está publicado em qa ou não existe site qa
+            response = publish_article_on_website(
                 user,
                 manager,
                 issue_proc,
@@ -175,11 +187,13 @@ def publish_article_collection_websites(
                 force_journal_publication,
                 force_issue_publication,
             )
-            yield {
+            resp = {
                 "collection": collection.acron,
                 "website": PUBLIC,
-                "published": published_article and published_article.get("completed"),
+                "published": response and response.get("completed"),
             }
+            responses.append(resp)
+    return responses
 
 
 def publish_article_on_website(
@@ -226,30 +240,45 @@ def publish_article_on_website(
         api.get_token()
         api_data = api.data
     except WebSiteConfiguration.DoesNotExist as exc:
-        return
+        return {"error": f"Website {collection} {website_kind} does not exists"}
     except Exception as exc:
-        return
+        return {"error": f"Website {collection} {website_kind}: {exc}"}
 
-    journal_proc = issue_proc.journal_proc
+    try:
+        responses = []
+        journal_proc = issue_proc.journal_proc
 
-    api_data["post_data_url"] = website.api_url_journal
-    response = ensure_published_journal(
-        journal_proc, website, user, api_data, force_journal_publication
-    )
+        api_data["post_data_url"] = website.api_url_journal
+        response = ensure_published_journal(
+            journal_proc, website, user, api_data, force_journal_publication
+        )
+        responses.append(response)
+        if response.get("error"):
+            raise ValueError(response.get("error"))
+        if not response.get("published"):
+            raise ValueError(f"Unable to publish article because journal {journal_proc} is not published")
 
-    api_data["post_data_url"] = website.api_url_issue
-    response = ensure_published_issue(
-        issue_proc, website, user, api_data, force_issue_publication
-    )
+        api_data["post_data_url"] = website.api_url_issue
+        response = ensure_published_issue(
+            issue_proc, website, user, api_data, force_issue_publication
+        )
+        responses.append(response)
+        if response.get("error"):
+            raise ValueError(response.get("error"))
+        if not response.get("published"):
+            raise ValueError(f"Unable to publish article because issue {issue_proc} is not published")
 
-    api_data["post_data_url"] = website.api_url_article
-    response = manager.publish(
-        user,
-        publish_article,
-        website_kind=website.purpose,
-        api_data=api_data,
-        force_update=True,
-        content_type="article",
-        bundle_id=issue_proc.bundle_id,
-    )
-    return response
+        api_data["post_data_url"] = website.api_url_article
+        return manager.publish(
+            user,
+            publish_article,
+            website_kind=website.purpose,
+            api_data=api_data,
+            force_update=True,
+            content_type="article",
+            bundle_id=issue_proc.bundle_id,
+        )
+    except Exception as e:
+        event = manager.start(user, f"Publish article on {collection} {website_kind}")
+        event.finish(user, completed=False, detail=responses)
+        return {"error": str(e)}
