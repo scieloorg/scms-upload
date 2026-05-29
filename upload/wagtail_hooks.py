@@ -38,6 +38,10 @@ from .models import (
 )
 from .permission_helper import UploadPermissionHelper
 from team.models import has_permission
+from upload.bulk_actions.republish import RepublishPublicBulkAction, RepublishQABulkAction
+
+hooks.register("register_bulk_action", RepublishQABulkAction)
+hooks.register("register_bulk_action", RepublishPublicBulkAction)
 
 
 class PermissionHelperMixin:
@@ -696,24 +700,3 @@ def register_disclosure_url():
     return [
         path("upload/", include("upload.urls", namespace="upload")),
     ]
-
-
-@hooks.register("insert_global_admin_html")
-def insert_batch_republish_button():
-    import json
-    label = json.dumps(str(_("Batch Republish")))
-    return (
-        "<script>"
-        "document.addEventListener('DOMContentLoaded', function () {"
-        "  if (!window.location.pathname.match(/\\/snippets\\/upload\\/readytopublishpackage\\/?$/)) return;"
-        "  var headerActions = document.querySelector('.w-header__actions');"
-        "  if (!headerActions) return;"
-        "  var link = document.createElement('a');"
-        "  link.href = '/admin/upload/batch-republish';"
-        "  link.className = 'button button-secondary';"
-        "  link.style.marginLeft = '0.5rem';"
-        f"  link.textContent = {label};"
-        "  headerActions.prepend(link);"
-        "});"
-        "</script>"
-    )
