@@ -1,0 +1,46 @@
+{% extends "wagtailadmin/base.html" %}
+{% load i18n wagtailadmin_tags %}
+
+{% block titletag %}{% trans "Republish Selected Packages" %}{% endblock %}
+
+{% block content %}
+{% include "wagtailadmin/shared/header.html" with title=_("Republish Selected Packages") icon="folder" %}
+
+<div class="nice-padding">
+    <p>
+        {% blocktrans trimmed with count=package_count %}
+        Schedule batch republication for the {{ count }} selected package(s).
+        Choose the target website to proceed.
+        {% endblocktrans %}
+    </p>
+
+    <form method="post" action="{% url 'upload:republish_selected' %}">
+        {% csrf_token %}
+        <input type="hidden" name="package_ids" value="{{ package_ids }}">
+
+        <div class="w-field__wrapper">
+            <label class="w-field__label" for="id_website_kind">
+                {% trans "Target website" %} <span class="w-required-mark">*</span>
+            </label>
+            <div class="w-field w-field--choice_field w-field--select_widget">
+                <select id="id_website_kind" name="website_kind" required class="w-field__input">
+                    <option value="">---------</option>
+                    {% for value, label in website_kinds %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="w-field__wrapper" style="margin-top: 1.5rem;">
+            <button type="submit" class="button button-longrunning">
+                <svg class="icon icon-tick" aria-hidden="true"><use href="#icon-tick"></use></svg>
+                {% trans "Schedule republication" %}
+            </button>
+            <a href="/admin/snippets/upload/readytopublishpackage/" class="button button-secondary" style="margin-left: 0.5rem;">
+                {% trans "Cancel" %}
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

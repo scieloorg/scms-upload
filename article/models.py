@@ -336,8 +336,16 @@ class Article(ClusterableModel, CommonControlField):
             if obj is None:
                 raise cls.DoesNotExist            
         if delete:
-            qs.exclude(pk=obj.pk).delete()
+            cls.delete_queryset(qs.exclude(pk=obj.pk))
         return obj
+
+    @classmethod
+    def delete_queryset(cls, qs):
+        ArticleDOIWithLang.objects.filter(article__in=qs).delete()
+        ArticleTitle.objects.filter(parent__in=qs).delete()
+        ArticleCollection.objects.filter(article__in=qs).delete()
+        ArticleWebPage.objects.filter(article__in=qs).delete()
+        return qs.delete()
 
     # ── create_or_update ──
 
@@ -734,7 +742,8 @@ class Article(ClusterableModel, CommonControlField):
         e delega a criação das ArticleWebPages.
         """
         items = []
-        
+        if not force_update:
+            force_update = self.pages.filter(url__startswith="None").exists()
         if not list(self.webpages) or not self.article_collections.exists() or force_update:
             try:
                 for journal_proc in self.journal.journalproc_set.all():
@@ -844,24 +853,43 @@ class Article(ClusterableModel, CommonControlField):
             data.append(item.data)
         return data
 
-    def _available_on_website(self, collection, purpose=None):
-        status_list = list(self.pages.filter(collection=collection, purpose=purpose).values_list("status", flat=True))
+    def is_available_on_website(self, collection=None, purpose=None):
+        pages = []
+        kwargs = {}
+        if purpose:
+            kwargs["purpose"] = purpose
+        if collection:
+            kwargs["collection"] = collection
+        items = self.pages.filter(**kwargs)
+        
+        status_list = list(items.values_list("status", flat=True).distinct())
         status = get_compiled_status(status_list)
         valid = status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+        
+        for item in items:
+            pages.append(item.data)
         return {
-            "collection": collection.acron,
+            "collection": collection and collection.acron,
             "purpose": purpose,
             "valid": valid,
-            "new_pid_status": get_pid_status_from_webpage_status(purpose, status),
             "status_list": status_list,
             "status": status,
+            "pages": pages,
         }
         
-    def available_on_classic_website(self, collection=None):
-        return self._available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC)
+    def available_on_classic_website(self, collection):
+        response = self.is_available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC)
+        response["new_pid_status"] = get_pid_status_from_webpage_status(
+            choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC, response["status"]
+        )
+        return response
 
-    def available_on_public_website(self, collection=None):
-        return self._available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC)
+    def available_on_public_website(self, collection):
+        response = self.is_available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC)
+        response["new_pid_status"] = get_pid_status_from_webpage_status(
+            choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC, response["status"]
+        )
+        return response
  
     @classmethod
     def get_repeated_values(cls, field_name, queryset=None, issue=None):
@@ -914,7 +942,7 @@ class Article(ClusterableModel, CommonControlField):
                     sps_pkg_to_delete.add(sps_pkg_id)
                     sps_pkg_names.append(sps_pkg_name)
             response["sps_pkg_with_invalid_pid_v2"] = sps_pkg_names
-            qtd_deleted, _ = qs.delete()
+            qtd_deleted, _ = cls.delete_queryset(qs)
             total_deletado += qtd_deleted
 
         # 1. Remoção por falta de pp_xml
@@ -933,7 +961,7 @@ class Article(ClusterableModel, CommonControlField):
                     sps_pkg_names.append(item.sps_pkg.sps_pkg_name)
         if article_ids:
             response["ppxml_invalid"] = sps_pkg_names
-            qtd_deleted, _ = qs.filter(id__in=article_ids).delete()
+            qtd_deleted, _ = cls.delete_queryset(qs.filter(id__in=article_ids))
             total_deletado += qtd_deleted
 
         # 2. Remoção por duplicidade
@@ -982,23 +1010,23 @@ class Article(ClusterableModel, CommonControlField):
                     response[f"repeated_{field_name}"].append((value, sps_pkg_names))
                     
                     # Executa a deleção e soma ao totalizador
-                    qtd_deletada, _ = remover_qs.delete()
+                    qtd_deletada, _ = cls.delete_queryset(remover_qs)
                     total_deletado += qtd_deletada
 
         # Se você precisar retornar o total_deletado junto com o dicionário, 
         # pode adicioná-lo ao dicionário ou retornar uma tupla. 
         # Como o seu esqueleto final pedia apenas o retorno do dicionário, mantive assim:
         if ppxml_to_delete:
-            PidProviderXML.objects.filter(id__in=ppxml_to_delete).delete()
+            PidProviderXML.delete_queryset(PidProviderXML.objects.filter(id__in=ppxml_to_delete))
         if sps_pkg_to_delete:
-            SPSPkg.objects.filter(id__in=sps_pkg_to_delete).delete()
+            SPSPkg.delete_queryset(SPSPkg.objects.filter(id__in=sps_pkg_to_delete))
         
         response["deleted_ppxml_ids"] = list(ppxml_to_delete)
         response["deleted_sps_pkg_ids"] = list(sps_pkg_to_delete)
         
         qs = cls.objects.filter(Q(sps_pkg__isnull=True) | Q(pp_xml__isnull=True), issue=issue)
         response["deleted_article_ids"] = list(qs.values_list("id", flat=True))
-        qtd_deleted, _ = qs.delete()
+        qtd_deleted, _ = cls.delete_queryset(qs)
         total_deletado += qtd_deleted
         
         response["total_deleted_items"] = total_deletado
@@ -1279,7 +1307,7 @@ class ArticleCollection(CommonControlField):
 
         # ── Site clássico ──
         classic_ws = self.classic_website
-        if classic_ws:
+        if classic_ws and classic_ws.url:
             purpose = choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC
             for item in article.get_html_urls(
                 classic_ws.url, purpose
@@ -1373,6 +1401,14 @@ class ArticleCollection(CommonControlField):
         pages = self.pages.all()
         if purpose:
             pages = pages.filter(purpose=purpose)
+
+        # Verifica se a coleção possui site clássico antes de checar
+        # páginas clássicas — algumas coleções não têm site clássico
+        if not self.classic_website:
+            if purpose == choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC:
+                return response
+            pages = pages.exclude(purpose=choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC)
+
         if not force_update:
             pages = pages.exclude(
                 status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
@@ -1574,6 +1610,8 @@ class ArticleWebPage(CommonControlField):
         -------
         ArticleWebPage
         """
+        if not item["url"]:
+            raise ValueError(f"ArticleWebPage.get_or_create_from_item requires url: {item}")
         lang_obj = Language.objects.filter(code2=item["lang"]).first()
         page, created = cls.objects.get_or_create(
             article=article,

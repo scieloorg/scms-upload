@@ -4,14 +4,15 @@ from django.contrib import messages
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
-from wagtail_modeladmin.views import CreateView, EditView, InspectView
+from wagtail.snippets.views.snippets import CreateView, EditView, InspectView
 
 from upload.models import Package, PkgValidationResult, choices
 from upload.tasks import (
     task_receive_packages,
-    task_publish_article,
+    task_upload_workflow_publish_article,
     task_complete_journal_data,
     task_complete_issue_data,
+    task_republish_articles,
 )
 from upload.utils import file_utils
 from upload.utils import package_utils
@@ -46,7 +47,7 @@ class PackageAdminInspectView(InspectView):
     def get_optimized_package_filepath_and_directory(self):
         # Obtém caminho do pacote otimizado
         _path = package_utils.generate_filepath_with_new_extension(
-            self.instance.file.name,
+            self.object.file.name,
             ".optz",
             True,
         )
@@ -61,10 +62,10 @@ class PackageAdminInspectView(InspectView):
     def set_pdf_paths(self, data, optz_dir):
         try:
             for rendition in package_utils.get_article_renditions_from_zipped_xml(
-                self.instance.file.name
+                self.object.file.name
             ):
                 package_files = file_utils.get_file_list_from_zip(
-                    self.instance.file.name
+                    self.object.file.name
                 )
                 document_name = package_utils.get_xml_filename(package_files)
                 rendition_name = package_utils.get_rendition_expected_name(
@@ -79,28 +80,28 @@ class PackageAdminInspectView(InspectView):
         except XMLFormatError:
             data["pdfs"] = []
 
-    def get_context_data(self):
+    def get_context_data(self, **kwargs):
         blocking_errors = list(
             PkgValidationResult.objects.filter(
-                report__package=self.instance,
+                report__package=self.object,
                 status=choices.VALIDATION_RESULT_BLOCKING,
             ).values_list("message", flat=True)
         )
         data = {
-            "pkg_zip_name": self.instance.pkg_zip.name,
-            "linked": self.instance.linked.all(),
+            "pkg_zip_name": self.object.pkg_zip.name,
+            "linked": self.object.linked.all(),
             "validation_results": {},
-            "package_id": self.instance.id,
-            "original_pkg": self.instance.file.name,
-            "status": self.instance.status,
-            "category": self.instance.category,
-            "languages": package_utils.get_languages(self.instance.file.name),
+            "package_id": self.object.id,
+            "original_pkg": self.object.file.name,
+            "status": self.object.status,
+            "category": self.object.category,
+            "languages": package_utils.get_languages(self.object.file.name),
             "pdfs": [],
-            "reports": list(self.instance.reports),
-            "xml_error_reports": list(self.instance.xml_error_reports),
-            "xml_info_reports": list(self.instance.xml_info_reports),
-            "summary": self.instance.summary,
-            "xml": self.instance.xml,
+            "reports": list(self.object.reports),
+            "xml_error_reports": list(self.object.xml_error_reports),
+            "xml_info_reports": list(self.object.xml_info_reports),
+            "summary": self.object.summary,
+            "xml": self.object.xml,
             "blocking_errors": blocking_errors,
         }
 
@@ -129,19 +130,19 @@ class XMLInfoReportEditView(EditView):
         return redirect(self.get_package_url())
 
     def get_package_url(self):
-        report = self.instance
+        report = self.object
         return f"/admin/upload/package/inspect/{report.package.id}/?#xi"
 
 
 class ValidationReportEditView(XMLInfoReportEditView):
     def get_package_url(self):
-        report = self.instance
+        report = self.object
         return f"/admin/upload/package/inspect/{report.package.id}/?#vr{report.id}"
 
 
 class XMLErrorReportEditView(XMLInfoReportEditView):
     def get_package_url(self):
-        report = self.instance
+        report = self.object
         return f"/admin/upload/package/inspect/{report.package.id}/?#xer{report.id}"
 
 
@@ -155,7 +156,7 @@ class PackageDecisionMixin:
 
     def get_task_function(self):
         """Pode ser sobrescrito se diferentes views usarem tasks diferentes"""
-        return task_publish_article
+        return task_upload_workflow_publish_article
 
     def process_decision(self, package, user, force_journal, force_issue):
         """Pode ser sobrescrito para customizar o processamento"""
@@ -231,7 +232,7 @@ def finish_deposit(request):
     if package_id:
         package = get_object_or_404(Package, pk=package_id)
 
-        if package.finish_deposit(task_publish_article):
+        if package.finish_deposit(task_upload_workflow_publish_article):
             # muda o status para a próxima etapa
             messages.success(request, _("Package has been deposited"))
             return redirect("/admin/upload/package/")
@@ -359,3 +360,57 @@ def archive_package(request):
                 ),
             )
     return redirect(f"/admin/upload/package/")
+
+
+def republish_selected(request):
+    """
+    Agenda republicação de um conjunto específico de pacotes selecionados na listagem.
+    Os IDs dos pacotes chegam via GET (parâmetro package_ids, separados por vírgula)
+    na primeira exibição do formulário, e via POST (campo oculto) na confirmação.
+    """
+    from collection.choices import WEBSITE_KIND
+
+    if not has_permission(request.user):
+        messages.error(request, _("Operation not available"))
+        return redirect("/admin/snippets/upload/readytopublishpackage/")
+
+    if request.method == "POST":
+        website_kind = request.POST.get("website_kind") or None
+        package_ids_raw = request.POST.get("package_ids", "")
+        package_ids = [
+            int(pk) for pk in package_ids_raw.split(",") if pk.strip().isdigit()
+        ]
+
+        if not package_ids:
+            messages.error(request, _("No packages selected."))
+            return redirect("/admin/snippets/upload/readytopublishpackage/")
+
+        task_republish_articles.delay(
+            username=request.user.username,
+            user_id=request.user.id,
+            website_kind=website_kind,
+            package_ids=package_ids,
+        )
+        messages.success(
+            request,
+            _("Batch republication of %(count)d package(s) scheduled for %(website)s website.")
+            % {"count": len(package_ids), "website": website_kind or _("all")},
+        )
+        return redirect("/admin/snippets/upload/readytopublishpackage/")
+
+    package_ids_raw = request.GET.get("package_ids", "")
+    package_ids = [pk for pk in package_ids_raw.split(",") if pk.strip().isdigit()]
+
+    if not package_ids:
+        messages.error(request, _("No packages selected."))
+        return redirect("/admin/snippets/upload/readytopublishpackage/")
+
+    return render(
+        request,
+        "modeladmin/upload/package/republish_selected.html",
+        {
+            "website_kinds": WEBSITE_KIND,
+            "package_ids": ",".join(package_ids),
+            "package_count": len(package_ids),
+        },
+    )
