@@ -389,7 +389,7 @@ def process_journal_result(
     journal.save()
 
     journal.journal_email.all().delete()
-    for item in result.get("email"):
+    for item in result.get("email") or []:
         journal.add_email(item)
 
     # Processa subjects
