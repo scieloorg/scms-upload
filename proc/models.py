@@ -2581,12 +2581,9 @@ class ArticleProc(BaseProc, ClusterableModel):
 
     @property
     def article(self):
-        try:
-            sps_pkg = self.sps_pkg
-            if sps_pkg:
-                return Article.objects.get(sps_pkg=sps_pkg)
-        except (AttributeError, Article.DoesNotExist) as e:
-            logging.info(f"Not found ArticleProc.article: {sps_pkg} {e}")
+        if not self.sps_pkg:
+            return None
+        return self.sps_pkg.article_set.all().order_by("-updated").first()
 
     # ── migration flow ──
 
