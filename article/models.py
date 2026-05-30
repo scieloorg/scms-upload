@@ -742,7 +742,8 @@ class Article(ClusterableModel, CommonControlField):
         e delega a criação das ArticleWebPages.
         """
         items = []
-        
+        if not force_update:
+            force_update = self.pages.filter(url__startswith="None").exists()
         if not list(self.webpages) or not self.article_collections.exists() or force_update:
             try:
                 for journal_proc in self.journal.journalproc_set.all():
@@ -852,24 +853,43 @@ class Article(ClusterableModel, CommonControlField):
             data.append(item.data)
         return data
 
-    def _available_on_website(self, collection, purpose=None):
-        status_list = list(self.pages.filter(collection=collection, purpose=purpose).values_list("status", flat=True))
+    def is_available_on_website(self, collection=None, purpose=None):
+        pages = []
+        kwargs = {}
+        if purpose:
+            kwargs["purpose"] = purpose
+        if collection:
+            kwargs["collection"] = collection
+        items = self.pages.filter(**kwargs)
+        
+        status_list = list(items.values_list("status", flat=True).distinct())
         status = get_compiled_status(status_list)
         valid = status == choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
+        
+        for item in items:
+            pages.append(item.data)
         return {
-            "collection": collection.acron,
+            "collection": collection and collection.acron,
             "purpose": purpose,
             "valid": valid,
-            "new_pid_status": get_pid_status_from_webpage_status(purpose, status),
             "status_list": status_list,
             "status": status,
+            "pages": pages,
         }
         
-    def available_on_classic_website(self, collection=None):
-        return self._available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC)
+    def available_on_classic_website(self, collection):
+        response = self.is_available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC)
+        response["new_pid_status"] = get_pid_status_from_webpage_status(
+            choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC, response["status"]
+        )
+        return response
 
-    def available_on_public_website(self, collection=None):
-        return self._available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC)
+    def available_on_public_website(self, collection):
+        response = self.is_available_on_website(collection, choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC)
+        response["new_pid_status"] = get_pid_status_from_webpage_status(
+            choices.ARTICLE_WEBPAGE_PURPOSE_PUBLIC, response["status"]
+        )
+        return response
  
     @classmethod
     def get_repeated_values(cls, field_name, queryset=None, issue=None):
@@ -1287,7 +1307,7 @@ class ArticleCollection(CommonControlField):
 
         # ── Site clássico ──
         classic_ws = self.classic_website
-        if classic_ws:
+        if classic_ws and classic_ws.url:
             purpose = choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC
             for item in article.get_html_urls(
                 classic_ws.url, purpose
@@ -1381,6 +1401,14 @@ class ArticleCollection(CommonControlField):
         pages = self.pages.all()
         if purpose:
             pages = pages.filter(purpose=purpose)
+
+        # Verifica se a coleção possui site clássico antes de checar
+        # páginas clássicas — algumas coleções não têm site clássico
+        if not self.classic_website:
+            if purpose == choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC:
+                return response
+            pages = pages.exclude(purpose=choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC)
+
         if not force_update:
             pages = pages.exclude(
                 status=choices.ARTICLE_WEBPAGE_STATUS_VALID_CONTENT
@@ -1582,6 +1610,8 @@ class ArticleWebPage(CommonControlField):
         -------
         ArticleWebPage
         """
+        if not item["url"]:
+            raise ValueError(f"ArticleWebPage.get_or_create_from_item requires url: {item}")
         lang_obj = Language.objects.filter(code2=item["lang"]).first()
         page, created = cls.objects.get_or_create(
             article=article,
