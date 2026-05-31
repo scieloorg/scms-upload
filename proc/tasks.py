@@ -1053,6 +1053,43 @@ def task_migrate_and_publish_articles_by_journal(
         journal_proc = JournalProc.objects.get(id=journal_proc_id)
         user = _get_user(user_id, username)
 
+        websites_to_ignore = ["PUBLIC", "QA"]
+        for purpose in WebSiteConfiguration.objects.filter(collection=journal_proc.collection, enabled=True).values_list("purpose", flat=True):
+            websites_to_ignore.remove(purpose)
+        for purpose in websites_to_ignore:
+            if purpose == "QA":
+                JournalProc.objects.filter(
+                    id=journal_proc.id,
+                    qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
+                    qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
+                )
+                IssueProc.objects.filter(
+                    journal_proc=journal_proc,
+                    qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
+                    qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
+                )
+                ArticleProc.objects.filter(
+                    issue_proc__journal_proc=journal_proc,
+                    qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
+                    qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
+                )
+            elif purpose == "PUBLIC":
+                JournalProc.objects.filter(
+                    id=journal_proc.id,
+                    public_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
+                    public_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
+                )
+                IssueProc.objects.filter(
+                    journal_proc=journal_proc,
+                    public_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
+                    public_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
+                )
+                ArticleProc.objects.filter(
+                    issue_proc__journal_proc=journal_proc,
+                    public_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
+                    public_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
+                )
+
         response = controller.import_journal_acron_id_records(
             user,
             ArticleProc,
