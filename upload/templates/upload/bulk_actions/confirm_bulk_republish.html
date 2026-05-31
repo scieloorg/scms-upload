@@ -1,0 +1,47 @@
+{% extends 'wagtailadmin/bulk_actions/confirmation/base.html' %}
+{% load i18n wagtailadmin_tags %}
+
+{% block titletag %}
+    {% if items|length == 1 %}
+        Republish ({{ website_kind }}) - {{ items.0.item }}
+    {% else %}
+        Republish ({{ website_kind }}) — {{ items|length }} {{ model_opts.verbose_name_plural|capfirst }}
+    {% endif %}
+{% endblock %}
+
+{% block header %}
+    {% include "wagtailadmin/shared/header.html" with title="Republish" subtitle=website_kind icon=header_icon only %}
+{% endblock header %}
+
+{% block items_with_access %}
+    {% if items %}
+        <p>
+            {% blocktrans trimmed with kind=website_kind count=items|length snippet_type_name=model_opts.verbose_name_plural %}
+                Are you sure you want to republish {{ count }} {{ snippet_type_name }} on <strong>{{ kind }}</strong>?
+            {% endblocktrans %}
+        </p>
+        <ul>
+            {% for snippet in items %}
+                <li>
+                    <a href="{{ snippet.edit_url }}" target="_blank" rel="noreferrer">{{ snippet.item }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endblock items_with_access %}
+
+{% block items_with_no_access %}
+    {% if items_with_no_access %}
+        <p>{% trans "You don't have permission to republish some of the selected packages." %}</p>
+    {% endif %}
+{% endblock items_with_no_access %}
+
+{% block form_section %}
+    {% if items %}
+        {% trans "Yes, republish" as action_button_text %}
+        {% trans "Cancel" as no_action_button_text %}
+        {% include 'wagtailadmin/bulk_actions/confirmation/form.html' %}
+    {% else %}
+        {% include 'wagtailadmin/bulk_actions/confirmation/go_back.html' %}
+    {% endif %}
+{% endblock form_section %}
