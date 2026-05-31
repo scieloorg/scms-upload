@@ -1058,12 +1058,32 @@ def task_migrate_and_publish_articles_by_journal(
             websites_to_ignore.remove(purpose)
         for purpose in websites_to_ignore:
             if purpose == "QA":
+                JournalProc.objects.filter(
+                    id=journal_proc.id,
+                    qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
+                    qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
+                )
+                IssueProc.objects.filter(
+                    journal_proc=journal_proc,
+                    qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
+                    qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
+                )
                 ArticleProc.objects.filter(
                     issue_proc__journal_proc=journal_proc,
                     qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
                     qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
                 )
             elif purpose == "PUBLIC":
+                JournalProc.objects.filter(
+                    id=journal_proc.id,
+                    public_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
+                    public_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
+                )
+                IssueProc.objects.filter(
+                    journal_proc=journal_proc,
+                    public_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
+                    public_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
+                )
                 ArticleProc.objects.filter(
                     issue_proc__journal_proc=journal_proc,
                     public_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
