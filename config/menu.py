@@ -1,6 +1,7 @@
 WAGTAIL_MENU_APPS_ORDER = [
-    "Tarefas",
+    None,
     "unexpected-error",
+    "Tasks",
     "processing",
     "migration",
     "journal",
@@ -16,11 +17,13 @@ WAGTAIL_MENU_APPS_ORDER = [
     "Images",
     "Documentos",
     "Ajuda",
+    "upload",
+    "upload-error",
 ]
 
 
 def get_menu_order(app_name):
     try:
-        return WAGTAIL_MENU_APPS_ORDER.index(app_name) + 1
+        return WAGTAIL_MENU_APPS_ORDER.index(app_name)
     except:
         return 9000

@@ -528,7 +528,7 @@ class Package(CommonControlField, ClusterableModel):
             return False
         return True
 
-    def finish_reception(self, task_publish_article=None, blocking_error_status=None):
+    def finish_reception(self, task_upload_workflow_publish_article=None, blocking_error_status=None):
         """
         1. Verifica se as validações que executaram em paralelo, finalizaram
         2. Calcula os números de problemas do pacote
@@ -545,9 +545,9 @@ class Package(CommonControlField, ClusterableModel):
 
         self.calculate_validation_numbers()
         self.evaluate_validation_numbers(blocking_error_status)
-        self.process_system_decision(task_publish_article)
+        self.process_system_decision(task_upload_workflow_publish_article)
 
-    def process_system_decision(self, task_publish_article):
+    def process_system_decision(self, task_upload_workflow_publish_article):
         is_ready_to_preview = False
 
         if self.status in (
@@ -556,7 +556,7 @@ class Package(CommonControlField, ClusterableModel):
         ):
             is_ready_to_preview = True
 
-        if task_publish_article and is_ready_to_preview:
+        if task_upload_workflow_publish_article and is_ready_to_preview:
             try:
                 user = self.updated_by or self.creator
                 # é desejável que o artigo seja publicado diretamente
@@ -578,9 +578,9 @@ class Package(CommonControlField, ClusterableModel):
                 )
                 event.finish(user, completed=True, detail=detail)
 
-                self.run_task_publish_article(
+                self.run_task_upload_workflow_publish_article(
                     user,
-                    task_publish_article,
+                    task_upload_workflow_publish_article,
                     response.get("websites") or [],
                     self.upload_validator.publication_rule,
                     True,
@@ -731,7 +731,7 @@ class Package(CommonControlField, ClusterableModel):
         data.update(self.metrics)
         return data
 
-    def finish_deposit(self, task_publish_article):
+    def finish_deposit(self, task_upload_workflow_publish_article):
         """
         1. Analisa as respostas do produtor de XML aos problemas encontrados no pacote
         O produtor de XML pode concordar ou discordar com os erros
@@ -762,7 +762,7 @@ class Package(CommonControlField, ClusterableModel):
         if self.is_acceptable_package:
             # pode finalizar, se a quantidade de erros é tolerável
             # para passar para o próximo passo
-            self.process_system_decision(task_publish_article)
+            self.process_system_decision(task_upload_workflow_publish_article)
             return True
 
         if not self.is_error_review_finished:
@@ -819,7 +819,7 @@ class Package(CommonControlField, ClusterableModel):
     def process_qa_decision(
         self,
         user,
-        task_publish_article=None,
+        task_upload_workflow_publish_article=None,
         force_journal_publication=None,
         force_issue_publication=None,
     ):
@@ -866,9 +866,9 @@ class Package(CommonControlField, ClusterableModel):
                 detail.update(response or {})
                 operation.finish(user, completed=True, detail=detail)
 
-                self.run_task_publish_article(
+                self.run_task_upload_workflow_publish_article(
                     user,
-                    task_publish_article,
+                    task_upload_workflow_publish_article,
                     response.get("websites") or [],
                     self.upload_validator.publication_rule,
                     force_journal_publication,
@@ -956,9 +956,8 @@ class Package(CommonControlField, ClusterableModel):
             save = True
 
         if comments:
-            if not self.qa_comment:
-                self.qa_comment = ""
-            self.qa_comment += "\n".join(comments)
+            self.qa_comment = self.qa_comment or ""
+            self.qa_comment += "\n".join(str(c) for c in comments)
             save = True
 
         if save:
@@ -1293,10 +1292,10 @@ class Package(CommonControlField, ClusterableModel):
                 )
             raise
 
-    def run_task_publish_article(
+    def run_task_upload_workflow_publish_article(
         self,
         user,
-        task_publish_article,
+        task_upload_workflow_publish_article,
         websites,
         publication_rule,
         force_journal_publication,
@@ -1305,7 +1304,7 @@ class Package(CommonControlField, ClusterableModel):
         if not websites:
             return
 
-        task_publish_article.apply_async(
+        task_upload_workflow_publish_article.apply_async(
             kwargs=dict(
                 user_id=user.id,
                 username=user.username,
@@ -1319,7 +1318,7 @@ class Package(CommonControlField, ClusterableModel):
         )
         if "PUBLIC" in websites:
             for item in self.linked.all():
-                task_publish_article.apply_async(
+                task_upload_workflow_publish_article.apply_async(
                     kwargs=dict(
                         user_id=user.id,
                         username=user.username,

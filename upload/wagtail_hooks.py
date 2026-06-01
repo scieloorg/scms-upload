@@ -8,6 +8,7 @@ from wagtail import hooks
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
+from core.views import CommonControlFieldViewSet
 from config.menu import get_menu_order
 from upload.views import (
     ReadyToPublishPackageEditView,
@@ -37,9 +38,27 @@ from .models import (
 )
 from .permission_helper import UploadPermissionHelper
 from team.models import has_permission
+from upload.bulk_actions.republish import RepublishPublicBulkAction, RepublishQABulkAction
+
+hooks.register("register_bulk_action", RepublishQABulkAction)
+hooks.register("register_bulk_action", RepublishPublicBulkAction)
 
 
-class PackageZipViewSet(SnippetViewSet):
+class PermissionHelperMixin:
+    @property
+    def permission_helper(self):
+        try:
+            return self._permission_helper
+        except AttributeError:
+            self._permission_helper = self.permission_helper_class(self.model)
+            return self._permission_helper
+
+
+class BaseUploadViewSet(CommonControlFieldViewSet, PermissionHelperMixin):
+    ...
+
+
+class PackageZipViewSet(BaseUploadViewSet):
     model = PackageZip
     # button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
@@ -74,7 +93,7 @@ class PackageZipViewSet(SnippetViewSet):
         return super().get_queryset(request).filter(**params)
 
 
-class PackageViewSet(SnippetViewSet):
+class PackageViewSet(BaseUploadViewSet):
     model = Package
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
@@ -186,7 +205,7 @@ class PackageViewSet(SnippetViewSet):
         return super().get_queryset(request).filter(status__in=status, **params)
 
 
-class QualityAnalysisPackageViewSet(SnippetViewSet):
+class QualityAnalysisPackageViewSet(BaseUploadViewSet):
     model = QAPackage
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
@@ -266,7 +285,7 @@ class QualityAnalysisPackageViewSet(SnippetViewSet):
         return super().get_queryset(request).filter(status__in=status, **params)
 
 
-class ReadyToPublishPackageViewSet(SnippetViewSet):
+class ReadyToPublishPackageViewSet(BaseUploadViewSet):
     model = ReadyToPublishPackage
 
     button_helper_class = UploadButtonHelper
@@ -329,7 +348,7 @@ class ReadyToPublishPackageViewSet(SnippetViewSet):
         return super().get_queryset(request).filter(status__in=status, **params)
 
 
-class XMLErrorReportViewSet(SnippetViewSet):
+class XMLErrorReportViewSet(BaseUploadViewSet):
     model = XMLErrorReport
     permission_helper_class = UploadPermissionHelper
     edit_view_class = XMLErrorReportEditView
@@ -361,10 +380,10 @@ class XMLErrorReportViewSet(SnippetViewSet):
         if self.permission_helper.user_is_analyst_team_member(request.user, None):
             return super().get_queryset(request)
 
-        return super().get_queryset(request).filter(package__creator=request.user)
+        return super().get_queryset(request).filter(status__in=status, **params)
 
 
-class XMLErrorViewSet(SnippetViewSet):
+class XMLErrorViewSet(BaseUploadViewSet):
     model = XMLError
     permission_helper_class = UploadPermissionHelper
     # create_view_class = XMLErrorCreateView
@@ -404,7 +423,8 @@ class XMLErrorViewSet(SnippetViewSet):
         return super().get_queryset(request).filter(package__creator=request.user)
 
 
-class XMLInfoReportViewSet(SnippetViewSet):
+
+class XMLInfoReportViewSet(BaseUploadViewSet):
     model = XMLInfoReport
     permission_helper_class = UploadPermissionHelper
     edit_view_class = XMLInfoReportEditView
@@ -439,7 +459,7 @@ class XMLInfoReportViewSet(SnippetViewSet):
         return super().get_queryset(request).filter(package__creator=request.user)
 
 
-class XMLInfoViewSet(SnippetViewSet):
+class XMLInfoViewSet(BaseUploadViewSet):
     model = XMLInfo
     permission_helper_class = UploadPermissionHelper
     # create_view_class = XMLInfoCreateView
@@ -479,7 +499,7 @@ class XMLInfoViewSet(SnippetViewSet):
         return super().get_queryset(request).filter(package__creator=request.user)
 
 
-class ValidationReportViewSet(SnippetViewSet):
+class ValidationReportViewSet(BaseUploadViewSet):
     model = ValidationReport
     permission_helper_class = UploadPermissionHelper
     # create_view_class = ValidationReportCreateView
@@ -515,7 +535,7 @@ class ValidationReportViewSet(SnippetViewSet):
         return super().get_queryset(request).filter(package__creator=request.user)
 
 
-class ValidationViewSet(SnippetViewSet):
+class ValidationViewSet(BaseUploadViewSet):
     model = PkgValidationResult
     permission_helper_class = UploadPermissionHelper
     # create_view_class = ValidationCreateView
@@ -546,7 +566,7 @@ class ValidationViewSet(SnippetViewSet):
         return super().get_queryset(request).filter(package__creator=request.user)
 
 
-class UploadValidatorViewSet(SnippetViewSet):
+class UploadValidatorViewSet(BaseUploadViewSet):
     model = UploadValidator
     permission_helper_class = UploadPermissionHelper
     # create_view_class = ValidationCreateView
@@ -577,7 +597,7 @@ class UploadValidatorViewSet(SnippetViewSet):
         return super().get_queryset(request).none()
 
 
-class ArchivedPackageViewSet(SnippetViewSet):
+class ArchivedPackageViewSet(BaseUploadViewSet):
     model = ArchivedPackage
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper

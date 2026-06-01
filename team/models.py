@@ -477,3 +477,4 @@ class JournalCompanyContract(CommonControlField):
     def can_manage_contract(cls, user, journal):
         """Check if a user can manage contracts for a journal (must be a journal manager)."""
         return JournalTeamMember.user_is_manager(user, journal)
+

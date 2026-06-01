@@ -40,3 +40,6 @@ class CommonControlFieldViewSet(SnippetViewSet):
     # Define as views customizadas
     add_view_class = UserTrackingCreateView
     edit_view_class = UserTrackingEditView
+
+    def get_queryset(self, request=None):
+        return self.model.objects.all()

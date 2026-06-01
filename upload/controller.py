@@ -15,6 +15,9 @@ from proc.controller import (
     JournalDataChecker,
     IssueDataChecker,
 )
+from upload.utils import file_utils, xml_utils
+
+pp = PidRequester()
 
 from upload.models import (
     Package,
@@ -22,6 +25,7 @@ from upload.models import (
     choices,
 )
 from upload.utils import file_utils, xml_utils
+
 
 pp = PidRequester()
 
@@ -308,7 +312,6 @@ def _check_article_and_journal(package, xml_with_pre, user):
             response, journal_checker, issue_checker
         )
         logging.info(f"_check_xml_and_registered_data_compatibility: {response}")
-
         response["package_status"] = choices.PS_ENQUEUED_FOR_VALIDATION
 
         _archive_pending_correction_package(response, name)
