@@ -225,6 +225,29 @@ def _get_collections(collection_acron):
         return []
 
 
+def fix_publication_status(collection):
+    """Para cada purpose (QA/PUBLIC) sem WebSiteConfiguration ativa, marca TODO → IGNORED."""
+    field_map = {"QA": "qa_ws_status", "PUBLIC": "public_ws_status"}
+    
+    enabled_items = {"QA": False, "PUBLIC": False}
+    for purpose in WebSiteConfiguration.objects.filter(
+        collection=collection, enabled=True
+    ).values_list("purpose", flat=True):
+        enabled_items[purpose] = True
+    
+    for purpose, enabled in enabled_items.items():
+        field = field_map[purpose]
+        if enabled:
+            filter_kwargs = {field: tracker_choices.PROGRESS_STATUS_IGNORED}
+            update_kwargs = {field: tracker_choices.PROGRESS_STATUS_TODO}
+        else:
+            filter_kwargs = {field: tracker_choices.PROGRESS_STATUS_TODO}
+            update_kwargs = {field: tracker_choices.PROGRESS_STATUS_IGNORED}
+        JournalProc.objects.filter(collection=collection, **filter_kwargs).update(**update_kwargs)
+        IssueProc.objects.filter(collection=collection, **filter_kwargs).update(**update_kwargs)
+        ArticleProc.objects.filter(collection=collection, **filter_kwargs).update(**update_kwargs)
+
+
 ############################################
 # JOURNALS
 ############################################
@@ -350,6 +373,7 @@ def task_migrate_and_publish_journals_by_collection(
             | Q(qa_ws_status__in=status)
             | Q(public_ws_status__in=status)
         )
+        fix_publication_status(collection)
         items_to_process = JournalProc.objects.filter(
             query_by_status, collection=collection, **journal_filter
         )
@@ -462,6 +486,7 @@ def task_publish_journals(
             params["acron"] = journal_acron
 
         for collection in _get_collections(collection_acron):
+            fix_publication_status(collection)
             for website_kind in (QA, PUBLIC):
                 api_data = get_api_data(collection, "journal", website_kind)
                 if not api_data or api_data.get("error"):
@@ -666,7 +691,7 @@ def task_migrate_and_publish_issues_by_collection(
         create_or_update_migrated_issue(
             user, collection, classic_website, force_update
         )
-
+        fix_publication_status(collection)
         params = {}
         if journal_acron:
             params["journal_proc__acron"] = journal_acron
@@ -773,6 +798,7 @@ def task_publish_issues(
             params["issue__publication_year"] = str(publication_year)
 
         for collection in _get_collections(collection_acron):
+            fix_publication_status(collection)
             for website_kind in (QA, PUBLIC):
                 total_processed = 0
                 api_data = get_api_data(collection, "issue", website_kind)
@@ -1053,43 +1079,7 @@ def task_migrate_and_publish_articles_by_journal(
         journal_proc = JournalProc.objects.get(id=journal_proc_id)
         user = _get_user(user_id, username)
 
-        websites_to_ignore = ["PUBLIC", "QA"]
-        for purpose in WebSiteConfiguration.objects.filter(collection=journal_proc.collection, enabled=True).values_list("purpose", flat=True):
-            websites_to_ignore.remove(purpose)
-        for purpose in websites_to_ignore:
-            if purpose == "QA":
-                JournalProc.objects.filter(
-                    id=journal_proc.id,
-                    qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
-                    qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
-                )
-                IssueProc.objects.filter(
-                    journal_proc=journal_proc,
-                    qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
-                    qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
-                )
-                ArticleProc.objects.filter(
-                    issue_proc__journal_proc=journal_proc,
-                    qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
-                    qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
-                )
-            elif purpose == "PUBLIC":
-                JournalProc.objects.filter(
-                    id=journal_proc.id,
-                    public_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
-                    public_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
-                )
-                IssueProc.objects.filter(
-                    journal_proc=journal_proc,
-                    public_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
-                    public_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
-                )
-                ArticleProc.objects.filter(
-                    issue_proc__journal_proc=journal_proc,
-                    public_ws_status=tracker_choices.PROGRESS_STATUS_TODO).update(
-                    public_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
-                )
-
+        fix_publication_status(journal_proc.collection)
         response = controller.import_journal_acron_id_records(
             user,
             ArticleProc,
@@ -1335,6 +1325,7 @@ def task_publish_issue_articles(
         )
 
         collection = issue_proc.collection
+        fix_publication_status(collection)
         total_processed = 0
         total_to_process = 0
         for website in WebSiteConfiguration.objects.filter(
@@ -1467,6 +1458,8 @@ def task_publish_articles(
         params=task_params,
     )
     try:
+        for collection in _get_collections(collection_acron):
+            fix_publication_status(collection)
         issue_procs = IssueProc.select_items(
             collection_acron=collection_acron,
             journal_acron=journal_acron,
