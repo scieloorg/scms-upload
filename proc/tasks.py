@@ -1838,6 +1838,8 @@ def task_track_classic_website_article_pids_for_collection(
         for article_proc in ArticleProc.items_to_check_url_and_content(
             collection, force_update
         ):
+            if not article_proc.article:
+                continue
             for website in WebSiteConfiguration.objects.filter(
                 collection=collection, enabled=True
             ):
