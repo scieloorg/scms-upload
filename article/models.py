@@ -914,7 +914,7 @@ class Article(ClusterableModel, CommonControlField):
         response = {
             "sps_pkg_with_invalid_pid_v2": [],
             "ppxml_invalid": [],
-            "repeated_sps_pkg_name": [],
+            "repeated_sps_pkg__sps_pkg_name": [],
             "repeated_pid_v2": [],
             "deleted_ppxml_ids": [],
             "deleted_sps_pkg_ids": [],
@@ -966,6 +966,7 @@ class Article(ClusterableModel, CommonControlField):
 
         # 2. Remoção por duplicidade
         for field_name in ("sps_pkg__sps_pkg_name", "pid_v2"):
+            response.setdefault(f"repeated_{field_name}", [])
             qs = cls.objects.select_related("journal").filter(issue=issue)
             
             multiple_values = cls.get_repeated_values(field_name, qs)
