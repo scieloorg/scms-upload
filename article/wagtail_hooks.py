@@ -34,10 +34,10 @@ class ArticleFilterSet(django_filters.FilterSet):
         choices=choices.ARTICLE_STATUS,  # ajuste para o nome real das choices
     )
     collection = django_filters.ModelChoiceFilter(
-        field_name="journal__journalproc__collection",
+        field_name="article_collections__collection",
         label=_("Collection"),
         queryset=Collection.objects.filter(
-            journalproc__journal__article__isnull=False
+            articlecollection__article__isnull=False
         ).distinct(),
     )
 
@@ -79,8 +79,8 @@ class ArticleSnippetViewSet(SnippetViewSet):
         "journal__official_journal__issn_print",
         "journal__official_journal__issn_electronic",
         "title_with_lang__text",
-        "sps_pkg__articleproc__collection__acron",
-        "sps_pkg__articleproc__collection__name",
+        "article_collections__collection__acron",
+        "article_collections__collection__name",
     )
     # inspect_view_fields não é usado em SnippetViewSet, use inspect_view_class customizada
 

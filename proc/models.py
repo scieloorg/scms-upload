@@ -2282,7 +2282,6 @@ class ArticleProc(BaseProc, ClusterableModel):
         force_update=False,
         sps_pkg_id_list=None,
     ):
-        status = status_list
         status_list = tracker_choices.get_valid_status(status_list, force_update)
         journal_proc_id_list = journal_proc_id_list or []
         issue_proc_id_list = issue_proc_id_list or []
@@ -2309,7 +2308,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             params["id__in"] = article_proc_id_list
 
         qs_status = Q()
-        if status:
+        if status_list:
             qs_status = (
                 Q(migration_status__in=status_list)
                 | Q(xml_status__in=status_list)
