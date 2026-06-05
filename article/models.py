@@ -914,7 +914,7 @@ class Article(ClusterableModel, CommonControlField):
         response = {
             "sps_pkg_with_invalid_pid_v2": [],
             "ppxml_invalid": [],
-            "repeated_sps_pkg_name": [],
+            "repeated_sps_pkg__sps_pkg_name": [],
             "repeated_pid_v2": [],
             "deleted_ppxml_ids": [],
             "deleted_sps_pkg_ids": [],
@@ -942,7 +942,7 @@ class Article(ClusterableModel, CommonControlField):
                     sps_pkg_to_delete.add(sps_pkg_id)
                     sps_pkg_names.append(sps_pkg_name)
             response["sps_pkg_with_invalid_pid_v2"] = sps_pkg_names
-            qtd_deleted, _ = cls.delete_queryset(qs)
+            qtd_deleted, _ignored = cls.delete_queryset(qs)
             total_deletado += qtd_deleted
 
         # 1. Remoção por falta de pp_xml
@@ -961,11 +961,12 @@ class Article(ClusterableModel, CommonControlField):
                     sps_pkg_names.append(item.sps_pkg.sps_pkg_name)
         if article_ids:
             response["ppxml_invalid"] = sps_pkg_names
-            qtd_deleted, _ = cls.delete_queryset(qs.filter(id__in=article_ids))
+            qtd_deleted, _ignored = cls.delete_queryset(qs.filter(id__in=article_ids))
             total_deletado += qtd_deleted
 
         # 2. Remoção por duplicidade
         for field_name in ("sps_pkg__sps_pkg_name", "pid_v2"):
+            response.setdefault(f"repeated_{field_name}", [])
             qs = cls.objects.select_related("journal").filter(issue=issue)
             
             multiple_values = cls.get_repeated_values(field_name, qs)
@@ -1010,7 +1011,7 @@ class Article(ClusterableModel, CommonControlField):
                     response[f"repeated_{field_name}"].append((value, sps_pkg_names))
                     
                     # Executa a deleção e soma ao totalizador
-                    qtd_deletada, _ = cls.delete_queryset(remover_qs)
+                    qtd_deletada, _ignored = cls.delete_queryset(remover_qs)
                     total_deletado += qtd_deletada
 
         # Se você precisar retornar o total_deletado junto com o dicionário, 
@@ -1026,7 +1027,7 @@ class Article(ClusterableModel, CommonControlField):
         
         qs = cls.objects.filter(Q(sps_pkg__isnull=True) | Q(pp_xml__isnull=True), issue=issue)
         response["deleted_article_ids"] = list(qs.values_list("id", flat=True))
-        qtd_deleted, _ = cls.delete_queryset(qs)
+        qtd_deleted, _ignored = cls.delete_queryset(qs)
         total_deletado += qtd_deleted
         
         response["total_deleted_items"] = total_deletado
