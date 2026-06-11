@@ -141,13 +141,9 @@ def task_load_records_from_counter_dict(
         )
 
         # Itera sobre documentos e dispara tarefas individuais
-        for document in harvester.harvest_documents():
+        for pid_v3, document in harvester.harvest_documents():
             try:
                 url = document.get("url")
-                if not url:
-                    invalid_items.append(document)
-                    continue
-                pid_v3 = document.get("pid_v3")
                 origin_date = document.get("origin_date")
                 task_load_record_from_xml_url.delay(
                     username=username,
@@ -157,6 +153,7 @@ def task_load_records_from_counter_dict(
                     xml_url=url,
                     origin_date=origin_date,
                     force_update=force_update,
+                    document_item=document.get("item"),
                 )
                 if stop:
                     count += 1
@@ -195,6 +192,7 @@ def task_load_record_from_xml_url(
     xml_url=None,
     origin_date=None,
     force_update=None,
+    document_item=None,
 ):
     """
     Carrega um registro individual em PidProviderXML a partir de uma URL de XML.
@@ -241,6 +239,7 @@ def task_load_record_from_xml_url(
             is_published=None,
             registered_in_core=False,
             auto_solve_pid_conflict=False,
+            document_item=document_item,
         )
 
         if result.get("error_msg"):
