@@ -1750,48 +1750,20 @@ class XMLURL(CommonControlField):
         except Exception as e:
             logging.error(f"Error saving zip file for XMLURL {self.url}: {e}")
             return False
-
+        
     @classmethod
-    def handle_xml_fetch_failure(cls, user, url, document_item, exception):
-        """Handle failure to obtain XML from URL - registers status without XML content."""
-        tb_str = traceback.format_exc()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        cls.create_or_update(
-            user=user,
-            url=url,
-            status="xml_fetch_failed",
-            pid=None,
-            detail={"document_item": document_item, "exceptions": tb_str},
-        )
-        return dict(
-            error_msg=str(exception),
-            error_type=str(exc_type),
-            exc_value=str(exc_value),
-            exc_traceback=str(exc_traceback),
-        )
+    def record(cls, user, url, status, document_item, *, exception=None, response=None, xml_with_pre=None, name=None):
+        detail = {"document_item": document_item}
+        if exception is not None:
+            detail["exceptions"] = traceback.format_exc()
+        if response is not None:
+            detail["response"] = response
 
-    @classmethod
-    def handle_pid_provider_failure(cls, user, url, document_item, name, response, xml_with_pre):
-        """Handle failure to create PidProviderXML record - registers status and saves XML content."""
-        xmlurl_obj = cls.create_or_update(
-            user=user,
-            url=url,
-            status="pid_provider_xml_failed",
-            pid=response.get("v3"),
-            detail={"document_item": document_item, "response": response},
-        )
-        name = name or response.get("v3") or "content.xml"
-        xmlurl_obj.save_file(xml_with_pre.tostring(), filename=name)
+        pid = response.get("v3") if response else None
+        xmlurl_obj = cls.create_or_update(user=user, url=url, status=status, pid=pid, detail=detail)
 
-    @classmethod
-    def register_success(cls, user, url, document_item, name=None, response=None, xml_with_pre=None):
-        """Register successful XML processing."""
-        xmlurl_obj = cls.create_or_update(
-            user=user,
-            url=url,
-            status="success",
-            pid=response.get("v3") if response else None,
-            detail={"document_item": document_item, "response": response},
-        )
-        name = name or response.get("v3") or "content.xml"
-        xmlurl_obj.save_file(xml_with_pre.tostring(), filename=name)
+        if xml_with_pre is not None:
+            filename = name or pid or "content.xml"
+            xmlurl_obj.save_file(xml_with_pre.tostring(), filename=filename)
+
+        return xmlurl_obj
