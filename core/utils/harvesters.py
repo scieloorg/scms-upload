@@ -73,16 +73,18 @@ class OPACHarvester:
         while True:
             # Constrói URL
             url = f"{self.base_url}&page={page}"
+
             logger.info(f"Fetching OPAC documents from: {url}")
             response = fetch_data(url, json=True, timeout=self.timeout)
+
             total_pages = total_pages or response.get("pages") or 0
             if not total_pages:
-                raise ValueError(f"Total pages={total_pages} for {url}")
+                break
             
             documents = response.get("documents", {})
             if not documents:
-                raise ValueError(f"Total documents={len(documents)} for {url}")
-            
+                break
+
             yield from documents.items()
 
             page += 1
