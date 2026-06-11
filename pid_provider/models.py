@@ -1618,7 +1618,7 @@ class XMLURL(CommonControlField):
         status: CharField - To control the request status (e.g., "pending", "failed", "retrying")
         pid: CharField - Article PID associated with this URL
         zipfile: FileField - Compressed XML content retrieved from the URL
-        exceptions: CharField - Exception traceback information (truncated to 255 chars if needed)
+        detail: JSONField
     """
 
     url = models.URLField(
@@ -1633,8 +1633,9 @@ class XMLURL(CommonControlField):
     zipfile = models.FileField(
         _("ZIP File"), upload_to=xml_url_zipfile_path, null=True, blank=True, max_length=300,
     )
-    exceptions = models.JSONField(
-        _("Exceptions"), null=True, blank=True
+    exceptions = models.CharField(_("Exceptions"), max_length=255, null=True, blank=True)
+    detail = models.JSONField(
+        _("Detail"), null=True, blank=True
     )
 
     base_form_class = CoreAdminModelForm
@@ -1644,6 +1645,7 @@ class XMLURL(CommonControlField):
         FieldPanel("status"),
         FieldPanel("pid"),
         FieldPanel("zipfile"),
+        FieldPanel("detail"),
         FieldPanel("exceptions"),
     ]
 
@@ -1674,14 +1676,14 @@ class XMLURL(CommonControlField):
         url=None,
         status=None,
         pid=None,
-        exceptions=None,
+        detail=None,
     ):
         try:
             obj = cls()
             obj.url = url
             obj.status = status
             obj.pid = pid
-            obj.exceptions = exceptions
+            obj.detail = detail
             obj.creator = user
             obj.save()
             return obj
@@ -1695,7 +1697,7 @@ class XMLURL(CommonControlField):
         url=None,
         status=None,
         pid=None,
-        exceptions=None,
+        detail=None,
     ):
         try:
             obj = cls.get(url=url)
@@ -1704,8 +1706,8 @@ class XMLURL(CommonControlField):
                 obj.status = status
             if pid is not None:
                 obj.pid = pid
-            if exceptions is not None:
-                obj.exceptions = exceptions
+            if detail is not None:
+                obj.detail = detail
             obj.save()
             return obj
         except cls.DoesNotExist:
@@ -1714,7 +1716,7 @@ class XMLURL(CommonControlField):
                 url,
                 status,
                 pid,
-                exceptions,
+                detail,
             )
 
     def save_file(self, xml_content, filename=None):
@@ -1759,7 +1761,7 @@ class XMLURL(CommonControlField):
             url=url,
             status="xml_fetch_failed",
             pid=None,
-            exceptions={"document_item": document_item, "exceptions": tb_str},
+            detail={"document_item": document_item, "exceptions": tb_str},
         )
         return dict(
             error_msg=str(exception),
@@ -1776,7 +1778,7 @@ class XMLURL(CommonControlField):
             url=url,
             status="pid_provider_xml_failed",
             pid=response.get("v3"),
-            exceptions={"document_item": document_item, "response": response},
+            detail={"document_item": document_item, "response": response},
         )
         name = name or response.get("v3") or "content.xml"
         xmlurl_obj.save_file(xml_with_pre.tostring(), filename=name)
@@ -1789,7 +1791,7 @@ class XMLURL(CommonControlField):
             url=url,
             status="success",
             pid=response.get("v3") if response else None,
-            exceptions={"document_item": document_item, "response": response},
+            detail={"document_item": document_item, "response": response},
         )
-        name = name or (response.get("v3") if response else None) or "content.xml"
+        name = name or response.get("v3") or "content.xml"
         xmlurl_obj.save_file(xml_with_pre.tostring(), filename=name)
