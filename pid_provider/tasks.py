@@ -119,6 +119,10 @@ def task_load_records_from_counter_dict(
             until_date="2024-12-31"
         )
     """
+    count = 0
+    invalid_items = []
+    exceptions = []
+
     try:
         user = _get_user(self.request, username=username, user_id=user_id)
 
@@ -137,22 +141,28 @@ def task_load_records_from_counter_dict(
         )
 
         # Itera sobre documentos e dispara tarefas individuais
-        count = 0
-        for document in harvester.harvest_documents():
-            origin_date = document.get("origin_date")
-            task_load_record_from_xml_url.delay(
-                username=username,
-                user_id=user_id,
-                collection_acron=collection_acron,
-                pid_v3=document["pid_v3"],
-                xml_url=document["url"],
-                origin_date=origin_date,
-                force_update=force_update,
-            )
-            count += 1
-            if stop and count >= stop:
-                break
-
+        for pid_v3, document in harvester.harvest_documents():
+            try:
+                url = document.get("url")
+                origin_date = document.get("origin_date")
+                task_load_record_from_xml_url.delay(
+                    username=username,
+                    user_id=user_id,
+                    collection_acron=collection_acron,
+                    pid_v3=pid_v3,
+                    xml_url=url,
+                    origin_date=origin_date,
+                    force_update=force_update,
+                    document_item=document.get("item"),
+                )
+                if stop:
+                    count += 1
+                    if count >= stop:
+                        break
+            except Exception as e:
+                exceptions.append({"error": str(e), "type": str(type(e))})
+        if exceptions or invalid_items:
+            raise ValueError(f"There are exceptions or invalid items")
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -166,6 +176,8 @@ def task_load_records_from_counter_dict(
                 "limit": limit,
                 "timeout": timeout,
                 "force_update": force_update,
+                "exceptions": exceptions,
+                "invalid_items": invalid_items,
             },
         )
 
@@ -180,6 +192,7 @@ def task_load_record_from_xml_url(
     xml_url=None,
     origin_date=None,
     force_update=None,
+    document_item=None,
 ):
     """
     Carrega um registro individual em PidProviderXML a partir de uma URL de XML.
@@ -210,6 +223,7 @@ def task_load_record_from_xml_url(
         - XML é baixado e processado via PidProvider.provide_pid_for_xml_uri
     """
     try:
+        pid_provider = None
         user = _get_user(self.request, username=username, user_id=user_id)
 
         # Usa PidProvider para processar XML e criar registro em PidProviderXML
@@ -225,6 +239,7 @@ def task_load_record_from_xml_url(
             is_published=None,
             registered_in_core=False,
             auto_solve_pid_conflict=False,
+            document_item=document_item,
         )
 
         if result.get("error_msg"):
