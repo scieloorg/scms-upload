@@ -83,33 +83,25 @@ class OPACHarvester:
             if not documents:
                 raise ValueError(f"Total documents={len(documents)} for {url}")
             
-            invalid_documents = []
-            for pid_v3, item in documents.items():
-                yield self.format_lean(pid_v3, item)
-            
+            yield from documents.items()
+
             page += 1
             if total_pages and page > total_pages:
                 logger.info(f"Finish to process {total_pages}")
                 break
 
-    def format_lean(self, pid_v3, item):
+    def format_raw(self, pid_v3, item):
         journal_acron = item.get("journal_acronym")
         xml_url = f"{self.domain}/j/{journal_acron}/a/{pid_v3}/?format=xml"
         origin_date = self._parse_gmt_date(
             item.get("update") or item.get("create")
         )
         return {
-            "pid_v1": item.get("pid_v1"),
-            "pid_v2": item.get("pid_v2"),
             "pid_v3": pid_v3,
-            "collection_acron": self.collection_acron,
-            "journal_acron": journal_acron,
             "url": xml_url,
-            "source_type": "opac",
             "origin_date": origin_date,
-            "metadata": {
-                "raw_data": item,
-            },
+            "collection_acron": self.collection_acron,
+            "item": item,
         }
 
     def format_normalized(self, pid_v3, item):
