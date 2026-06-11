@@ -214,7 +214,7 @@ class BasePidProvider:
             )
             
             # Handle response based on success or failure
-            if response.get("error_type") or response.get("error_message"):
+            if response.get("error_type") or response.get("error_msg") or response.get("error_message"):
                 self._handle_pid_provider_failure(response, xml_with_pre, xml_uri, name, user, origin_date, force_update, is_published)
             else:
                 self._register_success(xml_with_pre, xml_uri, name, user, response)
