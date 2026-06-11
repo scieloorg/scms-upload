@@ -1633,8 +1633,8 @@ class XMLURL(CommonControlField):
     zipfile = models.FileField(
         _("ZIP File"), upload_to=xml_url_zipfile_path, null=True, blank=True, max_length=300,
     )
-    exceptions = models.CharField(
-        _("Exceptions"), max_length=255, null=True, blank=True
+    exceptions = models.JSONField(
+        _("Exceptions"), null=True, blank=True
     )
 
     base_form_class = CoreAdminModelForm
@@ -1720,11 +1720,11 @@ class XMLURL(CommonControlField):
     def save_file(self, xml_content, filename=None):
         """
         Create a zip file from XML content and save it to the zipfile field.
-        
+
         Args:
             xml_content: str or bytes - The XML content to compress
             filename: str - Optional filename for the XML inside the zip (defaults to 'content.xml')
-            
+
         Returns:
             bool - True if file was saved successfully, False otherwise
         """
@@ -1732,19 +1732,64 @@ class XMLURL(CommonControlField):
             # Convert string to bytes if needed
             if isinstance(xml_content, str):
                 xml_content = xml_content.encode('utf-8')
-            
+
             # Create in-memory zip file
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 # Use provided filename or default
                 xml_filename = filename or 'content.xml'
                 zip_file.writestr(xml_filename, xml_content)
-            
+
             # Save the zip file to the model
             zip_filename = f"{self.pid or 'unknown'}_{self.pk or 'new'}.zip"
             self.zipfile.save(zip_filename, ContentFile(zip_buffer.getvalue()), save=True)
-            
+
             return True
         except Exception as e:
             logging.error(f"Error saving zip file for XMLURL {self.url}: {e}")
             return False
+
+    @classmethod
+    def handle_xml_fetch_failure(cls, user, url, document_item, exception):
+        """Handle failure to obtain XML from URL - registers status without XML content."""
+        tb_str = traceback.format_exc()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        cls.create_or_update(
+            user=user,
+            url=url,
+            status="xml_fetch_failed",
+            pid=None,
+            exceptions={"document_item": document_item, "exceptions": tb_str},
+        )
+        return dict(
+            error_msg=str(exception),
+            error_type=str(exc_type),
+            exc_value=str(exc_value),
+            exc_traceback=str(exc_traceback),
+        )
+
+    @classmethod
+    def handle_pid_provider_failure(cls, user, url, document_item, name, response, xml_with_pre):
+        """Handle failure to create PidProviderXML record - registers status and saves XML content."""
+        xmlurl_obj = cls.create_or_update(
+            user=user,
+            url=url,
+            status="pid_provider_xml_failed",
+            pid=response.get("v3"),
+            exceptions={"document_item": document_item, "response": response},
+        )
+        name = name or response.get("v3") or "content.xml"
+        xmlurl_obj.save_file(xml_with_pre.tostring(), filename=name)
+
+    @classmethod
+    def register_success(cls, user, url, document_item, name=None, response=None, xml_with_pre=None):
+        """Register successful XML processing."""
+        xmlurl_obj = cls.create_or_update(
+            user=user,
+            url=url,
+            status="success",
+            pid=response.get("v3") if response else None,
+            exceptions={"document_item": document_item, "response": response},
+        )
+        name = name or (response.get("v3") if response else None) or "content.xml"
+        xmlurl_obj.save_file(xml_with_pre.tostring(), filename=name)
