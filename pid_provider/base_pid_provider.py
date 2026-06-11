@@ -174,7 +174,7 @@ class BasePidProvider:
         try:
             xml_with_pre = list(XMLWithPre.create(uri=xml_uri))[0]
         except Exception as e:
-            return XMLURL.handle_xml_fetch_failure(user, xml_uri, document_item, e)
+            return XMLURL.record(user, xml_uri, "xml_fetch_failed", document_item, exception=e)
 
         # b) Try to create PidProviderXML record
         try:
@@ -191,12 +191,10 @@ class BasePidProvider:
             )
 
             if response.get("error_type") or response.get("error_msg") or response.get("error_message"):
-                XMLURL.handle_pid_provider_failure(user, xml_uri, document_item, name, response, xml_with_pre)
+                XMLURL.record(user, xml_uri, "pid_provider_xml_failed", document_item, response=response, xml_with_pre=xml_with_pre, name=name)
             else:
-                XMLURL.register_success(user, xml_uri, document_item, name, response, xml_with_pre)
-
+                XMLURL.record(user, xml_uri, "success", document_item, response=response, xml_with_pre=xml_with_pre, name=name)
             return response
-
         except Exception as e:
             return self._handle_unexpected_error(e, xml_uri, name, user, origin_date, force_update, is_published, document_item)
 
