@@ -83,6 +83,7 @@ def task_load_records_from_counter_dict(
     opac_domain=None,
     stop=None,
     journal_acron=None,
+    is_public=None,
 ):
     """
     Coleta documentos de uma coleção específica via endpoint counter_dict do OPAC.
@@ -152,6 +153,14 @@ def task_load_records_from_counter_dict(
                 origin_date = document.get("origin_date")
                 if document.get("status") == "false":
                     continue
+
+                document_item = document.get("item") or {}
+                doc_status = document_item.get("status")
+                doc_is_public = doc_status != "false" if doc_status is not None else None
+
+                if is_public is not None and doc_is_public != is_public:
+                    continue
+
                 task_load_record_from_xml_url.delay(
                     username=username,
                     user_id=user_id,
@@ -284,6 +293,7 @@ def task_retry_xml_urls_by_status(
     status_list=None,
     force_update=None,
     stop=None,
+    is_public=None,
 ):
     """
     Reprocessa registros XMLURL filtrando por uma lista de status.
@@ -326,6 +336,8 @@ def task_retry_xml_urls_by_status(
         params = {}
         if status_list:
             params["status__in"] = status_list
+        if is_public is not None:
+            params["is_public"] = is_public
         qs = XMLURL.objects.filter(**params)
 
         for xmlurl in qs.iterator():
