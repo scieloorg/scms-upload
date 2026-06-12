@@ -10,9 +10,9 @@ def sanitize_for_json(obj):
         # then decode as UTF-8 replacing any invalid sequences.
         # Fall back to surrogatepass for surrogates outside the DC80-DCFF range.
         try:
-            return obj.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
+            return obj.encode("utf-16", "surrogateescape").decode("utf-16", "replace")
         except UnicodeEncodeError:
-            return obj.encode("utf-8", "surrogatepass").decode("utf-8", "replace")
+            return obj.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
     if isinstance(obj, dict):
         return {sanitize_for_json(k): sanitize_for_json(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
