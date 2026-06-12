@@ -1076,6 +1076,7 @@ def task_migrate_and_publish_articles_by_journal(
         if not journal_proc_id:
             raise ValueError("journal_proc_id is required")
 
+        status = tracker_choices.get_valid_status(status, force_update)
         journal_proc = JournalProc.objects.get(id=journal_proc_id)
         user = _get_user(user_id, username)
 
