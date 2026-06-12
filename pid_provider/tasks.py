@@ -83,46 +83,35 @@ def task_load_records_from_counter_dict(
     opac_domain=None,
     stop=None,
     journal_acron=None,
-    is_public=None,
 ):
     """
-    Coleta documentos de uma coleção específica via endpoint counter_dict do OPAC.
+    Coleta documentos de uma coleção via endpoint counter_dict do OPAC e
+    enfileira task_load_record_from_xml_url para cada documento público.
 
-    Utiliza OPACHarvester para coletar documentos da API do novo site SciELO.
-    Processa uma coleção por vez.
+    Utiliza OPACHarvester para percorrer a API do novo site SciELO. Documentos
+    marcados como não públicos (is_public=False) são ignorados.
 
     Args:
-        self: Instância da tarefa Celery
-        username (str, optional): Nome do usuário executando a tarefa
-        user_id (int, optional): ID do usuário executando a tarefa
+        self: Instância da tarefa Celery.
+        username (str, optional): Nome do usuário executando a tarefa.
+        user_id (int, optional): ID do usuário executando a tarefa.
         collection_acron (str, optional): Acrônimo da coleção.
             Se None, usa "scl" (Brasil) como padrão.
-            Ex: "scl"
-        from_date (str, optional): Data inicial para coleta (formato ISO)
-        until_date (str, optional): Data final para coleta (formato ISO)
-        limit (int, optional): Limite de documentos por página
-        timeout (int, optional): Timeout em segundos para requisições HTTP
-        force_update (bool, optional): Força atualização mesmo se já existe
-        opac_domain (str, optional): Domínio do OPAC (default: "www.scielo.br")
-        stop (int, optional): Quantidade máxima de itens a coletar.
-            Se None, coleta todos os itens disponíveis.
-        journal_acron (str, optional): Acrônimo do periódico para filtrar.
-            Ex: "rsp"
-
-    Returns:
-        None
+        from_date (str, optional): Data inicial para coleta (formato ISO).
+        until_date (str, optional): Data final para coleta (formato ISO).
+        limit (int, optional): Número de documentos por página da API (padrão: 100).
+        timeout (int, optional): Timeout em segundos para requisições HTTP (padrão: 5).
+        force_update (bool, optional): Força atualização mesmo se o registro
+            já existe.
+        opac_domain (str, optional): Domínio do OPAC (padrão: "www.scielo.br").
+        stop (int, optional): Quantidade máxima de subtarefas disparadas.
+            Se None, processa todos os documentos disponíveis.
+        journal_acron (str, optional): Acrônimo do periódico para filtrar
+            a coleta (ex: "rsp").
 
     Side Effects:
-        - Dispara task_load_record_from_xml_url para cada documento
-        - Registra UnexpectedEvent em caso de erro
-
-    Examples:
-        # Carregar registros da coleção Brasil
-        task_load_records_from_counter_dict.delay(
-            collection_acron="scl",
-            from_date="2024-01-01",
-            until_date="2024-12-31"
-        )
+        - Dispara task_load_record_from_xml_url para cada documento público.
+        - Registra UnexpectedEvent em caso de erro.
     """
     count = 0
     invalid_items = []
@@ -147,19 +136,16 @@ def task_load_records_from_counter_dict(
         )
 
         # Itera sobre documentos e dispara tarefas individuais
-        for pid_v3, document in harvester.harvest_documents():
+        for pid_v3, item in harvester.harvest_documents():
             try:
+                document = harvester.format_raw(pid_v3, item)
+
                 url = document.get("url")
                 origin_date = document.get("origin_date")
-                if document.get("status") == "false":
+                if not document.get("is_public"):
                     continue
 
                 document_item = document.get("item") or {}
-                doc_status = document_item.get("status")
-                doc_is_public = doc_status != "false" if doc_status is not None else None
-
-                if is_public is not None and doc_is_public != is_public:
-                    continue
 
                 task_load_record_from_xml_url.delay(
                     username=username,
@@ -169,7 +155,7 @@ def task_load_records_from_counter_dict(
                     xml_url=url,
                     origin_date=origin_date,
                     force_update=force_update,
-                    document_item=document.get("item"),
+                    document_item=document_item,
                 )
                 if stop:
                     count += 1
@@ -213,30 +199,28 @@ def task_load_record_from_xml_url(
     """
     Carrega um registro individual em PidProviderXML a partir de uma URL de XML.
 
-    Esta tarefa coleta XML do site SciELO e cria/atualiza registros apenas em
-    PidProviderXML. NÃO cria registros de Article.
+    Esta tarefa baixa o XML do site SciELO e cria/atualiza registros apenas em
+    PidProviderXML via PidProvider.provide_pid_for_xml_uri. Não cria registros
+    de Article.
 
     Args:
-        self: Instância da tarefa Celery
-        username (str, optional): Nome do usuário executando a tarefa
-        user_id (int, optional): ID do usuário executando a tarefa
-        collection_acron (str): Acrônimo da coleção
-        pid_v3 (str): Identificador PID v3 do documento
-        xml_url (str): URL do XML do documento
+        self: Instância da tarefa Celery.
+        username (str, optional): Nome do usuário executando a tarefa.
+        user_id (int, optional): ID do usuário executando a tarefa.
+        collection_acron (str): Acrônimo da coleção (ex: "scl").
+        pid_v3 (str): Identificador PID v3 do documento.
+        xml_url (str): URL do XML do documento.
             Ex: "https://www.scielo.br/j/{journal}/a/{pid_v3}/?format=xml"
-        origin_date (str, optional): Data de última atualização na fonte
-        force_update (bool, optional): Força reprocessamento mesmo se já existe
-
-    Returns:
-        None
+        origin_date (str, optional): Data de última atualização na fonte (formato ISO).
+        force_update (bool, optional): Força reprocessamento mesmo se o registro
+            já existe.
+        document_item (dict, optional): Dados complementares do documento
+            provenientes do OPAC (ex: metadados retornados pelo harvester).
+            Armazenado no campo ``detail`` do XMLURL.
 
     Side Effects:
-        - Cria/atualiza registro em PidProviderXML
-        - Registra UnexpectedEvent em caso de erro
-
-    Notes:
-        - NÃO cria Article (diferença do código de referência)
-        - XML é baixado e processado via PidProvider.provide_pid_for_xml_uri
+        - Cria ou atualiza um registro em PidProviderXML.
+        - Registra UnexpectedEvent em caso de erro.
     """
     try:
         pid_provider = None
@@ -294,40 +278,36 @@ def task_retry_xml_urls_by_status(
     force_update=None,
     stop=None,
     is_public=None,
+    journal_acron=None,
 ):
     """
-    Reprocessa registros XMLURL filtrando por uma lista de status.
-
-    Percorre os registros XMLURL cujo status esteja na lista fornecida e
-    dispara task_load_record_from_xml_url para cada um.
+    Reprocessa registros XMLURL filtrando por status e enfileira
+    task_load_record_from_xml_url para cada um.
 
     Args:
-        self: Instância da tarefa Celery
-        username (str, optional): Nome do usuário executando a tarefa
-        user_id (int, optional): ID do usuário executando a tarefa
-        collection_acron (str, optional): Acrônimo da coleção passado a cada
-            subtarefa (ex: "scl"). Não é armazenado em XMLURL, deve ser
+        self: Instância da tarefa Celery.
+        username (str, optional): Nome do usuário executando a tarefa.
+        user_id (int, optional): ID do usuário executando a tarefa.
+        collection_acron (str, optional): Acrônimo da coleção repassado a cada
+            subtarefa (ex: "scl"). Não é armazenado em XMLURL; deve ser
             fornecido explicitamente quando necessário.
-        status_list (list, optional): Lista de status a filtrar.
-            Se None ou vazia, processa todos os registros com status não nulo.
-            Ex: ["failed", "error", "pending"]
-        force_update (bool, optional): Força reprocessamento mesmo se já existe
-        stop (int, optional): Quantidade máxima de itens a reprocessar.
-            Se None, processa todos os itens que correspondem ao filtro.
-
-    Returns:
-        None
+        status_list (list[str], optional): Lista de status a filtrar
+            (ex: ["failed", "error", "pending"]).
+            Se None ou vazia, processa todos os registros independentemente
+            do status.
+        force_update (bool, optional): Força reprocessamento mesmo se o registro
+            já existe.
+        stop (int, optional): Quantidade máxima de subtarefas disparadas.
+            Se None, processa todos os registros que correspondem ao filtro.
+        is_public (bool, optional): Filtra registros pelo campo is_public.
+            True → apenas documentos públicos; False → apenas não públicos;
+            None → sem filtro.
+        journal_acron (str, optional): Acrônimo do periódico para filtrar
+            registros cujo URL contenha "/{journal_acron}/" (ex: "rsp").
 
     Side Effects:
-        - Dispara task_load_record_from_xml_url para cada XMLURL encontrado
-        - Registra UnexpectedEvent em caso de erro
-
-    Examples:
-        # Reprocessar todos os registros com status "failed" ou "error"
-        task_retry_xml_urls_by_status.delay(
-            status_list=["failed", "error"],
-            force_update=True,
-        )
+        - Dispara task_load_record_from_xml_url para cada XMLURL encontrado.
+        - Registra UnexpectedEvent em caso de erro.
     """
     exceptions = []
     count = 0
@@ -337,17 +317,18 @@ def task_retry_xml_urls_by_status(
         if status_list:
             params["status__in"] = status_list
         if is_public is not None:
-            params["is_public"] = is_public
+            params["is_public__in"] = (is_public, None)
+        if journal_acron is not None:
+            params["url__contains"] = f"/{journal_acron}/"
+
         qs = XMLURL.objects.filter(**params)
 
         for xmlurl in qs.iterator():
             try:
                 document_item = None
                 if xmlurl.detail:
-                    document_item = xmlurl.detail.get("document_item")
+                    document_item = xmlurl.detail.get("item")
 
-                if document_item and document_item.get("status") == "false":
-                    continue
                 task_load_record_from_xml_url.delay(
                     username=username,
                     user_id=user_id,
