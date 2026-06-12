@@ -1626,7 +1626,8 @@ class XMLURL(CommonControlField):
         _("URL"), max_length=500, null=False, blank=False
     )
     status = models.CharField(
-        _("Status"), max_length=50, null=True, blank=True
+        _("Status"), max_length=50, null=True, blank=True,
+        choices=choices.XMLURL_STATUS,
     )
     pid = models.CharField(
         _("Article PID"), max_length=23, null=True, blank=True
