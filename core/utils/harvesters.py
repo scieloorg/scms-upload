@@ -22,6 +22,7 @@ class OPACHarvester:
         until_date: Optional[str] = None,
         limit: int = 100,
         timeout: int = 5,
+        journal_acron: Optional[str] = None,
     ):
         """
         Inicializa o harvester do OPAC.
@@ -33,6 +34,7 @@ class OPACHarvester:
             until_date: Data final no formato YYYY-MM-DD
             limit: Número de documentos por página
             timeout: Timeout em segundos para requisições
+            journal_acron: Acrônimo do periódico para filtrar (ex: 'rsp')
         """
         if not domain.startswith("http"):
             domain = f"http://{domain}"
@@ -48,6 +50,8 @@ class OPACHarvester:
             f"end_date={self.until_date}&begin_date={self.from_date}"
             f"&limit={self.limit}"
         )
+        if journal_acron:
+            self.base_url += f"&journal={journal_acron}"
 
     def harvest_documents(self) -> Generator[Dict[str, Any], None, None]:
         """
@@ -104,6 +108,9 @@ class OPACHarvester:
             "origin_date": origin_date,
             "collection_acron": self.collection_acron,
             "item": item,
+            # o nome do é status (o ideal é que fosse is_public) mas o OPAC retorna "false" ou "true" na chave status
+            # e o valor deve ser True se explicitamente é o contrário de "false"
+            "is_public": item.get("status") != "false",
         }
 
     def format_normalized(self, pid_v3, item):
