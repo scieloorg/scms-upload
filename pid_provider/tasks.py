@@ -317,6 +317,7 @@ def task_retry_xml_urls_by_status(
         if status_list:
             params["status__in"] = status_list
         if is_public is not None:
+            # is_public pode ser None em registros antigos; por isso, ao filtrar, None é incluído na consulta para evitar exclusão inadvertida desses registros.
             params["is_public__in"] = (is_public, None)
         if journal_acron is not None:
             params["url__contains"] = f"/{journal_acron}/"

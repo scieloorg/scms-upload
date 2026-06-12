@@ -408,6 +408,7 @@ def _schedule_retry_xml_urls_by_status(username, enabled=False):
             status_list=None,
             force_update=None,
             stop=None,
+            is_public=None,
         ),
         description=_("Reprocessa registros XMLURL por status"),
         priority=RETRY_XML_URLS_BY_STATUS_PRIORITY,
