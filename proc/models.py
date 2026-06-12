@@ -217,13 +217,20 @@ class Operation(CommonControlField):
         try:
             json.dumps(detail)
         except Exception as exc_detail:
-            detail = sanitize_for_json(detail)
+            detail = str(detail)
 
         self.detail = detail
         self.completed = completed
         self.updated_by = user
-        self.save()
-
+        try:
+            self.save()
+        except Exception:
+            try:
+                self.detail = sanitize_for_json(detail)
+                self.save()
+            except Exception:
+                self.detail = "Failed to decode detail"
+                self.save()
 
 def proc_report_directory_path(instance, filename):
     try:
