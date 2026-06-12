@@ -108,6 +108,9 @@ class OPACHarvester:
             "origin_date": origin_date,
             "collection_acron": self.collection_acron,
             "item": item,
+            # o nome do é status (o ideal é que fosse is_public) mas o OPAC retorna "false" ou "true" na chave status
+            # e o valor deve ser True se explicitamente é o contrário de "false"
+            "is_public": item.get("status") != "false",
         }
 
     def format_normalized(self, pid_v3, item):
