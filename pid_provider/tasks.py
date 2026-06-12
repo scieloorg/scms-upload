@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 
 from config import celery_app
 from core.utils.harvesters import OPACHarvester
+from pid_provider.models import XMLURL
 from pid_provider.provider import PidProvider
 from pid_provider.requester import PidRequester
 from proc.models import ArticleProc
@@ -81,6 +82,7 @@ def task_load_records_from_counter_dict(
     force_update=None,
     opac_domain=None,
     stop=None,
+    journal_acron=None,
 ):
     """
     Coleta documentos de uma coleção específica via endpoint counter_dict do OPAC.
@@ -103,6 +105,8 @@ def task_load_records_from_counter_dict(
         opac_domain (str, optional): Domínio do OPAC (default: "www.scielo.br")
         stop (int, optional): Quantidade máxima de itens a coletar.
             Se None, coleta todos os itens disponíveis.
+        journal_acron (str, optional): Acrônimo do periódico para filtrar.
+            Ex: "rsp"
 
     Returns:
         None
@@ -138,6 +142,7 @@ def task_load_records_from_counter_dict(
             until_date=until_date,
             limit=limit or 100,
             timeout=timeout or 5,
+            journal_acron=journal_acron,
         )
 
         # Itera sobre documentos e dispara tarefas individuais
@@ -145,6 +150,8 @@ def task_load_records_from_counter_dict(
             try:
                 url = document.get("url")
                 origin_date = document.get("origin_date")
+                if document.get("status") == "false":
+                    continue
                 task_load_record_from_xml_url.delay(
                     username=username,
                     user_id=user_id,
@@ -267,4 +274,97 @@ def task_load_record_from_xml_url(
             },
         )
 
+
+@celery_app.task(bind=True)
+def task_retry_xml_urls_by_status(
+    self,
+    username=None,
+    user_id=None,
+    collection_acron=None,
+    status_list=None,
+    force_update=None,
+    stop=None,
+):
+    """
+    Reprocessa registros XMLURL filtrando por uma lista de status.
+
+    Percorre os registros XMLURL cujo status esteja na lista fornecida e
+    dispara task_load_record_from_xml_url para cada um.
+
+    Args:
+        self: Instância da tarefa Celery
+        username (str, optional): Nome do usuário executando a tarefa
+        user_id (int, optional): ID do usuário executando a tarefa
+        collection_acron (str, optional): Acrônimo da coleção passado a cada
+            subtarefa (ex: "scl"). Não é armazenado em XMLURL, deve ser
+            fornecido explicitamente quando necessário.
+        status_list (list, optional): Lista de status a filtrar.
+            Se None ou vazia, processa todos os registros com status não nulo.
+            Ex: ["failed", "error", "pending"]
+        force_update (bool, optional): Força reprocessamento mesmo se já existe
+        stop (int, optional): Quantidade máxima de itens a reprocessar.
+            Se None, processa todos os itens que correspondem ao filtro.
+
+    Returns:
+        None
+
+    Side Effects:
+        - Dispara task_load_record_from_xml_url para cada XMLURL encontrado
+        - Registra UnexpectedEvent em caso de erro
+
+    Examples:
+        # Reprocessar todos os registros com status "failed" ou "error"
+        task_retry_xml_urls_by_status.delay(
+            status_list=["failed", "error"],
+            force_update=True,
+        )
+    """
+    exceptions = []
+    count = 0
+
+    try:
+        params = {}
+        if status_list:
+            params["status__in"] = status_list
+        qs = XMLURL.objects.filter(**params)
+
+        for xmlurl in qs.iterator():
+            try:
+                document_item = None
+                if xmlurl.detail:
+                    document_item = xmlurl.detail.get("document_item")
+
+                if document_item and document_item.get("status") == "false":
+                    continue
+                task_load_record_from_xml_url.delay(
+                    username=username,
+                    user_id=user_id,
+                    collection_acron=collection_acron,
+                    pid_v3=xmlurl.pid,
+                    xml_url=xmlurl.url,
+                    force_update=force_update,
+                    document_item=document_item,
+                )
+                if stop:
+                    count += 1
+                    if count >= stop:
+                        break
+            except Exception as e:
+                exceptions.append({"error": str(e), "type": str(type(e))})
+
+        if exceptions:
+            raise ValueError("There are exceptions")
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            exception=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "task": "task_retry_xml_urls_by_status",
+                "collection_acron": collection_acron,
+                "status_list": status_list,
+                "force_update": force_update,
+                "exceptions": exceptions,
+            },
+        )
 
