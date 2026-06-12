@@ -1609,16 +1609,17 @@ def xml_url_zipfile_path(instance, filename):
 class XMLURL(CommonControlField):
     """
     Model to store URLs that experienced failures and should be retried in the future.
-    
+
     This model tracks URLs that failed during processing, along with their status
     and associated article PID, enabling retry mechanisms to reprocess them later.
-    
+
     Fields:
         url: URLField - The URL that needs to be retried
         status: CharField - To control the request status (e.g., "pending", "failed", "retrying")
         pid: CharField - Article PID associated with this URL
         zipfile: FileField - Compressed XML content retrieved from the URL
         detail: JSONField
+        is_public: BooleanField - Whether the document is public (derived from item status)
     """
 
     url = models.URLField(
@@ -1637,6 +1638,9 @@ class XMLURL(CommonControlField):
     detail = models.JSONField(
         _("Detail"), null=True, blank=True
     )
+    is_public = models.BooleanField(
+        _("Is Public"), null=True, blank=True, default=None
+    )
 
     base_form_class = CoreAdminModelForm
 
@@ -1647,6 +1651,7 @@ class XMLURL(CommonControlField):
         FieldPanel("zipfile"),
         FieldPanel("detail"),
         FieldPanel("exceptions"),
+        FieldPanel("is_public"),
     ]
 
     class Meta:
@@ -1658,6 +1663,7 @@ class XMLURL(CommonControlField):
             models.Index(fields=["url"]),
             models.Index(fields=["status"]),
             models.Index(fields=["pid"]),
+            models.Index(fields=["is_public"], name="pid_provide_is_public_idx"),
         ]
 
     def __str__(self):
@@ -1677,6 +1683,7 @@ class XMLURL(CommonControlField):
         status=None,
         pid=None,
         detail=None,
+        is_public=None,
     ):
         try:
             obj = cls()
@@ -1684,6 +1691,7 @@ class XMLURL(CommonControlField):
             obj.status = status
             obj.pid = pid
             obj.detail = detail
+            obj.is_public = is_public
             obj.creator = user
             obj.save()
             return obj
@@ -1698,6 +1706,7 @@ class XMLURL(CommonControlField):
         status=None,
         pid=None,
         detail=None,
+        is_public=None,
     ):
         try:
             obj = cls.get(url=url)
@@ -1708,6 +1717,8 @@ class XMLURL(CommonControlField):
                 obj.pid = pid
             if detail is not None:
                 obj.detail = detail
+            if is_public is not None:
+                obj.is_public = is_public
             obj.save()
             return obj
         except cls.DoesNotExist:
@@ -1717,6 +1728,7 @@ class XMLURL(CommonControlField):
                 status,
                 pid,
                 detail,
+                is_public=is_public,
             )
 
     def save_file(self, xml_content, filename=None):
@@ -1760,7 +1772,14 @@ class XMLURL(CommonControlField):
             detail["response"] = response
 
         pid = response.get("v3") if response else None
-        xmlurl_obj = cls.create_or_update(user=user, url=url, status=status, pid=pid, detail=detail)
+
+        is_public = None
+        if document_item:
+            doc_status = document_item.get("status")
+            if doc_status is not None:
+                is_public = doc_status != "false"
+
+        xmlurl_obj = cls.create_or_update(user=user, url=url, status=status, pid=pid, detail=detail, is_public=is_public)
 
         if xml_with_pre is not None:
             filename = name or pid or "content.xml"
