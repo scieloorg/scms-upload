@@ -940,4 +940,4 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
         # 4. Salvamos tudo em uma única consulta ao banco
         if items_to_update:
-            cls.objects.bulk_update(items_to_update, ["pid_v2", "updated_by"])
+            cls.objects.bulk_update(items_to_update, ["pid_v2", "updated_by"], batch_size=100)
