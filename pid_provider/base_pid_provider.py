@@ -190,10 +190,16 @@ class BasePidProvider:
                 auto_solve_pid_conflict=auto_solve_pid_conflict,
             )
 
+            resp = dict(response)  # make a copy to avoid mutating original
+            try:
+                resp.pop("xml_with_pre", None)  # Remove xml_with_pre from response for logging
+            except AttributeError:
+                pass  # If xml_with_pre is not present or cannot be removed, ignore and log rest of response
+
             if response.get("error_type") or response.get("error_msg") or response.get("error_message"):
-                XMLURL.record(user, xml_uri, "pid_provider_xml_failed", document_item, response=response, xml_with_pre=xml_with_pre, name=name)
+                XMLURL.record(user, xml_uri, "pid_provider_xml_failed", document_item, response=resp, xml_with_pre=xml_with_pre, name=name)
             else:
-                XMLURL.record(user, xml_uri, "success", document_item, response=response, xml_with_pre=xml_with_pre, name=name)
+                XMLURL.record(user, xml_uri, "success", document_item, response=resp, xml_with_pre=xml_with_pre, name=name)
             return response
         except Exception as e:
             return self._handle_unexpected_error(e, xml_uri, name, user, origin_date, force_update, is_published, document_item)
