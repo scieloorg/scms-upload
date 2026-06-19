@@ -3,8 +3,10 @@ import hashlib
 import json
 import logging
 import os
+import posixpath
 from mimetypes import types_map
 from tempfile import NamedTemporaryFile, TemporaryDirectory
+from urllib.parse import urljoin
 
 from minio import Minio
 from minio.error import S3Error
@@ -69,9 +71,12 @@ class MinioStorage:
         minio_access_key,
         minio_secret_key,
         bucket_root,
-        location,
+        location=None,
         minio_secure=True,
         minio_http_client=None,
+        write_prefix="",
+        public_base_url="",
+        bucket_subdir=None,
     ):
         self.bucket_root = bucket_root
         self.POLICY_READ_ONLY = {
@@ -97,7 +102,22 @@ class MinioStorage:
         self.minio_secure = minio_secure
         self.http_client = minio_http_client
         self._client_instance = None
-        self.location = location
+        self.location = location or bucket_subdir
+        self.write_prefix = self._normalize_path(write_prefix)
+        self.public_base_url = (public_base_url or "").strip()
+
+    def _normalize_path(self, path):
+        return (path or "").strip("/")
+
+    def _object_name_for_storage(self, object_name):
+        object_name = self._normalize_path(object_name)
+        if not self.write_prefix:
+            return object_name
+        return posixpath.join(self.write_prefix, object_name)
+
+    def _public_uri(self, object_name):
+        object_name = self._normalize_path(object_name)
+        return urljoin(f"{self.public_base_url.rstrip('/')}/", object_name)
 
     @property
     def _client(self):
@@ -173,7 +193,12 @@ class MinioStorage:
         MinioStorageGetUriError
         """
         try:
-            url = self._client.presigned_get_object(self.bucket_root, object_name)
+            if self.public_base_url:
+                return self._public_uri(object_name)
+
+            url = self._client.presigned_get_object(
+                self.bucket_root, self._object_name_for_storage(object_name)
+            )
             return url.split("?")[0]
         except Exception as e:
             raise MinioStorageGetUriError(
@@ -257,10 +282,11 @@ class MinioStorage:
         ------
         MinioStorageNoSuchBucketError
         """
+        storage_object_name = self._object_name_for_storage(object_name)
         try:
             self._client.fput_object(
                 self.bucket_root,
-                object_name=object_name,
+                object_name=storage_object_name,
                 file_path=file_path,
                 content_type=mimetype,
             )

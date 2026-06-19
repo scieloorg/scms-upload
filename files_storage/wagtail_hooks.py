@@ -18,10 +18,13 @@ class MinioConfigurationViewSet(CommonControlFieldViewSet):
         "name",
         "host",
         "bucket_root",
+        "write_prefix",
+        "public_base_url",
     )
     search_fields = (
         "name",
         "host",
         "bucket_root",
+        "write_prefix",
+        "public_base_url",
     )
-

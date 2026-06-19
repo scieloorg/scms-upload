@@ -1,6 +1,6 @@
 # Create your tests here.
 import json
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, patch
 
 from django.test import TestCase
 from minio.error import S3Error
@@ -90,6 +90,21 @@ class MinioStorageTest(TestCase):
             "app_name",
         )
 
+    def test_get_uri_with_public_base_url(self):
+        minio_storage = MinioStorage(
+            minio_host="s3.wasabisys.com",
+            minio_access_key="minio_access_key",
+            minio_secret_key="minio_secret_key",
+            bucket_root="scielo",
+            location="sa-east-1",
+            write_prefix="upload",
+            public_base_url="https://minio.scielo.br/upload",
+        )
+
+        uri = minio_storage.get_uri("journal/article.xml")
+
+        self.assertEqual("https://minio.scielo.br/upload/journal/article.xml", uri)
+
     @patch("files_storage.minio.MinioStorage.fput")
     def test_register(self, mock_fput):
         metadata = self.minio_storage.register(
@@ -113,6 +128,35 @@ class MinioStorageTest(TestCase):
         mock_client_fput_object.assert_called_with(
             "instance_name",
             object_name="subdir1/subdir2/filename.xml",
+            file_path="/root/folder1/folder2/filename.xml",
+            content_type="mimetype_informado",
+        )
+        mock_get_uri.assert_called_with(
+            "subdir1/subdir2/filename.xml",
+        )
+
+    @patch("files_storage.minio.MinioStorage.get_uri")
+    @patch("files_storage.minio.Minio.fput_object")
+    def test__fput_object_uses_write_prefix(self, mock_client_fput_object, mock_get_uri):
+        minio_storage = MinioStorage(
+            minio_host="s3.wasabisys.com",
+            minio_access_key="minio_access_key",
+            minio_secret_key="minio_secret_key",
+            bucket_root="scielo",
+            location="sa-east-1",
+            write_prefix="upload",
+            public_base_url="https://minio.scielo.br/upload",
+        )
+
+        minio_storage._fput_object(
+            "/root/folder1/folder2/filename.xml",
+            "subdir1/subdir2/filename.xml",
+            mimetype="mimetype_informado",
+        )
+
+        mock_client_fput_object.assert_called_with(
+            "scielo",
+            object_name="upload/subdir1/subdir2/filename.xml",
             file_path="/root/folder1/folder2/filename.xml",
             content_type="mimetype_informado",
         )
@@ -212,25 +256,23 @@ class MinioStorageTest(TestCase):
     def test_fput_content(self, mock_fput_object):
         mock_fput_object.return_value = "uri"
         uri = self.minio_storage.fput_content(
-            content="<article/>",
+            content=b"<article/>",
             mimetype="text/xml",
             object_name="object_name",
         )
         self.assertEqual("uri", uri)
 
-    @patch("files_storage.minio.MinioStorage._create_tmp_file")
     @patch("files_storage.minio.MinioStorage._fput_object")
     def test_fput_content_calls_fput_object(
-        self, mock_fput_object, mock_create_tmp_file
+        self, mock_fput_object
     ):
-        mock_create_tmp_file.return_value = "/tmp/file.xml"
         uri = self.minio_storage.fput_content(
-            content="<article/>",
+            content=b"<article/>",
             mimetype="text/xml",
             object_name="object_name",
         )
         mock_fput_object.assert_called_with(
-            file_path="/tmp/file.xml",
+            file_path=ANY,
             object_name="object_name",
             mimetype="text/xml",
         )
