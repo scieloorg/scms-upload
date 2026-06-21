@@ -22,10 +22,11 @@ from wagtail.admin.panels import (
 )
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
+from scielo_classic_website.htmlbody.html_body import HTMLContent
 
-from article.models import Article
 from collection import choices as collection_choices
 from collection.models import Collection
+from core.widgets import ReadOnlyPrettyJSONWidget
 from core.models import CommonControlField
 from core.utils.file_utils import delete_files
 from core.utils.sanitize import sanitize_for_json
@@ -52,7 +53,6 @@ from package.models import SPSPkg
 from proc import exceptions
 from proc.forms import IssueProcAdminModelForm, ProcAdminModelForm
 from publication.api.publication import get_api_data
-from scielo_classic_website.htmlbody.html_body import HTMLContent
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 
@@ -94,7 +94,7 @@ class Operation(CommonControlField):
         FieldPanel("created", read_only=True),
         FieldPanel("updated", read_only=True),
         FieldPanel("completed", read_only=True),
-        FieldPanel("detail", read_only=True),
+        FieldPanel("detail", widget=ReadOnlyPrettyJSONWidget()),
     ]
 
     class Meta:
@@ -217,13 +217,20 @@ class Operation(CommonControlField):
         try:
             json.dumps(detail)
         except Exception as exc_detail:
-            detail = sanitize_for_json(detail)
+            detail = str(detail)
 
         self.detail = detail
         self.completed = completed
         self.updated_by = user
-        self.save()
-
+        try:
+            self.save()
+        except Exception:
+            try:
+                self.detail = sanitize_for_json(detail)
+                self.save()
+            except Exception:
+                self.detail = "Failed to decode detail"
+                self.save()
 
 def proc_report_directory_path(instance, filename):
     try:
@@ -1163,6 +1170,7 @@ class JournalProc(BaseProc, ClusterableModel):
         cls,
         collection_acron_list=None,
         journal_acron_list=None,
+        has_issue_proc=None,
     ):  
         collection_acron_list = collection_acron_list or []
         journal_acron_list = journal_acron_list or []
@@ -1172,6 +1180,8 @@ class JournalProc(BaseProc, ClusterableModel):
             params["collection__acron__in"] = collection_acron_list
         if journal_acron_list:
             params["acron__in"] = journal_acron_list
+        if has_issue_proc:
+            params["issueproc__isnull"] = False
         return cls.objects.filter(
             **params,
         )
@@ -1190,6 +1200,19 @@ class JournalProc(BaseProc, ClusterableModel):
     @property
     def issn_electronic(self):
         return self.journal and self.journal.issn_electronic
+
+    @classmethod
+    def get_total_status(cls, journal_proc_id):
+        return list(
+            cls.objects.filter(id=journal_proc_id).values(
+                "migration_status",
+                "qa_ws_status",
+                "public_ws_status"
+            ).annotate(
+                total=Count("id"),
+            ).order_by("-total")
+        )
+
 
 ################################################
 class IssueGetOrCreateError(Exception): ...
@@ -1422,7 +1445,6 @@ class IssueProc(BaseProc, ClusterableModel):
         journal_acron=None,
         issue_proc_id=None,
     ):  
-        status_list = tracker_choices.get_valid_status(status_list, force_update)
         collection_acron_list = collection_acron_list or []
         if collection_acron:
             collection_acron_list.append(collection_acron)
@@ -1838,6 +1860,26 @@ class IssueProc(BaseProc, ClusterableModel):
             return ""
         return "-".join([self.journal_proc.pid, self.issue.bundle_id_suffix])
 
+    @classmethod
+    def get_total_status(cls, journal_proc_id, item_type):
+        if item_type == "article":
+            return list(
+                cls.objects.filter(journal_proc_id=journal_proc_id).values(
+                    "docs_status",
+                    "files_status",
+                ).annotate(
+                    total=Count("id"),
+                ).order_by("-total")
+            )
+        return list(
+            cls.objects.filter(journal_proc_id=journal_proc_id).values(
+                "migration_status",
+                "qa_ws_status",
+                "public_ws_status"
+            ).annotate(
+                total=Count("id"),
+            ).order_by("-total")
+        )
 
 
 class ArticleEventCreateError(Exception): ...
@@ -2624,3 +2666,17 @@ class ArticleProc(BaseProc, ClusterableModel):
             self.pid_status = pid_status
             self.updated_by = user
             self.save()
+
+    @classmethod
+    def get_total_status(cls, journal_proc_id):
+        return list(
+            cls.objects.filter(issue_proc__journal_proc_id=journal_proc_id).values(
+                "xml_status",
+                "sps_pkg_status",
+                "migration_status",
+                "qa_ws_status",
+                "public_ws_status"
+            ).annotate(
+                total=Count("id"),
+            ).order_by("-total")
+        )

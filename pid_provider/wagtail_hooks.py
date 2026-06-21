@@ -6,6 +6,7 @@ from wagtail.snippets.views.snippets import SnippetViewSetGroup
 
 from config.menu import get_menu_order
 from core.views import CommonControlFieldViewSet
+from pid_provider import choices
 from pid_provider.models import XMLURL, XMLVersion, FixPidV2, OtherPid, PidProviderConfig, PidProviderXML
 
 
@@ -192,6 +193,10 @@ class XMLURLViewSet(CommonControlFieldViewSet):
         "status",
         "pid",
     ]
+    list_filter = {
+        "status": ["exact"],
+        "is_public": ["exact"],
+    }
     search_fields = (
         "url",
         "status",

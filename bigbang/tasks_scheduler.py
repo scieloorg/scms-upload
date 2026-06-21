@@ -69,6 +69,12 @@ GENERATE_SPS_PACKAGES_PRIORITY = 8
 
 SINCHRONIZE_TO_PID_PROVIDER_PRIORITY = 5
 
+RETRY_XML_URLS_BY_STATUS_MINUTES = MINUTES[10]
+RETRY_XML_URLS_BY_STATUS_PRIORITY = 5
+
+LOAD_RECORDS_FROM_COUNTER_DICT_MINUTES = MINUTES[10]
+LOAD_RECORDS_FROM_COUNTER_DICT_PRIORITY = 5
+
 MIGRATION_PRIORITY = ISSUE_DB_MIGRATION_PRIORITY + 1
 
 
@@ -113,6 +119,8 @@ def schedule_subtasks(username):
     enabled = False
     _schedule_fetch_and_create_journal(username, enabled)  # Nova tarefa adicionada
     _schedule_try_fetch_and_register_press_release(username, enabled)
+    _schedule_retry_xml_urls_by_status(username, enabled)
+    _schedule_load_records_from_counter_dict(username, enabled)
 
 
 def _schedule_check_article_availability(username, enabled=False):
@@ -391,6 +399,58 @@ def _schedule_fetch_and_create_journal(username, enabled=False):
         day_of_week="*",
         hour="*",
         minute=FETCH_AND_CREATE_JOURNAL_MINUTES,
+    )
+
+
+def _schedule_retry_xml_urls_by_status(username, enabled=False):
+    schedule_task(
+        task="pid_provider.tasks.task_retry_xml_urls_by_status",
+        name="task_retry_xml_urls_by_status",
+        kwargs=dict(
+            username=username,
+            collection_acron=None,
+            status_list=None,
+            force_update=None,
+            stop=None,
+            is_public=None,
+        ),
+        description=_("Reprocessa registros XMLURL por status"),
+        priority=RETRY_XML_URLS_BY_STATUS_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=RETRY_XML_URLS_BY_STATUS_MINUTES,
+    )
+
+
+def _schedule_load_records_from_counter_dict(username, enabled=False):
+    """
+    Agenda a tarefa de coletar documentos via endpoint counter_dict do OPAC.
+    Deixa a tarefa desabilitada por padrão
+    """
+    schedule_task(
+        task="pid_provider.tasks.task_load_records_from_counter_dict",
+        name="task_load_records_from_counter_dict",
+        kwargs=dict(
+            username=username,
+            collection_acron=None,
+            from_date=None,
+            until_date=None,
+            limit=None,
+            timeout=None,
+            force_update=None,
+            opac_domain=None,
+            stop=None,
+            journal_acron=None,
+        ),
+        description=_("Coleta documentos do OPAC via counter_dict"),
+        priority=LOAD_RECORDS_FROM_COUNTER_DICT_PRIORITY,
+        enabled=enabled,
+        run_once=False,
+        day_of_week="*",
+        hour="*",
+        minute=LOAD_RECORDS_FROM_COUNTER_DICT_MINUTES,
     )
 
 
