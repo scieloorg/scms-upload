@@ -1,28 +1,26 @@
 import io
-import json
 import logging
 import os
 import sys
 import traceback
 import zipfile
 from datetime import datetime
-from functools import lru_cache, cached_property
+from functools import cached_property
 from zlib import crc32
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
-from django.db.models import Q, Count, Min
+from django.db.models import Q, Count
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.pid_provider import v3_gen, xml_sps_adapter
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
-from wagtail.fields import RichTextField
-from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from collection.models import Collection
+from core.widgets import ReadOnlyPrettyJSONWidget
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutura
@@ -1609,23 +1607,25 @@ def xml_url_zipfile_path(instance, filename):
 class XMLURL(CommonControlField):
     """
     Model to store URLs that experienced failures and should be retried in the future.
-    
+
     This model tracks URLs that failed during processing, along with their status
     and associated article PID, enabling retry mechanisms to reprocess them later.
-    
+
     Fields:
         url: URLField - The URL that needs to be retried
         status: CharField - To control the request status (e.g., "pending", "failed", "retrying")
         pid: CharField - Article PID associated with this URL
         zipfile: FileField - Compressed XML content retrieved from the URL
-        exceptions: CharField - Exception traceback information (truncated to 255 chars if needed)
+        detail: JSONField
+        is_public: BooleanField - Whether the document is public (derived from item status)
     """
 
     url = models.URLField(
         _("URL"), max_length=500, null=False, blank=False
     )
     status = models.CharField(
-        _("Status"), max_length=50, null=True, blank=True
+        _("Status"), max_length=50, null=True, blank=True,
+        choices=choices.XMLURL_STATUS,
     )
     pid = models.CharField(
         _("Article PID"), max_length=23, null=True, blank=True
@@ -1633,8 +1633,12 @@ class XMLURL(CommonControlField):
     zipfile = models.FileField(
         _("ZIP File"), upload_to=xml_url_zipfile_path, null=True, blank=True, max_length=300,
     )
-    exceptions = models.CharField(
-        _("Exceptions"), max_length=255, null=True, blank=True
+    exceptions = models.CharField(_("Exceptions"), max_length=255, null=True, blank=True)
+    detail = models.JSONField(
+        _("Detail"), null=True, blank=True
+    )
+    is_public = models.BooleanField(
+        _("Is Public"), null=True, blank=True, default=None
     )
 
     base_form_class = CoreAdminModelForm
@@ -1644,7 +1648,9 @@ class XMLURL(CommonControlField):
         FieldPanel("status"),
         FieldPanel("pid"),
         FieldPanel("zipfile"),
+        FieldPanel("detail", widget=ReadOnlyPrettyJSONWidget()),
         FieldPanel("exceptions"),
+        FieldPanel("is_public"),
     ]
 
     class Meta:
@@ -1656,6 +1662,7 @@ class XMLURL(CommonControlField):
             models.Index(fields=["url"]),
             models.Index(fields=["status"]),
             models.Index(fields=["pid"]),
+            models.Index(fields=["is_public"], name="pid_provide_is_public_idx"),
         ]
 
     def __str__(self):
@@ -1674,14 +1681,16 @@ class XMLURL(CommonControlField):
         url=None,
         status=None,
         pid=None,
-        exceptions=None,
+        detail=None,
+        is_public=None,
     ):
         try:
             obj = cls()
             obj.url = url
             obj.status = status
             obj.pid = pid
-            obj.exceptions = exceptions
+            obj.detail = detail
+            obj.is_public = is_public
             obj.creator = user
             obj.save()
             return obj
@@ -1695,7 +1704,8 @@ class XMLURL(CommonControlField):
         url=None,
         status=None,
         pid=None,
-        exceptions=None,
+        detail=None,
+        is_public=None,
     ):
         try:
             obj = cls.get(url=url)
@@ -1704,8 +1714,10 @@ class XMLURL(CommonControlField):
                 obj.status = status
             if pid is not None:
                 obj.pid = pid
-            if exceptions is not None:
-                obj.exceptions = exceptions
+            if detail is not None:
+                obj.detail = detail
+            if is_public is not None:
+                obj.is_public = is_public
             obj.save()
             return obj
         except cls.DoesNotExist:
@@ -1714,17 +1726,18 @@ class XMLURL(CommonControlField):
                 url,
                 status,
                 pid,
-                exceptions,
+                detail,
+                is_public=is_public,
             )
 
     def save_file(self, xml_content, filename=None):
         """
         Create a zip file from XML content and save it to the zipfile field.
-        
+
         Args:
             xml_content: str or bytes - The XML content to compress
             filename: str - Optional filename for the XML inside the zip (defaults to 'content.xml')
-            
+
         Returns:
             bool - True if file was saved successfully, False otherwise
         """
@@ -1732,19 +1745,43 @@ class XMLURL(CommonControlField):
             # Convert string to bytes if needed
             if isinstance(xml_content, str):
                 xml_content = xml_content.encode('utf-8')
-            
+
             # Create in-memory zip file
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 # Use provided filename or default
                 xml_filename = filename or 'content.xml'
                 zip_file.writestr(xml_filename, xml_content)
-            
+
             # Save the zip file to the model
             zip_filename = f"{self.pid or 'unknown'}_{self.pk or 'new'}.zip"
             self.zipfile.save(zip_filename, ContentFile(zip_buffer.getvalue()), save=True)
-            
+
             return True
         except Exception as e:
             logging.error(f"Error saving zip file for XMLURL {self.url}: {e}")
             return False
+        
+    @classmethod
+    def record(cls, user, url, status, document_item, *, exception=None, response=None, xml_with_pre=None, name=None):
+        detail = {"document_item": document_item}
+        if exception is not None:
+            detail["exceptions"] = traceback.format_exc()
+        if response is not None:
+            detail["response"] = response
+
+        pid = response.get("v3") if response else None
+
+        is_public = None
+        if document_item:
+            doc_status = document_item.get("status")
+            if doc_status is not None:
+                is_public = doc_status != "false"
+
+        xmlurl_obj = cls.create_or_update(user=user, url=url, status=status, pid=pid, detail=detail, is_public=is_public)
+
+        if xml_with_pre is not None:
+            filename = name or pid or "content.xml"
+            xmlurl_obj.save_file(xml_with_pre.tostring(), filename=filename)
+
+        return xmlurl_obj

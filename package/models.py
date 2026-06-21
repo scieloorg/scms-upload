@@ -11,7 +11,6 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.core.files.base import ContentFile
 from django.db import models
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -21,22 +20,19 @@ from packtools.sps.models.v2.article_assets import ArticleAssets
 from packtools.sps.pid_provider.xml_sps_lib import (
     XMLWithPre,
     get_xml_with_pre,
-    get_xml_with_pre_from_uri,
 )
 from packtools.utils import SPPackage
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
 from wagtail.models import Orderable
-from wagtailautocomplete.edit_handlers import AutocompletePanel
 
-from collection import choices as collection_choices
 from collection.models import Language
+from core.widgets import ReadOnlyPrettyJSONWidget
 from core.models import CommonControlField
 from core.utils.requester import fetch_data
 from core.utils.file_utils import delete_files
 from files_storage.models import FileLocation, MinioConfiguration
 from package import choices
 from pid_provider.requester import PidRequester
-from tracker.models import UnexpectedEvent
 
 
 pid_provider_app = PidRequester()
@@ -335,7 +331,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         FieldPanel("registered_in_core", read_only=True),
         FieldPanel("valid_texts", read_only=True),
         FieldPanel("valid_components", read_only=True),
-        FieldPanel("texts", read_only=True),
+        FieldPanel("texts", widget=ReadOnlyPrettyJSONWidget()),
     ]
 
     edit_handler = TabbedInterface(
@@ -940,4 +936,4 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
         # 4. Salvamos tudo em uma única consulta ao banco
         if items_to_update:
-            cls.objects.bulk_update(items_to_update, ["pid_v2", "updated_by"])
+            cls.objects.bulk_update(items_to_update, ["pid_v2", "updated_by"], batch_size=100)

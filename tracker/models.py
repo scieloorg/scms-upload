@@ -2,19 +2,12 @@ import json
 import logging
 import traceback
 import uuid
-from datetime import datetime
 
-from django.core.files.base import ContentFile
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from modelcluster.fields import ParentalKey
-from modelcluster.models import ClusterableModel
-from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
-from wagtail.models import Orderable
-from wagtailautocomplete.edit_handlers import AutocompletePanel
+from wagtail.admin.panels import FieldPanel
 
-from core.forms import CoreAdminModelForm
-from core.models import CommonControlField
+from core.widgets import ReadOnlyPrettyJSONWidget
 from core.utils.sanitize import sanitize_for_json
 from tracker import choices
 
@@ -26,9 +19,6 @@ class UnexpectedEventCreateError(Exception): ...
 
 
 class EventCreateError(Exception): ...
-
-
-class EventReportCreateError(Exception): ...
 
 
 class EventReportSaveFileError(Exception): ...
@@ -114,6 +104,14 @@ class UnexpectedEvent(models.Model):
         blank=True,
     )
 
+    panels = [
+        FieldPanel("item", read_only=True),
+        FieldPanel("action", read_only=True),
+        FieldPanel("exception_type", read_only=True),
+        FieldPanel("exception_msg", read_only=True),
+        FieldPanel("traceback", widget=ReadOnlyPrettyJSONWidget()),
+        FieldPanel("detail", widget=ReadOnlyPrettyJSONWidget()),
+    ]
     class Meta:
         indexes = [
             models.Index(fields=["exception_type"]),
@@ -207,7 +205,7 @@ class TaskTracker(BaseEvent):
         FieldPanel("total_to_process", read_only=True),
         FieldPanel("total_processed", read_only=True),
         FieldPanel("status", read_only=True),
-        FieldPanel("detail", read_only=True),
+        FieldPanel("detail", widget=ReadOnlyPrettyJSONWidget()),
     ]
 
     @classmethod

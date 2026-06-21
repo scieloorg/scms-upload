@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.db.models import Q
+from django.db.models.functions import Substr, Length
 from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
@@ -719,7 +720,7 @@ def import_journal_acron_id_records(
             "journal_acron": journal_proc.acron,
             "force_update": force_update,
         }
-        
+        source_path = None
         collection = journal_proc.collection
         journal_acron = journal_proc.acron
         collection_acron = collection.acron
@@ -748,10 +749,6 @@ def import_journal_acron_id_records(
                 _("IdFileRecord is already up-to-date with acron.id")
             )
 
-        logging.info(f"Updating IdFileRecord from {source_path}")
-
-        issue_pids = set()
-
         for item in get_bases_work_acron_id_file_records(
             user,
             source_path,
@@ -759,26 +756,28 @@ def import_journal_acron_id_records(
             journal_proc,
         ):
             item["force_update"] = force_update
-            item["todo"] = True
             IdFileRecord.create_or_update(
                 user,
                 journal_id_file,
                 **item,
             )
-            if item["item_type"] == "article":
-                issue_pids.add(item["item_pid"][1:-5])
+
+        issue_pids = IdFileRecord.objects.filter(
+            item_type="article", todo=True, parent=journal_id_file,
+        ).annotate(
+            pid_sliced=Substr("item_pid", 2, Length("item_pid") - 6)
+        ).values_list("pid_sliced", flat=True).distinct()
 
         selected_issue_procs = journal_proc.issueproc_set.filter(
             pid__in=issue_pids,
-        )
-        selected_issue_procs.exclude(
+        ).exclude(
             docs_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
         ).update(
             docs_status=tracker_choices.PROGRESS_STATUS_REPROC,
             updated_by=user,
         )
         article_proc_model.objects.filter(
-            issue_proc__in=selected_issue_procs
+            issue_proc__in=selected_issue_procs or []
         ).exclude(
             xml_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
         ).update(
@@ -796,7 +795,10 @@ def import_journal_acron_id_records(
         detail["output"] = output
         return detail
     except FileNotFoundError as e:
-        raise FileNotFoundError(f"File not found: {source_path}")
+        output["message"] = f"File not found: {source_path}"
+        detail["stats"] = stats
+        detail["output"] = output
+        return detail
     except IdFileRecordIsAlreadyUptodate as e:
         output["message"] = str(e)
         detail["stats"] = stats
@@ -805,6 +807,7 @@ def import_journal_acron_id_records(
     except Exception as e:
         output["traceback"] = traceback.format_exc()
         detail["output"] = output
+        detail["stats"] = stats
         return detail
 
 

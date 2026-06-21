@@ -1,5 +1,4 @@
 import json
-import traceback
 import sys
 import csv
 import logging
@@ -8,7 +7,7 @@ import zlib
 from datetime import date, datetime, timedelta
 from random import randint
 from tempfile import TemporaryDirectory
-from zipfile import ZipFile, ZIP_DEFLATED
+from zipfile import ZipFile
 
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
@@ -19,14 +18,10 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.pid_provider.xml_sps_lib import (
     XMLWithPre,
-    XMLWithPreArticlePublicationDateError,
-    update_zip_file_xml,
-    get_zips,
 )
 from wagtail.admin.panels import (
     FieldPanel,
     InlinePanel,
-    MultiFieldPanel,
     ObjectList,
     TabbedInterface,
 )
@@ -35,15 +30,15 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article import choices as article_choices
 from article.models import Article
-
 from collection.models import Collection
 from collection import choices as collection_choices
+from core.widgets import ReadOnlyPrettyJSONWidget
 from core.models import CommonControlField
 from issue.models import Issue
 from package import choices as package_choices
 from package.models import SPSPkg
 from pid_provider.models import PidProviderXML
-from proc.models import IssueProc, JournalProc, Operation
+from proc.models import IssueProc, Operation
 from proc.source_core_api import create_or_update_issue
 from team.models import CollectionTeamMember
 from upload import choices
@@ -301,7 +296,7 @@ class Package(CommonControlField, ClusterableModel):
     panels = [
         # FieldPanel("file"),
         FieldPanel("status", read_only=True),
-        FieldPanel("numbers", read_only=True),
+        FieldPanel("numbers", widget=ReadOnlyPrettyJSONWidget()),
         FieldPanel("qa_ws_status", read_only=True),
         FieldPanel("public_ws_status", read_only=True),
     ]
@@ -1454,7 +1449,7 @@ class BaseValidationResult(CommonControlField):
         FieldPanel("subject", read_only=True),
         FieldPanel("status", read_only=True),
         FieldPanel("message", read_only=True),
-        FieldPanel("data", read_only=True),
+        FieldPanel("data", widget=ReadOnlyPrettyJSONWidget()),
     ]
 
     cols = ("status", "subject", "message", "data")
@@ -1669,7 +1664,9 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
     panels = [
         FieldPanel("status", read_only=True),
         FieldPanel("advice", read_only=True),
-        FieldPanel("data", read_only=True),
+        FieldPanel("got_value", widget=ReadOnlyPrettyJSONWidget()),
+        FieldPanel("expected_value", widget=ReadOnlyPrettyJSONWidget()),
+        FieldPanel("data", widget=ReadOnlyPrettyJSONWidget()),
         FieldPanel("reaction"),
     ]
 
@@ -2062,7 +2059,7 @@ class UploadValidator(CommonControlField):
         FieldPanel("max_impossible_to_fix_percentage"),
         FieldPanel("decision_for_critical_errors"),
         FieldPanel("publication_rule"),
-        FieldPanel("validation_params"),
+        FieldPanel("validation_params", widget=ReadOnlyPrettyJSONWidget()),
     ]
     base_form_class = UploadValidatorForm
 

@@ -60,8 +60,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from article.models import Article, ArticleCollection, ArticleWebPage, get_pid_status_from_webpage_status
-from article import choices as article_choices
+from article.models import Article, ArticleCollection, ArticleWebPage
 from journal.models import Journal
 from issue.models import Issue
 from collection.choices import PUBLIC, QA
@@ -69,12 +68,12 @@ from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from migration import controller
 from migration import choices as migration_choices
-from package.models import SPSPkg
 from proc.controller import (
     create_or_update_migrated_issue,
     create_or_update_migrated_journal,
     fetch_and_create_journal,
     migrate_issue,
+    get_total_status_data,
 )
 from proc.article_controller import ClassicWebsiteArticlePidTracker
 from proc.models import ArticleProc, IssueProc, JournalProc
@@ -963,6 +962,8 @@ def task_migrate_and_publish_articles(
             collection_acron_list += [collection_acron]
 
         items_to_process = {}
+        status = tracker_choices.get_valid_status(status, force_update)
+
         if publication_year or issue_folder:
             selected_issue_procs = IssueProc.select_items(
                 collection_acron_list=collection_acron_list,
@@ -975,20 +976,21 @@ def task_migrate_and_publish_articles(
                 to_migrate_articles=True,
             )
             issue_proc_ids = selected_issue_procs.values_list(
-                "journal_proc_id", "id"
+                "journal_proc_id", "journal_proc__acron", "id"
             ).distinct()
-            for journal_proc_id, issue_proc_id in issue_proc_ids:
-                items_to_process.setdefault(journal_proc_id, []).append(
+            for journal_proc_id, journal_acron, issue_proc_id in issue_proc_ids:
+                items_to_process.setdefault((journal_proc_id, journal_acron), []).append(
                     issue_proc_id
                 )
         else:
             journal_proc_ids = JournalProc.select_items(
                 collection_acron_list=collection_acron_list,
                 journal_acron_list=journal_acron_list,
-            ).values_list("id", flat=True)
+                has_issue_proc=True,
+            ).values_list("id", "acron")
             items_to_process = {
-                journal_proc_id: None
-                for journal_proc_id in journal_proc_ids
+                (journal_proc_id, journal_acron): None
+                for journal_proc_id, journal_acron in journal_proc_ids
             }
 
         total_journals_to_process = len(items_to_process)
@@ -1001,16 +1003,26 @@ def task_migrate_and_publish_articles(
         kwargs_.pop("collection_acron_list", None)
         kwargs_.pop("journal_acron_list", None)
 
+        skipped_journals = 0
         task_exec.total_to_process = total_journals_to_process
         total_processed = 0
-        for journal_proc_id, issue_proc_id_list in items_to_process.items():
+        for key in items_to_process.keys():
             kwargs = {}
             kwargs.update(kwargs_)
+            journal_proc_id, journal_acron = key
             kwargs["journal_proc_id"] = journal_proc_id
-            kwargs["issue_proc_id_list"] = issue_proc_id_list
+            kwargs["journal_acron"] = journal_acron
+            kwargs["issue_proc_id_list"] = items_to_process[key]
+            kwargs["status"] = status
+            
+            if not items_to_process[key]:
+                if not IssueProc.objects.filter(journal_proc_id=journal_proc_id).exists():
+                    skipped_journals.append(journal_acron)
+                    continue
             total_processed += 1
             task_migrate_and_publish_articles_by_journal.delay(**kwargs)
 
+        task_exec.add_event({"skipped_journals": skipped_journals})
         task_exec.total_processed = total_processed
         task_exec.finish()
 
@@ -1076,16 +1088,32 @@ def task_migrate_and_publish_articles_by_journal(
         if not journal_proc_id:
             raise ValueError("journal_proc_id is required")
 
+        status = tracker_choices.get_valid_status(status, force_update)
         journal_proc = JournalProc.objects.get(id=journal_proc_id)
         user = _get_user(user_id, username)
 
+        task_exec.item = f"{collection_acron}-{journal_proc.acron}-{issue_folder}-{publication_year}"
+
+        total_status_data = get_total_status_data(journal_proc_id, {})
+        task_exec.add_event({"total_status_data initial": total_status_data})
+
         fix_publication_status(journal_proc.collection)
+
+        total_status_data_updated = get_total_status_data(journal_proc_id, total_status_data)             
+        task_exec.add_event({"total_status_data after updating websites status": total_status_data_updated})
+
         response = controller.import_journal_acron_id_records(
             user,
             ArticleProc,
             journal_proc,
             force_update=force_import_acron_id_file,
         )
+
+        task_exec.add_event({"import_journal_acron_id_records_response": response})
+
+        total_status_data.update(total_status_data_updated)
+        total_status_data_updated = get_total_status_data(journal_proc_id, total_status_data)             
+        task_exec.add_event({"total_status_data after import_journal_acron_id_records": total_status_data_updated})
 
         qa_api_data = get_api_data(
             journal_proc.collection, "issue", "QA"
@@ -1097,10 +1125,8 @@ def task_migrate_and_publish_articles_by_journal(
         total_to_process = 0
 
         if issue_proc_id_list:
-            issue_proc_and_related_article_proc_id_list = {
-                issue_proc_id: []
-                for issue_proc_id in issue_proc_id_list
-            }
+            task_exec.add_number("total issues selected to process", len(issue_proc_id_list))
+            selected_article_proc_items = []
         else:
             selected_issue_procs = IssueProc.select_items(
                 journal_proc_id_list=[journal_proc_id],
@@ -1112,15 +1138,11 @@ def task_migrate_and_publish_articles_by_journal(
             issue_proc_id_list = list(
                 selected_issue_procs.values_list("id", flat=True)
             )
-            issue_proc_and_related_article_proc_id_list = {
-                issue_proc_id: []
-                for issue_proc_id in (issue_proc_id_list or [])
-            }
-
+            task_exec.add_number("total issues found to process", len(issue_proc_id_list))
             selected_article_proc_items = (
                 ArticleProc.select_items(
                     journal_proc_id_list=[journal_proc_id],
-                    exclude_issue_proc_id_list=list(issue_proc_id_list),
+                    exclude_issue_proc_id_list=issue_proc_id_list,
                     status_list=status,
                     force_update=force_update,
                 )
@@ -1128,16 +1150,19 @@ def task_migrate_and_publish_articles_by_journal(
                 .distinct()
             )
 
-            for issue_proc_id, article_proc_id in (
-                selected_article_proc_items
-            ):
+        issue_proc_and_related_article_proc_id_list = {
+            issue_proc_id: []
+            for issue_proc_id in (issue_proc_id_list or [])
+        }
+        if selected_article_proc_items:
+            for issue_proc_id, article_proc_id in selected_article_proc_items:
                 issue_proc_and_related_article_proc_id_list.setdefault(
                     issue_proc_id, []
                 ).append(article_proc_id)
 
-        total_to_process = len(
-            issue_proc_and_related_article_proc_id_list
-        )
+        total_to_process = len(issue_proc_and_related_article_proc_id_list)
+        task_exec.add_number("total issues to process", total_to_process)
+
         for (
             issue_proc_id,
             article_proc_id_list,
@@ -1216,14 +1241,19 @@ def task_migrate_and_publish_articles_by_issue(
         ).get(id=issue_proc_id)
         status = tracker_choices.get_valid_status(status, force_update)
 
+        journal_proc_id = issue_proc.journal_proc_id
+        total_status_data = {}
+        total_status_data_updated = get_total_status_data(journal_proc_id, total_status_data)             
+        task_exec.add_event({"total_status_data": total_status_data_updated})
+
         task_exec.item = str(issue_proc)
 
         total_articles_to_process = 0
+        article_procs = None
         if article_proc_id_list:
             article_procs = ArticleProc.objects.select_related(
                 "issue_proc",
             ).filter(id__in=article_proc_id_list)
-            total_articles_to_process = article_procs.count()
         else:
             total_migrated_records = issue_proc.migrate_document_records(
                 user, force_migrate_document_records
@@ -1246,7 +1276,7 @@ def task_migrate_and_publish_articles_by_issue(
                 status_list=status,
                 force_update=force_update,
             )
-            total_articles_to_process = article_procs.count()
+        total_articles_to_process = article_procs.count()
         task_exec.total_to_process = total_articles_to_process
 
         total_processed = 0
@@ -1262,6 +1292,11 @@ def task_migrate_and_publish_articles_by_issue(
 
         task_exec.total_processed = total_processed
         task_exec.add_number("total_processed", total_processed)
+        task_exec.add_number("total_articles", issue_proc.articleproc_set.count())
+
+        total_status_data.update(total_status_data_updated)
+        total_status_data_updated = get_total_status_data(journal_proc_id, total_status_data)
+        task_exec.add_event({"total_status_data after creating/updating ArticleProc": total_status_data_updated})
 
         task_publish_issue_articles.delay(
             user_id=user_id,
@@ -2085,7 +2120,6 @@ def task_check_articles_availability(
             "issue_folder": issue_folder,
             "publication_year": publication_year,
             "article_pid_v3": article_pid_v3,
-            "article_id": article_id,
             "collection_acron": collection_acron,
             "timeout": timeout,
             "force_update": force_update,
