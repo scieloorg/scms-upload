@@ -1,28 +1,26 @@
 import io
-import json
 import logging
 import os
 import sys
 import traceback
 import zipfile
 from datetime import datetime
-from functools import lru_cache, cached_property
+from functools import cached_property
 from zlib import crc32
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
-from django.db.models import Q, Count, Min
+from django.db.models import Q, Count
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.pid_provider import v3_gen, xml_sps_adapter
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
-from wagtail.fields import RichTextField
-from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from collection.models import Collection
+from core.widgets import ReadOnlyPrettyJSONWidget
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutura
@@ -1650,7 +1648,7 @@ class XMLURL(CommonControlField):
         FieldPanel("status"),
         FieldPanel("pid"),
         FieldPanel("zipfile"),
-        FieldPanel("detail"),
+        FieldPanel("detail", widget=ReadOnlyPrettyJSONWidget()),
         FieldPanel("exceptions"),
         FieldPanel("is_public"),
     ]
