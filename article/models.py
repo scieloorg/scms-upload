@@ -2,7 +2,6 @@ import logging
 import traceback
 from datetime import datetime, timezone
 
-from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, models
 from django.db.models import Count, Q
@@ -15,8 +14,9 @@ from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel, Tabbe
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
+from core.widgets import ReadOnlyPrettyJSONWidget
 from migration import choices as migration_choices
-from migration.models import MigratedArticle, ClassicWebsiteConfiguration
+from migration.models import ClassicWebsiteConfiguration
 from article.page_checker import check_url, check_content, format_url, format_classic_url
 from article.forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from collection.choices import PUBLIC
@@ -1495,7 +1495,7 @@ class ArticleWebPage(CommonControlField):
         FieldPanel("fmt", read_only=True),
         FieldPanel("lang", read_only=True),
         FieldPanel("status", read_only=True),
-        FieldPanel("detail", read_only=True),
+        FieldPanel("detail", widget=ReadOnlyPrettyJSONWidget()),
     ]
 
     class Meta:

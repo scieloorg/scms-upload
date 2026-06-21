@@ -2,7 +2,6 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 from django.core.files.base import ContentFile
 from django.db import DataError, IntegrityError, models
@@ -12,11 +11,12 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail.admin.panels import FieldPanel
 from wagtail.models import Orderable
+from scielo_classic_website import classic_ws
 
 from collection.models import Collection
+from core.widgets import ReadOnlyPrettyJSONWidget
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
-from scielo_classic_website import classic_ws
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent
 
@@ -235,7 +235,7 @@ class MigratedData(CommonControlField):
         FieldPanel("migration_status"),
         FieldPanel("isis_updated_date"),
         FieldPanel("isis_created_date"),
-        FieldPanel("data"),
+        FieldPanel("data", widget=ReadOnlyPrettyJSONWidget()),
     ]
 
     class Meta:
@@ -628,7 +628,7 @@ class MigratedJournal(MigratedData):
     panels = [
         FieldPanel("isis_updated_date"),
         FieldPanel("isis_created_date"),
-        FieldPanel("data"),
+        FieldPanel("data", widget=ReadOnlyPrettyJSONWidget()),
     ]
 
     @classmethod
@@ -645,7 +645,7 @@ class MigratedIssue(MigratedData):
     panels = [
         FieldPanel("isis_updated_date"),
         FieldPanel("isis_created_date"),
-        FieldPanel("data"),
+        FieldPanel("data", widget=ReadOnlyPrettyJSONWidget()),
     ]
 
     @classmethod
@@ -671,7 +671,7 @@ class MigratedArticle(MigratedData):
         FieldPanel("file_type"),
         FieldPanel("isis_updated_date"),
         FieldPanel("isis_created_date"),
-        FieldPanel("data"),
+        FieldPanel("data", widget=ReadOnlyPrettyJSONWidget()),
     ]
 
     def __str__(self):
@@ -882,7 +882,7 @@ class IdFileRecord(CommonControlField, Orderable):
     panels = [
         FieldPanel("item_pid", read_only=True),
         FieldPanel("item_type", read_only=True),
-        FieldPanel("data", read_only=True),
+        FieldPanel("data", widget=ReadOnlyPrettyJSONWidget()),
     ]
 
     class Meta:
@@ -989,7 +989,7 @@ class IdFileRecord(CommonControlField, Orderable):
             obj.updated_by = user
             obj.updated = datetime.now(timezone.utc)
             obj.data = data
-            obj.todo = todo
+            obj.todo = True
             obj.save()
             return obj
         except cls.DoesNotExist:
