@@ -38,6 +38,12 @@ class MinioConfiguration(CommonControlField):
     bucket_root = models.CharField(
         _("Bucket root"), max_length=32, null=True, blank=True
     )
+    write_prefix = models.CharField(
+        _("Write prefix"), max_length=128, null=True, blank=True
+    )
+    public_base_url = models.URLField(
+        _("Public base URL"), max_length=500, null=True, blank=True
+    )
     location = models.CharField(
         _("Location"),
         max_length=16,
@@ -62,6 +68,8 @@ class MinioConfiguration(CommonControlField):
         FieldPanel("name"),
         FieldPanel("host"),
         FieldPanel("bucket_root"),
+        FieldPanel("write_prefix"),
+        FieldPanel("public_base_url"),
         # FieldPanel("location"),
         FieldPanel("access_key"),
         FieldPanel("secret_key"),
@@ -85,6 +93,8 @@ class MinioConfiguration(CommonControlField):
         secret_key=None,
         secure=None,
         bucket_root=None,
+        write_prefix=None,
+        public_base_url=None,
         location=None,
         user=None,
     ):
@@ -98,6 +108,8 @@ class MinioConfiguration(CommonControlField):
             files_storage.access_key = access_key
             files_storage.secret_key = secret_key
             files_storage.bucket_root = bucket_root
+            files_storage.write_prefix = write_prefix
+            files_storage.public_base_url = public_base_url
             files_storage.location = location
             files_storage.creator = user
             files_storage.save()
@@ -125,12 +137,14 @@ class MinioConfiguration(CommonControlField):
             location=obj.location,
             minio_secure=obj.secure,
             minio_http_client=minio_http_client,
+            write_prefix=obj.write_prefix,
+            public_base_url=obj.public_base_url,
         )
 
 
 class FileLocation(CommonControlField):
     basename = models.CharField(_("Basename"), max_length=100, null=True, blank=True)
-    uri = models.URLField(_("URI"), null=True, blank=True, max_length=200)
+    uri = models.URLField(_("URI"), null=True, blank=True, max_length=500)
 
     autocomplete_search_field = "uri"
 
