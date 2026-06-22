@@ -25,6 +25,9 @@ def remove_duplicate_articles(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+
+    atomic = False  # ← necessário para PostgreSQL com triggers pendentes
+
     dependencies = [
         ("article", "0007_alter_article_options_article_first_pubdate_iso"),
     ]
