@@ -1764,24 +1764,48 @@ class XMLURL(CommonControlField):
         
     @classmethod
     def record(cls, user, url, status, document_item, *, exception=None, response=None, xml_with_pre=None, name=None):
+        pid = None
+        is_public = None
         detail = {"document_item": document_item}
+
+        if document_item:
+            pid = pid or document_item.get("pid_v3")
+            is_public = document_item.get("status")
+        if xml_with_pre:
+            pid = xml_with_pre.v3 or pid
+
+        if exception is not None:
+            detail["exceptions"] = traceback.format_exc()
+        if response is not None:
+            detail["response"] = response
+            pid = response.get("v3") or pid
+
+        xmlurl_obj = cls.create_or_update(user=user, url=url, status=status, pid=pid, detail=detail, is_public=is_public)
+
+        if xml_with_pre is not None:
+            name = xml_with_pre.sps_pkg_name
+            filename = f"{name}.xml"
+            xmlurl_obj.save_file(xml_with_pre.tostring(), filename=filename)
+
+        return xmlurl_obj
+    
+    def update_record(self, user, status, exception=None, response=None, xml_with_pre=None):
+        detail = self.detail
+
         if exception is not None:
             detail["exceptions"] = traceback.format_exc()
         if response is not None:
             detail["response"] = response
 
-        pid = response.get("v3") if response else None
-
-        is_public = None
-        if document_item:
-            doc_status = document_item.get("status")
-            if doc_status is not None:
-                is_public = doc_status != "false"
-
-        xmlurl_obj = cls.create_or_update(user=user, url=url, status=status, pid=pid, detail=detail, is_public=is_public)
+        self.status = status
+        self.detail = detail
+        self.updated_by = user
 
         if xml_with_pre is not None:
-            filename = name or pid or "content.xml"
-            xmlurl_obj.save_file(xml_with_pre.tostring(), filename=filename)
+            self.pid = xml_with_pre.v3
+            name = xml_with_pre.sps_pkg_name
+            filename = f"{name}.xml"
+            self.save_file(xml_with_pre.tostring(), filename=filename)
 
-        return xmlurl_obj
+        self.save()
+        return self

@@ -142,9 +142,6 @@ def task_load_records_from_counter_dict(
 
                 url = document.get("url")
                 origin_date = document.get("origin_date")
-                if not document.get("is_public"):
-                    continue
-
                 document_item = document.get("item") or {}
 
                 task_load_record_from_xml_url.delay(
