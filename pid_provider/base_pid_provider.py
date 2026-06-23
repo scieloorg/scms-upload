@@ -172,7 +172,11 @@ class BasePidProvider:
         """
         # a) Try to obtain XML from URI
         try:
+            xml_url_record = None
+            xml_with_pre = None
+            resp = None
             xml_with_pre = list(XMLWithPre.create(uri=xml_uri))[0]
+            xml_url_record = XMLURL.record(user, xml_uri, None, document_item, xml_with_pre=xml_with_pre)
         except Exception as e:
             return XMLURL.record(user, xml_uri, "xml_fetch_failed", document_item, exception=e)
 
@@ -197,11 +201,17 @@ class BasePidProvider:
                 pass  # If xml_with_pre is not present or cannot be removed, ignore and log rest of response
 
             if response.get("error_type") or response.get("error_msg") or response.get("error_message"):
-                XMLURL.record(user, xml_uri, "pid_provider_xml_failed", document_item, response=resp, xml_with_pre=xml_with_pre, name=name)
+                status = "pid_provider_xml_failed"
             else:
-                XMLURL.record(user, xml_uri, "success", document_item, response=resp, xml_with_pre=xml_with_pre, name=name)
+                status = "success"
+
+            xml_url_record.update_record(user, status, exception=None, response=resp, xml_with_pre=xml_with_pre)
             return response
         except Exception as e:
+            if xml_url_record:
+                xml_url_record.update_record(user, status=None, exception=e, response=resp, xml_with_pre=xml_with_pre)
+                return resp
+
             return self._handle_unexpected_error(e, xml_uri, name, user, origin_date, force_update, is_published, document_item)
 
     def _handle_unexpected_error(self, exception, xml_uri, name, user, origin_date, force_update, is_published, document_item):
