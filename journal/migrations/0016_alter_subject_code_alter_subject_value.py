@@ -12,11 +12,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="subject",
             name="code",
-            field=models.CharField(blank=True, max_length=512, null=True),
-        ),
-        migrations.AlterField(
-            model_name="subject",
-            name="value",
-            field=models.CharField(blank=True, max_length=512, null=True),
+            field=models.CharField(blank=True, max_length=60, null=True),
         ),
     ]
