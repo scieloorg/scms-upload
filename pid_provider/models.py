@@ -29,10 +29,9 @@ from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutu
     profile_property,
     profile_staticmethod,
 )
-from core.utils.similarity import how_similar
 from pid_provider import choices, exceptions
 from pid_provider.query_params import (
-    get_score,
+    compare_items,
     zero_to_none,
     QueryBuilderPidProviderXML,
 )
@@ -953,7 +952,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         matched = cls.best_matches(results, xml_adapter)
         if not matched:
             raise cls.DoesNotExist
-        return cls.objects.get(id=sorted(matched)[-1][-1])
+        return cls.objects.get(id=matched[0]["id"])
 
     @classmethod
     @profile_classmethod
@@ -978,90 +977,75 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             raise PidProviderXMLPidV3ConflictError(
                 _("No matching record found for the provided XML data.")
             )
-        return cls.objects.get(id=sorted(matched)[-1][-1])
+        return cls.objects.get(id=matched[0]["id"])
 
-    @profile_method
-    def match(self, xml_adapter):
+    def match(self, items):
         """
         """
-        labels = []
-        score = self.title_similarity(xml_adapter) * 100
-        if score > 50:
-            labels.append("title")
-        if score_item := get_score(self.z_surnames, xml_adapter.z_surnames, 10, 100):
-            labels.append("z_surnames")
-            score += score_item
-        if score_item := get_score(self.z_collab, xml_adapter.z_collab, 10, 100):
-            labels.append("z_collab")
-            score += score_item
-        if score_item := get_score(self.z_links, xml_adapter.z_links, 10, 100):
-            labels.append("z_links")
-            score += score_item
-        if score_item := get_score(self.z_partial_body, xml_adapter.z_partial_body, 10, 100):
-            labels.append("z_partial_body")
-            score += score_item
-        return {"score": score, "labels": labels}
+        results = {True: [], False: [], "total_ok": 0, "total_failed": 0}
+        total_score = 0
+        for label, registered, input_data in items:
+            result = compare_items(label, registered, input_data)
+            results[result.get("matched")].append(result)
+            total_score += result["score"]
+        results["total_score"] = total_score
+        results["percentual_score"] = total_score * 100 / len(items)
+        return results
 
-    def title_similarity(self, xml_adapter):
-        try:
-            registered = self.xml_with_pre.article_titles_texts
-        except Exception:
-            registered = []
-        xml_adapter_titles = xml_adapter.xml_with_pre.article_titles_texts
-        if xml_adapter_titles == registered:
-            return 1
-        if not xml_adapter_titles:
-            return 0
-        if not registered:
-            return 0
-        words1 = set()
-        for item in xml_adapter_titles:
-            words1.update(item.split())
-        words2 = set()
-        for item in registered:
-            words2.update(item.split())
-        return how_similar(" ".join(sorted(words1)), " ".join(sorted(words2)))
+    def match_data(self, xml_adapter):
+        return self.match([
+            ("title", self.xml_with_pre.article_titles_texts, xml_adapter.xml_with_pre.article_titles_texts),
+            ("z_surnames", self.z_surnames, xml_adapter.z_surnames),
+            ("z_collab", self.z_collab, xml_adapter.z_collab),
+            ("z_links", self.z_links, xml_adapter.z_links),
+            ("z_partial_body", self.z_partial_body, xml_adapter.z_partial_body),
+        ])
+    
+    def match_ids(self, xml_adapter):
+        return self.match([
+            ("pid_v3", self.v3, xml_adapter.v3),
+            ("pkg_name", self.pkg_name, xml_adapter.pkg_name),
+            ("main_doi", self.main_doi, xml_adapter.main_doi),
+            ("pid_v2", self.v2, xml_adapter.v2),
+        ])
 
     @classmethod
     def best_matches(cls, results, xml_adapter):
-        data = []
-        matched = []
+        detail = {
+            "total_results": results.count(),
+            "input_data": xml_adapter.data,
+        }
+        items = {}
+        found = []
         for item in results.iterator():
-            response = item.match(xml_adapter)
-            score = response["score"]
+            response = item.match_data(xml_adapter)
+            items[item.id] = response
+            percentual_score = response["percentual_score"]
+            found.append((percentual_score, item.updated.isoformat(), item.id))
 
-            if xml_adapter.v2:
-                if item.v2 == xml_adapter.v2:
-                    score += 100
-            elif xml_adapter.order and item.v2 and item.v2.endswith(xml_adapter.order):
-                score += 100
-            if item.v3 == xml_adapter.v3:
-                score += 100
-            if item.pkg_name == xml_adapter.pkg_name:
-                score += 100
-            if item.main_doi == xml_adapter.main_doi:
-                score += 100
+        detail["items"] = items
+        found = reversed(found)
 
-            _data = response
-            _data.update(item.data)
-            data.append(_data)
-
-            if score > 50:
-                matched.append((score, item.updated.isoformat(), item.id))
-
-        if results.count() > 1 or not matched:
-            detail = {
-                "xml_adapter_data": xml_adapter.data,
-                "data": data,
-                "matched": matched,
-            } 
+        ok = []
+        failed = []
+        for item in found:
+            percentual_score, updated, item_id = item
+            items[item_id]["id"] = item_id
+            if percentual_score > 0.5:
+                ok.append(items[item_id])
+            else:
+                failed.append(items[item_id])
+        
+        if failed:
+            detail["ok"] = ok
+            detail["failed"] = failed
             UnexpectedEvent.create(
                 item=xml_adapter.sps_pkg_name,
                 action="PidProviderXML.best_matches",
                 exception=cls.MultipleObjectsReturned,
                 detail=detail,
             )
-        return matched
+        return ok
 
     @profile_method
     def _add_data(self, xml_adapter, registered_in_core):
