@@ -226,9 +226,9 @@ class QueryBuilderPidProviderXML:
         if pkg_names:
             q |= Q(pkg_name__in=pkg_names)
 
-        # # DOI principal
-        # if self.main_doi:
-        #     q |= Q(main_doi=self.main_doi)
+        # DOI principal
+        if self.main_doi:
+            q |= Q(main_doi=self.main_doi)
 
         return q
     
