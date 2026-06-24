@@ -3,8 +3,38 @@ from functools import cached_property
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from core.utils.profiling_tools import profile_function
+from core.utils.similarity import how_similar
 from pid_provider import exceptions
+
+
+def compare_lists(registered, xml_adapter_titles):
+    if xml_adapter_titles == registered:
+        return 1
+    if not xml_adapter_titles:
+        return 0
+    if not registered:
+        return 0
+    words1 = set()
+    for item in xml_adapter_titles:
+        words1.update(item.split())
+    words2 = set()
+    for item in registered:
+        words2.update(item.split())
+    return how_similar(" ".join(sorted(words1)), " ".join(sorted(words2)))
+
+
+def compare_items(label, registered, input_data):
+    if isinstance(registered, list):
+        score = compare_lists(registered, input_data)
+    elif (input_data or None) == (registered or None):
+        score = 1
+    else:
+        score = 0
+    response = {"label": label, "score": score, "matched": score > 0.5}
+    if score != 1:
+        response["registered"] = registered
+        response["input_data"] = input_data
+    return response
 
 
 def get_score(registered, xml_data, min_value, max_value):
