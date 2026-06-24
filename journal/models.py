@@ -121,7 +121,7 @@ class OfficialJournal(CommonControlField):
     )
     issnl = models.CharField(_("ISSNL"), max_length=9, null=True, blank=True)
     previous_journal_title = models.CharField(max_length=500, null=True, blank=True)
-    next_journal_title = models.CharField(max_length=128, null=True, blank=True)
+    next_journal_title = models.CharField(max_length=500, null=True, blank=True)
 
     base_form_class = OfficialJournalForm
 
@@ -1090,8 +1090,8 @@ class JournalHistory(CommonControlField):
 
 
 class Subject(CommonControlField):
-    code = models.CharField(max_length=36, null=True, blank=True)
-    value = models.CharField(max_length=100, null=True, blank=True)
+    code = models.CharField(max_length=512, null=True, blank=True)
+    value = models.CharField(max_length=512, null=True, blank=True)
 
     def __str__(self):
         return f"{self.value}"
