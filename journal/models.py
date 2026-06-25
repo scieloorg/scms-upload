@@ -1090,7 +1090,7 @@ class JournalHistory(CommonControlField):
 
 
 class Subject(CommonControlField):
-    code = models.CharField(max_length=60, null=True, blank=True)
+    code = models.CharField(max_length=36, null=True, blank=True)
     value = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
