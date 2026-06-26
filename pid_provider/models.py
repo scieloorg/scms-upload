@@ -31,11 +31,11 @@ from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutu
 )
 from pid_provider import choices, exceptions
 from pid_provider.query_params import (
-    compare_items,
+    compare,
     zero_to_none,
     QueryBuilderPidProviderXML,
 )
-from tracker.models import BaseEvent, EventSaveError, UnexpectedEvent
+from tracker.models import UnexpectedEvent
 
 try:
     from django_prometheus.models import ExportModelOperationsMixin
@@ -518,19 +518,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         return f"{self.pkg_name} {self.v3}"
     
     @property
-    def article_pid_suffix_source(self):
-        try:
-            return self.xml_with_pre.get_article_pid_suffix_source()
-        except AttributeError:
-            return self.elocation_id or self.fpage or self.xml_with_pre.order
-    
-    def get_article_pid_suffix(self):
-        data = self.article_pid_suffix_source
-        if not data:
-            data = self.pkg_name.split("-")[-1]
-        return string_to_5_digits(data)
-
-    @property
     def collection_list(self):
         return "|".join(c.acron3 for c in self.collections.all())
 
@@ -608,7 +595,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         except Exception:
             return None
 
-    @property
+    @cached_property
     @profile_property
     def xml_with_pre(self):
         try:
@@ -964,7 +951,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             raise ValueError("get_record_by_pid_v3: XML has not pid v3")
         xml_pid_v3 = xml_adapter.v3
         results = (
-            cls.objects.filter(Q(v3=xml_pid_v3) | Q(other_pid__pid_in_xml=xml_pid_v3))
+            cls.objects.filter(Q(v3=xml_pid_v3) | Q(other_pid__pid_in_xml=xml_pid_v3)).distinct()
         )
         if not results.exists():
             raise cls.DoesNotExist
@@ -977,75 +964,62 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                     _("No matching record found for the provided XML data.")
                 )
             raise cls.DoesNotExist
-
-    def match(self, items):
-        """
-        """
-        results = {True: [], False: [], "total_ok": 0, "total_failed": 0}
-        total_score = 0
-        for label, registered, input_data in items:
-            result = compare_items(label, registered, input_data)
-            results[result.get("matched")].append(result)
-            total_score += result["score"]
-        results["total_score"] = total_score
-        results["percentual_score"] = total_score * 100 / len(items)
-        return results
-
-    def match_data(self, xml_adapter):
-        return self.match([
-            ("title", self.xml_with_pre.article_titles_texts, xml_adapter.xml_with_pre.article_titles_texts),
-            ("z_surnames", self.z_surnames, xml_adapter.z_surnames),
-            ("z_collab", self.z_collab, xml_adapter.z_collab),
-            ("z_links", self.z_links, xml_adapter.z_links),
-            ("z_partial_body", self.z_partial_body, xml_adapter.z_partial_body),
-        ])
     
-    def match_ids(self, xml_adapter):
-        return self.match([
-            ("pid_v3", self.v3, xml_adapter.v3),
-            ("pkg_name", self.pkg_name, xml_adapter.pkg_name),
-            ("main_doi", self.main_doi, xml_adapter.main_doi),
-            ("pid_v2", self.v2, xml_adapter.v2),
-        ])
+    @property
+    def data_to_compare(self):
+        return {
+            "title": self.xml_with_pre.article_titles_texts,
+            "z_surnames": self.z_surnames,
+            "z_collab": self.z_collab,
+            "z_links": self.z_links,
+            "z_partial_body": self.z_partial_body,
+        }
 
     @classmethod
     def best_matches(cls, results, xml_adapter):
+        input_data = {
+            "title": xml_adapter.xml_with_pre.article_titles_texts,
+            "z_surnames": xml_adapter.z_surnames,
+            "z_collab": xml_adapter.z_collab,
+            "z_links": xml_adapter.z_links,
+            "z_partial_body": xml_adapter.z_partial_body,
+        }
         detail = {
             "total_results": results.count(),
-            "input_data": xml_adapter.data,
+            "input_data": input_data,
         }
-        items = {}
+        responses = {}
         found = []
+        items = {}
         for item in results.iterator():
-            response = item.match_data(xml_adapter)
-            items[item.id] = response
-            percentual_score = response["percentual_score"]
-            found.append((percentual_score, item.updated.isoformat(), item.id))
+            item_data = item.data_to_compare
+            response = compare(item_data, input_data)
+            responses[item.id] = response
+            items[item.id] = item
+            found.append((response["percentual_score"], item.updated.isoformat(), item.id))
 
-        found = reversed(found)
+        found = sorted(found, reverse=True)
 
         ok = []
         failed = []
         for item in found:
             percentual_score, updated, item_id = item
-            items[item_id]["id"] = item_id
             if percentual_score > 0.5:
-                ok.append(items[item_id])
+                ok.append(responses[item_id])
             else:
-                failed.append(items[item_id])
+                failed.append(responses[item_id])
 
         detail["ok"] = ok
         detail["failed"] = failed
-
-        if not ok and failed:
+        if ok:
+            detail["registered"] = items.get(ok[0]["id"])
+        elif failed:
             UnexpectedEvent.create(
                 item=xml_adapter.sps_pkg_name,
                 action="PidProviderXML.best_matches",
                 exception=exceptions.UnmatchedPidProviderXMLError,
                 detail=detail,
             )
-        if ok:
-            detail["registered"] = cls.objects.get(id=ok[0]["id"])
         return detail
 
     @profile_method
