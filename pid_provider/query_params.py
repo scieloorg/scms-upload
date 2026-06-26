@@ -7,6 +7,22 @@ from core.utils.similarity import how_similar
 from pid_provider import exceptions
 
 
+def compare(registered_items, input_data):
+    """
+    """
+    total_score = 0
+    items = []
+    for label, registered_item in registered_items.items():
+        result = compare_items(label, registered_item, input_data[label])
+        items.append(result)
+        total_score += result["score"]
+    return {
+        "items": items,
+        "total_score": total_score,
+        "percentual_score": total_score * 100 / len(items)
+    }
+
+
 def compare_lists(registered, xml_adapter_titles):
     if xml_adapter_titles == registered:
         return 1
@@ -30,10 +46,9 @@ def compare_items(label, registered, input_data):
         score = 1
     else:
         score = 0
-    response = {"label": label, "score": score, "matched": score > 0.5}
+    response = {"label": label, "score": score}
     if score != 1:
         response["registered"] = registered
-        response["input_data"] = input_data
     return response
 
 
@@ -203,17 +218,21 @@ class QueryBuilderPidProviderXML:
         """
         q = Q()
         
+        other_pids = set()
         # PID v3 - máxima prioridade
         if self.v3:
             q |= Q(v3=self.v3)
+            other_pids.add(self.v3)
         
         # PID v2
         if self.v2:
             q |= Q(v2=self.v2)
+            other_pids.add(self.v2)
         
         # AOP PID
         if self.aop_pid:
             q |= Q(v2=self.aop_pid) | Q(aop_pid=self.aop_pid)
+            other_pids.add(self.aop_pid)
             
         # Package name
         pkg_names = set()
@@ -226,10 +245,11 @@ class QueryBuilderPidProviderXML:
         if pkg_names:
             q |= Q(pkg_name__in=pkg_names)
 
-        # DOI principal
         if self.main_doi:
             q |= Q(main_doi=self.main_doi)
 
+        if other_pids:
+            q |= Q(other_pid__pid_in_xml=other_pids)
         return q
     
     @cached_property
