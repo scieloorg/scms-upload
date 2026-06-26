@@ -434,10 +434,6 @@ def process_journal_result(
         )
         journal.sponsor.add(Sponsor.create_or_update(user, journal, institution))
 
-    # Processa subject descriptors (novo campo da API)
-    for item in result.get("subject_descriptor") or []:
-        journal.subject.add(Subject.create_or_update(user, item["value"]))
-
     no_lang = []
     for item in result.get("mission"):
         if not item["language"]:
