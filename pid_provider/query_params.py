@@ -13,7 +13,7 @@ def compare(registered_items, input_data):
     total_score = 0
     items = []
     for label, registered_item in registered_items.items():
-        result = compare_items(label, registered_item, input_data[label])
+        result = compare_items(label, registered_item, input_data.get(label))
         items.append(result)
         total_score += result["score"]
     return {
