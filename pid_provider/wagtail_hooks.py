@@ -6,8 +6,7 @@ from wagtail.snippets.views.snippets import SnippetViewSetGroup
 
 from config.menu import get_menu_order
 from core.views import CommonControlFieldViewSet
-from pid_provider import choices
-from pid_provider.models import XMLURL, XMLVersion, FixPidV2, OtherPid, PidProviderConfig, PidProviderXML
+from pid_provider.models import XMLURL, XMLVersion, FixPidV2, OtherPid, PidProviderConfig, PidProviderXML, PidProviderXMLRegistration
 
 
 class PidProviderXMLViewSet(CommonControlFieldViewSet):
@@ -202,6 +201,39 @@ class XMLURLViewSet(CommonControlFieldViewSet):
         "status",
         "pid",
     )
+
+
+class PidProviderXMLRegistrationViewSet(CommonControlFieldViewSet):
+    model = PidProviderXMLRegistration
+    icon = "doc-empty-inverse"
+    menu_label = _("PID Registration Events")
+    menu_name = "pid_provider_xml_registration"
+    add_to_admin_menu = True
+
+    # ordenação na listagem
+    ordering = ["-created"]
+
+    # colunas da listagem
+    list_display = (
+        "pkg_name",
+        "event_status",
+        "pid_provider_xml",
+        "error_type",
+        "created",
+    )
+
+    # filtros laterais
+    list_filter = ("event_status", "error_type", "created")
+
+    # busca
+    search_fields = ("pkg_name", "error_type", "pid_provider_xml__v3")
+
+    # paginação (tabela cresce em volume)
+    list_per_page = 50
+
+    # ---- READ ONLY: auditoria não é editada pela UI ----
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("pid_provider_xml")
 
 
 # Grupo de ViewSets
