@@ -19,7 +19,7 @@ def compare(registered_items, input_data):
     return {
         "items": items,
         "total_score": total_score,
-        "percentual_score": total_score * 100 / len(items)
+        "percentual_score": total_score / len(items)
     }
 
 
