@@ -249,7 +249,7 @@ class QueryBuilderPidProviderXML:
             q |= Q(main_doi=self.main_doi)
 
         if other_pids:
-            q |= Q(other_pid__pid_in_xml=other_pids)
+            q |= Q(other_pid__pid_in_xml__in=other_pids)
         return q
     
     @cached_property
@@ -342,33 +342,30 @@ class QueryBuilderPidProviderXML:
             ou None se nenhum dado textual estiver disponível
         """
         # Verifica se há algum dado textual disponível
-        if not any([
-            self.z_surnames,
-            self.z_collab,
-            self.z_links,
-            self.z_partial_body,
-        ]):
-            return Q(
-                z_surnames=self.z_surnames,
-                z_collab=self.z_collab,
-                z_links=self.z_links,
-                z_partial_body=self.z_partial_body,
-            )
+        if self.z_surnames or self.z_partial_body or self.z_collab or self.z_links:
+            q = Q()
         
-        q = Q()
+            # Adiciona query para sobrenomes se disponível
+            if self.z_surnames:
+                q |= Q(z_surnames=self.z_surnames)
+            
+            # Adiciona queries para outros campos textuais
+            if self.z_collab:
+                q |= Q(z_collab=self.z_collab)
+            
+            if self.z_links:
+                q |= Q(z_links=self.z_links)
+            
+            if self.z_partial_body:
+                q |= Q(z_partial_body=self.z_partial_body)
+            
+            return q
         
-        # Adiciona query para sobrenomes se disponível
-        if self.z_surnames:
-            q |= Q(z_surnames=self.z_surnames)
+        return Q(
+            z_surnames=self.z_surnames,
+            z_collab=self.z_collab,
+            z_links=self.z_links,
+            z_partial_body=self.z_partial_body,
+        )
         
-        # Adiciona queries para outros campos textuais
-        if self.z_collab:
-            q |= Q(z_collab=self.z_collab)
         
-        if self.z_links:
-            q |= Q(z_links=self.z_links)
-        
-        if self.z_partial_body:
-            q |= Q(z_partial_body=self.z_partial_body)
-        
-        return q
