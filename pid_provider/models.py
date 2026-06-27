@@ -633,7 +633,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             surnames = [p.get("surname") for p in persons if p.get("surname")]
         except Exception:
             surnames = []
-        partial = (xml_with_pre.partial_body or "")[: PidProviderXML.PARTIAL_BODY_MAX]
+        partial = (xml_with_pre.partial_body or "")[: PARTIAL_BODY_MAX]
         return {
             "surnames": surnames,
             "collab": xml_with_pre.collab,
@@ -683,12 +683,15 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         try:
             response["input_data"] = xml_with_pre.data
             response["input_data"].update({"origin": origin})
+            print(f"response: {response}")
 
             xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
             response["xml_adapter_data"] = xml_adapter.data
+            print(f"response: {response}")
 
             # dados legíveis do XML entrando (mesmo formato do readable_data)
             readable_input = cls.build_readable_data(xml_with_pre)
+            print(f"readable_input: {readable_input}")
             pkg_name = xml_adapter.sps_pkg_name
 
             # consulta se documento já está registrado
@@ -754,8 +757,12 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             response.update(registered.data)
 
         except Exception as exc:
-            if event_status != "skipped":
-                exc_type, exc_value, exc_traceback = sys.exc_info()
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            logging.exception(exc)
+            response["event_status"] = event_status
+            if event_status == "skipped":
+                response["message"] = str(exc)
+            else:
                 error_type = str(type(exc))
                 response.update({"error_msg": str(exc), "error_type": error_type})
 
@@ -1021,6 +1028,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         for item in results:
             item_data = item.data_to_compare
             response = compare(item_data, input_data)
+            response["id"] = item.id
             responses[item.id] = response
             items[item.id] = item
             found.append(
@@ -1032,7 +1040,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         ok = []
         failed = []
         for percentual_score, updated, item_id in found:
-            if percentual_score > 0.5:
+            if percentual_score > 0.6:
                 ok.append(responses[item_id])
             else:
                 failed.append(responses[item_id])
@@ -1041,9 +1049,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         detail["failed"] = failed
         if ok:
             detail["registered"] = items.get(ok[0]["id"])
-        # NOTA: removido o UnexpectedEvent daqui (disciplina item 4).
-        # O caso "failed sem ok" passa a ser refletido no PidProviderXMLRegistration
-        # com event_status="unmatched" no register/is_registered.
         return detail
 
     @profile_method
