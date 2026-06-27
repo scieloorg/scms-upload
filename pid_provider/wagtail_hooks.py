@@ -232,9 +232,8 @@ class PidProviderXMLRegistrationViewSet(CommonControlFieldViewSet):
     list_per_page = 50
 
     # ---- READ ONLY: auditoria não é editada pela UI ----
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related("pid_provider_xml")
-
+    # def get_queryset(self):
+    #     return super().get_queryset().select_related("pid_provider_xml")
 
 # Grupo de ViewSets
 class PidProviderViewSetGroup(SnippetViewSetGroup):
@@ -248,6 +247,7 @@ class PidProviderViewSetGroup(SnippetViewSetGroup):
         PidProviderConfigViewSet,
         XMLVersionViewSet,
         XMLURLViewSet,
+        PidProviderXMLRegistrationViewSet,
     )
 
 
