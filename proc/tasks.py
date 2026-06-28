@@ -971,9 +971,8 @@ def task_migrate_and_publish_articles(
                 publication_year=publication_year,
                 issue_folder=issue_folder,
                 status_list=status,
-                force_update=force_migrate_document_records
-                or force_migrate_document_files,
-                to_migrate_articles=True,
+                force_migrate_document_records=force_migrate_document_records,
+                force_migrate_document_files=force_migrate_document_files,
             )
             issue_proc_ids = selected_issue_procs.values_list(
                 "journal_proc_id", "journal_proc__acron", "id"
@@ -1133,7 +1132,6 @@ def task_migrate_and_publish_articles_by_journal(
                 status_list=status,
                 force_migrate_document_records=force_migrate_document_records,
                 force_migrate_document_files=force_migrate_document_files,
-                to_migrate_articles=True,
             )
             issue_proc_id_list = list(
                 selected_issue_procs.values_list("id", flat=True)
