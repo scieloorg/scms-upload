@@ -1438,7 +1438,8 @@ class IssueProc(BaseProc, ClusterableModel):
         journal_proc_id_list=None,
         publication_year=None,
         issue_folder=None,
-        status_list=None,
+        article_status_list=None,
+        issue_status_list=None,
         force_update=False,
         force_migrate_document_records=False,
         force_migrate_document_files=False,
@@ -1467,25 +1468,22 @@ class IssueProc(BaseProc, ClusterableModel):
         if issue_proc_id:
             params["issue_proc_id"] = issue_proc_id
 
-        if force_migrate_document_records or force_migrate_document_files:
-            upd_args = {}
-            if force_migrate_document_records:
-                upd_args["docs_status"] = tracker_choices.PROGRESS_STATUS_REPROC
-            if force_migrate_document_files:
-                upd_args["files_status"] = tracker_choices.PROGRESS_STATUS_REPROC
-            if upd_args:
-                cls.objects.filter(**params).update(**upd_args)
-            return cls.objects.filter(
-                Q(docs_status__in=status_list)
-                | Q(files_status__in=status_list),
-                **params,
-            )
-        return cls.objects.filter(
-            Q(migration_status__in=status_list)
-            | Q(qa_ws_status__in=status_list)
-            | Q(public_ws_status__in=status_list),
-            **params,
-        )
+        selected = cls.objects.filter(**params)
+        if force_update:
+            selected.exclude(migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO).update(migration_status=tracker_choices.PROGRESS_STATUS_REPROC)
+
+        if force_migrate_document_records:
+            selected.exclude(docs_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO).update(docs_status=tracker_choices.PROGRESS_STATUS_REPROC)
+
+        if force_migrate_document_files:
+            selected.exclude(files_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO).update(files_status=tracker_choices.PROGRESS_STATUS_REPROC)
+
+        q = Q()
+        if article_status_list:
+            q |= Q(docs_status__in=article_status_list) | Q(files_status__in=article_status_list)
+        if issue_status_list:
+            q |= Q(migration_status__in=issue_status_list) | Q(qa_ws_status__in=issue_status_list) | Q(public_ws_status__in=issue_status_list)
+        return selected.filter(q)
 
     @classmethod
     def filter_by_status(cls, STATUS):
