@@ -1596,6 +1596,7 @@ class IssueProc(BaseProc, ClusterableModel):
             self.files_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
+            ArticleProc.mark_for_reprocessing(self)
             failures = []
             migration_result = migrate_issue_files_function(
                 user,
@@ -1772,8 +1773,11 @@ class IssueProc(BaseProc, ClusterableModel):
             total_document_records = id_file_records.count()
             detail["total_document_records"] = total_document_records
 
-            if not force_update:
-                force_update = ArticleProc.objects.filter(issue_proc=self).count() < total_document_records
+            force_update = (
+                force_update or 
+                self.docs_status != tracker_choices.PROGRESS_STATUS_DONE or
+                ArticleProc.objects.filter(issue_proc=self).count() < total_document_records
+            )    
             if not force_update:
                 # obtém somente os registros por fazer (todo=True)
                 id_file_records = id_file_records.filter(todo=True)
