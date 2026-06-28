@@ -1440,6 +1440,8 @@ class IssueProc(BaseProc, ClusterableModel):
         issue_folder=None,
         status_list=None,
         force_update=False,
+        force_migrate_document_records=False,
+        force_migrate_document_files=False,
         to_migrate_articles=False,
         collection_acron=None,
         journal_acron=None,
@@ -1467,6 +1469,13 @@ class IssueProc(BaseProc, ClusterableModel):
             params["issue_proc_id"] = issue_proc_id
 
         if to_migrate_articles:
+            upd_args = {}
+            if force_migrate_document_records:
+                upd_args["docs_status"] = tracker_choices.PROGRESS_STATUS_REPROC
+            if force_migrate_document_files:
+                upd_args["files_status"] = tracker_choices.PROGRESS_STATUS_REPROC
+            if upd_args:
+                cls.objects.filter(**params).update(**upd_args)
             return cls.objects.filter(
                 Q(docs_status__in=status_list)
                 | Q(files_status__in=status_list),
@@ -1985,7 +1994,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         AutocompletePanel("sps_pkg", read_only=True),
     ]
     panel_status = [
-        FieldPanel("pid_status"),
+        FieldPanel("pid_status", read_only=True),
         FieldPanel("xml_status"),
         FieldPanel("sps_pkg_status"),
         FieldPanel("migration_status"),
