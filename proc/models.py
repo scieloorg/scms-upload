@@ -1442,7 +1442,6 @@ class IssueProc(BaseProc, ClusterableModel):
         force_update=False,
         force_migrate_document_records=False,
         force_migrate_document_files=False,
-        to_migrate_articles=False,
         collection_acron=None,
         journal_acron=None,
         issue_proc_id=None,
@@ -1468,7 +1467,7 @@ class IssueProc(BaseProc, ClusterableModel):
         if issue_proc_id:
             params["issue_proc_id"] = issue_proc_id
 
-        if to_migrate_articles:
+        if force_migrate_document_records or force_migrate_document_files:
             upd_args = {}
             if force_migrate_document_records:
                 upd_args["docs_status"] = tracker_choices.PROGRESS_STATUS_REPROC
