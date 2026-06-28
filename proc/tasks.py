@@ -970,9 +970,9 @@ def task_migrate_and_publish_articles(
                 journal_acron_list=journal_acron_list,
                 publication_year=publication_year,
                 issue_folder=issue_folder,
-                status_list=status,
                 force_migrate_document_records=force_migrate_document_records,
                 force_migrate_document_files=force_migrate_document_files,
+                article_status_list=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
             )
             issue_proc_ids = selected_issue_procs.values_list(
                 "journal_proc_id", "journal_proc__acron", "id"
@@ -1129,9 +1129,9 @@ def task_migrate_and_publish_articles_by_journal(
         else:
             selected_issue_procs = IssueProc.select_items(
                 journal_proc_id_list=[journal_proc_id],
-                status_list=status,
                 force_migrate_document_records=force_migrate_document_records,
                 force_migrate_document_files=force_migrate_document_files,
+                article_status_list=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
             )
             issue_proc_id_list = list(
                 selected_issue_procs.values_list("id", flat=True)
@@ -1499,8 +1499,6 @@ def task_publish_articles(
             issue_folder=issue_folder,
             publication_year=publication_year,
             issue_proc_id=issue_proc_id,
-            force_update=force_update,
-            status_list=status,
         )
         total = issue_procs.count()
         task_exec.add_event(f"Publishing articles of {total} issues")
