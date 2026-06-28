@@ -1003,7 +1003,7 @@ def task_migrate_and_publish_articles(
         kwargs_.pop("collection_acron_list", None)
         kwargs_.pop("journal_acron_list", None)
 
-        skipped_journals = 0
+        skipped_journals = []
         task_exec.total_to_process = total_journals_to_process
         total_processed = 0
         for key in items_to_process.keys():
@@ -1131,8 +1131,8 @@ def task_migrate_and_publish_articles_by_journal(
             selected_issue_procs = IssueProc.select_items(
                 journal_proc_id_list=[journal_proc_id],
                 status_list=status,
-                force_update=force_migrate_document_records
-                or force_migrate_document_files,
+                force_migrate_document_records=force_migrate_document_records,
+                force_migrate_document_files=force_migrate_document_files,
                 to_migrate_articles=True,
             )
             issue_proc_id_list = list(
