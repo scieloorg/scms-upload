@@ -1002,26 +1002,21 @@ def task_migrate_and_publish_articles(
         kwargs_.pop("collection_acron_list", None)
         kwargs_.pop("journal_acron_list", None)
 
-        skipped_journals = []
         task_exec.total_to_process = total_journals_to_process
         total_processed = 0
         for key in items_to_process.keys():
-            kwargs = {}
-            kwargs.update(kwargs_)
             journal_proc_id, journal_acron = key
+
+            kwargs = {}
+            kwargs.update(kwargs_)            
             kwargs["journal_proc_id"] = journal_proc_id
             kwargs["journal_acron"] = journal_acron
             kwargs["issue_proc_id_list"] = items_to_process[key]
             kwargs["status"] = status
             
-            if not items_to_process[key]:
-                if not IssueProc.objects.filter(journal_proc_id=journal_proc_id).exists():
-                    skipped_journals.append(journal_acron)
-                    continue
             total_processed += 1
             task_migrate_and_publish_articles_by_journal.delay(**kwargs)
 
-        task_exec.add_event({"skipped_journals": skipped_journals})
         task_exec.total_processed = total_processed
         task_exec.finish()
 
