@@ -1438,9 +1438,11 @@ class IssueProc(BaseProc, ClusterableModel):
         journal_proc_id_list=None,
         publication_year=None,
         issue_folder=None,
-        status_list=None,
+        article_status_list=None,
+        issue_status_list=None,
         force_update=False,
-        to_migrate_articles=False,
+        force_migrate_document_records=False,
+        force_migrate_document_files=False,
         collection_acron=None,
         journal_acron=None,
         issue_proc_id=None,
@@ -1466,18 +1468,22 @@ class IssueProc(BaseProc, ClusterableModel):
         if issue_proc_id:
             params["issue_proc_id"] = issue_proc_id
 
-        if to_migrate_articles:
-            return cls.objects.filter(
-                Q(docs_status__in=status_list)
-                | Q(files_status__in=status_list),
-                **params,
-            )
-        return cls.objects.filter(
-            Q(migration_status__in=status_list)
-            | Q(qa_ws_status__in=status_list)
-            | Q(public_ws_status__in=status_list),
-            **params,
-        )
+        selected = cls.objects.filter(**params)
+        if force_update:
+            selected.exclude(migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO).update(migration_status=tracker_choices.PROGRESS_STATUS_REPROC)
+
+        if force_migrate_document_records:
+            selected.exclude(docs_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO).update(docs_status=tracker_choices.PROGRESS_STATUS_REPROC)
+
+        if force_migrate_document_files:
+            selected.exclude(files_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO).update(files_status=tracker_choices.PROGRESS_STATUS_REPROC)
+
+        q = Q()
+        if article_status_list:
+            q |= Q(docs_status__in=article_status_list) | Q(files_status__in=article_status_list)
+        if issue_status_list:
+            q |= Q(migration_status__in=issue_status_list) | Q(qa_ws_status__in=issue_status_list) | Q(public_ws_status__in=issue_status_list)
+        return selected.filter(q)
 
     @classmethod
     def filter_by_status(cls, STATUS):
@@ -1590,6 +1596,7 @@ class IssueProc(BaseProc, ClusterableModel):
             self.files_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
+            ArticleProc.mark_for_reprocessing(self)
             failures = []
             migration_result = migrate_issue_files_function(
                 user,
@@ -1766,8 +1773,11 @@ class IssueProc(BaseProc, ClusterableModel):
             total_document_records = id_file_records.count()
             detail["total_document_records"] = total_document_records
 
-            if not force_update:
-                force_update = ArticleProc.objects.filter(issue_proc=self).count() < total_document_records
+            force_update = (
+                force_update or 
+                self.docs_status != tracker_choices.PROGRESS_STATUS_DONE or
+                ArticleProc.objects.filter(issue_proc=self).count() < total_document_records
+            )    
             if not force_update:
                 # obtém somente os registros por fazer (todo=True)
                 id_file_records = id_file_records.filter(todo=True)
@@ -1985,7 +1995,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         AutocompletePanel("sps_pkg", read_only=True),
     ]
     panel_status = [
-        FieldPanel("pid_status"),
+        FieldPanel("pid_status", read_only=True),
         FieldPanel("xml_status"),
         FieldPanel("sps_pkg_status"),
         FieldPanel("migration_status"),
