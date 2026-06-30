@@ -36,8 +36,8 @@
     "access_key": "",
     "secret_key": "",
     "secure": false,
-    "bucket": "root",
-    "write_prefix": "website"
+    "host_root_dir": "root",
+    "bucket": "website"
 },
 
 "classic_ws_config": {
