@@ -17,11 +17,11 @@ class MinioConfigurationViewSet(CommonControlFieldViewSet):
     list_display = (
         "name",
         "host",
-        "bucket_root",
+        "bucket",
     )
     search_fields = (
         "name",
         "host",
-        "bucket_root",
+        "bucket",
     )
 
