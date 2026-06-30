@@ -54,10 +54,15 @@ def now():
     return datetime.utcnow().isoformat().replace(":", "-").replace(".", "-")
 
 
-def minio_push_file_content(content, mimetype, object_name):
-    # TODO MinioStorage.fput_content
+def get_minio_config():
     try:
-        minio = MinioConfiguration.get_files_storage(name="website")
+        return MinioConfiguration.get_files_storage(name="website")
+    except Exception as e:
+        raise MinioConfiguration.DoesNotExist(e)
+
+
+def minio_push_file_content(minio, content, mimetype, object_name):
+    try:
         return {"uri": minio.fput_content(content, mimetype, object_name)}
     except Exception as e:
         logging.exception(e)
@@ -646,8 +651,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
         self.save()
         self.components.all().delete()
 
+        minio = get_minio_config()
         xml_with_pre = self.upload_items_to_the_cloud(
             user,
+            minio,
             article_proc,
             "upload_zip_content_to_the_cloud",
             self.upload_zip_content_to_the_cloud,
@@ -655,6 +662,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         )
         self.upload_items_to_the_cloud(
             user,
+            minio,
             article_proc,
             "upload_xml_to_the_cloud",
             self.upload_xml_to_the_cloud,
@@ -662,6 +670,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         )
         self.upload_items_to_the_cloud(
             user,
+            minio,
             article_proc,
             "upload_article_page_to_the_cloud",
             self.upload_article_page_to_the_cloud,
@@ -670,10 +679,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
         self.save()
 
     def upload_items_to_the_cloud(
-        self, user, article_proc, operation_title, callable_get_items, **params
+        self, user, minio, article_proc, operation_title, callable_get_items, **params
     ):
         op = article_proc.start(user, operation_title)
-        response = callable_get_items(user, **params)
+        response = callable_get_items(user, minio, **params)
         detail = dict(response)
         try:
             xml_with_pre = detail.pop("xml_with_pre")
@@ -693,6 +702,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
     def upload_to_the_cloud(
         self,
         user,
+        minio,
         filename,
         ext,
         content,
@@ -709,6 +719,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             if content:
                 mimetype = mimetypes.types_map.get(ext.lower()) or "application/octet-stream"
                 response = minio_push_file_content(
+                    minio,
                     content=content,
                     mimetype=mimetype,
                     object_name=f"{self.subdir}/{filename}",
@@ -738,7 +749,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         response["filename"] = filename
         return response
 
-    def upload_zip_content_to_the_cloud(self, user, original_pkg_components):
+    def upload_zip_content_to_the_cloud(self, user, minio, original_pkg_components):
         result = {}
         try:
             with TemporaryDirectory() as targetdir:
@@ -747,7 +758,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     zip_file_path = os.path.join(targetdir, filename)
                     package = SPPackage.from_file(self.file.path, workdir)
                     package.optimise(new_package_file_path=zip_file_path, preserve_files=False)
-                    result = self.upload_components_to_the_cloud(user, original_pkg_components, zip_file_path)
+                    result = self.upload_components_to_the_cloud(user, minio, original_pkg_components, zip_file_path)
                     detail = {"source": self.file.path, "zip_file_path": zip_file_path, "optimized": True}
         except Exception as e:
             zip_file_path = self.file.path
@@ -758,14 +769,13 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 "message": str(e),
                 "error": str(type(e)),
             }
-            result = self.upload_components_to_the_cloud(user, original_pkg_components, zip_file_path)
+            result = self.upload_components_to_the_cloud(user, minio, original_pkg_components, zip_file_path)
         result.update(detail)
         return result
 
-    def upload_components_to_the_cloud(self, user, original_pkg_components, zip_file_path):
+    def upload_components_to_the_cloud(self, user, minio, original_pkg_components, zip_file_path):
         xml_with_pre = None
         items = []
-
         with ZipFile(zip_file_path) as optimised_fp:
             for item in set(optimised_fp.namelist()):
                 name, ext = os.path.splitext(item)
@@ -783,6 +793,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                                 item = item + ext
                     result = self.upload_to_the_cloud(
                         user=user,
+                        minio=minio,
                         filename=item,
                         ext=ext,
                         content=content,
@@ -793,7 +804,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     items.append(result)
         return {"xml_with_pre": xml_with_pre, "items": items}
 
-    def upload_xml_to_the_cloud(self, user, xml_with_pre):
+    def upload_xml_to_the_cloud(self, user, minio, xml_with_pre):
         replacements = {}
         for item in self.components.filter(uri__isnull=False).iterator():
             replacements[item.basename] = item.uri
@@ -809,7 +820,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         filename = self.sps_pkg_name + ".xml"
 
         result = self.upload_to_the_cloud(
-            user, filename, ".xml", content, "xml", lang=None, legacy_uri=None
+            user, minio, filename, ".xml", content, "xml", lang=None, legacy_uri=None
         )
         self.xml_uri = result.get("uri")
         self.save()
@@ -844,7 +855,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                     "component_type": "html",
                 }
 
-    def upload_article_page_to_the_cloud(self, user):
+    def upload_article_page_to_the_cloud(self, user, minio):
         items = []
         for item in self.generate_article_html_pages():
             lang = item["lang"]
@@ -854,6 +865,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 content = None
             response = self.upload_to_the_cloud(
                 user,
+                minio,
                 item["filename"],
                 item["ext"],
                 content,
