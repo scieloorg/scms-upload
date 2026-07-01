@@ -364,9 +364,11 @@ def process_journal_result(
         foundation_year=official.get("foundation_year"),
         user=user,
     )
+    next_jt = result.get("next_journal_title")
+    prev_jt = result.get("previous_journal_title")
     official_journal.add_related_journal(
-        result.get("previous_journal_title"),
-        result.get("next_journal_title"),
+        prev_jt.get("previous_journal_title") if isinstance(prev_jt, dict) else prev_jt,
+        next_jt.get("next_journal_title") if isinstance(next_jt, dict) else next_jt,
     )
 
     # Cria/atualiza o journal

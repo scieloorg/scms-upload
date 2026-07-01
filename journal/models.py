@@ -121,7 +121,7 @@ class OfficialJournal(CommonControlField):
     )
     issnl = models.CharField(_("ISSNL"), max_length=9, null=True, blank=True)
     previous_journal_title = models.CharField(max_length=500, null=True, blank=True)
-    next_journal_title = models.CharField(max_length=128, null=True, blank=True)
+    next_journal_title = models.CharField(max_length=500, null=True, blank=True)
 
     base_form_class = OfficialJournalForm
 
