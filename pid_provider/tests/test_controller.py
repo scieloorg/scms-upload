@@ -3,7 +3,7 @@ from unittest.mock import ANY, Mock, patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from pid_provider.controller import PidProvider
+from pid_provider.provider import PidProvider
 from pid_provider.models import PidProviderXML
 
 User = get_user_model()

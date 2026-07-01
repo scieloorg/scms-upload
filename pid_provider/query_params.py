@@ -3,8 +3,53 @@ from functools import cached_property
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from core.utils.profiling_tools import profile_function
+from core.utils.similarity import how_similar
 from pid_provider import exceptions
+
+
+def compare(registered_items, input_data):
+    """
+    """
+    total_score = 0
+    items = []
+    for label, registered_item in registered_items.items():
+        result = compare_items(label, registered_item, input_data.get(label))
+        items.append(result)
+        total_score += result["score"]
+    return {
+        "items": items,
+        "total_score": total_score,
+        "percentual_score": total_score / len(items)
+    }
+
+
+def compare_lists(registered, xml_adapter_titles):
+    if xml_adapter_titles == registered:
+        return 1
+    if not xml_adapter_titles:
+        return 0
+    if not registered:
+        return 0
+    words1 = set()
+    for item in xml_adapter_titles:
+        words1.update(item.split())
+    words2 = set()
+    for item in registered:
+        words2.update(item.split())
+    return how_similar(" ".join(sorted(words1)), " ".join(sorted(words2)))
+
+
+def compare_items(label, registered, input_data):
+    if isinstance(registered, list):
+        score = compare_lists(registered, input_data)
+    elif (input_data or None) == (registered or None):
+        score = 1
+    else:
+        score = 0
+    response = {"label": label, "score": score}
+    if score != 1:
+        response["registered"] = registered
+    return response
 
 
 def get_score(registered, xml_data, min_value, max_value):
@@ -173,17 +218,21 @@ class QueryBuilderPidProviderXML:
         """
         q = Q()
         
+        other_pids = set()
         # PID v3 - máxima prioridade
         if self.v3:
             q |= Q(v3=self.v3)
+            other_pids.add(self.v3)
         
         # PID v2
         if self.v2:
             q |= Q(v2=self.v2)
+            other_pids.add(self.v2)
         
         # AOP PID
         if self.aop_pid:
             q |= Q(v2=self.aop_pid) | Q(aop_pid=self.aop_pid)
+            other_pids.add(self.aop_pid)
             
         # Package name
         pkg_names = set()
@@ -196,10 +245,11 @@ class QueryBuilderPidProviderXML:
         if pkg_names:
             q |= Q(pkg_name__in=pkg_names)
 
-        # # DOI principal
-        # if self.main_doi:
-        #     q |= Q(main_doi=self.main_doi)
+        if self.main_doi:
+            q |= Q(main_doi=self.main_doi)
 
+        if other_pids:
+            q |= Q(other_pid__pid_in_xml__in=other_pids)
         return q
     
     @cached_property
@@ -245,23 +295,36 @@ class QueryBuilderPidProviderXML:
         Returns
         -------
         dict
-            Dicionário com elocation_id, fpage, fpage_seq, lpage, 
-            pub_year, volume, number e suppl
+            Dicionário com pub_year, volume, number e suppl
+        """
+        return {
+            "pub_year": self.pub_year,
+            "volume": self.volume,
+            "number": self.number,
+            "suppl": self.suppl,
+        }
+    
+    @cached_property
+    def article_location_params(self):
+        """
+        Constrói dicionário com metadados do fascículo e paginação do artigo.
+        
+        Retorna todos os campos sem verificar presença, permitindo
+        que o ORM do Django filtre automaticamente valores None.
+        
+        Returns
+        -------
+        dict
+            Dicionário com elocation_id, fpage, fpage_seq, lpage, v2__endswith
         """
         data = {
             "elocation_id": self.elocation_id,
             "fpage": self.fpage,
             "fpage_seq": self.fpage_seq,
             "lpage": self.lpage,
-            "pub_year": self.pub_year,
-            "volume": self.volume,
-            "number": self.number,
-            "suppl": self.suppl,
         }
         if self.order:
             data["v2__endswith"] = self.order
-        elif not self.elocation_id and not self.fpage and self.main_doi:
-            data["main_doi__iexact"] = self.main_doi
         return data
     
     @cached_property
@@ -279,33 +342,30 @@ class QueryBuilderPidProviderXML:
             ou None se nenhum dado textual estiver disponível
         """
         # Verifica se há algum dado textual disponível
-        if not any([
-            self.z_surnames,
-            self.z_collab,
-            self.z_links,
-            self.z_partial_body,
-        ]):
-            return Q(
-                z_surnames=self.z_surnames,
-                z_collab=self.z_collab,
-                z_links=self.z_links,
-                z_partial_body=self.z_partial_body,
-            )
+        if self.z_surnames or self.z_partial_body or self.z_collab or self.z_links:
+            q = Q()
         
-        q = Q()
+            # Adiciona query para sobrenomes se disponível
+            if self.z_surnames:
+                q |= Q(z_surnames=self.z_surnames)
+            
+            # Adiciona queries para outros campos textuais
+            if self.z_collab:
+                q |= Q(z_collab=self.z_collab)
+            
+            if self.z_links:
+                q |= Q(z_links=self.z_links)
+            
+            if self.z_partial_body:
+                q |= Q(z_partial_body=self.z_partial_body)
+            
+            return q
         
-        # Adiciona query para sobrenomes se disponível
-        if self.z_surnames:
-            q |= Q(z_surnames=self.z_surnames)
+        return Q(
+            z_surnames=self.z_surnames,
+            z_collab=self.z_collab,
+            z_links=self.z_links,
+            z_partial_body=self.z_partial_body,
+        )
         
-        # Adiciona queries para outros campos textuais
-        if self.z_collab:
-            q |= Q(z_collab=self.z_collab)
         
-        if self.z_links:
-            q |= Q(z_links=self.z_links)
-        
-        if self.z_partial_body:
-            q |= Q(z_partial_body=self.z_partial_body)
-        
-        return q
