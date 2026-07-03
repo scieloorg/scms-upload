@@ -6,10 +6,10 @@ from unittest.mock import ANY, MagicMock, Mock, call, patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from lxml import etree
-from xmlsps.xml_sps_lib import XMLWithPre
+from packtools.xmlsps.xml_sps_lib import XMLWithPre
 
 from pid_provider import exceptions, models
-from pid_provider.xml_sps_adapter import PidProviderXMLAdapter
+from packtools.pid_provider.xml_sps_adapter import PidProviderXMLAdapter
 
 User = get_user_model()
 
@@ -100,7 +100,7 @@ class PidProviderXMLValidateQueryParamsTest(TestCase):
     def test_validate_query_params_issue_params_only(self):
         params = {}
         params.update(self.issue_params)
-        with self.assertRaises(exceptions.NotEnoughParametersToGetDocumentRecordError):
+        with self.assertRaises(exceptions.NotEnoughParametersToGetPidProviderXMLError):
             result = models.PidProviderXML.validate_query_params(params)
 
     def test_validate_query_params_journal_issns_absence(self):
@@ -108,7 +108,7 @@ class PidProviderXMLValidateQueryParamsTest(TestCase):
         params.update(self.issue_params)
         del params["journal__issn_print"]
         del params["journal__issn_electronic"]
-        with self.assertRaises(exceptions.NotEnoughParametersToGetDocumentRecordError):
+        with self.assertRaises(exceptions.NotEnoughParametersToGetPidProviderXMLError):
             result = models.PidProviderXML.validate_query_params(params)
 
     def test_validate_query_params_pub_year_absence(self):
@@ -116,7 +116,7 @@ class PidProviderXMLValidateQueryParamsTest(TestCase):
         params.update(self.issue_params)
         del params["article_pub_year"]
         del params["issue__pub_year"]
-        with self.assertRaises(exceptions.NotEnoughParametersToGetDocumentRecordError):
+        with self.assertRaises(exceptions.NotEnoughParametersToGetPidProviderXMLError):
             result = models.PidProviderXML.validate_query_params(params)
 
     def test_validate_query_params_main_doi_absence(self):
@@ -200,7 +200,7 @@ class PidProviderXMLValidateQueryParamsTest(TestCase):
         del params["z_collab"]
         del params["z_links"]
 
-        with self.assertRaises(exceptions.NotEnoughParametersToGetDocumentRecordError):
+        with self.assertRaises(exceptions.NotEnoughParametersToGetPidProviderXMLError):
             result = models.PidProviderXML.validate_query_params(params)
 
 
@@ -314,10 +314,10 @@ class PidProviderXMLQueryDocumentTest(TestCase):
         ]
         mock_query_list.return_value = params_list
         mock_validate_params.side_effect = (
-            exceptions.NotEnoughParametersToGetDocumentRecordError
+            exceptions.NotEnoughParametersToGetPidProviderXMLError
         )
 
-        with self.assertRaises(exceptions.NotEnoughParametersToGetDocumentRecordError):
+        with self.assertRaises(exceptions.NotEnoughParametersToGetPidProviderXMLError):
             xml_adapter = _get_xml_adapter()
             result = models.PidProviderXML._query_document(xml_adapter)
 
@@ -379,7 +379,7 @@ class PidProviderXMLGetRegisteredTest(TestCase):
         mock_query_document,
     ):
         mock_query_document.side_effect = (
-            exceptions.NotEnoughParametersToGetDocumentRecordError
+            exceptions.NotEnoughParametersToGetPidProviderXMLError
         )
 
         result = models.PidProviderXML.get_registered(self.xml_with_pre)
@@ -731,7 +731,7 @@ class PidProviderXMLRegisterTest(TestCase):
         mock_now,
     ):
         expected = {
-            "result_type": "<class 'pid_provider.exceptions.NotEnoughParametersToGetDocumentRecordError'>",
+            "result_type": "<class 'pid_provider.exceptions.NotEnoughParametersToGetPidProviderXMLError'>",
             "result_message": "No attribute enough for disambiguations {'z_surnames': None, 'z_collab': None, 'main_doi': None, 'z_links': None, 'z_partial_body': None, 'pkg_name': None, 'elocation_id': None, 'journal__issn_print': None, 'journal__issn_electronic': None, 'article_pub_year': None}",
             "origin": "filename.xml",
             "xml": "<article/>",
@@ -778,7 +778,7 @@ class PidProviderXMLRegisterTest(TestCase):
         mock_now,
     ):
         expected = {
-            "result_type": "<class 'pid_provider.exceptions.NotEnoughParametersToGetDocumentRecordError'>",
+            "result_type": "<class 'pid_provider.exceptions.NotEnoughParametersToGetPidProviderXMLError'>",
             "result_message": "No attribute enough for disambiguations {'z_surnames': None, 'z_collab': None, 'main_doi': None, 'z_links': None, 'z_partial_body': None, 'pkg_name': None, 'elocation_id': None, 'journal__issn_print': None, 'journal__issn_electronic': None, 'article_pub_year': None}",
             "origin": "filename.xml",
             "xml": "<article/>",
