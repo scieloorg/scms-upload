@@ -45,7 +45,7 @@ def compare_items(label, registered, input_data):
     elif (input_data or None) == (registered or None):
         score = 1
     else:
-        score = 0
+        score = how_similar(input_data, registered)
     response = {"label": label, "score": score}
     if score != 1:
         response["registered"] = registered
@@ -90,7 +90,7 @@ class QueryBuilderPidProviderXML:
         self.xml_adapter = xml_adapter
     
     # ========== Cached Properties para Atributos do XML Adapter ==========
-    
+
     @cached_property
     def v3(self):
         """PID v3 do documento."""

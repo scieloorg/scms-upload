@@ -103,26 +103,52 @@ def xml_directory_path(instance, filename):
     return f"pid_provider/{subdir_sps_pkg_name}/{filename}"
 
 
+def get_collection_from_article_id_authority(article_id_authority):
+    article_id_authority = (article_id_authority or "").split("-")[-1]
+    if article_id_authority:
+        try:
+            return Collection.objects.get(
+                acronym__iexact=article_id_authority.lower()
+            )
+        except Collection.DoesNotExist:
+            return None
+    return None
+
+
 class XMLVersion(CommonControlField):
     """
     Tem função de guardar a versão do XML
     """
-
     pid_provider_xml = models.ForeignKey(
         "PidProviderXML", null=True, blank=True, on_delete=models.SET_NULL
     )
     file = models.FileField(upload_to=xml_directory_path, null=True, blank=True, max_length=300)
     finger_print = models.CharField(max_length=64, null=True, blank=True)
+    body_fragment_fingerprint = models.CharField(_("body fragment fingerprint"), max_length=300, null=True, blank=True)
+
+    pkg_name = models.CharField(_("Package name"), max_length=100, null=True, blank=True)
+    pid_v3 = models.CharField(_("pid_v3"), max_length=23, null=True, blank=True)
+    pid_v2 = models.CharField(_("pid_v2"), max_length=24, null=True, blank=True)
+    aop_pid = models.CharField(_("AOP PID"), max_length=64, null=True, blank=True)
+    collection = models.ForeignKey("Collection", null=True, blank=True, on_delete=models.SET_NULL)
 
     class Meta:
         ordering = ["-created"]
         indexes = [
             models.Index(fields=["pid_provider_xml"]),
             models.Index(fields=["finger_print"]),
+            models.Index(fields=["pid_v2"]),
+            models.Index(fields=["collection"]),
+            models.Index(fields=["pid_v3"]),
+            models.Index(fields=["aop_pid"]),
+            models.Index(fields=["pkg_name"]),
+            models.Index(fields=["body_fragment_fingerprint"]),
         ]
 
     def __str__(self):
-        return f"{self.pid_provider_xml.pkg_name} {self.created}"
+        if self.collection and self.pkg_name and self.created:
+            return f"{self.collection} {self.pkg_name} {self.created}"
+        return f"{self.pid_provider_xml} {self.created}"
 
     @classmethod
     @profile_classmethod
@@ -131,11 +157,21 @@ class XMLVersion(CommonControlField):
         user,
         pid_provider_xml,
         xml_with_pre,
+        collection,
     ):
+        finger_print = xml_with_pre.finger_print
+        body_fragment_fingerprint = xml_with_pre.body_fragment_fingerprint
         try:
             obj = cls()
             obj.pid_provider_xml = pid_provider_xml
-            obj.finger_print = xml_with_pre.finger_print
+            obj.collection = collection
+            obj.finger_print = finger_print
+            obj.body_fragment_fingerprint = body_fragment_fingerprint
+            obj.pid_v3 = xml_with_pre.v3
+            obj.pid_v2 = xml_with_pre.v2
+            obj.collection = get_collection_from_article_id_authority(xml_with_pre.v2_authority)
+            obj.aop_pid = xml_with_pre.aop_pid
+            obj.pkg_name = xml_with_pre.pkg_name
             obj.creator = user
             obj.save()
             obj.save_file(
@@ -144,7 +180,7 @@ class XMLVersion(CommonControlField):
             obj.save()
             return obj
         except IntegrityError:
-            return cls.get(pid_provider_xml, xml_with_pre.finger_print)
+            return cls.get(pid_provider_xml, finger_print, body_fragment_fingerprint)
 
     def save_file(self, filename, content):
         try:
@@ -181,24 +217,31 @@ class XMLVersion(CommonControlField):
 
     @classmethod
     @profile_classmethod
-    def get(cls, pid_provider_xml, finger_print):
+    def get(cls, pid_provider_xml, finger_print=None, body_fragment_fingerprint=None):
         """
         Retorna última versão se finger_print corresponde
         """
-        if not pid_provider_xml or not finger_print:
+        if not pid_provider_xml or not (body_fragment_fingerprint or finger_print):
             raise XMLVersionGetError(
                 "XMLVersion.get requires pid_provider_xml and xml_with_pre parameters"
             )
         # .latest() já levanta DoesNotExist se vazio
+        if body_fragment_fingerprint:
+            return cls.objects.filter(
+                pid_provider_xml=pid_provider_xml, body_fragment_fingerprint=body_fragment_fingerprint
+            ).latest("created")
+
         return cls.objects.filter(
-            pid_provider_xml=pid_provider_xml, finger_print=finger_print
+            pid_provider_xml=pid_provider_xml, finger_print=finger_print,
         ).latest("created")
 
     @classmethod
     @profile_classmethod
     def get_or_create(cls, user, pid_provider_xml, xml_with_pre):
         try:
-            latest = cls.get(pid_provider_xml, xml_with_pre.finger_print)
+            finger_print = xml_with_pre.finger_print
+            body_fragment_fingerprint = xml_with_pre.body_fragment_fingerprint
+            latest = cls.get(pid_provider_xml, finger_print, body_fragment_fingerprint)
             try:
                 file_exist = os.path.isfile(latest.file.path)
             except (AttributeError, TypeError, ValueError) as e:
@@ -216,6 +259,7 @@ class XMLVersion(CommonControlField):
                 user=user,
                 pid_provider_xml=pid_provider_xml,
                 xml_with_pre=xml_with_pre,
+                collection=get_collection_from_article_id_authority(xml_with_pre.v2_authority)
             )
 
 
@@ -395,7 +439,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     z_links = models.CharField(_("links"), max_length=64, null=True, blank=True)
     z_partial_body = models.CharField(
         _("partial_body"), max_length=64, null=True, blank=True
-    )
+    )    
     # data de atualização / criação do registro fonte
     origin_date = models.CharField(
         _("Origin date"), max_length=10, null=True, blank=True
@@ -413,8 +457,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     readable_data = models.JSONField(
         _("Readable data"), null=True, blank=True
     )
-
-
 
     base_form_class = CoreAdminModelForm
 
@@ -438,10 +480,10 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         InlinePanel("other_pid", label=_("Other PID")),
     ]
     panel_c = [
-        FieldPanel("z_surnames"),
-        FieldPanel("z_collab"),
-        FieldPanel("z_links"),
-        FieldPanel("z_partial_body"),
+        FieldPanel("z_surnames", read_only=True),
+        FieldPanel("z_collab", read_only=True),
+        FieldPanel("z_links", read_only=True),
+        FieldPanel("z_partial_body", read_only=True),
         FieldPanel("readable_data", widget=ReadOnlyPrettyJSONWidget(), read_only=True),
     ]
 
@@ -626,35 +668,18 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             return False
         return True
 
-    @staticmethod
-    def build_readable_data(xml_with_pre):
-        try:
-            persons = xml_with_pre.authors.get("person") or []
-            surnames = [p.get("surname") for p in persons if p.get("surname")]
-        except Exception:
-            surnames = []
-        partial = (xml_with_pre.partial_body or "")[: PARTIAL_BODY_MAX]
-        return {
-            "surnames": surnames,
-            "collab": xml_with_pre.collab,
-            "links": xml_with_pre.links,
-            "article_titles": xml_with_pre.article_titles_texts,
-            "partial_body": partial or None,
-        }
-    
     @property
     def data_to_compare(self):
         readable = self.readable_data or {}
         titles = readable.get("article_titles")
-        if titles is None:
-            # legado: sem readable_data -> recai no XML (caro, lê arquivo)
-            titles = self.xml_with_pre.article_titles_texts
+        body_fragment = readable.get("body_fragment")
         return {
-            "title": titles,
+            "article_titles": titles or self.xml_with_pre.article_titles_texts,
             "z_surnames": self.z_surnames,
             "z_collab": self.z_collab,
             "z_links": self.z_links,
             "z_partial_body": self.z_partial_body,
+            "body_fragment": body_fragment or self.xml_with_pre.get_body_fragment(300),
         }
 
     @classmethod
@@ -683,15 +708,12 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         try:
             response["input_data"] = xml_with_pre.data
             response["input_data"].update({"origin": origin})
-            print(f"response: {response}")
 
             xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
             response["xml_adapter_data"] = xml_adapter.data
-            print(f"response: {response}")
 
             # dados legíveis do XML entrando (mesmo formato do readable_data)
-            readable_input = cls.build_readable_data(xml_with_pre)
-            print(f"readable_input: {readable_input}")
+            readable_input = xml_with_pre.get_article_data()
             pkg_name = xml_adapter.sps_pkg_name
 
             # consulta se documento já está registrado
@@ -1011,13 +1033,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @classmethod
     def best_matches(cls, results, xml_adapter):
         # results agora é uma LISTA materializada (não queryset)
-        input_data = {
-            "title": xml_adapter.xml_with_pre.article_titles_texts,
-            "z_surnames": xml_adapter.z_surnames,
-            "z_collab": xml_adapter.z_collab,
-            "z_links": xml_adapter.z_links,
-            "z_partial_body": xml_adapter.z_partial_body,
-        }
+        input_data = xml_adapter.get_data_to_compare()
         detail = {
             "total_results": len(results),
             "input_data": input_data,
@@ -1074,7 +1090,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         self.z_partial_body = xml_adapter.z_partial_body
 
         # NOVO: dados legíveis (somente inspeção)
-        self.readable_data = self.build_readable_data(xml_adapter.xml_with_pre)
+        self.readable_data = xml_adapter.xml_with_pre.get_article_data()
  
 
     @profile_method
