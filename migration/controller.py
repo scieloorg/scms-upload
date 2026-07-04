@@ -768,7 +768,7 @@ def import_journal_acron_id_records(
             pid_sliced=Substr("item_pid", 2, Length("item_pid") - 6)
         ).values_list("pid_sliced", flat=True).distinct()
 
-        selected_issue_procs = journal_proc.issueproc_set.filter(
+        journal_proc.issueproc_set.filter(
             pid__in=issue_pids,
         ).exclude(
             docs_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
@@ -777,7 +777,7 @@ def import_journal_acron_id_records(
             updated_by=user,
         )
         article_proc_model.objects.filter(
-            issue_proc__in=selected_issue_procs or []
+            issue_proc__pid__in=issue_pids
         ).exclude(
             xml_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
         ).update(
