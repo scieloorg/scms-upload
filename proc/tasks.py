@@ -1118,8 +1118,9 @@ def task_migrate_and_publish_articles_by_journal(
         total_processed = 0
         total_to_process = 0
 
+        issue_proc_and_related_article_proc_id_list = {}
         if issue_proc_id_list:
-            task_exec.add_number("total issues selected to process", len(issue_proc_id_list))
+            task_exec.add_number("total issue_proc_id_list", len(issue_proc_id_list))
             selected_article_proc_items = []
         else:
             selected_issue_procs = IssueProc.select_items(
@@ -1131,7 +1132,7 @@ def task_migrate_and_publish_articles_by_journal(
             issue_proc_id_list = list(
                 selected_issue_procs.values_list("id", flat=True)
             )
-            task_exec.add_number("total issues found to process", len(issue_proc_id_list))
+            task_exec.add_number("total issue_proc todo or reproc", len(issue_proc_id_list))
             selected_article_proc_items = (
                 ArticleProc.select_items(
                     journal_proc_id_list=[journal_proc_id],
@@ -1142,6 +1143,7 @@ def task_migrate_and_publish_articles_by_journal(
                 .values_list("issue_proc_id", "id")
                 .distinct()
             )
+            task_exec.add_number("total articles todo or reproc", selected_article_proc_items.count())
 
         issue_proc_and_related_article_proc_id_list = {
             issue_proc_id: []
@@ -1154,7 +1156,7 @@ def task_migrate_and_publish_articles_by_journal(
                 ).append(article_proc_id)
 
         total_to_process = len(issue_proc_and_related_article_proc_id_list)
-        task_exec.add_number("total issues to process", total_to_process)
+        task_exec.add_number("total issue_proc todo or reproc", total_to_process)
 
         for (
             issue_proc_id,
