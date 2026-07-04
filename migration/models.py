@@ -999,7 +999,7 @@ class IdFileRecord(CommonControlField, Orderable):
                 item_type,
                 item_pid,
                 data,
-                todo,
+                todo=True,
             )
 
     def get_record_data(self, journal_data=None, issue_data=None):
