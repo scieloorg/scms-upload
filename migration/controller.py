@@ -712,8 +712,7 @@ def import_journal_acron_id_records(
     Para um dado JournalAcronIdFile, criar itens em IdFileRecord
     """
     detail = {}
-    stats = {}
-    output = {}
+    exceptions = []
 
     try:
         detail["params"] = {
@@ -750,11 +749,13 @@ def import_journal_acron_id_records(
             )
 
         for item in get_bases_work_acron_id_file_records(
-            user,
             source_path,
             classic_website,
-            journal_proc,
         ):
+            if item.get("exception"):
+                exceptions.append(item.get("exception"))
+                continue
+
             item["force_update"] = force_update
             IdFileRecord.create_or_update(
                 user,
@@ -801,71 +802,54 @@ def import_journal_acron_id_records(
         detail["message"] = str(e)
     except Exception as e:
         detail["traceback"] = traceback.format_exc()
-        
+
+    detail["exceptions"] = exceptions
+
     return detail
 
 
 def get_bases_work_acron_id_file_records(
-    user, source_path, classic_website, journal_proc
+    source_path, classic_website,
 ):
-    try:
-        event = None
-        event = journal_proc.start(user, "get_bases_work_acron_id_file_records")
-        for item in get_doc_records(source_path):
-            try:
-                issue_id = item.get("issue_id")
-                doc_id = item.get("doc_id")
-                if doc_id:
-                    yield dict(
-                        item_type="article",
-                        item_pid=doc_id,
-                        data=item["doc_data"],
-                    )
+    for item in get_doc_records(source_path):
+        try:
+            issue_id = item.get("issue_id")
+            doc_id = item.get("doc_id")
 
-                elif issue_id:
-                    yield dict(
-                        item_type="issue",
-                        item_pid=issue_id,
-                        data=item["issue_data"],
-                    )
-
-                if not doc_id:
-                    continue
-
-                # se houver bases-work/p/<pid>, obtém os registros de parágrafo
-                ign_pid, p_records = classic_website.get_p_records(doc_id)
-                p_records = list(p_records)
-                if p_records:
-                    # adiciona registros p aos registros do artigo
-                    # info["external_p_records_count"] = len(p_records)
-                    yield dict(
-                        item_type="paragraph",
-                        item_pid=doc_id,
-                        data=p_records,
-                    )
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                subevent = journal_proc.start(
-                    user, "get_bases_work_acron_id_file_records item"
+            if doc_id:
+                yield dict(
+                    item_type="article",
+                    item_pid=doc_id,
+                    data=item["doc_data"],
                 )
-                subevent.finish(
-                    user,
-                    completed=False,
-                    detail=item,
-                    exception=e,
-                    exc_traceback=exc_traceback,
+                try:
+                    # se houver bases-work/p/<pid>, obtém os registros de parágrafo
+                    ign_pid, p_records = classic_website.get_p_records(doc_id)
+                    p_records = list(p_records)
+                    if p_records:
+                        # adiciona registros p aos registros do artigo
+                        # info["external_p_records_count"] = len(p_records)
+                        yield dict(
+                            item_type="paragraph",
+                            item_pid=doc_id,
+                            data=p_records,
+                        )
+                except FileNotFoundError:
+                    # é aceitável que bases-work/p/<pid>....id não exista
+                    pass
+
+            elif issue_id:
+                yield dict(
+                    item_type="issue",
+                    item_pid=issue_id,
+                    data=item["issue_data"],
                 )
 
-        event.finish(user, completed=True)
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        if event:
-            event.finish(
-                user,
-                completed=False,
-                detail=None,
-                exception=e,
-                exc_traceback=exc_traceback,
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            yield dict(
+                item_pid=doc_id or issue_id,
+                exception=str(e)
             )
 
 
