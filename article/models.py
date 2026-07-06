@@ -911,7 +911,7 @@ class Article(ClusterableModel, CommonControlField):
         try:
             return cls._exclude_invalid_records(user, issue, sps_pkg_id_list, timeout)
         except Exception as e:
-            return {"error": str(e), "error_type": str(type(e)), "traceback": traceback.format_exc(e)}
+            return {"error": str(e), "error_type": str(type(e)), "traceback": traceback.format_exc()}
 
     @classmethod
     def _exclude_invalid_records(cls, user, issue, sps_pkg_id_list, timeout=None):
