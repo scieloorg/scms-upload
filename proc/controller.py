@@ -2,6 +2,7 @@
 Facade para manter compatibilidade com o código existente.
 Este módulo importa todas as funções dos novos módulos especializados.
 """
+import logging
 
 from proc.models import JournalProc, IssueProc, ArticleProc
 
@@ -81,10 +82,10 @@ def ensure_issue_proc_exists(user, issue):
     return IssueDataChecker.ensure_proc_exists(user, issue)
 
 
-def get_total_status_data(journal_proc_id, total_status_data):
+def get_total_status_data(total_status_data, journal_proc_id, issue_proc_id=None):
     journal_total_status = JournalProc.get_total_status(journal_proc_id)
-    issue_total_status = IssueProc.get_total_status(journal_proc_id, "article")
-    article_total_status = ArticleProc.get_total_status(journal_proc_id)
+    issue_total_status = IssueProc.get_total_status(journal_proc_id, "article", issue_proc_id)
+    article_total_status = ArticleProc.get_total_status(journal_proc_id, issue_proc_id)
     
     total_status_data_updated = {}
     if journal_total_status != total_status_data.get("journal"):
