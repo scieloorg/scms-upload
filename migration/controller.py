@@ -787,13 +787,13 @@ def import_journal_acron_id_records(
         article_proc_model.objects.filter(
             issue_proc__pid__in=issue_pids
         ).exclude(
-            xml_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+            migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
         ).update(
-            xml_status=tracker_choices.PROGRESS_STATUS_REPROC,
+            migration_status=tracker_choices.PROGRESS_STATUS_REPROC,
             updated_by=user,
         )
-        detail["stats"]["total_articleproc_xml_status_to_process"] = article_proc_model.objects.filter(
-            xml_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+        detail["stats"]["total_articleproc_migration_status_to_process"] = article_proc_model.objects.filter(
+            migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
         ).count()
 
     except FileNotFoundError as e:
