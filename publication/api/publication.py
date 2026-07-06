@@ -90,7 +90,7 @@ class PublicationAPI:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             response = {
                 "post_data_url": self.post_data_url,
-                "payload": json.dumps(payload),
+                "payload": payload,
                 "traceback": traceback.format_tb(exc_traceback),
                 "error": str(e),
                 "error_type": str(type(e)),
@@ -102,7 +102,7 @@ class PublicationAPI:
             response["result"] = "OK"
         elif response.get("failed") is False:
             response["result"] = "OK"
-        response["payload"] = json.dumps(payload)
+        response["payload"] = payload
         return response or {}
 
     def get_token(self):
