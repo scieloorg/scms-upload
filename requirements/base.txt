@@ -53,7 +53,7 @@ flower==2.0.1  # https://github.com/mher/flower
 # ========================================
 # Wagtail CMS
 # ========================================
-wagtail==6.4.2  # https://github.com/wagtail/wagtail - UPGRADE de 6.2.1
+wagtail==7.0.8  # https://github.com/wagtail/wagtail - UPGRADE de 6.2.1
 wagtail-django-recaptcha==2.1.1
 wagtailmenus==3.1.9
 wagtail-localize==1.12.2  # UPGRADE de 1.9.0
