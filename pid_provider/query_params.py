@@ -311,48 +311,33 @@ class QueryBuilderPidProviderXML:
             data["main_doi__iexact"] = self.main_doi
         return data
     
-    @cached_property
+    @property
     def article_data_query(self):
         """
-        Constrói query para busca por dados textuais do artigo.
-        
-        Combina buscas por sobrenomes de autores, colaborações,
-        links e conteúdo parcial do corpo do artigo.
-        
-        Returns
-        -------
-        Q or None
-            Query object combinando z_surnames, z_collab, z_links e z_partial_body,
-            ou None se nenhum dado textual estiver disponível
+        Constrói query para busca por dados textuais codificados (hashes sha256).
         """
-        # Verifica se há algum dado textual disponível
-        if not any([
-            self.z_surnames,
-            self.z_collab,
-            self.z_links,
-            self.z_partial_body,
-        ]):
-            return Q(
-                z_surnames=self.z_surnames,
-                z_collab=self.z_collab,
-                z_links=self.z_links,
-                z_partial_body=self.z_partial_body,
-            )
+        z_surnames = self.adapter_data.get("z_surnames")
+        z_collab = self.adapter_data.get("z_collab")
+        z_links = self.adapter_data.get("z_links")
+        z_partial_body = self.adapter_data.get("z_partial_body")
+
+        # Se houver qualquer dado textual disponível, constrói query com OR (|)
+        if z_surnames or z_partial_body or z_collab or z_links:
+            q = Q()
+            if z_surnames:
+                q |= Q(z_surnames=z_surnames)
+            if z_collab:
+                q |= Q(z_collab=z_collab)
+            if z_links:
+                q |= Q(z_links=z_links)
+            if z_partial_body:
+                q |= Q(z_partial_body=z_partial_body)
+            return q
         
-        q = Q()
-        
-        # Adiciona query para sobrenomes se disponível
-        if self.z_surnames:
-            q |= Q(z_surnames=self.z_surnames)
-        
-        # Adiciona queries para outros campos textuais
-        if self.z_collab:
-            q |= Q(z_collab=self.z_collab)
-        
-        if self.z_links:
-            q |= Q(z_links=self.z_links)
-        
-        if self.z_partial_body:
-            q |= Q(z_partial_body=self.z_partial_body)
-        
-        return q
+        # Caso contrário, retorna os campos (geralmente None neste ponto) com AND
+        return Q(
+            z_surnames=z_surnames,
+            z_collab=z_collab,
+            z_links=z_links,
+            z_partial_body=z_partial_body,
+        )
