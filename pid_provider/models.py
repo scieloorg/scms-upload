@@ -35,6 +35,7 @@ from pid_provider import choices, exceptions
 from pid_provider.query_params import (
     get_score,
     zero_to_none,
+    compare,
     QueryBuilderPidProviderXML,
 )
 from tracker.models import BaseEvent, EventSaveError, UnexpectedEvent
@@ -1089,6 +1090,40 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 detail=detail,
             )
         return matched
+
+    @classmethod
+    def get_best_match(cls, results, xml_adapter_data):
+        # results agora é uma LISTA materializada (não queryset)
+        # xml_adapter_data = xml_adapter.get_data_to_compare()
+        detail = {
+            "total_results": results.count(),
+            "input_data": xml_adapter_data,
+        }
+        responses = {}
+        found = []
+        items = {}
+        for item in results:
+            item_data = item.data_to_compare
+            response = compare(item_data, xml_adapter_data)
+            response["id"] = item.id
+            responses[item.id] = response
+            items[item.id] = item
+            found.append(
+                (response["percentual_score"], item.updated.isoformat(), item.id)
+            )
+        found = sorted(found, reverse=True)
+        ok = []
+        failed = []
+        for percentual_score, updated, item_id in found:
+            if percentual_score > 0.6:
+                ok.append(responses[item_id])
+            else:
+                failed.append(responses[item_id])
+        detail["ok"] = ok
+        detail["failed"] = failed
+        if ok:
+            detail["registered"] = items.get(ok[0]["id"])
+        return detail
 
     @profile_method
     def _add_data(self, xml_adapter, registered_in_core):
