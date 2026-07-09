@@ -526,19 +526,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     def __str__(self):
         return f"{self.pkg_name} {self.v3}"
-    
-    @property
-    def article_pid_suffix_source(self):
-        try:
-            return self.xml_with_pre.get_article_pid_suffix_source()
-        except AttributeError:
-            return self.elocation_id or self.fpage or self.xml_with_pre.order
-    
-    def get_article_pid_suffix(self):
-        data = self.article_pid_suffix_source
-        if not data:
-            data = self.pkg_name.split("-")[-1]
-        return string_to_5_digits(data)
 
     @property
     def collection_list(self):
