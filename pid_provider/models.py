@@ -639,6 +639,20 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             return False
         return True
 
+    @property
+    def data_to_compare(self):
+        readable = self.readable_data or {}
+        titles = readable.get("article_titles")
+        body_fragment = readable.get("body_fragment")
+        return {
+            "article_titles": titles or self.xml_with_pre.article_titles_texts,
+            "z_surnames": self.z_surnames,
+            "z_collab": self.z_collab,
+            "z_links": self.z_links,
+            "z_partial_body": self.z_partial_body,
+            "body_fragment": body_fragment or self.xml_with_pre.get_body_fragment(PARTIAL_BODY_MAX),
+        }
+
     @classmethod
     @profile_classmethod
     def register(
