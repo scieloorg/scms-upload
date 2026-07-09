@@ -737,7 +737,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             )
 
             # analisa se continua o registro
-            updated_data = cls.is_updated(
+            updated_data = PidProviderXML.is_updated(
                 xml_with_pre,
                 registered,
                 force_update,
@@ -888,10 +888,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         for collection in Collection.objects.filter(q):
             self.collections.add(collection)
 
-    @classmethod
-    @profile_classmethod
+    @staticmethod
     def is_updated(
-        cls, xml_with_pre, registered, force_update, origin_date, registered_in_core
+        xml_with_pre, registered, force_update, origin_date, registered_in_core
     ):
         """
         XML é versão AOP, mas
