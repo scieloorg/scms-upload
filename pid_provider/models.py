@@ -903,6 +903,25 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             registered.collections.add(collection)
         return registered
 
+    def add_collections(self, xml_adapter):
+        q = Q()
+        issn_print = xml_adapter.journal_issn_print
+        issn_electronic = xml_adapter.journal_issn_electronic
+
+        try:
+            Collection.objects.filter(scielojournal__isnull=True).exists()
+            issn_path = "scielojournal__journal__official"
+        except FieldError:
+            issn_path = "journalproc__journal__official_journal"
+
+        if issn_print:
+            q |= Q(**{f"{issn_path}__issn_print": issn_print})
+        if issn_electronic:
+            q |= Q(**{f"{issn_path}__issn_electronic": issn_electronic})
+
+        for collection in Collection.objects.filter(q):
+            self.collections.add(collection)
+
     @classmethod
     @profile_classmethod
     def is_updated(
