@@ -221,48 +221,40 @@ class QueryBuilderPidProviderXML:
     
     # ========== Queries Construídas ==========
     
-    @cached_property
+    @property
     def identifier_queries(self):
         """
         Constrói queries para busca por identificadores (v3, v2, aop_pid, pkg_name, DOI).
-        
-        Busca em múltiplos campos incluindo other_pid para garantir
-        compatibilidade com diferentes formatos de PIDs.
-        
-        Returns
-        -------
-        Q
-            Query object combinando buscas por v3, v2, aop_pid, pkg_name e main_doi
         """
         q = Q()
+        other_pids = set()
         
+        # PIDs diretos do xml_adapter (não envelopados no data dict)
+        v3 = self.xml_adapter.v3
+        v2 = self.xml_adapter.v2
+        aop_pid = self.xml_adapter.aop_pid
+    
         # PID v3 - máxima prioridade
-        if self.v3:
-            q |= Q(v3=self.v3)
+        if v3:
+            q |= Q(v3=v3)
         
         # PID v2
-        if self.v2:
-            q |= Q(v2=self.v2)
+        if v2:
+            q |= Q(v2=v2)
         
         # AOP PID
-        if self.aop_pid:
-            q |= Q(v2=self.aop_pid) | Q(aop_pid=self.aop_pid)
+        if aop_pid:
+            q |= Q(v2=aop_pid) | Q(aop_pid=aop_pid)
             
-        # Package name
-        pkg_names = set()
-        if self.pkg_name:
-            pkg_names.add(self.pkg_name)
-        if self.sps_pkg_name:
-            pkg_names.add(self.sps_pkg_name)
-        if self.deprecated_sps_pkg_name:
-            pkg_names.add(self.deprecated_sps_pkg_name)
+        # Package names históricos e atuais
+        pkg_names = self.pkg_name_list
         if pkg_names:
             q |= Q(pkg_name__in=pkg_names)
 
-        # # DOI principal
-        # if self.main_doi:
-        #     q |= Q(main_doi=self.main_doi)
-
+        main_doi = self.adapter_data.get("main_doi")
+        if main_doi:
+            q |= Q(main_doi=main_doi)
+            
         return q
     
     @cached_property
