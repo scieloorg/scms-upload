@@ -987,6 +987,26 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             )
         return cls.objects.get(id=sorted(matched)[-1][-1])
 
+    @classmethod
+    @profile_classmethod
+    def select_records(cls, xml_adapter):
+        qbuilder = QueryBuilderPidProviderXML(xml_adapter)
+ 
+        # 1) correspondência direta por identificadores
+        yield cls.objects.filter(qbuilder.identifier_queries)
+
+        selected_journal = cls.objects.filter(qbuilder.issn_query)
+ 
+        # 2) journal + issue + dados do artigo
+        yield (
+            selected_journal.filter(
+                Q(**qbuilder.issue_params) & qbuilder.article_data_query
+            )
+        )
+ 
+        # 3) journal + dados do artigo
+        yield selected_journal.filter(qbuilder.article_data_query)
+
     @profile_method
     def match(self, xml_adapter):
         """
