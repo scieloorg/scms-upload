@@ -1329,13 +1329,19 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @classmethod
     @profile_classmethod
     def mark_items_as_invalid(cls, issns):
-        for item in cls.objects.filter(
+        items = cls.objects.filter(
             Q(issn_print__in=issns) | Q(issn_electronic__in=issns),
-        ).iterator():
+        )
+        items_to_update = []
+        for item in items.iterator():
             try:
-                invalid = bool(item.xml_with_pre)
+                valid = bool(item.xml_with_pre)
             except Exception as e:
-                invalid = True
+                valid = False
+            if not valid:
+                item.proc_status = choices.PPXML_STATUS_INVALID
+                items_to_update.append(item)
+        cls.objects.bulk_update(items_to_update, ["proc_status"], batch_size=100)
 
     @classmethod
     @profile_classmethod
