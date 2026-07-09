@@ -1165,22 +1165,17 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     @profile_method
     def _add_other_pid(self, registered_changed, user):
-        # registrados passam a ser other pid
-        # os pids do XML passam a ser os vigentes
         if not registered_changed:
             return
         for change_args in registered_changed:
-
             change_args["pid_in_xml"] = change_args.pop("registered")
-
             change_args["user"] = user
             change_args["pid_provider_xml"] = self
-
             OtherPid.get_or_create(**change_args)
         self.other_pid_count = self.other_pid.count()
-        self.save()
-
+        self.save(update_fields=["other_pid_count"])
     @classmethod
+
     @profile_classmethod
     def _get_unique_v3(cls):
         """
