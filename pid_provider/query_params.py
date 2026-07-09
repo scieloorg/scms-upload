@@ -257,35 +257,27 @@ class QueryBuilderPidProviderXML:
             
         return q
     
-    @cached_property
+    @property
     def issn_query(self):
         """
         Constrói query base para busca por ISSN (eletrônico ou impresso).
-        
-        Returns
-        -------
-        Q
-            Query object combinando ISSN eletrônico e impresso com operador OR
-        
-        Raises
-        ------
-        RequiredISSNErrorToGetPidProviderXMLError
-            Se nenhum ISSN (eletrônico ou impresso) estiver disponível
         """
         q = Q()
+        issn_electronic = self.adapter_data.get("issn_electronic")
+        issn_print = self.adapter_data.get("issn_print")
         
-        if not self.journal_issn_electronic and not self.journal_issn_print:
+        if not issn_electronic and not issn_print:
             raise exceptions.RequiredISSNErrorToGetPidProviderXMLError(
                 _("Required Print or Electronic ISSN to identify XML {}").format(
-                    self.pkg_name,
+                    self.xml_adapter.pkg_name,
                 )
             )
         
-        if self.journal_issn_electronic:
-            q |= Q(issn_electronic=self.journal_issn_electronic)
+        if issn_electronic:
+            q |= Q(issn_electronic=issn_electronic)
         
-        if self.journal_issn_print:
-            q |= Q(issn_print=self.journal_issn_print)
+        if issn_print:
+            q |= Q(issn_print=issn_print)
         
         return q
            
