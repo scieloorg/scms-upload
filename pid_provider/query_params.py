@@ -3,8 +3,53 @@ from functools import cached_property
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from core.utils.profiling_tools import profile_function
+from core.utils.similarity import how_similar
 from pid_provider import exceptions
+
+
+def compare(registered_items, input_data):
+    """
+    """
+    total_score = 0
+    items = []
+    for label, registered_item in registered_items.items():
+        result = compare_items(label, registered_item, input_data.get(label))
+        items.append(result)
+        total_score += result["score"]
+    return {
+        "items": items,
+        "total_score": total_score,
+        "percentual_score": total_score / len(items)
+    }
+
+
+def compare_lists(registered, xml_adapter_titles):
+    if xml_adapter_titles == registered:
+        return 1
+    if not xml_adapter_titles:
+        return 0
+    if not registered:
+        return 0
+    words1 = set()
+    for item in xml_adapter_titles:
+        words1.update(item.split())
+    words2 = set()
+    for item in registered:
+        words2.update(item.split())
+    return how_similar(" ".join(sorted(words1)), " ".join(sorted(words2)))
+
+
+def compare_items(label, registered, input_data):
+    if isinstance(registered, list):
+        score = compare_lists(registered, input_data)
+    elif (input_data or None) == (registered or None):
+        score = 1
+    else:
+        score = how_similar(input_data, registered)
+    response = {"label": label, "score": score}
+    if score != 1:
+        response["registered"] = registered
+    return response
 
 
 def get_score(registered, xml_data, min_value, max_value):
@@ -23,7 +68,6 @@ def zero_to_none(data):
     if int(data) == 0:
         return None
     return data
-
 
 class QueryBuilderPidProviderXML:
     """
