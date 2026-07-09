@@ -1092,6 +1092,8 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         self.z_links = xml_adapter.z_links
         self.z_partial_body = xml_adapter.z_partial_body
 
+        self.readable_data = xml_adapter.xml_with_pre.get_article_data()
+
     @profile_method
     def _add_dates(self, xml_adapter, origin_date, available_since):
         # evita que artigos WIP fique disponíveis antes de estarem públicos
