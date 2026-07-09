@@ -845,7 +845,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         registered_in_core=None,
     ):
         if registered:
-            # obtém os dados de substituição para registrar em other_pid
             registered_changed = registered.check_registered_pids_changed(
                 xml_adapter.xml_with_pre
             )
@@ -854,40 +853,20 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             registered = cls()
             registered.creator = user
             registered_changed = None
-
+ 
         registered.proc_status = choices.PPXML_STATUS_TODO
         registered._add_dates(xml_adapter, origin_date, available_since)
         registered._add_data(xml_adapter, registered_in_core)
         registered._add_journal(xml_adapter)
         registered._add_issue(xml_adapter)
-
+ 
         registered.save()
-
+ 
         if registered_changed:
             registered._add_other_pid(registered_changed, user)
         registered._add_current_version(xml_adapter.xml_with_pre, user)
-        q = Q()
-        if COLLECTION_PREFIX == "scielojournal":
-            if xml_adapter.journal_issn_print:
-                q |= Q(
-                    scielojournal__journal__official__issn_print=xml_adapter.journal_issn_print
-                )
-            if xml_adapter.journal_issn_electronic:
-                q |= Q(
-                    scielojournal__journal__official__issn_electronic=xml_adapter.journal_issn_electronic
-                )
-        else:
-            if xml_adapter.journal_issn_print:
-                q |= Q(
-                    journalproc__journal__official_journal__issn_print=xml_adapter.journal_issn_print
-                )
-            if xml_adapter.journal_issn_electronic:
-                q |= Q(
-                    journalproc__journal__official_journal__issn_electronic=xml_adapter.journal_issn_electronic
-                )
-
-        for collection in Collection.objects.filter(q):
-            registered.collections.add(collection)
+ 
+        registered.add_collections(xml_adapter)
         return registered
 
     def add_collections(self, xml_adapter):
