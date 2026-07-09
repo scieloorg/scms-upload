@@ -228,4 +228,4 @@ class QueryBuilderPidProviderXML:
             z_collab=z_collab,
             z_links=z_links,
             z_partial_body=z_partial_body,
-        )
+        ) & Q(**self.article_location_params)
