@@ -9,6 +9,7 @@ from functools import cached_property
 from zlib import crc32
 
 from django.core.files.base import ContentFile
+from django.core.exceptions import FieldError
 from django.db import IntegrityError, models
 from django.db.models import Q, Count
 from django.utils.translation import gettext_lazy as _
@@ -37,6 +38,8 @@ from pid_provider.query_params import (
     QueryBuilderPidProviderXML,
 )
 from tracker.models import BaseEvent, EventSaveError, UnexpectedEvent
+
+PARTIAL_BODY_MAX = 300
 
 try:
     from django_prometheus.models import ExportModelOperationsMixin
@@ -408,6 +411,11 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     registered_in_core = models.BooleanField(default=False)
     collections = models.ManyToManyField(Collection, blank=True)
 
+    # dados legíveis para facilitar a análise
+    readable_data = models.JSONField(
+        _("Readable data"), null=True, blank=True
+    )
+
     base_form_class = CoreAdminModelForm
 
     panel_a = [
@@ -430,10 +438,11 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         InlinePanel("other_pid", label=_("Other PID")),
     ]
     panel_c = [
-        FieldPanel("z_surnames"),
-        FieldPanel("z_collab"),
-        FieldPanel("z_links"),
-        FieldPanel("z_partial_body"),
+        FieldPanel("z_surnames", read_only=True),
+        FieldPanel("z_collab", read_only=True),
+        FieldPanel("z_links", read_only=True),
+        FieldPanel("z_partial_body", read_only=True),
+        FieldPanel("readable_data", widget=ReadOnlyPrettyJSONWidget(), read_only=True),
     ]
 
     edit_handler = TabbedInterface(
