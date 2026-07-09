@@ -993,10 +993,12 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     def select_records(cls, xml_adapter):
         qbuilder = QueryBuilderPidProviderXML(xml_adapter)
  
-        # 1) correspondência direta por identificadores
-        yield cls.objects.filter(qbuilder.identifier_queries)
+        objects = cls.objects.select_related("current_version")
 
-        selected_journal = cls.objects.filter(qbuilder.issn_query)
+        # 1) correspondência direta por identificadores
+        yield objects.filter(qbuilder.identifier_queries)
+
+        selected_journal = objects.filter(qbuilder.issn_query)
  
         # 2) journal + issue + dados do artigo
         yield (
@@ -1007,6 +1009,19 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
  
         # 3) journal + dados do artigo
         yield selected_journal.filter(qbuilder.article_data_query)
+
+    @classmethod
+    def select_best_match(cls, xml_adapter, selection_results):
+        for records in selection_results:
+            if not records:
+                continue
+            if not records.exists():
+                continue
+            result = cls.get_best_match(records, xml_adapter.get_data_to_compare())
+            if not result.get("registered"):
+                continue
+            return result
+        raise cls.DoesNotExist
 
     @profile_method
     def match(self, xml_adapter):
