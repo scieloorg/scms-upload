@@ -1794,3 +1794,119 @@ class XMLURL(CommonControlField):
             xmlurl_obj.save_file(xml_with_pre.tostring(), filename=filename)
 
         return xmlurl_obj
+
+
+# -----------------------------------------------------------------------------
+# [models.py] MODELO NOVO — PidProviderXMLRegistration
+# Auditoria por documento. Grava SEMPRE (created/updated/skipped/forbidden/
+# conflict/unmatched/error). FK nullable (unmatched/error podem não ter PPX).
+# -----------------------------------------------------------------------------
+class PidProviderXMLRegistration(CommonControlField):
+    EVENT_CREATED = "created"
+    EVENT_UPDATED = "updated"
+    EVENT_SKIPPED = "skipped"
+    EVENT_FORBIDDEN = "forbidden"
+    EVENT_CONFLICT = "conflict"
+    EVENT_UNMATCHED = "unmatched"
+    EVENT_ERROR = "error"
+    EVENT_BAD_REQUEST = "bad_request"
+
+    EVENT_STATUS_CHOICES = (
+        (EVENT_CREATED, "created"),
+        (EVENT_UPDATED, "updated"),
+        (EVENT_SKIPPED, "skipped"),
+        (EVENT_FORBIDDEN, "forbidden"),
+        (EVENT_CONFLICT, "conflict"),
+        (EVENT_UNMATCHED, "unmatched"),
+        (EVENT_BAD_REQUEST, "bad_request"),
+        (EVENT_ERROR, "error"),
+    )
+
+    pid_provider_xml = models.ForeignKey(
+        PidProviderXML,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="registration_events",
+    )
+    pkg_name = models.CharField(
+        _("Package name"), max_length=100, null=True, blank=True
+    )
+    event_status = models.CharField(
+        _("Event status"),
+        max_length=15,
+        null=True,
+        blank=True,
+        choices=EVENT_STATUS_CHOICES,
+    )
+    input_data = models.JSONField(_("Input data (readable)"), null=True, blank=True)
+    best_matches = models.JSONField(_("Best matches detail"), null=True, blank=True)
+    error_type = models.CharField(
+        _("Error type"), max_length=255, null=True, blank=True
+    )
+
+    base_form_class = CoreAdminModelForm
+
+    panels = [
+        FieldPanel("event_status", read_only=True),
+        FieldPanel("pkg_name", read_only=True),
+        AutocompletePanel("pid_provider_xml", read_only=True),
+        FieldPanel("error_type", read_only=True),
+        FieldPanel("input_data", widget=ReadOnlyPrettyJSONWidget(), read_only=True),
+        FieldPanel("best_matches", widget=ReadOnlyPrettyJSONWidget(), read_only=True),
+    ]
+
+    class Meta:
+        ordering = ["-created"]
+        verbose_name = _("PidProviderXML Registration")
+        verbose_name_plural = _("PidProviderXML Registrations")
+        indexes = [
+            models.Index(fields=["pkg_name"]),
+            models.Index(fields=["event_status"]),
+            models.Index(fields=["-created"]),
+            models.Index(fields=["pid_provider_xml"]),
+        ]
+
+    def __str__(self):
+        return f"{self.pkg_name} {self.event_status} {self.created}"
+
+    @staticmethod
+    def _serialize_best_matches(best_matches):
+        """
+        O detail do best_matches contém o objeto PidProviderXML em
+        detail['registered']. Para gravar em JSON, troca pelo v3/id.
+        """
+        if not best_matches:
+            return None
+        data = dict(best_matches)
+        registered = data.get("registered")
+        if registered is not None and hasattr(registered, "v3"):
+            data["registered"] = {"id": registered.id, "v3": registered.v3}
+        return data
+
+    @classmethod
+    def record(
+        cls,
+        user,
+        event_status,
+        pid_provider_xml=None,
+        pkg_name=None,
+        input_data=None,
+        best_matches=None,
+        error_type=None,
+    ):
+        try:
+            obj = cls()
+            obj.creator = user
+            obj.pid_provider_xml = pid_provider_xml
+            obj.pkg_name = pkg_name or (pid_provider_xml and pid_provider_xml.pkg_name)
+            obj.event_status = event_status
+            obj.input_data = input_data
+            obj.best_matches = cls._serialize_best_matches(best_matches)
+            obj.error_type = error_type
+            obj.save()
+            return obj
+        except Exception as e:
+            # registro de auditoria nunca deve derrubar o register
+            logging.exception(f"Unable to record PidProviderXMLRegistration: {e}")
+            return None
