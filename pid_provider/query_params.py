@@ -79,7 +79,7 @@ class QueryBuilderPidProviderXML:
     
     def __init__(self, xml_adapter):
         """
-        Inicializa o construtor de queries.
+        Inicializa o construtor de queries obtendo os dicionários de dados do adaptador.
         
         Parameters
         ----------
@@ -87,8 +87,27 @@ class QueryBuilderPidProviderXML:
             Adaptador com dados do XML para busca
         """
         self.xml_adapter = xml_adapter
-    
-    # ========== Cached Properties para Atributos do XML Adapter ==========
+        # Centraliza o acesso aos dados brutos e normalizados (hashes de 64 chars)
+        self.adapter_data = xml_adapter.data
+        self.compare_data = xml_adapter.get_data_to_compare()
+
+    @property
+    def pkg_name_list(self):
+        # --- Resolução Consolidada de Package Names ---
+        pkg_names = set()
+
+        # 1. Nome enviado originalmente via parâmetro no construtor
+        if self.xml_adapter.pkg_name:
+            pkg_names.add(self.xml_adapter.pkg_name)
+
+        # 2. Nome oficial atual gerado pelo motor de cálculo do XML
+        if self.xml_adapter.sps_pkg_name:
+            pkg_names.add(self.xml_adapter.sps_pkg_name)
+
+        # 3. Consolida todas as listas de nomes depreciados/alternativos
+        pkg_names.update(self.xml_adapter.xml_with_pre.deprecated_sps_pkg_name_list)
+
+        return set(item for item in pkg_names if item)
     
     @cached_property
     def v3(self):
