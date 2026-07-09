@@ -281,34 +281,32 @@ class QueryBuilderPidProviderXML:
         
         return q
            
-    @cached_property
+    @property
     def issue_params(self):
         """
         Constrói dicionário com metadados do fascículo e paginação do artigo.
-        
-        Retorna todos os campos sem verificar presença, permitindo
-        que o ORM do Django filtre automaticamente valores None.
-        
-        Returns
-        -------
-        dict
-            Dicionário com elocation_id, fpage, fpage_seq, lpage, 
-            pub_year, volume, number e suppl
+        """
+        return {
+            "pub_year": self.adapter_data.get("pub_year"),
+            "volume": self.adapter_data.get("volume"),
+            "number": self.adapter_data.get("number"),
+            "suppl": self.adapter_data.get("suppl"),
+        }
+
+    @property
+    def article_location_params(self):
+        """
+        Constrói dicionário com metadados de localização do artigo.
         """
         data = {
-            "elocation_id": self.elocation_id,
-            "fpage": self.fpage,
-            "fpage_seq": self.fpage_seq,
-            "lpage": self.lpage,
-            "pub_year": self.pub_year,
-            "volume": self.volume,
-            "number": self.number,
-            "suppl": self.suppl,
+            "elocation_id": self.adapter_data.get("elocation_id"),
+            "fpage": self.adapter_data.get("fpage"),
+            "fpage_seq": self.adapter_data.get("fpage_seq"),
+            "lpage": self.adapter_data.get("lpage"),
         }
-        if self.order:
-            data["v2__endswith"] = self.order
-        elif not self.elocation_id and not self.fpage and self.main_doi:
-            data["main_doi__iexact"] = self.main_doi
+        order = self.xml_adapter.order
+        if order:
+            data["v2__endswith"] = order
         return data
     
     @property
