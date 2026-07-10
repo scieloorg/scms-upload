@@ -69,6 +69,7 @@ def zero_to_none(data):
         return None
     return data
 
+
 class QueryBuilderPidProviderXML:
     """
     Construtor de queries para busca de PidProviderXML.
@@ -90,6 +91,34 @@ class QueryBuilderPidProviderXML:
         # Centraliza o acesso aos dados brutos e normalizados (hashes de 64 chars)
         self.adapter_data = xml_adapter.data
         self.compare_data = xml_adapter.get_data_to_compare()
+
+        self.xml_with_pre_data = xml_adapter.xml_with_pre.get_article_data(300)
+
+    def validate_input_data(self):
+        if not self.adapter_data.get("pub_year"):
+            raise exceptions.RequiredPublicationYearErrorToGetPidProviderXMLError()
+
+        issn_electronic = self.adapter_data.get("issn_electronic")
+        issn_print = self.adapter_data.get("issn_print")
+        if not issn_electronic and not issn_print:
+            raise exceptions.RequiredISSNErrorToGetPidProviderXMLError()
+
+        items = list(self.article_location_params.values())
+        if any(items):
+            return
+
+        article_titles = (self.xml_with_pre_data.get("article_titles") or [])
+        article_titles = [x for x in article_titles if x]
+        items = [
+            article_titles,
+            self.xml_with_pre_data.get("surnames"),
+            self.xml_with_pre_data.get("collab"),
+            self.xml_with_pre_data.get("links"),
+            self.xml_with_pre_data.get("partial_body"),
+        ]
+        if any(items):
+            return
+        raise exceptions.NotEnoughParametersToGetPidProviderXMLError()
 
     @property
     def pkg_name_list(self):
