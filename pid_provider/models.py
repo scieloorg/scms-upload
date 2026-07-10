@@ -947,6 +947,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @profile_classmethod
     def get_records(cls, xml_adapter):
         qbuilder = QueryBuilderPidProviderXML(xml_adapter)
+        qbuilder.validate_input_data()
         q_ids = qbuilder.identifier_queries
         q_journal = qbuilder.issn_query
         q_issue = Q(**qbuilder.issue_params)
@@ -992,6 +993,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @profile_classmethod
     def select_records(cls, xml_adapter):
         qbuilder = QueryBuilderPidProviderXML(xml_adapter)
+        qbuilder.validate_input_data()
  
         objects = cls.objects.select_related("current_version")
 
