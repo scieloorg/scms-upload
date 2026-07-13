@@ -1013,18 +1013,37 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         # 3) journal + dados do artigo
         yield "journal-article", selected_journal.filter(qbuilder.article_data_query)
 
-    @classmethod
-    def select_best_match(cls, xml_adapter, selection_results):
-        for records in selection_results:
-            if not records:
+        @staticmethod
+    def select_record(xml_adapter, selection_results):
+        unmatched_items = {}
+        xml_adapter_data_to_compare = xml_adapter.get_data_to_compare()
+        for label, query_set in selection_results:
+            if not query_set:
                 continue
-            if not records.exists():
+            if not query_set.exists():
                 continue
-            result = cls.get_best_match(records, xml_adapter.get_data_to_compare())
-            if not result.get("registered"):
-                continue
-            return result
-        raise cls.DoesNotExist
+            result = PidProviderXML.get_best_match(query_set, xml_adapter_data_to_compare)
+
+            matched = result.get("matched")
+            unmatched = result.get("unmatched")
+            registered = result.get("registered")
+            if registered:
+                response = {
+                    "total_results": query_set.count(),
+                    "registered": registered,
+                }
+                if matched:
+                    response["matched_items"] = {label: matched}
+                if unmatched:
+                    response["unmatched_items"] = {label: unmatched}
+                return response
+                    
+            if unmatched:
+                unmatched_items[label] = unmatched
+
+        if unmatched_items:
+            return {"unmatched_items": unmatched_items}
+        return {}
 
     @profile_method
     def match(self, xml_adapter):
