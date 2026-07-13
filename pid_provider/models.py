@@ -998,19 +998,20 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         objects = cls.objects.select_related("current_version")
 
         # 1) correspondência direta por identificadores
-        yield objects.filter(qbuilder.identifier_queries)
+        yield "ids", objects.filter(qbuilder.identifier_queries)
 
         selected_journal = objects.filter(qbuilder.issn_query)
  
         # 2) journal + issue + dados do artigo
         yield (
+            "journal-issue-article",
             selected_journal.filter(
                 Q(**qbuilder.issue_params) & qbuilder.article_data_query
             )
         )
  
         # 3) journal + dados do artigo
-        yield selected_journal.filter(qbuilder.article_data_query)
+        yield "journal-article", selected_journal.filter(qbuilder.article_data_query)
 
     @classmethod
     def select_best_match(cls, xml_adapter, selection_results):
@@ -1108,38 +1109,64 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             )
         return matched
 
-    @classmethod
-    def get_best_match(cls, results, xml_adapter_data):
-        # results agora é uma LISTA materializada (não queryset)
-        # xml_adapter_data = xml_adapter.get_data_to_compare()
-        detail = {
-            "total_results": results.count(),
-            "input_data": xml_adapter_data,
-        }
-        responses = {}
+    @staticmethod
+    def get_best_match(results, xml_adapter_data):
+        """
+        Compara uma lista de candidatos (PidProviderXML) com os dados do XML
+        recebido e classifica os candidatos por similaridade.
+
+        Parameters
+        ----------
+        results : list[PidProviderXML]
+            Lista JÁ MATERIALIZADA (não queryset) de candidatos a comparar.
+        xml_adapter_data : dict
+            Dados de comparação do XML de entrada, ou seja, o retorno de
+            ``xml_adapter.get_data_to_compare()``.
+
+        Returns
+        -------
+        dict
+            Todas as chaves abaixo são OPCIONAIS — só aparecem quando há
+            conteúdo para elas. Use ``.get(...)`` ou ``"chave" in result``
+            ao consumir o retorno, nunca acesso direto.
+
+            - ``"unmatched"``: presente apenas se houver ao menos 1
+            candidato com ``percentual_score`` <= 0.6. Lista de
+            ``item.data`` desses candidatos.
+            - ``"registered"``: presente apenas se houver ao menos 1
+            candidato aprovado (score > 0.6). Contém o OBJETO
+            ``PidProviderXML`` (não o dict ``.data``) do candidato com
+            maior score — em caso de empate, o critério de desempate é
+            ``updated`` mais recente e, em seguida, maior ``id``.
+            - ``"matched"``: presente apenas se houver 2 OU MAIS candidatos
+            aprovados. Contém ``item.data`` dos candidatos aprovados
+            EXCLUINDO o que já está em ``"registered"`` (ou seja, é a
+            lista de aprovados a partir do 2º colocado), na mesma ordem
+            de score decrescente.
+        """
+        detail = {}
         found = []
         items = {}
         for item in results:
             item_data = item.data_to_compare
             response = compare(item_data, xml_adapter_data)
-            response["id"] = item.id
-            responses[item.id] = response
             items[item.id] = item
-            found.append(
-                (response["percentual_score"], item.updated.isoformat(), item.id)
-            )
+            found.append((response["percentual_score"], item.updated.isoformat(), item.id))
+
         found = sorted(found, reverse=True)
-        ok = []
-        failed = []
+        matched = []
+        unmatched = []
         for percentual_score, updated, item_id in found:
             if percentual_score > 0.6:
-                ok.append(responses[item_id])
+                matched.append(items[item_id].data)
             else:
-                failed.append(responses[item_id])
-        detail["ok"] = ok
-        detail["failed"] = failed
-        if ok:
-            detail["registered"] = items.get(ok[0]["id"])
+                unmatched.append(items[item_id].data)
+        if matched:
+            detail["registered"] = items[found[0][-1]]
+            if len(matched) > 1:
+                detail["matched"] = matched[1:]
+        if unmatched:
+            detail["unmatched"] = unmatched
         return detail
 
     @profile_method
