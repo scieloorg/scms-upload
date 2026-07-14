@@ -1,13 +1,10 @@
-from django.http import HttpResponseRedirect
 from django.utils.translation import gettext_lazy as _
-from wagtail import hooks
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSetGroup
 
 from config.menu import get_menu_order
 from core.views import CommonControlFieldViewSet
-from pid_provider import choices
-from pid_provider.models import XMLURL, XMLVersion, FixPidV2, OtherPid, PidProviderConfig, PidProviderXML
+from pid_provider.models import XMLURL, XMLVersion, FixPidV2, OtherPid, PidProviderConfig, PidProviderXML, PidProviderXMLRegistration
 
 
 class PidProviderXMLViewSet(CommonControlFieldViewSet):
@@ -204,6 +201,36 @@ class XMLURLViewSet(CommonControlFieldViewSet):
     )
 
 
+class PidProviderXMLRegistrationViewSet(CommonControlFieldViewSet):
+    model = PidProviderXMLRegistration
+    icon = "doc-empty-inverse"
+    menu_label = _("PID Registration Events")
+    menu_name = "pid_provider_xml_registration"
+
+    # ordenação na listagem
+    ordering = ["-created"]
+
+    # colunas da listagem
+    list_display = (
+        "pkg_name",
+        "event_status",
+        "pid_provider_xml",
+        "created",
+    )
+
+    # filtros laterais
+    list_filter = ("event_status", "created")
+
+    # busca
+    search_fields = ("pkg_name", "pid_provider_xml__v2", "pid_provider_xml__v3")
+
+    # paginação (tabela cresce em volume)
+    list_per_page = 50
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("pid_provider_xml")
+
+
 # Grupo de ViewSets
 class PidProviderViewSetGroup(SnippetViewSetGroup):
     menu_label = _("Pid Provider")
@@ -216,6 +243,7 @@ class PidProviderViewSetGroup(SnippetViewSetGroup):
         PidProviderConfigViewSet,
         XMLVersionViewSet,
         XMLURLViewSet,
+        PidProviderXMLRegistrationViewSet,
     )
 
 
