@@ -38,7 +38,7 @@ from pid_provider.query_params import (
     compare,
     QueryBuilderPidProviderXML,
 )
-from tracker.models import BaseEvent, EventSaveError, UnexpectedEvent
+from tracker.models import UnexpectedEvent
 
 PARTIAL_BODY_MAX = 300
 
@@ -765,19 +765,14 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 raise exc
 
             # analisa se continua o registro
-            updated_data = PidProviderXML.is_updated(
-                xml_with_pre,
-                registered,
-                force_update,
-                origin_date,
-                registered_in_core,
-            )
-            if updated_data:
-                event_status = "skipped"
-                response["skipped"] = True
-                response.update(updated_data)
-            else:
-                # cria ou atualiza registro
+            try:
+                PidProviderXML.is_updated(
+                    xml_with_pre,
+                    registered,
+                    force_update,
+                    origin_date,
+                    registered_in_core,
+                )
                 registered = cls._save(
                     registered,
                     xml_adapter,
@@ -788,7 +783,16 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 )
                 # data to return
                 response.update(registered.data)
+            except exceptions.ForbiddenPidProviderXMLRegistrationError:
+                event_status = "forbidden"
+                raise
+            except exceptions.SkipSavePidProviderXML:
+                event_status = "skipped"
+                response["skipped"] = True
+                response.update(registered.data)
+                # do not raise
         except Exception as exc:
+            event_status = event_status or "error"
             exc_type, exc_value, exc_traceback = sys.exc_info()
             error_type = str(type(exc))
             response.update({
@@ -953,7 +957,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         if registered.is_equal_to(xml_with_pre):
             # XML fornecido é igual ao registrado, não precisa continuar
             logging.info(f"Skip update: equal")
-            return registered.data
+            raise exceptions.SkipSavePidProviderXML
 
         if xml_with_pre.is_aop and registered and not registered.is_aop:
             logging.info(f"Skip update: forbidden")
@@ -969,9 +973,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             and registered.origin_date
             and registered.origin_date > origin_date
         ):
-            # retorna item registrado que está mais atualizado
-            logging.info(f"Skip update: is already up-to-date")
-            return registered.data
+            raise exceptions.SkipSavePidProviderXML
 
     @profile_method
     def is_equal_to(self, xml_with_pre):
