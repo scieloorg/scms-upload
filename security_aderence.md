@@ -8,7 +8,7 @@ Este documento declara como este repositório atende às diretrizes da **NSI.04 
 
 | Campo | Valor |
 |---|---|
-| Nome do sistema | SCMS Upload (SciELO Content Management System — Upload) |
+| Nome do sistema | Upload (Alimentação Direta) |
 | Responsável técnico | Roberta Takenaka |
 | Classificação da informação tratada | Pública (metadados de periódicos, fascículos e artigos; dados de migração do site clássico) |
 | Dados pessoais tratados (LGPD)? | Sim — usuários de sistema (emails); dados de login; histórico de edições e criação |
