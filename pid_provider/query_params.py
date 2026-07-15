@@ -91,22 +91,32 @@ class QueryBuilderPidProviderXML:
         # Centraliza o acesso aos dados brutos e normalizados (hashes de 64 chars)
         self.adapter_data = xml_adapter.data
         self.compare_data = xml_adapter.get_data_to_compare()
-
         self.xml_with_pre_data = xml_adapter.xml_with_pre.get_article_data(300)
 
+    @property
+    def pkg_name_list(self):
+        # --- Resolução Consolidada de Package Names ---
+        pkg_names = set()
+        # 1. Nome enviado originalmente via parâmetro no construtor
+        if self.xml_adapter.pkg_name:
+            pkg_names.add(self.xml_adapter.pkg_name)
+        # 2. Nome oficial atual gerado pelo motor de cálculo do XML
+        if self.xml_adapter.sps_pkg_name:
+            pkg_names.add(self.xml_adapter.sps_pkg_name)
+        # 3. Consolida todas as listas de nomes depreciados/alternativos
+        pkg_names.update(self.xml_adapter.xml_with_pre.deprecated_sps_pkg_name_list)
+        return set(item for item in pkg_names if item)
+    
     def validate_input_data(self):
         if not self.adapter_data.get("pub_year"):
             raise exceptions.RequiredPublicationYearErrorToGetPidProviderXMLError()
-
         issn_electronic = self.adapter_data.get("issn_electronic")
         issn_print = self.adapter_data.get("issn_print")
         if not issn_electronic and not issn_print:
             raise exceptions.RequiredISSNErrorToGetPidProviderXMLError()
-
         items = list(self.article_location_params.values())
         if any(items):
             return
-
         article_titles = (self.xml_with_pre_data.get("article_titles") or [])
         article_titles = [x for x in article_titles if x]
         items = [
@@ -120,24 +130,6 @@ class QueryBuilderPidProviderXML:
             return
         raise exceptions.NotEnoughParametersToGetPidProviderXMLError()
 
-    @property
-    def pkg_name_list(self):
-        # --- Resolução Consolidada de Package Names ---
-        pkg_names = set()
-
-        # 1. Nome enviado originalmente via parâmetro no construtor
-        if self.xml_adapter.pkg_name:
-            pkg_names.add(self.xml_adapter.pkg_name)
-
-        # 2. Nome oficial atual gerado pelo motor de cálculo do XML
-        if self.xml_adapter.sps_pkg_name:
-            pkg_names.add(self.xml_adapter.sps_pkg_name)
-
-        # 3. Consolida todas as listas de nomes depreciados/alternativos
-        pkg_names.update(self.xml_adapter.xml_with_pre.deprecated_sps_pkg_name_list)
-
-        return set(item for item in pkg_names if item)
-    
     # ========== Queries Construídas ==========
     
     @property
