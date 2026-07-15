@@ -1010,32 +1010,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     @classmethod
     @profile_classmethod
-    def get_record_by_pid_v3(cls, xml_adapter):
-        # tenta procurar pelo pid_v3
-        if not xml_adapter.v3:
-            raise ValueError("get_record_by_pid_v3: XML has not pid v3")
-        xml_pid_v3 = xml_adapter.v3
-        # select_related("current_version") já vem do manager
-        results = cls.objects.filter(
-            Q(v3=xml_pid_v3) | Q(other_pid__pid_in_xml=xml_pid_v3)
-        )
-        if not results.exists():
-            # pid v3 é inédito
-            raise cls.DoesNotExist
-        
-        xml_adapter_data_to_compare = xml_adapter.get_data_to_compare()
-        result = PidProviderXML.get_best_match(results, xml_adapter_data_to_compare)
-        registered = result.get("registered")
-        if not registered:
-            xml_data = xml_adapter.xml_with_pre.get_article_data(PARTIAL_BODY_MAX)
-            items = [item.data for item in results]
-            raise PidProviderXMLPidV3ConflictError(
-                _(f"{xml_pid_v3} belongs to {items}, not to {xml_data}")
-            )
-        return registered
-
-    @classmethod
-    @profile_classmethod
     def select_records(cls, xml_adapter):
         """
         Gera pares (label, lista_de_candidatos) para cada estratégia de
@@ -1108,6 +1082,32 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         if unmatched_items:
             return {"unmatched_items": unmatched_items}
         return {}
+
+    @classmethod
+    @profile_classmethod
+    def get_record_by_pid_v3(cls, xml_adapter):
+        # tenta procurar pelo pid_v3
+        if not xml_adapter.v3:
+            raise ValueError("get_record_by_pid_v3: XML has not pid v3")
+        xml_pid_v3 = xml_adapter.v3
+        # select_related("current_version") já vem do manager
+        results = cls.objects.filter(
+            Q(v3=xml_pid_v3) | Q(other_pid__pid_in_xml=xml_pid_v3)
+        )
+        if not results.exists():
+            # pid v3 é inédito
+            raise cls.DoesNotExist
+        
+        xml_adapter_data_to_compare = xml_adapter.get_data_to_compare()
+        result = PidProviderXML.get_best_match(results, xml_adapter_data_to_compare)
+        registered = result.get("registered")
+        if not registered:
+            xml_data = xml_adapter.xml_with_pre.get_article_data(PARTIAL_BODY_MAX)
+            items = [item.data for item in results]
+            raise PidProviderXMLPidV3ConflictError(
+                _(f"{xml_pid_v3} belongs to {items}, not to {xml_data}")
+            )
+        return registered
 
     @staticmethod
     def get_best_match(results, xml_adapter_data):
