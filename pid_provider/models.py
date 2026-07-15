@@ -11,7 +11,7 @@ from zlib import crc32
 from django.core.files.base import ContentFile
 from django.core.exceptions import FieldError
 from django.db import IntegrityError, models
-from django.db.models import Q, Count
+from django.db.models import Prefetch, Q, Count
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -30,15 +30,13 @@ from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutu
     profile_property,
     profile_staticmethod,
 )
-from core.utils.similarity import how_similar
 from pid_provider import choices, exceptions
 from pid_provider.query_params import (
-    get_score,
     zero_to_none,
     compare,
     QueryBuilderPidProviderXML,
 )
-from tracker.models import UnexpectedEvent
+from tracker.models import BaseEvent, UnexpectedEvent
 
 PARTIAL_BODY_MAX = 300
 
@@ -346,6 +344,24 @@ class OtherPid(CommonControlField):
         return self.updated or self.created
 
 
+class PidProviderXMLManager(models.Manager):
+    """
+    Manager customizado: aplica select_related("current_version") em toda
+    consulta de PidProviderXML.objects, evitando repetir esse select_related
+    manualmente em cada classmethod (get_xml_with_pre, get_record_by_pid_v3,
+    select_records, public_items, mark_items_as_invalid, get_by_pid_v3, etc).
+
+    Nota: prefetch_related("collections") NÃO entra aqui de propósito —
+    prefetch_related sempre dispara uma query extra, mesmo quando
+    "collections" não é usado (ex.: em _is_registered_pid, que só faz
+    .exists()). Por isso ele é aplicado pontualmente em get_queryset(),
+    que é o método de listagem que de fato usa collection_list.
+    """
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("current_version")
+
+
 class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     """
     Tem responsabilidade de garantir a atribuição do PID da versão 3,
@@ -417,6 +433,8 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         _("Readable data"), null=True, blank=True
     )
 
+    objects = PidProviderXMLManager()
+
     base_form_class = CoreAdminModelForm
 
     panel_a = [
@@ -446,11 +464,16 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         FieldPanel("readable_data", widget=ReadOnlyPrettyJSONWidget(), read_only=True),
     ]
 
+    panels_event = [
+        InlinePanel("events", label=_("Events")),
+    ]
+
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_a, heading=_("Identification")),
             ObjectList(panel_b, heading=_("Other PIDs")),
             ObjectList(panel_c, heading=_("Data")),
+            ObjectList(panels_event, heading=_("Events")),
         ]
     )
 
@@ -558,7 +581,10 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             params["pub_year__lte"] = until_pub_year
         if proc_status_list:
             params["proc_status__in"] = proc_status_list
-        return cls.objects.filter(q, **params)
+        # select_related("current_version") já vem do manager;
+        # prefetch_related("collections") é aplicado aqui pois este método
+        # é usado em listagens que iteram collection_list.
+        return cls.objects.prefetch_related("collections").filter(q, **params)
 
     @classmethod
     def delete_queryset(cls, qs):
@@ -569,6 +595,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @profile_classmethod
     def public_items(cls, from_date):
         now = datetime.utcnow().isoformat()[:10]
+        # select_related("current_version") já vem do manager
         return cls.objects.filter(
             (Q(available_since__isnull=True) | Q(available_since__lte=now))
             & (Q(created__gte=from_date) | Q(updated__gte=from_date)),
@@ -599,8 +626,8 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @profile_classmethod
     def get_xml_with_pre(cls, v3):
         try:
-            # Usar select_related para evitar query extra ao acessar current_version
-            return cls.objects.select_related("current_version").get(v3=v3).xml_with_pre
+            # select_related("current_version") já vem do manager
+            return cls.objects.get(v3=v3).xml_with_pre
         except cls.DoesNotExist:
             return None
         except Exception:
@@ -988,8 +1015,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         if not xml_adapter.v3:
             raise ValueError("get_record_by_pid_v3: XML has not pid v3")
         xml_pid_v3 = xml_adapter.v3
-        results = (
-            cls.objects.filter(Q(v3=xml_pid_v3) | Q(other_pid__pid_in_xml=xml_pid_v3))
+        # select_related("current_version") já vem do manager
+        results = cls.objects.filter(
+            Q(v3=xml_pid_v3) | Q(other_pid__pid_in_xml=xml_pid_v3)
         )
         if not results.exists():
             # pid v3 é inédito
@@ -1009,44 +1037,63 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @classmethod
     @profile_classmethod
     def select_records(cls, xml_adapter):
+        """
+        Gera pares (label, lista_de_candidatos) para cada estratégia de
+        correspondência, do mais específico ao mais genérico.
+
+        Cada branch é materializada (list(...)) uma única vez aqui, para
+        que o consumidor (select_record) nunca precise avaliar a queryset
+        mais de uma vez (evita repetir .exists() + .count() + iteração,
+        que geram queries separadas no banco). Por ser um generator, uma
+        branch só é construída e avaliada quando o consumidor de fato
+        solicita o próximo item — se a primeira branch já resolver, as
+        demais nunca chegam a rodar no banco.
+        """
         qbuilder = QueryBuilderPidProviderXML(xml_adapter)
         qbuilder.validate_input_data()
- 
-        objects = cls.objects.select_related("current_version")
+
+        # select_related("current_version") já vem do manager
+        objects = cls.objects.all()
 
         # 1) correspondência direta por identificadores
-        yield "ids", objects.filter(qbuilder.identifier_queries)
+        yield "ids", list(objects.filter(qbuilder.identifier_queries))
 
         selected_journal = objects.filter(qbuilder.issn_query)
- 
+
         # 2) journal + issue + dados do artigo
         yield (
             "journal-issue-article",
-            selected_journal.filter(
-                Q(**qbuilder.issue_params) & qbuilder.article_data_query
-            )
+            list(
+                selected_journal.filter(
+                    Q(**qbuilder.issue_params) & qbuilder.article_data_query
+                )
+            ),
         )
- 
+
         # 3) journal + dados do artigo
-        yield "journal-article", selected_journal.filter(qbuilder.article_data_query)
+        yield "journal-article", list(selected_journal.filter(qbuilder.article_data_query))
 
     @staticmethod
     def select_record(xml_adapter, selection_results):
+        """
+        Consome os pares (label, lista_de_candidatos) produzidos por
+        select_records. As listas já vêm materializadas, então aqui só
+        checamos truthiness (nunca .exists()/.count() sobre queryset).
+        """
         unmatched_items = {}
         xml_adapter_data_to_compare = xml_adapter.get_data_to_compare()
-        for label, query_set in selection_results:
-            if not query_set:
+        for label, results in selection_results:
+            if not results:
                 continue
-            if not query_set.exists():
-                continue
-            result = PidProviderXML.get_best_match(query_set, xml_adapter_data_to_compare)
+
+            result = PidProviderXML.get_best_match(results, xml_adapter_data_to_compare)
 
             matched = result.get("matched")
             unmatched = result.get("unmatched")
             registered = result.get("registered")
             if registered:
                 response = {
-                    "total_results": query_set.count(),
+                    "total_results": len(results),
                     "registered": registered,
                 }
                 if matched:
@@ -1054,7 +1101,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 if unmatched:
                     response["unmatched_items"] = {label: unmatched}
                 return response
-                    
+
             if unmatched:
                 unmatched_items[label] = unmatched
 
@@ -1335,6 +1382,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             params["v2"] = pid_v2
         if partial_pid_v2:
             params["v2__contains"] = partial_pid_v2
+        # select_related("current_version") já vem do manager
         try:
             return cls.objects.get(**params)
         except cls.MultipleObjectsReturned as e:
@@ -1377,6 +1425,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @classmethod
     @profile_classmethod
     def mark_items_as_invalid(cls, issns):
+        # select_related("current_version") já vem do manager
+        # (necessário aqui pois o loop acessa item.xml_with_pre, que usa
+        # self.current_version)
         items = cls.objects.filter(
             Q(issn_print__in=issns) | Q(issn_electronic__in=issns),
         )
@@ -1453,7 +1504,19 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             int: Número de items atualizados.
         """
         try:
-            items = cls.objects.filter(pkg_name=pkg_name)
+            # select_related("current_version") já vem do manager.
+            # prefetch_related com Prefetch + to_attr é necessário aqui
+            # porque o loop chama item.other_pid.filter(pid_type="pid_v3"),
+            # e um .filter() sobre manager relacionado ignora o cache do
+            # prefetch_related simples (só .all() usa o cache) — por isso
+            # a filtragem precisa estar dentro do próprio Prefetch.
+            items = cls.objects.prefetch_related(
+                Prefetch(
+                    "other_pid",
+                    queryset=OtherPid.objects.filter(pid_type="pid_v3"),
+                    to_attr="pid_v3_others",
+                )
+            ).filter(pkg_name=pkg_name)
             if items.count() <= 1:
                 return 0
 
@@ -1469,12 +1532,16 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             most_recent_item.save()
 
             for item in items.exclude(id=most_recent_item.id):
-                for other_pid in item.other_pid.filter(pid_type="pid_v3"):
+                for other_pid in item.pid_v3_others:
                     OtherPid.get_or_create(
                         user=user,
                         pid_type=other_pid.pid_type,
                         pid_in_xml=other_pid.pid_in_xml,
-                        version=other_pid.current_version,
+                        # Nota: OtherPid não tem campo current_version, e
+                        # sim `version` — corrigido aqui (era
+                        # other_pid.current_version, que não existe no
+                        # modelo e lançaria AttributeError).
+                        version=other_pid.version,
                         pid_provider_xml=most_recent_item,
                     )
                 OtherPid.get_or_create(
@@ -1841,6 +1908,40 @@ class XMLURL(CommonControlField):
             xmlurl_obj.save_file(xml_with_pre.tostring(), filename=filename)
 
         return xmlurl_obj
+
+
+class XMLEvent(BaseEvent, CommonControlField):
+    """
+    Model to log events related to XML processing in the PID Provider system.
+
+    This model captures various events that occur during the processing of XML data,
+    such as registration attempts, validation errors, and other significant actions,
+    along with relevant details for debugging and monitoring purposes.
+
+    Attributes:
+        name (CharField): Name of the event.
+        detail (JSONField): Detailed information about the event.
+        created (DateTimeField): Timestamp when the event was created.
+        completed (BooleanField): Indicates if the event has been completed.
+        ppxml (ParentalKey): Reference to the related PidProviderXML instance.
+
+    Methods:
+        data (property): Returns a dictionary with the event's name, detail, and creation timestamp.
+        create (classmethod): Creates and saves a new XMLEvent instance.
+        finish: Marks the event as completed and optionally updates details, errors, or exceptions.
+    """
+    ppxml = ParentalKey(
+        PidProviderXML, on_delete=models.CASCADE, related_name="events"
+    )
+
+    @classmethod
+    def register(cls, ppxml, name, detail=None, errors=None, exceptions=None):
+        obj = cls()
+        obj.ppxml = ppxml
+        obj.name = name
+        completed = bool(not errors and not exceptions)
+        obj.finish(completed=completed, detail=detail, errors=errors, exceptions=exceptions)
+        return obj
 
 
 # -----------------------------------------------------------------------------
