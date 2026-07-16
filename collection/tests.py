@@ -198,7 +198,7 @@ class MinioConfigurationQueryFilterTest(TestCase):
             creator=self.creator,
         )
         self.minio = MinioConfiguration.objects.create(
-            name="minio1", host="minio.example.com", bucket_root="root", creator=self.creator
+            name="minio1", host="minio.example.com", bucket="root", creator=self.creator
         )
 
     def _filtered_qs(self, user):
