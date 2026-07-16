@@ -13,7 +13,11 @@ User = get_user_model()
 class PidProviderXMLSelectRecordsTests(TestCase):
     """
     select_records agora é um generator: apenas yield-a tuplas
-    (label, queryset) com os candidatos de cada estratégia de busca.
+    (label, lista_de_candidatos_materializada) com os candidatos de
+    cada estratégia de busca. Cada branch é convertida com list(...)
+    dentro do próprio método (ver docstring de select_records), então
+    o que chega aqui NÃO é mais um QuerySet — é uma list — e portanto
+    não expõe métodos como .count() ou .filter().
     Ele NÃO chama mais best_matches nem levanta DoesNotExist —
     essa orquestração ficou fora deste método.
     """
@@ -30,7 +34,7 @@ class PidProviderXMLSelectRecordsTests(TestCase):
         self.xml_adapter_mock.sps_pkg_name = "test_package"
 
     @patch("pid_provider.models.QueryBuilderPidProviderXML")
-    def test_select_records_yields_three_labeled_querysets_in_order(self, mock_qbuilder_cls):
+    def test_select_records_yields_three_labeled_lists_in_order(self, mock_qbuilder_cls):
         """O generator deve produzir, nesta ordem: ids, journal-issue-article, journal-article."""
         mock_qbuilder = mock_qbuilder_cls.return_value
         mock_qbuilder.identifier_queries = Q(v3="12345")
@@ -63,25 +67,29 @@ class PidProviderXMLSelectRecordsTests(TestCase):
         labels = [label for label, _ in results]
         self.assertEqual(labels, ["ids", "journal-issue-article", "journal-article"])
 
+        # cada branch já vem materializada como list (não QuerySet)
+        for _label, candidates in results:
+            self.assertIsInstance(candidates, list)
+
         # 1) ids: só o registro com v3 correspondente
-        ids_qs = results[0][1]
-        self.assertIn(record_by_id, ids_qs)
-        self.assertNotIn(record_by_journal_issue_article, ids_qs)
-        self.assertNotIn(record_by_journal_article_only, ids_qs)
+        ids_list = results[0][1]
+        self.assertIn(record_by_id, ids_list)
+        self.assertNotIn(record_by_journal_issue_article, ids_list)
+        self.assertNotIn(record_by_journal_article_only, ids_list)
 
         # 2) journal + issue + artigo: só o que bate no pub_year certo
-        journal_issue_article_qs = results[1][1]
-        self.assertIn(record_by_journal_issue_article, journal_issue_article_qs)
-        self.assertNotIn(record_by_journal_article_only, journal_issue_article_qs)
+        journal_issue_article_list = results[1][1]
+        self.assertIn(record_by_journal_issue_article, journal_issue_article_list)
+        self.assertNotIn(record_by_journal_article_only, journal_issue_article_list)
 
         # 3) journal + artigo (ignora issue): pega os dois do mesmo issn/z_surnames
-        journal_article_qs = results[2][1]
-        self.assertIn(record_by_journal_issue_article, journal_article_qs)
-        self.assertIn(record_by_journal_article_only, journal_article_qs)
+        journal_article_list = results[2][1]
+        self.assertIn(record_by_journal_issue_article, journal_article_list)
+        self.assertIn(record_by_journal_article_only, journal_article_list)
 
     @patch("pid_provider.models.QueryBuilderPidProviderXML")
-    def test_select_records_empty_querysets_when_no_match(self, mock_qbuilder_cls):
-        """Sem nenhum registro correspondente, cada queryset yield deve vir vazia (sem levantar exceção)."""
+    def test_select_records_empty_lists_when_no_match(self, mock_qbuilder_cls):
+        """Sem nenhum registro correspondente, cada lista yield deve vir vazia (sem levantar exceção)."""
         mock_qbuilder = mock_qbuilder_cls.return_value
         mock_qbuilder.identifier_queries = Q(v3="nao_existe")
         mock_qbuilder.issn_query = Q(issn_print="0000-0000")
@@ -91,8 +99,10 @@ class PidProviderXMLSelectRecordsTests(TestCase):
         results = list(PidProviderXML.select_records(self.xml_adapter_mock))
 
         self.assertEqual(len(results), 3)
-        for _label, qs in results:
-            self.assertEqual(qs.count(), 0)
+        for _label, candidates in results:
+            self.assertIsInstance(candidates, list)
+            # listas usam len(), não .count() (que é método de QuerySet)
+            self.assertEqual(len(candidates), 0)
 
     @patch("pid_provider.models.QueryBuilderPidProviderXML")
     def test_select_records_is_lazy_until_iterated(self, mock_qbuilder_cls):
