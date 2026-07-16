@@ -7,13 +7,17 @@ class PidProviderXMLSelectRecordTests(TestCase):
     """
     Testes de select_record com get_best_match totalmente mockado
     (get_best_match já tem cobertura própria em outro arquivo).
+
+    IMPORTANTE: select_record recebe pares (label, lista_de_candidatos)
+    já materializados por select_records (list(...), não QuerySet).
+    O código só faz truthiness (`if not results`) e `len(results)` —
+    NUNCA chama `.exists()` ou `.count()`. Por isso os "candidatos"
+    aqui são listas Python simples, não MagicMock simulando QuerySet.
     """
 
-    def _make_query_set(self, exists=True, count=0):
-        query_set = MagicMock()
-        query_set.exists.return_value = exists
-        query_set.count.return_value = count
-        return query_set
+    def _make_results(self, count):
+        """Simula a lista de candidatos já materializada para um label."""
+        return [MagicMock(name=f"candidate_{i}") for i in range(count)]
 
     def _make_xml_adapter(self, data_to_compare=None):
         xml_adapter = MagicMock()
@@ -22,7 +26,7 @@ class PidProviderXMLSelectRecordTests(TestCase):
 
     @patch("pid_provider.models.PidProviderXML.get_best_match")
     def test_select_record_returns_empty_dict_when_no_selection_results(self, mock_get_best_match):
-        """Sem nenhum label/query_set, retorna dict vazio e nem chama get_best_match."""
+        """Sem nenhum label/lista, retorna dict vazio e nem chama get_best_match."""
 
         xml_adapter = self._make_xml_adapter()
 
@@ -33,16 +37,16 @@ class PidProviderXMLSelectRecordTests(TestCase):
         xml_adapter.get_data_to_compare.assert_called_once()
 
     @patch("pid_provider.models.PidProviderXML.get_best_match")
-    def test_select_record_skips_falsy_or_nonexistent_query_sets(self, mock_get_best_match):
-        """query_set falsy (ex.: lista vazia) ou sem .exists() devem ser pulados, sem chamar get_best_match."""
+    def test_select_record_skips_falsy_empty_lists(self, mock_get_best_match):
+        """Listas vazias (falsy) devem ser puladas via `if not results`, sem chamar get_best_match."""
 
-        empty_query_set = []  # "not query_set" é True -> pulado antes de checar .exists()
-        nonexistent_query_set = self._make_query_set(exists=False)
+        empty_list_1 = self._make_results(0)  # []
+        empty_list_2 = self._make_results(0)  # []
 
         xml_adapter = self._make_xml_adapter()
         selection_results = [
-            ("empty_label", empty_query_set),
-            ("nonexistent_label", nonexistent_query_set),
+            ("empty_label", empty_list_1),
+            ("also_empty_label", empty_list_2),
         ]
 
         result = PidProviderXML.select_record(xml_adapter, selection_results)
@@ -57,7 +61,7 @@ class PidProviderXMLSelectRecordTests(TestCase):
         get_best_match, sem fatiar de novo -- nenhum item deve se perder.
         """
 
-        query_set = self._make_query_set(exists=True, count=5)
+        candidates = self._make_results(5)
         xml_adapter = self._make_xml_adapter()
 
         mock_get_best_match.return_value = {
@@ -66,8 +70,9 @@ class PidProviderXMLSelectRecordTests(TestCase):
             # sem "unmatched": todos os candidatos foram aprovados
         }
 
-        result = PidProviderXML.select_record(xml_adapter, [("journal", query_set)])
+        result = PidProviderXML.select_record(xml_adapter, [("journal", candidates)])
 
+        # total_results = len(results), NÃO .count()
         self.assertEqual(result["total_results"], 5)
         self.assertEqual(result["registered"], "ITEM_1")
         # Sem re-fatiamento: os 2 itens de "matched" continuam intactos
@@ -83,7 +88,7 @@ class PidProviderXMLSelectRecordTests(TestCase):
         sem a chave "matched_items".
         """
 
-        query_set = self._make_query_set(exists=True, count=1)
+        candidates = self._make_results(1)
         xml_adapter = self._make_xml_adapter()
 
         mock_get_best_match.return_value = {
@@ -91,7 +96,7 @@ class PidProviderXMLSelectRecordTests(TestCase):
             # sem "matched": só havia 1 candidato aprovado
         }
 
-        result = PidProviderXML.select_record(xml_adapter, [("journal", query_set)])
+        result = PidProviderXML.select_record(xml_adapter, [("journal", candidates)])
 
         self.assertEqual(result["total_results"], 1)
         self.assertEqual(result["registered"], "ITEM_1")
@@ -102,7 +107,7 @@ class PidProviderXMLSelectRecordTests(TestCase):
     def test_select_record_includes_unmatched_items_alongside_matched(self, mock_get_best_match):
         """Quando há "registered"/"matched" E "unmatched" no mesmo label, ambos aparecem na resposta."""
 
-        query_set = self._make_query_set(exists=True, count=4)
+        candidates = self._make_results(4)
         xml_adapter = self._make_xml_adapter()
 
         mock_get_best_match.return_value = {
@@ -111,7 +116,7 @@ class PidProviderXMLSelectRecordTests(TestCase):
             "unmatched": ["ITEM_4_DATA"],
         }
 
-        result = PidProviderXML.select_record(xml_adapter, [("journal", query_set)])
+        result = PidProviderXML.select_record(xml_adapter, [("journal", candidates)])
 
         self.assertEqual(result["matched_items"], {"journal": ["ITEM_2_DATA", "ITEM_3_DATA"]})
         self.assertEqual(result["unmatched_items"], {"journal": ["ITEM_4_DATA"]})
@@ -124,7 +129,7 @@ class PidProviderXMLSelectRecordTests(TestCase):
         real ["ITEM_X_DATA"], e não mais uma auto-referência ao dicionário acumulador.
         """
 
-        query_set = self._make_query_set(exists=True, count=1)
+        candidates = self._make_results(1)
         xml_adapter = self._make_xml_adapter()
 
         mock_get_best_match.return_value = {
@@ -132,7 +137,7 @@ class PidProviderXMLSelectRecordTests(TestCase):
             # sem "registered": nenhum candidato passou do corte
         }
 
-        result = PidProviderXML.select_record(xml_adapter, [("journal", query_set)])
+        result = PidProviderXML.select_record(xml_adapter, [("journal", candidates)])
 
         self.assertEqual(result, {"unmatched_items": {"journal": ["ITEM_X_DATA"]}})
 
@@ -143,8 +148,8 @@ class PidProviderXMLSelectRecordTests(TestCase):
         o que foi acumulado em unmatched_items para labels anteriores é descartado.
         """
 
-        query_set_1 = self._make_query_set(exists=True, count=1)
-        query_set_2 = self._make_query_set(exists=True, count=3)
+        candidates_1 = self._make_results(1)
+        candidates_2 = self._make_results(3)
         xml_adapter = self._make_xml_adapter()
 
         mock_get_best_match.side_effect = [
@@ -156,8 +161,8 @@ class PidProviderXMLSelectRecordTests(TestCase):
         ]
 
         selection_results = [
-            ("label1", query_set_1),
-            ("label2", query_set_2),
+            ("label1", candidates_1),
+            ("label2", candidates_2),
         ]
 
         result = PidProviderXML.select_record(xml_adapter, selection_results)
@@ -176,8 +181,8 @@ class PidProviderXMLSelectRecordTests(TestCase):
         para sua própria lista de não aprovados (não mais para o dict acumulador).
         """
 
-        query_set_1 = self._make_query_set(exists=True, count=1)
-        query_set_2 = self._make_query_set(exists=True, count=1)
+        candidates_1 = self._make_results(1)
+        candidates_2 = self._make_results(1)
         xml_adapter = self._make_xml_adapter()
 
         mock_get_best_match.side_effect = [
@@ -186,8 +191,8 @@ class PidProviderXMLSelectRecordTests(TestCase):
         ]
 
         selection_results = [
-            ("label1", query_set_1),
-            ("label2", query_set_2),
+            ("label1", candidates_1),
+            ("label2", candidates_2),
         ]
 
         result = PidProviderXML.select_record(xml_adapter, selection_results)
@@ -198,14 +203,14 @@ class PidProviderXMLSelectRecordTests(TestCase):
         )
 
     @patch("pid_provider.models.PidProviderXML.get_best_match")
-    def test_select_record_passes_query_set_and_comparison_data_to_get_best_match(self, mock_get_best_match):
-        """get_best_match deve ser chamado com o query_set do label e os dados já processados do xml_adapter."""
+    def test_select_record_passes_candidates_and_comparison_data_to_get_best_match(self, mock_get_best_match):
+        """get_best_match deve ser chamado com a lista de candidatos do label e os dados já processados do xml_adapter."""
 
-        query_set = self._make_query_set(exists=True, count=1)
+        candidates = self._make_results(1)
         xml_adapter = self._make_xml_adapter(data_to_compare={"title": "Foo"})
 
         mock_get_best_match.return_value = {"unmatched": ["ITEM_DATA"]}
 
-        PidProviderXML.select_record(xml_adapter, [("journal", query_set)])
+        PidProviderXML.select_record(xml_adapter, [("journal", candidates)])
 
-        mock_get_best_match.assert_called_once_with(query_set, {"title": "Foo"})
+        mock_get_best_match.assert_called_once_with(candidates, {"title": "Foo"})
