@@ -1,3 +1,5 @@
+from django.db import migrations, models
+
 class Migration(migrations.Migration):
     dependencies = [
         ("files_storage", "0004_remove_minioconfiguration_bucket_app_subdir_and_more"),
