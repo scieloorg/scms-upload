@@ -102,15 +102,20 @@ class OPACHarvester:
         origin_date = self._parse_gmt_date(
             item.get("update") or item.get("create")
         )
+        try:
+            # o nome do é status (o ideal é que fosse is_public) mas o OPAC retorna "false" ou "true" na chave status
+            # e o valor deve ser True se explicitamente é o contrário de "false"
+            is_public = item["status"]
+        except KeyError:
+            # a ausência é questão de versão mais antiga do opac_5 que não tem este campo
+            is_public = None
         return {
             "pid_v3": pid_v3,
             "url": xml_url,
             "origin_date": origin_date,
             "collection_acron": self.collection_acron,
             "item": item,
-            # o nome do é status (o ideal é que fosse is_public) mas o OPAC retorna "false" ou "true" na chave status
-            # e o valor deve ser True se explicitamente é o contrário de "false"
-            "is_public": item.get("status") != "false",
+            "is_public": is_public,
         }
 
     def format_normalized(self, pid_v3, item):
