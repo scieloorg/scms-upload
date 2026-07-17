@@ -142,7 +142,10 @@ def task_load_records_from_counter_dict(
 
                 url = document.get("url")
                 origin_date = document.get("origin_date")
-                if not document.get("is_public"):
+
+                if document["is_public"] is False:
+                    # False = explicitamente não está público
+                    # None = não se tem informação
                     continue
 
                 document_item = document.get("item") or {}
