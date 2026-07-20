@@ -36,7 +36,7 @@ from pid_provider.query_params import (
     compare,
     QueryBuilderPidProviderXML,
 )
-from tracker.models import BaseEvent, UnexpectedEvent
+from tracker.models import UnexpectedEvent
 
 PARTIAL_BODY_MAX = 300
 
@@ -464,16 +464,11 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         FieldPanel("readable_data", widget=ReadOnlyPrettyJSONWidget(), read_only=True),
     ]
 
-    panels_event = [
-        InlinePanel("events", label=_("Events")),
-    ]
-
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_a, heading=_("Identification")),
             ObjectList(panel_b, heading=_("Other PIDs")),
             ObjectList(panel_c, heading=_("Data")),
-            ObjectList(panels_event, heading=_("Events")),
         ]
     )
 
@@ -1908,40 +1903,6 @@ class XMLURL(CommonControlField):
             xmlurl_obj.save_file(xml_with_pre.tostring(), filename=filename)
 
         return xmlurl_obj
-
-
-class XMLEvent(BaseEvent, CommonControlField):
-    """
-    Model to log events related to XML processing in the PID Provider system.
-
-    This model captures various events that occur during the processing of XML data,
-    such as registration attempts, validation errors, and other significant actions,
-    along with relevant details for debugging and monitoring purposes.
-
-    Attributes:
-        name (CharField): Name of the event.
-        detail (JSONField): Detailed information about the event.
-        created (DateTimeField): Timestamp when the event was created.
-        completed (BooleanField): Indicates if the event has been completed.
-        ppxml (ParentalKey): Reference to the related PidProviderXML instance.
-
-    Methods:
-        data (property): Returns a dictionary with the event's name, detail, and creation timestamp.
-        create (classmethod): Creates and saves a new XMLEvent instance.
-        finish: Marks the event as completed and optionally updates details, errors, or exceptions.
-    """
-    ppxml = ParentalKey(
-        PidProviderXML, on_delete=models.CASCADE, related_name="events"
-    )
-
-    @classmethod
-    def register(cls, ppxml, name, detail=None, errors=None, exceptions=None):
-        obj = cls()
-        obj.ppxml = ppxml
-        obj.name = name
-        completed = bool(not errors and not exceptions)
-        obj.finish(completed=completed, detail=detail, errors=errors, exceptions=exceptions)
-        return obj
 
 
 # -----------------------------------------------------------------------------
