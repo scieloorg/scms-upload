@@ -260,6 +260,8 @@ def create_or_update_journal(
             exc_traceback=exc_traceback,
         )
         raise e
+    journal.core_synchronized = True
+    journal.save()
     return journal
 
 
