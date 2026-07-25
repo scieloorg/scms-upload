@@ -48,16 +48,10 @@ def create_or_update_migrated_journal(
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             UnexpectedEvent.create(
+                action="proc.sources.classic_website.create_or_update_migrated_journal",
+                item=scielo_issn,
                 e=e,
                 exc_traceback=exc_traceback,
-                detail={
-                    "task": "proc.sources.classic_website.create_or_update_migrated_journal",
-                    "user_id": user.id,
-                    "username": user.username,
-                    "collection": collection.acron,
-                    "pid": scielo_issn,
-                    "force_update": force_update,
-                },
             )
 
 
