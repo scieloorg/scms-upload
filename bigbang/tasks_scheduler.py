@@ -210,6 +210,8 @@ def _schedule_migrate_and_publish_journals(username, enabled):
             force_update=False,
             status=[],
             valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
+            force_import_acron_id_file=False,
+            force_core_sync=False,
         ),
         description=_("Migra e publica os periódicos"),
         priority=TITLE_DB_MIGRATION_PRIORITY,
