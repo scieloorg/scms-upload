@@ -412,6 +412,12 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     z_surnames = models.CharField(_("surnames"), max_length=64, null=True, blank=True)
     z_collab = models.CharField(_("collab"), max_length=64, null=True, blank=True)
     z_links = models.CharField(_("links"), max_length=64, null=True, blank=True)
+
+    # NOTA: a partir de então body_fragment_fingerprint (hash 300 chars), não mais 
+    # z_partial_body (hash do primeiro parágrafo que apresentou muita ambiguidade).
+    # Registros antigos mantêm o valor legado;
+    # a query de match (article_data_query) compara com ambos os
+    # candidatos para cobrir os dois formatos sem exigir backfill.
     z_partial_body = models.CharField(
         _("partial_body"), max_length=64, null=True, blank=True
     )
@@ -1194,7 +1200,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         self.z_surnames = xml_adapter.z_surnames
         self.z_collab = xml_adapter.z_collab
         self.z_links = xml_adapter.z_links
-        self.z_partial_body = xml_adapter.z_partial_body
+        self.z_partial_body = xml_adapter.xml_with_pre.body_fragment_fingerprint
 
         self.readable_data = xml_adapter.xml_with_pre.get_article_data()
 
