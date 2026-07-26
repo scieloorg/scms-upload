@@ -10,6 +10,17 @@ from pid_provider.models import PidProviderXML
 User = get_user_model()
 
 
+def build_get_article_data_query_side_effect(issue_true_query, issue_false_query):
+    """
+    Constrói o side_effect para `qbuilder.get_article_data_query(issue)`,
+    já que agora é ele quem decide a query final (antes, select_records
+    montava `Q(**issue_params) & article_data_query` diretamente).
+    """
+    def _side_effect(issue):
+        return issue_true_query if issue else issue_false_query
+    return _side_effect
+
+
 class PidProviderXMLSelectRecordsTests(TestCase):
     """
     select_records agora é um generator: apenas yield-a tuplas
@@ -20,6 +31,14 @@ class PidProviderXMLSelectRecordsTests(TestCase):
     não expõe métodos como .count() ou .filter().
     Ele NÃO chama mais best_matches nem levanta DoesNotExist —
     essa orquestração ficou fora deste método.
+
+    IMPORTANTE (pós-diff): as branches 2 e 3 não usam mais
+    `qbuilder.issue_params` e `qbuilder.article_data_query` diretamente —
+    passaram a usar `qbuilder.get_article_data_query(issue=True)` (branch
+    "journal-issue-article") e `qbuilder.get_article_data_query(issue=False)`
+    (branch "journal-article"). Por isso o mock precisa configurar
+    `get_article_data_query` (não mais `issue_params`/`article_data_query`
+    isolados).
     """
 
     def setUp(self):
@@ -39,8 +58,16 @@ class PidProviderXMLSelectRecordsTests(TestCase):
         mock_qbuilder = mock_qbuilder_cls.return_value
         mock_qbuilder.identifier_queries = Q(v3="12345")
         mock_qbuilder.issn_query = Q(issn_print="1234-5678")
-        mock_qbuilder.issue_params = {"pub_year": 2026}
-        mock_qbuilder.article_data_query = Q(z_surnames="Silva")
+
+        # issue=True -> exige pub_year=2026 (equivalente ao antigo issue_params)
+        # issue=False -> ignora pub_year, só olha z_surnames (equivalente ao
+        # antigo article_data_query "puro")
+        mock_qbuilder.get_article_data_query.side_effect = (
+            build_get_article_data_query_side_effect(
+                issue_true_query=Q(pub_year=2026) & Q(z_surnames="Silva"),
+                issue_false_query=Q(z_surnames="Silva"),
+            )
+        )
 
         record_by_id = PidProviderXML.objects.create(
             creator=self.user, v3="12345", registered_in_core=True
@@ -71,6 +98,11 @@ class PidProviderXMLSelectRecordsTests(TestCase):
         for _label, candidates in results:
             self.assertIsInstance(candidates, list)
 
+        # get_article_data_query deve ter sido chamado com issue=True e
+        # depois issue=False, nesta ordem
+        calls = [c.args[0] if c.args else c.kwargs.get("issue") for c in mock_qbuilder.get_article_data_query.call_args_list]
+        self.assertEqual(calls, [True, False])
+
         # 1) ids: só o registro com v3 correspondente
         ids_list = results[0][1]
         self.assertIn(record_by_id, ids_list)
@@ -93,8 +125,12 @@ class PidProviderXMLSelectRecordsTests(TestCase):
         mock_qbuilder = mock_qbuilder_cls.return_value
         mock_qbuilder.identifier_queries = Q(v3="nao_existe")
         mock_qbuilder.issn_query = Q(issn_print="0000-0000")
-        mock_qbuilder.issue_params = {"pub_year": 1900}
-        mock_qbuilder.article_data_query = Q(z_surnames="Ninguem")
+        mock_qbuilder.get_article_data_query.side_effect = (
+            build_get_article_data_query_side_effect(
+                issue_true_query=Q(pub_year=1900) & Q(z_surnames="Ninguem"),
+                issue_false_query=Q(z_surnames="Ninguem"),
+            )
+        )
 
         results = list(PidProviderXML.select_records(self.xml_adapter_mock))
 
@@ -110,12 +146,18 @@ class PidProviderXMLSelectRecordsTests(TestCase):
         Por ser generator, nada é executado na chamada da função:
         QueryBuilderPidProviderXML(...) e validate_input_data() só
         rodam quando o generator é de fato consumido (primeiro next()).
+        get_article_data_query só é chamado a partir do 2º/3º next(),
+        já que a 1ª branch ("ids") não depende dele.
         """
         mock_qbuilder = mock_qbuilder_cls.return_value
         mock_qbuilder.identifier_queries = Q(v3="qualquer")
         mock_qbuilder.issn_query = Q(issn_print="0000-0000")
-        mock_qbuilder.issue_params = {}
-        mock_qbuilder.article_data_query = Q()
+        mock_qbuilder.get_article_data_query.side_effect = (
+            build_get_article_data_query_side_effect(
+                issue_true_query=Q(),
+                issue_false_query=Q(),
+            )
+        )
 
         gen = PidProviderXML.select_records(self.xml_adapter_mock)
 
@@ -123,7 +165,16 @@ class PidProviderXMLSelectRecordsTests(TestCase):
         mock_qbuilder_cls.assert_not_called()
         mock_qbuilder.validate_input_data.assert_not_called()
 
-        next(gen)
+        next(gen)  # yield "ids"
 
         mock_qbuilder_cls.assert_called_once_with(self.xml_adapter_mock)
         mock_qbuilder.validate_input_data.assert_called_once()
+        # "ids" não usa get_article_data_query
+        mock_qbuilder.get_article_data_query.assert_not_called()
+
+        next(gen)  # yield "journal-issue-article"
+        mock_qbuilder.get_article_data_query.assert_called_once_with(issue=True)
+
+        next(gen)  # yield "journal-article"
+        self.assertEqual(mock_qbuilder.get_article_data_query.call_count, 2)
+        mock_qbuilder.get_article_data_query.assert_called_with(issue=False)
