@@ -36,7 +36,7 @@ from pid_provider.query_params import (
     compare,
     QueryBuilderPidProviderXML,
 )
-from tracker.models import UnexpectedEvent
+from tracker.models import BaseEvent, UnexpectedEvent
 
 PARTIAL_BODY_MAX = 300
 
@@ -615,6 +615,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             "record_status": "updated" if self.updated else "created",
             "registered_in_core": self.registered_in_core,
         }
+        _data.update(self.get_readable_data())
         return _data
 
     @classmethod
@@ -649,9 +650,16 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             return False
         return True
 
+    def get_readable_data(self):
+        if self.readable_data:
+            return self.readable_data
+        if self.xml_with_pre:
+            return self.xml_with_pre.get_article_data()
+        return {}
+
     @property
     def data_to_compare(self):
-        readable = self.readable_data or {}
+        readable = self.get_readable_data()
         titles = readable.get("article_titles")
         body_fragment = readable.get("body_fragment")
         return {
@@ -1034,13 +1042,15 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             "journal-issue-article",
             list(
                 selected_journal.filter(
-                    Q(**qbuilder.issue_params) & qbuilder.article_data_query
+                    qbuilder.get_article_data_query(issue=True)
                 )
             ),
         )
 
         # 3) journal + dados do artigo
-        yield "journal-article", list(selected_journal.filter(qbuilder.article_data_query))
+        yield "journal-article", list(
+            selected_journal.filter(qbuilder.get_article_data_query(issue=False))
+        )
 
     @staticmethod
     def select_record(xml_adapter, selection_results):
