@@ -245,22 +245,120 @@ class ArticleLocationParamsTests(SimpleTestCase):
 
 
 class ArticleDataQueryTests(SimpleTestCase):
+    """
+    Atualizado: `article_data_query` não tem mais o branch OR nem faz o
+    merge com `article_location_params` internamente. Agora ela sempre
+    retorna a query AND com os valores reais (truthy ou não) dos 4 campos
+    textuais. A junção com localização/fascículo passou para
+    `get_article_data_query`.
+    """
 
-    def test_builds_or_query_with_available_textual_fields(self):
+    def test_returns_and_query_with_available_textual_fields(self):
         adapter = make_xml_adapter(
             data={"z_surnames": "Silva", "z_partial_body": "corpo"}
         )
         qbuilder = QueryBuilderPidProviderXML(adapter)
-        expected = Q(z_surnames="Silva") | Q(z_partial_body="corpo")
+        expected = Q(
+            z_surnames="Silva", z_collab=None, z_links=None, z_partial_body="corpo"
+        )
         self.assertEqual(qbuilder.article_data_query, expected)
 
-    def test_falls_back_to_and_query_when_no_textual_data(self):
-        adapter = make_xml_adapter(data={})
+    def test_does_not_use_or_even_when_multiple_fields_present(self):
+        """Antes do diff, múltiplos campos truthy geravam OR; agora é sempre AND."""
+        adapter = make_xml_adapter(
+            data={
+                "z_surnames": "Silva",
+                "z_collab": "Grupo X",
+                "z_links": "link1",
+                "z_partial_body": "corpo",
+            }
+        )
         qbuilder = QueryBuilderPidProviderXML(adapter)
         expected = Q(
+            z_surnames="Silva",
+            z_collab="Grupo X",
+            z_links="link1",
+            z_partial_body="corpo",
+        )
+        self.assertEqual(qbuilder.article_data_query, expected)
+        # Garante que não é a versão OR (equivalente mas com | em vez de AND
+        # implícito do Q com múltiplos kwargs)
+        or_version = (
+            Q(z_surnames="Silva")
+            | Q(z_collab="Grupo X")
+            | Q(z_links="link1")
+            | Q(z_partial_body="corpo")
+        )
+        self.assertNotEqual(qbuilder.article_data_query, or_version)
+
+    def test_returns_and_query_when_no_textual_data(self):
+        adapter = make_xml_adapter(data={})
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        expected = Q(z_surnames=None, z_collab=None, z_links=None, z_partial_body=None)
+        self.assertEqual(qbuilder.article_data_query, expected)
+
+    def test_no_longer_merges_with_article_location_params(self):
+        """
+        Regressão: antes do diff, quando não havia dado textual,
+        `article_data_query` retornava `Q(...) & Q(**article_location_params)`.
+        Agora essa junção não ocorre mais aqui.
+        """
+        adapter = make_xml_adapter(
+            data={"elocation_id": "e123", "fpage": "10", "lpage": "20"}
+        )
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        old_style_expected = Q(
             z_surnames=None, z_collab=None, z_links=None, z_partial_body=None
         ) & Q(**qbuilder.article_location_params)
-        self.assertEqual(qbuilder.article_data_query, expected)
+        self.assertNotEqual(qbuilder.article_data_query, old_style_expected)
+
+
+class GetArticleDataQueryTests(SimpleTestCase):
+    """Novo método introduzido pelo diff, usado em select_records (models.py)."""
+
+    def test_issue_true_combines_article_data_issue_and_location_params(self):
+        adapter = make_xml_adapter(
+            data={
+                "z_surnames": "Silva",
+                "pub_year": "2026",
+                "volume": "10",
+                "number": "2",
+                "suppl": None,
+                "elocation_id": "e1",
+                "fpage": "10",
+                "lpage": "20",
+            }
+        )
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        result = qbuilder.get_article_data_query(issue=True)
+        expected = (
+            qbuilder.article_data_query
+            & Q(**qbuilder.issue_params)
+            & Q(**qbuilder.article_location_params)
+        )
+        self.assertEqual(result, expected)
+
+    def test_issue_false_requires_issue_and_location_fields_null(self):
+        adapter = make_xml_adapter(data={"z_surnames": "Silva"})
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        result = qbuilder.get_article_data_query(issue=False)
+        expected = qbuilder.article_data_query & Q(
+            volume__isnull=True,
+            number__isnull=True,
+            suppl__isnull=True,
+            elocation_id__isnull=True,
+            fpage__isnull=True,
+            lpage__isnull=True,
+        )
+        self.assertEqual(result, expected)
+
+    def test_issue_true_and_false_produce_different_queries(self):
+        adapter = make_xml_adapter(data={"z_surnames": "Silva", "pub_year": "2026"})
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        self.assertNotEqual(
+            qbuilder.get_article_data_query(issue=True),
+            qbuilder.get_article_data_query(issue=False),
+        )
 
 
 class ZeroToNoneTests(SimpleTestCase):
@@ -334,6 +432,31 @@ class CompareItemsTests(SimpleTestCase):
             result, {"label": "z_surnames", "score": 0.4, "registered": "Silva"}
         )
         mock_how_similar.assert_called_once_with("Souza", "Silva")
+
+    @patch("pid_provider.query_params.how_similar")
+    def test_none_input_data_falls_back_to_empty_string_for_how_similar(
+        self, mock_how_similar
+    ):
+        """
+        Regressão do diff: antes, `how_similar(input_data, registered)` com
+        input_data=None estourava TypeError dentro de how_similar. Agora
+        `input_data or ""` evita isso.
+        """
+        mock_how_similar.return_value = 0.2
+        result = compare_items("z_links", "algum-link", None)
+        self.assertEqual(
+            result, {"label": "z_links", "score": 0.2, "registered": "algum-link"}
+        )
+        mock_how_similar.assert_called_once_with("", "algum-link")
+
+    @patch("pid_provider.query_params.how_similar")
+    def test_none_registered_falls_back_to_empty_string_for_how_similar(
+        self, mock_how_similar
+    ):
+        mock_how_similar.return_value = 0.3
+        result = compare_items("z_links", None, "algum-link")
+        self.assertEqual(result, {"label": "z_links", "score": 0.3, "registered": None})
+        mock_how_similar.assert_called_once_with("algum-link", "")
 
 
 class CompareTests(SimpleTestCase):
