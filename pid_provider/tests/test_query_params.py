@@ -2,6 +2,18 @@
 Testes para QueryBuilderPidProviderXML e as funções de comparação
 (compare, compare_lists, compare_items, get_score, zero_to_none).
 
+Atualizado para cobrir a correção do falso-match na branch journal-article:
+- QueryBuilderPidProviderXML agora também lê
+  `xml_adapter.xml_with_pre.body_fragment_fingerprint` (fingerprint do
+  corpo INTEIRO do artigo) diretamente do xml_with_pre — sem depender de
+  mudança no PidProviderXMLAdapter/packtools.
+- `article_data_query` não usa mais z_partial_body isolado: delega ao
+  novo `partial_body_query`, que monta `z_partial_body__in=[...]` com os
+  hashes disponíveis (legado + novo fingerprint) ou, quando nenhum dos
+  dois existe no XML de entrada, `z_partial_body__isnull=True` — nunca
+  `z_partial_body__in=(None, None)`, que em SQL jamais casaria com
+  candidatos NULL (NULL = NULL é UNKNOWN, não True).
+
 ATENÇÃO: ajuste o caminho de import abaixo (`pid_provider.query_params`)
 para o módulo real onde essas classes/funções estão definidas no projeto,
 caso seja diferente.
@@ -36,8 +48,16 @@ def make_xml_adapter(
     collab=None,
     links=None,
     partial_body=None,
+    body_fragment_fingerprint=None,
 ):
-    """Monta um mock de xml_adapter com a forma esperada por QueryBuilderPidProviderXML."""
+    """
+    Monta um mock de xml_adapter com a forma esperada por
+    QueryBuilderPidProviderXML.
+
+    body_fragment_fingerprint: valor de
+    xml_adapter.xml_with_pre.body_fragment_fingerprint, o novo sinal
+    (hash do corpo inteiro do artigo) usado em partial_body_query.
+    """
     adapter = MagicMock()
     adapter.data = data or {}
     adapter.get_data_to_compare.return_value = {}
@@ -48,6 +68,7 @@ def make_xml_adapter(
     adapter.sps_pkg_name = sps_pkg_name
     adapter.order = order
     adapter.xml_with_pre.deprecated_sps_pkg_name_list = deprecated_sps_pkg_name_list or []
+    adapter.xml_with_pre.body_fragment_fingerprint = body_fragment_fingerprint
     adapter.xml_with_pre.get_article_data.return_value = {
         "article_titles": article_titles or [],
         "surnames": surnames,
@@ -244,77 +265,128 @@ class ArticleLocationParamsTests(SimpleTestCase):
         self.assertEqual(params["v2__endswith"], "00003")
 
 
-class ArticleDataQueryTests(SimpleTestCase):
+class PartialBodyQueryTests(SimpleTestCase):
     """
-    Atualizado: `article_data_query` não tem mais o branch OR nem faz o
-    merge com `article_location_params` internamente. Agora ela sempre
-    retorna a query AND com os valores reais (truthy ou não) dos 4 campos
-    textuais. A junção com localização/fascículo passou para
-    `get_article_data_query`.
+    Cobre especificamente o fix do incidente: z_partial_body agora aceita
+    dois formatos de hash (legado e fingerprint do corpo inteiro), e o
+    caso "nenhum dos dois presente" precisa cair em isnull=True, nunca em
+    __in=(None, None).
     """
 
-    def test_returns_and_query_with_available_textual_fields(self):
+    def test_uses_in_with_only_legacy_partial_body(self):
         adapter = make_xml_adapter(
-            data={"z_surnames": "Silva", "z_partial_body": "corpo"}
+            data={"z_partial_body": "hash-legado"},
+            body_fragment_fingerprint=None,
         )
         qbuilder = QueryBuilderPidProviderXML(adapter)
-        expected = Q(
-            z_surnames="Silva", z_collab=None, z_links=None, z_partial_body="corpo"
+        self.assertEqual(
+            qbuilder.partial_body_query, Q(z_partial_body__in=["hash-legado"])
         )
-        self.assertEqual(qbuilder.article_data_query, expected)
 
-    def test_does_not_use_or_even_when_multiple_fields_present(self):
-        """Antes do diff, múltiplos campos truthy geravam OR; agora é sempre AND."""
+    def test_uses_in_with_only_body_fragment_fingerprint(self):
+        adapter = make_xml_adapter(
+            data={},
+            body_fragment_fingerprint="hash-corpo-inteiro",
+        )
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        self.assertEqual(
+            qbuilder.partial_body_query,
+            Q(z_partial_body__in=["hash-corpo-inteiro"]),
+        )
+
+    def test_uses_in_with_both_hashes_when_both_present_and_different(self):
+        adapter = make_xml_adapter(
+            data={"z_partial_body": "hash-legado"},
+            body_fragment_fingerprint="hash-corpo-inteiro",
+        )
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        self.assertEqual(
+            qbuilder.partial_body_query,
+            Q(z_partial_body__in=["hash-legado", "hash-corpo-inteiro"]),
+        )
+
+    def test_deduplicates_when_both_hashes_are_equal(self):
+        adapter = make_xml_adapter(
+            data={"z_partial_body": "hash-igual"},
+            body_fragment_fingerprint="hash-igual",
+        )
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        self.assertEqual(
+            qbuilder.partial_body_query, Q(z_partial_body__in=["hash-igual"])
+        )
+
+    def test_uses_isnull_when_neither_hash_is_present(self):
+        """
+        Regressão do incidente: quando o XML de entrada não tem nenhum
+        hash de corpo, a query deve usar isnull=True (equivalente ao
+        antigo Q(z_partial_body=None)), e JAMAIS __in=(None, None), que
+        em SQL nunca casaria com candidatos cujo z_partial_body é NULL
+        (NULL = NULL é UNKNOWN, não True).
+        """
+        adapter = make_xml_adapter(data={}, body_fragment_fingerprint=None)
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        self.assertEqual(qbuilder.partial_body_query, Q(z_partial_body__isnull=True))
+        self.assertNotEqual(
+            qbuilder.partial_body_query, Q(z_partial_body__in=(None, None))
+        )
+
+
+class ArticleDataQueryTests(SimpleTestCase):
+    """
+    article_data_query agora delega o campo z_partial_body inteiramente a
+    partial_body_query (ver PartialBodyQueryTests) e mantém AND puro para
+    z_surnames/z_collab/z_links.
+    """
+
+    def test_combines_textual_fields_with_partial_body_query_both_hashes(self):
         adapter = make_xml_adapter(
             data={
                 "z_surnames": "Silva",
-                "z_collab": "Grupo X",
-                "z_links": "link1",
-                "z_partial_body": "corpo",
-            }
+                "z_collab": None,
+                "z_links": None,
+                "z_partial_body": "hash-legado",
+            },
+            body_fragment_fingerprint="hash-corpo-inteiro",
         )
         qbuilder = QueryBuilderPidProviderXML(adapter)
-        expected = Q(
-            z_surnames="Silva",
-            z_collab="Grupo X",
-            z_links="link1",
-            z_partial_body="corpo",
+        expected = Q(z_surnames="Silva", z_collab=None, z_links=None) & Q(
+            z_partial_body__in=["hash-legado", "hash-corpo-inteiro"]
         )
         self.assertEqual(qbuilder.article_data_query, expected)
-        # Garante que não é a versão OR (equivalente mas com | em vez de AND
-        # implícito do Q com múltiplos kwargs)
-        or_version = (
-            Q(z_surnames="Silva")
-            | Q(z_collab="Grupo X")
-            | Q(z_links="link1")
-            | Q(z_partial_body="corpo")
-        )
-        self.assertNotEqual(qbuilder.article_data_query, or_version)
 
-    def test_returns_and_query_when_no_textual_data(self):
-        adapter = make_xml_adapter(data={})
+    def test_falls_back_to_isnull_when_no_body_hash_available(self):
+        adapter = make_xml_adapter(data={}, body_fragment_fingerprint=None)
         qbuilder = QueryBuilderPidProviderXML(adapter)
-        expected = Q(z_surnames=None, z_collab=None, z_links=None, z_partial_body=None)
+        expected = Q(z_surnames=None, z_collab=None, z_links=None) & Q(
+            z_partial_body__isnull=True
+        )
         self.assertEqual(qbuilder.article_data_query, expected)
 
-    def test_no_longer_merges_with_article_location_params(self):
+    def test_two_different_articles_produce_different_queries(self):
         """
-        Regressão: antes do diff, quando não havia dado textual,
-        `article_data_query` retornava `Q(...) & Q(**article_location_params)`.
-        Agora essa junção não ocorre mais aqui.
+        Regressão conceitual do incidente: dois artigos com hashes de
+        corpo diferentes (mesmo que ambos tenham, no passado, colidido
+        via z_partial_body legado genérico) agora produzem queries IN
+        distintas, pois o fingerprint do corpo inteiro entra na
+        composição.
         """
-        adapter = make_xml_adapter(
-            data={"elocation_id": "e123", "fpage": "10", "lpage": "20"}
+        adapter_a = make_xml_adapter(
+            data={"z_partial_body": "rotulo-generico-artigo-revisao"},
+            body_fragment_fingerprint="hash-corpo-artigo-a",
         )
-        qbuilder = QueryBuilderPidProviderXML(adapter)
-        old_style_expected = Q(
-            z_surnames=None, z_collab=None, z_links=None, z_partial_body=None
-        ) & Q(**qbuilder.article_location_params)
-        self.assertNotEqual(qbuilder.article_data_query, old_style_expected)
+        adapter_b = make_xml_adapter(
+            data={"z_partial_body": "rotulo-generico-artigo-revisao"},
+            body_fragment_fingerprint="hash-corpo-artigo-b",
+        )
+        qbuilder_a = QueryBuilderPidProviderXML(adapter_a)
+        qbuilder_b = QueryBuilderPidProviderXML(adapter_b)
+        self.assertNotEqual(
+            qbuilder_a.article_data_query, qbuilder_b.article_data_query
+        )
 
 
 class GetArticleDataQueryTests(SimpleTestCase):
-    """Novo método introduzido pelo diff, usado em select_records (models.py)."""
+    """Método usado em select_records (models.py)."""
 
     def test_issue_true_combines_article_data_issue_and_location_params(self):
         adapter = make_xml_adapter(
@@ -327,7 +399,8 @@ class GetArticleDataQueryTests(SimpleTestCase):
                 "elocation_id": "e1",
                 "fpage": "10",
                 "lpage": "20",
-            }
+            },
+            body_fragment_fingerprint=None,
         )
         qbuilder = QueryBuilderPidProviderXML(adapter)
         result = qbuilder.get_article_data_query(issue=True)
@@ -339,7 +412,9 @@ class GetArticleDataQueryTests(SimpleTestCase):
         self.assertEqual(result, expected)
 
     def test_issue_false_requires_issue_and_location_fields_null(self):
-        adapter = make_xml_adapter(data={"z_surnames": "Silva"})
+        adapter = make_xml_adapter(
+            data={"z_surnames": "Silva"}, body_fragment_fingerprint=None
+        )
         qbuilder = QueryBuilderPidProviderXML(adapter)
         result = qbuilder.get_article_data_query(issue=False)
         expected = qbuilder.article_data_query & Q(
@@ -353,7 +428,10 @@ class GetArticleDataQueryTests(SimpleTestCase):
         self.assertEqual(result, expected)
 
     def test_issue_true_and_false_produce_different_queries(self):
-        adapter = make_xml_adapter(data={"z_surnames": "Silva", "pub_year": "2026"})
+        adapter = make_xml_adapter(
+            data={"z_surnames": "Silva", "pub_year": "2026"},
+            body_fragment_fingerprint=None,
+        )
         qbuilder = QueryBuilderPidProviderXML(adapter)
         self.assertNotEqual(
             qbuilder.get_article_data_query(issue=True),
@@ -437,11 +515,6 @@ class CompareItemsTests(SimpleTestCase):
     def test_none_input_data_falls_back_to_empty_string_for_how_similar(
         self, mock_how_similar
     ):
-        """
-        Regressão do diff: antes, `how_similar(input_data, registered)` com
-        input_data=None estourava TypeError dentro de how_similar. Agora
-        `input_data or ""` evita isso.
-        """
         mock_how_similar.return_value = 0.2
         result = compare_items("z_links", "algum-link", None)
         self.assertEqual(
