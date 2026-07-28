@@ -908,6 +908,13 @@ class Article(ClusterableModel, CommonControlField):
 
     @classmethod
     def exclude_invalid_records(cls, user, issue, sps_pkg_id_list, timeout=None):
+        try:
+            return cls._exclude_invalid_records(user, issue, sps_pkg_id_list, timeout)
+        except Exception as e:
+            return {"error": str(e), "error_type": str(type(e)), "traceback": traceback.format_exc()}
+
+    @classmethod
+    def _exclude_invalid_records(cls, user, issue, sps_pkg_id_list, timeout=None):
         total_deletado = 0
         
         # Estrutura exata solicitada por você
@@ -986,12 +993,13 @@ class Article(ClusterableModel, CommonControlField):
                     try:
                         item.create_or_update_article_collections(user)
                         item.check_availability(user, force_update=True, timeout=timeout)
-                        response = item.available_on_public_website()
-                        events.append(_("Checking {} is available. Result: {}").format(item, response))
-                        
-                        if response.get("valid"):
-                            keep = item
-                            break
+                        for coll in item.article_collections:
+                            response = item.available_on_public_website(coll.collection)
+                            events.append(_("Checking {} is available. Result: {}").format(item, response))
+                            
+                            if response.get("valid"):
+                                keep = item
+                                break
                     except Exception as e:
                         exceptions.append(_("Checking {} is available. Result: {}").format(item, e))
                 
@@ -1018,9 +1026,19 @@ class Article(ClusterableModel, CommonControlField):
         # pode adicioná-lo ao dicionário ou retornar uma tupla. 
         # Como o seu esqueleto final pedia apenas o retorno do dicionário, mantive assim:
         if ppxml_to_delete:
-            PidProviderXML.delete_queryset(PidProviderXML.objects.filter(id__in=ppxml_to_delete))
+            try:
+                PidProviderXML.objects.filter(id__in=ppxml_to_delete).delete()
+            except Exception as e:
+                exceptions.append(str(e))
+                PidProviderXML.objects.filter(
+                    id__in=ppxml_to_delete, 
+                ).update(proc_status=PPXML_STATUS_INVALID)
+
         if sps_pkg_to_delete:
-            SPSPkg.delete_queryset(SPSPkg.objects.filter(id__in=sps_pkg_to_delete))
+            try:
+                SPSPkg.objects.filter(id__in=sps_pkg_to_delete).delete()
+            except Exception as e:
+                exceptions.append(str(e))
         
         response["deleted_ppxml_ids"] = list(ppxml_to_delete)
         response["deleted_sps_pkg_ids"] = list(sps_pkg_to_delete)
@@ -1566,8 +1584,7 @@ class ArticleWebPage(CommonControlField):
                     article = self.article
                     lang_code = self.lang.code2 if self.lang else None
                     article_metadata = article.get_metadata_items(lang_code)
-
-                response = check_content(article_metadata, content, self.fmt) 
+                response = check_content(article_metadata, content, self.fmt)
                 detail.update(response)
                 try:
                     rate = response["rate"]

@@ -712,8 +712,7 @@ def import_journal_acron_id_records(
     Para um dado JournalAcronIdFile, criar itens em IdFileRecord
     """
     detail = {}
-    stats = {}
-    output = {}
+    exceptions = []
 
     try:
         detail["params"] = {
@@ -731,9 +730,7 @@ def import_journal_acron_id_records(
             journal_acron,
             journal_acron + ".id",
         )
-        
-        datetime_now = datetime.now(timezone.utc).isoformat()
-        logging.info(f"Processing {source_path} at {datetime_now}")
+        detail["source_path"] = source_path
         journal_id_file = JournalAcronIdFile.create_or_update(
             user=user,
             collection=collection,
@@ -741,20 +738,24 @@ def import_journal_acron_id_records(
             source_path=source_path,
             force_update=force_update,
         )
+        journal_id_file_data = journal_id_file.data
+        detail.update(journal_id_file_data)
         
-        if not force_update and not id_file_record_need_to_be_updated(
-            journal_id_file, datetime_now, output, stats
-        ):
+        id_file_record_need_to_be_updated = journal_id_file_data.get("id_file_record_need_to_be_updated")
+        
+        if not force_update and not id_file_record_need_to_be_updated:
             raise IdFileRecordIsAlreadyUptodate(
                 _("IdFileRecord is already up-to-date with acron.id")
             )
 
         for item in get_bases_work_acron_id_file_records(
-            user,
             source_path,
             classic_website,
-            journal_proc,
         ):
+            if item.get("exception"):
+                exceptions.append(item.get("exception"))
+                continue
+
             item["force_update"] = force_update
             IdFileRecord.create_or_update(
                 user,
@@ -762,13 +763,16 @@ def import_journal_acron_id_records(
                 **item,
             )
 
+        journal_id_file_data = journal_id_file.data
+        detail.update(journal_id_file_data)
+
         issue_pids = IdFileRecord.objects.filter(
             item_type="article", todo=True, parent=journal_id_file,
         ).annotate(
             pid_sliced=Substr("item_pid", 2, Length("item_pid") - 6)
         ).values_list("pid_sliced", flat=True).distinct()
 
-        selected_issue_procs = journal_proc.issueproc_set.filter(
+        journal_proc.issueproc_set.all().filter(
             pid__in=issue_pids,
         ).exclude(
             docs_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
@@ -776,124 +780,76 @@ def import_journal_acron_id_records(
             docs_status=tracker_choices.PROGRESS_STATUS_REPROC,
             updated_by=user,
         )
+        detail["stats"]["total_issueproc_docs_status_to_process"] = journal_proc.issueproc_set.all().filter(
+            docs_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+        ).count()
+
         article_proc_model.objects.filter(
-            issue_proc__in=selected_issue_procs or []
+            issue_proc__pid__in=issue_pids
         ).exclude(
-            xml_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+            migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
         ).update(
-            xml_status=tracker_choices.PROGRESS_STATUS_REPROC,
+            migration_status=tracker_choices.PROGRESS_STATUS_REPROC,
             updated_by=user,
         )
+        detail["stats"]["total_articleproc_migration_status_to_process"] = article_proc_model.objects.filter(
+            migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
+        ).count()
 
-        qs = journal_id_file.id_file_records.filter(item_type="article")
-        total_id_file_records = qs.count()
-        total_id_file_records_to_migrate = qs.filter(todo=True).count()
-    
-        stats["total_id_file_records"] = total_id_file_records
-        stats["total_id_file_records_to_migrate"] = total_id_file_records_to_migrate
-        detail["stats"] = stats
-        detail["output"] = output
-        return detail
     except FileNotFoundError as e:
-        output["message"] = f"File not found: {source_path}"
-        detail["stats"] = stats
-        detail["output"] = output
-        return detail
+        detail["message"] = f"File not found: {source_path}"
     except IdFileRecordIsAlreadyUptodate as e:
-        output["message"] = str(e)
-        detail["stats"] = stats
-        detail["output"] = output
-        return detail
+        detail["message"] = str(e)
     except Exception as e:
-        output["traceback"] = traceback.format_exc()
-        detail["output"] = output
-        detail["stats"] = stats
-        return detail
+        detail["traceback"] = traceback.format_exc()
 
+    detail["exceptions"] = exceptions
 
-def id_file_record_need_to_be_updated(journal_id_file, datetime_now, output, stats):
-    output["datetime_now"] = datetime_now
-    
-    output["journal_id_file_last_updated"] = journal_id_file.updated.isoformat()
-    
-    qs = journal_id_file.id_file_records.filter(item_type="article")
-    total_id_file_records = qs.count()
-    stats["total_id_file_records"] = total_id_file_records
-    if total_id_file_records == 0:
-        return True
-
-    total_id_file_records = journal_id_file.id_file_records.count()
-    stats["total_id_file_records"] = total_id_file_records
-    
-    output["id_file_record_last_updated"] = qs.order_by("-updated").first().updated.isoformat()
-    logging.info(f"id_file_record_last_updated: {output['id_file_record_last_updated']}")
-    if output["journal_id_file_last_updated"] > output["id_file_record_last_updated"]:
-        return True
-
-    return False
+    return detail
 
 
 def get_bases_work_acron_id_file_records(
-    user, source_path, classic_website, journal_proc
+    source_path, classic_website,
 ):
-    try:
-        event = None
-        event = journal_proc.start(user, "get_bases_work_acron_id_file_records")
-        for item in get_doc_records(source_path):
-            try:
-                issue_id = item.get("issue_id")
-                doc_id = item.get("doc_id")
-                if doc_id:
-                    yield dict(
-                        item_type="article",
-                        item_pid=doc_id,
-                        data=item["doc_data"],
-                    )
+    for item in get_doc_records(source_path):
+        try:
+            issue_id = item.get("issue_id")
+            doc_id = item.get("doc_id")
 
-                elif issue_id:
-                    yield dict(
-                        item_type="issue",
-                        item_pid=issue_id,
-                        data=item["issue_data"],
-                    )
-
-                if not doc_id:
-                    continue
-
-                # se houver bases-work/p/<pid>, obtém os registros de parágrafo
-                ign_pid, p_records = classic_website.get_p_records(doc_id)
-                p_records = list(p_records)
-                if p_records:
-                    # adiciona registros p aos registros do artigo
-                    # info["external_p_records_count"] = len(p_records)
-                    yield dict(
-                        item_type="paragraph",
-                        item_pid=doc_id,
-                        data=p_records,
-                    )
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                subevent = journal_proc.start(
-                    user, "get_bases_work_acron_id_file_records item"
+            if doc_id:
+                yield dict(
+                    item_type="article",
+                    item_pid=doc_id,
+                    data=item["doc_data"],
                 )
-                subevent.finish(
-                    user,
-                    completed=False,
-                    detail=item,
-                    exception=e,
-                    exc_traceback=exc_traceback,
+                try:
+                    # se houver bases-work/p/<pid>, obtém os registros de parágrafo
+                    ign_pid, p_records = classic_website.get_p_records(doc_id)
+                    p_records = list(p_records)
+                    if p_records:
+                        # adiciona registros p aos registros do artigo
+                        # info["external_p_records_count"] = len(p_records)
+                        yield dict(
+                            item_type="paragraph",
+                            item_pid=doc_id,
+                            data=p_records,
+                        )
+                except FileNotFoundError:
+                    # é aceitável que bases-work/p/<pid>....id não exista
+                    pass
+
+            elif issue_id:
+                yield dict(
+                    item_type="issue",
+                    item_pid=issue_id,
+                    data=item["issue_data"],
                 )
 
-        event.finish(user, completed=True)
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        if event:
-            event.finish(
-                user,
-                completed=False,
-                detail=None,
-                exception=e,
-                exc_traceback=exc_traceback,
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            yield dict(
+                item_pid=doc_id or issue_id,
+                exception=str(e)
             )
 
 
