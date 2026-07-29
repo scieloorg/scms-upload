@@ -869,6 +869,27 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             pass
         return obj
 
+    @property
+    def data(self):
+        output = {}
+        stats = {}
+        output["journal_id_file_last_updated"] = self.updated.isoformat()
+        output["id_file_record_last_updated"] = output["journal_id_file_last_updated"]
+        qs = self.id_file_records.filter(item_type="article")
+        total_id_file_records = qs.count()
+        stats["total_id_file_records"] = total_id_file_records
+        stats["total_id_file_records_to_migrate"] = qs.filter(todo=True).count()
+        if total_id_file_records:
+            output["id_file_record_last_updated"] = qs.order_by("-updated").first().updated.isoformat()
+
+        id_file_record_need_to_be_updated = (
+            total_id_file_records == 0 or
+            output["journal_id_file_last_updated"] > output["id_file_record_last_updated"]
+        )
+        output["stats"] = stats
+        output["id_file_record_need_to_be_updated"] = id_file_record_need_to_be_updated
+        return output
+
 
 class IdFileRecord(CommonControlField, Orderable):
     parent = ParentalKey(
@@ -999,7 +1020,7 @@ class IdFileRecord(CommonControlField, Orderable):
                 item_type,
                 item_pid,
                 data,
-                todo,
+                todo=True,
             )
 
     def get_record_data(self, journal_data=None, issue_data=None):
@@ -1036,13 +1057,13 @@ class IdFileRecord(CommonControlField, Orderable):
         }
 
     @classmethod
-    def document_records_to_migrate(cls, collection, issue_pid, force_update):
+    def document_records_to_migrate(cls, collection, issue_pid, todo=None):
         params = {}
         if collection:
             params["parent__collection"] = collection
         if issue_pid:
             params["item_pid__startswith"] = f"S{issue_pid}"
-        if not force_update:
+        if todo:
             params["todo"] = True
         return cls.objects.filter(item_type="article", **params)
 
