@@ -3,7 +3,6 @@ import logging
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
-from wagtail.admin.ui.tables import TitleColumn
 from wagtail import hooks
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
