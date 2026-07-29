@@ -38,7 +38,7 @@ class PackageZipCreateView(CreateView):
             )
         )
         if pkg_zip.show_package_validations:
-            return redirect(f"/admin/upload/package?q={pkg_zip.name}")
+            return redirect(f"/admin/snippets/upload/package/?q={pkg_zip.name}")
         else:
             return HttpResponseRedirect(self.get_success_url())
 
@@ -131,19 +131,19 @@ class XMLInfoReportEditView(EditView):
 
     def get_package_url(self):
         report = self.object
-        return f"/admin/upload/package/inspect/{report.package.id}/?#xi"
+        return f"/admin/snippets/upload/package/inspect/{report.package.id}/?#xi"
 
 
 class ValidationReportEditView(XMLInfoReportEditView):
     def get_package_url(self):
         report = self.object
-        return f"/admin/upload/package/inspect/{report.package.id}/?#vr{report.id}"
+        return f"/admin/snippets/upload/package/inspect/{report.package.id}/?#vr{report.id}"
 
 
 class XMLErrorReportEditView(XMLInfoReportEditView):
     def get_package_url(self):
         report = self.object
-        return f"/admin/upload/package/inspect/{report.package.id}/?#xer{report.id}"
+        return f"/admin/snippets/upload/package/inspect/{report.package.id}/?#xer{report.id}"
 
 
 class PackageDecisionMixin:
@@ -235,14 +235,14 @@ def finish_deposit(request):
         if package.finish_deposit(task_upload_workflow_publish_article):
             # muda o status para a próxima etapa
             messages.success(request, _("Package has been deposited"))
-            return redirect("/admin/upload/package/")
+            return redirect("/admin/snippets/upload/package/")
 
         if not package.is_error_review_finished:
             messages.error(
                 request,
                 _("The XML package needs review and comment"),
             )
-            return redirect(f"/admin/upload/package/inspect/{package_id}")
+            return redirect(f"/admin/snippets/upload/package/inspect/{package_id}/")
 
         if not package.is_acceptable_package:
             messages.error(
@@ -253,7 +253,7 @@ def finish_deposit(request):
                 request,
                 _("Correct package based on report and resubmit"),
             )
-        return redirect(f"/admin/upload/package/inspect/{package_id}")
+        return redirect(f"/admin/snippets/upload/package/inspect/{package_id}/")
 
 
 def download_errors(request):
@@ -336,7 +336,7 @@ def assign(request):
         # else:
         #     messages.warning(request, _("Package has been reassigned with success."))
 
-    return redirect(f"/admin/upload/qapackage/edit/{package_id}")
+    return redirect(f"/admin/snippets/upload/qapackage/edit/{package_id}/")
 
 
 def archive_package(request):
@@ -359,7 +359,7 @@ def archive_package(request):
                     package.status
                 ),
             )
-    return redirect(f"/admin/upload/package/")
+    return redirect(f"/admin/snippets/upload/package/")
 
 
 def republish_selected(request):
