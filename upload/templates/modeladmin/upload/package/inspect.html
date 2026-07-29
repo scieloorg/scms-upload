@@ -14,7 +14,7 @@
         </p>
         {% for lk in linked %}
             <p class="back">
-                <a href="/admin/upload/package/inspect/{{ lk.id }}/">
+                <a href="/admin/snippets/upload/package/inspect/{{ lk.id }}/">
                     {% icon name="arrow-left" classname="default" %}
                     {% blocktrans trimmed with lk.status as st %}Go to {{ lk }} validation reports ({{ st }}) {% endblocktrans %}
 
@@ -99,7 +99,7 @@
                             {% if report.creation == 'doing' %}
                                 <a class="button" href Reload page="">{% trans 'Processing...' %}</a>
                             {% else %}
-                                <a class="button" href="/admin/upload/validationreport/edit/{{ report.id }}">
+                                <a class="button" href="/admin/snippets/upload/validationreport/edit/{{ report.id }}/">
                                     {% if perms.upload.send_validation_error_resolution and report.errors %}
                                         {% trans 'Resolve errors' %}
                                     {% else %}
@@ -149,7 +149,7 @@
                             {% if report.creation == 'doing' %}
                                 <a class="button" href="">{% trans 'Processing... Reload page' %}</a>
                             {% else %}
-                                <a class="button" href="/admin/upload/xmlerrorreport/edit/{{ report.id }}">
+                                <a class="button" href="/admin/snippets/upload/xmlerrorreport/edit/{{ report.id }}/">
                                     {% if report.xml_producer_ack %}
                                         {% trans 'Error review completed' %}
                                     {% else %}
@@ -186,7 +186,7 @@
                         <td>{{ report.total }}</td>    
                         <td>
                             <a name="xi"/>
-                            <a class="button" href="/admin/upload/xmlinforeport/edit/{{ report.id }}">{% trans 'View report' %}</a>
+                            <a class="button" href="/admin/snippets/upload/xmlinforeport/edit/{{ report.id }}/">{% trans 'View report' %}</a>
                         </td>
                     </tr>
                 {% endfor %}
