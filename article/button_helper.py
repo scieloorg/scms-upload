@@ -28,7 +28,7 @@ class RequestArticleChangeButtonHelper(ButtonHelper):
         #     package_category = PC_ERRATUM
 
         return {
-            "url": "/admin/upload/package/create/?article_id=%s&package_category=%s"
+            "url": "/admin/snippets/upload/package/create/?article_id=%s&package_category=%s"
             % (obj.article.id, package_category),
             "label": text,
             "classname": self.finalise_classname(classnames),
@@ -91,7 +91,7 @@ class ArticleButtonHelper(ButtonHelper):
         #     package_category = PC_ERRATUM
 
         return {
-            "url": "/admin/upload/package/create/?article_id=%s&package_category=%s"
+            "url": "/admin/snippets/upload/package/create/?article_id=%s&package_category=%s"
             % (obj.id, package_category),
             "label": text,
             "classname": self.finalise_classname(classnames),

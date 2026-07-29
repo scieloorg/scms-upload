@@ -3,7 +3,6 @@ import logging
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
-
 from wagtail import hooks
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
@@ -97,6 +96,7 @@ class PackageViewSet(BaseUploadViewSet):
     model = Package
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
+    inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
     menu_label = _("Package admin")
@@ -213,6 +213,7 @@ class QualityAnalysisPackageViewSet(BaseUploadViewSet):
     menu_icon = "folder"
     menu_order = 200
     edit_view_class = QAPackageEditView
+    inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
     add_to_settings_menu = False
@@ -294,6 +295,7 @@ class ReadyToPublishPackageViewSet(BaseUploadViewSet):
     menu_icon = "folder"
     menu_order = 200
     edit_view_class = ReadyToPublishPackageEditView
+    inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
     add_to_settings_menu = False
