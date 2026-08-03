@@ -4,15 +4,6 @@ Testes de files_storage.models.
 
 Cobre MinioConfiguration (get_or_create, get, get_files_storage e as
 properties object_name_prefix / public_url) e FileLocation (get_or_create).
-
-Notas:
-- creator (CommonControlField), access_key e secret_key são NOT NULL; os testes
-  sempre fornecem user/creator e credenciais ao persistir.
-- get_files_storage instancia MinioStorage com o contrato real de
-  files_storage.minio:
-      bucket             <- obj.host_root_dir or obj.bucket
-      object_name_prefix <- obj.object_name_prefix
-      public_url         <- obj.public_url
 """
 from unittest.mock import patch
 
@@ -39,7 +30,7 @@ class MinioConfigurationGetOrCreateTest(TestCase):
             secure=True,
             bucket="upload",
             host_root_dir="scielo",
-            public_base_url="https://minio.scielo.br/scielo",
+            public_base_url="https://minio.scielo.br",
             location="sa-east-1",
             user=self.user,
         )
@@ -48,7 +39,7 @@ class MinioConfigurationGetOrCreateTest(TestCase):
         self.assertEqual("s3.wasabisys.com", obj.host)
         self.assertEqual("upload", obj.bucket)
         self.assertEqual("scielo", obj.host_root_dir)
-        self.assertEqual("https://minio.scielo.br/scielo", obj.public_base_url)
+        self.assertEqual("https://minio.scielo.br", obj.public_base_url)
         self.assertEqual("sa-east-1", obj.location)
         self.assertTrue(obj.secure)
 
@@ -62,7 +53,6 @@ class MinioConfigurationGetOrCreateTest(TestCase):
             secure=True, bucket="upload", user=self.user,
         )
         self.assertEqual(first.pk, second.pk)
-        # Não atualiza os campos do existente; host permanece o original.
         self.assertEqual("h1", second.host)
         self.assertEqual(1, MinioConfiguration.objects.filter(name="website").count())
 
@@ -84,43 +74,43 @@ class MinioConfigurationGetTest(TestCase):
 
 
 class MinioConfigurationPropertiesTest(TestCase):
-    """Properties são puras (não tocam o banco) -> instâncias não salvas."""
-
     def test_object_name_prefix_with_host_root_dir(self):
         obj = MinioConfiguration(bucket="upload", host_root_dir="scielo")
-        self.assertEqual("upload", obj.object_name_prefix)
+        self.assertEqual("upload", obj.minio_object_name_prefix)
 
     def test_object_name_prefix_without_host_root_dir(self):
         obj = MinioConfiguration(bucket="upload", host_root_dir=None)
-        self.assertEqual("", obj.object_name_prefix)
+        self.assertEqual("", obj.minio_object_name_prefix)
 
-    def test_public_url_uses_public_base_url_with_prefix(self):
+    def test_public_url_with_host_root_dir_and_public_base(self):
         obj = MinioConfiguration(
             host="s3.host", bucket="upload", host_root_dir="scielo",
             public_base_url="https://minio.scielo.br", secure=True,
         )
-        self.assertEqual("https://minio.scielo.br/upload", obj.public_url)
+        # Usa exatamente o que foi informado como public_base_url
+        self.assertEqual("https://minio.scielo.br", obj.minio_public_url)
 
-    def test_public_url_uses_public_base_url_without_prefix(self):
+    def test_public_url_without_host_root_dir_and_public_base(self):
         obj = MinioConfiguration(
             host="s3.host", bucket="upload", host_root_dir=None,
             public_base_url="https://minio.scielo.br",
         )
-        self.assertEqual("https://minio.scielo.br", obj.public_url)
+        self.assertEqual("https://minio.scielo.br", obj.minio_public_url)
 
-    def test_public_url_falls_back_to_host_https(self):
+    def test_public_url_falls_back_to_host_with_root_dir(self):
         obj = MinioConfiguration(
             host="s3.host", bucket="upload", host_root_dir="scielo",
             public_base_url=None, secure=True,
         )
-        self.assertEqual("https://s3.host/upload", obj.public_url)
+        # neste caso o upload será o prefixo do object
+        self.assertEqual("https://s3.host/scielo", obj.minio_public_url)
 
-    def test_public_url_falls_back_to_host_http_when_not_secure(self):
+    def test_public_url_falls_back_to_host_without_root_dir(self):
         obj = MinioConfiguration(
             host="s3.host", bucket="upload", host_root_dir=None,
             public_base_url=None, secure=False,
         )
-        self.assertEqual("http://s3.host", obj.public_url)
+        self.assertEqual("http://s3.host/upload", obj.minio_public_url)
 
 
 class MinioConfigurationGetFilesStorageTest(TestCase):
@@ -142,9 +132,9 @@ class MinioConfigurationGetFilesStorageTest(TestCase):
             minio_host="s3.host",
             minio_access_key="ak",
             minio_secret_key="sk",
-            bucket="scielo",  # host_root_dir tem precedência sobre bucket
-            object_name_prefix="upload",
-            public_url="https://minio.scielo.br/upload",
+            minio_bucket="scielo",
+            minio_object_name_prefix="upload",
+            minio_public_url="https://minio.scielo.br",
             location="sa-east-1",
             minio_secure=True,
             minio_http_client=None,
@@ -160,9 +150,9 @@ class MinioConfigurationGetFilesStorageTest(TestCase):
         MinioConfiguration.get_files_storage("website")
 
         _, kwargs = mock_storage.call_args
-        self.assertEqual("upload", kwargs["bucket"])
-        self.assertEqual("", kwargs["object_name_prefix"])
-        self.assertEqual("http://s3.host", kwargs["public_url"])
+        self.assertEqual("upload", kwargs["minio_bucket"])
+        self.assertEqual("", kwargs["minio_object_name_prefix"])
+        self.assertEqual("http://s3.host/upload", kwargs["minio_public_url"])
 
     @patch("files_storage.models.MinioStorage")
     def test_falls_back_to_first_config_when_name_absent(self, mock_storage):
