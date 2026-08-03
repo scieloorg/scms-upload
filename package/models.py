@@ -863,6 +863,8 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 content = item["content"].encode("utf-8")
             except KeyError:
                 content = None
+            if not content:
+                continue
             response = self.upload_to_the_cloud(
                 user,
                 minio,
