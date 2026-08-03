@@ -322,10 +322,12 @@ class Article(ClusterableModel, CommonControlField):
         return cls.objects.get(**params)
     
     @classmethod
-    def get_first(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, delete=False):
+    def get_first(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, delete=False, name_list=None):
         q = Q()
         if pid_v2:
             q |= Q(pid_v2=pid_v2)
+        if name_list:
+            q |= Q(sps_pkg__sps_pkg_name__in=name_list)
         if sps_pkg_name:
             q |= Q(sps_pkg__sps_pkg_name=sps_pkg_name)
         qs = cls.objects.filter(q).order_by("-updated")
@@ -364,7 +366,12 @@ class Article(ClusterableModel, CommonControlField):
             raise ValueError(f"SPSPkg {sps_pkg} xml_with_pre is missing pid_v2")
 
         try:
-            obj = cls.get_first(sps_pkg.sps_pkg_name, pid_v2, pid_v3, delete=True)
+            try:
+                name_list = self.xml_with_pre.pkg_name_variations
+            except AttributeError:
+                name_list = [self.xml_with_pre.sps_pkg_name]
+                name_list.extend(self.xml_with_pre.deprecated_sps_pkg_name_list)
+            obj = cls.get_first(sps_pkg.sps_pkg_name, pid_v2, pid_v3, delete=True, name_list=name_list)
         except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
