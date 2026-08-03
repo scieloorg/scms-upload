@@ -1,6 +1,6 @@
 import logging
 
-from packtools.sps.validation.models.abstract import Abstract
+from packtools.sps.models.v2.abstract import XMLAbstracts
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.article_contribs import ArticleContribs
 from packtools.sps.models.article_doi_with_lang import DoiWithLang
@@ -160,74 +160,16 @@ class XMLArticle:
         for item in xml_toc_sections.sub_article_section:
             yield {"language": item["lang"], "text": item["text"]}
 
-    # standard abstracts: excludes graphical / key-points / summary, which
-    # are not meant to serve as the article's textual abstract (SPS spec)
-    _STANDARD_ABSTRACTS_XPATH = (
-        ".//abstract[not(@abstract-type)] | .//trans-abstract[not(@abstract-type)]"
-    )
-
     def get_abstracts(self):
         try:
-            nodes = self.xmltree.xpath(self._STANDARD_ABSTRACTS_XPATH)
-        except Exception:
+            for item in XMLAbstracts(self.xmltree).get_abstracts():
+                text = item.get("text")
+                lang = item.get("lang")
+                if not text:
+                    continue
+                yield {"language": lang, "text": text}
+        except Exception as e:
             return
-
-        root_lang = self.xmltree.find(".").get(
-            "{http://www.w3.org/XML/1998/namespace}lang"
-        )
-        for node in nodes:
-            try:
-                lang = (
-                    node.get("{http://www.w3.org/XML/1998/namespace}lang")
-                    or root_lang
-                )
-                item = Abstract(
-                    node, lang, None, None, None, None
-                ).data
-                text = (
-                    item.get("text")
-                    or self._compose_abstract_text_from_item(item)
-                    or self._extract_raw_abstract_text(node)
-                )
-            except Exception:
-                continue
-            if not text:
-                continue
-            yield {"language": item.get("lang"), "text": text}
-
-    @staticmethod
-    def _compose_abstract_text_from_item(item):
-        """Rebuilds abstract text from packtools' structured `p`/`sections`
-        data, for packtools versions whose Abstract.data lacks "text"."""
-        parts = []
-        sections = item.get("sections") or []
-        if sections:
-            for section in sections:
-                title = section.get("title") or {}
-                if title.get("plain_text"):
-                    parts.append(title["plain_text"])
-                p = section.get("p") or {}
-                if p.get("plain_text"):
-                    parts.append(p["plain_text"])
-        else:
-            for p_item in item.get("p") or []:
-                if p_item.get("plain_text"):
-                    parts.append(p_item["plain_text"])
-        return " ".join(parts)
-
-    @staticmethod
-    def _extract_raw_abstract_text(node):
-        """Last-resort extraction for non-SPS-compliant abstracts whose text
-        is not wrapped in <p>/<sec> (e.g. legacy migrated XML)."""
-        full_text = " ".join(t.strip() for t in node.itertext() if t.strip())
-        title_node = node.find("title")
-        if title_node is not None:
-            title_text = " ".join(
-                t.strip() for t in title_node.itertext() if t.strip()
-            )
-            if title_text and full_text.startswith(title_text):
-                full_text = full_text[len(title_text):].strip()
-        return full_text
 
     def get_keywords(self):
         for lang, keywords in (

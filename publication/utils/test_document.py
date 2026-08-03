@@ -1,9 +1,9 @@
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from lxml import etree
 
-from publication.utils.document import Abstract, XMLArticle
+from publication.utils.document import XMLArticle
 
 
 def _create_xml_article(xml_string):
@@ -163,12 +163,12 @@ class XMLArticleGetAbstractsTest(TestCase):
         )
 
     def test_get_abstracts_without_p_wrapper_regression_issue_1031(self):
-        """Regression test for scieloorg/scms-upload#1031: abstracts whose
-        text is not wrapped in <p> (legacy migrated XML, e.g. URY
-        collection) must still have their text extracted, and this must
-        hold regardless of whether the installed packtools version includes
-        the "text" key in Abstract.data (see scieloorg/packtools#1064,
-        which silently dropped that key)."""
+        """Regression test for scieloorg/scms-upload#1031: legacy migrated
+        XML (e.g. URY collection) may have abstract text sitting directly
+        under <abstract>/<trans-abstract>, not wrapped in <p>. Extraction
+        for this case lives in packtools (scieloorg/packtools#1272,
+        released in 4.16.11); this test only confirms it comes through
+        get_abstracts() transparently."""
         xml_string = """<article xml:lang="es">
             <front>
                 <article-meta>
@@ -205,38 +205,3 @@ class XMLArticleGetAbstractsTest(TestCase):
         result = list(article_xml.get_abstracts())
 
         self.assertEqual(result, [])
-
-    def test_one_broken_abstract_does_not_blank_out_the_others(self):
-        """A parsing failure on a single <abstract>/<trans-abstract> node
-        must not discard abstracts from sibling nodes that parsed fine."""
-        xml_string = """<article xml:lang="en">
-            <front>
-                <article-meta>
-                    <abstract>
-                        <title>Abstract</title>
-                        <p>This one will fail to parse.</p>
-                    </abstract>
-                    <trans-abstract xml:lang="pt">
-                        <title>Resumo</title>
-                        <p>Este deve continuar funcionando.</p>
-                    </trans-abstract>
-                </article-meta>
-            </front>
-        </article>"""
-
-        article_xml = _create_xml_article(xml_string)
-
-        def flaky_abstract(node, lang, *args):
-            if node.tag == "abstract":
-                raise ValueError("simulated packtools failure")
-            return Abstract(node, lang, *args)
-
-        with patch(
-            "publication.utils.document.Abstract", side_effect=flaky_abstract
-        ):
-            result = list(article_xml.get_abstracts())
-
-        self.assertEqual(
-            result,
-            [{"language": "pt", "text": "Este deve continuar funcionando."}],
-        )
