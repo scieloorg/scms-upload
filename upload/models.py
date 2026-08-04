@@ -951,10 +951,11 @@ class Package(CommonControlField, ClusterableModel):
             self.status = new_status
             save = True
 
-        if comments:
-            self.qa_comment = self.qa_comment or ""
-            self.qa_comment += "\n".join(str(c) for c in comments)
-            save = True
+        # não acrescentar os erros na caixa qa_comments
+        # if comments:
+        #     self.qa_comment = self.qa_comment or ""
+        #     self.qa_comment += "\n".join(str(c) for c in comments)
+        #     save = True
 
         if save:
             self.save()
