@@ -367,10 +367,10 @@ class Article(ClusterableModel, CommonControlField):
 
         try:
             try:
-                name_list = self.xml_with_pre.pkg_name_variations
+                name_list = xml_with_pre.pkg_name_variations
             except AttributeError:
-                name_list = [self.xml_with_pre.sps_pkg_name]
-                name_list.extend(self.xml_with_pre.deprecated_sps_pkg_name_list)
+                name_list = [xml_with_pre.sps_pkg_name]
+                name_list.extend(xml_with_pre.deprecated_sps_pkg_name_list)
             obj = cls.get_first(sps_pkg.sps_pkg_name, pid_v2, pid_v3, delete=True, name_list=name_list)
         except cls.DoesNotExist:
             obj = cls()
