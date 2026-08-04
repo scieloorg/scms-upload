@@ -89,14 +89,14 @@ class MinioStorage:
         minio_host,
         minio_access_key,
         minio_secret_key,
-        bucket,
-        object_name_prefix,
-        public_url,
+        minio_bucket,
+        minio_object_name_prefix,
+        minio_public_url,
         location,
         minio_secure=True,
         minio_http_client=None,
     ):
-        self.bucket = bucket
+        self.bucket = minio_bucket
         self.POLICY_READ_ONLY = {
             "Version": "2012-10-17",
             "Statement": [
@@ -121,8 +121,8 @@ class MinioStorage:
         self.http_client = minio_http_client
         self._client_instance = None
         self.location = location
-        self.object_name_prefix = object_name_prefix
-        self.public_url = public_url
+        self.object_name_prefix = minio_object_name_prefix
+        self.public_url = minio_public_url
 
     @property
     def _client(self):
