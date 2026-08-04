@@ -39,6 +39,40 @@ from .permission_helper import UploadPermissionHelper
 from team.models import has_permission
 from upload.bulk_actions.republish import RepublishPublicBulkAction, RepublishQABulkAction
 
+from django.contrib.admin.utils import quote
+from wagtail.admin.ui.tables import TitleColumn
+from wagtail.snippets.views.snippets import IndexView as SnippetIndexView
+
+
+class InspectFirstIndexView(SnippetIndexView):
+    """
+    Restaura o comportamento do ModelAdmin legado: clicar no item da
+    listagem abre a INSPECT view (se disponível), em vez da edit view.
+    O botão 'Edit' continua disponível normalmente no menu de ações "...".
+    """
+
+    def _get_title_column(self, field_name, column_class=TitleColumn, **kwargs):
+        column_class = self._get_title_column_class(column_class)
+
+        def get_url(instance):
+            if inspect_url := self.get_inspect_url(instance):
+                return inspect_url
+            return self.get_edit_url(instance)
+
+        kwargs.setdefault(
+            "get_title_id",
+            lambda instance: f"snippet_{quote(instance.pk)}_title",
+        )
+
+        if not self.model:
+            return column_class(
+                "name", label="Name", accessor=str, get_url=get_url, **kwargs
+            )
+        return self._get_custom_column(
+            field_name, column_class, get_url=get_url, **kwargs
+        )
+
+
 hooks.register("register_bulk_action", RepublishQABulkAction)
 hooks.register("register_bulk_action", RepublishPublicBulkAction)
 
@@ -96,6 +130,9 @@ class PackageViewSet(BaseUploadViewSet):
     model = Package
     button_helper_class = UploadButtonHelper
     permission_helper_class = UploadPermissionHelper
+
+    index_view_class = InspectFirstIndexView
+
     inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
