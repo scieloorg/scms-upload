@@ -272,7 +272,7 @@ class Journal(CommonControlField, ClusterableModel):
     panels_institution = [
         InlinePanel("owner", label=_("Owner")),
         InlinePanel("publisher", label=_("Publisher")),
-        InlinePanel("sponsor", label=_("Owner")),
+        InlinePanel("sponsor", label=_("Sponsor")),
     ]
 
     panels_mission = [
