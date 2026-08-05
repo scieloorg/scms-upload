@@ -304,14 +304,10 @@ class Journal(CommonControlField, ClusterableModel):
 
     @property
     def collections(self):
-        from collection.models import Collection
-
         return Collection.objects.filter(journalproc__journal=self).distinct()
 
     @property
     def collections_acron(self):
-        from collection.models import Collection
-
         return list(
             Collection.objects.filter(journalproc__journal=self)
             .values_list("acron", flat=True)
@@ -321,8 +317,6 @@ class Journal(CommonControlField, ClusterableModel):
 
     @property
     def collections_name(self):
-        from collection.models import Collection
-
         return list(
             Collection.objects.filter(journalproc__journal=self)
             .values_list("name", flat=True)
@@ -359,20 +353,37 @@ class Journal(CommonControlField, ClusterableModel):
                 official_journal__issn_print=issn_print,
             )
         except Journal.DoesNotExist:
-            raise Journal.DoesNotExist(
-                {
-                    "journal_title": journal_title,
-                    "issn_electronic": issn_electronic,
-                    "issn_print": issn_print,
-                }
-            )
+            try:
+                # corrige bug por ter troca print por electronic e vice-versa
+                return Journal.objects.get(
+                    official_journal__issn_electronic=issn_print,
+                    official_journal__issn_print=issn_electronic,
+                )
+            except Journal.MultipleObjectsReturned:
+                return Journal.objects.filter(
+                    official_journal__issn_electronic=issn_print,
+                    official_journal__issn_print=issn_electronic,
+                ).order_by("-updated").first()
+            except Journal.DoesNotExist:
+                issns = set()
+                if issn_electronic:
+                    issns.add(issn_electronic)
+                if issn_print:
+                    issns.add(issn_print)
+                journal = Journal.objects.filter(
+                    Q(official_journal__issn_electronic__in=issns) |
+                    Q(official_journal__issn_print__in=issns),
+                ).order_by("-updated").first()
+                if journal:
+                    return journal
+                raise Journal.DoesNotExist
         except Journal.MultipleObjectsReturned:
             return (
                 Journal.objects.filter(
-                    Q(official_journal__issn_electronic=issn_electronic)
-                    | Q(official_journal__issn_print=issn_print)
+                    official_journal__issn_electronic=issn_electronic,
+                    official_journal__issn_print=issn_print,
                 )
-                .order_by("-created")
+                .order_by("-updated")
                 .first()
             )
 
@@ -888,8 +899,7 @@ class JournalCollection(CommonControlField, ClusterableModel):
     base_form_class = CoreAdminModelForm
 
     panels = [
-        AutocompletePanel("journal"),
-        AutocompletePanel("collection"),
+        InlinePanel("journal_history", label=_("Journal history"))
     ]
 
     class Meta:
