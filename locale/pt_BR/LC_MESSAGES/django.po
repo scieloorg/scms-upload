@@ -1468,7 +1468,7 @@ msgstr "Propietario"
 
 #: journal/models.py:277 journal/models.py:288
 msgid "Publisher"
-msgstr "Editor"
+msgstr "Publicador"
 
 #: journal/models.py:281 journal/models.py:289
 msgid "Mission"
