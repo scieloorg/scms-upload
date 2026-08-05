@@ -5,10 +5,9 @@ from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.admin.ui.tables import UpdatedAtColumn
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
-from wagtail import hooks
 
 from config.menu import get_menu_order
-from journal.models import Journal, OfficialJournal
+from journal.models import Journal, OfficialJournal, JournalCollection
 
 
 class OfficialJournalViewSet(SnippetViewSet):
@@ -62,6 +61,32 @@ class JournalViewSet(SnippetViewSet):
     list_filter = ["core_synchronized"]
 
 
+class JournalCollectionViewSet(SnippetViewSet):
+    model = JournalCollection
+    menu_label = _("Journal Collection")
+    menu_icon = "site"
+    menu_order = get_menu_order("journal_collection")
+    add_to_settings_menu = False
+
+    list_display = (
+        "journal",
+        "collection",
+        "creator",
+        "updated",
+        "created",
+        "updated_by",
+    )
+    list_filter = (
+        "collection",
+    )
+    search_fields = (
+        "journal__title",     # ajuste para o campo textual real de Journal
+        "collection__name",   # ajuste para o campo textual real de Collection
+        "collection__acron3", # se existir, ajuda muito na busca por sigla
+    )
+    export_filename = "journal_collections"
+
+
 # Grupo de ViewSets
 class JournalViewSetGroup(SnippetViewSetGroup):
     menu_icon = "folder"
@@ -71,9 +96,12 @@ class JournalViewSetGroup(SnippetViewSetGroup):
     items = [
         # OfficialJournalViewSet,  # Descomentado como no original
         JournalViewSet,
+        JournalCollectionViewSet,
         # JournalProcViewSet,  # Se existir
     ]
 
 
-# Registrar o grupo no menu
+# # Registrar o grupo no menu
 register_snippet(JournalViewSetGroup)
+# register_snippet(JournalCollectionViewSet)
+

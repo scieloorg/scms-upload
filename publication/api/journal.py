@@ -9,22 +9,43 @@ from publication.api.publication import PublicationAPI
 from publication.utils.journal import build_journal
 
 
-def publish_journal(journal_proc, api_data):
+REASON_MAP = {
+    "ceased": "deceased",
+    "suspended-by-committee": "suspended",
+    "suspended-by-editor": "suspended",
+    "not-open-access": "suspended",
+}
 
-    logging.info(f"publish_journal {journal_proc}")
+EVENT_MAP = {
+    "ADMITTED": "current",
+    "INTERRUPTED": "deceased",
+}
+
+def translate_status(event_type, interruption_reason):
+    status = None
+    if interruption_reason:
+        status = REASON_MAP.get(interruption_reason)
+    else:
+        status = EVENT_MAP.get(event_type)
+    return status or "inprogress"
+
+    
+def publish_journal(journal_proc, api_data):
 
     journal = journal_proc.journal
 
     if not journal.core_synchronized:
         try:
+            # tenta sincronizar os dados
             fetch_and_create_journal(
                 user=journal_proc.updated_by or journal_proc.creator,
                 collection_acron=journal_proc.collection.acron,
-                issn_electronic=journal.issn_print,
-                issn_print=journal.issn_electronic,
+                issn_electronic=journal.issn_electronic,
+                issn_print=journal.issn_print,
                 force_update=True,
             )
         except:
+            # mesmo que falhe, tenta publicar os dados
             pass
 
     journal_pid = journal_proc.pid
@@ -167,6 +188,7 @@ class JournalPayload:
         self.data["sponsors"] = []
         self.data["status_history"] = []
         self.data["mission"] = []
+        self.data["institution_responsible_for"] = []
 
     def add_ids(self, journal_id):
         self.data["id"] = journal_id
@@ -182,6 +204,8 @@ class JournalPayload:
     def add_journal_issns(self, scielo_issn, eletronic_issn, print_issn=None):
         self.data["scielo_issn"] = scielo_issn
         self.data["print_issn"] = print_issn
+        # opac_schema: Journal.eletronic_issn (typo)
+        # https://github.com/scieloorg/opac_schema/blob/26d4c63709f6ae5d43f6cae0ff9f21fe36f0107c/opac_schema/v1/models.py#L573
         self.data["eletronic_issn"] = eletronic_issn
 
     def add_thematic_scopes(self, subject_categories, subject_areas):
@@ -240,7 +264,7 @@ class JournalPayload:
         self.data["next_journal"] = {"name": next_journal_title}
         self.data["previous_journal"] = {"name": previous_journal}
 
-    def add_event_to_timeline(self, status, since, reason):
+    def add_event_to_timeline(self, event, since, reason):
         """
         Add item to self.data["timeline
 
@@ -251,7 +275,8 @@ class JournalPayload:
         reason : StringField
 
         """
-        if status and since:
+        status = translate_status(event, reason)
+        if event and since:
             self.data["status_history"].append(
                 {
                     "status": status or "",
