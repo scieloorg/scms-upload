@@ -24,11 +24,9 @@ class InstitutionViewSet(SnippetViewSet):
     )
     search_fields = (
         "name",
+    )
+    list_filter = (
         "institution_type",
-        "creator",
-        "updated",
-        "created",
-        "updated_by",
     )
     list_export = (
         "name",

@@ -398,10 +398,21 @@ def process_journal_result(
     for item in result.get("subject") or []:
         journal.subject.add(Subject.create_or_update(user, item["value"]))
 
-    # Processa publishers
+    institution_names = set()
     for item in result.get("publisher") or []:
-        institution = Institution.get_or_create(
-            inst_name=item["name"],
+        institution_names.add(item["name"])
+
+    # Processa owners
+    for item in result.get("owner") or []:
+        institution_names.add(item["name"])
+
+    for item in result.get("sponsor") or []:
+        institution_names.add(item["name"])
+
+    institutions = {}
+    for name in institution_names:
+        institutions[name] = Institution.get_or_create(
+            inst_name=name,
             inst_acronym=None,
             level_1=None,
             level_2=None,
@@ -409,31 +420,25 @@ def process_journal_result(
             location=None,
             user=user,
         )
+
+    # Processa publishers
+    for item in result.get("publisher") or []:
+        institution = institutions.get(item["name"])
+        if not institution:
+            continue
         journal.publisher.add(Publisher.create_or_update(user, journal, institution))
 
     # Processa owners
     for item in result.get("owner") or []:
-        institution = Institution.get_or_create(
-            inst_name=item["name"],
-            inst_acronym=None,
-            level_1=None,
-            level_2=None,
-            level_3=None,
-            location=None,
-            user=user,
-        )
+        institution = institutions.get(item["name"])
+        if not institution:
+            continue
         journal.owner.add(Owner.create_or_update(user, journal, institution))
 
     for item in result.get("sponsor") or []:
-        institution = Institution.get_or_create(
-            inst_name=item["name"],
-            inst_acronym=None,
-            level_1=None,
-            level_2=None,
-            level_3=None,
-            location=None,
-            user=user,
-        )
+        institution = institutions.get(item["name"])
+        if not institution:
+            continue
         journal.sponsor.add(Sponsor.create_or_update(user, journal, institution))
 
     no_lang = []

@@ -76,17 +76,19 @@ def build_journal(
     for sponsor in journal.sponsor.all():
         builder.add_sponsor(sponsor.institution.name)
 
-    names = []
+    names = set()
     for item in journal.owner.all():
         name = item.institution.name
-        if name not in names:
-            names.append(name)
-            builder.add_publisher(name)
+        if not name:
+            continue
+        names.add(name)
+        builder.add_publisher(name)
     for item in journal.publisher.all():
         name = item.institution.name
-        if name not in names:
-            names.append(name)
-            builder.add_publisher(name)
+        if not name:
+            continue
+        names.add(name)
+        builder.add_publisher(name)
 
     builder.add_thematic_scopes(
         subject_categories=journal.wos_areas,

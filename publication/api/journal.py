@@ -199,6 +199,8 @@ class JournalPayload:
 
     def add_sponsor(self, sponsor):
         # Sponsors
+        if not sponsor:
+            return
         self.data["sponsors"].append({"name": sponsor})
 
     @staticmethod
@@ -299,5 +301,7 @@ class JournalPayload:
         self.data["is_public"] = availability_status == "C"
 
     def add_publisher(self, name):
+        if not name:
+            return
         self.data.setdefault("institution_responsible_for", [])
         self.data["institution_responsible_for"].append({"name": name})
