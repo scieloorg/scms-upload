@@ -1,5 +1,6 @@
 import logging
 import sys
+import traceback
 
 from django.contrib.auth import get_user_model
 
@@ -62,13 +63,17 @@ def ensure_published_journal(journal_proc, website, user, api_data, force_update
     Raises:
         PublicationError: Se ocorrer erro na publicação
     """
-
-    try:
-        if not force_update:
+    if not force_update:
+        try:
             journal_url = (
                 f"{website.url}/scielo.php?pid={journal_proc.pid}&script=sci_serial"
             )
             return {"journal": str(journal_proc), "published": bool(fetch_data(journal_url))}
+        except Exception:
+            pass
+
+    try:
+        response = {}
         response = journal_proc.publish(
             user,
             publish_journal,
@@ -80,9 +85,14 @@ def ensure_published_journal(journal_proc, website, user, api_data, force_update
         if not response:
             raise Exception(f"Unable to publish journal {journal_proc}")
         response["published"] = response.get("completed")
+        if not response["published"]:
+            raise Exception(f"Unable to publish journal {journal_proc}")
         return response
     except Exception as e:
-        return {"error": f"journal {journal_proc} is not published. {e}"}
+        response = response or {}
+        if not response.get("error"):
+            response["error"] = traceback.format_exc()
+        return response
 
 
 def ensure_published_issue(issue_proc, website, user, api_data, force_update=None):
@@ -108,6 +118,10 @@ def ensure_published_issue(issue_proc, website, user, api_data, force_update=Non
                 f"{website.url}/scielo.php?pid={issue_proc.pid}&script=sci_issuetoc"
             )
             return {"issue": str(issue_proc), "published": bool(fetch_data(issue_url))}
+    except Exception as e:
+        pass
+    try:
+        response = None
         response = issue_proc.publish(
             user,
             publish_issue,
@@ -119,10 +133,14 @@ def ensure_published_issue(issue_proc, website, user, api_data, force_update=Non
         if not response:
             raise Exception(f"Unable to publish issue {issue_proc}")
         response["published"] = response.get("completed")
+        if not response["published"]:
+            raise Exception(f"Unable to publish issue {issue_proc}")
         return response
     except Exception as e:
-        return {"error": f"issue {issue_proc} is not published. {e}"}
-
+        response = response or {}
+        if not response.get("error"):
+            response["error"] = traceback.format_exc()
+        return response
 
 
 def publish_article_on_collection_websites(
