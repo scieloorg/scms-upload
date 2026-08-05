@@ -637,12 +637,11 @@ def task_upload_workflow_publish_article(
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
+            item=str(manager),
+            action="task_upload_workflow_publish_article",
             e=e,
             exc_traceback=exc_traceback,
             detail=dict(
-                task="task_upload_workflow_publish_article",
-                item=str(manager),
-                upload_package_id=upload_package_id,
                 websites=websites,
             ),
         )
