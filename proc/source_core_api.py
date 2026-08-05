@@ -422,6 +422,7 @@ def process_journal_result(
         )
 
     # Processa publishers
+    journal.publisher.clear()
     for item in result.get("publisher") or []:
         institution = institutions.get(item["name"])
         if not institution:
@@ -429,12 +430,14 @@ def process_journal_result(
         journal.publisher.add(Publisher.create_or_update(user, journal, institution))
 
     # Processa owners
+    journal.owner.clear()
     for item in result.get("owner") or []:
         institution = institutions.get(item["name"])
         if not institution:
             continue
         journal.owner.add(Owner.create_or_update(user, journal, institution))
 
+    journal.sponsor.clear()
     for item in result.get("sponsor") or []:
         institution = institutions.get(item["name"])
         if not institution:
