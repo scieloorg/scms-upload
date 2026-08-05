@@ -269,23 +269,20 @@ class Journal(CommonControlField, ClusterableModel):
         FieldPanel("core_synchronized"),
     ]
 
-    panels_owner = [
-        InlinePanel("owner", label=_("Owner"), classname="collapsed"),
-    ]
-
-    panels_publisher = [
-        InlinePanel("publisher", label=_("Publisher"), classname="collapsed"),
+    panels_institution = [
+        InlinePanel("owner", label=_("Owner")),
+        InlinePanel("publisher", label=_("Publisher")),
+        InlinePanel("sponsor", label=_("Owner")),
     ]
 
     panels_mission = [
-        InlinePanel("mission", label=_("Mission"), classname="collapsed"),
+        InlinePanel("mission", label=_("Mission")),
     ]
 
     edit_handler = TabbedInterface(
         [
             ObjectList(panels_identification, heading=_("Identification")),
-            ObjectList(panels_owner, heading=_("Owners")),
-            ObjectList(panels_publisher, heading=_("Publisher")),
+            ObjectList(panels_institution, heading=_("Institutions")),
             ObjectList(panels_mission, heading=_("Mission")),
         ]
     )
