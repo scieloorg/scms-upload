@@ -121,7 +121,7 @@ class OfficialJournal(CommonControlField):
     )
     issnl = models.CharField(_("ISSNL"), max_length=9, null=True, blank=True)
     previous_journal_title = models.CharField(max_length=500, null=True, blank=True)
-    next_journal_title = models.CharField(max_length=128, null=True, blank=True)
+    next_journal_title = models.CharField(max_length=500, null=True, blank=True)
 
     base_form_class = OfficialJournalForm
 
@@ -269,23 +269,20 @@ class Journal(CommonControlField, ClusterableModel):
         FieldPanel("core_synchronized"),
     ]
 
-    panels_owner = [
-        InlinePanel("owner", label=_("Owner"), classname="collapsed"),
-    ]
-
-    panels_publisher = [
-        InlinePanel("publisher", label=_("Publisher"), classname="collapsed"),
+    panels_institution = [
+        InlinePanel("owner", label=_("Owner")),
+        InlinePanel("publisher", label=_("Publisher")),
+        InlinePanel("sponsor", label=_("Sponsor")),
     ]
 
     panels_mission = [
-        InlinePanel("mission", label=_("Mission"), classname="collapsed"),
+        InlinePanel("mission", label=_("Mission")),
     ]
 
     edit_handler = TabbedInterface(
         [
             ObjectList(panels_identification, heading=_("Identification")),
-            ObjectList(panels_owner, heading=_("Owners")),
-            ObjectList(panels_publisher, heading=_("Publisher")),
+            ObjectList(panels_institution, heading=_("Institutions")),
             ObjectList(panels_mission, heading=_("Mission")),
         ]
     )
