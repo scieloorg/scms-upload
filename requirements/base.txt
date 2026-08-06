@@ -53,12 +53,12 @@ flower==2.0.1  # https://github.com/mher/flower
 # ========================================
 # Wagtail CMS
 # ========================================
-wagtail==6.4.2  # https://github.com/wagtail/wagtail - UPGRADE de 6.2.1
+wagtail==7.3.1  # https://github.com/wagtail/wagtail - UPGRADE de 6.4.2
 wagtail-django-recaptcha==2.1.1
-wagtailmenus==3.1.9
-wagtail-localize==1.12.2  # UPGRADE de 1.9.0
-wagtail-modeladmin==2.0.0
-wagtail-autocomplete==0.12.0  # UPGRADE de 0.11.0
+wagtailmenus==4.0.6  # UPGRADE de 3.1.9
+wagtail-localize==1.13  # UPGRADE de 1.12.2
+wagtail-modeladmin==2.2.0  # UPGRADE de 2.0.0
+wagtail-autocomplete==0.12.0
 
 # ========================================
 # Database & Storage
