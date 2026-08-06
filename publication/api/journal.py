@@ -20,8 +20,8 @@ def publish_journal(journal_proc, api_data):
             fetch_and_create_journal(
                 user=journal_proc.updated_by or journal_proc.creator,
                 collection_acron=journal_proc.collection.acron,
-                issn_electronic=journal.issn_print,
-                issn_print=journal.issn_electronic,
+                issn_electronic=journal.issn_electronic,
+                issn_print=journal.issn_print,
                 force_update=True,
             )
         except:
@@ -199,6 +199,8 @@ class JournalPayload:
 
     def add_sponsor(self, sponsor):
         # Sponsors
+        if not sponsor:
+            return
         self.data["sponsors"].append({"name": sponsor})
 
     @staticmethod
@@ -299,5 +301,7 @@ class JournalPayload:
         self.data["is_public"] = availability_status == "C"
 
     def add_publisher(self, name):
+        if not name:
+            return
         self.data.setdefault("institution_responsible_for", [])
         self.data["institution_responsible_for"].append({"name": name})
