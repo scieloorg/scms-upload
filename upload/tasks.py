@@ -18,7 +18,7 @@ from collection.models import WebSiteConfiguration
 from config import celery_app
 from issue.models import Issue
 from journal.models import Journal
-from proc.controller import ensure_journal_proc_exists, ensure_issue_proc_exists
+from proc.controller import ensure_journal_data_is_updated, ensure_issue_data_is_updated
 from proc.models import JournalProc, IssueProc
 from proc.tasks import TaskExecution
 from publication.api.issue import sync_issue
@@ -615,12 +615,12 @@ def task_upload_workflow_publish_article(
         journal = article.journal
         issue = article.issue
 
-        ensure_journal_proc_exists(user, journal)
-        ensure_issue_proc_exists(user, issue)
+        ensure_journal_data_is_updated(user, journal, force_journal_publication)
+        ensure_issue_data_is_updated(user, issue, force_issue_publication)
 
         article.create_or_update_article_collections(user)
 
-        for journal_proc in JournalProc.objects.filter(journal=journal).only("collection"):
+        for collection in journal.collections:
             # publica o artigo em cada coleção a que ele pertence
             task_publish_article.delay(
                 user_id,
@@ -629,7 +629,7 @@ def task_upload_workflow_publish_article(
                 article_proc_id=None,
                 upload_package_id=upload_package_id,
                 publication_rule=None,
-                collection_id=journal_proc.collection.id,
+                collection_id=collection.id,
                 force_journal_publication=force_journal_publication,
                 force_issue_publication=force_issue_publication,
             )
@@ -728,59 +728,6 @@ def task_publish_article(
                     websites=websites,
                 ),
             )
-
-
-@celery_app.task(bind=True)
-def task_complete_journal_data(
-    self,
-    user_id,
-    username,
-    journal_id=None,
-):
-    """
-    Tarefa que publica artigos ingressados pelo Upload
-    """
-    try:
-        user = _get_user(user_id, username)
-        ensure_journal_proc_exists(user, Journal.objects.get(pk=journal_id))
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail=dict(
-                task="task_complete_journal_data",
-                item="journal",
-                journal_id=journal_id,
-            ),
-        )
-
-
-@celery_app.task(bind=True)
-def task_complete_issue_data(
-    self,
-    user_id,
-    username,
-    issue_id=None,
-):
-    """
-    Tarefa que publica artigos ingressados pelo Upload
-    """
-    try:
-        user = _get_user(user_id, username)
-        ensure_issue_proc_exists(user, Issue.objects.get(pk=issue_id))
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            e=e,
-            exc_traceback=exc_traceback,
-            detail=dict(
-                task="task_complete_issue_data",
-                item="issue",
-                issue_id=issue_id,
-            ),
-        )
-
 
 
 ############################################
