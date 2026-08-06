@@ -154,7 +154,11 @@ class JournalDataChecker(BaseDataChecker):
         )
 
     def is_updated(self, obj):
-        return False
+        if obj.missing_fields:
+            return False
+        if not JournalProc.objects.filter(journal=obj).exists():
+            return False
+        return True
 
     def fetch_from_core(self, force_update=True):
         """Consulta dados remotos de journal e atualiza os dados locais."""
@@ -478,8 +482,10 @@ class IssueDataChecker(BaseDataChecker):
         return cls(journal, publication_year, xml.volume, xml.suppl, xml.number, user)
 
     def is_updated(self, obj):
-        return False
-
+        if not IssueProc.objects.filter(issue=obj).exists():
+            return False
+        return True
+    
     def get_local(self):
         """Consulta dados locais de issue."""
         return Issue.get(
