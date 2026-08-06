@@ -173,19 +173,14 @@ class PackageDecisionMixin:
 
         user = self.request.user
         force_journal_publication = form.cleaned_data.get("force_journal_publication")
-        if force_journal_publication and package.journal:
-            task_complete_journal_data.delay(
-                user_id=user.id,
-                username=user.username,
-                journal_id=package.journal.id,
-            )
+        if not package.journal:
+            messages.error(self.request, _("Package journal was not identified in the system or is not registered"))
+            return HttpResponseRedirect(self.get_success_url())
+        
         force_issue_publication = form.cleaned_data.get("force_issue_publication")
-        if force_issue_publication and package.issue:
-            task_complete_issue_data.delay(
-                user_id=user.id,
-                username=user.username,
-                issue_id=package.issue.id,
-            )
+        if not package.issue:
+            messages.error(self.request, _("Package issue was not identified in the system or is not registered"))
+            return HttpResponseRedirect(self.get_success_url())
 
         if self.process_decision(
             package,
