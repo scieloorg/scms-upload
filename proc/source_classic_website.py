@@ -123,7 +123,7 @@ def migrate_journal(
     """
     try:
         event = None
-        detail = None
+        detail = {}
         detail = {
             "journal_proc": str(journal_proc),
             "force_update": force_update,
@@ -191,7 +191,7 @@ def migrate_issue(user, issue_proc, force_update):
     """
     try:
         event = None
-        detail = None
+        detail = {}
         detail = {
             "issue_proc": str(issue_proc),
             "force_update": force_update,
