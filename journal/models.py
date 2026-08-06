@@ -638,6 +638,10 @@ class Journal(CommonControlField, ClusterableModel):
                 missing.append(_("Print ISSN"))
             if not self.official_journal.title_iso:
                 missing.append(_("ISO Title"))
+        else:
+            missing.append(_("Electronic ISSN"))
+            missing.append(_("Print ISSN"))
+            missing.append(_("ISO Title"))
 
         # Verificar mission
         if not self.mission.exists():
@@ -658,6 +662,13 @@ class Journal(CommonControlField, ClusterableModel):
         # Verificar subject
         if not self.subject.exists():
             missing.append(_("study area"))
+
+        for collection in self.collections:
+            if not JournalHistory.objects.filter(
+                journal_collection__journal=self,
+                journal_collection__collection=collection,
+            ).exists():
+                missing.append(_("history for {}").format(collection))
 
         return missing
 
