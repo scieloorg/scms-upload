@@ -623,6 +623,7 @@ class Journal(CommonControlField, ClusterableModel):
             "logo_url": _("Logo URL"),
             "license_code": _("License Code"),
             "wos_areas": _("WoS Areas"),
+            "journal_acron": _("Journal acronym"),
         }
         missing = []
         for field, description in fields.items():
@@ -639,9 +640,7 @@ class Journal(CommonControlField, ClusterableModel):
             if not self.official_journal.title_iso:
                 missing.append(_("ISO Title"))
         else:
-            missing.append(_("Electronic ISSN"))
-            missing.append(_("Print ISSN"))
-            missing.append(_("ISO Title"))
+            missing.append(_("Official Journal"))
 
         # Verificar mission
         if not self.mission.exists():
@@ -669,6 +668,9 @@ class Journal(CommonControlField, ClusterableModel):
                 journal_collection__collection=collection,
             ).exists():
                 missing.append(_("history for {}").format(collection))
+
+        if len(self.collections) == 0:
+            missing.append(_("Journal collection"))
 
         return missing
 
