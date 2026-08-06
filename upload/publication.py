@@ -8,7 +8,6 @@ from collection.models import WebSiteConfiguration
 from collection.choices import PUBLIC, QA
 from core.utils.requester import fetch_data
 from proc.models import ArticleProc, IssueProc, JournalProc
-from proc.source_core_api import create_or_update_journal, create_or_update_issue
 from publication.api.document import publish_article
 from publication.api.issue import publish_issue
 from publication.api.journal import publish_journal
