@@ -2,7 +2,7 @@ import logging
 
 
 def build_journal(
-    builder, journal, journal_id, journal_acron, journal_history, availability_status
+    builder, journal, journal_id, journal_acron, journal_history, availability_status, force_update=False
 ):
     official_journal = journal.official_journal
     builder.add_issue_count(journal.issue_count)
@@ -23,6 +23,18 @@ def build_journal(
         )
 
     current_status = "inprogress"
+
+    if force_update and not builder.data.get("status_history"):
+        # bloco de fallback para garantir a publicação, data aleatória
+        builder.data["status_history"] = [
+            {
+                "status": "current",
+                "date": "1999-07-02T00:00:00.000000Z",
+                "reason": "",
+            }
+        ]
+        builder.data["current_status"] = "current"
+
     if builder.data.get("status_history"):
         try:
             current_status = sorted(
