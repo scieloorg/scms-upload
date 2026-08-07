@@ -1116,7 +1116,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             xml_data = xml_adapter.xml_with_pre.get_article_data(PARTIAL_BODY_MAX)
             items = [item.data for item in results]
             raise PidProviderXMLPidV3ConflictError(
-                _(f"{xml_pid_v3} belongs to {items}, not to {xml_data}")
+                _("{} belongs to {}, not to {}").format(
+                    xml_pid_v3, items, xml_data
+                )
             )
         return registered
 
