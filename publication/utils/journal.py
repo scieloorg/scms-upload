@@ -22,26 +22,9 @@ def build_journal(
             jh.interruption_reason,
         )
 
-    current_status = "inprogress"
-    if builder.data.get("status_history"):
-        try:
-            current_status = sorted(
-                builder.data["status_history"], key=lambda x: x["date"]
-            )[-1]["status"]
-        except (IndexError, KeyError):
-            current_status = "inprogress"
-    builder.data["current_status"] = current_status
+    builder.add_current_status()
+    builder.add_forced_current_status(force_update)
 
-    if force_update and not builder.data.get("status_history"):
-        # bloco de fallback para garantir a publicação, data aleatória
-        builder.data["status_history"] = [
-            {
-                "status": "current",
-                "date": "1999-07-02T00:00:00.000000Z",
-                "reason": "",
-            }
-        ]
-        builder.data["current_status"] = "current"
 
     builder.add_journal_issns(
         scielo_issn=journal_id,
