@@ -50,10 +50,7 @@ def publish_journal(journal_proc, api_data):
 
     journal_pid = journal_proc.pid
     journal_acron = journal_proc.acron
-    journal_history = JournalHistory.objects.filter(
-        journal_collection__collection=journal_proc.collection,
-        journal_collection__journal=journal_proc.journal,
-    )
+    journal_history = journal_proc.journal_history
 
     payload = {}
 
@@ -275,8 +272,8 @@ class JournalPayload:
         reason : StringField
 
         """
-        status = translate_status(event, reason)
         if event and since:
+            status = translate_status(event, reason)
             self.data["status_history"].append(
                 {
                     "status": status or "",
