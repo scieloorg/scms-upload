@@ -607,6 +607,14 @@ class Journal(CommonControlField, ClusterableModel):
         return [item.value for item in self.subject.all()]
 
     @property
+    def is_complete(self):
+        if self.missing_fields:
+            return False
+        if not self.core_synchronized:
+            return False
+        return True
+
+    @property
     def missing_fields(self):
         """
         Verifica campos não preenchidos no Journal e retorna um relatório detalhado.
