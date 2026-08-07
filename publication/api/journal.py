@@ -329,3 +329,30 @@ class JournalPayload:
             return
         self.data.setdefault("institution_responsible_for", [])
         self.data["institution_responsible_for"].append({"name": name})
+
+    def add_current_status(self):
+        current_status = "inprogress"
+        if self.data.get("status_history"):
+            try:
+                current_status = sorted(
+                    self.data["status_history"], key=lambda x: x["date"]
+                )[-1]["status"]
+            except (IndexError, KeyError):
+                current_status = "inprogress"
+        self.data["current_status"] = current_status
+
+    def add_forced_current_status(self, force_update):
+        if self.data["current_status"] == "current":
+            return
+        if not force_update:
+            return
+        if not self.data.get("status_history"):
+            # bloco de fallback para garantir a publicação, data aleatória
+            self.data["status_history"] = [
+                {
+                    "status": "current",
+                    "date": "1999-07-02T00:00:00.000000Z",
+                    "reason": "",
+                }
+            ]
+            self.data["current_status"] = "current"
