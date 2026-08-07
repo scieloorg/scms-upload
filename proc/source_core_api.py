@@ -6,6 +6,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 
+from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.db.models import Q
 
@@ -154,7 +155,7 @@ class JournalDataChecker(BaseDataChecker):
         )
 
     def is_updated(self, obj):
-        if obj.missing_fields:
+        if not obj.is_complete:
             return False
         if not JournalProc.objects.filter(journal=obj).exists():
             return False
@@ -197,29 +198,14 @@ def fetch_and_create_journal(
     """
     # Conta os resultados primeiro para validação
 
-    try:
-        block_unregistered_collection = not collection_acron
-        results = fetch_journal_data_with_pagination(
-            collection_acron=collection_acron,
-            issn_electronic=issn_electronic,
-            issn_print=issn_print,
-        )
-    except FetchJournalDataException:
-        if not collection_acron:
-            raise
-
-        # api ainda não está aceitando o param collection_acron,
-        # consulta api com collection_acron=None e
-        # block_unregistered_collection=True
-        results = fetch_journal_data_with_pagination(
-            issn_electronic=issn_electronic,
-            issn_print=issn_print,
-        )
-
-    for result in results:
+    for result in fetch_journal_data_with_pagination(
+        collection_acron,
+        issn_electronic,
+        issn_print,
+    ):
         try:
             process_journal_result(
-                user, result, block_unregistered_collection, force_update
+                user, result, force_update
             )
         except Exception as e:
             logging.exception(e)
@@ -279,20 +265,11 @@ def fetch_journal_data_with_pagination(
 
 
 def process_journal_result(
-    user, result, block_unregistered_collection, force_update=None
+    user, result, force_update=None
 ):
     """
     Processa um único resultado de journal da API e cria/atualiza as entidades correspondentes.
     """
-
-    if block_unregistered_collection:
-        collections = set()
-        for item in result.get("scielo_journal") or []:
-            collections.add(item["collection_acron"])
-        if not collections:
-            return
-        if not Collection.objects.filter(acron__in=collections).exists():
-            return
 
     # Processa dados oficiais do journal
     official = result["official"]
@@ -313,12 +290,19 @@ def process_journal_result(
     )
 
     # Cria/atualiza o journal
-    journal = Journal.create_or_update(
-        user=user,
-        official_journal=official_journal,
-        title=result.get("title"),
-        short_title=result.get("short_title"),
-    )
+    try:
+        journal = Journal.get_registered(
+            journal_title=result.get("title"),
+            issn_electronic=official.get("issn_electronic"),
+            issn_print=official.get("issn_print"),
+        )
+    except Journal.DoesNotExist:
+        journal = Journal.create_or_update(
+            user=user,
+            official_journal=official_journal,
+            title=result.get("title"),
+            short_title=result.get("short_title"),
+        )
     journal.core_synchronized = False
     journal.contact_address = result.get("contact_address")
     journal.contact_name = result.get("contact_name")
@@ -336,18 +320,25 @@ def process_journal_result(
         journal.add_email(item)
 
     # Processa subjects
+    journal.subject.clear()
     for item in result.get("subject") or []:
         journal.subject.add(Subject.create_or_update(user, item["value"]))
 
     institution_names = set()
     for item in result.get("publisher") or []:
+        if not item["name"]:
+            continue
         institution_names.add(item["name"])
 
     # Processa owners
     for item in result.get("owner") or []:
+        if not item["name"]:
+            continue
         institution_names.add(item["name"])
 
     for item in result.get("sponsor") or []:
+        if not item["name"]:
+            continue
         institution_names.add(item["name"])
 
     institutions = {}
@@ -397,12 +388,43 @@ def process_journal_result(
         no_lang = []
 
     # Processa dados específicos do SciELO
-    journal_acron = None
-    for item in result.get("scielo_journal") or []:
+    journal_acron = journal.journal_acron
+
+    scielo_journals = result.get("scielo_journal") or []
+    if len(scielo_journals) == 0:
+        raise ValueError(
+            _("Missing SciELO Journal {} registration at core.scielo.org").format(
+                journal
+            )
+        )
+
+    ignore_collection_doesnotexist = len(scielo_journals) > 1
+
+    collection = None
+    for item in scielo_journals:
         try:
             collection = Collection.objects.get(acron=item["collection_acron"])
         except Collection.DoesNotExist:
-            continue
+            if ignore_collection_doesnotexist:
+                # journal está presente em mais de uma coleção, mas a instância de Upload
+                # não necessariamente gerencia o periódico em todas as coleções
+                continue
+            raise
+
+        # Processa histórico do journal
+        journal_collection = JournalCollection.create_or_update(
+            user, collection, journal
+        )
+        for jh in item.get("journal_history") or []:
+            JournalHistory.create_or_update(
+                user,
+                journal_collection,
+                jh["event_type"],
+                jh["year"],
+                jh["month"],
+                jh["day"],
+                jh["interruption_reason"],
+            )
 
         journal_proc = JournalProc.get_or_create(user, collection, item["issn_scielo"])
         journal_proc.update(
@@ -416,24 +438,15 @@ def process_journal_result(
         )
         journal_acron = journal_acron or item.get("journal_acron")
 
-        journal_collection = JournalCollection.create_or_update(
-            user, collection, journal
-        )
-
-        # Processa histórico do journal
-        for jh in item.get("journal_history") or []:
-            JournalHistory.create_or_update(
-                user,
-                journal_collection,
-                jh["event_type"],
-                jh["year"],
-                jh["month"],
-                jh["day"],
-                jh["interruption_reason"],
+    if not collection:
+        raise ValueError(
+            _("Unable to get journal collection data for {}").format(
+                journal
             )
-    journal.core_synchronized = True
+        )
     if journal.journal_acron != journal_acron:
         journal.journal_acron = journal_acron
+    journal.core_synchronized = True
     journal.save()
 
     # TODO: Campos da API não processados ainda:
