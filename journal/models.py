@@ -1067,6 +1067,7 @@ class JournalHistory(CommonControlField):
             obj.interruption_reason = interruption_reason
             obj.updated_by = obj.updated_by or user
             obj.save()
+            return obj
         except cls.DoesNotExist:
             return cls.create(
                 user,
