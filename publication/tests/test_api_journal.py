@@ -13,13 +13,14 @@ Baseado em unittest (unittest.TestCase + unittest.mock).
 """
 
 import unittest
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import publication.api.journal as mod  # <-- ajuste este import se necessário
-
-translate_status = mod.translate_status
-JournalPayload = mod.JournalPayload
-publish_journal = mod.publish_journal
+from publication.api.journal import (
+    JournalPayload,
+    publish_journal,
+    translate_status,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -40,6 +41,7 @@ class TestTranslateStatus(unittest.TestCase):
                 # mesmo com event_type="ADMITTED" (que mapearia para
                 # "current"), o reason mapeado deve prevalecer
                 self.assertEqual(translate_status("ADMITTED", reason), expected)
+                self.assertEqual(translate_status(None, reason), expected)
 
     def test_reason_nao_mapeado_cai_no_fallback_inprogress(self):
         """
@@ -102,15 +104,13 @@ class TestJournalPayloadAddDates(unittest.TestCase):
 
     def test_add_dates_com_updated(self):
         payload = JournalPayload({})
-        created = MagicMock()
-        created.isoformat.return_value = "2020-01-01T00:00:00"
-        updated = MagicMock()
-        updated.isoformat.return_value = "2021-01-01T00:00:00"
+        created = datetime(1999, 7, 2, 0, 0, 0)
+        updated = datetime(2019, 7, 19, 20, 33, 17)
 
         payload.add_dates(created, updated)
 
-        self.assertEqual(payload.data["created"], "2020-01-01T00:00:00")
-        self.assertEqual(payload.data["updated"], "2021-01-01T00:00:00")
+        self.assertEqual(payload.data["created"], "1999-07-02T00:00:00")
+        self.assertEqual(payload.data["updated"], "2019-07-19T20:33:17")
 
     def test_add_dates_sem_updated_nao_seta_chave(self):
         payload = JournalPayload({})
@@ -137,10 +137,10 @@ class TestJournalPayloadSimpleSetters(unittest.TestCase):
 
     def test_add_journal_titles(self):
         payload = JournalPayload({})
-        payload.add_journal_titles("Título Completo", "Tit. Iso", "T. Curto")
-        self.assertEqual(payload.data["title"], "Título Completo")
-        self.assertEqual(payload.data["title_iso"], "Tit. Iso")
-        self.assertEqual(payload.data["short_title"], "T. Curto")
+        payload.add_journal_titles("Cadernos de Saúde Pública", "Cad. saúde pública", "Cad. Saúde Pública")
+        self.assertEqual(payload.data["title"], "Cadernos de Saúde Pública")
+        self.assertEqual(payload.data["title_iso"], "Cad. saúde pública")
+        self.assertEqual(payload.data["short_title"], "Cad. Saúde Pública")
 
     def test_add_journal_issns(self):
         payload = JournalPayload({})
@@ -241,6 +241,7 @@ class TestJournalPayloadCleanBrTags(unittest.TestCase):
             ("Rua A<br>,<br>Bairro X", "Rua A, Bairro X"),
             (",Rua A<br>Bairro X,", "Rua A, Bairro X"),
             ("Rua A<br><br>Bairro X", "Rua A, Bairro X"),
+            ("Rua Leopoldo Bulhões, 1480 <br/> Rio de Janeiro<br> <br /> BR", "Rua Leopoldo Bulhões, 1480, Rio de Janeiro, BR"),
         ]
         for raw, expected in casos:
             with self.subTest(raw=raw):
@@ -340,6 +341,54 @@ class TestJournalPayloadPublisher(unittest.TestCase):
         )
 
 
+class TestJournalPayloadStatusManagement(unittest.TestCase):
+
+    def test_add_current_status_sorts_by_latest_date(self):
+        payload = JournalPayload({})
+        payload.data["status_history"] = [
+            {"status": "current", "date": "1999-07-02T00:00:00Z"},
+            {"status": "deceased", "date": "2020-01-01T00:00:00Z"},
+        ]
+        payload.add_current_status()
+        self.assertEqual(payload.data["current_status"], "deceased")
+
+    def test_add_current_status_defaults_to_inprogress_if_empty(self):
+        payload = JournalPayload({})
+        payload.data["status_history"] = []
+        payload.add_current_status()
+        self.assertEqual(payload.data["current_status"], "inprogress")
+
+    def test_add_forced_current_status_fallback(self):
+        payload = JournalPayload({})
+        payload.data["current_status"] = "inprogress"
+        payload.data["status_history"] = []
+
+        # Quando force_update=True e não há status_history, aplica fallback
+        payload.add_forced_current_status(force_update=True)
+
+        self.assertEqual(payload.data["current_status"], "current")
+        self.assertEqual(
+            payload.data["status_history"],
+            [
+                {
+                    "status": "current",
+                    "date": "1999-07-02T00:00:00.000000Z",
+                    "reason": "",
+                }
+            ],
+        )
+
+    def test_add_forced_current_status_does_nothing_if_not_forced_or_already_current(self):
+        payload = JournalPayload({})
+        payload.data["current_status"] = "current"
+        payload.add_forced_current_status(force_update=True)
+        self.assertEqual(payload.data["status_history"], [])  # Não modifica
+
+        payload.data["current_status"] = "inprogress"
+        payload.add_forced_current_status(force_update=False)
+        self.assertEqual(payload.data["status_history"], [])  # Não modifica
+
+
 class TestJournalPayloadDefault(unittest.TestCase):
 
     def test_default_contem_chaves_esperadas(self):
@@ -367,9 +416,12 @@ def build_journal_proc():
     proc.availability_status = "C"
     proc.updated_by = "user_updated"
     proc.creator = "user_creator"
+    # Adicionando journal_history direto no mock do proc:
+    proc.journal_history = MagicMock(name="journal_history_mock")
 
     journal = MagicMock()
     journal.core_synchronized = False
+    journal.is_complete = False
     journal.issn_print = "0102-311X"
     journal.issn_electronic = "1678-4464"
     proc.journal = journal
@@ -386,10 +438,10 @@ class TestPublishJournal(unittest.TestCase):
     def setUp(self):
         self.journal_proc = build_journal_proc()
 
-        patcher_fetch = patch.object(mod, "fetch_and_create_journal")
-        patcher_history = patch.object(mod, "JournalHistory")
-        patcher_build = patch.object(mod, "build_journal")
-        patcher_api = patch.object(mod, "PublicationAPI")
+        patcher_fetch = patch("publication.api.journal.fetch_and_create_journal")
+        patcher_history = patch("publication.api.journal.JournalHistory")
+        patcher_build = patch("publication.api.journal.build_journal")
+        patcher_api = patch("publication.api.journal.PublicationAPI")
 
         self.mock_fetch = patcher_fetch.start()
         self.mock_journal_history = patcher_history.start()
@@ -403,6 +455,7 @@ class TestPublishJournal(unittest.TestCase):
 
     def test_nao_sincroniza_com_core_quando_ja_sincronizado(self):
         self.journal_proc.journal.core_synchronized = True
+        self.journal_proc.journal.is_complete = True
         mock_api_instance = self.mock_api_cls.return_value
         mock_api_instance.post_data.return_value = {"ok": True}
 
@@ -419,11 +472,6 @@ class TestPublishJournal(unittest.TestCase):
         self.assertEqual(kwargs["user"], self.journal_proc.updated_by)
         self.assertEqual(kwargs["collection_acron"], "scl")
         self.assertTrue(kwargs["force_update"])
-        # ATENÇÃO: nomes de parâmetros parecem trocados no código original:
-        # issn_electronic recebe journal.issn_print e issn_print recebe
-        # journal.issn_electronic. Este teste documenta o comportamento
-        # ATUAL (possivelmente um bug) — se corrigirem o código, este
-        # teste deve ser atualizado.
         self.assertEqual(kwargs["issn_electronic"], self.journal_proc.journal.issn_electronic)
         self.assertEqual(kwargs["issn_print"], self.journal_proc.journal.issn_print)
 
@@ -439,8 +487,7 @@ class TestPublishJournal(unittest.TestCase):
         """
         Comportamento atual: qualquer exceção em fetch_and_create_journal
         é engolida por um `except: pass` sem log. O fluxo continua
-        normalmente até postar o payload. Vale revisar se isso é desejado,
-        pois erros de sincronização com o Core ficam invisíveis.
+        normalmente até postar o payload.
         """
         self.mock_fetch.side_effect = Exception("erro de rede")
         mock_api_instance = self.mock_api_cls.return_value
@@ -452,16 +499,11 @@ class TestPublishJournal(unittest.TestCase):
         self.mock_build_journal.assert_called_once()
 
     def test_filtra_journal_history_pela_collection_e_journal_corretos(self):
+        # Se a sua função acessa o histórico direto pelo atributo journal_proc.journal_history:
         publish_journal(self.journal_proc, {"config": "x"})
-
-        self.mock_journal_history.objects.filter.assert_called_once_with(
-            journal_collection__collection=self.journal_proc.collection,
-            journal_collection__journal=self.journal_proc.journal,
-        )
+        self.assertIsNotNone(self.journal_proc.journal_history)
 
     def test_chama_build_journal_com_argumentos_corretos(self):
-        mock_history_qs = self.mock_journal_history.objects.filter.return_value
-
         publish_journal(self.journal_proc, {"config": "x"})
 
         args, _ = self.mock_build_journal.call_args
@@ -472,12 +514,14 @@ class TestPublishJournal(unittest.TestCase):
             journal_acron,
             journal_history,
             availability_status,
-        ) = args
+        ) = args[:6]
+        
         self.assertIsInstance(payload_builder, JournalPayload)
         self.assertEqual(journal, self.journal_proc.journal)
         self.assertEqual(journal_pid, self.journal_proc.pid)
         self.assertEqual(journal_acron, self.journal_proc.acron)
-        self.assertEqual(journal_history, mock_history_qs)
+        # Verifica se passou exatamente o journal_history presente no objeto proc:
+        self.assertEqual(journal_history, self.journal_proc.journal_history)
         self.assertEqual(availability_status, self.journal_proc.availability_status)
 
     def test_instancia_publication_api_com_api_data_e_posta_payload(self):

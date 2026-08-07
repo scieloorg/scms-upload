@@ -2,7 +2,7 @@ import logging
 
 
 def build_journal(
-    builder, journal, journal_id, journal_acron, journal_history, availability_status
+    builder, journal, journal_id, journal_acron, journal_history, availability_status, force_update=False
 ):
     official_journal = journal.official_journal
     builder.add_issue_count(journal.issue_count)
@@ -22,15 +22,9 @@ def build_journal(
             jh.interruption_reason,
         )
 
-    current_status = "inprogress"
-    if builder.data.get("status_history"):
-        try:
-            current_status = sorted(
-                builder.data["status_history"], key=lambda x: x["date"]
-            )[-1]["status"]
-        except (IndexError, KeyError):
-            current_status = "inprogress"
-    builder.data["current_status"] = current_status
+    builder.add_current_status()
+    builder.add_forced_current_status(force_update)
+
 
     builder.add_journal_issns(
         scielo_issn=journal_id,

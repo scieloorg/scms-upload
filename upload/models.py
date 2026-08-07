@@ -39,7 +39,7 @@ from package import choices as package_choices
 from package.models import SPSPkg
 from pid_provider.models import PidProviderXML
 from proc.models import IssueProc, Operation
-from proc.source_core_api import create_or_update_issue
+from proc.source_core_api import IssueDataChecker
 from team.models import CollectionTeamMember
 from upload import choices
 from upload.forms import (
@@ -2408,13 +2408,13 @@ class PidV2Generator:
 
     def get_issue_pid(self, user, journal, issue):
         if not issue:
-            issue = create_or_update_issue(
+            checker = IssueDataChecker(
                 journal=journal,
-                pub_year=self.xml_with_pre.pub_year,
+                publication_year=self.xml_with_pre.pub_year,
                 volume=self.xml_with_pre.volume,
                 suppl=self.xml_with_pre.suppl,
                 number=self.xml_with_pre.number,
                 user=user,
-                force_update=True,
             )
+            issue = checker.ensure_proc_exists()
         return IssueProc.get_issue_pid(issue)

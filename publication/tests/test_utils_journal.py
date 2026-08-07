@@ -1,29 +1,8 @@
-"""
-Testes para `build_journal` (publication/utils/journal.py).
-
-AJUSTE NECESSÁRIO:
-O import abaixo assume `publication.utils.journal`, conforme referenciado
-em `from publication.utils.journal import build_journal` no módulo de
-publicação. Ajuste se o caminho real for outro — o restante dos testes usa
-sempre `mod.build_journal`, então não precisa mudar mais nada.
-
-Baseado em unittest (unittest.TestCase + unittest.mock).
-
-Estratégia:
-- Na maior parte dos testes, `builder` é um MagicMock, para verificar
-  exatamente quais métodos foram chamados e com quais argumentos.
-- Como a função manipula `builder.data` diretamente (não só via métodos)
-  para calcular `current_status`, setamos `builder.data = {}` manualmente
-  em cada teste que precisa disso.
-- `journal`, `journal_history` e os objetos relacionados (mission, sponsor,
-  owner, publisher, eventos de histórico) são construídos com MagicMock,
-  configurando apenas os atributos relevantes para cada teste.
-"""
-
 import unittest
+from datetime import datetime
 from unittest.mock import MagicMock
 
-import publication.utils.journal as mod  # <-- ajuste este import se necessário
+import publication.utils.journal as mod
 
 build_journal = mod.build_journal
 
@@ -221,61 +200,39 @@ class TestBuildJournalMissionAndTimeline(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Cálculo de current_status
+# Cálculo de current_status e tratamento de force_update
 # ---------------------------------------------------------------------------
 
 class TestBuildJournalCurrentStatus(unittest.TestCase):
-    """
-    Como `add_event_to_timeline` está mockado (não popula builder.data de
-    fato), simulamos o estado de `builder.data["status_history"]`
-    diretamente antes de chamar build_journal, para testar isoladamente a
-    lógica de cálculo de current_status.
-    """
 
-    def _run(self, status_history):
+    def test_chama_add_current_status(self):
         builder = build_fake_builder()
-        if status_history is not None:
-            builder.data["status_history"] = status_history
         journal = build_fake_journal()
         journal_history = build_fake_journal_history()
 
         build_journal(builder, journal, "1678-4463", "csp", journal_history, "C")
-        return builder.data["current_status"]
 
-    def test_sem_status_history_retorna_inprogress(self):
-        self.assertEqual(self._run(None), "inprogress")
+        builder.add_current_status.assert_called_once()
 
-    def test_status_history_vazio_retorna_inprogress(self):
-        self.assertEqual(self._run([]), "inprogress")
+    def test_chama_add_forced_current_status_com_force_update_default_false(self):
+        builder = build_fake_builder()
+        journal = build_fake_journal()
+        journal_history = build_fake_journal_history()
 
-    def test_status_history_com_um_evento(self):
-        status_history = [{"status": "current", "date": "1999-01-01", "reason": ""}]
-        self.assertEqual(self._run(status_history), "current")
+        build_journal(builder, journal, "1678-4463", "csp", journal_history, "C")
 
-    def test_status_history_usa_status_do_evento_mais_recente(self):
-        status_history = [
-            {"status": "current", "date": "1999-01-01", "reason": ""},
-            {"status": "deceased", "date": "2020-01-01", "reason": "ceased"},
-            {"status": "suspended", "date": "2010-01-01", "reason": "suspended-by-editor"},
-        ]
-        # ordenado por date, o último (2020-01-01) deve prevalecer
-        self.assertEqual(self._run(status_history), "deceased")
+        builder.add_forced_current_status.assert_called_once_with(False)
 
-    def test_ordem_de_insercao_nao_importa_apenas_a_data(self):
-        status_history = [
-            {"status": "deceased", "date": "2020-01-01", "reason": "ceased"},
-            {"status": "current", "date": "1999-01-01", "reason": ""},
-        ]
-        self.assertEqual(self._run(status_history), "deceased")
+    def test_chama_add_forced_current_status_com_force_update_true(self):
+        builder = build_fake_builder()
+        journal = build_fake_journal()
+        journal_history = build_fake_journal_history()
 
-    def test_evento_sem_chave_date_cai_no_fallback_inprogress(self):
-        """
-        `sorted(..., key=lambda x: x["date"])` lança KeyError se algum
-        evento não tiver "date". A função captura isso e retorna
-        "inprogress".
-        """
-        status_history = [{"status": "current", "reason": ""}]
-        self.assertEqual(self._run(status_history), "inprogress")
+        build_journal(
+            builder, journal, "1678-4463", "csp", journal_history, "C", force_update=True
+        )
+
+        builder.add_forced_current_status.assert_called_once_with(True)
 
 
 # ---------------------------------------------------------------------------
@@ -366,12 +323,6 @@ class TestBuildJournalLogoUrl(unittest.TestCase):
                 )
 
     def test_fallback_quando_atributo_logo_url_nao_existe(self):
-        """
-        Simula um objeto `journal` sem o atributo `logo_url` (ex.: modelo
-        real sem esse campo). `del journal.logo_url` num MagicMock faz o
-        próximo acesso ao atributo levantar AttributeError, exercitando o
-        bloco `except AttributeError` da função.
-        """
         builder = build_fake_builder()
         journal = build_fake_journal()
         del journal.logo_url

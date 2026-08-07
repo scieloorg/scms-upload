@@ -607,6 +607,14 @@ class Journal(CommonControlField, ClusterableModel):
         return [item.value for item in self.subject.all()]
 
     @property
+    def is_complete(self):
+        if self.missing_fields:
+            return False
+        if not self.core_synchronized:
+            return False
+        return True
+
+    @property
     def missing_fields(self):
         """
         Verifica campos não preenchidos no Journal e retorna um relatório detalhado.
@@ -623,6 +631,7 @@ class Journal(CommonControlField, ClusterableModel):
             "logo_url": _("Logo URL"),
             "license_code": _("License Code"),
             "wos_areas": _("WoS Areas"),
+            "journal_acron": _("Journal acronym"),
         }
         missing = []
         for field, description in fields.items():
@@ -638,6 +647,8 @@ class Journal(CommonControlField, ClusterableModel):
                 missing.append(_("Print ISSN"))
             if not self.official_journal.title_iso:
                 missing.append(_("ISO Title"))
+        else:
+            missing.append(_("Official Journal"))
 
         # Verificar mission
         if not self.mission.exists():
@@ -658,6 +669,16 @@ class Journal(CommonControlField, ClusterableModel):
         # Verificar subject
         if not self.subject.exists():
             missing.append(_("study area"))
+
+        for collection in self.collections:
+            if not JournalHistory.objects.filter(
+                journal_collection__journal=self,
+                journal_collection__collection=collection,
+            ).exists():
+                missing.append(_("history for {}").format(collection))
+
+        if len(self.collections) == 0:
+            missing.append(_("Journal collection"))
 
         return missing
 
@@ -1054,6 +1075,7 @@ class JournalHistory(CommonControlField):
             obj.interruption_reason = interruption_reason
             obj.updated_by = obj.updated_by or user
             obj.save()
+            return obj
         except cls.DoesNotExist:
             return cls.create(
                 user,

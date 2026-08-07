@@ -34,7 +34,8 @@ def publish_journal(journal_proc, api_data):
 
     journal = journal_proc.journal
 
-    if not journal.core_synchronized:
+    force_update = not journal.is_complete
+    if force_update:
         try:
             # tenta sincronizar os dados
             fetch_and_create_journal(
@@ -50,10 +51,7 @@ def publish_journal(journal_proc, api_data):
 
     journal_pid = journal_proc.pid
     journal_acron = journal_proc.acron
-    journal_history = JournalHistory.objects.filter(
-        journal_collection__collection=journal_proc.collection,
-        journal_collection__journal=journal_proc.journal,
-    )
+    journal_history = journal_proc.journal_history
 
     payload = {}
 
@@ -65,6 +63,7 @@ def publish_journal(journal_proc, api_data):
         journal_acron,
         journal_history,
         journal_proc.availability_status,
+        force_update,
     )
 
     api = PublicationAPI(**api_data)
@@ -275,8 +274,8 @@ class JournalPayload:
         reason : StringField
 
         """
-        status = translate_status(event, reason)
         if event and since:
+            status = translate_status(event, reason)
             self.data["status_history"].append(
                 {
                     "status": status or "",
@@ -330,3 +329,30 @@ class JournalPayload:
             return
         self.data.setdefault("institution_responsible_for", [])
         self.data["institution_responsible_for"].append({"name": name})
+
+    def add_current_status(self):
+        current_status = "inprogress"
+        if self.data.get("status_history"):
+            try:
+                current_status = sorted(
+                    self.data["status_history"], key=lambda x: x["date"]
+                )[-1]["status"]
+            except (IndexError, KeyError):
+                current_status = "inprogress"
+        self.data["current_status"] = current_status
+
+    def add_forced_current_status(self, force_update):
+        if self.data["current_status"] == "current":
+            return
+        if not force_update:
+            return
+        if not self.data.get("status_history"):
+            # bloco de fallback para garantir a publicação, data aleatória
+            self.data["status_history"] = [
+                {
+                    "status": "current",
+                    "date": "1999-07-02T00:00:00.000000Z",
+                    "reason": "",
+                }
+            ]
+            self.data["current_status"] = "current"
