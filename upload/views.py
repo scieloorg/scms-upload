@@ -10,8 +10,6 @@ from upload.models import Package, PkgValidationResult, choices
 from upload.tasks import (
     task_receive_packages,
     task_upload_workflow_publish_article,
-    task_complete_journal_data,
-    task_complete_issue_data,
     task_republish_articles,
 )
 from upload.utils import file_utils
