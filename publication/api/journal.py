@@ -34,7 +34,8 @@ def publish_journal(journal_proc, api_data):
 
     journal = journal_proc.journal
 
-    if not journal.core_synchronized:
+    force_update = not journal.is_complete
+    if force_update:
         try:
             # tenta sincronizar os dados
             fetch_and_create_journal(
@@ -62,6 +63,7 @@ def publish_journal(journal_proc, api_data):
         journal_acron,
         journal_history,
         journal_proc.availability_status,
+        force_update,
     )
 
     api = PublicationAPI(**api_data)
