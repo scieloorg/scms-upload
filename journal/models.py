@@ -955,9 +955,7 @@ class JournalCollection(CommonControlField, ClusterableModel):
     @classmethod
     def create_or_update(cls, user, collection, journal):
         try:
-            obj = cls.get(collection, journal)
-            obj.updated_by = obj.updated_by or user
-            obj.save()
+            return cls.get(collection, journal)
         except cls.DoesNotExist:
             return cls.create(user, collection, journal)
 
