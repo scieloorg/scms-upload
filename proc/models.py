@@ -33,7 +33,7 @@ from core.utils.sanitize import sanitize_for_json
 from htmlxml.models import HTMLXML
 from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
-from journal.models import Journal
+from journal.models import Journal, JournalHistory
 from migration import choices as migration_choices
 from migration.controller import (
     PkgZipBuilder,
@@ -1239,6 +1239,13 @@ class JournalProc(BaseProc, ClusterableModel):
             total = item.pop("total")
             items.append({"total": total, "status": item})
         return items
+
+    @property
+    def journal_history(self):
+        return JournalHistory.objects.filter(
+            journal_collection__collection=self.collection,
+            journal_collection__journal=self.journal,
+        )
 
 
 ################################################
