@@ -89,7 +89,7 @@ class QueryBuilderPidProviderXML:
         """
         self.xml_adapter = xml_adapter
         # Centraliza o acesso aos dados brutos e normalizados (hashes de 64 chars)
-        # z_body_fragment: fingerprint sha256 do corpo INTEIRO do artigo
+        # z_body_fragment: fingerprint sha256 de um fragmento estável do corpo
         # (XMLWithPre.body_fragment_fingerprint), acessado direto do
         # xml_with_pre — não requer nenhuma mudança no packtools nem no
         # PidProviderXMLAdapter. É mais robusto que z_partial_body (que
@@ -237,7 +237,7 @@ class QueryBuilderPidProviderXML:
 
         - legado: hash de z_partial_body (primeiro parágrafo não vazio
           do corpo, via xml_adapter.z_partial_body);
-        - atual: fingerprint do corpo INTEIRO do artigo
+        - atual: fingerprint de um fragmento estável do corpo
           (xml_with_pre.body_fragment_fingerprint), gravado no mesmo
           campo z_partial_body a partir desta correção (sem necessidade
           de migração/backfill).
@@ -255,7 +255,11 @@ class QueryBuilderPidProviderXML:
         `Q(z_partial_body=None)` (que o Django traduz para IS NULL).
         """
         z_partial_body = self.adapter_data.get("z_partial_body")
-        candidates = set(v for v in (z_partial_body, self.z_body_fragment) if v)
+        candidates = set(
+            value
+            for value in (z_partial_body, self.z_body_fragment)
+            if value
+        )
         if candidates:
             return Q(z_partial_body__in=candidates)
         return Q(z_partial_body__isnull=True)
