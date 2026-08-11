@@ -121,7 +121,8 @@ class XMLVersion(CommonControlField):
         ]
 
     def __str__(self):
-        return f"{self.pid_provider_xml.pkg_name} {self.created}"
+        pkg_name = self.pid_provider_xml.pkg_name if self.pid_provider_xml else "-"
+        return f"{pkg_name} {self.created}"
 
     @classmethod
     @profile_classmethod
