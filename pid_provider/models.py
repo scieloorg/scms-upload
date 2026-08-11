@@ -18,6 +18,7 @@ from modelcluster.models import ClusterableModel
 from packtools.sps.pid_provider import v3_gen, xml_sps_adapter
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
+from wagtail.contrib.settings.models import BaseGenericSetting, register_setting
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from collection.models import Collection
@@ -121,7 +122,8 @@ class XMLVersion(CommonControlField):
         ]
 
     def __str__(self):
-        return f"{self.pid_provider_xml.pkg_name} {self.created}"
+        pkg_name = self.pid_provider_xml.pkg_name if self.pid_provider_xml else "-"
+        return f"{pkg_name} {self.created}"
 
     @classmethod
     @profile_classmethod
@@ -836,9 +838,11 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 "error_type": error_type,
                 "traceback": traceback.format_exc()
             })
-        finally:            
+        finally:
             response["event_status"] = event_status
-            if error_type or (select_record_response or {}).get("matched_items"):
+            record_all = PidProviderSetting.load().record_all_registration_events
+            matched_items = (select_record_response or {}).get("matched_items")
+            if record_all or error_type or matched_items:
                 PidProviderXMLRegistration.record(
                     user=user,
                     pid_provider_xml=registered,
@@ -1923,13 +1927,32 @@ class XMLURL(CommonControlField):
         return xmlurl_obj
 
 
+@register_setting
+class PidProviderSetting(BaseGenericSetting):
+    record_all_registration_events = models.BooleanField(
+        default=False,
+        verbose_name=_("Gravar todos os eventos de auditoria"),
+        help_text=_(
+            "Quando ativo, grava auditoria em PidProviderXMLRegistration "
+            "mesmo para fluxos limpos (created, updated, skipped)."
+        ),
+    )
+
+    panels = [
+        FieldPanel("record_all_registration_events"),
+    ]
+
+    class Meta:
+        verbose_name = _("Configurações do PID Provider")
+
+
 # -----------------------------------------------------------------------------
-# [models.py] MODELO NOVO — PidProviderXMLRegistration
-# Auditoria por documento. Grava SEMPRE (created/updated/skipped/forbidden/
-# conflict/unmatched/error). FK nullable (unmatched/error podem não ter PPX).
+# Auditoria por documento. Por padrão, grava apenas em erros ou ambiguidades
+# (matched_items). Caso a opção no Wagtail Admin esteja ativa, grava todos os
+# eventos. FK nullable porque erros e casos sem correspondência podem não ter PPX.
 # -----------------------------------------------------------------------------
 class PidProviderXMLRegistration(CommonControlField):
-    LIGHTWEIGHT_STATUSES = {"created", "updated", "skip_update"}
+    LIGHTWEIGHT_STATUSES = {"created", "updated", "skipped"}
 
     EVENT_CREATED = "created"
     EVENT_UPDATED = "updated"
