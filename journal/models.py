@@ -197,6 +197,7 @@ class OfficialJournal(CommonControlField):
             obj = cls.objects.filter(qs).order_by("-updated").first()
             if not obj:
                 raise
+            return obj
 
     @classmethod
     def create_or_update(

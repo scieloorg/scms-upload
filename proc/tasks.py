@@ -408,6 +408,8 @@ def task_migrate_and_publish_journals_by_collection(
             query_by_status |= Q(migration_status__in=status)
             query_by_status |= Q(journal__core_synchronized=False)         
 
+        # para force_core_sync=True, o filtro migration_status deixa de ser relevante
+
         fix_publication_status(collection)
         items_to_process = JournalProc.objects.filter(
             query_by_status, collection=collection, **journal_filter
