@@ -82,7 +82,7 @@ class JournalCollectionViewSet(SnippetViewSet):
     search_fields = (
         "journal__title",     # ajuste para o campo textual real de Journal
         "collection__name",   # ajuste para o campo textual real de Collection
-        "collection__acron3", # se existir, ajuda muito na busca por sigla
+        "collection__acron", # se existir, ajuda muito na busca por sigla
     )
     export_filename = "journal_collections"
 
