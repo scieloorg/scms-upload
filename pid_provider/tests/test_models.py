@@ -10,3 +10,17 @@ class XMLVersionTests(SimpleTestCase):
         xml_version = XMLVersion(pid_provider_xml=None)
 
         self.assertEqual(str(xml_version), "- None")
+
+
+class PidProviderXMLRegistrationTests(SimpleTestCase):
+    @patch.object(PidProviderXMLRegistration, "save")
+    def test_skipped_event_does_not_store_detail(self, save):
+        registration = PidProviderXMLRegistration.record(
+            user=None,
+            event_status=PidProviderXMLRegistration.EVENT_SKIPPED,
+            detail={"large": "payload"},
+        )
+
+        save.assert_called_once_with()
+        self.assertIsNotNone(registration)
+        self.assertIsNone(registration.detail)
