@@ -397,14 +397,15 @@ def task_migrate_and_publish_journals_by_collection(
         journal_filter = {}
         if journal_acron:
             journal_filter["acron"] = journal_acron
+
         status = tracker_choices.get_valid_status(status, force_update)
         query_by_status = (
-            Q(migration_status__in=status)
-            | Q(qa_ws_status__in=status)
+            Q(qa_ws_status__in=status)
             | Q(public_ws_status__in=status)
         )
         if not force_core_sync:
-            # seleciona também aqueles que não estão sincronizados 
+            # seleciona também aqueles que não estão sincronizados
+            query_by_status |= Q(migration_status__in=status)
             query_by_status |= Q(journal__core_synchronized=False)         
 
         fix_publication_status(collection)
@@ -424,9 +425,7 @@ def task_migrate_and_publish_journals_by_collection(
                 detail = {}
                 event = journal_proc.start(user, "migrate journal")
 
-                if force_core_sync or (
-                    journal_proc.journal and not journal_proc.journal.core_synchronized
-                ):
+                if force_core_sync:
                     fetch_and_create_journal(
                         user,
                         collection_acron=collection.acron,
