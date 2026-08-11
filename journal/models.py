@@ -170,15 +170,33 @@ class OfficialJournal(CommonControlField):
 
     @classmethod
     def get(cls, issn_print=None, issn_electronic=None, issnl=None, title=None):
+        params = {}
         if issn_electronic:
-            return cls.objects.get(issn_electronic=issn_electronic)
+            params["issn_electronic"] = issn_electronic
         if issn_print:
-            return cls.objects.get(issn_print=issn_print)
+            params["issn_print"] = issn_print
         if issnl:
-            return cls.objects.get(issnl=issnl)
-        raise ValueError(
-            f"{title} - OfficialJournal.get requires issn_print, issn_electronic"
-        )
+            params["issnl"] = issnl
+        if not params:
+            raise ValueError(
+                f"OfficialJournal.get requires issn_print, issn_electronic, issnl"
+            )
+
+        try:
+            return cls.objects.get(**params)
+        except cls.MultipleObjectsReturned:
+            return cls.objects.filter(**params).order_by("-updated").first()
+        except cls.DoesNotExist:
+            qs = Q()
+            if issn_electronic:
+                qs |= Q(issn_electronic=issn_electronic)
+            if issn_print:
+                qs |= Q(issn_print=issn_print)
+            if issnl:
+                qs |= Q(issnl=issnl)
+            obj = cls.objects.filter(qs).order_by("-updated").first()
+            if not obj:
+                raise
 
     @classmethod
     def create_or_update(
