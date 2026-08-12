@@ -63,7 +63,6 @@ wagtail-autocomplete==0.12.0  # UPGRADE de 0.11.0
 # ========================================
 # Database & Storage
 # ========================================
-mongoengine==0.28.2
 minio==7.2.8  # Mantendo versão maior
 
 # ========================================
@@ -76,7 +75,6 @@ langdetect==1.0.9
 # ========================================
 # HTTP & Networking
 # ========================================
-aiohttp==3.10.5  # Async HTTP client - Mantendo versão maior
 urllib3==2.2.3  # Mantendo versão maior
 requests>=2.32.3  # Mantendo versão maior
 tornado>=6.4.1  # Pinned by Snyk - Mantendo versão maior
@@ -91,8 +89,6 @@ iso639-lang==2.6.3  # Mantendo versão maior
 # ========================================
 # Using specific versions for stability
 -e git+https://github.com/scieloorg/packtools.git@4.16.11#egg=packtools
--e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
--e git+https://github.com/scieloorg/opac_schema.git@v2.66#egg=opac_schema
 -e git+https://github.com/scieloorg/scielo_migration.git@1.10.8#egg=scielo_classic_website
 
 # ========================================
@@ -105,7 +101,6 @@ django-silk==5.3.2  # NOVA ADIÇÃO
 # Excel Processing
 # ========================================
 xlwt==1.3.0  # NOVA ADIÇÃO
-xmltodict==0.13.0  # https://github.com/martinblech/xmltodict.git - NOVA ADIÇÃO
 
 # ========================================
 # Two Factor Authentication
