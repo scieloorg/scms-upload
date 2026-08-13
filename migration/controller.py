@@ -260,6 +260,10 @@ def create_or_update_journal(
             exc_traceback=exc_traceback,
         )
         raise e
+    # core_synchronized = True, inibe atualização via coleta do core.scielo.org,
+    # pois os dados entraram via migração
+    journal.core_synchronized = True
+    journal.save()
     return journal
 
 

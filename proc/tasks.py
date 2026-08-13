@@ -309,6 +309,7 @@ def task_migrate_and_publish_journals(
     status=None,
     valid_status=None,
     force_import_acron_id_file=False,
+    force_core_sync=False,
 ):
     """
     Ponto de entrada para migração e publicação de periódicos.
@@ -325,6 +326,7 @@ def task_migrate_and_publish_journals(
             "force_update": force_update,
             "status": status,
             "force_import_acron_id_file": force_import_acron_id_file,
+            "force_core_sync": force_core_sync,
         }
         for collection in _get_collections(collection_acron):
             task_migrate_and_publish_journals_by_collection.delay(
@@ -335,12 +337,13 @@ def task_migrate_and_publish_journals(
                 force_update=force_update,
                 status=status,
                 force_import_acron_id_file=force_import_acron_id_file,
+                force_core_sync=force_core_sync,
             )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             action="proc.tasks.task_migrate_and_publish_journals",
-            item=f"{collection_acron}-{journal_acron}",
+            item=collection_acron,
             e=e,
             exc_traceback=exc_traceback,
             detail={"task_params": task_params},
@@ -357,6 +360,7 @@ def task_migrate_and_publish_journals_by_collection(
     force_update=False,
     status=None,
     force_import_acron_id_file=False,
+    force_core_sync=False,
 ):
     """
     Migra e publica periódicos de uma coleção.
@@ -374,10 +378,11 @@ def task_migrate_and_publish_journals_by_collection(
         "force_update": force_update,
         "status": status,
         "force_import_acron_id_file": force_import_acron_id_file,
+        "force_core_sync": force_core_sync,
     }
     task_exec = TaskExecution(
         name="proc.tasks.task_migrate_and_publish_journals_by_collection",
-        item=f"{collection_acron}-{journal_acron}",
+        item=f"{collection_acron}",
         params=task_params,
     )
     try:
@@ -386,18 +391,25 @@ def task_migrate_and_publish_journals_by_collection(
         classic_website = controller.get_classic_website(collection_acron)
         collection = Collection.objects.get(acron=collection_acron)
         create_or_update_migrated_journal(
-            user, collection, classic_website, force_update
+            user, collection, classic_website, force_import_acron_id_file
         )
 
         journal_filter = {}
         if journal_acron:
             journal_filter["acron"] = journal_acron
+
         status = tracker_choices.get_valid_status(status, force_update)
         query_by_status = (
-            Q(migration_status__in=status)
-            | Q(qa_ws_status__in=status)
+            Q(qa_ws_status__in=status)
             | Q(public_ws_status__in=status)
         )
+        if not force_core_sync:
+            # seleciona também aqueles que não estão sincronizados
+            query_by_status |= Q(migration_status__in=status)
+            query_by_status |= Q(journal__core_synchronized=False)         
+
+        # para force_core_sync=True, o filtro migration_status deixa de ser relevante
+
         fix_publication_status(collection)
         items_to_process = JournalProc.objects.filter(
             query_by_status, collection=collection, **journal_filter
@@ -414,18 +426,24 @@ def task_migrate_and_publish_journals_by_collection(
             try:
                 detail = {}
                 event = journal_proc.start(user, "migrate journal")
-                completed = journal_proc.create_or_update_item(
-                    user, force_update, controller.create_or_update_journal
-                )
-                if force_update or not journal_proc.journal.core_synchronized:
+
+                if force_core_sync:
                     fetch_and_create_journal(
                         user,
                         collection_acron=collection.acron,
                         issn_electronic=journal_proc.issn_electronic,
                         issn_print=journal_proc.issn_print,
-                        force_update=force_update,
+                        force_update=force_core_sync,
                     )
+                    detail["journal_data_source"] = "core data"
+                else:
+                    # cria journal a partir de migrated journal
+                    journal_proc.create_or_update_item(
+                        user, force_update, controller.create_or_update_journal
+                    )
+                    detail["journal_data_source"] = "classic website data"
                 if qa_api_data and not qa_api_data.get("error"):
+                    detail["task_publish_journal_on_qa_website"] = "scheduled"
                     task_publish_journal.apply_async(
                         kwargs=dict(
                             user_id=user_id,
@@ -437,6 +455,7 @@ def task_migrate_and_publish_journals_by_collection(
                         )
                     )
                 if public_api_data and not public_api_data.get("error"):
+                    detail["task_publish_journal_on_public_website"] = "scheduled"
                     task_publish_journal.apply_async(
                         kwargs=dict(
                             user_id=user_id,
@@ -476,7 +495,7 @@ def task_migrate_and_publish_journals_by_collection(
         except Exception:
             UnexpectedEvent.create(
                 action="proc.tasks.task_migrate_and_publish_journals_by_collection",
-                item=f"{collection_acron}-{journal_acron}",
+                item=f"{collection_acron}",
                 e=e,
                 exc_traceback=exc_traceback,
                 detail=task_params,
