@@ -435,43 +435,101 @@ class SPSPkg(CommonControlField, ClusterableModel):
             }
 
     @classmethod
-    def get(cls, pid_v3):
-        return cls.objects.get(pid_v3=pid_v3)
-
-    @classmethod
-    def delete_queryset(cls, qs):
+    def delete_related_items(cls, qs):
         SPSPkgComponent.objects.filter(sps_pkg__in=qs).delete()
         qs.delete()
 
     def set_registered_in_core(self, value):
         PidRequester.set_registered_in_core(self.pid_v3, value)
 
-    @staticmethod
-    def is_registered_in_core(pid_v3):
-        if not pid_v3:
-            return False
+    @classmethod
+    def search_by_ppx_id(cls, ppx_id):
+        """
+        Return SPSPkg, None
+
+        Raises cls.DoesNotExist
+        """
         try:
-            obj = SPSPkg.objects.get(pid_v3=pid_v3)
-            return obj.registered_in_core
-        except SPSPkg.DoesNotExist:
-            return False
+            return cls.objects.get(ppx_id=ppx_id)
+        except cls.MultipleObjectsReturned:
+            return cls.objects.filter(ppx_id=ppx_id).order_by("-updated").first()
+        except cls.DoesNotExist:
+            if not cls.objects.filter(ppx_id__isnull=True).exists():
+                raise cls.DoesNotExist
+            return None
 
     @classmethod
-    def _get_or_create(cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2):
+    def search_by_identifiers(cls, pid_v3=None, sps_pkg_name=None, pkg_name_list=None, pid_v2=None):
+        qs = Q()
+        params = {}
+        if pid_v3:
+            params["pid_v3"] = pid_v3
+            qs |= Q(pid_v3=pid_v3)
+        if pid_v2:
+            params["pid_v2"] = pid_v2
+            qs |= Q(pid_v2=pid_v2)
+        if sps_pkg_name:
+            params["sps_pkg_name"] = sps_pkg_name
+            qs |= Q(sps_pkg_name=sps_pkg_name)
+        if pkg_name_list:
+            params["sps_pkg_name__in"] = pkg_name_list
+            qs |= Q(sps_pkg_name__in=pkg_name_list)
+
+        if not params:
+            raise ValueError("SPSPkg.get requires at least one of pid_v3, sps_pkg_name, pkg_name_list, pid_v2")
+
+        items = cls.objects.filter(qs)
+        found = list(items)
+        if not found:
+            raise cls.DoesNotExist
+        if len(found) == 1:
+            return found[0]
+
+        ids_1 = set(items.values_list("id", flat=True))
+        ids_2 = set(cls.objects.filter(**params).values_list("id", flat=True))
+        print((params, ids_1, ids_2))
+        if ids_1 == ids_2:
+            # todos os encontrados tem a mesma identificação, então retorna o mais recente
+            return items.order_by("-updated").first()
+        # possíveis causas de multiplicidade:
+        # - defeitos nos metadados que foram o nome do pacote
+        # - defeitos no pid provider
+        # - multiplicidade nos pid v2 (participação em multicoleções)
+        data = []
+        for item in items:
+            data.append(item.data)
+        raise SPSPkgMultipleObjectReturnedException(data)
+
+    @classmethod
+    def get(cls, ppx_id, pid_v3=None, sps_pkg_name=None, pkg_name_list=None, pid_v2=None):
         try:
-            obj = cls.objects.get(sps_pkg_name=sps_pkg_name)            
-        except cls.MultipleObjectsReturned:
-            items = cls.objects.filter(sps_pkg_name=sps_pkg_name).order_by("-updated")
-            obj = items.first()
-            cls.delete_queryset(items.exclude(id=obj.id))
+            if not ppx_id:
+                raise ValueError("SPSPkg.get requires ppx_id")
+            obj = cls.search_by_ppx_id(ppx_id)
+            if obj:
+                return obj
+        except cls.DoesNotExist:
+            raise
+            # fix_sps_pkg_names foi executado antes, então não pesquisar por pkg_name_list
+        return cls.search_by_identifiers(
+            pid_v3=pid_v3, sps_pkg_name=sps_pkg_name, pkg_name_list=None, pid_v2=pid_v2
+        )
+
+    @classmethod
+    def _create_or_update(cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2, pkg_name_list, ppx_id):
+        try:
+            obj = cls.get(ppx_id, pid_v3, sps_pkg_name, pkg_name_list, pid_v2)
         except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
-            obj.sps_pkg_name = sps_pkg_name
+
+        # update
+        obj.sps_pkg_name = sps_pkg_name
         obj.pid_v3 = pid_v3
         obj.pid_v2 = pid_v2
         obj.registered_in_core = registered_in_core
         obj.updated_by = user
+        obj.ppx_id = ppx_id
         obj.save()
         return obj
 
