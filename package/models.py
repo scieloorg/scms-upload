@@ -539,6 +539,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
     @property
     def data(self):
         return dict(
+            sps_pkg_name=self.sps_pkg_name,
+            pid_v3=self.pid_v3,
+            pid_v2=self.pid_v2,
             is_complete=self.is_complete,
             registered_in_core=self.registered_in_core,
             valid_texts=self.valid_texts,
