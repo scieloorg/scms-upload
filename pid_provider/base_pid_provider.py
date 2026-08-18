@@ -83,6 +83,11 @@ class BasePidProvider:
         registered["apply_xml_changes"] = self.caller == "core" and registered.get(
             "xml_changed"
         )
+        if self.caller == "core":
+            try:
+                registered.pop("ppx_id")
+            except KeyError:
+                pass
         registered["xml_with_pre"] = xml_with_pre
         return registered
 
