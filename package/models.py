@@ -373,13 +373,31 @@ class SPSPkg(CommonControlField, ClusterableModel):
     def autocomplete_label(self):
         return f"{self.sps_pkg_name} {self.pid_v3}"
 
-    def fix_sps_pkg_name(self):
-        sps_pkg_name = self.xml_with_pre.sps_pkg_name
+    def fix_sps_pkg_name(self, save=False):
+        try:
+            sps_pkg_name = self.xml_with_pre.sps_pkg_name
+        except Exception as e:
+            return False
         if self.sps_pkg_name != sps_pkg_name:
             self.sps_pkg_name = sps_pkg_name
-            self.save()
+            if save:
+                self.save()
             return True
         return False
+
+    @classmethod
+    def fix_sps_pkg_names(cls, pid_v3, pid_v2, pkg_name_list, batch_size=200):
+        to_update = []
+        for item in cls.objects.filter(
+            Q(sps_pkg_name__in=pkg_name_list) |
+            Q(pid_v2=pid_v2, sps_pkg_name__isnull=True) |
+            Q(pid_v3=pid_v3, sps_pkg_name__isnull=True)
+        ):
+            if item.fix_sps_pkg_name():  # calcula mas não salva
+                to_update.append(item)
+        if to_update:
+            cls.objects.bulk_update(to_update, ["sps_pkg_name"], batch_size=batch_size)
+        return len(to_update)
 
     @property
     def xml_with_pre(self):
