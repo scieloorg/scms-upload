@@ -1000,29 +1000,115 @@ class SPSPkg(CommonControlField, ClusterableModel):
             return pub_date
         # em caso de data incompleta, tenta retornar a data completa, completando com 06 o mes ausente e com 15 o dia ausente
         return xml_with_pre.get_complete_publication_date()
-    
+
+    def add_ppx(self, user, save=False):
+        registered = pid_provider_app.is_registered_xml_zip(self.file.path)
+        try:
+            self.ppx_id = registered["ppx_id"]
+            self.updated_by = user
+            if save:
+                self.save()
+        except KeyError:
+            return registered 
+
     @classmethod
-    def complete_pid_v2(cls, user, sps_pkg_id_list=None):
+    def complete_ppx(cls, user, sps_pkg_id_list=None, pkg_name_substr=None, pid_v2_subst=None):
         filters = {
-            "pid_v2__isnull": True,
+            "ppx__isnull": True,
         }
+        qs = Q()
         if sps_pkg_id_list:
-            filters["id__in"] = sps_pkg_id_list
+            qs |= Q(id__in=sps_pkg_id_list)
+        if pkg_name_substr:
+            qs |= Q(sps_pkg_name__contains=pkg_name_substr)
+        if pid_v2_subst:
+            qs |= Q(pid_v2__contains=pid_v2_subst)
 
-        # 1. Buscamos os objetos (o select_related é essencial aqui para evitar o problema de N+1)
+        failures = []
+        success = []
         items_to_update = []
-        queryset = cls.objects.filter(**filters)
-
-        for item in queryset:
-            # 2. Atualizamos o valor na instância em memória
-            # Certifique-se de que o caminho 'sps_pkg.xml_with_pre.v2' está correto
+        for sps_pkg in cls.objects.filter(qs, **filters).iterator():
             try:
-                item.pid_v2 = item.xml_with_pre.v2
-                item.updated_by = user
-                items_to_update.append(item)
+                name = sps_pkg.sps_pkg_name
+                response = sps_pkg.add_ppx(user)
+                if sps_pkg.ppx_id:
+                    success.append(name)
+                    items_to_update.append(sps_pkg)
+                    continue
+                response["name"] = name
+                failures.append(response)
             except Exception:
-                pass
-
-        # 4. Salvamos tudo em uma única consulta ao banco
+                failures.append({
+                    "name": name,
+                    "response": traceback.format_exc(),
+                })
         if items_to_update:
-            cls.objects.bulk_update(items_to_update, ["pid_v2", "updated_by"], batch_size=100)
+            cls.objects.bulk_update(
+                items_to_update, ["ppx", "updated_by"], batch_size=100)
+        return {
+            "failures": failures,
+            "success": success,
+        }
+
+    @classmethod
+    def exclude_invalid_records(cls, user, issue_proc__pid):
+        try:
+            return cls._exclude_invalid_records(user, issue_proc__pid)
+        except Exception as e:
+            return {"error": str(e), "error_type": str(type(e)), "traceback": traceback.format_exc()}
+
+    @classmethod
+    def _exclude_invalid_records(cls, user, issue_pid):
+        total_deletado = 0
+        response = {}
+        exceptions = []
+        prefix_article_pid = f"S{issue_pid}"
+        sps_pkgs = cls.objects.filter(pid_v2__startswith=prefix_article_pid)
+        response["total_sps_pkgs"]= sps_pkgs.count()
+        # 1. Remoção por falta de ppx
+        to_delete = sps_pkgs.filter(ppx_id__isnull=True)
+        if to_delete:
+            try:
+                qtd_deleted, _ignored = cls.delete_related_items(to_delete)
+                response["total_deleted_due_to_missing_ppx"] = qtd_deleted
+                total_deletado += qtd_deleted
+                # consulta novamente
+                sps_pkgs = cls.objects.filter(pid_v2__startswith=prefix_article_pid)
+            except Exception as e:
+                exceptions.append({
+                    "action": "deleting due to missing ppx",
+                    "exception": traceback.format_exc()
+                })
+        # 2. Remoção por duplicidade
+        duplicated_items = []
+        multiple_values = (
+            sps_pkgs.values("ppx_id")
+            .annotate(total=Count("id"))
+            .filter(total__gt=1)
+            .values_list("ppx_id", flat=True)
+        )
+        for value in list(multiple_values or []):
+            try:
+                # Filtra os registros que possuem este valor específico duplicado
+                sps_pkgs_which_same_ppx = sps_pkgs.filter(ppx_id=value).order_by("-updated")
+                data = {"value": value, "total": sps_pkgs_which_same_ppx.count()}
+
+                keep = sps_pkgs_which_same_ppx.first()
+
+                # Executa a deleção e soma ao totalizador
+                qtd_deletada, _ignored = cls.delete_related_items(
+                    sps_pkgs_which_same_ppx.exclude(id=keep.id)
+                )
+                data["total_deleted"] = qtd_deletada
+                duplicated_items.append(data)
+                total_deletado += qtd_deletada
+            except Exception as e:
+                exceptions.append({
+                    "action": "removing duplicity",
+                    "item": value,
+                    "exception": traceback.format_exc()
+                })
+        response["total_deleted_items"] = total_deletado
+        response["exceptions"] = exceptions
+        response["duplicated_items"] = duplicated_items
+        return response
