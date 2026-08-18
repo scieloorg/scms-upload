@@ -2,7 +2,7 @@ import logging
 import mimetypes
 import os
 import sys
-import glob
+import traceback
 from io import BytesIO
 from shutil import copyfile
 from datetime import datetime
@@ -11,6 +11,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.core.files.base import ContentFile
 from django.db import models
+from django.db.models import Q, Count
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -33,6 +34,7 @@ from core.utils.file_utils import delete_files
 from files_storage.models import FileLocation, MinioConfiguration
 from package import choices
 from pid_provider.requester import PidRequester
+from pid_provider.models import PidProviderXML
 
 
 pid_provider_app = PidRequester()
@@ -47,6 +49,9 @@ class SPSPkgAddPidV3ToZipFileError(Exception):
 
 
 class AddPidV3ToXMLFileError(Exception):
+    ...
+
+class SPSPkgMultipleObjectReturnedException(Exception):
     ...
 
 
@@ -296,6 +301,12 @@ class SPSPkg(CommonControlField, ClusterableModel):
     # zip
     file = models.FileField(upload_to=pkg_directory_path, null=True, blank=True, max_length=150)
 
+    ppx = models.ForeignKey(
+        PidProviderXML,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
     # XML URI
     xml_uri = models.URLField(null=True, blank=True)
 
