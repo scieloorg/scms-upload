@@ -447,7 +447,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     panel_a = [
         FieldPanel("proc_status"),
-        FieldPanel("collections", read_only=True),
         FieldPanel("issn_electronic", read_only=True),
         FieldPanel("issn_print", read_only=True),
         FieldPanel("pub_year", read_only=True),
@@ -461,7 +460,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     ]
     panel_b = [
         AutocompletePanel("collections", read_only=True),
-        AutocompletePanel("current_version", read_only=True),
+        FieldPanel("current_version", read_only=True),
         InlinePanel("other_pid", label=_("Other PID")),
     ]
     panel_c = [
@@ -620,8 +619,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             "finger_print": self.current_version and self.current_version.finger_print,
             "created": self.created and self.created.isoformat(),
             "updated": self.updated and self.updated.isoformat(),
-            "record_status": "updated" if self.updated else "created",
+            "record_status": "updated" if self.updated != self.created else "created",
             "registered_in_core": self.registered_in_core,
+            "ppx_id": self.id
         }
         _data.update(self.get_readable_data())
         return _data
