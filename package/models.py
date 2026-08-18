@@ -617,18 +617,15 @@ class SPSPkg(CommonControlField, ClusterableModel):
         Solicita PID versão 3
 
         """
-        xml = None
         with TemporaryDirectory() as targetdir:
-            xml_zip_path = os.path.join(targetdir, os.path.basename(zip_xml_file_path))
             with ZipFile(zip_xml_file_path) as zipf_source:
                 for item in zipf_source.namelist():
-                    if item.endswith(".xml"):
-                        xml = item
-                        with ZipFile(xml_zip_path, "w", compression=ZIP_DEFLATED) as zipf_destination:
-                            zipf_destination.writestr(item, zipf_source.read(item))
-                        break
-            if xml:
-                return cls._add_pid_v3_to_zip(user, zip_xml_file_path, is_public, article_proc, xml_zip_path)
+                    if not item.endswith(".xml"):
+                        continue
+                    xml_zip_path = os.path.join(targetdir, os.path.basename(zip_xml_file_path))
+                    with ZipFile(xml_zip_path, "w", compression=ZIP_DEFLATED) as zipf_destination:
+                        zipf_destination.writestr(item, zipf_source.read(item))
+                    return cls._add_pid_v3_to_zip(user, zip_xml_file_path, is_public, article_proc, xml_zip_path)
 
     @classmethod
     def _add_pid_v3_to_zip(cls, user, zip_xml_file_path, is_public, article_proc, xml_zip_path):
@@ -652,12 +649,17 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
                 xml_with_pre = response.pop("xml_with_pre")
 
-                obj = cls._get_or_create(
+                pkg_name_list = xml_with_pre.pkg_name_variations
+                cls.fix_sps_pkg_names(response["v3"], response["v2"], pkg_name_list)
+
+                obj = cls._create_or_update(
                     user=user,
                     pid_v3=response["v3"],
-                    sps_pkg_name=response["pkg_name"],
+                    sps_pkg_name=response["sps_pkg_name"],
                     registered_in_core=response.get("registered_in_core"),
                     pid_v2=response["v2"],
+                    pkg_name_list=pkg_name_list,
+                    ppx_id=response.get("ppx_id")
                 )
 
                 if response.get("changed"):
@@ -672,9 +674,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             if operation:
+                response["traceback"] = traceback.format_exc()
                 operation.finish(
                     user,
-                    exc_traceback=exc_traceback,
                     exception=e,
                     detail=response,
                 )
