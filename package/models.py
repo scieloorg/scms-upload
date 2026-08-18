@@ -608,21 +608,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
             components=[item.data for item in self.components.all()],
         )
 
-    @classmethod
-    def is_registered_xml_zip(cls, zip_xml_file_path):
-        """
-        Check if zip_xml_file_path is registered
-        """
-        for item in pid_provider_app.is_registered_xml_zip(zip_xml_file_path):
-            pid_v3 = item.get("v3")
-            if pid_v3:
-                try:
-                    obj = cls.objects.get(pid_v3=pid_v3)
-                    item["synchronized"] = obj.registered_in_core
-                except cls.DoesNotExist:
-                    pass
-            yield item
-
     def fix_pid_v2(self, user, correct_pid_v2):
         return pid_provider_app.fix_pid_v2(user, self.pid_v3, correct_pid_v2)
 
