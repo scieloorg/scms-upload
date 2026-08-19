@@ -887,153 +887,117 @@ class Article(ClusterableModel, CommonControlField):
         )
 
     @classmethod
-    def exclude_invalid_records(cls, user, issue, sps_pkg_id_list, timeout=None):
+    def complete_sps_pkg_ppx(cls, user, issue):
+        """
+        Migra Article.pp_xml para Article.sps_pkg.ppx
+        """
+        articles = cls.objects.filter(
+            sps_pkg__ppx__isnull=True,
+            pp_xml_id__isnull=False,
+            issue=issue,
+        ).select_related("sps_pkg", "pp_xml")
+
+        sps_pkgs = []
+        for article in articles:
+            sps_pkg = article.sps_pkg
+            if not article.pp_xml.xml_with_pre:
+                # provavelmente xml nao encontrado
+                # sps_pkg.ppx_id = None -> executará sps_pkg.complete_sps_pkg_ppx
+                continue
+            sps_pkg.ppx_id = article.pp_xml_id
+            sps_pkg.updated_by = user
+            sps_pkgs.append(sps_pkg)
+
+        if sps_pkgs:
+            SPSPkg.objects.bulk_update(
+                sps_pkgs,
+                ["ppx_id", "updated_by"],
+                batch_size=100,
+            )
+
+    @classmethod
+    def exclude_invalid_records(cls, user, issue, timeout=None):
         try:
-            return cls._exclude_invalid_records(user, issue, sps_pkg_id_list, timeout)
+            return cls._exclude_invalid_records(user, issue, timeout)
         except Exception as e:
             return {"error": str(e), "error_type": str(type(e)), "traceback": traceback.format_exc()}
 
     @classmethod
-    def _exclude_invalid_records(cls, user, issue, sps_pkg_id_list, timeout=None):
+    def _exclude_invalid_records(cls, user, issue, timeout=None):
         total_deletado = 0
-        
-        # Estrutura exata solicitada por você
-        response = {
-            "sps_pkg_with_invalid_pid_v2": [],
-            "ppxml_invalid": [],
-            "repeated_sps_pkg__sps_pkg_name": [],
-            "repeated_pid_v2": [],
-            "deleted_ppxml_ids": [],
-            "deleted_sps_pkg_ids": [],
-            "deleted_article_ids": [],
-            "total_deleted_items": 0
-        }
-        ppxml_to_delete = set()
-        sps_pkg_to_delete = set()
-        
-        events = []
+        response = {}
         exceptions = []
-
-        qs = cls.objects.select_related("pp_xml", "sps_pkg").filter(issue=issue)
-        q = Q(sps_pkg__isnull=True)
-        if sps_pkg_id_list:
-            q |= Q(sps_pkg__id__in=sps_pkg_id_list)
-        
-        qs = qs.filter(q)
-        if qs.exists():
-            sps_pkg_names = []
-            for pp_xml_id, sps_pkg_name, sps_pkg_id in qs.values_list("pp_xml_id", "sps_pkg__sps_pkg_name", "sps_pkg_id"):
-                if pp_xml_id:
-                    ppxml_to_delete.add(pp_xml_id)
-                if sps_pkg_id:
-                    sps_pkg_to_delete.add(sps_pkg_id)
-                    sps_pkg_names.append(sps_pkg_name)
-            response["sps_pkg_with_invalid_pid_v2"] = sps_pkg_names
-            qtd_deleted, _ignored = cls.delete_queryset(qs)
-            total_deletado += qtd_deleted
-
-        # 1. Remoção por falta de pp_xml
-        qs = cls.objects.select_related("pp_xml").filter(issue=issue)
-        sps_pkg_names = []
-        article_ids = set()
-        for item in qs:
+        articles = cls.objects.filter(issue=issue)
+        response["total_articles"]= articles.count()
+        # 1. Remoção por falta de sps_pkg
+        to_delete = articles.filter(sps_pkg_id__isnull=True)
+        if to_delete:
             try:
-                xml_with_pre = item.pp_xml.xml_with_pre
-            except Exception:
-                article_ids.add(item.id)
-                if item.pp_xml:
-                    ppxml_to_delete.add(item.pp_xml.id)
-                if item.sps_pkg:
-                    sps_pkg_to_delete.add(item.sps_pkg.id)
-                    sps_pkg_names.append(item.sps_pkg.sps_pkg_name)
-        if article_ids:
-            response["ppxml_invalid"] = sps_pkg_names
-            qtd_deleted, _ignored = cls.delete_queryset(qs.filter(id__in=article_ids))
-            total_deletado += qtd_deleted
-
+                qtd_deleted, _ignored = cls.delete_related_items(to_delete)
+                response["total_deleted_due_to_missing_sps_pkg"] = qtd_deleted
+                total_deletado += qtd_deleted
+                # consulta novamente
+                articles = cls.objects.filter(issue=issue)
+            except Exception as e:
+                exceptions.append({
+                    "action": "deleting due to missing sps_pkg",
+                    "exception": traceback.format_exc()
+                })
         # 2. Remoção por duplicidade
-        for field_name in ("sps_pkg__sps_pkg_name", "pid_v2"):
-            response.setdefault(f"repeated_{field_name}", [])
-            qs = cls.objects.select_related("journal").filter(issue=issue)
-            
-            multiple_values = cls.get_repeated_values(field_name, qs)
-            
-            for value in list(multiple_values or []):
-                
+        duplicated_items = []
+        multiple_values = cls.get_repeated_values("sps_pkg_id", articles)
+        for value in list(multiple_values or []):
+            try:
                 # Filtra os registros que possuem este valor específico duplicado
-                duplicados = qs.filter(**{field_name: value}).order_by("-updated")
-                
-                if not duplicados.exists():
-                    continue
-                
-                # Define o fallback (mais recente) caso nenhum seja válido na API
-                keep = duplicados.first()
-                
-                for item in duplicados:
-                    try:
-                        item.create_or_update_article_collections(user)
-                        item.check_availability(user, force_update=True, timeout=timeout)
-                        for coll in item.article_collections:
-                            response = item.available_on_public_website(coll.collection)
-                            events.append(_("Checking {} is available. Result: {}").format(item, response))
-                            
-                            if response.get("valid"):
-                                keep = item
-                                break
-                    except Exception as e:
-                        exceptions.append(_("Checking {} is available. Result: {}").format(item, e))
-                
-                # Separa os que serão deletados
-                remover_qs = duplicados.exclude(id=keep.id)
-                
-                if remover_qs.exists():
-                    sps_pkg_names = []
-                    for pp_xml_id, sps_pkg_name, sps_pkg_id in remover_qs.values_list("pp_xml_id", "sps_pkg__sps_pkg_name", "sps_pkg_id"):
-                        if pp_xml_id:
-                            ppxml_to_delete.add(pp_xml_id)
-                        if sps_pkg_id:
-                            sps_pkg_to_delete.add(sps_pkg_id)
-                            sps_pkg_names.append(sps_pkg_name)
-                    
-                    # Alimenta a chave dinâmica: "repeated_sps_pkg_name" ou "repeated_pid_v2"
-                    response[f"repeated_{field_name}"].append((value, sps_pkg_names))
-                    
-                    # Executa a deleção e soma ao totalizador
-                    qtd_deletada, _ignored = cls.delete_queryset(remover_qs)
-                    total_deletado += qtd_deletada
+                articles_which_same_sps_pkg = articles.filter(sps_pkg_id=value).order_by("-updated")
 
-        # Se você precisar retornar o total_deletado junto com o dicionário, 
-        # pode adicioná-lo ao dicionário ou retornar uma tupla. 
-        # Como o seu esqueleto final pedia apenas o retorno do dicionário, mantive assim:
-        if ppxml_to_delete:
-            try:
-                PidProviderXML.objects.filter(id__in=ppxml_to_delete).delete()
-            except Exception as e:
-                exceptions.append(str(e))
-                PidProviderXML.objects.filter(
-                    id__in=ppxml_to_delete, 
-                ).update(proc_status=PPXML_STATUS_INVALID)
+                articles_which_same_sps_pkg_list = list(articles_which_same_sps_pkg)
+                data = {"value": value, "total": len(articles_which_same_sps_pkg_list)}
+                
+                result = Article.duplicated_item_to_keep(user, timeout, articles_which_same_sps_pkg_list)
+                data.update(result)
 
-        if sps_pkg_to_delete:
-            try:
-                SPSPkg.objects.filter(id__in=sps_pkg_to_delete).delete()
+                # Executa a deleção e soma ao totalizador
+                qtd_deletada, _ignored = cls.delete_related_items(
+                    articles_which_same_sps_pkg.exclude(id=result["keep"])
+                )
+                data["total_deleted"] = qtd_deletada
+                duplicated_items.append(data)
+                total_deletado += qtd_deletada
             except Exception as e:
-                exceptions.append(str(e))
-        
-        response["deleted_ppxml_ids"] = list(ppxml_to_delete)
-        response["deleted_sps_pkg_ids"] = list(sps_pkg_to_delete)
-        
-        qs = cls.objects.filter(Q(sps_pkg__isnull=True) | Q(pp_xml__isnull=True), issue=issue)
-        response["deleted_article_ids"] = list(qs.values_list("id", flat=True))
-        qtd_deleted, _ignored = cls.delete_queryset(qs)
-        total_deletado += qtd_deleted
-        
+                exceptions.append({
+                    "action": "removing duplicity",
+                    "item": value,
+                    "exception": traceback.format_exc()
+                })
         response["total_deleted_items"] = total_deletado
-        response["events"] = events
         response["exceptions"] = exceptions
+        response["duplicated_items"] = duplicated_items
         return response
 
- 
+    @staticmethod
+    def duplicated_item_to_keep(user, timeout, duplicated_items):
+        # Define o fallback (mais recente) caso nenhum seja válido na API
+        keep = duplicated_items[0]
+        exceptions = []
+        # Verifica a disponibilidade do artigo
+        for item in duplicated_items:
+            try:
+                item.create_or_update_article_collections(user)
+                item.check_availability(user, force_update=True, timeout=timeout)
+                for coll in item.article_collections.all():
+                    page_status = item.available_on_public_website(coll.collection)
+                    if page_status.get("valid"):
+                        keep = item
+                        break
+            except Exception as e:
+                exceptions.append({
+                    "item": str(item),
+                    "exception": traceback.format_exc()
+                })
+        return {"keep": keep.id, "exceptions": exceptions}
+
+
 # ============================================================
 # Article DOI / Title / RelatedItem / RequestChange
 # ============================================================
