@@ -307,8 +307,10 @@ class Article(ClusterableModel, CommonControlField):
     # ── get / dedup ──
 
     @classmethod
-    def get(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None):
+    def get(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, sps_pkg=None):
         params = {}
+        if sps_pkg:
+            params["sps_pkg"] = sps_pkg
         if pid_v2:
             params["pid_v2"] = pid_v2
         if pid_v3:
@@ -358,41 +360,41 @@ class Article(ClusterableModel, CommonControlField):
         if not xml_with_pre:
             raise ValueError(f"SPSPkg {sps_pkg} is missing xml_with_pre")
 
-        pid_v2 = xml_with_pre.v2
-        pid_v3 = sps_pkg.pid_v3
-        if not pid_v2:
-            raise ValueError(f"SPSPkg {sps_pkg} xml_with_pre is missing pid_v2")
-
         try:
-            obj = cls.get_first(sps_pkg.sps_pkg_name, pid_v2, pid_v3, delete=True)
+            obj = cls.get(sps_pkg=sps_pkg)
         except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
+            obj.sps_pkg = sps_pkg
+        except cls.MultipleObjectsReturned:
+            items = cls.objects.filter(sps_pkg=sps_pkg).order_by("-updated")
+            obj = items.first()
+            cls.delete_related_items(items.exclude(id=obj.id))
 
-        obj.pid_v3 = pid_v3
-        obj.pid_v2 = pid_v2
-        obj.sps_pkg = sps_pkg
+        obj.pid_v3 = sps_pkg.pid_v3
+        obj.pid_v2 = sps_pkg.pid_v2
         obj.article_type = xml_with_pre.xmltree.find(".").get("article-type")
 
         if journal:
             obj.journal = journal
         else:
-            obj.add_journal(user)
+            obj.add_journal(xml_with_pre)
         if issue:
             obj.issue = issue
         else:
-            obj.add_issue(user)
+            obj.add_issue(xml_with_pre)
 
         obj.status = obj.status or choices.AS_READY_TO_PUBLISH
-        obj.add_pages()
-        obj.add_position(position, xml_with_pre.fpage)
+        obj.add_pages(xml_with_pre)
         obj.add_article_publication_date()
         obj.add_pp_xml()
+        obj.add_position(position, xml_with_pre.fpage)
         obj.save()
 
-        obj.add_sections(user)
-        obj.add_article_titles(user)
+        obj.add_sections(user, xml_with_pre)
+        obj.add_article_titles(user, xml_with_pre)
         obj.add_doi_with_lang(user, xml_with_pre.article_doi_with_lang)
+        obj.add_position_in_table_of_contents()
         return obj
 
     # ── add_* helpers ──
