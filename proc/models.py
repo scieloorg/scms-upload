@@ -61,6 +61,10 @@ class NoDocumentRecordsToMigrateError(Exception):
     ...
 
 
+class ArticleProcSaveProcessedXMLError(Exception):
+    ...
+
+
 class Operation(CommonControlField):
     """
     Modelo que registra operações executadas durante o processamento.
@@ -2256,13 +2260,15 @@ class ArticleProc(BaseProc, ClusterableModel):
             detail["file_type"] = migrated_data.file_type
             if detail["file_type"] == "html":
                 xml_file_path = self.get_xml_from_html(user, detail)
-                xml_with_pre = None
+                xml_with_pre = list(
+                    XMLWithPre.create(path=xml_file_path)
+                )[0]
             else:
                 xml_with_pre = self.get_xml_from_native(detail)
                 xml_file_path = None
 
             self.save_processed_xml(
-                xml_with_pre, xml_file_path, detail,
+                xml_with_pre, detail,
                 migrated_document_publication_day,
             )
             self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -2343,24 +2349,26 @@ class ArticleProc(BaseProc, ClusterableModel):
             )
 
     def save_processed_xml(
-        self, xml_with_pre, xml_file_path, detail,
+        self, xml_with_pre, detail,
         migrated_document_publication_day,
     ):
         try:
-            if not xml_with_pre and xml_file_path:
-                xml_with_pre = list(
-                    XMLWithPre.create(path=xml_file_path)
-                )[0]
             if not xml_with_pre:
-                raise ValueError("No XML with pre to process")
+                raise ValueError("ArticleProc.save_processed_xml requires xml_with_pre")
+
+            # se necessario, completa xml_with_pre.v2
             if self.pid and xml_with_pre.v2 != self.pid:
                 xml_with_pre.v2 = self.pid
+
+            # se necessario, completa xml_with_pre.order
             order = str(int(self.pid[-5:]))
             if (
                 not xml_with_pre.order
                 or str(int(xml_with_pre.order)) != order
             ):
                 xml_with_pre.order = order
+
+            # se necessario, completa xml_with_pre.article_publication_date
             try:
                 article_date = xml_with_pre.article_publication_date
             except Exception:
@@ -2370,26 +2378,30 @@ class ArticleProc(BaseProc, ClusterableModel):
                     migrated_document_publication_day
                     or xml_with_pre.get_complete_publication_date()
                 )
+
+            # padroniza o nome do pacote
+            xml_with_pre.built_sps_pkg_name = xml_with_pre.build_sps_pkg_name()
+
+            # atualiza detalhe da operação
             detail.update(xml_with_pre.data)
+
             try:
+                # apagar arquivo atual para poupar espaço
                 os.unlink(self.processed_xml.path)
             except Exception:
                 pass
+
+            # o arquivo será gravado com o nome xml_with_pre.built_sps_pkg_name 
             self.processed_xml.save(
                 xml_with_pre.sps_pkg_name + ".xml",
                 ContentFile(xml_with_pre.tostring()),
                 save=False,
             )
         except Exception as e:
-            logging.exception(f"Exception: save_processed_xml: {e}")
-            raise XMLVersionXmlWithPreError(
+            raise ArticleProcSaveProcessedXMLError(
                 _(
-                    "Unable to get xml with pre from migrated article "
-                    "{}: {} {}"
-                ).format(
-                    xml_file_path or xml_with_pre.sps_pkg_name + ".xml",
-                    type(e), e,
-                )
+                    "Unable to save processed xml from {}: {}"
+                ).format(self.pkg_name, traceback.format_exc())
             )
 
     @classmethod
