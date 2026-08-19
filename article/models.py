@@ -674,46 +674,6 @@ class Article(ClusterableModel, CommonControlField):
             kwargs["sps_pkg__id__in"] = sps_pkg_list
         return cls.objects.filter(**kwargs)
 
-    @classmethod
-    def fix_sps_pkg_names(cls, items=None):
-        if not items:
-            items = cls.objects
-        items.filter(
-            sps_pkg__isnull=False,
-            issue__supplement__isnull=False,
-        ).select_related(
-            "sps_pkg", "pp_xml",
-        ).exclude(
-            Q(sps_pkg__sps_pkg_name__contains="-s"),
-        )
-
-        response = []
-        for item in items:
-            data = {}
-            try:
-                data["pid_v3"] = item.pid_v3
-                data["pid_v2"] = item.pid_v2
-                try:
-                    data["sps_pkg__pkg_name"] = item.sps_pkg.sps_pkg_name
-                    data["sps_pkg__pkg_name_fixed"] = item.fix_sps_pkg_name()
-                except Exception:
-                    data["sps_pkg__pkg_name_exception"] = traceback.format_exc()
-                try:
-                    data["pp_xml__pkg_name"] = item.pp_xml.pkg_name
-                    data["pp_xml__pkg_name_fixed"] = item.pp_xml.fix_pkg_name(
-                        data.get("sps_pkg__pkg_name")
-                    )
-                except Exception:
-                    data["pp_xml__pkg_name_exception"] = traceback.format_exc()
-            except Exception:
-                data["exception"] = traceback.format_exc()
-            response.append(data)
-        return response
-
-    def fix_sps_pkg_name(self):
-        if self.sps_pkg:
-            return self.sps_pkg.fix_sps_pkg_name()
-
     # ── ArticleCollection: ponto de entrada ──
 
     def create_or_update_article_collections(self, user, force_update=None):
