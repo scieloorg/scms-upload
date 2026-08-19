@@ -319,30 +319,12 @@ class Article(ClusterableModel, CommonControlField):
             params["sps_pkg__sps_pkg_name"] = sps_pkg_name
 
         if not params:
-            raise ValueError("Article.get requires pid_v3 or pid_v2 or sps_pkg_name")
+            raise ValueError("Article.get requires sps_pkg or spid_v3 or pid_v2 or sps_pkg_name")
         
         return cls.objects.get(**params)
-    
-    @classmethod
-    def get_first(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, delete=False):
-        q = Q()
-        if pid_v2:
-            q |= Q(pid_v2=pid_v2)
-        if sps_pkg_name:
-            q |= Q(sps_pkg__sps_pkg_name=sps_pkg_name)
-        qs = cls.objects.filter(q).order_by("-updated")
-        obj = qs.first()
-        if obj is None:
-            qs = cls.objects.filter(pid_v3=pid_v3).order_by("-updated")
-            obj = qs.first()
-            if obj is None:
-                raise cls.DoesNotExist            
-        if delete:
-            cls.delete_queryset(qs.exclude(pk=obj.pk))
-        return obj
 
     @classmethod
-    def delete_queryset(cls, qs):
+    def delete_related_items(cls, qs):
         ArticleDOIWithLang.objects.filter(article__in=qs).delete()
         ArticleTitle.objects.filter(parent__in=qs).delete()
         ArticleCollection.objects.filter(article__in=qs).delete()
@@ -798,7 +780,7 @@ class Article(ClusterableModel, CommonControlField):
 
         try:
             xmltree = self.sps_pkg.xml_with_pre.xmltree
-            contribs = xmltree.findall(
+            contribs = xmltree.xpath(
                 ".//front/article-meta/contrib-group/"
                 "contrib[@contrib-type='author']"
             )
