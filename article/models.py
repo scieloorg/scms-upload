@@ -430,7 +430,7 @@ class Article(ClusterableModel, CommonControlField):
         titles = ArticleTitles(
             xmltree=xml_with_pre.xmltree,
         ).article_title_list
-        self.title_with_lang.all().clear()
+        self.title_with_lang.clear()
         for title in titles:
             try:
                 language_code2 = title.get("language") or title.get("lang")
@@ -457,7 +457,7 @@ class Article(ClusterableModel, CommonControlField):
                 logging.exception(e)
 
     def add_sections(self, user, xml_with_pre):
-        self.sections.all().clear()
+        self.sections.clear()
 
         xml_sections = ArticleTocSections(
             xmltree=xml_with_pre.xmltree,
