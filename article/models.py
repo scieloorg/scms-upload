@@ -513,17 +513,19 @@ class Article(ClusterableModel, CommonControlField):
     def add_position(self, position=None, fpage=None):
         try:
             self.position = int(position or fpage)
-            return
         except (ValueError, TypeError):
-            pass
-        if not self.created:
-            self.save()
+            self.position = None
+
+    def add_position_in_table_of_contents(self):
+        if self.position:
+            return
         position = TocSection.get_section_position(self.issue, self.sections) or 0
         sections = [item.text for item in self.sections.all()]
         self.position = (
             position * 10000
             + Article.objects.filter(sections__text__in=sections).count()
         )
+        self.save()
 
     # ── display properties ──
 
