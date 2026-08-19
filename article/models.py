@@ -420,15 +420,13 @@ class Article(ClusterableModel, CommonControlField):
     def add_related_item(self, target_doi, target_article_type):
         self.save()
 
-    def add_pages(self):
-        xml_with_pre = self.sps_pkg.xml_with_pre
+    def add_pages(self, xml_with_pre):
         self.fpage = xml_with_pre.fpage
         self.fpage_seq = xml_with_pre.fpage_seq
         self.lpage = xml_with_pre.lpage
         self.elocation_id = xml_with_pre.elocation_id
 
-    def add_issue(self, user):
-        xml_with_pre = self.sps_pkg.xml_with_pre
+    def add_issue(self, xml_with_pre):
         self.issue = Issue.get(
             journal=self.journal,
             volume=xml_with_pre.volume,
@@ -436,8 +434,7 @@ class Article(ClusterableModel, CommonControlField):
             number=xml_with_pre.number,
         )
 
-    def add_journal(self, user):
-        xml_with_pre = self.sps_pkg.xml_with_pre
+    def add_journal(self, xml_with_pre):
         self.journal = Journal.get(
             official_journal=OfficialJournal.get(
                 issn_electronic=xml_with_pre.journal_issn_electronic,
