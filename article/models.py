@@ -472,20 +472,17 @@ class Article(ClusterableModel, CommonControlField):
             except Exception as e:
                 logging.exception(e)
 
-    def add_sections(self, user):
-        self.sections.all().delete()
+    def add_sections(self, user, xml_with_pre):
+        self.sections.all().clear()
 
         xml_sections = ArticleTocSections(
-            xmltree=self.sps_pkg.xml_with_pre.xmltree,
+            xmltree=xml_with_pre.xmltree,
         )
 
         items = xml_sections.article_section
         items.extend(xml_sections.sub_article_section)
 
-        try:
-            toc = TOC.objects.get(issue=self.issue)
-        except TOC.DoesNotExist:
-            toc = TOC.create_or_update(user, self.issue, ordered=False)
+        toc = TOC.create_or_update(user, self.issue, ordered=False)
 
         group = None
         for item in items:
