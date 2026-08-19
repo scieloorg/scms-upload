@@ -46,7 +46,7 @@ Organização hierárquica das tasks de migração e publicação:
 
   Utilitários:
     task_fetch_and_create_journal
-    task_exclude_invalid_issue_articles
+    task_fix_issue_articles
     task_remove_duplicate_issues
     task_check_main_article_page_availability
 """
@@ -68,6 +68,7 @@ from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from migration import controller
 from migration import choices as migration_choices
+from package.models import SPSPkg
 from proc.controller import (
     create_or_update_migrated_issue,
     create_or_update_migrated_journal,
@@ -1157,10 +1158,28 @@ def task_migrate_and_publish_articles_by_journal(
         total_to_process = 0
 
         issue_proc_and_related_article_proc_id_list = {}
+        mark_to_reproc_response = {}
         if issue_proc_id_list:
             task_exec.add_number("total issue_proc_id_list", len(issue_proc_id_list))
             selected_article_proc_items = []
+            mark_to_reproc_response = ArticleProc.mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect(
+                user,
+                journal_proc=journal_proc,
+                issue_proc_id_list=issue_proc_id_list,
+            )
+            task_exec.add_event({
+                "operation": "ArticleProc.mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect",
+                "response": mark_to_reproc_response,
+            })
         else:
+            mark_to_reproc_response = ArticleProc.mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect(
+                user,
+                journal_proc=journal_proc,
+            )
+            task_exec.add_event({
+                "operation": "ArticleProc.mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect",
+                "response": mark_to_reproc_response,
+            })
             selected_issue_procs = IssueProc.select_items(
                 journal_proc_id_list=[journal_proc_id],
                 force_migrate_document_records=force_migrate_document_records,
@@ -1202,7 +1221,7 @@ def task_migrate_and_publish_articles_by_journal(
         ) in issue_proc_and_related_article_proc_id_list.items():
             total_processed += 1
             # executa sincronamente a eliminação de registros ArticleProc e Article cujo conteúdo é defeituoso
-            response = task_exclude_invalid_issue_articles(
+            response = task_fix_issue_articles(
                 issue_proc_id=issue_proc_id,
                 username=username,
                 user_id=user_id,
@@ -1703,7 +1722,7 @@ def task_fetch_and_create_journal(
 
 
 @celery_app.task(bind=True)
-def task_exclude_invalid_issue_articles(
+def task_fix_issue_articles(
     self,
     issue_proc_id,
     username=None,
@@ -1712,12 +1731,36 @@ def task_exclude_invalid_issue_articles(
     public_api_data=None,
 ):
     """
-    Remove artigos duplicados e inconsistentes de um fascículo.
+    Corrige e remove artigos duplicados/inconsistentes de um fascículo.
 
-    Executa ``Article.fix_sps_pkg_names`` e ``Article.exclude_invalid_issue_articles``
-    para o fascículo associado ao ``IssueProc`` informado.
-    Chamada automaticamente por ``task_migrate_and_publish_articles_by_issue``
-    antes de iniciar a migração dos artigos.
+    Executa, para o fascículo associado ao ``IssueProc`` informado:
+    1. ``ArticleProc.complete_sps_pkg_ppx``, que completa o vínculo
+       ``sps_pkg.ppx`` dos ArticleProc do fascículo ainda sem PidProviderXML
+       associado.
+    2. ``Article.exclude_invalid_records``, que remove registros de Article
+       inválidos ou duplicados.
+
+    Chamada automaticamente por ``task_migrate_and_publish_articles_by_journal``
+    antes de iniciar a migração dos artigos do fascículo.
+
+    Parameters
+    ----------
+    issue_proc_id : int
+        ID do IssueProc cujo fascículo será processado.
+    username : str, optional
+        Nome do usuário que executa a tarefa (alternativa a user_id).
+    user_id : int, optional
+        ID do usuário que executa a tarefa (alternativa a username).
+    timeout : int, optional
+        Tempo limite passado para Article.exclude_invalid_records.
+    public_api_data : dict, optional
+        Não utilizado atualmente nesta implementação.
+
+    Returns
+    -------
+    list or dict
+        Lista de eventos ``{"operation": str, "response": dict}`` executados,
+        ou dict com detalhes de exceção em caso de falha.
     """
     try:
         detail = None
@@ -1727,13 +1770,34 @@ def task_exclude_invalid_issue_articles(
         )
         detail = []
         issue = issue_proc.issue
-        response = ArticleProc.exclude_invalid_items(user, issue)
-        detail.append({"operation": "ArticleProc.exclude_invalid_items", "response": response})
-        response = Article.exclude_invalid_records(user, issue, response.get("sps_pkg_id_list"), timeout=timeout)
-        detail.append({"operation": "Article.exclude_invalid_records", "response": response})
-        if response.get("deleted_sps_pkg_ids"):
-            response = ArticleProc.exclude_invalid_items(user, issue)
-            detail.append({"operation": "ArticleProc.exclude_invalid_items", "response": response})
+        # migra Article.pp_xml para Article.sps_pkg.ppx
+        response = Article.complete_sps_pkg_ppx(
+            user, issue)
+        detail.append({
+            "operation": "Article.complete_sps_pkg_ppx",
+            "response": response,
+        })
+        # completa ArticleProc.sps_pkg.ppx
+        response = ArticleProc.complete_sps_pkg_ppx(
+            user, issue_proc_id_list=[issue_proc_id])
+        detail.append({
+            "operation": "ArticleProc.complete_sps_pkg_ppx",
+            "response": response,
+        })
+        # exclue os SPSPkg cujos ppx is None ou que tem ppx duplicados (mantém 1)
+        response = SPSPkg.exclude_invalid_records(
+            user, issue_proc.pid)
+        detail.append({
+            "operation": "SPSPkg.exclude_invalid_records",
+            "response": response,
+        })
+        # exclue os Article cujos sps_pkg is None ou que tem sps_pkg duplicados (mantém 1)
+        response = Article.exclude_invalid_records(
+            user, issue, timeout=timeout)
+        detail.append({
+            "operation": "Article.exclude_invalid_records",
+            "response": response,
+        })
         return detail
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
