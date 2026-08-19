@@ -442,11 +442,11 @@ class Article(ClusterableModel, CommonControlField):
             ),
         )
 
-    def add_article_titles(self, user):
+    def add_article_titles(self, user, xml_with_pre):
         titles = ArticleTitles(
-            xmltree=self.sps_pkg.xml_with_pre.xmltree,
+            xmltree=xml_with_pre.xmltree,
         ).article_title_list
-        self.title_with_lang.all().delete()
+        self.title_with_lang.all().clear()
         for title in titles:
             try:
                 language_code2 = title.get("language") or title.get("lang")
