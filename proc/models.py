@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
-from django.db.models import Count, Q
+from django.db.models import Count, Q, F
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -2651,49 +2651,65 @@ class ArticleProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
-    def get_sps_pkg_ids_which_pid_v2_is_incorrect(cls, items=None, issue=None):
-        if issue and not items:
-            items = cls.objects.filter(
-                pid__isnull=False,
-                migrated_data__isnull=False,
-                sps_pkg__pid_v2__isnull=False,
-                issue_proc__issue=issue,
-            )
-        if not items.exists():
-            return set()
+    def mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect(
+        cls, user, journal_proc, issue_proc_id_list=None
+    ):
+        """
+        Marca para reprocessamento os ArticleProc cujo sps_pkg.pid_v2 está
+        preenchido mas não corresponde ao pid do ArticleProc (migrated_data.pid).
+        """
+        params = {}
+        if issue_proc_id_list:
+            params["issue_proc_id__in"] = issue_proc_id_list
+        elif journal_proc:
+            params["issue_proc__journal_proc"] = journal_proc
 
-        from django.db.models import F
-        return set(
-            items
-            .exclude(migrated_data__pid=F("sps_pkg__pid_v2"))
-            .values_list("sps_pkg_id", flat=True)
-        )
+        items = cls.objects.filter(
+            pid__isnull=False,
+            migrated_data__isnull=False,
+            sps_pkg__isnull=False,
+            **params,
+        ).exclude(migrated_data__pid=F("sps_pkg__pid_v2"))
+
+        marked_to_reproc = []
+        failures = {}
+        for item in items.iterator():
+            try:
+                item.updated_by = user
+                item.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
+                item.propagate_reproc_or_todo_status()
+                marked_to_reproc.append(item.pid)
+            except Exception:
+                failures[item.pid] = traceback.format_exc()
+
+        return {
+            "marked_to_reproc": marked_to_reproc,
+            "failures": failures,
+        }
 
     @classmethod
-    def exclude_invalid_items(cls, user, issue):
-        try:
-            # obtém sps_pkg_ids cujo pid_v2 não corresponde ao ArticleProc.pid
-            sps_pkg_id_list = cls.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
+    def complete_sps_pkg_ppx(
+        cls, user, journal_proc=None, issue_proc_id_list=None
+    ):
+        """
+        Completa sps_pkg.ppx (campo novo)
+        """
+        params = {}
+        if issue_proc_id_list:
+            params["issue_proc_id__in"] = issue_proc_id_list
+        elif journal_proc:
+            params["issue_proc__journal_proc"] = journal_proc
 
-            # completa sps_pkg.pid_v2 com os valores de sps_pkg.xml_with_pre.v2
-            SPSPkg.complete_pid_v2(user, sps_pkg_id_list=sps_pkg_id_list)
-
-            # obtém novamente sps_pkg_ids cujo pid_v2 não corresponde ao cls.pid
-            sps_pkg_id_list = cls.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
-
-            qs = cls.objects.filter(
-                Q(sps_pkg_id__in=sps_pkg_id_list)|Q(sps_pkg__isnull=True),
-                issue_proc__issue=issue,
-            )
-            items = qs.values("pid", "sps_pkg__sps_pkg_name")
-            qs.delete()
-            return {"sps_pkg_id_list": list(sps_pkg_id_list), "deleted": list(items)}
-        except Exception as e:
-            return {
-                "error": str(e),
-                "error_type": str(type(e)),
-                "traceback": traceback.format_exc()
-            }
+        sps_pkg_id_list = cls.objects.filter(
+            sps_pkg__ppx__isnull=True,
+            **params,
+        ).values_list("sps_pkg_id", flat=True)
+        return SPSPkg.complete_ppx(
+            user,
+            sps_pkg_id_list=sps_pkg_id_list,
+            pkg_name_substr=None,
+            pid_v2_subst=None,
+        )
 
     def update_sps_pkg_status(self):
         if self.sps_pkg:
