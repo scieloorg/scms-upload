@@ -655,7 +655,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 obj = cls._create_or_update(
                     user=user,
                     pid_v3=response["v3"],
-                    sps_pkg_name=response["sps_pkg_name"],
+                    sps_pkg_name=xml_with_pre.sps_pkg_name,
                     registered_in_core=response.get("registered_in_core"),
                     pid_v2=response["v2"],
                     pkg_name_list=pkg_name_list,
