@@ -2393,69 +2393,9 @@ class ArticleProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
-    def select_items_old(
-        cls,
-        qs=None,
-        collection_acron=None,
-        journal_acron=None,
-        issue_folder=None,
-        publication_year=None,
-        issue_proc_id=None,
-        journal_proc_id_list=None,
-        issue_proc_id_list=None,
-        exclude_issue_proc_id_list=None,
-        article_proc_id_list=None,
-        status_list=None,
-        force_update=False,
-        sps_pkg_id_list=None,
-    ):
-        status_list = tracker_choices.get_valid_status(status_list, force_update)
-        journal_proc_id_list = journal_proc_id_list or []
-        issue_proc_id_list = issue_proc_id_list or []
-        exclude_issue_proc_id_list = exclude_issue_proc_id_list or []
-
-        params = {}
-        if sps_pkg_id_list:
-            params["sps_pkg_id__in"] = sps_pkg_id_list
-        if collection_acron:
-            params["collection__acron"] = collection_acron
-        if journal_acron:
-            params["issue_proc__journal_proc__acron"] = journal_acron
-        if journal_proc_id_list:
-            params["issue_proc__journal_proc__id__in"] = journal_proc_id_list
-        if publication_year:
-            params["issue_proc__issue__publication_year"] = publication_year
-        if issue_folder:
-            params["issue_proc__issue_folder"] = issue_folder
-        if issue_proc_id:
-            params["issue_proc__id"] = issue_proc_id
-        if issue_proc_id_list:
-            params["issue_proc__id__in"] = issue_proc_id_list
-        if article_proc_id_list:
-            params["id__in"] = article_proc_id_list
-
-        qs_status = Q()
-        if status_list:
-            qs_status = (
-                Q(migration_status__in=status_list)
-                | Q(xml_status__in=status_list)
-                | Q(sps_pkg_status__in=status_list)
-                | Q(qa_ws_status__in=status_list)
-                | Q(public_ws_status__in=status_list)
-            )
-
-        qs = qs or cls.objects
-        qs = qs.filter(
-            qs_status,
-            **params,
-        )
-        if exclude_issue_proc_id_list:
-            return qs.exclude(issue_proc__id__in=exclude_issue_proc_id_list)
-        return qs
-
-    @classmethod
     def select_items(
         cls,
+        issue_proc_id=None,
         collection_acron_list=None,
         journal_acron_list=None,
         issue_folder=None,
@@ -2471,6 +2411,8 @@ class ArticleProc(BaseProc, ClusterableModel):
             params["collection__acron__in"] = collection_acron_list
         if journal_acron_list:
             params["issue_proc__journal_proc__acron__in"] = journal_acron_list
+        if issue_proc_id:
+            params["issue_proc_id"] = issue_proc_id
 
         qs_status = Q()
         if status_list:
