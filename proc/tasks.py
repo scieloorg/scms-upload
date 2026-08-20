@@ -998,7 +998,6 @@ def task_migrate_and_publish_articles(
         params=task_params,
     )
     try:
-        params = {}
         journal_acron_list = journal_acron_list or []
         if journal_acron:
             journal_acron_list += [journal_acron]
@@ -1006,36 +1005,17 @@ def task_migrate_and_publish_articles(
         if collection_acron:
             collection_acron_list += [collection_acron]
 
-        items_to_process = {}
         status = tracker_choices.get_valid_status(status, force_update)
 
-        if publication_year or issue_folder:
-            selected_issue_procs = IssueProc.select_items(
-                collection_acron_list=collection_acron_list,
-                journal_acron_list=journal_acron_list,
-                publication_year=publication_year,
-                issue_folder=issue_folder,
-                force_migrate_document_records=force_migrate_document_records,
-                force_migrate_document_files=force_migrate_document_files,
-                article_status_list=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
-            )
-            issue_proc_ids = selected_issue_procs.values_list(
-                "journal_proc_id", "journal_proc__acron", "id"
-            ).distinct()
-            for journal_proc_id, journal_acron, issue_proc_id in issue_proc_ids:
-                items_to_process.setdefault((journal_proc_id, journal_acron), []).append(
-                    issue_proc_id
-                )
-        else:
-            journal_proc_ids = JournalProc.select_items(
-                collection_acron_list=collection_acron_list,
-                journal_acron_list=journal_acron_list,
-                has_issue_proc=True,
-            ).values_list("id", "acron")
-            items_to_process = {
-                (journal_proc_id, journal_acron): None
-                for journal_proc_id, journal_acron in journal_proc_ids
-            }
+        items_to_process = ArticleProc.get_journal_and_issue_proc_ids(
+            collection_acron_list=collection_acron_list,
+            journal_acron_list=journal_acron_list,
+            publication_year=publication_year,
+            issue_folder=issue_folder,
+            force_migrate_document_records=force_migrate_document_records,
+            force_migrate_document_files=force_migrate_document_files,
+            status_list=status,
+        )
 
         total_journals_to_process = len(items_to_process)
         task_exec.add_number(
@@ -1060,6 +1040,11 @@ def task_migrate_and_publish_articles(
             kwargs["status"] = status
             
             total_processed += 1
+            task_exec.add_event({
+                "action": "scheduled task_migrate_and_publish_articles_by_journal",
+                "item": journal_acron,
+                "total_issues": len(items_to_process[key])
+            })
             task_migrate_and_publish_articles_by_journal.delay(**kwargs)
 
         task_exec.total_processed = total_processed
