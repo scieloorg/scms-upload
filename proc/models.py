@@ -2393,7 +2393,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
-    def select_items(
+    def select_items_old(
         cls,
         qs=None,
         collection_acron=None,
@@ -2452,6 +2452,74 @@ class ArticleProc(BaseProc, ClusterableModel):
         if exclude_issue_proc_id_list:
             return qs.exclude(issue_proc__id__in=exclude_issue_proc_id_list)
         return qs
+
+    @classmethod
+    def select_items(
+        cls,
+        collection_acron_list=None,
+        journal_acron_list=None,
+        issue_folder=None,
+        publication_year=None,
+        status_list=None,
+    ):
+        params = {}
+        if publication_year:
+            params["issue_proc__issue__publication_year"] = publication_year
+        if issue_folder:
+            params["issue_proc__issue_folder"] = issue_folder
+        if collection_acron_list:
+            params["collection__acron__in"] = collection_acron_list
+        if journal_acron_list:
+            params["issue_proc__journal_proc__acron__in"] = journal_acron_list
+
+        qs_status = Q()
+        if status_list:
+            qs_status = (
+                Q(migration_status__in=status_list)
+                | Q(xml_status__in=status_list)
+                | Q(sps_pkg_status__in=status_list)
+                | Q(qa_ws_status__in=status_list)
+                | Q(public_ws_status__in=status_list)
+            )
+
+        return cls.objects.filter(
+            qs_status,
+            **params,
+        )
+
+    @classmethod
+    def get_issue_proc_ids(
+        cls,
+        collection_acron_list=None,
+        journal_acron_list=None,
+        issue_folder=None,
+        publication_year=None,
+        status_list=None,
+        force_migrate_document_records=None,
+        force_migrate_document_files=None,
+    ):
+        article_issue_proc_id_list = set(
+            cls.select_items(
+                collection_acron_list=collection_acron_list,
+                journal_acron_list=journal_acron_list,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                status_list=status_list,
+            ).values_list("issue_proc_id", flat=True)
+        )
+        issue_proc_id_list = set(
+            IssueProc.select_items(
+                collection_acron_list=collection_acron_list,
+                journal_acron_list=journal_acron_list,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                article_status_list=status_list,
+                force_migrate_document_records=force_migrate_document_records,
+                force_migrate_document_files=force_migrate_document_files,
+            ).values_list("id", flat=True)
+        )
+        # uniao dos dois resultados
+        return issue_proc_id_list | article_issue_proc_id_list
 
     @classmethod
     def filter_by_status(cls, STATUS):
