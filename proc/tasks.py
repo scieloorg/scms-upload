@@ -1022,30 +1022,31 @@ def task_migrate_and_publish_articles(
             "total_journals_to_process", total_journals_to_process
         )
 
-        kwargs_ = {}
-        kwargs_.update(task_params)
-        kwargs_.pop("collection_acron_list", None)
-        kwargs_.pop("journal_acron_list", None)
-
         task_exec.total_to_process = total_journals_to_process
         total_processed = 0
-        for key in items_to_process.keys():
-            journal_proc_id, journal_acron = key
+        for (journal_proc_id, journal_acron), issue_proc_id_list in items_to_process.items():
 
-            kwargs = {}
-            kwargs.update(kwargs_)            
-            kwargs["journal_proc_id"] = journal_proc_id
-            kwargs["journal_acron"] = journal_acron
-            kwargs["issue_proc_id_list"] = items_to_process[key]
-            kwargs["status"] = status
-            
+            task_migrate_and_publish_articles_by_journal.delay(
+                user_id=user_id,
+                username=username,
+                collection_acron=collection_acron,
+                journal_acron=journal_acron,
+                journal_proc_id=journal_proc_id,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                issue_proc_id_list=list(issue_proc_id_list),
+                status=status,
+                force_update=force_update,
+                force_import_acron_id_file=force_import_acron_id_file,
+                force_migrate_document_records=force_migrate_document_records,
+                force_migrate_document_files=force_migrate_document_files,
+            )
             total_processed += 1
             task_exec.add_event({
                 "action": "scheduled task_migrate_and_publish_articles_by_journal",
                 "item": journal_acron,
-                "total_issues": len(items_to_process[key])
+                "total_issues": len(issue_proc_id_list)
             })
-            task_migrate_and_publish_articles_by_journal.delay(**kwargs)
 
         task_exec.total_processed = total_processed
         task_exec.finish()
