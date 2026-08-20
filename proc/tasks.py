@@ -1136,6 +1136,8 @@ def task_migrate_and_publish_articles_by_journal(
         fix_publication_status(journal_proc.collection)
         task_exec.update_total_status(("Updated publication status"))
 
+        # a partir de acron.id, cria ou atualiza JournalAcronIdFile e IdFileRecord,
+        # fonte para criar/atualizar ArticleProc
         response = controller.import_journal_acron_id_records(
             user,
             ArticleProc,
@@ -1172,7 +1174,7 @@ def task_migrate_and_publish_articles_by_journal(
             )
             task_exec.add_number("total issue_proc todo or reproc", len(issue_proc_id_list))
             selected_article_proc_items = (
-                ArticleProc.select_items(
+                ArticleProc.select_items_old(
                     journal_proc_id_list=[journal_proc_id],
                     exclude_issue_proc_id_list=issue_proc_id_list,
                     status_list=status,
@@ -1306,9 +1308,9 @@ def task_migrate_and_publish_articles_by_issue(
             task_exec.add_event({"operation": "migrate_document_files", "response": response})
             task_exec.update_total_status(("Created or updated Migrated file records"), issue_proc_id)
 
-            article_procs = ArticleProc.select_items(
+            article_procs = ArticleProc.select_items_old(
                 issue_proc_id_list=[issue_proc_id],
-                status_list=status,
+                status_list=tracker_choices.get_valid_status(status, force_update),
                 force_update=force_update,
             )
         total_articles_to_process = article_procs.count()
