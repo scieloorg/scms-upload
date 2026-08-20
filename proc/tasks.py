@@ -1025,7 +1025,7 @@ def task_migrate_and_publish_articles(
         task_exec.total_to_process = total_journals_to_process
         total_processed = 0
         for (journal_proc_id, journal_acron), issue_proc_id_list in items_to_process.items():
-
+            issue_proc_id_list = list(issue_proc_id_list)
             task_migrate_and_publish_articles_by_journal.delay(
                 user_id=user_id,
                 username=username,
@@ -1034,7 +1034,7 @@ def task_migrate_and_publish_articles(
                 journal_proc_id=journal_proc_id,
                 issue_folder=issue_folder,
                 publication_year=publication_year,
-                issue_proc_id_list=list(issue_proc_id_list),
+                issue_proc_id_list=issue_proc_id_list,
                 status=status,
                 force_update=force_update,
                 force_import_acron_id_file=force_import_acron_id_file,
@@ -1181,7 +1181,6 @@ def task_migrate_and_publish_articles_by_issue(
     user_id=None,
     username=None,
     issue_proc_id=None,
-    article_proc_id_list=None,
     status=None,
     force_update=False,
     force_migrate_document_records=False,
@@ -1202,7 +1201,6 @@ def task_migrate_and_publish_articles_by_issue(
         "user_id": user_id,
         "username": username,
         "issue_proc_id": issue_proc_id,
-        "article_proc_id_list": article_proc_id_list,
         "status": status,
         "force_update": force_update,
         "force_migrate_document_records": force_migrate_document_records,
@@ -1227,42 +1225,33 @@ def task_migrate_and_publish_articles_by_issue(
 
         task_exec.add_event(exclude_invalid_articles_response)
 
-        total_articles_to_process = 0
-        article_procs = None
-        if article_proc_id_list:
-            article_procs = ArticleProc.objects.select_related(
-                "issue_proc",
-            ).filter(id__in=article_proc_id_list)
-        else:
-            # cria ou atualiza ArticleProc
-            response = issue_proc.migrate_document_records(
-                user, force_migrate_document_records
-            )
-            task_exec.add_event({"operation": "migrate_document_records", "response": response})
-            task_exec.update_total_status(("Created or updated Article Processing records"), issue_proc_id)
+        # a partir do IdFileRecord, cria ou atualiza ArticleProc
+        response = issue_proc.migrate_document_records(
+            user, force_migrate_document_records
+        )
+        task_exec.add_event({"operation": "migrate_document_records", "response": response})
+        task_exec.update_total_status(("Created or updated Article Processing records"), issue_proc_id)
 
-            # cria ou atualiza MigratedFile
-            response = issue_proc.migrate_document_files(
-                user,
-                force_migrate_document_files,
-                controller.migrate_issue_files,
-            )
-            task_exec.add_event({"operation": "migrate_document_files", "response": response})
-            task_exec.update_total_status(("Created or updated Migrated file records"), issue_proc_id)
+        # cria ou atualiza MigratedFile
+        response = issue_proc.migrate_document_files(
+            user,
+            force_migrate_document_files,
+            controller.migrate_issue_files,
+        )
+        task_exec.add_event({"operation": "migrate_document_files", "response": response})
+        task_exec.update_total_status(("Created or updated Migrated file records"), issue_proc_id)
 
-            article_procs = ArticleProc.select_items_old(
-                issue_proc_id_list=[issue_proc_id],
-                status_list=tracker_choices.get_valid_status(status, force_update),
-                force_update=force_update,
-            )
-        total_articles_to_process = article_procs.count()
-        task_exec.total_to_process = total_articles_to_process
+        article_procs = ArticleProc.select_items(
+            issue_proc_id=issue_proc_id,
+            status_list=None if force_update else status,
+        )
+        task_exec.total_to_process = article_procs.count()
 
         total_processed = 0
         exceptions = {}
         for article_proc in article_procs:
             try:
-                # faz o fluxo completo do artigo: get_xml e cria sps_pkg
+                # executa get_xml, generate_sps_pkg, cria / atualiza Article
                 article = article_proc.migrate_article(user, force_update)
                 total_processed += 1
             except Exception as e:
