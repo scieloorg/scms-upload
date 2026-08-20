@@ -2488,7 +2488,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         )
 
     @classmethod
-    def get_issue_proc_ids(
+    def get_journal_and_issue_proc_ids(
         cls,
         collection_acron_list=None,
         journal_acron_list=None,
@@ -2498,16 +2498,33 @@ class ArticleProc(BaseProc, ClusterableModel):
         force_migrate_document_records=None,
         force_migrate_document_files=None,
     ):
-        article_issue_proc_id_list = set(
+        """
+        Retorna os IDs de JournalProc e IssueProc agrupados por periódico.
+
+        Realiza a busca combinada em ArticleProc e IssueProc aplicando os
+        filtros informados e agrupa os IDs de fascículos (issue_proc_id) em
+        um conjunto mapeado pela tupla identificadora do periódico
+        (journal_proc_id, journal_acron).
+
+        Returns:
+            dict: Dicionário no formato:
+                {
+                    (journal_proc_id, journal_acron): {issue_proc_id1, issue_proc_id2, ...},
+                    ...
+                }
+        """
+        list_from_article = set(
             cls.select_items(
                 collection_acron_list=collection_acron_list,
                 journal_acron_list=journal_acron_list,
                 issue_folder=issue_folder,
                 publication_year=publication_year,
                 status_list=status_list,
-            ).values_list("issue_proc_id", flat=True)
+            ).values_list(
+                "issue_proc__journal_proc_id", "issue_proc__journal_proc__acron", "issue_proc_id"
+            )
         )
-        issue_proc_id_list = set(
+        list_from_issue = set(
             IssueProc.select_items(
                 collection_acron_list=collection_acron_list,
                 journal_acron_list=journal_acron_list,
@@ -2516,10 +2533,17 @@ class ArticleProc(BaseProc, ClusterableModel):
                 article_status_list=status_list,
                 force_migrate_document_records=force_migrate_document_records,
                 force_migrate_document_files=force_migrate_document_files,
-            ).values_list("id", flat=True)
+            ).values_list(
+                "journal_proc_id", "journal_proc__acron", "id"
+            )
         )
-        # uniao dos dois resultados
-        return issue_proc_id_list | article_issue_proc_id_list
+        items_to_process = {}
+        items = list_from_issue | list_from_article
+        for journal_proc_id, journal_acron, issue_proc_id in items:
+            items_to_process.setdefault((journal_proc_id, journal_acron), set()).add(
+                issue_proc_id
+            )
+        return items_to_process
 
     @classmethod
     def filter_by_status(cls, STATUS):
