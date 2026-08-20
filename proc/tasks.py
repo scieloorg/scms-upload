@@ -1077,7 +1077,6 @@ def task_migrate_and_publish_articles_by_journal(
     publication_year=None,
     issue_folder=None,
     status=None,
-    valid_status=None,
     force_update=False,
     force_import_acron_id_file=False,
     force_migrate_document_records=False,
@@ -1111,10 +1110,10 @@ def task_migrate_and_publish_articles_by_journal(
     try:
         if not journal_proc_id:
             raise ValueError("journal_proc_id is required")
-
-        status = tracker_choices.get_valid_status(status, force_update)
         journal_proc = JournalProc.objects.get(id=journal_proc_id)
+
         user = _get_user(user_id, username)
+        status = tracker_choices.get_valid_status(status, force_update)
 
         task_exec.journal_proc_id = journal_proc_id
         task_exec.update_total_status(("Start"))
@@ -1142,53 +1141,10 @@ def task_migrate_and_publish_articles_by_journal(
             journal_proc.collection, "issue", "PUBLIC"
         )
         total_processed = 0
-        total_to_process = 0
+        total_to_process = len(issue_proc_id_list)
 
-        issue_proc_and_related_article_proc_id_list = {}
-        if issue_proc_id_list:
-            task_exec.add_number("total issue_proc_id_list", len(issue_proc_id_list))
-            selected_article_proc_items = []
-        else:
-            selected_issue_procs = IssueProc.select_items(
-                journal_proc_id_list=[journal_proc_id],
-                force_migrate_document_records=force_migrate_document_records,
-                force_migrate_document_files=force_migrate_document_files,
-                article_status_list=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
-            )
-            issue_proc_id_list = list(
-                selected_issue_procs.values_list("id", flat=True)
-            )
-            task_exec.add_number("total issue_proc todo or reproc", len(issue_proc_id_list))
-            selected_article_proc_items = (
-                ArticleProc.select_items_old(
-                    journal_proc_id_list=[journal_proc_id],
-                    exclude_issue_proc_id_list=issue_proc_id_list,
-                    status_list=status,
-                    force_update=force_update,
-                )
-                .values_list("issue_proc_id", "id")
-                .distinct()
-            )
-            task_exec.add_number("total articles todo or reproc", selected_article_proc_items.count())
-
-        issue_proc_and_related_article_proc_id_list = {
-            issue_proc_id: []
-            for issue_proc_id in (issue_proc_id_list or [])
-        }
-        if selected_article_proc_items:
-            for issue_proc_id, article_proc_id in selected_article_proc_items:
-                issue_proc_and_related_article_proc_id_list.setdefault(
-                    issue_proc_id, []
-                ).append(article_proc_id)
-
-        total_to_process = len(issue_proc_and_related_article_proc_id_list)
-        task_exec.add_number("total issue_proc todo or reproc", total_to_process)
-
-        for (
-            issue_proc_id,
-            article_proc_id_list,
-        ) in issue_proc_and_related_article_proc_id_list.items():
-            total_processed += 1
+        for issue_proc_id in issue_proc_id_list:
+            
             # executa sincronamente a eliminação de registros ArticleProc e Article cujo conteúdo é defeituoso
             response = task_exclude_invalid_issue_articles(
                 issue_proc_id=issue_proc_id,
@@ -1201,7 +1157,6 @@ def task_migrate_and_publish_articles_by_journal(
                 user_id=user_id,
                 username=username,
                 issue_proc_id=issue_proc_id,
-                article_proc_id_list=article_proc_id_list,
                 status=status,
                 force_update=force_update,
                 force_migrate_document_records=force_migrate_document_records,
@@ -1210,6 +1165,7 @@ def task_migrate_and_publish_articles_by_journal(
                 public_api_data=public_api_data,
                 exclude_invalid_articles_response=response,
             )
+            total_processed += 1
         task_exec.total_processed = total_processed
         task_exec.total_to_process = total_to_process
         task_exec.finish()
