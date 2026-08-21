@@ -13,7 +13,7 @@ from core.utils.requester import NonRetryableError, fetch_data
 def check_url(url, timeout=None):
     try:
         fetch_data(url, timeout=timeout or 2)
-    except NonRetryableError as e:
+    except Exception as e:
         return False
     else:
         return True
@@ -103,7 +103,10 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
             )
 
     def create_or_update_urls(self, user, website_url, timeout=None):
-        for url in self.article.get_urls(website_url):
+        urls = self.article.get_webpage_items(
+            website_url, purpose="QA"
+        )
+        for url in urls:
             ScieloURLStatus.create_or_update(
                 user=user,
                 article=self.article,
