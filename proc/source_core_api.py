@@ -24,6 +24,7 @@ from journal.models import (
     Sponsor,
     Subject,
 )
+from location.models import Location
 from pid_provider.models import PidProviderConfig
 from proc.exceptions import ProcBaseException
 from proc.models import IssueProc, JournalProc
@@ -290,19 +291,12 @@ def process_journal_result(
     )
 
     # Cria/atualiza o journal
-    try:
-        journal = Journal.get_registered(
-            journal_title=result.get("title"),
-            issn_electronic=official.get("issn_electronic"),
-            issn_print=official.get("issn_print"),
-        )
-    except Journal.DoesNotExist:
-        journal = Journal.create_or_update(
-            user=user,
-            official_journal=official_journal,
-            title=result.get("title"),
-            short_title=result.get("short_title"),
-        )
+    journal = Journal.create_or_update(
+        user=user,
+        official_journal=official_journal,
+        title=result.get("title"),
+        short_title=result.get("short_title"),
+    )
     journal.core_synchronized = False
     journal.contact_address = result.get("contact_address")
     journal.contact_name = result.get("contact_name")
@@ -313,6 +307,21 @@ def process_journal_result(
     journal.wos_areas = result.get("wos_areas", [])
     journal.logo_url = result.get("url_logo")
     journal.submission_online_url = result.get("submission_online_url")
+
+    # Processa location -> contact_location
+    loc_data = result.get("location") or {}
+    if loc_data:
+        city_name = loc_data.get("city_name")
+        country_name = loc_data.get("country_name")
+        if city_name or country_name:
+            contact_loc = Location.create_or_update(
+                user,
+                city_name=city_name,
+                state_name=loc_data.get("state_name"),
+                country_name=country_name,
+                country_acronym=loc_data.get("country_acronym"),
+            )
+            journal.contact_location = contact_loc
     journal.save()
 
     journal.journal_email.all().delete()
@@ -452,11 +461,9 @@ def process_journal_result(
     # TODO: Campos da API não processados ainda:
     # - copyright (array)
     # - table_of_contents (array)
-    # - location (object with city_name, state_name, country_name, etc.)
     # - text_language (array)
     # - title_in_database (array)
     # - crossmark_policy (array)
-    # - acronym (root level field)
     # - other_titles
 
     return journal
