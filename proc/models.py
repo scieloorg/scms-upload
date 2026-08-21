@@ -2678,8 +2678,8 @@ class ArticleProc(BaseProc, ClusterableModel):
 
         items = cls.objects.filter(
             pid__isnull=False,
-            migrated_data__isnull=False,
-            sps_pkg__isnull=False,
+            migrated_data_id__isnull=False,
+            sps_pkg_id__isnull=False,
             **params,
         ).exclude(migrated_data__pid=F("sps_pkg__pid_v2"))
 
@@ -2713,7 +2713,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             params["issue_proc__journal_proc"] = journal_proc
 
         sps_pkg_id_list = cls.objects.filter(
-            sps_pkg__ppx__isnull=True,
+            sps_pkg__ppx_id__isnull=True,
             **params,
         ).values_list("sps_pkg_id", flat=True)
         return SPSPkg.complete_ppx(
@@ -2722,6 +2722,132 @@ class ArticleProc(BaseProc, ClusterableModel):
             pkg_name_substr=None,
             pid_v2_subst=None,
         )
+
+    @classmethod
+    def exclude_invalid_records(
+        cls,
+        user,
+        issue_proc_id,
+        delete_article_proc_which_sps_pkg_is_missing=True,
+        delete_article_proc_which_is_duplicated=True,
+    ):
+        try:
+            return cls._exclude_invalid_records(
+                user,
+                issue_proc_id,
+                delete_article_proc_which_sps_pkg_is_missing,
+                delete_article_proc_which_is_duplicated,
+            )
+        except Exception as e:
+            return {"error": str(e), "error_type": str(type(e)), "traceback": traceback.format_exc()}
+
+    @classmethod
+    def _exclude_invalid_records(
+        cls,
+        user,
+        issue_proc_id,
+        delete_article_proc_which_sps_pkg_is_missing=True,
+        delete_article_proc_which_is_duplicated=True,
+    ):
+        total_deletado = 0
+        response = {}
+        exceptions = []
+        article_procs = cls.objects.filter(issue_proc_id=issue_proc_id)
+        response["total_article_procs"]= article_procs.count()
+        response["params"] = {
+            "delete_article_proc_which_sps_pkg_is_missing": delete_article_proc_which_sps_pkg_is_missing,
+            "delete_article_proc_which_is_duplicated": delete_article_proc_which_is_duplicated,            
+        }
+
+        if delete_article_proc_which_sps_pkg_is_missing:
+            # 1. Remoção por falta de sps_pkg
+            to_delete = article_procs.filter(sps_pkg_id__isnull=True)
+            if to_delete:
+                try:
+                    qtd_deleted, _ignored = cls.delete_related_items(to_delete)
+                    response["total_delete_article_proc_which_sps_pkg_is_missing"] = qtd_deleted
+                    total_deletado += qtd_deleted
+                    # consulta novamente
+                    article_procs = cls.objects.filter(
+                        issue_proc_id=issue_proc_id,
+                        sps_pkg_id__isnull=False,
+                    )
+                except Exception as e:
+                    exceptions.append({
+                        "action": "deleting due to missing sps_pkg",
+                        "exception": traceback.format_exc()
+                    })
+
+        if delete_article_proc_which_is_duplicated:
+            # 2. Remoção por duplicidade
+            results = []
+            multiple_values = (
+                article_procs
+                .filter(sps_pkg_id__isnull=True)
+                .annotate(total=Count("id"))
+                .filter(total__gt=1)
+                .values_list("sps_pkg_id", flat=True)
+            )
+            total_delete_article_proc_which_is_duplicated = 0
+            for value in list(multiple_values or []):
+                data, error = cls.process_duplicated_sps_pkg(value, article_procs)
+                if data:
+                    results.append(data)
+                    total_delete_article_proc_which_is_duplicated += data["total_deleted"]
+                elif error:
+                    exceptions.append(error)
+            response["results"] = results
+            total_deletado += total_delete_article_proc_which_is_duplicated
+            response["total_delete_article_proc_which_is_duplicated"] = total_delete_article_proc_which_is_duplicated
+        response["total_deleted_items"] = total_deletado
+        response["exceptions"] = exceptions
+        return response
+
+    @classmethod
+    def process_duplicated_sps_pkg(cls, value, article_procs):
+        """
+        Processa e remove duplicadas para um determinado `sps_pkg_id` (value).
+        Retorna uma tupla contendo (data_dict, exception_dict).
+        """
+        try:
+            data = {
+                "value": value,
+            }
+
+            # Filtra os registros que possuem este valor específico duplicado
+            duplicated_items = article_procs.filter(sps_pkg_id=value)
+            data["total"] = duplicated_items.count()
+
+            duplicated_items_has_not_article = duplicated_items.filter(
+                sps_pkg__article__isnull=True
+            )
+            total_has_not_article = duplicated_items_has_not_article.count()
+            data["total_has_not_article"] = total_has_not_article
+
+            duplicated_items_has_article = duplicated_items.filter(
+                sps_pkg__article__isnull=False
+            )
+            total_has_article = duplicated_items_has_article.count()
+            data["total_has_article"] = total_has_article
+
+            if total_has_article:
+                keep = duplicated_items_has_article.order_by("-updated").first()
+                to_delete = duplicated_items.exclude(id=keep.id)
+            else:
+                to_delete = duplicated_items
+
+            # Executa a deleção
+            qtd_deletada, _ignored = cls.delete_related_items(to_delete)
+            data["total_deleted"] = qtd_deletada
+            return data, None
+
+        except Exception as e:
+            exception_data = {
+                "action": "removing duplicity",
+                "value": value,
+                "exception": traceback.format_exc(),
+            }
+            return None, exception_data
 
     def update_sps_pkg_status(self):
         if self.sps_pkg:
