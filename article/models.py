@@ -852,8 +852,8 @@ class Article(ClusterableModel, CommonControlField):
         Migra Article.pp_xml para Article.sps_pkg.ppx
         """
         articles = cls.objects.filter(
-            sps_pkg__isnull=False,
-            sps_pkg__ppx__isnull=True,
+            sps_pkg_id__isnull=False,
+            sps_pkg__ppx_id__isnull=True,
             pp_xml_id__isnull=False,
             issue=issue,
         ).select_related("sps_pkg", "pp_xml")
@@ -877,63 +877,94 @@ class Article(ClusterableModel, CommonControlField):
             )
 
     @classmethod
-    def exclude_invalid_records(cls, user, issue, timeout=None):
+    def exclude_invalid_records(
+        cls,
+        user,
+        issue,
+        delete_article_which_sps_pkg_is_missing=True,
+        delete_article_which_is_duplicated=True,
+         timeout=None,
+    ):
         try:
-            return cls._exclude_invalid_records(user, issue, timeout)
+            return cls._exclude_invalid_records(
+                user,
+                issue,
+                delete_article_which_sps_pkg_is_missing,
+                delete_article_which_is_duplicated,
+                timeout,
+            )
         except Exception as e:
             return {"error": str(e), "error_type": str(type(e)), "traceback": traceback.format_exc()}
 
     @classmethod
-    def _exclude_invalid_records(cls, user, issue, timeout=None):
+    def _exclude_invalid_records(
+        cls,
+        user,
+        issue,
+        delete_article_which_sps_pkg_is_missing=True,
+        delete_article_which_is_duplicated=True,
+        timeout=None,
+    ):
         total_deletado = 0
         response = {}
         exceptions = []
         articles = cls.objects.filter(issue=issue)
         response["total_articles"]= articles.count()
-        # 1. Remoção por falta de sps_pkg
-        to_delete = articles.filter(sps_pkg_id__isnull=True)
-        if to_delete:
-            try:
-                qtd_deleted, _ignored = cls.delete_related_items(to_delete)
-                response["total_deleted_due_to_missing_sps_pkg"] = qtd_deleted
-                total_deletado += qtd_deleted
-                # consulta novamente
-                articles = cls.objects.filter(issue=issue)
-            except Exception as e:
-                exceptions.append({
-                    "action": "deleting due to missing sps_pkg",
-                    "exception": traceback.format_exc()
-                })
-        # 2. Remoção por duplicidade
-        duplicated_items = []
-        multiple_values = cls.get_repeated_values("sps_pkg_id", articles)
-        for value in list(multiple_values or []):
-            try:
-                # Filtra os registros que possuem este valor específico duplicado
-                articles_which_same_sps_pkg = articles.filter(sps_pkg_id=value).order_by("-updated")
+        response["params"] = {
+            "delete_article_which_sps_pkg_is_missing": delete_article_which_sps_pkg_is_missing,
+            "delete_article_which_is_duplicated": delete_article_which_is_duplicated,            
+        }
 
-                articles_which_same_sps_pkg_list = list(articles_which_same_sps_pkg)
-                data = {"value": value, "total": len(articles_which_same_sps_pkg_list)}
-                
-                result = Article.duplicated_item_to_keep(user, timeout, articles_which_same_sps_pkg_list)
-                data.update(result)
+        if delete_article_which_sps_pkg_is_missing:
+            # 1. Remoção por falta de sps_pkg
+            to_delete = articles.filter(sps_pkg_id__isnull=True)
+            if to_delete:
+                try:
+                    qtd_deleted, _ignored = cls.delete_related_items(to_delete)
+                    response["total_delete_article_which_sps_pkg_is_missing"] = qtd_deleted
+                    total_deletado += qtd_deleted
+                    # consulta novamente
+                    articles = cls.objects.filter(issue=issue, sps_pkg_id__isnull=False)
+                except Exception as e:
+                    exceptions.append({
+                        "action": "deleting due to missing sps_pkg",
+                        "exception": traceback.format_exc()
+                    })
 
-                # Executa a deleção e soma ao totalizador
-                qtd_deletada, _ignored = cls.delete_related_items(
-                    articles_which_same_sps_pkg.exclude(id=result["keep"])
-                )
-                data["total_deleted"] = qtd_deletada
-                duplicated_items.append(data)
-                total_deletado += qtd_deletada
-            except Exception as e:
-                exceptions.append({
-                    "action": "removing duplicity",
-                    "item": value,
-                    "exception": traceback.format_exc()
-                })
+        if delete_article_which_is_duplicated:
+            # 2. Remoção por duplicidade
+            duplicated_items = []
+            multiple_values = cls.get_repeated_values("sps_pkg_id", articles)
+            total_delete_article_which_is_duplicated = 0
+            for value in list(multiple_values or []):
+                try:
+                    # Filtra os registros que possuem este valor específico duplicado
+                    articles_which_same_sps_pkg = articles.filter(sps_pkg_id=value).order_by("-updated")
+
+                    articles_which_same_sps_pkg_list = list(articles_which_same_sps_pkg)
+                    data = {"value": value, "total": len(articles_which_same_sps_pkg_list)}
+                    
+                    result = Article.duplicated_item_to_keep(user, timeout, articles_which_same_sps_pkg_list)
+                    data.update(result)
+
+                    # Executa a deleção e soma ao totalizador
+                    qtd_deletada, _ignored = cls.delete_related_items(
+                        articles_which_same_sps_pkg.exclude(id=result["keep"])
+                    )
+                    total_delete_article_which_is_duplicated += qtd_deletada
+                    data["total_deleted"] = qtd_deletada
+                    duplicated_items.append(data)
+                except Exception as e:
+                    exceptions.append({
+                        "action": "removing duplicity",
+                        "item": value,
+                        "exception": traceback.format_exc()
+                    })
+            response["duplicated_items"] = duplicated_items
+            total_deletado += total_delete_article_which_is_duplicated
+            response["total_delete_article_which_is_duplicated"] = total_delete_article_which_is_duplicated
         response["total_deleted_items"] = total_deletado
         response["exceptions"] = exceptions
-        response["duplicated_items"] = duplicated_items
         return response
 
     @staticmethod
