@@ -1031,7 +1031,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         if not sps_pkg_id_list and not pkg_name_substr and not pid_v2_subst:
             raise ValueError("SPSPkg.complete_ppx requires sps_pkg_id_list or pkg_name_substr or pid_v2_subst")
         filters = {
-            "ppx__isnull": True,
+            "ppx_id__isnull": True,
         }
         qs = Q()
         if sps_pkg_id_list:
@@ -1068,64 +1068,91 @@ class SPSPkg(CommonControlField, ClusterableModel):
         }
 
     @classmethod
-    def exclude_invalid_records(cls, user, issue_proc__pid):
+    def exclude_invalid_records(
+        cls,
+        user,
+        issue_proc_pid,
+        delete_sps_pkg_which_ppx_is_missing,
+        delete_sps_pkg_which_is_duplicated,
+    ):
         try:
-            return cls._exclude_invalid_records(user, issue_proc__pid)
+            return cls._exclude_invalid_records(
+                user,
+                issue_proc_pid,
+                delete_sps_pkg_which_ppx_is_missing,
+                delete_sps_pkg_which_is_duplicated,
+            )
         except Exception as e:
             return {"error": str(e), "error_type": str(type(e)), "traceback": traceback.format_exc()}
 
     @classmethod
-    def _exclude_invalid_records(cls, user, issue_pid):
+    def _exclude_invalid_records(
+        cls,
+        user,
+        issue_pid,
+        delete_sps_pkg_which_ppx_is_missing,
+        delete_sps_pkg_which_is_duplicated,
+    ):
         total_deletado = 0
         response = {}
         exceptions = []
         prefix_article_pid = f"S{issue_pid}"
         sps_pkgs = cls.objects.filter(pid_v2__startswith=prefix_article_pid)
         response["total_sps_pkgs"]= sps_pkgs.count()
-        # 1. Remoção por falta de ppx
-        to_delete = sps_pkgs.filter(ppx_id__isnull=True)
-        if to_delete:
-            try:
-                qtd_deleted, _ignored = cls.delete_related_items(to_delete)
-                response["total_deleted_due_to_missing_ppx"] = qtd_deleted
-                total_deletado += qtd_deleted
-                # consulta novamente
-                sps_pkgs = cls.objects.filter(pid_v2__startswith=prefix_article_pid)
-            except Exception as e:
-                exceptions.append({
-                    "action": "deleting due to missing ppx",
-                    "exception": traceback.format_exc()
-                })
-        # 2. Remoção por duplicidade
-        duplicated_items = []
-        multiple_values = (
-            sps_pkgs.values("ppx_id")
-            .annotate(total=Count("id"))
-            .filter(total__gt=1)
-            .values_list("ppx_id", flat=True)
-        )
-        for value in list(multiple_values or []):
-            try:
-                # Filtra os registros que possuem este valor específico duplicado
-                sps_pkgs_which_same_ppx = sps_pkgs.filter(ppx_id=value).order_by("-updated")
-                data = {"value": value, "total": sps_pkgs_which_same_ppx.count()}
+        response["params"] = {
+            "delete_sps_pkg_which_ppx_is_missing": delete_sps_pkg_which_ppx_is_missing,
+            "delete_sps_pkg_which_is_duplicated": delete_sps_pkg_which_is_duplicated,            
+        }
 
-                keep = sps_pkgs_which_same_ppx.first()
+        if delete_sps_pkg_which_ppx_is_missing:
+            # 1. Remoção por falta de ppx
+            to_delete = sps_pkgs.filter(ppx_id__isnull=True)
+            if to_delete:
+                try:
+                    qtd_deleted, _ignored = cls.delete_related_items(to_delete)
+                    response["total_delete_sps_pkg_which_ppx_is_missing"] = qtd_deleted
+                    total_deletado += qtd_deleted
+                    # consulta novamente
+                    sps_pkgs = cls.objects.filter(pid_v2__startswith=prefix_article_pid)
+                except Exception as e:
+                    exceptions.append({
+                        "action": "deleting due to missing ppx",
+                        "exception": traceback.format_exc()
+                    })
+        if delete_sps_pkg_which_is_duplicated:
+            # 2. Remoção por duplicidade
+            duplicated_items = []
+            multiple_values = (
+                sps_pkgs.values("ppx_id")
+                .annotate(total=Count("id"))
+                .filter(total__gt=1)
+                .values_list("ppx_id", flat=True)
+            )
+            total_delete_sps_pkg_which_is_duplicated = 0
+            for value in list(multiple_values or []):
+                try:
+                    # Filtra os registros que possuem este valor específico duplicado
+                    sps_pkgs_which_same_ppx = sps_pkgs.filter(ppx_id=value).order_by("-updated")
+                    data = {"value": value, "total": sps_pkgs_which_same_ppx.count()}
 
-                # Executa a deleção e soma ao totalizador
-                qtd_deletada, _ignored = cls.delete_related_items(
-                    sps_pkgs_which_same_ppx.exclude(id=keep.id)
-                )
-                data["total_deleted"] = qtd_deletada
-                duplicated_items.append(data)
-                total_deletado += qtd_deletada
-            except Exception as e:
-                exceptions.append({
-                    "action": "removing duplicity",
-                    "item": value,
-                    "exception": traceback.format_exc()
-                })
+                    keep = sps_pkgs_which_same_ppx.first()
+
+                    # Executa a deleção e soma ao totalizador
+                    qtd_deletada, _ignored = cls.delete_related_items(
+                        sps_pkgs_which_same_ppx.exclude(id=keep.id)
+                    )
+                    data["total_deleted"] = qtd_deletada
+                    duplicated_items.append(data)
+                    total_delete_sps_pkg_which_is_duplicated += qtd_deletada
+                except Exception as e:
+                    exceptions.append({
+                        "action": "removing duplicity",
+                        "item": value,
+                        "exception": traceback.format_exc()
+                    })
+            response["total_delete_sps_pkg_which_is_duplicated"] = total_delete_sps_pkg_which_is_duplicated
+            response["exceptions"] = exceptions
+            response["duplicated_items"] = duplicated_items
+            total_deletado += total_delete_sps_pkg_which_is_duplicated
         response["total_deleted_items"] = total_deletado
-        response["exceptions"] = exceptions
-        response["duplicated_items"] = duplicated_items
         return response
