@@ -170,34 +170,24 @@ class OfficialJournal(CommonControlField):
 
     @classmethod
     def get(cls, issn_print=None, issn_electronic=None, issnl=None, title=None):
-        params = {}
+        issns = []
         if issn_electronic:
-            params["issn_electronic"] = issn_electronic
+            issns.append(issn_electronic)
         if issn_print:
-            params["issn_print"] = issn_print
+            issns.append(issn_print)
         if issnl:
-            params["issnl"] = issnl
-        if not params:
+            issns.append(issnl)
+            
+        if not issns:
             raise ValueError(
                 f"OfficialJournal.get requires issn_print, issn_electronic, issnl"
             )
 
+        qs = Q(issnl__in=issns) | Q(issn_electronic__in=issns) | Q(issn_print__in=issns)
         try:
-            return cls.objects.get(**params)
+            return cls.objects.get(qs)
         except cls.MultipleObjectsReturned:
-            return cls.objects.filter(**params).order_by("-updated").first()
-        except cls.DoesNotExist:
-            qs = Q()
-            if issn_electronic:
-                qs |= Q(issn_electronic=issn_electronic)
-            if issn_print:
-                qs |= Q(issn_print=issn_print)
-            if issnl:
-                qs |= Q(issnl=issnl)
-            obj = cls.objects.filter(qs).order_by("-updated").first()
-            if not obj:
-                raise
-            return obj
+            return cls.objects.filter(qs).order_by("-updated").first()
 
     @classmethod
     def create_or_update(
