@@ -852,6 +852,7 @@ class Article(ClusterableModel, CommonControlField):
         Migra Article.pp_xml para Article.sps_pkg.ppx
         """
         articles = cls.objects.filter(
+            sps_pkg__isnull=False,
             sps_pkg__ppx__isnull=True,
             pp_xml_id__isnull=False,
             issue=issue,
