@@ -437,29 +437,32 @@ class SPSPkg(CommonControlField, ClusterableModel):
     @classmethod
     def delete_related_items(cls, qs):
         SPSPkgComponent.objects.filter(sps_pkg__in=qs).delete()
-        qs.delete()
+        return qs.delete()
 
     def set_registered_in_core(self, value):
         PidRequester.set_registered_in_core(self.pid_v3, value)
 
     @classmethod
     def search_by_ppx_id(cls, ppx_id):
-        """
-        Return SPSPkg, None
-
-        Raises cls.DoesNotExist
-        """
         try:
             return cls.objects.get(ppx_id=ppx_id)
         except cls.MultipleObjectsReturned:
-            return cls.objects.filter(ppx_id=ppx_id).order_by("-updated").first()
-        except cls.DoesNotExist:
-            if not cls.objects.filter(ppx_id__isnull=True).exists():
-                raise cls.DoesNotExist
-            return None
+            return (
+                cls.objects
+                .filter(ppx_id=ppx_id)
+                .order_by("-updated")
+                .first()
+            )
 
     @classmethod
-    def search_by_identifiers(cls, pid_v3=None, sps_pkg_name=None, pkg_name_list=None, pid_v2=None):
+    def search_by_identifiers(
+        cls,
+        pid_v3=None,
+        sps_pkg_name=None,
+        pkg_name_list=None,
+        pid_v2=None,
+        queryset=None,
+    ):
         qs = Q()
         params = {}
         if pid_v3:
@@ -476,44 +479,56 @@ class SPSPkg(CommonControlField, ClusterableModel):
             qs |= Q(sps_pkg_name__in=pkg_name_list)
 
         if not params:
-            raise ValueError("SPSPkg.get requires at least one of pid_v3, sps_pkg_name, pkg_name_list, pid_v2")
+            raise ValueError(
+                "SPSPkg.get requires at least one of "
+                "pid_v3, sps_pkg_name, pkg_name_list, pid_v2"
+            )
 
-        items = cls.objects.filter(qs)
+        if queryset is None:
+            queryset = cls.objects
+
+        items = queryset.filter(qs)
         found = list(items)
         if not found:
             raise cls.DoesNotExist
         if len(found) == 1:
             return found[0]
 
-        ids_1 = set(items.values_list("id", flat=True))
-        ids_2 = set(cls.objects.filter(**params).values_list("id", flat=True))
-        print((params, ids_1, ids_2))
-        if ids_1 == ids_2:
-            # todos os encontrados tem a mesma identificação, então retorna o mais recente
+        ids_found_by_any_identifier = set(
+            items.values_list("id", flat=True)
+        )
+        ids_found_by_all_identifiers = set(
+            queryset.filter(**params).values_list("id", flat=True)
+        )
+
+        if ids_found_by_any_identifier == ids_found_by_all_identifiers:
             return items.order_by("-updated").first()
-        # possíveis causas de multiplicidade:
-        # - defeitos nos metadados que foram o nome do pacote
-        # - defeitos no pid provider
-        # - multiplicidade nos pid v2 (participação em multicoleções)
-        data = []
-        for item in items:
-            data.append(item.data)
+
+        data = [item.data for item in items]
         raise SPSPkgMultipleObjectReturnedException(data)
 
     @classmethod
-    def get(cls, ppx_id, pid_v3=None, sps_pkg_name=None, pkg_name_list=None, pid_v2=None):
+    def get(
+        cls,
+        ppx_id,
+        pid_v3=None,
+        sps_pkg_name=None,
+        pkg_name_list=None,
+        pid_v2=None,
+    ):
+        if not ppx_id:
+            raise ValueError("SPSPkg.get requires ppx_id")
+
         try:
-            if not ppx_id:
-                raise ValueError("SPSPkg.get requires ppx_id")
-            obj = cls.search_by_ppx_id(ppx_id)
-            if obj:
-                return obj
+            return cls.search_by_ppx_id(ppx_id)
         except cls.DoesNotExist:
-            raise
-            # fix_sps_pkg_names foi executado antes, então não pesquisar por pkg_name_list
-        return cls.search_by_identifiers(
-            pid_v3=pid_v3, sps_pkg_name=sps_pkg_name, pkg_name_list=None, pid_v2=pid_v2
-        )
+            return cls.search_by_identifiers(
+                pid_v3=pid_v3,
+                sps_pkg_name=sps_pkg_name,
+                pkg_name_list=None,
+                pid_v2=pid_v2,
+                queryset=cls.objects.filter(ppx_id__isnull=True),
+            )
 
     @classmethod
     def _create_or_update(cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2, pkg_name_list, ppx_id):
@@ -1002,17 +1017,19 @@ class SPSPkg(CommonControlField, ClusterableModel):
         return xml_with_pre.get_complete_publication_date()
 
     def add_ppx(self, user, save=False):
-        registered = pid_provider_app.is_registered_xml_zip(self.file.path)
-        try:
-            self.ppx_id = registered["ppx_id"]
-            self.updated_by = user
-            if save:
-                self.save()
-        except KeyError:
-            return registered 
+        for registered in pid_provider_app.is_registered_xml_zip(self.file.path):
+            try:
+                self.ppx_id = registered["ppx_id"]
+                self.updated_by = user
+                if save:
+                    self.save()
+            except KeyError:
+                return registered 
 
     @classmethod
     def complete_ppx(cls, user, sps_pkg_id_list=None, pkg_name_substr=None, pid_v2_subst=None):
+        if not sps_pkg_id_list and not pkg_name_substr and not pid_v2_subst:
+            raise ValueError("SPSPkg.complete_ppx requires sps_pkg_id_list or pkg_name_substr or pid_v2_subst")
         filters = {
             "ppx__isnull": True,
         }
