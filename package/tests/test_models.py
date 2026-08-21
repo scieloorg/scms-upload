@@ -473,7 +473,7 @@ class SPSPkgAddPpxTestCase(TestCase):
     @patch("package.models.pid_provider_app.is_registered_xml_zip")
     def test_add_ppx_success_saves_by_default(self, mock_is_registered):
         ppx_id = self.registered_ppx.id
-        mock_is_registered.return_value = {"ppx_id": ppx_id}
+        mock_is_registered.side_effect = [{"ppx_id": ppx_id}]
 
         response = self.sps_pkg.add_ppx(self.user, save=True)
 
@@ -485,7 +485,7 @@ class SPSPkgAddPpxTestCase(TestCase):
     @patch("package.models.pid_provider_app.is_registered_xml_zip")
     def test_add_ppx_with_save_false_does_not_persist(self, mock_is_registered):
         ppx_id = self.registered_ppx.id
-        mock_is_registered.return_value = {"ppx_id": ppx_id}
+        mock_is_registered.side_effect = [{"ppx_id": ppx_id}]
 
         response = self.sps_pkg.add_ppx(self.user, save=False)
 
@@ -499,7 +499,7 @@ class SPSPkgAddPpxTestCase(TestCase):
     def test_add_ppx_failure_returns_registered_and_does_not_set_ppx(
         self, mock_is_registered
     ):
-        mock_is_registered.return_value = {"error": "xml not found"}
+        mock_is_registered.side_effect = [{"error": "xml not found"}]
 
         response = self.sps_pkg.add_ppx(self.user, save=False)
 
@@ -847,6 +847,24 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         self.assertEqual(result["exceptions"][0]["item"], 99)
         mock_delete_related.assert_not_called()
         self.assertEqual(result["total_deleted_items"], 0)
+
+
+class SPSPkgDeleteRelatedItemsTestCase(unittest.TestCase):
+    """Testes para SPSPkg.delete_related_items()."""
+
+    @patch("package.models.SPSPkgComponent")
+    def test_deletes_components_and_returns_queryset_delete_result(
+        self, mock_component
+    ):
+        mock_qs = MagicMock()
+        mock_qs.delete.return_value = (3, {"package.SPSPkg": 3})
+
+        result = SPSPkg.delete_related_items(mock_qs)
+
+        mock_component.objects.filter.assert_called_once_with(sps_pkg__in=mock_qs)
+        mock_component.objects.filter.return_value.delete.assert_called_once()
+        mock_qs.delete.assert_called_once()
+        self.assertEqual(result, (3, {"package.SPSPkg": 3}))
 
 
 if __name__ == "__main__":
