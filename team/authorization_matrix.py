@@ -159,6 +159,64 @@ GROUP_ACCESS = {
             "wagtailadmin": ("access_admin",),
         },
     },
+    TeamGroups.COMPANY_ADMIN: {
+        "apps": {
+            "institution": READ_ACCESS,
+            "issue": READ_ACCESS,
+            "journal": READ_ACCESS,
+            "location": READ_ACCESS,
+            "team": FULL_ACCESS,
+            "upload": FULL_ACCESS,
+        },
+        "models": {
+            "team": {
+                "company": VIEW_ACTIONS,
+                "companyteammember": CRUD_ACTIONS,
+                "journalcompanycontract": VIEW_ACTIONS,
+            },
+            "upload": {
+                "*": VIEW_ACTIONS,
+                "package": ("add", "view"),
+                "packagezip": ("add", "view"),
+                "validationreport": ("change", "view"),
+                "xmlerrorreport": ("change", "view"),
+                "xmlinforeport": ("change", "view"),
+            },
+        },
+        "custom": {
+            "upload": (FINISH_DEPOSIT,),
+            "wagtailadmin": ("access_admin",),
+        },
+    },
+    TeamGroups.COMPANY_MEMBER: {
+        "apps": {
+            "institution": READ_ACCESS,
+            "issue": READ_ACCESS,
+            "journal": READ_ACCESS,
+            "location": READ_ACCESS,
+            "team": READ_ACCESS,
+            "upload": FULL_ACCESS,
+        },
+        "models": {
+            "team": {
+                "company": VIEW_ACTIONS,
+                "companyteammember": VIEW_ACTIONS,
+                "journalcompanycontract": VIEW_ACTIONS,
+            },
+            "upload": {
+                "*": VIEW_ACTIONS,
+                "package": ("add", "view"),
+                "packagezip": ("add", "view"),
+                "validationreport": ("change", "view"),
+                "xmlerrorreport": ("change", "view"),
+                "xmlinforeport": ("change", "view"),
+            },
+        },
+        "custom": {
+            "upload": (FINISH_DEPOSIT,),
+            "wagtailadmin": ("access_admin",),
+        },
+    },
 }
 
 STAFF_APPS = {"bigbang", "core"}
