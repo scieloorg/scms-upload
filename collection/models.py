@@ -1,6 +1,3 @@
-import logging
-
-from langdetect import detect
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -58,29 +55,10 @@ class Collection(CommonControlField):
             collection.creator = user
             collection.save()
             return collection
-    
+
     def get_website_config(self, purpose, content_type):
         ws = WebSiteConfiguration.get(collection=self, purpose=purpose)
         return ws.get_data(content_type=content_type)
-
-    @classmethod
-    def get_managers(cls, collection_id):
-        """Get all managers for this collection."""
-        from team.models import CollectionTeamMember, TeamRole
-        return CollectionTeamMember.objects.filter(
-            collection_id=collection_id,
-            role=TeamRole.MANAGER,
-            is_active_member=True
-        )
-
-    @classmethod
-    def get_members(cls, collection_id):
-        """Get all active members (including managers) for this collection."""
-        from team.models import CollectionTeamMember
-        return CollectionTeamMember.objects.filter(
-            collection_id=collection_id,
-            is_active_member=True
-        )
 
 
 class WebSiteConfiguration(CommonControlField, ClusterableModel):
@@ -154,7 +132,6 @@ class WebSiteConfiguration(CommonControlField, ClusterableModel):
 
     @classmethod
     def get(cls, url=None, collection=None, purpose=None):
-        params = dict(url=url, collection=collection, purpose=purpose)
         if url:
             return cls.objects.get(url=url)
         if collection and purpose:
@@ -290,8 +267,7 @@ class Language(CommonControlField):
         code2 = valid_code2 or original_code
         try:
             return cls.get(name, code2)
-        except cls.MultipleObjectsReturned as e:
-            # logging.exception(f"Language.get_or_create raise {e}: {name} {code2}")
+        except cls.MultipleObjectsReturned:
             return cls.objects.filter(code2=code2).first()
         except cls.DoesNotExist:
             if not creator:
