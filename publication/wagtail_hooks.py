@@ -1,11 +1,14 @@
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 
+from core.users.permission_policies import TeamScopedSnippetViewSetMixin
+
 from .models import ArticleAvailability
 
 
-class ArticleAvailabilitySiteViewSet(SnippetViewSet):
+class ArticleAvailabilitySiteViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     model = ArticleAvailability
+    journal_field = "article__journal"
     menu_icon = "folder"
     menu_order = 100
     add_to_settings_menu = False  # or True to add your model to the Settings sub-menu
