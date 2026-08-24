@@ -2724,6 +2724,10 @@ class ArticleProc(BaseProc, ClusterableModel):
         )
 
     @classmethod
+    def delete_related_items(cls, qs):
+        return qs.delete()        
+
+    @classmethod
     def exclude_invalid_records(
         cls,
         user,
@@ -2818,22 +2822,15 @@ class ArticleProc(BaseProc, ClusterableModel):
             duplicated_items = article_procs.filter(sps_pkg_id=value)
             data["total"] = duplicated_items.count()
 
-            duplicated_items_has_not_article = duplicated_items.filter(
-                sps_pkg__article__isnull=True
-            )
-            total_has_not_article = duplicated_items_has_not_article.count()
-            data["total_has_not_article"] = total_has_not_article
+            article_id = duplicated_items.value_list(
+                "sps_pkg__article_id", flat=True
+            ).distinct()
 
-            duplicated_items_has_article = duplicated_items.filter(
-                sps_pkg__article__isnull=False
-            )
-            total_has_article = duplicated_items_has_article.count()
-            data["total_has_article"] = total_has_article
-
-            if total_has_article:
-                keep = duplicated_items_has_article.order_by("-updated").first()
+            if article_id:
+                keep = duplicated_items.order_by("-updated").first()
                 to_delete = duplicated_items.exclude(id=keep.id)
             else:
+                # apagar todos article_proc cujo sps_pkg__article is None
                 to_delete = duplicated_items
 
             # Executa a deleção
