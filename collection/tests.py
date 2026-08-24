@@ -1,17 +1,18 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
 from collection.models import Collection, WebSiteConfiguration
+from collection.wagtail_hooks import CollectionViewSet, WebSiteConfigurationViewSet
 from files_storage.models import MinioConfiguration
+from files_storage.wagtail_hooks import MinioConfigurationViewSet
 from migration.models import ClassicWebsiteConfiguration
+from migration.wagtail_hooks import ClassicWebsiteConfigurationViewSet
 from team.models import CollectionTeamMember, TeamRole, get_user_membership_ids
 
 User = get_user_model()
 
 
 class CollectionTeamHelperFunctionsTest(TestCase):
-    """Tests for get_user_membership_ids from team.models."""
-
     def setUp(self):
         self.creator = User.objects.create_user(
             username="creator", email="creator@example.com", password="pass"
@@ -67,9 +68,8 @@ class CollectionTeamHelperFunctionsTest(TestCase):
 
 
 class CollectionViewSetQueryFilterTest(TestCase):
-    """Tests for get_queryset filtering logic on Collection model."""
-
     def setUp(self):
+        self.factory = RequestFactory()
         self.creator = User.objects.create_user(
             username="creator", email="creator@example.com", password="pass"
         )
@@ -91,36 +91,31 @@ class CollectionViewSetQueryFilterTest(TestCase):
             is_active_member=True,
             creator=self.creator,
         )
+        self.viewset = CollectionViewSet()
 
-    def _filtered_qs(self, user):
-        """Simulate the CollectionViewSet.get_queryset filtering logic."""
-        qs = Collection.objects.all()
-        if user.is_superuser:
-            return qs
-        membership = get_user_membership_ids(user)
-        if membership.get("collection_list_ids"):
-            return qs.filter(id__in=membership["collection_list_ids"])
-        return qs.none()
+    def _get_qs(self, user):
+        request = self.factory.get("/admin/snippets/collection/collection/")
+        request.user = user
+        return self.viewset.get_queryset(request)
 
     def test_superuser_sees_all_collections(self):
-        qs = self._filtered_qs(self.superuser)
+        qs = self._get_qs(self.superuser)
         self.assertIn(self.col_a, qs)
         self.assertIn(self.col_b, qs)
 
     def test_collection_team_member_sees_only_own_collection(self):
-        qs = self._filtered_qs(self.collection_member)
+        qs = self._get_qs(self.collection_member)
         self.assertIn(self.col_a, qs)
         self.assertNotIn(self.col_b, qs)
 
     def test_non_collection_team_user_sees_nothing(self):
-        qs = self._filtered_qs(self.other_user)
+        qs = self._get_qs(self.other_user)
         self.assertEqual(qs.count(), 0)
 
 
 class WebSiteConfigurationQueryFilterTest(TestCase):
-    """Tests for get_queryset filtering logic on WebSiteConfiguration model."""
-
     def setUp(self):
+        self.factory = RequestFactory()
         self.creator = User.objects.create_user(
             username="creator", email="creator@example.com", password="pass"
         )
@@ -148,85 +143,77 @@ class WebSiteConfigurationQueryFilterTest(TestCase):
         self.ws_b = WebSiteConfiguration.objects.create(
             collection=self.col_b, url="http://b.example.com", enabled=True, creator=self.creator
         )
+        self.viewset = WebSiteConfigurationViewSet()
 
-    def _filtered_qs(self, user):
-        qs = WebSiteConfiguration.objects.all()
-        if user.is_superuser:
-            return qs
-        membership = get_user_membership_ids(user)
-        if membership.get("collection_list_ids"):
-            return qs.filter(collection_id__in=membership["collection_list_ids"])
-        return qs.none()
+    def _get_qs(self, user):
+        request = self.factory.get("/admin/snippets/collection/websiteconfiguration/")
+        request.user = user
+        return self.viewset.get_queryset(request)
 
     def test_superuser_sees_all_website_configs(self):
-        qs = self._filtered_qs(self.superuser)
+        qs = self._get_qs(self.superuser)
         self.assertIn(self.ws_a, qs)
         self.assertIn(self.ws_b, qs)
 
     def test_collection_team_member_sees_only_own_collection_config(self):
-        qs = self._filtered_qs(self.collection_member)
+        qs = self._get_qs(self.collection_member)
         self.assertIn(self.ws_a, qs)
         self.assertNotIn(self.ws_b, qs)
 
     def test_non_collection_team_user_sees_nothing(self):
-        qs = self._filtered_qs(self.other_user)
+        qs = self._get_qs(self.other_user)
         self.assertEqual(qs.count(), 0)
 
 
 class MinioConfigurationQueryFilterTest(TestCase):
-    """Tests for get_queryset filtering logic on MinioConfiguration model."""
-
     def setUp(self):
+        self.factory = RequestFactory()
         self.creator = User.objects.create_user(
             username="creator", email="creator@example.com", password="pass"
         )
         self.superuser = User.objects.create_superuser(
             username="admin", email="admin@example.com", password="pass"
         )
-        self.collection_member = User.objects.create_user(
-            username="col_member", email="col@example.com", password="pass"
+        self.collection_manager = User.objects.create_user(
+            username="col_mgr", email="col_mgr@example.com", password="pass"
         )
         self.other_user = User.objects.create_user(
             username="other", email="other@example.com", password="pass"
         )
         self.col = Collection.objects.create(acron="A", name="Collection A", creator=self.creator)
         CollectionTeamMember.objects.create(
-            user=self.collection_member,
+            user=self.collection_manager,
             collection=self.col,
-            role=TeamRole.MEMBER,
+            role=TeamRole.MANAGER,
             is_active_member=True,
             creator=self.creator,
         )
         self.minio = MinioConfiguration.objects.create(
             name="minio1", host="minio.example.com", bucket="root", creator=self.creator
         )
+        self.viewset = MinioConfigurationViewSet()
 
-    def _filtered_qs(self, user):
-        qs = MinioConfiguration.objects.all()
-        if user.is_superuser:
-            return qs
-        membership = get_user_membership_ids(user)
-        if membership.get("collection_list_ids"):
-            return qs
-        return qs.none()
+    def _get_qs(self, user):
+        request = self.factory.get("/admin/snippets/files_storage/minioconfiguration/")
+        request.user = user
+        return self.viewset.get_queryset(request)
 
     def test_superuser_sees_all_minio_configs(self):
-        qs = self._filtered_qs(self.superuser)
+        qs = self._get_qs(self.superuser)
         self.assertIn(self.minio, qs)
 
-    def test_collection_team_member_sees_all_minio_configs(self):
-        qs = self._filtered_qs(self.collection_member)
-        self.assertIn(self.minio, qs)
+    def test_collection_manager_sees_no_minio_configs(self):
+        qs = self._get_qs(self.collection_manager)
+        self.assertEqual(qs.count(), 0)
 
-    def test_non_collection_team_user_sees_nothing(self):
-        qs = self._filtered_qs(self.other_user)
+    def test_non_collection_admin_user_sees_nothing(self):
+        qs = self._get_qs(self.other_user)
         self.assertEqual(qs.count(), 0)
 
 
 class ClassicWebsiteConfigurationQueryFilterTest(TestCase):
-    """Tests for get_queryset filtering logic on ClassicWebsiteConfiguration model."""
-
     def setUp(self):
+        self.factory = RequestFactory()
         self.creator = User.objects.create_user(
             username="creator", email="creator@example.com", password="pass"
         )
@@ -254,27 +241,23 @@ class ClassicWebsiteConfigurationQueryFilterTest(TestCase):
         self.cwc_b = ClassicWebsiteConfiguration.objects.create(
             collection=self.col_b, creator=self.creator
         )
+        self.viewset = ClassicWebsiteConfigurationViewSet()
 
-    def _filtered_qs(self, user):
-        qs = ClassicWebsiteConfiguration.objects.all()
-        if user.is_superuser:
-            return qs
-        membership = get_user_membership_ids(user)
-        if membership.get("collection_list_ids"):
-            return qs.filter(collection_id__in=membership["collection_list_ids"])
-        return qs.none()
+    def _get_qs(self, user):
+        request = self.factory.get("/admin/snippets/migration/classicwebsiteconfiguration/")
+        request.user = user
+        return self.viewset.get_queryset(request)
 
     def test_superuser_sees_all_classic_configs(self):
-        qs = self._filtered_qs(self.superuser)
+        qs = self._get_qs(self.superuser)
         self.assertIn(self.cwc_a, qs)
         self.assertIn(self.cwc_b, qs)
 
     def test_collection_team_member_sees_only_own_collection_config(self):
-        qs = self._filtered_qs(self.collection_member)
+        qs = self._get_qs(self.collection_member)
         self.assertIn(self.cwc_a, qs)
         self.assertNotIn(self.cwc_b, qs)
 
     def test_non_collection_team_user_sees_nothing(self):
-        qs = self._filtered_qs(self.other_user)
+        qs = self._get_qs(self.other_user)
         self.assertEqual(qs.count(), 0)
-
