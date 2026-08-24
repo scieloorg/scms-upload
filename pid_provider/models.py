@@ -621,6 +621,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             "ppx_id": self.id
         }
         _data.update(self.get_readable_data())
+        _data.update(self.record_status)
         return _data
 
     @property
