@@ -171,17 +171,26 @@ class OfficialJournal(CommonControlField):
     @classmethod
     def get(cls, issn_print=None, issn_electronic=None, issnl=None, title=None):
         issns = []
+        params = {}
         if issn_electronic:
             issns.append(issn_electronic)
+            params["issn_electronic"] = issn_electronic
         if issn_print:
             issns.append(issn_print)
+            params["issn_print"] = issn_print
         if issnl:
             issns.append(issnl)
-            
+            params["issns"] = issns
         if not issns:
             raise ValueError(
                 f"OfficialJournal.get requires issn_print, issn_electronic, issnl"
             )
+        try:
+            return cls.objects.get(**params)
+        except cls.DoesNotExist:
+            pass
+        except cls.MultipleObjectsReturned:
+            return cls.objects.filter(**params).order_by("-updated").first()
 
         qs = Q(issnl__in=issns) | Q(issn_electronic__in=issns) | Q(issn_print__in=issns)
         try:
@@ -446,7 +455,7 @@ class Journal(CommonControlField, ClusterableModel):
             obj.official_journal = official_journal or obj.official_journal
             obj.title = title or obj.title
             obj.short_title = short_title or obj.short_title
-            obj.journal_acron = journal_acron
+            obj.journal_acron = journal_acron or obj.journal_acron
             obj.save()
             return obj
         except cls.DoesNotExist:
@@ -616,23 +625,14 @@ class Journal(CommonControlField, ClusterableModel):
         return [item.value for item in self.subject.all()]
 
     @property
-    def is_complete(self):
-        if self.missing_fields:
-            return False
-        if not self.core_synchronized:
-            return False
-        return True
-
-    @property
     def missing_fields(self):
         """
-        Verifica campos não preenchidos no Journal e retorna um relatório detalhado.
+        Verifica ausência de campos relevantes para o site público
         """
         fields = {
             "title": _("Journal Title"),
             "short_title": _("Short Title"),
             "journal_acron": _("Journal Acronym"),
-            "official_journal": _("Official Journal"),
             "contact_name": _("Contact Name"),
             "contact_address": _("Contact Address"),
             "contact_location": _("Contact Location"),
@@ -650,9 +650,8 @@ class Journal(CommonControlField, ClusterableModel):
 
         # Verificar official_journal
         if self.official_journal:
-            if not self.official_journal.issn_electronic:
+            if not self.official_journal.issn_electronic and not self.official_journal.issn_print:
                 missing.append(_("Electronic ISSN"))
-            if not self.official_journal.issn_print:
                 missing.append(_("Print ISSN"))
             if not self.official_journal.title_iso:
                 missing.append(_("ISO Title"))
@@ -668,11 +667,8 @@ class Journal(CommonControlField, ClusterableModel):
             missing.append(_("sponsor"))
 
         # Verificar owner
-        if not self.owner.exists():
+        if not self.owner.exists() and not self.publisher.exists():
             missing.append(_("owner"))
-
-        # Verificar publisher
-        if not self.publisher.exists():
             missing.append(_("publisher"))
 
         # Verificar subject
