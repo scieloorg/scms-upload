@@ -1,11 +1,15 @@
+import django_filters
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSetGroup
-import django_filters
 
 from config.menu import get_menu_order
+from core.users.permission_policies import (
+    SuperuserOnlySnippetViewSetMixin,
+    TeamScopedSnippetViewSetMixin,
+)
 from core.views import CommonControlFieldViewSet
 from htmlxml.models import HTMLXML
 from package.models import SPSPkg
@@ -18,37 +22,37 @@ class HTMLXMLFilterSet(django_filters.FilterSet):
         field_name='html_img_total',
         lookup_expr='gt',
         label=_('Has Images'),
-        method='filter_has_images'
+        method='filter_has_images',
     )
-    
+
     has_tables = django_filters.BooleanFilter(
-        field_name='html_table_total', 
+        field_name='html_table_total',
         lookup_expr='gt',
         label=_('Has Tables'),
-        method='filter_has_tables'
+        method='filter_has_tables',
     )
-    
+
     has_attention_demands = django_filters.BooleanFilter(
         field_name='attention_demands',
-        lookup_expr='gt', 
+        lookup_expr='gt',
         label=_('Has Attention Demands'),
-        method='filter_has_attention_demands'
+        method='filter_has_attention_demands',
     )
-    
+
     def filter_has_images(self, queryset, name, value):
         if value is True:
             return queryset.filter(html_img_total__gt=0)
         elif value is False:
             return queryset.filter(html_img_total=0)
         return queryset
-    
+
     def filter_has_tables(self, queryset, name, value):
         if value is True:
             return queryset.filter(html_table_total__gt=0)
         elif value is False:
             return queryset.filter(html_table_total=0)
         return queryset
-    
+
     def filter_has_attention_demands(self, queryset, name, value):
         if value is True:
             return queryset.filter(attention_demands__gt=0)
@@ -60,7 +64,7 @@ class HTMLXMLFilterSet(django_filters.FilterSet):
         model = HTMLXML
         fields = [
             'html2xml_status',
-            'quality', 
+            'quality',
             'pdf_langs',
             'html_translation_langs',
             'article_type',
@@ -71,13 +75,14 @@ class HTMLXMLFilterSet(django_filters.FilterSet):
         ]
 
 
-class JournalProcViewSet(CommonControlFieldViewSet):
+class JournalProcViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = JournalProc
+    collection_field = "collection"
     menu_label = _("Journal Processing")
     menu_icon = "folder"
     menu_order = 200
     add_to_settings_menu = False
-    
+
     list_display = [
         "journal",
         "pid",
@@ -103,11 +108,12 @@ class JournalProcViewSet(CommonControlFieldViewSet):
     ]
 
 
-class IssueProcViewSet(CommonControlFieldViewSet):
+class IssueProcViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = IssueProc
+    collection_field = "collection"
     inspect_view_enabled = True
     menu_label = _("Issue Processing")
-    
+
     menu_icon = "folder"
     menu_order = 300
     add_to_settings_menu = False
@@ -142,8 +148,9 @@ class IssueProcViewSet(CommonControlFieldViewSet):
     ]
 
 
-class HTMLXMLViewSet(CommonControlFieldViewSet):
+class HTMLXMLViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = HTMLXML
+    collection_field = "migrated_article__collection"
     menu_label = _("XML from HTML")
     menu_icon = "doc-full"
     menu_order = 300
@@ -171,7 +178,7 @@ class HTMLXMLViewSet(CommonControlFieldViewSet):
     ]
 
 
-class SPSPkgViewSet(CommonControlFieldViewSet):
+class SPSPkgViewSet(SuperuserOnlySnippetViewSetMixin, CommonControlFieldViewSet):
     model = SPSPkg
     menu_label = _("SPS Package")
     inspect_view_enabled = True
@@ -206,15 +213,15 @@ class SPSPkgViewSet(CommonControlFieldViewSet):
     ]
 
 
-class ArticleProcViewSet(CommonControlFieldViewSet):
+class ArticleProcViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = ArticleProc
-    menu_label = _("Article Processing")
+    collection_field = "collection"
     inspect_view_enabled = True
     menu_icon = "doc-full"
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 10
-    
+
     list_display = [
         "__str__",
         "xml_status",
@@ -244,8 +251,9 @@ class ArticleProcViewSet(CommonControlFieldViewSet):
     ]
 
 
-class ProcReportViewSet(CommonControlFieldViewSet):
+class ProcReportViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = ProcReport
+    collection_field = "collection"
     menu_label = _("Processing Report")
     inspect_view_enabled = True
     menu_icon = "doc-full"

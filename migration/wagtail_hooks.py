@@ -1,11 +1,11 @@
-from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
-from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 from wagtail.snippets.models import register_snippet
+from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from config.menu import get_menu_order
+from core.users.permission_policies import TeamScopedSnippetViewSetMixin
 from core.views import CommonControlFieldViewSet
 from migration.models import (
     ClassicWebsiteConfiguration,
@@ -18,13 +18,16 @@ from migration.models import (
 )
 
 
-class ClassicWebsiteConfigurationViewSet(CommonControlFieldViewSet):
+class ClassicWebsiteConfigurationViewSet(
+    TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet
+):
     model = ClassicWebsiteConfiguration
+    collection_field = "collection"
     menu_label = _("Classic Website Configuration")
     menu_icon = "doc-full"
     menu_order = 100
     add_to_settings_menu = False
-    
+
     list_display = [
         "collection",
         "created",
@@ -37,14 +40,15 @@ class ClassicWebsiteConfigurationViewSet(CommonControlFieldViewSet):
     search_fields = ["collection__acron", "collection__name"]
 
 
-class MigratedDataViewSet(SnippetViewSet):
+class MigratedDataViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     model = MigratedData
+    collection_field = "collection"
     menu_label = _("Migrated Data")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
     inspect_view_enabled = True
-    
+
     list_per_page = 10
     list_display = [
         "pid",
@@ -72,14 +76,15 @@ class MigratedDataViewSet(SnippetViewSet):
     ]
 
 
-class MigratedArticleViewSet(SnippetViewSet):
+class MigratedArticleViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     model = MigratedArticle
+    collection_field = "collection"
     menu_label = _("Migrated Article")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
     inspect_view_enabled = True
-    
+
     list_per_page = 10
     list_display = [
         "pid",
@@ -106,14 +111,15 @@ class MigratedArticleViewSet(SnippetViewSet):
     ]
 
 
-class MigratedJournalViewSet(SnippetViewSet):
+class MigratedJournalViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     model = MigratedJournal
+    collection_field = "collection"
     menu_label = _("Migrated Journal")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
     inspect_view_enabled = True
-    
+
     list_per_page = 10
     list_display = [
         "pid",
@@ -138,14 +144,15 @@ class MigratedJournalViewSet(SnippetViewSet):
     ]
 
 
-class MigratedIssueViewSet(SnippetViewSet):
+class MigratedIssueViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     model = MigratedIssue
+    collection_field = "collection"
     menu_label = _("Migrated Issue")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
     inspect_view_enabled = True
-    
+
     list_per_page = 10
     list_display = [
         "pid",
@@ -170,14 +177,15 @@ class MigratedIssueViewSet(SnippetViewSet):
     ]
 
 
-class MigratedFileViewSet(SnippetViewSet):
+class MigratedFileViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     model = MigratedFile
+    collection_field = "collection"
     menu_label = _("Migrated files")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
     inspect_view_enabled = True
-    
+
     list_per_page = 10
     list_display = [
         "original_path",
@@ -202,13 +210,14 @@ class MigratedFileViewSet(SnippetViewSet):
     ]
 
 
-class IdFileRecordViewSet(SnippetViewSet):
+class IdFileRecordViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     model = IdFileRecord
+    collection_field = "parent__collection"
     menu_label = _("Article id file")
     menu_icon = "doc-full"
     menu_order = 300
     add_to_settings_menu = False
-    
+
     list_per_page = 10
     list_display = [
         "item_pid",
@@ -242,11 +251,10 @@ class MigrationViewSetGroup(SnippetViewSetGroup):
         MigratedIssueViewSet,
         MigratedArticleViewSet,
         MigratedFileViewSet,
-        IdFileRecordViewSet,    
+        IdFileRecordViewSet,
     )
 
 
-# Registra o grupo de snippets
 register_snippet(MigrationViewSetGroup)
 
 
