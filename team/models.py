@@ -38,53 +38,56 @@ def active_contract_queryset(queryset=None, today=None):
 
 
 def get_user_membership_ids(user):
-    """
-    Returns a dict with the list IDs of collections, journals or companies
-    that the user is actively associated with, depending on team membership type.
-    Priority order: collection > journal > company.
+    result = {
+        "collection_list_ids": set(),
+        "journal_list_ids": set(),
+        "company_list_ids": set(),
+    }
 
-    For collection team members, journal_list_ids is also populated with the journals
-    that belong to the user's collections.
-    For company team members, journal_list_ids is also populated with the journals
-    that have active contracts with the user's companies.
-    """
-    from journal.models import JournalCollection
+    if not user or not getattr(user, "is_authenticated", False):
+        return {key: [] for key in result}
 
-    result = {"collection_list_ids": [], "journal_list_ids": [], "company_list_ids": []}
-
-    collection_ids = list(
-        CollectionTeamMember.objects.filter(user=user, is_active_member=True)
-        .values_list("collection", flat=True)
+    collection_ids = set(
+        CollectionTeamMember.objects.filter(
+            user=user,
+            is_active_member=True,
+            collection__isnull=False,
+        ).values_list("collection", flat=True)
     )
+
     if collection_ids:
         result["collection_list_ids"] = collection_ids
-        result["journal_list_ids"] = list(
-            JournalCollection.objects.filter(
-                collection__in=collection_ids
-            ).values_list("journal", flat=True)
+        result["journal_list_ids"].update(
+            JournalCollection.objects.filter(collection__in=collection_ids).values_list(
+                "journal", flat=True
+            )
         )
-        return result
 
-    journal_ids = list(
-        JournalTeamMember.objects.filter(user=user, is_active_member=True)
-        .values_list("journal", flat=True)
+    journal_ids = set(
+        JournalTeamMember.objects.filter(
+            user=user,
+            is_active_member=True,
+        ).values_list("journal", flat=True)
     )
+
     if journal_ids:
-        result["journal_list_ids"] = journal_ids
-        return result
+        result["journal_list_ids"].update(journal_ids)
 
-    company_ids = list(
-        CompanyTeamMember.objects.filter(user=user, is_active_member=True)
-        .values_list("company", flat=True)
+    company_ids = set(
+        CompanyTeamMember.objects.filter(
+            user=user,
+            is_active_member=True,
+        ).values_list("company", flat=True)
     )
+
     if company_ids:
         result["company_list_ids"] = company_ids
-        result["journal_list_ids"] = list(
-            JournalCompanyContract.objects.filter(
-                company__in=company_ids, is_active=True
-            ).values_list("journal", flat=True)
+        contracts = active_contract_queryset(
+            JournalCompanyContract.objects.filter(company__in=company_ids)
         )
-    return result
+        result["journal_list_ids"].update(contracts.values_list("journal", flat=True))
+
+    return {key: list(value) for key, value in result.items()}
 
 
 def has_permission(user=None):
