@@ -10,6 +10,7 @@ from article.models import Article
 from collection.models import Collection
 from config.menu import WAGTAIL_MENU_APPS_ORDER, get_menu_order
 from journal.models import Journal
+from team.authorization import get_user_accessible_apps
 
 # @hooks.register("insert_global_admin_css", order=100)
 # def global_admin_css():
@@ -89,9 +90,43 @@ def reorder_menu_items(request, menu_items):
 
 @hooks.register("construct_main_menu")
 def remove_menu_items(request, menu_items):
-    if not request.user.is_superuser:
+    user = request.user
+
+    if not user.is_superuser:
         menu_items[:] = [
             item
             for item in menu_items
             if item.name not in ["documents", "explorer", "reports"]
         ]
+
+    accessible_apps = get_user_accessible_apps(user)
+    menu_to_app_mapping = {
+        "upload": "upload",
+        "articles": "article",
+        "journals": "journal",
+        "issues": "issue",
+        "collections": "collection",
+        "team": "team",
+        "institutions": "institution",
+        "locations": "location",
+        "migration": "migration",
+        "doi": "doi",
+        "pid-provider": "pid_provider",
+        "publication": "publication",
+        "package": "package",
+        "processes": "proc",
+        "tracker": "tracker",
+        "files-storage": "files_storage",
+        "htmlxml": "htmlxml",
+        "researcher": "researcher",
+        "core-settings": "core_settings",
+        "django-celery-beat": "django_celery_beat",
+    }
+
+    menu_items[:] = [
+        item
+        for item in menu_items
+        if item.name not in menu_to_app_mapping
+        or menu_to_app_mapping[item.name] in accessible_apps
+        or user.is_superuser
+    ]
