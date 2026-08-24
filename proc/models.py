@@ -644,13 +644,12 @@ class BaseProc(CommonControlField):
                 operation.finish(user, exc_traceback=exc_traceback, exception=e)
             else:
                 UnexpectedEvent.create(
+                    action="proc.BaseProc.register_classic_website_data",
+                    item=pid,
                     e=e,
                     exc_traceback=exc_traceback,
                     detail={
-                        "task": "proc.BaseProc.register_classic_website_data",
-                        "username": user.username,
                         "collection": collection.acron,
-                        "pid": pid,
                     },
                 )
 
