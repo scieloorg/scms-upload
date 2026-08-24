@@ -1,0 +1,5 @@
+ACCESS_ALL_PACKAGES = "access_all_packages"
+ASSIGN_PACKAGE = "assign_package"
+FINISH_DEPOSIT = "finish_deposit"
+PUBLISH_PACKAGE = "publish_package"
+REPUBLISH_PACKAGE = "republish_package"

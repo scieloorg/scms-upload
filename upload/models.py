@@ -51,7 +51,13 @@ from upload.forms import (
     XMLErrorReportForm,
     PackageZipForm,
 )
-from upload.permission_helper import ACCESS_ALL_PACKAGES, ASSIGN_PACKAGE, FINISH_DEPOSIT
+from upload.permissions import (
+    ACCESS_ALL_PACKAGES,
+    ASSIGN_PACKAGE,
+    FINISH_DEPOSIT,
+    PUBLISH_PACKAGE,
+    REPUBLISH_PACKAGE,
+)
 from upload.utils import file_utils
 from upload.utils.package_utils import update_zip_file
 from upload.utils.zip_pkg import PkgZip
@@ -317,6 +323,8 @@ class Package(CommonControlField, ClusterableModel):
             (FINISH_DEPOSIT, _("Can finish deposit")),
             (ACCESS_ALL_PACKAGES, _("Can access all packages from all users")),
             (ASSIGN_PACKAGE, _("Can assign package")),
+            (PUBLISH_PACKAGE, _("Can publish package")),
+            (REPUBLISH_PACKAGE, _("Can republish package")),
         )
         indexes = [
             models.Index(
