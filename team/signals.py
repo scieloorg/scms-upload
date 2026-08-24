@@ -1,8 +1,11 @@
 import threading
 from contextlib import contextmanager
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.db.models.signals import post_delete, post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
+
+from collection.models import Collection
 
 from .constants import TeamGroups
 from .models import CollectionTeamMember, CompanyTeamMember, JournalTeamMember, TeamRole
@@ -122,6 +125,23 @@ def _post_save_handler(instance, **_kwargs):
 def _post_delete_handler(instance, **_kwargs):
     sync_user_groups(instance.user)
 
+
+def _capture_collection_team_users(instance, **_kwargs):
+    instance._team_user_ids = list(
+        CollectionTeamMember.objects.filter(
+            collection=instance,
+            user__isnull=False,
+        ).values_list("user", flat=True)
+    )
+
+
+def _sync_collection_team_users(instance, **_kwargs):
+    User = get_user_model()
+
+    for user in User.objects.filter(pk__in=getattr(instance, "_team_user_ids", ())):
+        sync_user_groups(user)
+
+
 def register_signals():
     for model in _TEAM_MEMBER_RELATIONS:
         model_label = model._meta.label_lower
@@ -143,3 +163,16 @@ def register_signals():
             weak=False,
             dispatch_uid=f"team.sync_groups_after_delete.{model_label}",
         )
+
+    pre_delete.connect(
+        _capture_collection_team_users,
+        sender=Collection,
+        weak=False,
+        dispatch_uid="team.capture_collection_team_users",
+    )
+    post_delete.connect(
+        _sync_collection_team_users,
+        sender=Collection,
+        weak=False,
+        dispatch_uid="team.sync_groups_after_collection_delete",
+    )
