@@ -719,13 +719,13 @@ def process_issue_result(user, journal, result):
     )
 
     # Cria/atualiza o issue com todos os campos da API
-    issue = Issue.get_or_create(
+    issue = Issue.create_or_update(
+        user,
         journal=journal,
         volume=result.get("volume"),
         supplement=result.get("supplement"),
         number=result.get("number"),
         publication_year=result.get("year"),
-        user=user,
         order=result.get("order"),
         issue_pid_suffix=result.get("issue_pid_suffix"),
     )
