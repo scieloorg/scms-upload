@@ -106,6 +106,11 @@ django_makemigrations: ## Run makemigrations from django container using $(compo
 django_migrate: ## Run migrate from django container using $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py migrate
 
+django_authorization_sync: ## Reconcile canonical groups, permissions, and memberships $(compose)
+	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py create_user_groups --sync-users
+
+django_deploy: django_migrate django_authorization_sync ## Run database and authorization deploy steps $(compose)
+
 django_migrate_fresh_migrations: ## Run makemigrations and migrate from django container using $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) run --rm django bash -c 'python manage.py makemigrations && python manage.py migrate'
 
