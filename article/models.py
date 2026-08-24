@@ -832,15 +832,16 @@ class Article(ClusterableModel, CommonControlField):
         return response
  
     @classmethod
-    def get_repeated_values(cls, field_name, queryset=None, issue=None):
+    def get_repeated_values(cls, field_name, queryset, issue=None):
         if not queryset:
-            queryset = cls.objects
+            raise ValueError("Article.get_repeated_values requires queryset")
         params = {}
         if issue:
             params["issue"] = issue
         queryset = queryset.filter(**params)
         return (
             queryset.values(field_name)
+            .filter(sps_pkg_id__isnull=False)
             .annotate(total=Count("id"))
             .filter(total__gt=1)
             .values_list(field_name, flat=True)
