@@ -1,30 +1,55 @@
 import logging
 
+from django.contrib.admin.utils import quote
+from django.db.models import Q
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
-from django.db.models import Q
 from wagtail import hooks
+from wagtail.admin.ui.tables import TitleColumn
+from wagtail.admin.widgets import ListingButton
 from wagtail.snippets.models import register_snippet
-from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
+from wagtail.snippets.views.snippets import IndexView as SnippetIndexView
+from wagtail.snippets.views.snippets import SnippetViewSetGroup
 
-from core.views import CommonControlFieldViewSet
 from config.menu import get_menu_order
+from core.users.permission_policies import (
+    TeamScopedCopyView,
+    TeamScopedDeleteView,
+    TeamScopedEditView,
+    TeamScopedHistoryView,
+    TeamScopedInspectView,
+    TeamScopedRevisionsCompareView,
+    TeamScopedRevisionsUnscheduleView,
+    TeamScopedUnpublishView,
+    TeamScopedUsageView,
+)
+from core.users.scoped_queryset import scope_by_membership
+from core.views import CommonControlFieldViewSet
+from upload.admin_buttons import get_package_action_buttons
+from upload.bulk_actions.republish import (
+    RepublishPublicBulkAction,
+    RepublishQABulkAction,
+)
+from upload.permission_policies import UploadModelPermissionPolicy
+from upload.permissions import ACCESS_ALL_PACKAGES
+from upload.querysets import get_scoped_package_queryset, scope_package_queryset
 from upload.views import (
-    ReadyToPublishPackageEditView,
     PackageAdminInspectView,
+    PackageZipCreateView,
     QAPackageEditView,
+    ReadyToPublishPackageEditView,
     ValidationReportEditView,
     XMLErrorReportEditView,
     XMLInfoReportEditView,
-    PackageZipCreateView,
 )
 
-from .button_helper import UploadButtonHelper
 from .models import (
-    ReadyToPublishPackage,
+    ArchivedPackage,
     Package,
+    PackageZip,
     PkgValidationResult,
     QAPackage,
+    ReadyToPublishPackage,
     UploadValidator,
     ValidationReport,
     XMLError,
@@ -32,25 +57,26 @@ from .models import (
     XMLInfo,
     XMLInfoReport,
     choices,
-    PackageZip,
-    ArchivedPackage,
 )
-from .permission_helper import UploadPermissionHelper
-from team.models import has_permission
-from upload.bulk_actions.republish import RepublishPublicBulkAction, RepublishQABulkAction
 
-from django.contrib.admin.utils import quote
-from wagtail.admin.ui.tables import TitleColumn
-from wagtail.snippets.views.snippets import IndexView as SnippetIndexView
+MODEL_PERMISSION_ACTIONS = ("add", "change", "delete", "view")
 
 
-class InspectFirstIndexView(SnippetIndexView):
-    """
-    Restaura o comportamento do ModelAdmin legado: clicar no item da
-    listagem abre a INSPECT view (se disponível), em vez da edit view.
-    O botão 'Edit' continua disponível normalmente no menu de ações "...".
-    """
+class PackageActionIndexView(SnippetIndexView):
+    def get_list_more_buttons(self, instance):
+        buttons = super().get_list_more_buttons(instance)
+        buttons.extend(
+            get_package_action_buttons(
+                self.request.user,
+                instance,
+                ListingButton,
+            )
+        )
 
+        return buttons
+
+
+class InspectFirstPackageIndexView(PackageActionIndexView):
     def _get_title_column(self, field_name, column_class=TitleColumn, **kwargs):
         column_class = self._get_title_column_class(column_class)
 
@@ -77,24 +103,43 @@ hooks.register("register_bulk_action", RepublishQABulkAction)
 hooks.register("register_bulk_action", RepublishPublicBulkAction)
 
 
-class PermissionHelperMixin:
+class BaseUploadViewSet(CommonControlFieldViewSet):
+    denied_permission_actions = ()
+    edit_view_class = TeamScopedEditView
+    delete_view_class = TeamScopedDeleteView
+    inspect_view_class = TeamScopedInspectView
+    copy_view_class = TeamScopedCopyView
+    history_view_class = TeamScopedHistoryView
+    revisions_compare_view_class = TeamScopedRevisionsCompareView
+    revisions_unschedule_view_class = TeamScopedRevisionsUnscheduleView
+    usage_view_class = TeamScopedUsageView
+    unpublish_view_class = TeamScopedUnpublishView
+
     @property
-    def permission_helper(self):
-        try:
-            return self._permission_helper
-        except AttributeError:
-            self._permission_helper = self.permission_helper_class(self.model)
-            return self._permission_helper
+    def permission_policy(self):
+        return UploadModelPermissionPolicy(
+            self.model,
+            denied_actions=self.denied_permission_actions,
+        )
 
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        if not self.permission_policy.user_has_any_permission(
+            request.user,
+            MODEL_PERMISSION_ACTIONS,
+        ):
+            return queryset.none()
 
-class BaseUploadViewSet(CommonControlFieldViewSet, PermissionHelperMixin):
-    ...
+        return queryset
+
+    def get_common_view_kwargs(self, **kwargs):
+        view_kwargs = super().get_common_view_kwargs(**kwargs)
+        view_kwargs["viewset"] = self
+        return view_kwargs
 
 
 class PackageZipViewSet(BaseUploadViewSet):
     model = PackageZip
-    # button_helper_class = UploadButtonHelper
-    permission_helper_class = UploadPermissionHelper
     add_view_class = PackageZipCreateView
     menu_label = _("Package upload")
     menu_icon = "folder"
@@ -117,21 +162,24 @@ class PackageZipViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
+        if request.user.is_superuser:
+            return super().get_queryset(request)
 
-        params = {}
-        if not self.permission_helper.user_is_analyst_team_member(request.user, None):
-            params = {"creator": request.user}
-        return super().get_queryset(request).filter(**params)
+        qs = super().get_queryset(request)
+        if request.user.has_perm(f"upload.{ACCESS_ALL_PACKAGES}"):
+            package_scope = get_scoped_package_queryset(request.user)
+            return qs.filter(
+                Q(creator=request.user) | Q(packages__in=package_scope)
+            ).distinct()
+
+        return qs.filter(creator=request.user)
 
 
 class PackageViewSet(BaseUploadViewSet):
     model = Package
-    button_helper_class = UploadButtonHelper
-    permission_helper_class = UploadPermissionHelper
+    denied_permission_actions = ("delete",)
 
-    index_view_class = InspectFirstIndexView
+    index_view_class = InspectFirstPackageIndexView
 
     inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
@@ -179,73 +227,34 @@ class PackageViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
-
         params = {}
         try:
             params["pkg_zip__id"] = request.GET["pkg_zip_id"]
         except KeyError:
             logging.info(request.GET)
 
-        if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            waiting_status = [
-                choices.PS_ENQUEUED_FOR_VALIDATION,
-                choices.PS_PENDING_CORRECTION,
-                choices.PS_UNEXPECTED,
-                choices.PS_REQUIRED_ERRATUM,
-                choices.PS_REQUIRED_UPDATE,
-            ]
-            action_required = [
-                choices.PS_VALIDATED_WITH_ERRORS,
-            ]
+        status = [
+            choices.PS_ENQUEUED_FOR_VALIDATION,
+            choices.PS_VALIDATED_WITH_ERRORS,
+            choices.PS_PENDING_CORRECTION,
+            choices.PS_UNEXPECTED,
+            choices.PS_REQUIRED_ERRATUM,
+            choices.PS_REQUIRED_UPDATE,
+            choices.PS_PENDING_QA_DECISION,
+            choices.PS_READY_TO_PREVIEW,
+            choices.PS_PREVIEW,
+            choices.PS_READY_TO_PUBLISH,
+            choices.PS_PUBLISHED,
+        ]
 
-            # Ações requeridas no menu QA, neste menu é para consultar
-            action_required_qa_menu = [
-                choices.PS_PENDING_QA_DECISION,
-            ]
-
-            # Ações requeridas no menu Publication, neste menu é para consultar
-            action_required_publication_menu = [
-                choices.PS_READY_TO_PREVIEW,
-                choices.PS_PREVIEW,
-                choices.PS_READY_TO_PUBLISH,
-                choices.PS_PUBLISHED,
-            ]
-
-            status = (
-                action_required
-                + waiting_status
-                + action_required_qa_menu
-                + action_required_publication_menu
-            )
-        else:
-            params["creator"] = request.user
-            action_required = [
-                choices.PS_VALIDATED_WITH_ERRORS,
-                choices.PS_PENDING_CORRECTION,
-                choices.PS_UNEXPECTED,
-                choices.PS_REQUIRED_ERRATUM,
-                choices.PS_REQUIRED_UPDATE,
-            ]
-            waiting_status = [
-                choices.PS_ENQUEUED_FOR_VALIDATION,
-                choices.PS_PENDING_QA_DECISION,
-                choices.PS_READY_TO_PREVIEW,
-                choices.PS_PREVIEW,
-                choices.PS_READY_TO_PUBLISH,
-                choices.PS_PUBLISHED,
-            ]
-
-            status = action_required + waiting_status
-
-        return super().get_queryset(request).filter(status__in=status, **params)
+        qs = super().get_queryset(request).filter(status__in=status, **params)
+        return scope_package_queryset(qs, request.user)
 
 
 class QualityAnalysisPackageViewSet(BaseUploadViewSet):
     model = QAPackage
-    button_helper_class = UploadButtonHelper
-    permission_helper_class = UploadPermissionHelper
+    denied_permission_actions = ("delete",)
+    index_view_class = PackageActionIndexView
     menu_label = _("Quality control admin")
     menu_icon = "folder"
     menu_order = 200
@@ -283,22 +292,6 @@ class QualityAnalysisPackageViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
-        """
-        Para Analista de Qualidade
-        PS_VALIDATED_WITH_ERRORS:
-            sem esperar o produtor de XML terminar o depósito,
-            revisar os erros, aceitar ou rejeitar pacote
-        PS_PENDING_CORRECTION:
-            a pedido do produtor de XML,
-            revisar os erros, aceitar ou rejeitar pacote
-        PS_PENDING_QA_DECISION:
-            a pedido do produtor de XML,
-            revisar os erros, aceitar ou rejeitar pacote
-
-        Para o produtor de XML, apenas consulta
-        """
         status = [
             choices.PS_VALIDATED_WITH_ERRORS,
             choices.PS_PENDING_CORRECTION,
@@ -307,27 +300,18 @@ class QualityAnalysisPackageViewSet(BaseUploadViewSet):
         params = {
             "blocking_errors": 0,
         }
-        if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            return (
-                super()
-                .get_queryset(request)
-                .filter(
-                    Q(assignee__isnull=True) | Q(assignee=request.user),
-                    status__in=status,
-                    **params
-                )
+        qs = super().get_queryset(request).filter(status__in=status, **params)
+        if not request.user.is_superuser:
+            qs = qs.filter(
+                Q(assignee__isnull=True) | Q(assignee=request.user),
             )
-        else:
-            params["creator"] = request.user
 
-        return super().get_queryset(request).filter(status__in=status, **params)
+        return scope_package_queryset(qs, request.user)
 
 
 class ReadyToPublishPackageViewSet(BaseUploadViewSet):
     model = ReadyToPublishPackage
-
-    button_helper_class = UploadButtonHelper
-    permission_helper_class = UploadPermissionHelper
+    denied_permission_actions = ("delete",)
     menu_label = _("Publication admin")
     menu_icon = "folder"
     menu_order = 200
@@ -367,32 +351,23 @@ class ReadyToPublishPackageViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
         status = [
             choices.PS_READY_TO_PREVIEW,
             choices.PS_PREVIEW,
             choices.PS_READY_TO_PUBLISH,
             choices.PS_PUBLISHED,
-            # choices.PS_SCHEDULED_PUBLICATION,
         ]
         params = {
             "blocking_errors": 0,
         }
-        if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            return super().get_queryset(request).filter(status__in=status, **params)
-        else:
-            params["creator"] = request.user
+        qs = super().get_queryset(request).filter(status__in=status, **params)
 
-        return super().get_queryset(request).filter(status__in=status, **params)
+        return scope_package_queryset(qs, request.user)
 
 
 class XMLErrorReportViewSet(BaseUploadViewSet):
     model = XMLErrorReport
-    permission_helper_class = UploadPermissionHelper
     edit_view_class = XMLErrorReportEditView
-    # create_view_class = XMLErrorReportCreateView
-    # inspect_view_class = XMLErrorReportAdminInspectView
     menu_label = _("XML Error Reports")
     menu_icon = "error"
     add_to_settings_menu = False
@@ -413,20 +388,12 @@ class XMLErrorReportViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
-
-        if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            return super().get_queryset(request)
-
-        return super().get_queryset(request).filter(status__in=status, **params)
+        qs = super().get_queryset(request)
+        return qs.filter(package__in=get_scoped_package_queryset(request.user))
 
 
 class XMLErrorViewSet(BaseUploadViewSet):
     model = XMLError
-    permission_helper_class = UploadPermissionHelper
-    # create_view_class = XMLErrorCreateView
-    # inspect_view_class = XMLErrorAdminInspectView
     menu_label = _("XML errors")
     menu_icon = "error"
     add_to_settings_menu = False
@@ -453,22 +420,13 @@ class XMLErrorViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
-
-        if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            return super().get_queryset(request)
-
-        return super().get_queryset(request).filter(package__creator=request.user)
-
+        qs = super().get_queryset(request)
+        return qs.filter(report__package__in=get_scoped_package_queryset(request.user))
 
 
 class XMLInfoReportViewSet(BaseUploadViewSet):
     model = XMLInfoReport
-    permission_helper_class = UploadPermissionHelper
     edit_view_class = XMLInfoReportEditView
-    # create_view_class = XMLInfoReportCreateView
-    # inspect_view_class = XMLInfoReportAdminInspectView
     menu_label = _("XML Info Reports")
     menu_icon = "error"
     add_to_settings_menu = False
@@ -489,20 +447,12 @@ class XMLInfoReportViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
-
-        if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            return super().get_queryset(request)
-
-        return super().get_queryset(request).filter(package__creator=request.user)
+        qs = super().get_queryset(request)
+        return qs.filter(package__in=get_scoped_package_queryset(request.user))
 
 
 class XMLInfoViewSet(BaseUploadViewSet):
     model = XMLInfo
-    permission_helper_class = UploadPermissionHelper
-    # create_view_class = XMLInfoCreateView
-    # inspect_view_class = XMLInfoAdminInspectView
     menu_label = _("XML info")
     menu_icon = "error"
     add_to_settings_menu = False
@@ -529,22 +479,13 @@ class XMLInfoViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
-
-        if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            return super().get_queryset(request)
-
-        return super().get_queryset(request).filter(package__creator=request.user)
+        qs = super().get_queryset(request)
+        return qs.filter(report__package__in=get_scoped_package_queryset(request.user))
 
 
 class ValidationReportViewSet(BaseUploadViewSet):
     model = ValidationReport
-    permission_helper_class = UploadPermissionHelper
-    # create_view_class = ValidationReportCreateView
     edit_view_class = ValidationReportEditView
-
-    # inspect_view_class = ValidationReportAdminInspectView
     menu_label = _("Validation Reports")
     menu_icon = "error"
     add_to_settings_menu = False
@@ -565,20 +506,12 @@ class ValidationReportViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
-
-        if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            return super().get_queryset(request)
-
-        return super().get_queryset(request).filter(package__creator=request.user)
+        qs = super().get_queryset(request)
+        return qs.filter(package__in=get_scoped_package_queryset(request.user))
 
 
 class ValidationViewSet(BaseUploadViewSet):
     model = PkgValidationResult
-    permission_helper_class = UploadPermissionHelper
-    # create_view_class = ValidationCreateView
-    # inspect_view_class = ValidationAdminInspectView
     menu_label = _("Validations")
     menu_icon = "error"
     add_to_settings_menu = False
@@ -596,20 +529,12 @@ class ValidationViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
-
-        if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            return super().get_queryset(request)
-
-        return super().get_queryset(request).filter(package__creator=request.user)
+        qs = super().get_queryset(request)
+        return qs.filter(report__package__in=get_scoped_package_queryset(request.user))
 
 
 class UploadValidatorViewSet(BaseUploadViewSet):
     model = UploadValidator
-    permission_helper_class = UploadPermissionHelper
-    # create_view_class = ValidationCreateView
-    # inspect_view_class = ValidationAdminInspectView
     menu_label = _("Upload Validator")
     menu_icon = "folder"
     add_to_settings_menu = False
@@ -627,19 +552,16 @@ class UploadValidatorViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
-
-        if self.permission_helper.user_is_analyst_team_member(request.user, None):
-            return super().get_queryset(request)
-
-        return super().get_queryset(request).none()
+        return scope_by_membership(
+            request.user,
+            super().get_queryset(request),
+            collection_field="collection",
+        )
 
 
 class ArchivedPackageViewSet(BaseUploadViewSet):
     model = ArchivedPackage
-    button_helper_class = UploadButtonHelper
-    permission_helper_class = UploadPermissionHelper
+    denied_permission_actions = ("delete",)
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
     menu_label = _("Archived Packages")
@@ -685,18 +607,9 @@ class ArchivedPackageViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        if not self.permission_helper.user_can_use_upload_module(request.user, None):
-            return super().get_queryset(request).none()
+        qs = super().get_queryset(request).filter(~Q(status__in=choices.PS_WIP))
 
-        params = {}
-        if not self.permission_helper.user_is_analyst_team_member(request.user, None):
-            params = {"creator": request.user}
-
-        return (
-            super()
-            .get_queryset(request)
-            .filter(~Q(status__in=choices.PS_WIP), **params)
-        )
+        return scope_package_queryset(qs, request.user)
 
 
 class UploadViewSetGroup(SnippetViewSetGroup):
