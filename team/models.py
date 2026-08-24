@@ -1,8 +1,10 @@
 import logging
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import FieldPanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
@@ -10,6 +12,7 @@ from wagtailautocomplete.edit_handlers import AutocompletePanel
 from collection.models import Collection
 from core.models import CommonControlField, VisualIdentityMixin
 from core.forms import CoreAdminModelForm
+from journal.models import JournalCollection
 User = get_user_model()
 
 
@@ -20,6 +23,18 @@ class TeamRole(models.TextChoices):
     """Role types for team members."""
     MANAGER = "manager", _("Manager")
     MEMBER = "member", _("Member")
+
+
+def active_contract_queryset(queryset=None, today=None):
+    if queryset is None:
+        queryset = JournalCompanyContract.objects.all()
+
+    today = today or timezone.localdate()
+
+    return queryset.filter(is_active=True).filter(
+        Q(start_date__isnull=True) | Q(start_date__lte=today),
+        Q(end_date__isnull=True) | Q(end_date__gte=today),
+    )
 
 
 def get_user_membership_ids(user):
@@ -496,4 +511,3 @@ class JournalCompanyContract(CommonControlField):
     def can_manage_contract(cls, user, journal):
         """Check if a user can manage contracts for a journal (must be a journal manager)."""
         return JournalTeamMember.user_is_manager(user, journal)
-
