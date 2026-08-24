@@ -7,13 +7,13 @@ from wagtail.models import Orderable
 
 from article.models import Article
 from core.models import CommonControlField
-from core.utils.requester import NonRetryableError, fetch_data
+from core.utils.requester import fetch_data, NonRetryableError, RetryableError
 
 
 def check_url(url, timeout=None):
     try:
         fetch_data(url, timeout=timeout or 2)
-    except Exception as e:
+    except (NonRetryableError, RetryableError) as e:
         return False
     else:
         return True
@@ -103,14 +103,14 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
             )
 
     def create_or_update_urls(self, user, website_url, timeout=None):
-        urls = self.article.get_webpage_items(
+        webpage_items = self.article.get_webpage_items(
             website_url, purpose="QA"
         )
-        for url in urls:
+        for webpage_item in webpage_items:
             ScieloURLStatus.create_or_update(
                 user=user,
                 article=self.article,
-                url=url,
+                url=webpage_item["url"],
                 timeout=timeout,
             )
         self.check_is_completed()
