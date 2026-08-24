@@ -191,7 +191,7 @@ class Issue(CommonControlField, IssuePublicationDate):
             self.issue_pid_suffix = issue_pid_suffix or self.issue_pid_suffix or self.generate_issue_pid_suffix()
             self.is_continuous_publishing_model = is_continuous_publishing_model
             self.total_documents = total_documents
-            if self.creator:
+            if self.creator_id:
                 self.updated_by = user
             else:
                 self.creator = user
