@@ -443,6 +443,17 @@ class JournalCompanyContract(CommonControlField):
             models.Index(fields=["journal", "is_active"]),
             models.Index(fields=["company", "is_active"]),
         ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(start_date__isnull=True)
+                    | Q(end_date__isnull=True)
+                    | Q(start_date__lte=models.F("end_date"))
+                ),
+                name="team_contract_valid_date_range",
+            )
+        ]
+
     base_form_class = CoreAdminModelForm
     panels = [
         AutocompletePanel("journal"),
@@ -456,6 +467,14 @@ class JournalCompanyContract(CommonControlField):
     def __str__(self):
         status = "Active" if self.is_active else "Inactive"
         return f"{self.journal} - {self.company} ({status})"
+
+    def clean(self):
+        super().clean()
+
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValidationError(
+                {"end_date": _("End date must be on or after start date.")}
+            )
 
     @classmethod
     def get_journal_companies(cls, journal, is_active=True):
