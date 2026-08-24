@@ -1136,6 +1136,17 @@ def task_migrate_and_publish_articles(
         if collection_acron:
             collection_acron_list += [collection_acron]
 
+        user = _get_user(user_id, username)
+        response = ArticleProc.mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect(
+            user,
+            journal_acron_list=journal_acron_list,
+            collection_acron_list=collection_acron_list,
+        )
+        task_exec.add_event({
+            "operation": "ArticleProc.mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect",
+            "response": response,
+        })
+
         status = tracker_choices.get_valid_status(status, force_update)
 
         items_to_process = ArticleProc.get_journal_and_issue_proc_ids(
