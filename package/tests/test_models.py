@@ -5,10 +5,10 @@ import unittest
 from unittest.mock import MagicMock, Mock, patch, PropertyMock
 from datetime import datetime
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-
+from django.test.utils import isolate_apps
 
 from package.models import (
     now,
@@ -102,14 +102,13 @@ class UtilityFunctionsTestCase(TestCase):
         self.assertEqual(preview_page_directory_path(DummyChildInstance(), "preview.html"), "sps_pkg/sps/pkg/v1/preview.html")
 
 
-class DummyBasicXMLFile(BasicXMLFile):
-    class Meta:
-        app_label = "package"
-
-
-class BasicXMLFileTestCase(TestCase):
-    
+@isolate_apps("package")
+class BasicXMLFileTestCase(SimpleTestCase):
     def setUp(self):
+        class DummyBasicXMLFile(BasicXMLFile):
+            class Meta:
+                app_label = "package"
+
         self.xml_obj = DummyBasicXMLFile()
         self.xml_obj.file = MagicMock()
         self.xml_obj.file.path = "/tmp/test_file.xml"
@@ -131,9 +130,7 @@ class BasicXMLFileTestCase(TestCase):
     @patch("package.models.delete_files")
     def test_save_and_delete_file(self, mock_delete):
         self.xml_obj.file.save = MagicMock()
-        
         self.xml_obj.save_file("updated.xml", b"<updated/>", delete_existing=True)
-        
         mock_delete.assert_called_with("/tmp/test_file.xml")
         self.xml_obj.file.save.assert_called_once()
 
@@ -366,13 +363,13 @@ class SPSPkgSearchByPpxIdTestCase(TestCase):
         found = SPSPkg.search_by_ppx_id(self.registered_ppx.id)
         self.assertEqual(found, newer)
 
-    def test_returns_none_when_no_match_but_null_ppx_items_exist(self):
+    def test_raises_does_not_exist_when_sps_pkg_and_pid_provider_are_not_related(self):
         SPSPkg.objects.create(
             creator=self.user, sps_pkg_name="pkg-null-ppx", pid_v3="v3-null",
         )
         other_ppx = PidProviderXML.objects.create(creator=self.user)
-        found = SPSPkg.search_by_ppx_id(other_ppx.id)
-        self.assertIsNone(found)
+        with self.assertRaises(SPSPkg.DoesNotExist):
+            SPSPkg.search_by_ppx_id(other_ppx.id)
 
     def test_raises_does_not_exist_when_no_match_and_no_null_ppx_items(self):
         SPSPkg.objects.exclude(id=self.pkg_with_ppx.id).delete()
@@ -473,7 +470,7 @@ class SPSPkgAddPpxTestCase(TestCase):
     @patch("package.models.pid_provider_app.is_registered_xml_zip")
     def test_add_ppx_success_saves_by_default(self, mock_is_registered):
         ppx_id = self.registered_ppx.id
-        mock_is_registered.side_effect = [{"ppx_id": ppx_id}]
+        mock_is_registered.return_value = ({"ppx_id": ppx_id},)
 
         response = self.sps_pkg.add_ppx(self.user, save=True)
 
@@ -485,7 +482,7 @@ class SPSPkgAddPpxTestCase(TestCase):
     @patch("package.models.pid_provider_app.is_registered_xml_zip")
     def test_add_ppx_with_save_false_does_not_persist(self, mock_is_registered):
         ppx_id = self.registered_ppx.id
-        mock_is_registered.side_effect = [{"ppx_id": ppx_id}]
+        mock_is_registered.return_value = ({"ppx_id": ppx_id},)
 
         response = self.sps_pkg.add_ppx(self.user, save=False)
 
@@ -499,7 +496,7 @@ class SPSPkgAddPpxTestCase(TestCase):
     def test_add_ppx_failure_returns_registered_and_does_not_set_ppx(
         self, mock_is_registered
     ):
-        mock_is_registered.side_effect = [{"error": "xml not found"}]
+        mock_is_registered.return_value = ({"error": "xml not found"},)
 
         response = self.sps_pkg.add_ppx(self.user, save=False)
 
@@ -539,7 +536,7 @@ class SPSPkgCompletePpxTestCase(TestCase):
 
         mock_add_ppx.side_effect = fake_add_ppx
 
-        response = SPSPkg.complete_ppx(user=self.user)
+        response = SPSPkg.complete_ppx(user=self.user, pkg_name_substr="pkg-")
 
         self.assertIn("pkg-ok", response["success"])
         self.assertEqual(len(response["failures"]), 2)
@@ -589,7 +586,7 @@ class SPSPkgCompletePpxTestCase(TestCase):
 
         with patch.object(SPSPkg, "add_ppx", autospec=True) as mock_add_ppx:
             mock_add_ppx.return_value = None
-            SPSPkg.complete_ppx(user=self.user)
+            SPSPkg.complete_ppx(user=self.user, pkg_name_substr="pkg-")
 
         called_ids = [call.args[0].id for call in mock_add_ppx.call_args_list]
         self.assertNotIn(pkg_with_ppx.id, called_ids)
@@ -669,8 +666,9 @@ class SPSPkgExcludeInvalidRecordsTestCase(unittest.TestCase):
         with patch.object(
             SPSPkg, "_exclude_invalid_records", side_effect=Exception("boom")
         ):
-            result = SPSPkg.exclude_invalid_records(Mock(), "0034-777220210006")
-
+            result = SPSPkg.exclude_invalid_records(
+                Mock(), "0034-777220210006", True, True
+            )
         self.assertIn("error", result)
         self.assertEqual(result["error"], "boom")
         self.assertIn("traceback", result)
@@ -680,8 +678,9 @@ class SPSPkgExcludeInvalidRecordsTestCase(unittest.TestCase):
         with patch.object(
             SPSPkg, "_exclude_invalid_records", return_value=expected
         ):
-            result = SPSPkg.exclude_invalid_records(Mock(), "0034-777220210006")
-
+            result = SPSPkg.exclude_invalid_records(
+                Mock(), "0034-777220210006", True, True
+            )
         self.assertEqual(result, expected)
 
 
@@ -717,13 +716,17 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
 
         mock_objects.filter.return_value = sps_pkgs_qs
 
-        result = SPSPkg._exclude_invalid_records(Mock(), "0034-777220210006")
+        result = SPSPkg._exclude_invalid_records(
+            Mock(), "0034-777220210006",
+            delete_sps_pkg_which_ppx_is_missing=True,
+            delete_sps_pkg_which_is_duplicated=True,
+        )
 
         self.assertEqual(result["total_sps_pkgs"], 5)
         self.assertEqual(result["total_deleted_items"], 0)
         self.assertEqual(result["exceptions"], [])
         self.assertEqual(result["duplicated_items"], [])
-        self.assertNotIn("total_deleted_due_to_missing_ppx", result)
+        self.assertNotIn("total_delete_sps_pkg_which_ppx_is_missing", result)
         mock_delete_related.assert_not_called()
 
     @patch.object(SPSPkg, "delete_related_items", return_value=(3, {}))
@@ -743,12 +746,16 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
 
         mock_objects.filter.side_effect = [first_qs, second_qs]
 
-        result = SPSPkg._exclude_invalid_records(Mock(), "0034-777220210006")
+        result = SPSPkg._exclude_invalid_records(
+            Mock(), "0034-777220210006",
+            delete_sps_pkg_which_ppx_is_missing=True,
+            delete_sps_pkg_which_is_duplicated=False,
+        )
 
         self.assertEqual(mock_objects.filter.call_count, 2)
         mock_delete_related.assert_called_once_with(to_delete_qs)
         self.assertEqual(result["total_sps_pkgs"], 5)
-        self.assertEqual(result["total_deleted_due_to_missing_ppx"], 3)
+        self.assertEqual(result["total_delete_sps_pkg_which_ppx_is_missing"], 3)
         self.assertEqual(result["total_deleted_items"], 3)
 
     @patch.object(SPSPkg, "delete_related_items", side_effect=Exception("db error"))
@@ -765,14 +772,18 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
 
         mock_objects.filter.return_value = sps_pkgs_qs
 
-        result = SPSPkg._exclude_invalid_records(Mock(), "0034-777220210006")
+        result = SPSPkg._exclude_invalid_records(
+            Mock(), "0034-777220210006",
+            delete_sps_pkg_which_ppx_is_missing=True,
+            delete_sps_pkg_which_is_duplicated=True,  # necessário p/ "exceptions" existir no dict
+        )
 
         self.assertEqual(len(result["exceptions"]), 1)
         self.assertEqual(
             result["exceptions"][0]["action"], "deleting due to missing ppx"
         )
         self.assertEqual(result["total_deleted_items"], 0)
-        self.assertNotIn("total_deleted_due_to_missing_ppx", result)
+        self.assertNotIn("total_delete_sps_pkg_which_ppx_is_missing", result)
 
     @patch.object(SPSPkg, "delete_related_items", return_value=(2, {}))
     @patch("package.models.SPSPkg.objects")
@@ -806,7 +817,11 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
 
         mock_objects.filter.return_value = sps_pkgs_qs
 
-        result = SPSPkg._exclude_invalid_records(Mock(), "0034-777220210006")
+        result = SPSPkg._exclude_invalid_records(
+            Mock(), "0034-777220210006",
+            delete_sps_pkg_which_ppx_is_missing=True,
+            delete_sps_pkg_which_is_duplicated=True,
+        )
 
         duplicados_qs.exclude.assert_called_once_with(id=10)
         mock_delete_related.assert_called_once_with(remover_qs)
@@ -840,7 +855,11 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
 
         mock_objects.filter.return_value = sps_pkgs_qs
 
-        result = SPSPkg._exclude_invalid_records(Mock(), "0034-777220210006")
+        result = SPSPkg._exclude_invalid_records(
+            Mock(), "0034-777220210006",
+            delete_sps_pkg_which_ppx_is_missing=True,
+            delete_sps_pkg_which_is_duplicated=True,
+        )
 
         self.assertEqual(len(result["exceptions"]), 1)
         self.assertEqual(result["exceptions"][0]["action"], "removing duplicity")
