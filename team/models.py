@@ -85,7 +85,7 @@ def has_permission(user=None):
 
 class TeamMember(CommonControlField):
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
-    is_active_member = models.BooleanField(null=True, blank=True, default=True)
+    is_active_member = models.BooleanField(default=True)
 
     base_form_class = CoreAdminModelForm
     panels = [
