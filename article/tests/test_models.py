@@ -3,8 +3,8 @@
 - Article.delete_related_items(qs)
 - Article.create_or_update(user, sps_pkg, issue=None, journal=None, position=None)
 - Article.get_repeated_values(field_name, queryset=None, issue=None)
-- Article.exclude_invalid_records(user, issue, timeout=None)
-- Article._exclude_invalid_records(user, issue, timeout=None)
+- Article.exclude_invalid_records(user, issue, delete_article_which_sps_pkg_is_missing=True, delete_article_which_is_duplicated=True, timeout=None)
+- Article._exclude_invalid_records(user, issue, delete_article_which_sps_pkg_is_missing=True, delete_article_which_is_duplicated=True, timeout=None)
 - Article.duplicated_item_to_keep(user, timeout, duplicated_items)
 
 """
@@ -305,20 +305,30 @@ class ArticleCreateOrUpdateTestCase(unittest.TestCase):
 
 
 class ArticleGetRepeatedValuesTestCase(unittest.TestCase):
-    """Testes para Article.get_repeated_values()."""
+    """Testes para Article.get_repeated_values().
+
+    Fluxo real: queryset.filter(**params) -> .values(field_name) ->
+    .filter(sps_pkg_id__isnull=False) -> .annotate(total=Count("id")) ->
+    .filter(total__gt=1) -> .values_list(field_name, flat=True).
+    """
 
     @patch("article.models.Article.objects")
     def test_uses_default_manager_when_no_queryset_given(self, mock_objects):
         mock_filtered = MagicMock()
         mock_objects.filter.return_value = mock_filtered
         mock_annotated = MagicMock()
-        mock_filtered.values.return_value.annotate.return_value = mock_annotated
+        mock_filtered.values.return_value.filter.return_value.annotate.return_value = (
+            mock_annotated
+        )
         mock_annotated.filter.return_value.values_list.return_value = ["v1", "v2"]
 
-        result = Article.get_repeated_values("pid_v2")
+        result = Article.get_repeated_values("pid_v2", mock_objects)
 
         mock_objects.filter.assert_called_once_with()
         mock_filtered.values.assert_called_once_with("pid_v2")
+        mock_filtered.values.return_value.filter.assert_called_once_with(
+            sps_pkg_id__isnull=False
+        )
         self.assertEqual(result, ["v1", "v2"])
 
     def test_uses_given_queryset(self):
@@ -326,7 +336,9 @@ class ArticleGetRepeatedValuesTestCase(unittest.TestCase):
         mock_filtered = MagicMock()
         mock_qs.filter.return_value = mock_filtered
         mock_annotated = MagicMock()
-        mock_filtered.values.return_value.annotate.return_value = mock_annotated
+        mock_filtered.values.return_value.filter.return_value.annotate.return_value = (
+            mock_annotated
+        )
         mock_annotated.filter.return_value.values_list.return_value = ["v1"]
 
         result = Article.get_repeated_values(
@@ -335,6 +347,9 @@ class ArticleGetRepeatedValuesTestCase(unittest.TestCase):
 
         mock_qs.filter.assert_called_once_with()
         mock_filtered.values.assert_called_once_with("sps_pkg__sps_pkg_name")
+        mock_filtered.values.return_value.filter.assert_called_once_with(
+            sps_pkg_id__isnull=False
+        )
         self.assertEqual(result, ["v1"])
 
     def test_filters_by_issue_when_given(self):
@@ -343,7 +358,9 @@ class ArticleGetRepeatedValuesTestCase(unittest.TestCase):
         mock_filtered = MagicMock()
         mock_qs.filter.return_value = mock_filtered
         mock_annotated = MagicMock()
-        mock_filtered.values.return_value.annotate.return_value = mock_annotated
+        mock_filtered.values.return_value.filter.return_value.annotate.return_value = (
+            mock_annotated
+        )
         mock_annotated.filter.return_value.values_list.return_value = []
 
         Article.get_repeated_values("pid_v2", queryset=mock_qs, issue=mock_issue)
@@ -357,7 +374,12 @@ class ArticleGetRepeatedValuesTestCase(unittest.TestCase):
 
 
 class ArticleExcludeInvalidRecordsTestCase(unittest.TestCase):
-    """Testes para o wrapper exclude_invalid_records()."""
+    """Testes para o wrapper exclude_invalid_records().
+
+    O wrapper repassa para _exclude_invalid_records posicionalmente:
+    (user, issue, delete_article_which_sps_pkg_is_missing,
+    delete_article_which_is_duplicated, timeout).
+    """
 
     def test_wrapper_catches_exceptions(self):
         with patch.object(
@@ -385,7 +407,8 @@ class ArticleExcludeInvalidRecordsTestCase(unittest.TestCase):
             Article.exclude_invalid_records(Mock(), Mock(), timeout=30)
 
         mock_inner.assert_called_once()
-        self.assertEqual(mock_inner.call_args[0][2], 30)
+        # args posicionais: (user, issue, missing_flag, duplicated_flag, timeout)
+        self.assertEqual(mock_inner.call_args[0][4], 30)
 
 
 # ============================================================
@@ -429,7 +452,7 @@ class ArticleExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         self.assertEqual(result["total_deleted_items"], 0)
         self.assertEqual(result["exceptions"], [])
         self.assertEqual(result["duplicated_items"], [])
-        self.assertNotIn("total_deleted_due_to_missing_sps_pkg", result)
+        self.assertNotIn("total_delete_article_which_sps_pkg_is_missing", result)
 
     @patch.object(Article, "get_repeated_values", return_value=[])
     @patch.object(Article, "delete_related_items", return_value=(3, {}))
@@ -455,7 +478,9 @@ class ArticleExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         self.assertEqual(mock_objects.filter.call_count, 2)
         mock_delete_related.assert_called_once_with(to_delete_qs)
         self.assertEqual(result["total_articles"], 5)
-        self.assertEqual(result["total_deleted_due_to_missing_sps_pkg"], 3)
+        self.assertEqual(
+            result["total_delete_article_which_sps_pkg_is_missing"], 3
+        )
         self.assertEqual(result["total_deleted_items"], 3)
 
     @patch.object(
@@ -481,7 +506,7 @@ class ArticleExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
             result["exceptions"][0]["action"], "deleting due to missing sps_pkg"
         )
         self.assertEqual(result["total_deleted_items"], 0)
-        self.assertNotIn("total_deleted_due_to_missing_sps_pkg", result)
+        self.assertNotIn("total_delete_article_which_sps_pkg_is_missing", result)
 
     @patch.object(Article, "duplicated_item_to_keep")
     @patch.object(Article, "delete_related_items", return_value=(2, {}))
