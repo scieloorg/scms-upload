@@ -26,7 +26,7 @@ def _get_digits(value):
         return 0
 
 
-class IssueGetOrCreateError(Exception): ...
+class IssueUpdateError(Exception): ...
 
 
 class Issue(CommonControlField, IssuePublicationDate):
@@ -168,9 +168,8 @@ class Issue(CommonControlField, IssuePublicationDate):
                 number=number,
             ).order_by("-updated").first()
 
-    @classmethod
-    def create(
-        cls,
+    def update(
+        self,
         user,
         journal,
         volume,
@@ -183,21 +182,22 @@ class Issue(CommonControlField, IssuePublicationDate):
         issue_pid_suffix=None,
     ):
         try:
-            obj = cls()
-            obj.journal = journal
-            obj.volume = volume
-            obj.supplement = supplement
-            obj.number = number
-            obj.publication_year = publication_year
-            obj.order = order or obj.generate_order()
-            obj.issue_pid_suffix = issue_pid_suffix or obj.generate_issue_pid_suffix()
-            obj.is_continuous_publishing_model = is_continuous_publishing_model
-            obj.total_documents = total_documents
-            obj.creator = user
-            obj.save()
-            return obj
+            self.journal = journal
+            self.volume = volume
+            self.supplement = supplement
+            self.number = number
+            self.publication_year = publication_year
+            self.order = order or self.order or self.generate_order()
+            self.issue_pid_suffix = issue_pid_suffix or self.issue_pid_suffix or self.generate_issue_pid_suffix()
+            self.is_continuous_publishing_model = is_continuous_publishing_model
+            self.total_documents = total_documents
+            if self.creator:
+                self.updated_by = user
+            else:
+                self.creator = user
+            self.save()
         except IntegrityError:
-            return cls.get(journal, volume, supplement, number)
+            raise
         except Exception as e:
             data = dict(
                 journal=journal,
@@ -205,19 +205,18 @@ class Issue(CommonControlField, IssuePublicationDate):
                 supplement=supplement,
                 number=number,
                 publication_year=publication_year,
-                user=user,
             )
-            raise IssueGetOrCreateError(f"Unable to get or create issue {e} {data}")
+            raise IssueUpdateError(f"Unable to get or create issue {e} {data}")
 
     @classmethod
-    def get_or_create(
+    def create_or_update(
         cls,
+        user,
         journal,
         volume,
         supplement,
         number,
-        publication_year,
-        user,
+        publication_year=None,
         is_continuous_publishing_model=None,
         total_documents=None,
         order=None,
@@ -230,33 +229,22 @@ class Issue(CommonControlField, IssuePublicationDate):
                 supplement=supplement,
                 number=number,
             )
-            obj.is_continuous_publishing_model = (
-                is_continuous_publishing_model or obj.is_continuous_publishing_model
-            )
-            obj.total_documents = total_documents or obj.total_documents
-            obj.publication_year = publication_year or obj.publication_year
-            obj.order = order or obj.order or obj.generate_order()
-            obj.issue_pid_suffix = (
-                issue_pid_suffix
-                or obj.issue_pid_suffix
-                or obj.generate_issue_pid_suffix()
-            )
-            obj.updated_by = user
-            obj.save()
-            return obj
         except cls.DoesNotExist:
-            return cls.create(
-                user,
-                journal,
-                volume,
-                supplement,
-                number,
-                publication_year,
-                is_continuous_publishing_model,
-                total_documents,
-                order,
-                issue_pid_suffix,
-            )
+            obj = cls()
+
+        obj.update(
+            user,
+            journal,
+            volume,
+            supplement,
+            number,
+            publication_year,
+            is_continuous_publishing_model,
+            total_documents,
+            order,
+            issue_pid_suffix,
+        )
+        return obj
 
     def generate_issue_pid_suffix(self):
         return str(self.generate_order()).zfill(4)
