@@ -1,8 +1,6 @@
 # wagtail_hooks.py (ou views.py)
-from django.http import HttpResponseRedirect
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel
-from wagtail.admin.ui.tables import UpdatedAtColumn
+from wagtail.admin.filters import WagtailFilterSet, BooleanFilter
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
@@ -37,18 +35,34 @@ class OfficialJournalViewSet(SnippetViewSet):
     inspect_view_enabled = True
 
 
+class JournalFilterSet(WagtailFilterSet):
+    is_complete = BooleanFilter(
+        method="filter_is_complete",
+        label=_("Is complete"),
+    )
+
+    class Meta:
+        model = Journal
+        fields = ["core_synchronized"]  # campos reais de banco continuam normais aqui
+
+    def filter_is_complete(self, queryset, name, value):
+        # is_complete é property em Python, não dá pra filtrar via SQL
+        ids = [obj.pk for obj in queryset if not obj.missing]
+        return queryset.filter(pk__in=ids)
+
+
 class JournalViewSet(SnippetViewSet):
     model = Journal
     menu_label = _("Journal")
     menu_icon = "folder"
     menu_order = 200
     add_to_settings_menu = False
-    add_to_admin_menu = False  # Será adicionado via grupo
-    
+    add_to_admin_menu = False
+
     list_display = [
         "title",
         "journal_acron",
-        "core_synchronized",
+        "missing_fields",
         "updated",
     ]
     search_fields = [
@@ -58,7 +72,7 @@ class JournalViewSet(SnippetViewSet):
         "title",
         "journal_acron",
     ]
-    list_filter = ["core_synchronized"]
+    filterset_class = JournalFilterSet
 
 
 class JournalCollectionViewSet(SnippetViewSet):
