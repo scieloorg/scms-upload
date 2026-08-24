@@ -1,5 +1,3 @@
-import logging
-
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -10,17 +8,14 @@ from wagtail.admin.panels import FieldPanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from collection.models import Collection
-from core.models import CommonControlField, VisualIdentityMixin
 from core.forms import CoreAdminModelForm
+from core.models import CommonControlField, VisualIdentityMixin
 from journal.models import JournalCollection
+
 User = get_user_model()
 
 
-ALLOWED_COLLECTIONS = ["dom", "spa", "scl", "pan"]
-
-
 class TeamRole(models.TextChoices):
-    """Role types for team members."""
     MANAGER = "manager", _("Manager")
     MEMBER = "member", _("Member")
 
@@ -28,9 +23,7 @@ class TeamRole(models.TextChoices):
 def active_contract_queryset(queryset=None, today=None):
     if queryset is None:
         queryset = JournalCompanyContract.objects.all()
-
     today = today or timezone.localdate()
-
     return queryset.filter(is_active=True).filter(
         Q(start_date__isnull=True) | Q(start_date__lte=today),
         Q(end_date__isnull=True) | Q(end_date__gte=today),
@@ -87,18 +80,7 @@ def get_user_membership_ids(user):
         )
         result["journal_list_ids"].update(contracts.values_list("journal", flat=True))
 
-    return {key: list(value) for key, value in result.items()}
-
-
-def has_permission(user=None):
-    try:
-        if not user:
-            logging.info("has_permission: collection")
-            return Collection.objects.filter(acron__in=ALLOWED_COLLECTIONS).exists()
-        logging.info("has_permission: user")
-        return CollectionTeamMember.has_upload_permission(user)
-    except Exception:
-        return False
+    return {k: list(v) for k, v in result.items()}
 
 
 class TeamMember(CommonControlField):
@@ -110,17 +92,6 @@ class TeamMember(CommonControlField):
         FieldPanel("user"),
         FieldPanel("is_active_member"),
     ]
-
-    @staticmethod
-    def autocomplete_custom_queryset_filter(text):
-        return TeamMember.objects.filter(
-            Q(user__username__icontains=text)
-            | Q(user__email__icontains=text)
-            | Q(user__name__icontains=text)
-        )
-
-    def autocomplete_label(self):
-        return str(self.user)
 
     class Meta:
         abstract = True
@@ -140,10 +111,7 @@ class CollectionTeamMember(TeamMember):
         Collection, null=True, blank=True, on_delete=models.SET_NULL
     )
     role = models.CharField(
-        _("Role"),
-        max_length=20,
-        choices=TeamRole.choices,
-        default=TeamRole.MEMBER
+        _("Role"), max_length=20, choices=TeamRole.choices, default=TeamRole.MEMBER
     )
 
     panels = [
@@ -176,64 +144,17 @@ class CollectionTeamMember(TeamMember):
     def __str__(self):
         return f"{self.user} - {self.collection} ({self.get_role_display()})"
 
-    def is_manager(self):
-        """Check if this member is a manager."""
-        return self.role == TeamRole.MANAGER
-
-    @classmethod
-    def user_is_manager(cls, user, collection):
-        """Check if a user is a manager for a specific collection."""
-        return cls.objects.filter(
-            user=user,
-            collection=collection,
-            role=TeamRole.MANAGER,
-            is_active_member=True
-        ).exists()
-
-    @classmethod
-    def get_user_collections(cls, user, role=None, is_active=True):
-        """Get all collections a user is associated with."""
-        filters = {"user": user}
-        if role:
-            filters["role"] = role
-        if is_active is not None:
-            filters["is_active_member"] = is_active
-        return cls.objects.filter(**filters).select_related("collection")
-
-    @staticmethod
-    def collections(user, is_active_member=None):
-        try:
-            if is_active_member:
-                for member in CollectionTeamMember.objects.filter(
-                    user=user, is_active_member=is_active_member
-                ):
-                    yield member.collection
-            else:
-                for member in CollectionTeamMember.objects.filter(user=user):
-                    yield member.collection
-        except Exception:
-            return Collection.objects.all()
-
-    @staticmethod
-    def members(user, is_active_member=None):
-        for collection in CollectionTeamMember.collections(user, is_active_member):
-            return CollectionTeamMember.objects.filter(collection=collection)
-
-    @classmethod
-    def has_upload_permission(cls, user):
-        return cls.objects.filter(user=user, collection__acron__in=ALLOWED_COLLECTIONS).exists()
-
 
 class Company(VisualIdentityMixin, CommonControlField):
-    """
-    Company represents an editorial services provider that can be contracted
-    by journals to produce XML files.
-    """
     name = models.CharField(_("Company Name"), max_length=255, unique=True)
     description = models.TextField(_("Description"), blank=True, null=True)
-    personal_contact = models.CharField(_("Personal Contact"), max_length=30, blank=True, null=True)
+    personal_contact = models.CharField(
+        _("Personal Contact"), max_length=30, blank=True, null=True
+    )
     contact_email = models.EmailField(_("Contact Email"), blank=True, null=True)
-    contact_phone = models.CharField(_("Contact Phone"), max_length=50, blank=True, null=True)
+    contact_phone = models.CharField(
+        _("Contact Phone"), max_length=50, blank=True, null=True
+    )
     certified_since = models.DateField(_("Certified Since"), blank=True, null=True)
     is_active = models.BooleanField(_("Active"), default=True)
 
@@ -244,6 +165,7 @@ class Company(VisualIdentityMixin, CommonControlField):
             models.Index(fields=["name"]),
             models.Index(fields=["is_active"]),
         ]
+
     base_form_class = CoreAdminModelForm
     panels = [
         FieldPanel("name"),
@@ -265,40 +187,16 @@ class Company(VisualIdentityMixin, CommonControlField):
     def autocomplete_label(self):
         return self.name
 
-    @classmethod
-    def get_managers(cls, company_id):
-        """Get all managers for this company."""
-        return CompanyTeamMember.objects.filter(
-            company_id=company_id,
-            role=TeamRole.MANAGER,
-            is_active_member=True
-        )
-
-    @classmethod
-    def get_members(cls, company_id):
-        """Get all active members (including managers) for this company."""
-        return CompanyTeamMember.objects.filter(
-            company_id=company_id,
-            is_active_member=True
-        )
-
 
 class JournalTeamMember(TeamMember):
-    """
-    Editorial team members associated with a specific journal.
-    Can be either managers or regular members.
-    """
     journal = models.ForeignKey(
         "journal.Journal",
         on_delete=models.CASCADE,
         related_name="team_members",
-        verbose_name=_("Journal")
+        verbose_name=_("Journal"),
     )
     role = models.CharField(
-        _("Role"),
-        max_length=20,
-        choices=TeamRole.choices,
-        default=TeamRole.MEMBER
+        _("Role"), max_length=20, choices=TeamRole.choices, default=TeamRole.MEMBER
     )
 
     class Meta:
@@ -332,47 +230,16 @@ class JournalTeamMember(TeamMember):
     def autocomplete_label(self):
         return f"{self.user} - {self.journal} ({self.get_role_display()})"
 
-    def is_manager(self):
-        """Check if this member is a manager."""
-        return self.role == TeamRole.MANAGER
-
-    @classmethod
-    def user_is_manager(cls, user, journal):
-        """Check if a user is a manager for a specific journal."""
-        return cls.objects.filter(
-            user=user,
-            journal=journal,
-            role=TeamRole.MANAGER,
-            is_active_member=True
-        ).exists()
-
-    @classmethod
-    def get_user_journals(cls, user, role=None, is_active=True):
-        """Get all journals a user is associated with."""
-        filters = {"user": user}
-        if role:
-            filters["role"] = role
-        if is_active is not None:
-            filters["is_active_member"] = is_active
-        return cls.objects.filter(**filters).select_related("journal")
-
 
 class CompanyTeamMember(TeamMember):
-    """
-    Company team members (XML providers) associated with an editorial services company.
-    Can be either managers or regular members.
-    """
     company = models.ForeignKey(
         Company,
         on_delete=models.CASCADE,
         related_name="team_members",
-        verbose_name=_("Company")
+        verbose_name=_("Company"),
     )
     role = models.CharField(
-        _("Role"),
-        max_length=20,
-        choices=TeamRole.choices,
-        default=TeamRole.MEMBER
+        _("Role"), max_length=20, choices=TeamRole.choices, default=TeamRole.MEMBER
     )
 
     class Meta:
@@ -406,47 +273,19 @@ class CompanyTeamMember(TeamMember):
     def autocomplete_label(self):
         return f"{self.user} - {self.company} ({self.get_role_display()})"
 
-    def is_manager(self):
-        """Check if this member is a manager."""
-        return self.role == TeamRole.MANAGER
-
-    @classmethod
-    def user_is_manager(cls, user, company):
-        """Check if a user is a manager for a specific company."""
-        return cls.objects.filter(
-            user=user,
-            company=company,
-            role=TeamRole.MANAGER,
-            is_active_member=True
-        ).exists()
-
-    @classmethod
-    def get_user_companies(cls, user, role=None, is_active=True):
-        """Get all companies a user is associated with."""
-        filters = {"user": user}
-        if role:
-            filters["role"] = role
-        if is_active is not None:
-            filters["is_active_member"] = is_active
-        return cls.objects.filter(**filters).select_related("company")
-
 
 class JournalCompanyContract(CommonControlField):
-    """
-    Represents a contract between a journal and a company for XML production services.
-    Journal managers can manage these contracts.
-    """
     journal = models.ForeignKey(
         "journal.Journal",
         on_delete=models.CASCADE,
         related_name="company_contracts",
-        verbose_name=_("Journal")
+        verbose_name=_("Journal"),
     )
     company = models.ForeignKey(
         Company,
         on_delete=models.CASCADE,
         related_name="journal_contracts",
-        verbose_name=_("Company")
+        verbose_name=_("Company"),
     )
     is_active = models.BooleanField(_("Active"), default=True)
     start_date = models.DateField(_("Start Date"), null=True, blank=True)
@@ -488,29 +327,7 @@ class JournalCompanyContract(CommonControlField):
 
     def clean(self):
         super().clean()
-
         if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValidationError(
                 {"end_date": _("End date must be on or after start date.")}
             )
-
-    @classmethod
-    def get_journal_companies(cls, journal, is_active=True):
-        """Get all companies contracted by a journal."""
-        filters = {"journal": journal}
-        if is_active is not None:
-            filters["is_active"] = is_active
-        return cls.objects.filter(**filters).select_related("company")
-
-    @classmethod
-    def get_company_journals(cls, company, is_active=True):
-        """Get all journals that contracted a company."""
-        filters = {"company": company}
-        if is_active is not None:
-            filters["is_active"] = is_active
-        return cls.objects.filter(**filters).select_related("journal")
-
-    @classmethod
-    def can_manage_contract(cls, user, journal):
-        """Check if a user can manage contracts for a journal (must be a journal manager)."""
-        return JournalTeamMember.user_is_manager(user, journal)
