@@ -3,7 +3,14 @@ from contextlib import contextmanager
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
+from django.core.exceptions import PermissionDenied
+from django.db.models.signals import (
+    m2m_changed,
+    post_delete,
+    post_save,
+    pre_delete,
+    pre_save,
+)
 
 from collection.models import Collection
 
@@ -142,6 +149,70 @@ def _sync_collection_team_users(instance, **_kwargs):
         sync_user_groups(user)
 
 
+def _user_groups_changed_handler(instance, action, reverse, pk_set, **_kwargs):
+    if is_system_group_update() or action not in ("pre_add", "pre_remove", "pre_clear"):
+        return
+
+    protected_ids = set(
+        Group.objects.filter(name__in=TeamGroups.ALL).values_list("pk", flat=True)
+    )
+    if reverse:
+        touches_protected = instance.pk in protected_ids
+    elif action == "pre_clear":
+        touches_protected = instance.groups.filter(pk__in=protected_ids).exists()
+    else:
+        touches_protected = bool(protected_ids.intersection(pk_set or set()))
+
+    if touches_protected:
+        raise PermissionDenied(
+            "Canonical group memberships are managed by active team records."
+        )
+
+
+def _group_permissions_changed_handler(instance, action, reverse, pk_set, **_kwargs):
+    if is_system_group_update() or action not in ("pre_add", "pre_remove", "pre_clear"):
+        return
+
+    protected_ids = set(
+        Group.objects.filter(name__in=TeamGroups.ALL).values_list("pk", flat=True)
+    )
+    if reverse:
+        if action == "pre_clear":
+            touches_protected = instance.group_set.filter(pk__in=protected_ids).exists()
+        else:
+            touches_protected = bool(protected_ids.intersection(pk_set or set()))
+    else:
+        touches_protected = instance.pk in protected_ids
+
+    if touches_protected:
+        raise PermissionDenied(
+            "Canonical group permissions are managed by the authorization matrix."
+        )
+
+
+def _group_pre_save_handler(sender, instance, **_kwargs):
+    if is_system_group_update():
+        return
+
+    if instance.pk:
+        try:
+            old = sender.objects.get(pk=instance.pk)
+            if old.name in TeamGroups.ALL and instance.name != old.name:
+                raise PermissionDenied(
+                    f"Canonical group '{old.name}' cannot be renamed."
+                )
+        except sender.DoesNotExist:
+            pass
+
+
+def _group_pre_delete_handler(instance, **_kwargs):
+    if is_system_group_update():
+        return
+
+    if instance.name in TeamGroups.ALL:
+        raise PermissionDenied(f"Canonical group '{instance.name}' cannot be deleted.")
+
+
 def register_signals():
     for model in _TEAM_MEMBER_RELATIONS:
         model_label = model._meta.label_lower
@@ -175,4 +246,31 @@ def register_signals():
         sender=Collection,
         weak=False,
         dispatch_uid="team.sync_groups_after_collection_delete",
+    )
+
+    pre_save.connect(
+        _group_pre_save_handler,
+        sender=Group,
+        weak=False,
+        dispatch_uid="team.protect_group_rename",
+    )
+    pre_delete.connect(
+        _group_pre_delete_handler,
+        sender=Group,
+        weak=False,
+        dispatch_uid="team.protect_group_delete",
+    )
+
+    User = get_user_model()
+    m2m_changed.connect(
+        _user_groups_changed_handler,
+        sender=User.groups.through,
+        weak=False,
+        dispatch_uid="team.protect_canonical_user_groups",
+    )
+    m2m_changed.connect(
+        _group_permissions_changed_handler,
+        sender=Group.permissions.through,
+        weak=False,
+        dispatch_uid="team.protect_canonical_group_permissions",
     )
