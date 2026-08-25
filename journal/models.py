@@ -180,7 +180,7 @@ class OfficialJournal(CommonControlField):
             params["issn_print"] = issn_print
         if issnl:
             issns.append(issnl)
-            params["issns"] = issns
+            params["issnl"] = issnl
         if not issns:
             raise ValueError(
                 f"OfficialJournal.get requires issn_print, issn_electronic, issnl"
