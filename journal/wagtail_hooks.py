@@ -1,6 +1,7 @@
 # wagtail_hooks.py (ou views.py)
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.filters import WagtailFilterSet, BooleanFilter
+from django_filters import BooleanFilter
+from wagtail.admin.filters import WagtailFilterSet
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
@@ -46,8 +47,14 @@ class JournalFilterSet(WagtailFilterSet):
         fields = ["core_synchronized"]  # campos reais de banco continuam normais aqui
 
     def filter_is_complete(self, queryset, name, value):
-        # is_complete é property em Python, não dá pra filtrar via SQL
-        ids = [obj.pk for obj in queryset if not obj.missing]
+        if value is None:
+            return queryset
+
+        if value:
+            ids = [obj.pk for obj in queryset if not obj.missing_fields]
+        else:
+            ids = [obj.pk for obj in queryset if obj.missing_fields]
+
         return queryset.filter(pk__in=ids)
 
 
