@@ -133,7 +133,7 @@ class TestJournalDataChecker(TestCase):
         journal = MagicMock()
         journal.core_synchronized = False
 
-        self.assertFalse(self.checker.is_local_or_remote(journal))
+        self.assertEqual("remote", self.checker.is_local_or_remote(journal))
 
     @patch("proc.source_core_api.JournalProc.objects.filter")
     def test_is_local_or_remote_returns_false_if_journal_proc_does_not_exist(self, mock_proc_filter):
@@ -142,7 +142,7 @@ class TestJournalDataChecker(TestCase):
         journal.missing_fields = []
         mock_proc_filter.return_value.exists.return_value = False
 
-        self.assertFalse(self.checker.is_local_or_remote(journal))
+        self.assertEqual("remote", self.checker.is_local_or_remote(journal))
 
     @patch("proc.source_core_api.JournalProc.objects.filter")
     def test_is_local_or_remote_returns_true_when_complete_and_proc_exists(self, mock_proc_filter):
@@ -151,7 +151,7 @@ class TestJournalDataChecker(TestCase):
         journal.missing_fields = []
         mock_proc_filter.return_value.exists.return_value = True
 
-        self.assertTrue(self.checker.is_local_or_remote(journal))
+        self.assertEqual("local", self.checker.is_local_or_remote(journal))
 
     @patch.object(JournalDataChecker, "get_or_fetch")
     @patch("proc.source_core_api.JournalProc.objects.filter")
