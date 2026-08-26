@@ -20,10 +20,10 @@ def get_user_group_names(user):
 
 
 def user_app_access(user, app_label):
-    if user and user.is_superuser:
-        return FULL_ACCESS
     if not user or not user.is_authenticated:
         return NO_ACCESS
+    if user.is_superuser:
+        return FULL_ACCESS
     if user.is_staff and app_label in STAFF_APPS:
         return FULL_ACCESS
 
@@ -41,14 +41,14 @@ def user_app_access(user, app_label):
 
 
 def get_user_accessible_apps(user):
-    if user and user.is_superuser:
+    if not user or not user.is_authenticated:
+        return set()
+    if user.is_superuser:
         return {
             app_label
             for group_access in GROUP_ACCESS.values()
             for app_label in group_access["apps"]
         } | STAFF_APPS
-    if not user or not user.is_authenticated:
-        return set()
 
     accessible_apps = {
         app_label

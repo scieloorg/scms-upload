@@ -42,10 +42,10 @@ class CollectionTeamMemberPolicy:
 class CompanyPolicy:
     @staticmethod
     def scope_queryset(user, queryset):
-        if user and user.is_superuser:
-            return queryset
         if not user or not user.is_authenticated:
             return queryset.none()
+        if user.is_superuser:
+            return queryset
 
         group_names = set(user.groups.values_list("name", flat=True))
         if TeamGroups.COLLECTION_ADMIN in group_names and (
@@ -73,10 +73,10 @@ class CompanyPolicy:
 class JournalTeamMemberPolicy:
     @staticmethod
     def scope_queryset(user, queryset):
-        if user and user.is_superuser:
-            return queryset
         if not user or not user.is_authenticated:
             return queryset.none()
+        if user.is_superuser:
+            return queryset
 
         group_names = set(user.groups.values_list("name", flat=True))
         scope = Q()

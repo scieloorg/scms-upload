@@ -20,10 +20,10 @@ from team.authorization import user_app_access
 
 class TeamModelPermissionPolicy(ModelPermissionPolicy):
     def _check_app_access(self, user, action):
-        if user and user.is_superuser:
-            return True
         if not user or not user.is_authenticated:
             return False
+        if user.is_superuser:
+            return True
         access = user_app_access(user, self.app_label)
         if not access or access == "none":
             return False

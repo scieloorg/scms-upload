@@ -10,10 +10,10 @@ def scope_by_membership(
     journal_field=None,
     company_field=None,
 ):
-    if user and user.is_superuser:
-        return queryset
     if not user or not user.is_authenticated:
         return queryset.none()
+    if user.is_superuser:
+        return queryset
 
     membership = get_user_membership_ids(user)
     collection_ids = membership.get("collection_list_ids") or []
