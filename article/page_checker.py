@@ -7,7 +7,7 @@ import unicodedata
 from difflib import SequenceMatcher
 from html import unescape
 
-from core.utils.requester import fetch_data
+from core.utils.requester import fetch_data, NonRetryableError, RetryableError
 
 
 # Threshold de similaridade para considerar "encontrado"
@@ -39,7 +39,7 @@ def check_url(url, timeout):
             raise ValueError("check_page_url_and_content: URL is required for availability check.")
         content = fetch_data(url, timeout=timeout or 30)
         return {"content": content}
-    except Exception as e:
+    except (NonRetryableError, RetryableError) as e:
         return {"error": str(e), "function": "check_url"}
     
 
