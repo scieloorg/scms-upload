@@ -2787,7 +2787,8 @@ class ArticleProc(BaseProc, ClusterableModel):
             results = []
             multiple_values = (
                 article_procs
-                .filter(sps_pkg_id__isnull=True)
+                .filter(sps_pkg_id__isnull=False)
+                .values("sps_pkg_id")
                 .annotate(total=Count("id"))
                 .filter(total__gt=1)
                 .values_list("sps_pkg_id", flat=True)
@@ -2822,7 +2823,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             duplicated_items = article_procs.filter(sps_pkg_id=value)
             data["total"] = duplicated_items.count()
 
-            article_id = duplicated_items.value_list(
+            article_id = duplicated_items.values_list(
                 "sps_pkg__article_id", flat=True
             ).distinct()
 
