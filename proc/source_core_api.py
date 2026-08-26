@@ -728,15 +728,20 @@ def process_issue_result(user, journal, result):
         publication_year=result.get("year"),
         order=result.get("order"),
         issue_pid_suffix=result.get("issue_pid_suffix"),
+        is_continuous_publishing_model=result.get("is_continuous_publishing_model"),
+        total_documents=result.get("total_documents"),
     )
 
     # Atualiza campos adicionais do issue se disponíveis na API
+    save = False
     if hasattr(issue, "season") and result.get("season"):
         issue.season = result.get("season")
+        save = True
     if hasattr(issue, "month") and result.get("month"):
         issue.month = result.get("month")
-
-    issue.save()
+        save = True
+    if save:
+        issue.save()
 
     for journal_proc in JournalProc.objects.filter(journal=journal):
         try:
