@@ -66,7 +66,7 @@ from issue.models import Issue
 from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
-from migration import controller
+from migration import controller as migration_controller
 from migration import choices as migration_choices
 from proc.controller import (
     create_or_update_migrated_issue,
@@ -82,7 +82,7 @@ from publication.api.issue import publish_issue, sync_issue
 from publication.api.journal import publish_journal
 from publication.api.publication import get_api_data
 from tracker import choices as tracker_choices
-from tracker.models import TaskTracker, UnexpectedEvent, sanitize_for_json
+from tracker.models import TaskTracker, UnexpectedEvent
 
 User = get_user_model()
 
@@ -388,7 +388,7 @@ def task_migrate_and_publish_journals_by_collection(
     try:
         user = _get_user(user_id, username)
 
-        classic_website = controller.get_classic_website(collection_acron)
+        classic_website = migration_controller.get_classic_website(collection_acron)
         collection = Collection.objects.get(acron=collection_acron)
         create_or_update_migrated_journal(
             user, collection, classic_website, force_import_acron_id_file
@@ -439,7 +439,7 @@ def task_migrate_and_publish_journals_by_collection(
                 else:
                     # cria journal a partir de migrated journal
                     journal_proc.create_or_update_item(
-                        user, force_update, controller.create_or_update_journal
+                        user, force_update, migration_controller.create_or_update_journal
                     )
                     detail["journal_data_source"] = "classic website data"
                 if qa_api_data and not qa_api_data.get("error"):
@@ -730,7 +730,7 @@ def task_migrate_and_publish_issues_by_collection(
     try:
         user = _get_user(user_id, username)
 
-        classic_website = controller.get_classic_website(collection_acron)
+        classic_website = migration_controller.get_classic_website(collection_acron)
         collection = Collection.objects.get(acron=collection_acron)
         create_or_update_migrated_issue(
             user, collection, classic_website, force_update
@@ -1085,7 +1085,7 @@ def task_migrate_and_publish_articles_by_journal(
     """
     Migra e publica artigos de um periódico.
 
-    Importa o arquivo acron.id via ``controller.import_journal_acron_id_records``
+    Importa o arquivo acron.id via ``migration_controller.import_journal_acron_id_records``
     e agenda ``task_migrate_and_publish_articles_by_issue`` para cada
     ``IssueProc`` do periódico.
     """
@@ -1123,7 +1123,7 @@ def task_migrate_and_publish_articles_by_journal(
 
         # a partir de acron.id, cria ou atualiza JournalAcronIdFile e IdFileRecord,
         # fonte para criar/atualizar ArticleProc
-        response = controller.import_journal_acron_id_records(
+        response = migration_controller.import_journal_acron_id_records(
             user,
             ArticleProc,
             journal_proc,
@@ -1236,7 +1236,7 @@ def task_migrate_and_publish_articles_by_issue(
         response = issue_proc.migrate_document_files(
             user,
             force_migrate_document_files,
-            controller.migrate_issue_files,
+            migration_controller.migrate_issue_files,
         )
         task_exec.add_event({"operation": "migrate_document_files", "response": response})
         task_exec.update_total_status(("Created or updated Migrated file records"), issue_proc_id)
