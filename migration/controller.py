@@ -334,6 +334,7 @@ def create_or_update_issue(
         migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         force_update=force_update,
     )
+    return issue
 
 
 def _get_issue_params(user, journal, classic_website_issue):
