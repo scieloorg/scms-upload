@@ -3,7 +3,7 @@ from django.db.models import Q
 
 from team.models import get_user_membership_ids
 from upload import choices
-from upload.permissions import ACCESS_ALL_PACKAGES
+from upload.permissions import ACCESS_PACKAGES
 
 
 def scope_package_queryset(qs, user):
@@ -30,7 +30,7 @@ def scope_package_queryset(qs, user):
         | Q(article__journal__in=journal_list_ids)
     )
 
-    if user.has_perm(f"upload.{ACCESS_ALL_PACKAGES}"):
+    if user.has_perm(f"upload.{ACCESS_PACKAGES}"):
         return qs.filter(scope_q | own_unexpected_q).distinct()
 
     return qs.filter(

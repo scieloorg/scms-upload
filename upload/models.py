@@ -44,7 +44,7 @@ from upload.forms import (
     XMLErrorReportForm,
 )
 from upload.permissions import (
-    ACCESS_ALL_PACKAGES,
+    ACCESS_PACKAGES,
     ASSIGN_PACKAGE,
     FINISH_DEPOSIT,
     PUBLISH_PACKAGE,
@@ -312,7 +312,10 @@ class Package(CommonControlField, ClusterableModel):
         verbose_name_plural = _("Package admin")
         permissions = (
             (FINISH_DEPOSIT, _("Can finish deposit")),
-            (ACCESS_ALL_PACKAGES, _("Can access all packages from all users")),
+            (
+                ACCESS_PACKAGES,
+                _("Can access packages from all users within authorized scope"),
+            ),
             (ASSIGN_PACKAGE, _("Can assign package")),
             (PUBLISH_PACKAGE, _("Can publish package")),
             (REPUBLISH_PACKAGE, _("Can republish package")),

@@ -20,7 +20,7 @@ from team.models import (
 )
 from upload.controller import _check_article_and_journal
 from upload.models import Package, PackageZip, choices
-from upload.permissions import ACCESS_ALL_PACKAGES
+from upload.permissions import ACCESS_PACKAGES
 from upload.querysets import scope_package_queryset
 from upload.wagtail_hooks import PackageViewSet
 
@@ -371,13 +371,13 @@ class RejectedPackageVisibilityTest(TestCase):
         # bn_editor NÃO DEVE ver o pacote regular da mr
         self.assertNotIn(self.mr_regular_pkg, scoped)
 
-    def test_sender_with_access_all_packages_sees_own_rejected_package(self):
-        perm = Permission.objects.get(codename=ACCESS_ALL_PACKAGES)
+    def test_sender_with_access_packages_sees_own_rejected_package(self):
+        perm = Permission.objects.get(codename=ACCESS_PACKAGES)
         self.bn_editor.user_permissions.add(perm)
 
         scoped = scope_package_queryset(Package.objects.all(), self.bn_editor)
 
-        # Mesmo com ACCESS_ALL_PACKAGES (que amplia acesso no escopo de suas revistas),
+        # Mesmo com ACCESS_PACKAGES (que amplia acesso no escopo de suas revistas),
         # deve ver seu pacote rejeitado com status unexpected
         self.assertIn(self.bn_rejected_pkg, scoped)
         self.assertNotIn(self.mr_regular_pkg, scoped)

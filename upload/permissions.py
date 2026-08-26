@@ -1,4 +1,4 @@
-ACCESS_ALL_PACKAGES = "access_all_packages"
+ACCESS_PACKAGES = "access_packages"
 ASSIGN_PACKAGE = "assign_package"
 FINISH_DEPOSIT = "finish_deposit"
 PUBLISH_PACKAGE = "publish_package"

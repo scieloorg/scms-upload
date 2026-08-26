@@ -1,6 +1,6 @@
 from team.constants import TeamGroups
 from upload.permissions import (
-    ACCESS_ALL_PACKAGES,
+    ACCESS_PACKAGES,
     ASSIGN_PACKAGE,
     FINISH_DEPOSIT,
     PUBLISH_PACKAGE,
@@ -46,7 +46,7 @@ GROUP_ACCESS = {
         },
         "custom": {
             "upload": (
-                ACCESS_ALL_PACKAGES,
+                ACCESS_PACKAGES,
                 ASSIGN_PACKAGE,
                 FINISH_DEPOSIT,
                 PUBLISH_PACKAGE,
@@ -92,7 +92,7 @@ GROUP_ACCESS = {
         },
         "custom": {
             "upload": (
-                ACCESS_ALL_PACKAGES,
+                ACCESS_PACKAGES,
                 ASSIGN_PACKAGE,
                 FINISH_DEPOSIT,
                 PUBLISH_PACKAGE,
@@ -126,7 +126,7 @@ GROUP_ACCESS = {
             },
         },
         "custom": {
-            "upload": (ACCESS_ALL_PACKAGES, FINISH_DEPOSIT),
+            "upload": (ACCESS_PACKAGES, FINISH_DEPOSIT),
             "wagtailadmin": ("access_admin",),
         },
     },
@@ -155,7 +155,7 @@ GROUP_ACCESS = {
             },
         },
         "custom": {
-            "upload": (ACCESS_ALL_PACKAGES, FINISH_DEPOSIT),
+            "upload": (ACCESS_PACKAGES, FINISH_DEPOSIT),
             "wagtailadmin": ("access_admin",),
         },
     },

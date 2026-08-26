@@ -31,7 +31,7 @@ from upload.bulk_actions.republish import (
     RepublishQABulkAction,
 )
 from upload.permission_policies import UploadModelPermissionPolicy
-from upload.permissions import ACCESS_ALL_PACKAGES
+from upload.permissions import ACCESS_PACKAGES
 from upload.querysets import get_scoped_package_queryset, scope_package_queryset
 from upload.views import (
     PackageAdminInspectView,
@@ -173,7 +173,7 @@ class PackageZipViewSet(BaseUploadViewSet):
             return super().get_queryset(request)
 
         qs = super().get_queryset(request)
-        if request.user.has_perm(f"upload.{ACCESS_ALL_PACKAGES}"):
+        if request.user.has_perm(f"upload.{ACCESS_PACKAGES}"):
             package_scope = get_scoped_package_queryset(request.user)
             return qs.filter(
                 Q(creator=request.user) | Q(packages__in=package_scope)
