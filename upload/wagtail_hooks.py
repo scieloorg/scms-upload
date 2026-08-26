@@ -105,6 +105,7 @@ hooks.register("register_bulk_action", RepublishPublicBulkAction)
 
 class BaseUploadViewSet(CommonControlFieldViewSet):
     denied_permission_actions = ()
+    package_scope_field = None
     edit_view_class = TeamScopedEditView
     delete_view_class = TeamScopedDeleteView
     inspect_view_class = TeamScopedInspectView
@@ -129,6 +130,12 @@ class BaseUploadViewSet(CommonControlFieldViewSet):
             MODEL_PERMISSION_ACTIONS,
         ):
             return queryset.none()
+
+        if self.package_scope_field:
+            package_scope = get_scoped_package_queryset(request.user)
+            queryset = queryset.filter(
+                **{f"{self.package_scope_field}__in": package_scope}
+            )
 
         return queryset
 
@@ -367,6 +374,7 @@ class ReadyToPublishPackageViewSet(BaseUploadViewSet):
 
 class XMLErrorReportViewSet(BaseUploadViewSet):
     model = XMLErrorReport
+    package_scope_field = "package"
     edit_view_class = XMLErrorReportEditView
     menu_label = _("XML Error Reports")
     menu_icon = "error"
@@ -387,13 +395,10 @@ class XMLErrorReportViewSet(BaseUploadViewSet):
         "package__file",
     )
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.filter(package__in=get_scoped_package_queryset(request.user))
-
 
 class XMLErrorViewSet(BaseUploadViewSet):
     model = XMLError
+    package_scope_field = "report__package"
     menu_label = _("XML errors")
     menu_icon = "error"
     add_to_settings_menu = False
@@ -419,13 +424,10 @@ class XMLErrorViewSet(BaseUploadViewSet):
         "package__file",
     )
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.filter(report__package__in=get_scoped_package_queryset(request.user))
-
 
 class XMLInfoReportViewSet(BaseUploadViewSet):
     model = XMLInfoReport
+    package_scope_field = "package"
     edit_view_class = XMLInfoReportEditView
     menu_label = _("XML Info Reports")
     menu_icon = "error"
@@ -446,13 +448,10 @@ class XMLInfoReportViewSet(BaseUploadViewSet):
         "package__file",
     )
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.filter(package__in=get_scoped_package_queryset(request.user))
-
 
 class XMLInfoViewSet(BaseUploadViewSet):
     model = XMLInfo
+    package_scope_field = "report__package"
     menu_label = _("XML info")
     menu_icon = "error"
     add_to_settings_menu = False
@@ -478,13 +477,10 @@ class XMLInfoViewSet(BaseUploadViewSet):
         "package__file",
     )
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.filter(report__package__in=get_scoped_package_queryset(request.user))
-
 
 class ValidationReportViewSet(BaseUploadViewSet):
     model = ValidationReport
+    package_scope_field = "package"
     edit_view_class = ValidationReportEditView
     menu_label = _("Validation Reports")
     menu_icon = "error"
@@ -505,13 +501,10 @@ class ValidationReportViewSet(BaseUploadViewSet):
         "package__file",
     )
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.filter(package__in=get_scoped_package_queryset(request.user))
-
 
 class ValidationViewSet(BaseUploadViewSet):
     model = PkgValidationResult
+    package_scope_field = "report__package"
     menu_label = _("Validations")
     menu_icon = "error"
     add_to_settings_menu = False
@@ -527,10 +520,6 @@ class ValidationViewSet(BaseUploadViewSet):
         "status",
         "message",
     )
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.filter(report__package__in=get_scoped_package_queryset(request.user))
 
 
 class UploadValidatorViewSet(BaseUploadViewSet):

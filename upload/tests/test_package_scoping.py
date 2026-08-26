@@ -26,12 +26,20 @@ from team.models import (
     TeamRole,
 )
 from upload.admin_buttons import get_package_action_buttons
-from upload.models import Package, PackageZip, choices
+from upload.models import (
+    Package,
+    PackageZip,
+    PkgValidationResult,
+    ValidationReport,
+    choices,
+)
 from upload.querysets import get_scoped_package_queryset
 from upload.wagtail_hooks import (
     PackageViewSet,
     PackageZipViewSet,
     QualityAnalysisPackageViewSet,
+    ValidationReportViewSet,
+    ValidationViewSet,
 )
 
 User = get_user_model()
@@ -167,6 +175,38 @@ class PackageScopingTest(TestCase):
         qs = viewset.get_queryset(request)
 
         self.assertEqual(qs.count(), 0)
+
+    def test_validation_reports_and_results_follow_package_scope(self):
+        scoped_report = ValidationReport.objects.create(
+            package=self.package_1,
+            category=choices.VAL_CAT_XML_FORMAT,
+            creator=self.superuser,
+        )
+        unrelated_report = ValidationReport.objects.create(
+            package=self.package_2,
+            category=choices.VAL_CAT_XML_FORMAT,
+            creator=self.superuser,
+        )
+        scoped_result = PkgValidationResult(
+            report=scoped_report,
+            creator=self.superuser,
+        )
+        scoped_result.save()
+        unrelated_result = PkgValidationResult(
+            report=unrelated_report,
+            creator=self.superuser,
+        )
+        unrelated_result.save()
+        request = self.factory.get("/admin/snippets/upload/validationreport/")
+        request.user = self.analyst_user
+
+        report_queryset = ValidationReportViewSet().get_queryset(request)
+        result_queryset = ValidationViewSet().get_queryset(request)
+
+        self.assertIn(scoped_report, report_queryset)
+        self.assertNotIn(unrelated_report, report_queryset)
+        self.assertIn(scoped_result, result_queryset)
+        self.assertNotIn(unrelated_result, result_queryset)
 
     def test_company_user_package_zip_scoping(self):
         request = self.factory.get("/admin/snippets/upload/packagezip/")
