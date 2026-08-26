@@ -203,7 +203,7 @@ def finish_deposit(request):
     if request.method != "POST":
         return render(
             request,
-            "modeladmin/upload/package/confirm_action.html",
+            "upload/admin/package/confirm_action.html",
             {
                 "title": _("Finish deposit"),
                 "message": _("Confirm finishing the deposit for package '{}'?").format(
@@ -332,7 +332,7 @@ def archive_package(request):
     if request.method != "POST":
         return render(
             request,
-            "modeladmin/upload/package/confirm_action.html",
+            "upload/admin/package/confirm_action.html",
             {
                 "title": _("Archive package"),
                 "message": _("Confirm archiving package '{}'?").format(package),
@@ -418,7 +418,7 @@ def republish_selected(request):
 
     return render(
         request,
-        "modeladmin/upload/package/republish_selected.html",
+        "upload/admin/package/republish_selected.html",
         {
             "website_kinds": WEBSITE_KIND,
             "package_ids": ",".join(package_ids),

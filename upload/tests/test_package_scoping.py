@@ -315,6 +315,16 @@ class PackageScopingTest(TestCase):
         self.assertEqual(response.status_code, 302)
         delay.assert_not_called()
 
+    def test_republish_requires_post_confirmation(self):
+        self.client.force_login(self.analyst_user)
+
+        response = self.client.get(
+            reverse("upload:republish_selected"),
+            {"package_ids": str(self.package_1.pk)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
     @patch("upload.views.task_republish_articles.delay")
     def test_republish_schedules_only_authorized_selection(self, delay):
         self.analyst_user.refresh_from_db()
