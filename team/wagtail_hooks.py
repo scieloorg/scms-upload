@@ -1,12 +1,11 @@
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import get_form_for_model
 from wagtail.snippets.models import register_snippet
-from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
+from wagtail.snippets.views.snippets import SnippetViewSetGroup
 
 from config.menu import get_menu_order
-from core.forms import CoreAdminModelForm
 from core.users.permission_policies import TeamScopedSnippetViewSetMixin
-from core.views import CommonControlFieldCreateView
+from core.views import CommonControlFieldViewSet
 from team.forms import (
     CollectionTeamMemberAdminForm,
     CompanyTeamMemberAdminForm,
@@ -43,7 +42,9 @@ class TeamAdminFormViewSetMixin:
 
 
 class CollectionTeamMemberViewSet(
-    TeamScopedSnippetViewSetMixin, TeamAdminFormViewSetMixin, SnippetViewSet
+    TeamScopedSnippetViewSetMixin,
+    TeamAdminFormViewSetMixin,
+    CommonControlFieldViewSet,
 ):
     model = CollectionTeamMember
     scope_policy = CollectionTeamMemberPolicy
@@ -52,7 +53,6 @@ class CollectionTeamMemberViewSet(
     add_to_settings_menu = False
     exclude_from_explorer = False
     base_form_class = CollectionTeamMemberAdminForm
-    add_view_class = CommonControlFieldCreateView
 
     list_display = (
         "user",
@@ -71,15 +71,13 @@ class CollectionTeamMemberViewSet(
     )
 
 
-class CompanyViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
+class CompanyViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = Company
     scope_policy = CompanyPolicy
     menu_label = _("Companies")
     menu_icon = "group"
     add_to_settings_menu = False
     exclude_from_explorer = False
-    add_view_class = CommonControlFieldCreateView
-    base_form_class = CoreAdminModelForm
 
     list_display = (
         "name",
@@ -99,7 +97,9 @@ class CompanyViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
 
 
 class JournalTeamMemberViewSet(
-    TeamScopedSnippetViewSetMixin, TeamAdminFormViewSetMixin, SnippetViewSet
+    TeamScopedSnippetViewSetMixin,
+    TeamAdminFormViewSetMixin,
+    CommonControlFieldViewSet,
 ):
     model = JournalTeamMember
     scope_policy = JournalTeamMemberPolicy
@@ -107,7 +107,6 @@ class JournalTeamMemberViewSet(
     menu_icon = "user"
     add_to_settings_menu = False
     exclude_from_explorer = False
-    add_view_class = CommonControlFieldCreateView
     base_form_class = JournalTeamMemberAdminForm
 
     list_display = (
@@ -127,7 +126,9 @@ class JournalTeamMemberViewSet(
 
 
 class CompanyTeamMemberViewSet(
-    TeamScopedSnippetViewSetMixin, TeamAdminFormViewSetMixin, SnippetViewSet
+    TeamScopedSnippetViewSetMixin,
+    TeamAdminFormViewSetMixin,
+    CommonControlFieldViewSet,
 ):
     model = CompanyTeamMember
     scope_policy = CompanyTeamMemberPolicy
@@ -135,7 +136,6 @@ class CompanyTeamMemberViewSet(
     menu_icon = "user"
     add_to_settings_menu = False
     exclude_from_explorer = False
-    add_view_class = CommonControlFieldCreateView
     base_form_class = CompanyTeamMemberAdminForm
 
     list_display = (
@@ -155,7 +155,9 @@ class CompanyTeamMemberViewSet(
 
 
 class JournalCompanyContractViewSet(
-    TeamScopedSnippetViewSetMixin, TeamAdminFormViewSetMixin, SnippetViewSet
+    TeamScopedSnippetViewSetMixin,
+    TeamAdminFormViewSetMixin,
+    CommonControlFieldViewSet,
 ):
     model = JournalCompanyContract
     scope_policy = JournalCompanyContractPolicy
@@ -163,7 +165,6 @@ class JournalCompanyContractViewSet(
     menu_icon = "doc-full"
     add_to_settings_menu = False
     exclude_from_explorer = False
-    add_view_class = CommonControlFieldCreateView
     base_form_class = JournalCompanyContractAdminForm
 
     list_display = (

@@ -1,4 +1,5 @@
-from core.forms import CoreAdminModelForm
+from wagtail.admin.forms import WagtailAdminModelForm
+
 from team.models import (
     CollectionTeamMember,
     CompanyTeamMember,
@@ -7,7 +8,7 @@ from team.models import (
 )
 
 
-class ManagedRelationAdminForm(CoreAdminModelForm):
+class ManagedRelationAdminForm(WagtailAdminModelForm):
     membership_model = None
     relation_field = None
 
