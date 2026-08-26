@@ -2,7 +2,7 @@ import logging
 
 
 def build_journal(
-    builder, journal, journal_id, journal_acron, journal_history, availability_status
+    builder, journal, journal_id, journal_acron, journal_history, availability_status, force_update=False
 ):
     official_journal = journal.official_journal
     builder.add_issue_count(journal.issue_count)
@@ -15,41 +15,16 @@ def build_journal(
     for mission in journal.mission.all():
         builder.add_mission(mission.language.code2, mission.text)
 
-    for journal_history in journal_history.all():
-        logging.info(f"journal_history.event_type: {journal_history.event_type}")
-
-        if journal_history.event_type == "ADMITTED":
-            event_type = "current"
-        elif journal_history.interruption_reason == "ceased":
-            # deceased está incorreto no opac
-            event_type = "deceased"
-        elif journal_history.interruption_reason == "suspended-by-committee":
-            event_type = "suspended"
-        elif journal_history.interruption_reason == "suspended-by-editor":
-            event_type = "suspended"
-        elif journal_history.interruption_reason == "not-open-access":
-            event_type = "suspended"
-        elif journal_history.event_type == "INTERRUPTED":
-            # deceased está incorreto no opac
-            event_type = "deceased"
-        else:
-            event_type = "inprogress"
-
+    for jh in journal_history.all():
         builder.add_event_to_timeline(
-            event_type,
-            journal_history.date,
-            journal_history.interruption_reason,
+            jh.event_type,
+            jh.date,
+            jh.interruption_reason,
         )
 
-    current_status = "inprogress"
-    if builder.data.get("status_history"):
-        try:
-            current_status = sorted(
-                builder.data["status_history"], key=lambda x: x["date"]
-            )[-1]["status"]
-        except (IndexError, KeyError):
-            current_status = "inprogress"
-    builder.data["current_status"] = current_status
+    builder.add_current_status()
+    builder.add_forced_current_status(force_update)
+
 
     builder.add_journal_issns(
         scielo_issn=journal_id,
@@ -82,12 +57,13 @@ def build_journal(
         if not name:
             continue
         names.add(name)
-        builder.add_publisher(name)
     for item in journal.publisher.all():
         name = item.institution.name
         if not name:
             continue
         names.add(name)
+
+    for name in names:
         builder.add_publisher(name)
 
     builder.add_thematic_scopes(

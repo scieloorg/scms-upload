@@ -6,6 +6,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 
+from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.db.models import Q
 
@@ -23,6 +24,7 @@ from journal.models import (
     Sponsor,
     Subject,
 )
+from location.models import Location
 from pid_provider.models import PidProviderConfig
 from proc.exceptions import ProcBaseException
 from proc.models import IssueProc, JournalProc
@@ -80,18 +82,26 @@ class BaseDataChecker(ABC):
         """Consulta dados locais. Deve ser implementado pelas subclasses."""
 
     @abstractmethod
+    def is_local_or_remote(self, obj):
+        """Verifica se registro está atualizado. Deve ser implementado pelas subclasses."""
+    
+    @abstractmethod
     def fetch_from_core(self, **kwargs):
-        """Consulta dados remotos e atualiza os dados locais. Deve ser implementado pelas subclasses."""
-
-    def get_or_fetch(self):
+            """Consulta dados remotos e atualiza os dados locais. Deve ser implementado pelas subclasses."""
+    
+    def get_or_fetch(self, force_update=False):
         """Consulta dados locais; se inexistentes, consulta o core e tenta novamente."""
-        # 1. consulta dados locais
-        try:
-            return self.get_local()
-        except self.model.DoesNotExist:
-            pass
 
-        # 2. dados locais inexistentes, consulta dados remotos
+        if not force_update:
+            # 1. consulta dados locais
+            try:
+                obj = self.get_local()
+                if self.is_local_or_remote(obj) == "local":
+                    return obj
+            except self.model.DoesNotExist:
+                pass
+
+        # 2. dados locais inexistentes ou desatualizados, consulta dados remotos
         # e atualiza os dados locais com os dados remotos
         self.fetch_from_core()
 
@@ -145,6 +155,17 @@ class JournalDataChecker(BaseDataChecker):
             self.journal_title, self.issn_electronic, self.issn_print
         )
 
+    def is_local_or_remote(self, obj):
+        if not obj.core_synchronized:
+            # core_synchronized = False força atualização
+            return "remote"
+        if obj.missing_fields:
+            # indica ausencia de campos relevantes para o site público
+            return "remote"
+        if not JournalProc.objects.filter(journal=obj).exists():
+            return "remote"
+        return "local"
+
     def fetch_from_core(self, force_update=True):
         """Consulta dados remotos de journal e atualiza os dados locais."""
         self.core_communication_error = False
@@ -159,88 +180,15 @@ class JournalDataChecker(BaseDataChecker):
             self.core_communication_error = True
             logging.warning(f"Core API communication failure for journal: {e}")
 
-    @staticmethod
-    def ensure_proc_exists(user, journal):
-        """
-        Verifica e garante a existência de JournalProc para o journal.
+    def ensure_proc_exists(self, force_update):
+        journal = self.get_or_fetch(force_update)
 
-        Args:
-            user: O usuário que executa a operação
-            journal: O journal que deve ter um JournalProc
+        if journal and JournalProc.objects.filter(journal=journal).exists():
+            return journal
 
-        Returns:
-            True se JournalProc existe
-
-        Raises:
-            JournalProc.DoesNotExist: Se não foi possível criar JournalProc
-        """
-        if (
-            journal.missing_fields
-            or not JournalProc.objects.filter(
-                journal=journal, acron__isnull=False
-            ).exists()
-        ):
-            create_or_update_journal(
-                journal_title=journal.title,
-                issn_electronic=journal.official_journal.issn_electronic,
-                issn_print=journal.official_journal.issn_print,
-                user=user,
-                force_update=True,
-            )
-
-        journal_proc = JournalProc.objects.filter(
-            journal=journal, acron__isnull=False
-        ).first()
-        if journal_proc:
-            if not journal.journal_acron:
-                journal.journal_acron = journal_proc.acron
-                journal.save()
-            return True
-
-        raise JournalProc.DoesNotExist(f"JournalProc does not exist: {journal}")
-
-
-def create_or_update_journal(
-    journal_title, issn_electronic, issn_print, user, force_update=None
-):
-    """
-    Cria ou atualiza um journal baseado nos dados da API Core.
-
-    Esta função é chamada no fluxo de ingresso de conteúdo novo.
-    Para migração, use migration.controller.create_or_update_journal.
-    """
-    force_update = (
-        force_update
-        or not JournalProc.objects.filter(
-            Q(journal__official_journal__issn_electronic=issn_electronic)
-            | Q(journal__official_journal__issn_print=issn_print)
-        ).exists()
-    )
-
-    checker = JournalDataChecker(journal_title, issn_electronic, issn_print, user)
-
-    if not force_update:
-        try:
-            return checker.get_local()
-        except Journal.DoesNotExist:
-            pass
-
-    try:
-        fetch_and_create_journal(
-            user,
-            issn_electronic=issn_electronic,
-            issn_print=issn_print,
-            force_update=force_update,
+        raise JournalProc.DoesNotExist(
+            f"JournalProc does not exist: {journal}"
         )
-    except FetchMultipleJournalsError as exc:
-        raise exc
-    except FetchJournalDataException as exc:
-        pass
-
-    try:
-        return checker.get_local()
-    except Journal.DoesNotExist as exc:
-        return None
 
 
 def fetch_and_create_journal(
@@ -256,29 +204,14 @@ def fetch_and_create_journal(
     """
     # Conta os resultados primeiro para validação
 
-    try:
-        block_unregistered_collection = not collection_acron
-        results = fetch_journal_data_with_pagination(
-            collection_acron=collection_acron,
-            issn_electronic=issn_electronic,
-            issn_print=issn_print,
-        )
-    except FetchJournalDataException:
-        if not collection_acron:
-            raise
-
-        # api ainda não está aceitando o param collection_acron,
-        # consulta api com collection_acron=None e
-        # block_unregistered_collection=True
-        results = fetch_journal_data_with_pagination(
-            issn_electronic=issn_electronic,
-            issn_print=issn_print,
-        )
-
-    for result in results:
+    for result in fetch_journal_data_with_pagination(
+        collection_acron,
+        issn_electronic,
+        issn_print,
+    ):
         try:
             process_journal_result(
-                user, result, block_unregistered_collection, force_update
+                user, result, force_update
             )
         except Exception as e:
             logging.exception(e)
@@ -338,20 +271,11 @@ def fetch_journal_data_with_pagination(
 
 
 def process_journal_result(
-    user, result, block_unregistered_collection, force_update=None
+    user, result, force_update=None
 ):
     """
     Processa um único resultado de journal da API e cria/atualiza as entidades correspondentes.
     """
-
-    if block_unregistered_collection:
-        collections = set()
-        for item in result.get("scielo_journal") or []:
-            collections.add(item["collection_acron"])
-        if not collections:
-            return
-        if not Collection.objects.filter(acron__in=collections).exists():
-            return
 
     # Processa dados oficiais do journal
     official = result["official"]
@@ -388,6 +312,22 @@ def process_journal_result(
     journal.wos_areas = result.get("wos_areas", [])
     journal.logo_url = result.get("url_logo")
     journal.submission_online_url = result.get("submission_online_url")
+
+    # Processa location -> contact_location
+    loc_data = result.get("location") or {}
+    if loc_data:
+        city_name = loc_data.get("city_name")
+        country_name = loc_data.get("country_name")
+        if city_name or country_name:
+            contact_loc = Location.create_or_update(
+                user,
+                city_name=city_name,
+                state_name=loc_data.get("state_name"),
+                state_acronym=loc_data.get("state_acronym"),
+                country_name=country_name,
+                country_acronym=loc_data.get("country_acronym"),
+            )
+            journal.contact_location = contact_loc
     journal.save()
 
     journal.journal_email.all().delete()
@@ -395,18 +335,25 @@ def process_journal_result(
         journal.add_email(item)
 
     # Processa subjects
+    journal.subject.clear()
     for item in result.get("subject") or []:
         journal.subject.add(Subject.create_or_update(user, item["value"]))
 
     institution_names = set()
     for item in result.get("publisher") or []:
+        if not item["name"]:
+            continue
         institution_names.add(item["name"])
 
     # Processa owners
     for item in result.get("owner") or []:
+        if not item["name"]:
+            continue
         institution_names.add(item["name"])
 
     for item in result.get("sponsor") or []:
+        if not item["name"]:
+            continue
         institution_names.add(item["name"])
 
     institutions = {}
@@ -422,6 +369,7 @@ def process_journal_result(
         )
 
     # Processa publishers
+    journal.publisher.clear()
     for item in result.get("publisher") or []:
         institution = institutions.get(item["name"])
         if not institution:
@@ -429,12 +377,14 @@ def process_journal_result(
         journal.publisher.add(Publisher.create_or_update(user, journal, institution))
 
     # Processa owners
+    journal.owner.clear()
     for item in result.get("owner") or []:
         institution = institutions.get(item["name"])
         if not institution:
             continue
         journal.owner.add(Owner.create_or_update(user, journal, institution))
 
+    journal.sponsor.clear()
     for item in result.get("sponsor") or []:
         institution = institutions.get(item["name"])
         if not institution:
@@ -453,11 +403,43 @@ def process_journal_result(
         no_lang = []
 
     # Processa dados específicos do SciELO
-    for item in result.get("scielo_journal") or []:
+    journal_acron = journal.journal_acron
+
+    scielo_journals = result.get("scielo_journal") or []
+    if len(scielo_journals) == 0:
+        raise ValueError(
+            _("Missing SciELO Journal {} registration at core.scielo.org").format(
+                journal
+            )
+        )
+
+    ignore_collection_doesnotexist = len(scielo_journals) > 1
+
+    collection = None
+    for item in scielo_journals:
         try:
             collection = Collection.objects.get(acron=item["collection_acron"])
         except Collection.DoesNotExist:
-            continue
+            if ignore_collection_doesnotexist:
+                # journal está presente em mais de uma coleção, mas a instância de Upload
+                # não necessariamente gerencia o periódico em todas as coleções
+                continue
+            raise
+
+        # Processa histórico do journal
+        journal_collection = JournalCollection.create_or_update(
+            user, collection, journal
+        )
+        for jh in item.get("journal_history") or []:
+            JournalHistory.create_or_update(
+                user,
+                journal_collection,
+                jh["event_type"],
+                jh["year"],
+                jh["month"],
+                jh["day"],
+                jh["interruption_reason"],
+            )
 
         journal_proc = JournalProc.get_or_create(user, collection, item["issn_scielo"])
         journal_proc.update(
@@ -469,35 +451,25 @@ def process_journal_result(
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
             force_update=force_update,
         )
-        if not journal.journal_acron:
-            journal.journal_acron = item.get("journal_acron")
+        journal_acron = journal_acron or item.get("journal_acron")
 
-        journal_collection = JournalCollection.create_or_update(
-            user, collection, journal
-        )
-
-        # Processa histórico do journal
-        for jh in item.get("journal_history") or []:
-            JournalHistory.create_or_update(
-                user,
-                journal_collection,
-                jh["event_type"],
-                jh["year"],
-                jh["month"],
-                jh["day"],
-                jh["interruption_reason"],
+    if not collection:
+        raise ValueError(
+            _("Unable to get journal collection data for {}").format(
+                journal
             )
+        )
+    if journal.journal_acron != journal_acron:
+        journal.journal_acron = journal_acron
     journal.core_synchronized = True
     journal.save()
 
     # TODO: Campos da API não processados ainda:
     # - copyright (array)
     # - table_of_contents (array)
-    # - location (object with city_name, state_name, country_name, etc.)
     # - text_language (array)
     # - title_in_database (array)
     # - crossmark_policy (array)
-    # - acronym (root level field)
     # - other_titles
 
     return journal
@@ -535,6 +507,11 @@ class IssueDataChecker(BaseDataChecker):
         xml = ArticleMetaIssue(xmltree)
         return cls(journal, publication_year, xml.volume, xml.suppl, xml.number, user)
 
+    def is_local_or_remote(self, obj):
+        if not IssueProc.objects.filter(issue=obj).exists():
+            return "remote"
+        return "local"
+    
     def get_local(self):
         """Consulta dados locais de issue."""
         return Issue.get(
@@ -560,8 +537,7 @@ class IssueDataChecker(BaseDataChecker):
             self.core_communication_error = True
             logging.warning(f"Core API communication failure for issue: {e}")
 
-    @staticmethod
-    def ensure_proc_exists(user, issue):
+    def ensure_proc_exists(self, force_update=False):
         """
         Verifica e garante a existência de IssueProc para o issue.
 
@@ -575,63 +551,14 @@ class IssueDataChecker(BaseDataChecker):
         Raises:
             IssueProc.DoesNotExist: Se não foi possível criar IssueProc
         """
-        if IssueProc.objects.filter(issue=issue).exists():
-            return True
+        issue = self.get_or_fetch(force_update)
 
-        create_or_update_issue(
-            journal=issue.journal,
-            pub_year=issue.publication_year,
-            volume=issue.volume,
-            suppl=issue.supplement,
-            number=issue.number,
-            user=user,
-            force_update=True,
+        if issue and IssueProc.objects.filter(issue=issue).exists():
+            return issue
+
+        raise IssueProc.DoesNotExist(
+            f"IssueProc does not exist: {issue}"
         )
-
-        if IssueProc.objects.filter(issue=issue).exists():
-            return True
-
-        raise IssueProc.DoesNotExist(f"IssueProc does not exist: {issue}")
-
-
-def create_or_update_issue(
-    journal, pub_year, volume, suppl, number, user, force_update=None
-):
-    """
-    Cria ou atualiza um issue baseado nos dados da API Core.
-
-    Esta função é chamada no fluxo de ingresso de conteúdo novo.
-    Para migração, use migration.controller.create_or_update_issue.
-    """
-    force_update = (
-        force_update
-        or not IssueProc.objects.filter(
-            journal_proc__journal=journal,
-            issue__publication_year=pub_year,
-            issue__volume=volume,
-            issue__number=number,
-            issue__supplement=suppl,
-        ).exists()
-    )
-
-    checker = IssueDataChecker(journal, pub_year, volume, suppl, number, user)
-
-    if not force_update:
-        try:
-            return checker.get_local()
-        except Issue.DoesNotExist:
-            pass
-
-    try:
-        fetch_and_create_issues(journal, pub_year, volume, suppl, number, user)
-    except FetchIssueDataException as exc:
-        logging.warning(f"Erro ao buscar dados de issue: {exc}")
-        pass
-
-    try:
-        return checker.get_local()
-    except Issue.DoesNotExist as exc:
-        return None
 
 
 def fetch_and_create_issues(journal, pub_year, volume, suppl, number, user):

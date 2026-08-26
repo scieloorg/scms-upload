@@ -44,6 +44,8 @@ class UploadJournalDataCheckerTestCase(unittest.TestCase):
     def test_check_returns_journal_from_local_data(self, mock_journal_cls):
         """Test that local data is used first without querying core API."""
         mock_journal = Mock()
+        mock_journal.core_synchronized = True
+        mock_journal.missing_fields = []
         mock_journal_cls.get_registered.return_value = mock_journal
 
         response = {}
@@ -64,6 +66,9 @@ class UploadJournalDataCheckerTestCase(unittest.TestCase):
     ):
         """Test that core API is queried when local data doesn't exist."""
         mock_journal = Mock()
+        mock_journal.core_synchronized = True
+        mock_journal.missing_fields = []
+
         mock_journal_cls.DoesNotExist = JournalDoesNotExist
         # First call: DoesNotExist, second call after core fetch: returns journal
         mock_journal_cls.get_registered.side_effect = [
@@ -138,6 +143,8 @@ class UploadJournalDataCheckerTestCase(unittest.TestCase):
     def test_check_does_not_call_core_when_local_found(self, mock_journal_cls):
         """Test that core API is NOT called when local data exists."""
         mock_journal = Mock()
+        mock_journal.core_synchronized = True
+        mock_journal.missing_fields = []
         mock_journal_cls.get_registered.return_value = mock_journal
 
         response = {}
@@ -183,6 +190,8 @@ class UploadJournalDataCheckerTestCase(unittest.TestCase):
     def test_get_or_fetch_returns_local_journal(self, mock_journal_cls):
         """Test get_or_fetch returns journal from local data."""
         mock_journal = Mock()
+        mock_journal.core_synchronized = True
+        mock_journal.missing_fields = []
         mock_journal_cls.get_registered.return_value = mock_journal
 
         user = Mock()

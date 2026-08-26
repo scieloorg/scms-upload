@@ -36,8 +36,6 @@ from proc.source_core_api import (
     IssueDataChecker,
     JournalDataChecker,
     UnableToGetJournalDataFromCoreError,
-    create_or_update_issue,
-    create_or_update_journal,
     fetch_and_create_issues,
     fetch_and_create_journal,
 )
@@ -45,8 +43,6 @@ from proc.source_core_api import (
 # Mantém a interface pública existente para backward compatibility
 __all__ = [
     # Core API functions
-    "create_or_update_journal",
-    "create_or_update_issue",
     "fetch_and_create_journal",
     "fetch_and_create_issues",
     # Core API classes
@@ -72,14 +68,29 @@ __all__ = [
 ]
 
 
-def ensure_journal_proc_exists(user, journal):
+def ensure_journal_data_is_updated(user, journal, force_update=False):
     """Delega para JournalDataChecker.ensure_proc_exists."""
-    return JournalDataChecker.ensure_proc_exists(user, journal)
+    checker = JournalDataChecker(
+        journal_title=journal.title,
+        issn_electronic=journal.official_journal.issn_electronic,
+        issn_print=journal.official_journal.issn_print,
+        user=user,
+    )
+    return checker.ensure_proc_exists(force_update)
 
 
-def ensure_issue_proc_exists(user, issue):
+def ensure_issue_data_is_updated(user, issue, force_update=False):
     """Delega para IssueDataChecker.ensure_proc_exists."""
-    return IssueDataChecker.ensure_proc_exists(user, issue)
+
+    checker = IssueDataChecker(
+        journal=issue.journal,
+        publication_year=issue.publication_year,
+        volume=issue.volume,
+        suppl=issue.supplement,
+        number=issue.number,
+        user=user,
+    )
+    return checker.ensure_proc_exists(force_update)
 
 
 def get_total_status_data(total_status_data, journal_proc_id, issue_proc_id=None):

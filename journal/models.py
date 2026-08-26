@@ -170,34 +170,33 @@ class OfficialJournal(CommonControlField):
 
     @classmethod
     def get(cls, issn_print=None, issn_electronic=None, issnl=None, title=None):
+        issns = []
         params = {}
         if issn_electronic:
+            issns.append(issn_electronic)
             params["issn_electronic"] = issn_electronic
         if issn_print:
+            issns.append(issn_print)
             params["issn_print"] = issn_print
         if issnl:
+            issns.append(issnl)
             params["issnl"] = issnl
-        if not params:
+        if not issns:
             raise ValueError(
                 f"OfficialJournal.get requires issn_print, issn_electronic, issnl"
             )
-
         try:
             return cls.objects.get(**params)
+        except cls.DoesNotExist:
+            pass
         except cls.MultipleObjectsReturned:
             return cls.objects.filter(**params).order_by("-updated").first()
-        except cls.DoesNotExist:
-            qs = Q()
-            if issn_electronic:
-                qs |= Q(issn_electronic=issn_electronic)
-            if issn_print:
-                qs |= Q(issn_print=issn_print)
-            if issnl:
-                qs |= Q(issnl=issnl)
-            obj = cls.objects.filter(qs).order_by("-updated").first()
-            if not obj:
-                raise
-            return obj
+
+        qs = Q(issnl__in=issns) | Q(issn_electronic__in=issns) | Q(issn_print__in=issns)
+        try:
+            return cls.objects.get(qs)
+        except cls.MultipleObjectsReturned:
+            return cls.objects.filter(qs).order_by("-updated").first()
 
     @classmethod
     def create_or_update(
@@ -323,14 +322,10 @@ class Journal(CommonControlField, ClusterableModel):
 
     @property
     def collections(self):
-        from collection.models import Collection
-
         return Collection.objects.filter(journalproc__journal=self).distinct()
 
     @property
     def collections_acron(self):
-        from collection.models import Collection
-
         return list(
             Collection.objects.filter(journalproc__journal=self)
             .values_list("acron", flat=True)
@@ -340,8 +335,6 @@ class Journal(CommonControlField, ClusterableModel):
 
     @property
     def collections_name(self):
-        from collection.models import Collection
-
         return list(
             Collection.objects.filter(journalproc__journal=self)
             .values_list("name", flat=True)
@@ -378,20 +371,37 @@ class Journal(CommonControlField, ClusterableModel):
                 official_journal__issn_print=issn_print,
             )
         except Journal.DoesNotExist:
-            raise Journal.DoesNotExist(
-                {
-                    "journal_title": journal_title,
-                    "issn_electronic": issn_electronic,
-                    "issn_print": issn_print,
-                }
-            )
+            try:
+                # corrige bug por ter troca print por electronic e vice-versa
+                return Journal.objects.get(
+                    official_journal__issn_electronic=issn_print,
+                    official_journal__issn_print=issn_electronic,
+                )
+            except Journal.MultipleObjectsReturned:
+                return Journal.objects.filter(
+                    official_journal__issn_electronic=issn_print,
+                    official_journal__issn_print=issn_electronic,
+                ).order_by("-updated").first()
+            except Journal.DoesNotExist:
+                issns = set()
+                if issn_electronic:
+                    issns.add(issn_electronic)
+                if issn_print:
+                    issns.add(issn_print)
+                journal = Journal.objects.filter(
+                    Q(official_journal__issn_electronic__in=issns) |
+                    Q(official_journal__issn_print__in=issns),
+                ).order_by("-updated").first()
+                if journal:
+                    return journal
+                raise Journal.DoesNotExist
         except Journal.MultipleObjectsReturned:
             return (
                 Journal.objects.filter(
-                    Q(official_journal__issn_electronic=issn_electronic)
-                    | Q(official_journal__issn_print=issn_print)
+                    official_journal__issn_electronic=issn_electronic,
+                    official_journal__issn_print=issn_print,
                 )
-                .order_by("-created")
+                .order_by("-updated")
                 .first()
             )
 
@@ -445,7 +455,7 @@ class Journal(CommonControlField, ClusterableModel):
             obj.official_journal = official_journal or obj.official_journal
             obj.title = title or obj.title
             obj.short_title = short_title or obj.short_title
-            obj.journal_acron = journal_acron
+            obj.journal_acron = journal_acron or obj.journal_acron
             obj.save()
             return obj
         except cls.DoesNotExist:
@@ -617,13 +627,12 @@ class Journal(CommonControlField, ClusterableModel):
     @property
     def missing_fields(self):
         """
-        Verifica campos não preenchidos no Journal e retorna um relatório detalhado.
+        Verifica ausência de campos relevantes para o site público
         """
         fields = {
             "title": _("Journal Title"),
             "short_title": _("Short Title"),
             "journal_acron": _("Journal Acronym"),
-            "official_journal": _("Official Journal"),
             "contact_name": _("Contact Name"),
             "contact_address": _("Contact Address"),
             "contact_location": _("Contact Location"),
@@ -631,6 +640,7 @@ class Journal(CommonControlField, ClusterableModel):
             "logo_url": _("Logo URL"),
             "license_code": _("License Code"),
             "wos_areas": _("WoS Areas"),
+            "journal_acron": _("Journal acronym"),
         }
         missing = []
         for field, description in fields.items():
@@ -640,12 +650,13 @@ class Journal(CommonControlField, ClusterableModel):
 
         # Verificar official_journal
         if self.official_journal:
-            if not self.official_journal.issn_electronic:
+            if not self.official_journal.issn_electronic and not self.official_journal.issn_print:
                 missing.append(_("Electronic ISSN"))
-            if not self.official_journal.issn_print:
                 missing.append(_("Print ISSN"))
             if not self.official_journal.title_iso:
                 missing.append(_("ISO Title"))
+        else:
+            missing.append(_("Official Journal"))
 
         # Verificar mission
         if not self.mission.exists():
@@ -656,16 +667,23 @@ class Journal(CommonControlField, ClusterableModel):
             missing.append(_("sponsor"))
 
         # Verificar owner
-        if not self.owner.exists():
+        if not self.owner.exists() and not self.publisher.exists():
             missing.append(_("owner"))
-
-        # Verificar publisher
-        if not self.publisher.exists():
             missing.append(_("publisher"))
 
         # Verificar subject
         if not self.subject.exists():
             missing.append(_("study area"))
+
+        for collection in self.collections:
+            if not JournalHistory.objects.filter(
+                journal_collection__journal=self,
+                journal_collection__collection=collection,
+            ).exists():
+                missing.append(_("history for {}").format(collection))
+
+        if len(self.collections) == 0:
+            missing.append(_("Journal collection"))
 
         return missing
 
@@ -907,8 +925,7 @@ class JournalCollection(CommonControlField, ClusterableModel):
     base_form_class = CoreAdminModelForm
 
     panels = [
-        AutocompletePanel("journal"),
-        AutocompletePanel("collection"),
+        InlinePanel("journal_history", label=_("Journal history"))
     ]
 
     class Meta:
@@ -943,9 +960,7 @@ class JournalCollection(CommonControlField, ClusterableModel):
     @classmethod
     def create_or_update(cls, user, collection, journal):
         try:
-            obj = cls.get(collection, journal)
-            obj.updated_by = obj.updated_by or user
-            obj.save()
+            return cls.get(collection, journal)
         except cls.DoesNotExist:
             return cls.create(user, collection, journal)
 
@@ -1063,6 +1078,7 @@ class JournalHistory(CommonControlField):
             obj.interruption_reason = interruption_reason
             obj.updated_by = obj.updated_by or user
             obj.save()
+            return obj
         except cls.DoesNotExist:
             return cls.create(
                 user,

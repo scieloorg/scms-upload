@@ -1,14 +1,12 @@
 # wagtail_hooks.py (ou views.py)
-from django.http import HttpResponseRedirect
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel
-from wagtail.admin.ui.tables import UpdatedAtColumn
+from django_filters import BooleanFilter
+from wagtail.admin.filters import WagtailFilterSet
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
-from wagtail import hooks
 
 from config.menu import get_menu_order
-from journal.models import Journal, OfficialJournal
+from journal.models import Journal, OfficialJournal, JournalCollection
 
 
 class OfficialJournalViewSet(SnippetViewSet):
@@ -38,18 +36,40 @@ class OfficialJournalViewSet(SnippetViewSet):
     inspect_view_enabled = True
 
 
+class JournalFilterSet(WagtailFilterSet):
+    is_complete = BooleanFilter(
+        method="filter_is_complete",
+        label=_("Is complete"),
+    )
+
+    class Meta:
+        model = Journal
+        fields = ["core_synchronized"]  # campos reais de banco continuam normais aqui
+
+    def filter_is_complete(self, queryset, name, value):
+        if value is None:
+            return queryset
+
+        if value:
+            ids = [obj.pk for obj in queryset if not obj.missing_fields]
+        else:
+            ids = [obj.pk for obj in queryset if obj.missing_fields]
+
+        return queryset.filter(pk__in=ids)
+
+
 class JournalViewSet(SnippetViewSet):
     model = Journal
     menu_label = _("Journal")
     menu_icon = "folder"
     menu_order = 200
     add_to_settings_menu = False
-    add_to_admin_menu = False  # Será adicionado via grupo
-    
+    add_to_admin_menu = False
+
     list_display = [
         "title",
         "journal_acron",
-        "core_synchronized",
+        "missing_fields",
         "updated",
     ]
     search_fields = [
@@ -59,7 +79,33 @@ class JournalViewSet(SnippetViewSet):
         "title",
         "journal_acron",
     ]
-    list_filter = ["core_synchronized"]
+    filterset_class = JournalFilterSet
+
+
+class JournalCollectionViewSet(SnippetViewSet):
+    model = JournalCollection
+    menu_label = _("Journal Collection")
+    menu_icon = "site"
+    menu_order = get_menu_order("journal_collection")
+    add_to_settings_menu = False
+
+    list_display = (
+        "journal",
+        "collection",
+        "creator",
+        "updated",
+        "created",
+        "updated_by",
+    )
+    list_filter = (
+        "collection",
+    )
+    search_fields = (
+        "journal__title",     # ajuste para o campo textual real de Journal
+        "collection__name",   # ajuste para o campo textual real de Collection
+        "collection__acron", # se existir, ajuda muito na busca por sigla
+    )
+    export_filename = "journal_collections"
 
 
 # Grupo de ViewSets
@@ -71,9 +117,12 @@ class JournalViewSetGroup(SnippetViewSetGroup):
     items = [
         # OfficialJournalViewSet,  # Descomentado como no original
         JournalViewSet,
+        JournalCollectionViewSet,
         # JournalProcViewSet,  # Se existir
     ]
 
 
-# Registrar o grupo no menu
+# # Registrar o grupo no menu
 register_snippet(JournalViewSetGroup)
+# register_snippet(JournalCollectionViewSet)
+
