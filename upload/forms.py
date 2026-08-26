@@ -73,14 +73,11 @@ class PackageDecisionForm(CoreAdminModelForm):
                 )
             )
 
-        if not self.for_user or not self.for_user.is_superuser:
-            if self.for_user:
-                analyst_queryset = analyst_queryset.filter(
-                    collection__collectionteammember__user=self.for_user,
-                    collection__collectionteammember__is_active_member=True,
-                )
-            else:
-                analyst_queryset = analyst_queryset.none()
+        if not self.for_user.is_superuser:
+            analyst_queryset = analyst_queryset.filter(
+                collection__collectionteammember__user=self.for_user,
+                collection__collectionteammember__is_active_member=True,
+            )
 
             article_queryset = scope_by_membership(
                 self.for_user,
