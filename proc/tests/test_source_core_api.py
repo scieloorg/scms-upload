@@ -318,17 +318,18 @@ class TestIssueDataChecker(TestCase):
 
     @patch("proc.source_core_api.IssueProc.objects.filter")
     def test_is_local_or_remote_returns_true_when_proc_exists(self, mock_proc_filter):
+        
         mock_proc_filter.return_value.exists.return_value = True
         issue = MagicMock()
 
-        self.assertTrue(self.checker.is_local_or_remote(issue))
+        self.assertEqual("local", self.checker.is_local_or_remote(issue))
 
     @patch("proc.source_core_api.IssueProc.objects.filter")
     def test_is_local_or_remote_returns_false_when_proc_does_not_exist(self, mock_proc_filter):
         mock_proc_filter.return_value.exists.return_value = False
         issue = MagicMock()
 
-        self.assertFalse(self.checker.is_local_or_remote(issue))
+        self.assertEqual("remote", self.checker.is_local_or_remote(issue))
 
     @patch.object(IssueDataChecker, "get_or_fetch")
     @patch("proc.source_core_api.IssueProc.objects.filter")
