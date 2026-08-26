@@ -344,9 +344,14 @@ class Journal(CommonControlField, ClusterableModel):
 
     @property
     def first_letters(self):
+        if self.journal_acron:
+            return self.journal_acron.upper()
+        title = self.short_title or (self.official_journal and self.official_journal.title_iso)
+        if not title:
+            raise ValueError("Journal.first_letters requires short_title or official_journal.title_iso")
         return "".join(
             word[0]
-            for word in (self.short_title or self.official_journal.title_iso).split()
+            for word in title.split()
         ).upper()
 
     @property

@@ -94,14 +94,12 @@ def create_or_update_migrated_issue(
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             UnexpectedEvent.create(
+                action="proc.sources.classic_website.create_or_update_migrated_issue",
+                item=pid,
                 e=e,
                 exc_traceback=exc_traceback,
                 detail={
-                    "task": "proc.sources.classic_website.create_or_update_migrated_issue",
-                    "user_id": user.id,
-                    "username": user.username,
                     "collection": collection.acron,
-                    "pid": pid,
                     "force_update": force_update,
                 },
             )
@@ -212,14 +210,12 @@ def migrate_issue(user, issue_proc, force_update):
             return
 
         UnexpectedEvent.create(
+            action="proc.sources.classic_website.migrate_issue",
+            item=issue_proc.pid,
             e=e,
             exc_traceback=exc_traceback,
             detail={
-                "task": "proc.sources.classic_website.migrate_issue",
-                "user_id": user.id,
-                "username": user.username,
-                "collection": issue_proc.collection.acron,
-                "pid": issue_proc.pid,
+                "issue_proc": str(issue_proc),
                 "force_update": force_update,
             },
         )
