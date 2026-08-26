@@ -229,7 +229,7 @@ class PackageViewSet(BaseUploadViewSet):
     def get_queryset(self, request):
         params = {}
         try:
-            params["pkg_zip__id"] = request.GET["pkg_zip_id"]
+            params["pkg_zip_id"] = request.GET["pkg_zip_id"]
         except KeyError:
             logging.info(request.GET)
 

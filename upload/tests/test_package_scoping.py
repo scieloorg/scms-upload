@@ -137,6 +137,18 @@ class PackageScopingTest(TestCase):
         self.assertIn(self.package_1, qs)
         self.assertNotIn(self.package_2, qs)
 
+    def test_package_queryset_filters_by_package_zip_id(self):
+        request = self.factory.get(
+            "/admin/snippets/upload/package/",
+            {"pkg_zip_id": self.pkg_zip_1.pk},
+        )
+        request.user = self.superuser
+
+        qs = PackageViewSet().get_queryset(request)
+
+        self.assertIn(self.package_1, qs)
+        self.assertNotIn(self.package_2, qs)
+
     def test_company_user_sees_only_own_contracted_packages(self):
         request = self.factory.get("/admin/snippets/upload/package/")
         request.user = self.company_user
