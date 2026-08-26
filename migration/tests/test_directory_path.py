@@ -4,9 +4,7 @@ from django.test import TestCase
 
 from core.users.models import User
 
-from .models import (
-    Collection,
-    JournalAcronIdFile,
+from migration.models import (
     extract_relative_path,
     migrated_files_directory_path,
 )
