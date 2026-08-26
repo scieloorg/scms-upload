@@ -1141,6 +1141,7 @@ def task_migrate_and_publish_articles_by_journal(
             journal_proc.collection, "issue", "PUBLIC"
         )
         total_processed = 0
+        issue_proc_id_list = list(issue_proc_id_list)
         total_to_process = len(issue_proc_id_list)
 
         for issue_proc_id in issue_proc_id_list:
