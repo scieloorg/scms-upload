@@ -2,7 +2,7 @@ import logging
 import mimetypes
 import os
 import sys
-import glob
+import traceback
 from io import BytesIO
 from shutil import copyfile
 from datetime import datetime
@@ -11,6 +11,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.core.files.base import ContentFile
 from django.db import models
+from django.db.models import Q, Count
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -33,6 +34,7 @@ from core.utils.file_utils import delete_files
 from files_storage.models import FileLocation, MinioConfiguration
 from package import choices
 from pid_provider.requester import PidRequester
+from pid_provider.models import PidProviderXML
 
 
 pid_provider_app = PidRequester()
@@ -47,6 +49,9 @@ class SPSPkgAddPidV3ToZipFileError(Exception):
 
 
 class AddPidV3ToXMLFileError(Exception):
+    ...
+
+class SPSPkgMultipleObjectReturnedException(Exception):
     ...
 
 
@@ -296,6 +301,12 @@ class SPSPkg(CommonControlField, ClusterableModel):
     # zip
     file = models.FileField(upload_to=pkg_directory_path, null=True, blank=True, max_length=150)
 
+    ppx = models.ForeignKey(
+        PidProviderXML,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
     # XML URI
     xml_uri = models.URLField(null=True, blank=True)
 
@@ -362,13 +373,31 @@ class SPSPkg(CommonControlField, ClusterableModel):
     def autocomplete_label(self):
         return f"{self.sps_pkg_name} {self.pid_v3}"
 
-    def fix_sps_pkg_name(self):
-        sps_pkg_name = self.xml_with_pre.sps_pkg_name
+    def fix_sps_pkg_name(self, save=False):
+        try:
+            sps_pkg_name = self.xml_with_pre.sps_pkg_name
+        except Exception as e:
+            return False
         if self.sps_pkg_name != sps_pkg_name:
             self.sps_pkg_name = sps_pkg_name
-            self.save()
+            if save:
+                self.save()
             return True
         return False
+
+    @classmethod
+    def fix_sps_pkg_names(cls, pid_v3, pid_v2, pkg_name_list, batch_size=200):
+        to_update = []
+        for item in cls.objects.filter(
+            Q(sps_pkg_name__in=pkg_name_list) |
+            Q(pid_v2=pid_v2, sps_pkg_name__isnull=True) |
+            Q(pid_v3=pid_v3, sps_pkg_name__isnull=True)
+        ):
+            if item.fix_sps_pkg_name():  # calcula mas não salva
+                to_update.append(item)
+        if to_update:
+            cls.objects.bulk_update(to_update, ["sps_pkg_name"], batch_size=batch_size)
+        return len(to_update)
 
     @property
     def xml_with_pre(self):
@@ -406,43 +435,116 @@ class SPSPkg(CommonControlField, ClusterableModel):
             }
 
     @classmethod
-    def get(cls, pid_v3):
-        return cls.objects.get(pid_v3=pid_v3)
-
-    @classmethod
-    def delete_queryset(cls, qs):
+    def delete_related_items(cls, qs):
         SPSPkgComponent.objects.filter(sps_pkg__in=qs).delete()
-        qs.delete()
+        return qs.delete()
 
     def set_registered_in_core(self, value):
         PidRequester.set_registered_in_core(self.pid_v3, value)
 
-    @staticmethod
-    def is_registered_in_core(pid_v3):
-        if not pid_v3:
-            return False
+    @classmethod
+    def search_by_ppx_id(cls, ppx_id):
         try:
-            obj = SPSPkg.objects.get(pid_v3=pid_v3)
-            return obj.registered_in_core
-        except SPSPkg.DoesNotExist:
-            return False
+            return cls.objects.get(ppx_id=ppx_id)
+        except cls.MultipleObjectsReturned:
+            return (
+                cls.objects
+                .filter(ppx_id=ppx_id)
+                .order_by("-updated")
+                .first()
+            )
 
     @classmethod
-    def _get_or_create(cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2):
+    def search_by_identifiers(
+        cls,
+        pid_v3=None,
+        sps_pkg_name=None,
+        pkg_name_list=None,
+        pid_v2=None,
+        queryset=None,
+    ):
+        qs = Q()
+        params = {}
+        if pid_v3:
+            params["pid_v3"] = pid_v3
+            qs |= Q(pid_v3=pid_v3)
+        if pid_v2:
+            params["pid_v2"] = pid_v2
+            qs |= Q(pid_v2=pid_v2)
+        if sps_pkg_name:
+            params["sps_pkg_name"] = sps_pkg_name
+            qs |= Q(sps_pkg_name=sps_pkg_name)
+        if pkg_name_list:
+            params["sps_pkg_name__in"] = pkg_name_list
+            qs |= Q(sps_pkg_name__in=pkg_name_list)
+
+        if not params:
+            raise ValueError(
+                "SPSPkg.get requires at least one of "
+                "pid_v3, sps_pkg_name, pkg_name_list, pid_v2"
+            )
+
+        if queryset is None:
+            queryset = cls.objects
+
+        items = queryset.filter(qs)
+        found = list(items)
+        if not found:
+            raise cls.DoesNotExist
+        if len(found) == 1:
+            return found[0]
+
+        ids_found_by_any_identifier = set(
+            items.values_list("id", flat=True)
+        )
+        ids_found_by_all_identifiers = set(
+            queryset.filter(**params).values_list("id", flat=True)
+        )
+
+        if ids_found_by_any_identifier == ids_found_by_all_identifiers:
+            return items.order_by("-updated").first()
+
+        data = [item.data for item in items]
+        raise SPSPkgMultipleObjectReturnedException(data)
+
+    @classmethod
+    def get(
+        cls,
+        ppx_id,
+        pid_v3=None,
+        sps_pkg_name=None,
+        pkg_name_list=None,
+        pid_v2=None,
+    ):
+        if not ppx_id:
+            raise ValueError("SPSPkg.get requires ppx_id")
+
         try:
-            obj = cls.objects.get(sps_pkg_name=sps_pkg_name)            
-        except cls.MultipleObjectsReturned:
-            items = cls.objects.filter(sps_pkg_name=sps_pkg_name).order_by("-updated")
-            obj = items.first()
-            cls.delete_queryset(items.exclude(id=obj.id))
+            return cls.search_by_ppx_id(ppx_id)
+        except cls.DoesNotExist:
+            return cls.search_by_identifiers(
+                pid_v3=pid_v3,
+                sps_pkg_name=sps_pkg_name,
+                pkg_name_list=None,
+                pid_v2=pid_v2,
+                queryset=cls.objects.filter(ppx_id__isnull=True),
+            )
+
+    @classmethod
+    def _create_or_update(cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2, pkg_name_list, ppx_id):
+        try:
+            obj = cls.get(ppx_id, pid_v3, sps_pkg_name, pkg_name_list, pid_v2)
         except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
-            obj.sps_pkg_name = sps_pkg_name
+
+        # update
+        obj.sps_pkg_name = sps_pkg_name
         obj.pid_v3 = pid_v3
         obj.pid_v2 = pid_v2
         obj.registered_in_core = registered_in_core
         obj.updated_by = user
+        obj.ppx_id = ppx_id
         obj.save()
         return obj
 
@@ -510,6 +612,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
     @property
     def data(self):
         return dict(
+            sps_pkg_name=self.sps_pkg_name,
+            pid_v3=self.pid_v3,
+            pid_v2=self.pid_v2,
             is_complete=self.is_complete,
             registered_in_core=self.registered_in_core,
             valid_texts=self.valid_texts,
@@ -517,21 +622,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
             texts=self.texts,
             components=[item.data for item in self.components.all()],
         )
-
-    @classmethod
-    def is_registered_xml_zip(cls, zip_xml_file_path):
-        """
-        Check if zip_xml_file_path is registered
-        """
-        for item in pid_provider_app.is_registered_xml_zip(zip_xml_file_path):
-            pid_v3 = item.get("v3")
-            if pid_v3:
-                try:
-                    obj = cls.objects.get(pid_v3=pid_v3)
-                    item["synchronized"] = obj.registered_in_core
-                except cls.DoesNotExist:
-                    pass
-            yield item
 
     def fix_pid_v2(self, user, correct_pid_v2):
         return pid_provider_app.fix_pid_v2(user, self.pid_v3, correct_pid_v2)
@@ -542,18 +632,15 @@ class SPSPkg(CommonControlField, ClusterableModel):
         Solicita PID versão 3
 
         """
-        xml = None
         with TemporaryDirectory() as targetdir:
-            xml_zip_path = os.path.join(targetdir, os.path.basename(zip_xml_file_path))
             with ZipFile(zip_xml_file_path) as zipf_source:
                 for item in zipf_source.namelist():
-                    if item.endswith(".xml"):
-                        xml = item
-                        with ZipFile(xml_zip_path, "w", compression=ZIP_DEFLATED) as zipf_destination:
-                            zipf_destination.writestr(item, zipf_source.read(item))
-                        break
-            if xml:
-                return cls._add_pid_v3_to_zip(user, zip_xml_file_path, is_public, article_proc, xml_zip_path)
+                    if not item.endswith(".xml"):
+                        continue
+                    xml_zip_path = os.path.join(targetdir, os.path.basename(zip_xml_file_path))
+                    with ZipFile(xml_zip_path, "w", compression=ZIP_DEFLATED) as zipf_destination:
+                        zipf_destination.writestr(item, zipf_source.read(item))
+                    return cls._add_pid_v3_to_zip(user, zip_xml_file_path, is_public, article_proc, xml_zip_path)
 
     @classmethod
     def _add_pid_v3_to_zip(cls, user, zip_xml_file_path, is_public, article_proc, xml_zip_path):
@@ -577,12 +664,17 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
                 xml_with_pre = response.pop("xml_with_pre")
 
-                obj = cls._get_or_create(
+                pkg_name_list = xml_with_pre.pkg_name_variations
+                cls.fix_sps_pkg_names(response["v3"], response["v2"], pkg_name_list)
+
+                obj = cls._create_or_update(
                     user=user,
                     pid_v3=response["v3"],
-                    sps_pkg_name=response["pkg_name"],
+                    sps_pkg_name=xml_with_pre.sps_pkg_name,
                     registered_in_core=response.get("registered_in_core"),
                     pid_v2=response["v2"],
+                    pkg_name_list=pkg_name_list,
+                    ppx_id=response.get("ppx_id")
                 )
 
                 if response.get("changed"):
@@ -597,9 +689,9 @@ class SPSPkg(CommonControlField, ClusterableModel):
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             if operation:
+                response["traceback"] = traceback.format_exc()
                 operation.finish(
                     user,
-                    exc_traceback=exc_traceback,
                     exception=e,
                     detail=response,
                 )
@@ -923,29 +1015,144 @@ class SPSPkg(CommonControlField, ClusterableModel):
             return pub_date
         # em caso de data incompleta, tenta retornar a data completa, completando com 06 o mes ausente e com 15 o dia ausente
         return xml_with_pre.get_complete_publication_date()
-    
-    @classmethod
-    def complete_pid_v2(cls, user, sps_pkg_id_list=None):
-        filters = {
-            "pid_v2__isnull": True,
-        }
-        if sps_pkg_id_list:
-            filters["id__in"] = sps_pkg_id_list
 
-        # 1. Buscamos os objetos (o select_related é essencial aqui para evitar o problema de N+1)
-        items_to_update = []
-        queryset = cls.objects.filter(**filters)
-
-        for item in queryset:
-            # 2. Atualizamos o valor na instância em memória
-            # Certifique-se de que o caminho 'sps_pkg.xml_with_pre.v2' está correto
+    def add_ppx(self, user, save=False):
+        for registered in pid_provider_app.is_registered_xml_zip(self.file.path):
             try:
-                item.pid_v2 = item.xml_with_pre.v2
-                item.updated_by = user
-                items_to_update.append(item)
-            except Exception:
-                pass
+                self.ppx_id = registered["ppx_id"]
+                self.updated_by = user
+                if save:
+                    self.save()
+            except KeyError:
+                return registered 
 
-        # 4. Salvamos tudo em uma única consulta ao banco
+    @classmethod
+    def complete_ppx(cls, user, sps_pkg_id_list=None, pkg_name_substr=None, pid_v2_subst=None):
+        if not sps_pkg_id_list and not pkg_name_substr and not pid_v2_subst:
+            raise ValueError("SPSPkg.complete_ppx requires sps_pkg_id_list or pkg_name_substr or pid_v2_subst")
+        filters = {
+            "ppx_id__isnull": True,
+        }
+        qs = Q()
+        if sps_pkg_id_list:
+            qs |= Q(id__in=sps_pkg_id_list)
+        if pkg_name_substr:
+            qs |= Q(sps_pkg_name__contains=pkg_name_substr)
+        if pid_v2_subst:
+            qs |= Q(pid_v2__contains=pid_v2_subst)
+
+        failures = []
+        success = []
+        items_to_update = []
+        for sps_pkg in cls.objects.filter(qs, **filters).iterator():
+            try:
+                name = sps_pkg.sps_pkg_name
+                response = sps_pkg.add_ppx(user)
+                if sps_pkg.ppx_id:
+                    success.append(name)
+                    items_to_update.append(sps_pkg)
+                    continue
+                response["name"] = name
+                failures.append(response)
+            except Exception:
+                failures.append({
+                    "name": name,
+                    "response": traceback.format_exc(),
+                })
         if items_to_update:
-            cls.objects.bulk_update(items_to_update, ["pid_v2", "updated_by"], batch_size=100)
+            cls.objects.bulk_update(
+                items_to_update, ["ppx", "updated_by"], batch_size=100)
+        return {
+            "failures": failures,
+            "success": success,
+        }
+
+    @classmethod
+    def exclude_invalid_records(
+        cls,
+        user,
+        issue_proc_pid,
+        delete_sps_pkg_which_ppx_is_missing,
+        delete_sps_pkg_which_is_duplicated,
+    ):
+        try:
+            return cls._exclude_invalid_records(
+                user,
+                issue_proc_pid,
+                delete_sps_pkg_which_ppx_is_missing,
+                delete_sps_pkg_which_is_duplicated,
+            )
+        except Exception as e:
+            return {"error": str(e), "error_type": str(type(e)), "traceback": traceback.format_exc()}
+
+    @classmethod
+    def _exclude_invalid_records(
+        cls,
+        user,
+        issue_pid,
+        delete_sps_pkg_which_ppx_is_missing,
+        delete_sps_pkg_which_is_duplicated,
+    ):
+        total_deletado = 0
+        response = {}
+        exceptions = []
+        prefix_article_pid = f"S{issue_pid}"
+        sps_pkgs = cls.objects.filter(pid_v2__startswith=prefix_article_pid)
+        response["total_sps_pkgs"]= sps_pkgs.count()
+        response["params"] = {
+            "delete_sps_pkg_which_ppx_is_missing": delete_sps_pkg_which_ppx_is_missing,
+            "delete_sps_pkg_which_is_duplicated": delete_sps_pkg_which_is_duplicated,            
+        }
+
+        if delete_sps_pkg_which_ppx_is_missing:
+            # 1. Remoção por falta de ppx
+            to_delete = sps_pkgs.filter(ppx_id__isnull=True)
+            if to_delete:
+                try:
+                    qtd_deleted, _ignored = cls.delete_related_items(to_delete)
+                    response["total_delete_sps_pkg_which_ppx_is_missing"] = qtd_deleted
+                    total_deletado += qtd_deleted
+                    # consulta novamente
+                    sps_pkgs = cls.objects.filter(pid_v2__startswith=prefix_article_pid)
+                except Exception as e:
+                    exceptions.append({
+                        "action": "deleting due to missing ppx",
+                        "exception": traceback.format_exc()
+                    })
+        if delete_sps_pkg_which_is_duplicated:
+            # 2. Remoção por duplicidade
+            duplicated_items = []
+            multiple_values = (
+                sps_pkgs.values("ppx_id")
+                .annotate(total=Count("id"))
+                .filter(total__gt=1)
+                .values_list("ppx_id", flat=True)
+            )
+            total_delete_sps_pkg_which_is_duplicated = 0
+            for value in list(multiple_values or []):
+                try:
+                    # Filtra os registros que possuem este valor específico duplicado
+                    sps_pkgs_which_same_ppx = sps_pkgs.filter(ppx_id=value).order_by("-updated")
+                    data = {"value": value, "total": sps_pkgs_which_same_ppx.count()}
+
+                    keep = sps_pkgs_which_same_ppx.first()
+
+                    # Executa a deleção e soma ao totalizador
+                    qtd_deletada, _ignored = cls.delete_related_items(
+                        sps_pkgs_which_same_ppx.exclude(id=keep.id)
+                    )
+                    data["total_deleted"] = qtd_deletada
+                    duplicated_items.append(data)
+                    total_delete_sps_pkg_which_is_duplicated += qtd_deletada
+                except Exception as e:
+                    exceptions.append({
+                        "action": "removing duplicity",
+                        "item": value,
+                        "exception": traceback.format_exc()
+                    })
+            response["total_delete_sps_pkg_which_is_duplicated"] = total_delete_sps_pkg_which_is_duplicated
+            response["exceptions"] = exceptions
+            response["duplicated_items"] = duplicated_items
+            total_deletado += total_delete_sps_pkg_which_is_duplicated
+        response["total_deleted_items"] = total_deletado
+        return response

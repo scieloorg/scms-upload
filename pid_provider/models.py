@@ -447,7 +447,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     panel_a = [
         FieldPanel("proc_status"),
-        FieldPanel("collections", read_only=True),
         FieldPanel("issn_electronic", read_only=True),
         FieldPanel("issn_print", read_only=True),
         FieldPanel("pub_year", read_only=True),
@@ -461,7 +460,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     ]
     panel_b = [
         AutocompletePanel("collections", read_only=True),
-        AutocompletePanel("current_version", read_only=True),
+        FieldPanel("current_version", read_only=True),
         InlinePanel("other_pid", label=_("Other PID")),
     ]
     panel_c = [
@@ -618,13 +617,34 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             "aop_pid": self.aop_pid,
             "pkg_name": self.pkg_name,
             "finger_print": self.current_version and self.current_version.finger_print,
-            "created": self.created and self.created.isoformat(),
-            "updated": self.updated and self.updated.isoformat(),
-            "record_status": "updated" if self.updated else "created",
             "registered_in_core": self.registered_in_core,
+            "ppx_id": self.id
         }
         _data.update(self.get_readable_data())
+        _data.update(self.record_status)
         return _data
+
+    @property
+    def record_status(self):
+        """Retorna os timestamps e o estado do registro ('created' ou 'updated').
+
+        Calcula a variação entre `created` e `updated` para definir o estado de 
+        persistência. Utilizado para direcionar o código HTTP de resposta:
+        - 'created' -> 201 Created
+        - 'updated' -> 200 OK ou 204 No Content
+
+        Returns:
+            dict: Dicionário com `created`, `updated` em ISO 8601 e `record_status`.
+        """
+        d = {}
+        if self.created:
+            d["created"] = self.created.isoformat()
+            d["record_status"] = "created"
+            if self.updated:
+                d["updated"] = self.updated.isoformat()
+                if (self.updated - self.created).total_seconds() > 1:
+                    d["record_status"] = "updated"
+        return d         
 
     @classmethod
     @profile_classmethod
