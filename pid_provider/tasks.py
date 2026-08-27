@@ -47,7 +47,7 @@ def task_fix_pid_v2(
     username=None,
     user_id=None,
 ):
-    for article_proc in ArticleProc.objects.filter(sps_pkg__isnull=False).iterator():
+    for article_proc in ArticleProc.objects.filter(sps_pkg_id__isnull=False).iterator():
         subtask_fix_pid_v2.apply_async(
             kwargs=dict(
                 username=username,

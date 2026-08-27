@@ -107,8 +107,11 @@ class PublicationAPI:
         """
         curl --request POST http://0.0.0.0:8000/api/v1/auth -u "useremail:password"
         """
+        if not self.enabled:
+            raise ValueError(_("Website enabled is False ({})").format(self.post_data_url))
+
         if not self.get_token_url:
-            return
+            raise ValueError(_("Website.get_token_url is not set"))
 
         resp = post_data(
             self.get_token_url,

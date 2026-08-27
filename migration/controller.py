@@ -12,6 +12,8 @@ from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
+from scielo_classic_website import classic_ws
+from scielo_classic_website.iid2json.id2json3 import get_doc_records
 
 from article.models import Article
 from collection.models import Language
@@ -30,13 +32,10 @@ from journal.models import (
     Subject,
 )
 from location.models import Location
-from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile
-from scielo_classic_website import classic_ws
-from scielo_classic_website.iid2json.id2json3 import get_doc_records
+from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile, ClassicWebsiteConfiguration
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 
-from .models import ClassicWebsiteConfiguration
 
 
 class IdFileRecordIsAlreadyUptodate(Exception):
@@ -260,6 +259,10 @@ def create_or_update_journal(
             exc_traceback=exc_traceback,
         )
         raise e
+    # core_synchronized = True, inibe atualização via coleta do core.scielo.org,
+    # pois os dados entraram via migração
+    journal.core_synchronized = True
+    journal.save()
     return journal
 
 
@@ -314,20 +317,15 @@ def create_or_update_issue(
     if not journal_proc.journal:
         raise ValueError(f"Missing JournalProc.journal for {journal_proc}")
 
-    issue = Issue.get_or_create(
-        journal=journal_proc.journal,
-        publication_year=classic_website_issue.publication_year,
-        volume=classic_website_issue.volume,
-        number=classic_website_issue.number,
-        supplement=classic_website_issue.supplement,
-        user=user,
-        is_continuous_publishing_model=bool(
-            not classic_website_issue.number and not classic_website_issue.supplement
-        ),
-        total_documents=classic_website_issue.total_documents,
-        order=int(classic_website_issue.order[-4:]),
-        issue_pid_suffix=classic_website_issue.order[-4:],
-    )
+    kwargs = _get_issue_params(user, journal_proc.journal, classic_website_issue)
+    issue = issue_proc.issue
+    if issue:
+        issue.update(**kwargs)
+    else:
+        issue = Issue.create_or_update(**kwargs)
+
+    _create_sections(user, issue, classic_website_issue)
+
     issue_proc.update(
         user=user,
         journal_proc=journal_proc,
@@ -336,7 +334,27 @@ def create_or_update_issue(
         migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         force_update=force_update,
     )
+    return issue
 
+
+def _get_issue_params(user, journal, classic_website_issue):
+    return dict(
+        user=user,
+        journal=journal,
+        publication_year=classic_website_issue.publication_year,
+        volume=classic_website_issue.volume,
+        number=classic_website_issue.number,
+        supplement=classic_website_issue.supplement,
+        is_continuous_publishing_model=bool(
+            not classic_website_issue.number and not classic_website_issue.supplement
+        ),
+        total_documents=classic_website_issue.total_documents,
+        order=int(classic_website_issue.order[-4:]),
+        issue_pid_suffix=classic_website_issue.order[-4:],
+    )
+
+
+def _create_sections(user, issue, classic_website_issue):
     toc = TOC.create_or_update(
         user,
         issue,
@@ -365,7 +383,6 @@ def create_or_update_issue(
                 text=text,
             )
             TocSection.create_or_update(user, toc, section.get("code"), sec)
-    return issue
 
 
 def create_or_update_article(

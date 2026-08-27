@@ -18,12 +18,14 @@ Organização hierárquica das tasks de migração e publicação:
   Articles:
     task_migrate_and_publish_articles
       └─ task_migrate_and_publish_articles_by_journal (por periódico)
+          ├─ task_fix_issue_articles (síncrono, por fascículo selecionado,
+          │   antes de agendar a migração; corrige/exclui registros
+          │   duplicados ou com sps_pkg.ppx ausente)
           └─ task_migrate_and_publish_articles_by_issue (por fascículo)
               └─ task_publish_issue_articles (publica artigos + sincroniza issue)
                   ├─ task_publish_article (por artigo, síncrono)
-                  │   └─ task_check_article_webpages (verifica disponibilidade)
-                  │       ├─ task_check_article_page_availability (por webpage, síncrono)
-                  │       └─ task_update_article_proc_availability (callback)
+                  │   └─ task_check_article_webpages (verifica disponibilidade
+                  │       e já atualiza o pid_status diretamente; ver nota)
                   └─ task_sync_issue (sincroniza fascículo no site)
 
   Publicação avulsa (somente publicação, sem migração):
@@ -32,9 +34,17 @@ Organização hierárquica das tasks de migração e publicação:
 
   Verificação de disponibilidade (em lote):
     task_check_articles_availability
-      └─ task_check_article_webpages (por artigo × website)
-          ├─ task_check_article_page_availability (por webpage)
-          └─ task_update_article_proc_availability (callback)
+      └─ task_check_article_webpages (por artigo × website; atualiza o
+          pid_status diretamente ao final, sem despachar outra task)
+
+  NOTA: neste arquivo, ``task_check_article_page_availability`` e
+  ``task_update_article_proc_availability`` não são chamadas por nenhuma
+  outra task (nenhum ``.delay``/``.apply_async``/chamada direta as
+  referencia). Elas podem estar sendo usadas como callbacks de uma
+  Celery chain/chord montada fora deste módulo (ex.: a partir de
+  ``ArticleWebPage``/``Article.check_availability``) ou podem ser código
+  órfão remanescente de uma versão anterior do fluxo — vale confirmar
+  antes de assumir que compõem o pipeline ativo.
 
   Rastreamento de PIDs do site clássico:
     task_track_classic_website_article_pids
@@ -46,7 +56,7 @@ Organização hierárquica das tasks de migração e publicação:
 
   Utilitários:
     task_fetch_and_create_journal
-    task_exclude_invalid_issue_articles
+    task_fix_issue_articles
     task_remove_duplicate_issues
     task_check_main_article_page_availability
 """
@@ -66,8 +76,9 @@ from issue.models import Issue
 from collection.choices import PUBLIC, QA
 from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
-from migration import controller
+from migration import controller as migration_controller
 from migration import choices as migration_choices
+from package.models import SPSPkg
 from proc.controller import (
     create_or_update_migrated_issue,
     create_or_update_migrated_journal,
@@ -82,7 +93,7 @@ from publication.api.issue import publish_issue, sync_issue
 from publication.api.journal import publish_journal
 from publication.api.publication import get_api_data
 from tracker import choices as tracker_choices
-from tracker.models import TaskTracker, UnexpectedEvent, sanitize_for_json
+from tracker.models import TaskTracker, UnexpectedEvent
 
 User = get_user_model()
 
@@ -309,6 +320,7 @@ def task_migrate_and_publish_journals(
     status=None,
     valid_status=None,
     force_import_acron_id_file=False,
+    force_core_sync=False,
 ):
     """
     Ponto de entrada para migração e publicação de periódicos.
@@ -325,6 +337,7 @@ def task_migrate_and_publish_journals(
             "force_update": force_update,
             "status": status,
             "force_import_acron_id_file": force_import_acron_id_file,
+            "force_core_sync": force_core_sync,
         }
         for collection in _get_collections(collection_acron):
             task_migrate_and_publish_journals_by_collection.delay(
@@ -335,12 +348,13 @@ def task_migrate_and_publish_journals(
                 force_update=force_update,
                 status=status,
                 force_import_acron_id_file=force_import_acron_id_file,
+                force_core_sync=force_core_sync,
             )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             action="proc.tasks.task_migrate_and_publish_journals",
-            item=f"{collection_acron}-{journal_acron}",
+            item=collection_acron,
             e=e,
             exc_traceback=exc_traceback,
             detail={"task_params": task_params},
@@ -357,6 +371,7 @@ def task_migrate_and_publish_journals_by_collection(
     force_update=False,
     status=None,
     force_import_acron_id_file=False,
+    force_core_sync=False,
 ):
     """
     Migra e publica periódicos de uma coleção.
@@ -374,30 +389,38 @@ def task_migrate_and_publish_journals_by_collection(
         "force_update": force_update,
         "status": status,
         "force_import_acron_id_file": force_import_acron_id_file,
+        "force_core_sync": force_core_sync,
     }
     task_exec = TaskExecution(
         name="proc.tasks.task_migrate_and_publish_journals_by_collection",
-        item=f"{collection_acron}-{journal_acron}",
+        item=f"{collection_acron}",
         params=task_params,
     )
     try:
         user = _get_user(user_id, username)
 
-        classic_website = controller.get_classic_website(collection_acron)
+        classic_website = migration_controller.get_classic_website(collection_acron)
         collection = Collection.objects.get(acron=collection_acron)
         create_or_update_migrated_journal(
-            user, collection, classic_website, force_update
+            user, collection, classic_website, force_import_acron_id_file
         )
 
         journal_filter = {}
         if journal_acron:
             journal_filter["acron"] = journal_acron
+
         status = tracker_choices.get_valid_status(status, force_update)
         query_by_status = (
-            Q(migration_status__in=status)
-            | Q(qa_ws_status__in=status)
+            Q(qa_ws_status__in=status)
             | Q(public_ws_status__in=status)
         )
+        if not force_core_sync:
+            # seleciona também aqueles que não estão sincronizados
+            query_by_status |= Q(migration_status__in=status)
+            query_by_status |= Q(journal__core_synchronized=False)         
+
+        # para force_core_sync=True, o filtro migration_status deixa de ser relevante
+
         fix_publication_status(collection)
         items_to_process = JournalProc.objects.filter(
             query_by_status, collection=collection, **journal_filter
@@ -414,18 +437,24 @@ def task_migrate_and_publish_journals_by_collection(
             try:
                 detail = {}
                 event = journal_proc.start(user, "migrate journal")
-                completed = journal_proc.create_or_update_item(
-                    user, force_update, controller.create_or_update_journal
-                )
-                if force_update or not journal_proc.journal.core_synchronized:
+
+                if force_core_sync:
                     fetch_and_create_journal(
                         user,
                         collection_acron=collection.acron,
                         issn_electronic=journal_proc.issn_electronic,
                         issn_print=journal_proc.issn_print,
-                        force_update=force_update,
+                        force_update=force_core_sync,
                     )
+                    detail["journal_data_source"] = "core data"
+                else:
+                    # cria journal a partir de migrated journal
+                    journal_proc.create_or_update_item(
+                        user, force_update, migration_controller.create_or_update_journal
+                    )
+                    detail["journal_data_source"] = "classic website data"
                 if qa_api_data and not qa_api_data.get("error"):
+                    detail["task_publish_journal_on_qa_website"] = "scheduled"
                     task_publish_journal.apply_async(
                         kwargs=dict(
                             user_id=user_id,
@@ -437,6 +466,7 @@ def task_migrate_and_publish_journals_by_collection(
                         )
                     )
                 if public_api_data and not public_api_data.get("error"):
+                    detail["task_publish_journal_on_public_website"] = "scheduled"
                     task_publish_journal.apply_async(
                         kwargs=dict(
                             user_id=user_id,
@@ -476,7 +506,7 @@ def task_migrate_and_publish_journals_by_collection(
         except Exception:
             UnexpectedEvent.create(
                 action="proc.tasks.task_migrate_and_publish_journals_by_collection",
-                item=f"{collection_acron}-{journal_acron}",
+                item=f"{collection_acron}",
                 e=e,
                 exc_traceback=exc_traceback,
                 detail=task_params,
@@ -711,7 +741,7 @@ def task_migrate_and_publish_issues_by_collection(
     try:
         user = _get_user(user_id, username)
 
-        classic_website = controller.get_classic_website(collection_acron)
+        classic_website = migration_controller.get_classic_website(collection_acron)
         collection = Collection.objects.get(acron=collection_acron)
         create_or_update_migrated_issue(
             user, collection, classic_website, force_update
@@ -949,13 +979,76 @@ def task_migrate_and_publish_articles(
     force_migrate_document_records=False,
     force_migrate_document_files=False,
     skip_migrate_pending_document_records=False,
+    delete_article_which_is_duplicated=False,
+    delete_article_which_sps_pkg_is_missing=False,
+    delete_sps_pkg_which_is_duplicated=False,
+    delete_sps_pkg_which_ppx_is_missing=False,
+    delete_article_procs_which_sps_pkg_is_missing=False,
+    delete_article_procs_which_is_duplicated=False,
 ):
     """
     Ponto de entrada para migração e publicação de artigos.
 
-    Consolida collection_acron_list/journal_acron_list, seleciona JournalProcs
-    ou IssueProcs conforme os filtros fornecidos e agenda
-    ``task_migrate_and_publish_articles_by_journal`` para cada periódico.
+    Consolida ``collection_acron``/``collection_acron_list`` e
+    ``journal_acron``/``journal_acron_list`` em listas únicas e resolve
+    quais periódicos (e, opcionalmente, quais fascículos) serão
+    processados:
+
+    - Se ``publication_year`` ou ``issue_folder`` forem informados,
+      seleciona ``IssueProc`` via ``IssueProc.select_items`` (filtrando
+      também por ``article_status_list=PROGRESS_STATUS_REGULAR_TODO``,
+      isto é, fascículos cujo ``docs_status``/``files_status`` indica que
+      há artigos pendentes de migração ou reprocessamento) e agrupa os
+      ``issue_proc_id`` por periódico.
+    - Caso contrário, seleciona todos os ``JournalProc`` com
+      ``has_issue_proc=True`` (nenhum fascículo específico é fixado; a
+      seleção de fascículos/artigos fica a cargo de
+      ``task_migrate_and_publish_articles_by_journal``).
+
+    Para cada periódico resultante, agenda
+    ``task_migrate_and_publish_articles_by_journal`` repassando
+    ``issue_proc_id_list`` (quando aplicável) e os demais parâmetros de
+    controle de migração/exclusão.
+
+    Parameters
+    ----------
+    collection_acron / collection_acron_list : str / list, optional
+        Coleção(ões) a processar; combinados em uma única lista.
+    journal_acron / journal_acron_list : str / list, optional
+        Periódico(s) a processar; combinados em uma única lista.
+    publication_year / issue_folder : int / str, optional
+        Quando informados, restringem o processamento a fascículos
+        específicos (via ``IssueProc.select_items``) em vez de todos os
+        fascículos do periódico.
+    status : list, optional
+        Lista de status usada para selecionar itens pendentes; resolvida
+        por ``tracker_choices.get_valid_status(status, force_update)``.
+    force_update : bool, default False
+        Se True, ignora o filtro de status e força reprocessamento.
+    force_import_acron_id_file : bool, default False
+        Repassado até ``controller.import_journal_acron_id_records``
+        (via ``task_migrate_and_publish_articles_by_journal``) para
+        forçar a reimportação do arquivo acron.id.
+    force_migrate_document_records / force_migrate_document_files : bool, default False
+        Repassados até ``IssueProc.migrate_document_records`` /
+        ``migrate_document_files`` para forçar a remigração de registros
+        e arquivos de documento.
+    skip_migrate_pending_document_records : bool, default False
+        Reservado; não é utilizado no corpo atual desta task.
+    delete_article_which_is_duplicated : bool, default False
+        Repassado até ``task_fix_issue_articles`` / ``Article.exclude_invalid_records``:
+        remove ``Article`` duplicados (mantém 1).
+    delete_article_which_sps_pkg_is_missing : bool, default False
+        Repassado até ``task_fix_issue_articles``: controla se a exclusão
+        de registros inválidos deve ser executada mesmo quando a
+        reconciliação de ``sps_pkg.ppx`` reportar falhas (ver docstring
+        de ``task_fix_issue_articles``).
+    delete_sps_pkg_which_is_duplicated / delete_sps_pkg_which_ppx_is_missing : bool, default False
+        Repassados até ``task_fix_issue_articles`` / ``SPSPkg.exclude_invalid_records``:
+        removem ``SPSPkg`` duplicados ou sem ``ppx`` associado.
+    delete_article_procs_which_sps_pkg_is_missing / delete_article_procs_which_is_duplicated : bool, default False
+        Repassados até ``task_fix_issue_articles`` / ``ArticleProc.exclude_invalid_records``:
+        removem ``ArticleProc`` duplicados ou sem ``sps_pkg`` associado.
     """
     task_params = {
         "user_id": user_id,
@@ -971,6 +1064,12 @@ def task_migrate_and_publish_articles(
         "force_import_acron_id_file": force_import_acron_id_file,
         "force_migrate_document_records": force_migrate_document_records,
         "force_migrate_document_files": force_migrate_document_files,
+        "delete_article_which_is_duplicated": delete_article_which_is_duplicated,
+        "delete_article_which_sps_pkg_is_missing": delete_article_which_sps_pkg_is_missing,
+        "delete_sps_pkg_which_is_duplicated": delete_sps_pkg_which_is_duplicated,
+        "delete_sps_pkg_which_ppx_is_missing": delete_sps_pkg_which_ppx_is_missing,
+        "delete_article_procs_which_sps_pkg_is_missing": delete_article_procs_which_sps_pkg_is_missing,
+        "delete_article_procs_which_is_duplicated": delete_article_procs_which_is_duplicated,
     }
     title = f"{collection_acron or collection_acron_list}-{journal_acron or journal_acron_list}-{issue_folder}-{publication_year}"
     task_exec = TaskExecution(
@@ -979,7 +1078,6 @@ def task_migrate_and_publish_articles(
         params=task_params,
     )
     try:
-        params = {}
         journal_acron_list = journal_acron_list or []
         if journal_acron:
             journal_acron_list += [journal_acron]
@@ -987,61 +1085,48 @@ def task_migrate_and_publish_articles(
         if collection_acron:
             collection_acron_list += [collection_acron]
 
-        items_to_process = {}
         status = tracker_choices.get_valid_status(status, force_update)
 
-        if publication_year or issue_folder:
-            selected_issue_procs = IssueProc.select_items(
-                collection_acron_list=collection_acron_list,
-                journal_acron_list=journal_acron_list,
-                publication_year=publication_year,
-                issue_folder=issue_folder,
-                force_migrate_document_records=force_migrate_document_records,
-                force_migrate_document_files=force_migrate_document_files,
-                article_status_list=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
-            )
-            issue_proc_ids = selected_issue_procs.values_list(
-                "journal_proc_id", "journal_proc__acron", "id"
-            ).distinct()
-            for journal_proc_id, journal_acron, issue_proc_id in issue_proc_ids:
-                items_to_process.setdefault((journal_proc_id, journal_acron), []).append(
-                    issue_proc_id
-                )
-        else:
-            journal_proc_ids = JournalProc.select_items(
-                collection_acron_list=collection_acron_list,
-                journal_acron_list=journal_acron_list,
-                has_issue_proc=True,
-            ).values_list("id", "acron")
-            items_to_process = {
-                (journal_proc_id, journal_acron): None
-                for journal_proc_id, journal_acron in journal_proc_ids
-            }
+        items_to_process = ArticleProc.get_journal_and_issue_proc_ids(
+            collection_acron_list=collection_acron_list,
+            journal_acron_list=journal_acron_list,
+            publication_year=publication_year,
+            issue_folder=issue_folder,
+            force_migrate_document_records=force_migrate_document_records,
+            force_migrate_document_files=force_migrate_document_files,
+            status_list=status,
+        )
 
         total_journals_to_process = len(items_to_process)
         task_exec.add_number(
             "total_journals_to_process", total_journals_to_process
         )
 
-        kwargs_ = {}
-        kwargs_.update(task_params)
-        kwargs_.pop("collection_acron_list", None)
-        kwargs_.pop("journal_acron_list", None)
-
         task_exec.total_to_process = total_journals_to_process
         total_processed = 0
-        for key in items_to_process.keys():
-            journal_proc_id, journal_acron = key
-
-            kwargs = {}
-            kwargs.update(kwargs_)            
-            kwargs["journal_proc_id"] = journal_proc_id
-            kwargs["journal_acron"] = journal_acron
-            kwargs["issue_proc_id_list"] = items_to_process[key]
-            kwargs["status"] = status
-            
+        for (journal_proc_id, journal_acron), issue_proc_id_list in items_to_process.items():
+            issue_proc_id_list = list(issue_proc_id_list)
+            task_migrate_and_publish_articles_by_journal.delay(
+                user_id=user_id,
+                username=username,
+                collection_acron=collection_acron,
+                journal_acron=journal_acron,
+                journal_proc_id=journal_proc_id,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                issue_proc_id_list=issue_proc_id_list,
+                status=status,
+                force_update=force_update,
+                force_import_acron_id_file=force_import_acron_id_file,
+                force_migrate_document_records=force_migrate_document_records,
+                force_migrate_document_files=force_migrate_document_files,
+            )
             total_processed += 1
-            task_migrate_and_publish_articles_by_journal.delay(**kwargs)
+            task_exec.add_event({
+                "action": "scheduled task_migrate_and_publish_articles_by_journal",
+                "item": journal_acron,
+                "total_issues": len(issue_proc_id_list)
+            })
 
         task_exec.total_processed = total_processed
         task_exec.finish()
@@ -1072,16 +1157,50 @@ def task_migrate_and_publish_articles_by_journal(
     publication_year=None,
     issue_folder=None,
     status=None,
-    valid_status=None,
     force_update=False,
     force_import_acron_id_file=False,
     force_migrate_document_records=False,
     force_migrate_document_files=False,
+    delete_article_which_is_duplicated=False,
+    delete_article_which_sps_pkg_is_missing=False,
+    delete_sps_pkg_which_is_duplicated=False,
+    delete_sps_pkg_which_ppx_is_missing=False,
+    delete_article_procs_which_sps_pkg_is_missing=False,
+    delete_article_procs_which_is_duplicated=False,
 ):
     """
-    Migra e publica artigos de um periódico.
+    Migra e publica artigos de um periódico: seleciona fascículos/artigos
+    pendentes, corrige inconsistências e agenda a migração por fascículo.
 
-    Importa o arquivo acron.id via ``controller.import_journal_acron_id_records``
+    Fluxo:
+
+    1. ``fix_publication_status``: normaliza ``qa_ws_status``/``public_ws_status``
+       de Journal/Issue/Article conforme os websites habilitados na coleção.
+    2. ``controller.import_journal_acron_id_records``: importa/atualiza o
+       arquivo acron.id do periódico (respeitando ``force_import_acron_id_file``).
+    3. ``ArticleProc.mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect``:
+       marca para reprocessamento os ``ArticleProc`` cujo ``pid_v2`` do
+       ``sps_pkg`` está incorreto (restrito a ``issue_proc_id_list``, quando
+       informado).
+    4. Seleção dos fascículos/artigos a processar:
+       - Se ``issue_proc_id_list`` foi recebido (chamada originada de
+         ``task_migrate_and_publish_articles`` com filtro de fascículo),
+         processa apenas esses ``IssueProc``, sem artigos fixados
+         individualmente.
+       - Caso contrário, seleciona via ``IssueProc.select_items`` os
+         fascículos com ``article_status_list=PROGRESS_STATUS_REGULAR_TODO``
+         (isto é, cujo ``docs_status``/``files_status`` sinaliza documentos
+         pendentes de migração ou reprocessamento) e, para os demais
+         fascículos do periódico, seleciona diretamente os ``ArticleProc``
+         pendentes via ``ArticleProc.select_items``.
+    5. Para cada fascículo resultante, executa **de forma síncrona**
+       ``task_fix_issue_articles`` (corrige/exclui ``SPSPkg``/``Article``/``ArticleProc``
+       inconsistentes antes da migração) e então agenda, de forma
+       assíncrona, ``task_migrate_and_publish_articles_by_issue`` repassando
+       a resposta de ``task_fix_issue_articles`` em
+       ``exclude_invalid_articles_response``.
+
+    Importa o arquivo acron.id via ``migration_controller.import_journal_acron_id_records``
     e agenda ``task_migrate_and_publish_articles_by_issue`` para cada
     ``IssueProc`` do periódico.
     """
@@ -1097,6 +1216,12 @@ def task_migrate_and_publish_articles_by_journal(
         "force_import_acron_id_file": force_import_acron_id_file,
         "force_migrate_document_records": force_migrate_document_records,
         "force_migrate_document_files": force_migrate_document_files,
+        "delete_article_which_is_duplicated": delete_article_which_is_duplicated,
+        "delete_article_which_sps_pkg_is_missing": delete_article_which_sps_pkg_is_missing,
+        "delete_sps_pkg_which_is_duplicated": delete_sps_pkg_which_is_duplicated,
+        "delete_sps_pkg_which_ppx_is_missing": delete_sps_pkg_which_ppx_is_missing,
+        "delete_article_procs_which_sps_pkg_is_missing": delete_article_procs_which_sps_pkg_is_missing,
+        "delete_article_procs_which_is_duplicated": delete_article_procs_which_is_duplicated,
     }
     task_exec = TaskExecution(
         name="proc.tasks.task_migrate_and_publish_articles_by_journal",
@@ -1106,10 +1231,10 @@ def task_migrate_and_publish_articles_by_journal(
     try:
         if not journal_proc_id:
             raise ValueError("journal_proc_id is required")
-
-        status = tracker_choices.get_valid_status(status, force_update)
         journal_proc = JournalProc.objects.get(id=journal_proc_id)
+
         user = _get_user(user_id, username)
+        status = tracker_choices.get_valid_status(status, force_update)
 
         task_exec.journal_proc_id = journal_proc_id
         task_exec.update_total_status(("Start"))
@@ -1117,7 +1242,9 @@ def task_migrate_and_publish_articles_by_journal(
         fix_publication_status(journal_proc.collection)
         task_exec.update_total_status(("Updated publication status"))
 
-        response = controller.import_journal_acron_id_records(
+        # a partir de acron.id, cria ou atualiza JournalAcronIdFile e IdFileRecord,
+        # fonte para criar/atualizar ArticleProc
+        response = migration_controller.import_journal_acron_id_records(
             user,
             ArticleProc,
             journal_proc,
@@ -1135,66 +1262,29 @@ def task_migrate_and_publish_articles_by_journal(
             journal_proc.collection, "issue", "PUBLIC"
         )
         total_processed = 0
-        total_to_process = 0
+        issue_proc_id_list = list(issue_proc_id_list)
+        total_to_process = len(issue_proc_id_list)
 
-        issue_proc_and_related_article_proc_id_list = {}
-        if issue_proc_id_list:
-            task_exec.add_number("total issue_proc_id_list", len(issue_proc_id_list))
-            selected_article_proc_items = []
-        else:
-            selected_issue_procs = IssueProc.select_items(
-                journal_proc_id_list=[journal_proc_id],
-                force_migrate_document_records=force_migrate_document_records,
-                force_migrate_document_files=force_migrate_document_files,
-                article_status_list=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
-            )
-            issue_proc_id_list = list(
-                selected_issue_procs.values_list("id", flat=True)
-            )
-            task_exec.add_number("total issue_proc todo or reproc", len(issue_proc_id_list))
-            selected_article_proc_items = (
-                ArticleProc.select_items(
-                    journal_proc_id_list=[journal_proc_id],
-                    exclude_issue_proc_id_list=issue_proc_id_list,
-                    status_list=status,
-                    force_update=force_update,
-                )
-                .values_list("issue_proc_id", "id")
-                .distinct()
-            )
-            task_exec.add_number("total articles todo or reproc", selected_article_proc_items.count())
-
-        issue_proc_and_related_article_proc_id_list = {
-            issue_proc_id: []
-            for issue_proc_id in (issue_proc_id_list or [])
-        }
-        if selected_article_proc_items:
-            for issue_proc_id, article_proc_id in selected_article_proc_items:
-                issue_proc_and_related_article_proc_id_list.setdefault(
-                    issue_proc_id, []
-                ).append(article_proc_id)
-
-        total_to_process = len(issue_proc_and_related_article_proc_id_list)
-        task_exec.add_number("total issue_proc todo or reproc", total_to_process)
-
-        for (
-            issue_proc_id,
-            article_proc_id_list,
-        ) in issue_proc_and_related_article_proc_id_list.items():
-            total_processed += 1
+        for issue_proc_id in issue_proc_id_list:
+            
             # executa sincronamente a eliminação de registros ArticleProc e Article cujo conteúdo é defeituoso
-            response = task_exclude_invalid_issue_articles(
+            response = task_fix_issue_articles(
                 issue_proc_id=issue_proc_id,
                 username=username,
                 user_id=user_id,
                 public_api_data=public_api_data,
+                delete_article_which_is_duplicated=delete_article_which_is_duplicated,
+                delete_article_which_sps_pkg_is_missing=delete_article_which_sps_pkg_is_missing,
+                delete_sps_pkg_which_is_duplicated=delete_sps_pkg_which_is_duplicated,
+                delete_sps_pkg_which_ppx_is_missing=delete_sps_pkg_which_ppx_is_missing,
+                delete_article_procs_which_sps_pkg_is_missing=delete_article_procs_which_sps_pkg_is_missing,
+                delete_article_procs_which_is_duplicated=delete_article_procs_which_is_duplicated,
             )
 
             task_migrate_and_publish_articles_by_issue.delay(
                 user_id=user_id,
                 username=username,
                 issue_proc_id=issue_proc_id,
-                article_proc_id_list=article_proc_id_list,
                 status=status,
                 force_update=force_update,
                 force_migrate_document_records=force_migrate_document_records,
@@ -1203,6 +1293,7 @@ def task_migrate_and_publish_articles_by_journal(
                 public_api_data=public_api_data,
                 exclude_invalid_articles_response=response,
             )
+            total_processed += 1
         task_exec.total_processed = total_processed
         task_exec.total_to_process = total_to_process
         task_exec.finish()
@@ -1218,7 +1309,6 @@ def task_migrate_and_publish_articles_by_issue(
     user_id=None,
     username=None,
     issue_proc_id=None,
-    article_proc_id_list=None,
     status=None,
     force_update=False,
     force_migrate_document_records=False,
@@ -1228,18 +1318,61 @@ def task_migrate_and_publish_articles_by_issue(
     exclude_invalid_articles_response=None,
 ):
     """
-    Migra e publica artigos de um fascículo.
+    Migra artigos de um fascículo e agenda a publicação deles.
 
-    Executa o pipeline completo de migração para cada artigo:
-    migração de registros (``migrate_document_records``), migração de arquivos
-    (``migrate_document_files``) e ``ArticleProc.migrate_article``.
-    Ao final agenda ``task_publish_issue_articles``.
+    Se ``article_proc_id_list`` for informado (fascículo já teve seus
+    ``ArticleProc`` selecionados por
+    ``task_migrate_and_publish_articles_by_journal``), processa apenas
+    esses registros diretamente, sem repetir a migração de
+    registros/arquivos do fascículo. Caso contrário, executa o pipeline
+    completo:
+
+    1. ``issue_proc.migrate_document_records``: cria/atualiza os
+       ``ArticleProc`` do fascículo a partir do site clássico.
+    2. ``issue_proc.migrate_document_files``: cria/atualiza os
+       ``MigratedFile`` (pacotes SPS) do fascículo via
+       ``controller.migrate_issue_files``.
+    3. ``ArticleProc.select_items``: seleciona os ``ArticleProc``
+       pendentes (conforme ``status``/``force_update``) para migração.
+
+    Para cada ``ArticleProc`` selecionado, chama
+    ``article_proc.migrate_article`` (obtém o XML/pacote SPS e cria ou
+    atualiza os registros ``SPSPkg``/``Article``); falhas individuais são
+    registradas em ``task_exec`` mas não interrompem o loop.
+
+    Ao final, agenda (assíncrono) ``task_publish_issue_articles`` para
+    publicar os artigos do fascículo e sincronizar o TOC.
+
+    Parameters
+    ----------
+    issue_proc_id : int
+        ID do ``IssueProc`` cujo fascículo será migrado.
+    article_proc_id_list : list[int], optional
+        Quando informado, restringe a migração a esses ``ArticleProc``
+        específicos (pula as etapas de migração de registros/arquivos do
+        fascículo).
+    status : list, optional
+        Lista de status usada em ``ArticleProc.select_items`` quando
+        ``article_proc_id_list`` não é informado.
+    force_update : bool, default False
+        Se True, ignora o filtro de status ao selecionar artigos e força
+        remigração em ``migrate_article``.
+    force_migrate_document_records / force_migrate_document_files : bool, default False
+        Forçam a remigração de registros/arquivos do fascículo mesmo que
+        já tenham sido migrados anteriormente.
+    qa_api_data / public_api_data : dict, optional
+        Recebidos de ``task_migrate_and_publish_articles_by_journal`` mas
+        não utilizados no corpo atual desta task (não são repassados a
+        ``task_publish_issue_articles``, que recalcula os dados de API
+        por website habilitado).
+    exclude_invalid_articles_response : list or dict, optional
+        Resultado de ``task_fix_issue_articles`` executado antes desta
+        task; apenas registrado no histórico de eventos (``task_exec``).
     """
     task_params = {
         "user_id": user_id,
         "username": username,
         "issue_proc_id": issue_proc_id,
-        "article_proc_id_list": article_proc_id_list,
         "status": status,
         "force_update": force_update,
         "force_migrate_document_records": force_migrate_document_records,
@@ -1264,42 +1397,33 @@ def task_migrate_and_publish_articles_by_issue(
 
         task_exec.add_event(exclude_invalid_articles_response)
 
-        total_articles_to_process = 0
-        article_procs = None
-        if article_proc_id_list:
-            article_procs = ArticleProc.objects.select_related(
-                "issue_proc",
-            ).filter(id__in=article_proc_id_list)
-        else:
-            # cria ou atualiza ArticleProc
-            response = issue_proc.migrate_document_records(
-                user, force_migrate_document_records
-            )
-            task_exec.add_event({"operation": "migrate_document_records", "response": response})
-            task_exec.update_total_status(("Created or updated Article Processing records"), issue_proc_id)
+        # a partir do IdFileRecord, cria ou atualiza ArticleProc
+        response = issue_proc.migrate_document_records(
+            user, force_migrate_document_records
+        )
+        task_exec.add_event({"operation": "migrate_document_records", "response": response})
+        task_exec.update_total_status(("Created or updated Article Processing records"), issue_proc_id)
 
-            # cria ou atualiza MigratedFile
-            response = issue_proc.migrate_document_files(
-                user,
-                force_migrate_document_files,
-                controller.migrate_issue_files,
-            )
-            task_exec.add_event({"operation": "migrate_document_files", "response": response})
-            task_exec.update_total_status(("Created or updated Migrated file records"), issue_proc_id)
+        # cria ou atualiza MigratedFile
+        response = issue_proc.migrate_document_files(
+            user,
+            force_migrate_document_files,
+            migration_controller.migrate_issue_files,
+        )
+        task_exec.add_event({"operation": "migrate_document_files", "response": response})
+        task_exec.update_total_status(("Created or updated Migrated file records"), issue_proc_id)
 
-            article_procs = ArticleProc.select_items(
-                issue_proc_id_list=[issue_proc_id],
-                status_list=status,
-                force_update=force_update,
-            )
-        total_articles_to_process = article_procs.count()
-        task_exec.total_to_process = total_articles_to_process
+        article_procs = ArticleProc.select_items(
+            issue_proc_id=issue_proc_id,
+            status_list=None if force_update else status,
+        )
+        task_exec.total_to_process = article_procs.count()
 
         total_processed = 0
         exceptions = {}
         for article_proc in article_procs:
             try:
-                # faz o fluxo completo do artigo: get_xml e cria sps_pkg
+                # executa get_xml, generate_sps_pkg, cria / atualiza Article
                 article = article_proc.migrate_article(user, force_update)
                 total_processed += 1
             except Exception as e:
@@ -1338,9 +1462,32 @@ def task_publish_issue_articles(
     """
     Publica artigos de um fascículo e sincroniza o fascículo no site.
 
-    Para cada WebSiteConfiguration habilitado da coleção:
-    1. Publica cada artigo via task_publish_article (síncrono).
-    2. Agenda task_sync_issue (assíncrono).
+    Seleciona os ``ArticleProc`` do fascículo que já possuem
+    ``sps_pkg.pid_v3`` (isto é, artigos com pacote SPS registrado no PID
+    Provider) e, para cada ``WebSiteConfiguration`` habilitada da coleção
+    (QA e/ou PUBLIC):
+
+    1. Filtra os artigos pendentes de publicação naquele website
+       (``qa_ws_status``/``public_ws_status`` em ``status``).
+    2. Publica cada artigo pendente via ``task_publish_article``
+       (chamada síncrona, artigo a artigo).
+    3. Agenda (assíncrono) ``task_sync_issue`` para aquele website, para
+       que o fascículo seja atualizado no TOC do site.
+
+    Falhas de publicação de artigos individuais são registradas em
+    ``task_exec`` e não interrompem o processamento dos demais artigos
+    nem dos demais websites.
+
+    Parameters
+    ----------
+    issue_proc_id : int
+        ID do ``IssueProc`` cujos artigos serão publicados.
+    status : list, optional
+        Lista de status usada para filtrar artigos pendentes de
+        publicação; resolvida por ``tracker_choices.get_valid_status``.
+    force_update : bool, default False
+        Se True, ignora o filtro de status (publica mesmo artigos já
+        publicados).
     """
     task_params = {
         "user_id": user_id,
@@ -1446,10 +1593,23 @@ def task_sync_issue(
     api_data=None,
 ):
     """
-    Sincroniza a tabela de conteúdo de um fascículo no site (QA ou PUBLIC).
+    Sincroniza a tabela de conteúdo (TOC) de um fascículo no site (QA ou PUBLIC).
 
-    Chamada de forma assíncrona após ``task_publish_issue_articles``
-    para garantir que o fascículo apareça corretamente no TOC do site.
+    Delega para ``publication.api.issue.sync_issue``, usando ``api_data``
+    se fornecido ou buscando via ``get_api_data`` caso contrário.
+    Chamada de forma assíncrona por ``task_publish_issue_articles`` (uma
+    vez por website habilitado) após a publicação dos artigos do
+    fascículo, para garantir que o TOC reflita os artigos recém-publicados.
+
+    Parameters
+    ----------
+    issue_proc_id : int
+        ID do ``IssueProc`` cujo fascículo será sincronizado.
+    website_kind : str
+        ``QA`` ou ``PUBLIC``.
+    api_data : dict, optional
+        Dados de API pré-carregados; se omitido, obtidos via
+        ``get_api_data(issue_proc.collection, "issue", website_kind)``.
     """
     try:
         user = _get_user(user_id, username)
@@ -1500,9 +1660,32 @@ def task_publish_articles(
     timeout=None,
 ):
     """
-    Agenda publicação de artigos pendentes.
+    Publicação avulsa de artigos (sem etapa de migração).
 
-    Seleciona IssueProcs e agenda task_publish_issue_articles para cada um.
+    Ponto de entrada independente do fluxo de migração: normaliza o
+    status de publicação das coleções selecionadas
+    (``fix_publication_status``), seleciona ``IssueProc`` via
+    ``IssueProc.select_items`` conforme os filtros fornecidos e agenda
+    (assíncrono) ``task_publish_issue_articles`` para cada fascículo,
+    reaproveitando artigos e pacotes SPS já migrados.
+
+    Parameters
+    ----------
+    collection_acron / journal_acron : str, optional
+        Filtram a coleção/periódico a processar.
+    issue_folder / publication_year : str / int, optional
+        Filtram fascículo(s) específico(s).
+    issue_proc_id : int, optional
+        Restringe a um único ``IssueProc``.
+    status : list, optional
+        Repassado a ``task_publish_issue_articles`` para filtrar artigos
+        pendentes de publicação.
+    force_update : bool, default False
+        Repassado a ``task_publish_issue_articles``.
+    verify : bool, optional
+        Recebido mas não utilizado no corpo atual desta task.
+    timeout : int, optional
+        Recebido mas não utilizado no corpo atual desta task.
     """
     task_params = {
         "user_id": user_id,
@@ -1567,7 +1750,33 @@ def task_publish_article(
     """
     Publica um artigo individual no site QA ou PUBLIC.
 
-    Após publicação bem-sucedida, agenda task_check_article_webpages.
+    Delega para ``article_proc.publish`` (que chama
+    ``publication.api.document.publish_article`` e atualiza
+    ``qa_ws_status``/``public_ws_status`` conforme o resultado). Se a
+    publicação for concluída com sucesso, agenda (assíncrono)
+    ``task_check_article_webpages`` para verificar a disponibilidade da
+    página recém-publicada.
+
+    Note
+    ----
+    Executada de forma síncrona por ``task_publish_issue_articles``
+    (chamada direta, não ``.delay``), artigo a artigo.
+
+    Parameters
+    ----------
+    website_kind : str
+        ``QA`` ou ``PUBLIC``.
+    website_id : int, optional
+        ID da ``WebSiteConfiguration`` correspondente; apenas informativo
+        (não é usado para consulta nesta task).
+    article_proc_id : int
+        ID do ``ArticleProc`` a publicar.
+    api_data : dict, optional
+        Dados de API usados por ``publish_article``.
+    force_update : bool, optional
+        Se True, republica mesmo que já esteja marcado como publicado.
+    timeout : int, optional
+        Recebido e repassado a ``task_check_article_webpages``.
     """
     user = None
     detail = {"published": False, "available": False}
@@ -1684,21 +1893,70 @@ def task_fetch_and_create_journal(
 
 
 @celery_app.task(bind=True)
-def task_exclude_invalid_issue_articles(
+def task_fix_issue_articles(
     self,
     issue_proc_id,
     username=None,
     user_id=None,
     timeout=None,
     public_api_data=None,
+    delete_article_which_is_duplicated=False,
+    delete_article_which_sps_pkg_is_missing=False,
+    delete_sps_pkg_which_is_duplicated=False,
+    delete_sps_pkg_which_ppx_is_missing=False,
+    delete_article_procs_which_sps_pkg_is_missing=False,
+    delete_article_procs_which_is_duplicated=False,
 ):
     """
-    Remove artigos duplicados e inconsistentes de um fascículo.
+    Corrige e remove artigos duplicados/inconsistentes de um fascículo.
 
-    Executa ``Article.fix_sps_pkg_names`` e ``Article.exclude_invalid_issue_articles``
-    para o fascículo associado ao ``IssueProc`` informado.
-    Chamada automaticamente por ``task_migrate_and_publish_articles_by_issue``
-    antes de iniciar a migração dos artigos.
+    Executa, para o fascículo associado ao ``IssueProc`` informado:
+    1. ``ArticleProc.complete_sps_pkg_ppx``, que completa o vínculo
+       ``sps_pkg.ppx`` dos ArticleProc do fascículo ainda sem PidProviderXML
+       associado.
+    2. ``Article.exclude_invalid_records``, que remove registros de Article
+       inválidos ou duplicados.
+
+    Chamada automaticamente por ``task_migrate_and_publish_articles_by_journal``
+    antes de iniciar a migração dos artigos do fascículo.
+
+    A etapa de exclusão (passo 2) é destrutiva: ela apaga definitivamente
+    ``SPSPkg``/``Article`` cujo vínculo com ``PidProviderXML`` não pôde ser
+    resolvido. Se a reconciliação do passo 1 (``ArticleProc.complete_sps_pkg_ppx``)
+    reportar falhas (``response["failures"]``), isso pode significar apenas uma
+    falha temporária (PID Provider fora do ar, ZIP inacessível, etc.) e não que
+    o registro é de fato inválido. Por isso, quando há falhas na reconciliação,
+    a exclusão só é executada se ``delete_article_which_sps_pkg_is_missing=True``; caso
+    contrário, os ``ArticleProc`` correspondentes aos pacotes que falharam são
+    marcados com ``migration_status=PROGRESS_STATUS_BLOCKED`` para revisão
+    manual, e a etapa de exclusão é pulada. O usuário pode então investigar e,
+    se confirmar que os registros são realmente inválidos, executar a task
+    novamente com ``delete_article_which_sps_pkg_is_missing=True``.
+
+    Parameters
+    ----------
+    issue_proc_id : int
+        ID do IssueProc cujo fascículo será processado.
+    username : str, optional
+        Nome do usuário que executa a tarefa (alternativa a user_id).
+    user_id : int, optional
+        ID do usuário que executa a tarefa (alternativa a username).
+    timeout : int, optional
+        Tempo limite passado para Article.exclude_invalid_records.
+    public_api_data : dict, optional
+        Não utilizado atualmente nesta implementação.
+    delete_article_which_sps_pkg_is_missing : bool, optional
+        Se True, executa a exclusão de registros inválidos mesmo quando a
+        reconciliação (``ArticleProc.complete_sps_pkg_ppx``) reportou falhas.
+        Se False (padrão), nesse caso a exclusão é pulada e os ArticleProc
+        afetados são apenas marcados (``migration_status=BLOCKED``) para que
+        o usuário decida, mais tarde, solicitar a exclusão.
+
+    Returns
+    -------
+    list or dict
+        Lista de eventos ``{"operation": str, "response": dict}`` executados,
+        ou dict com detalhes de exceção em caso de falha.
     """
     try:
         detail = None
@@ -1707,14 +1965,66 @@ def task_exclude_invalid_issue_articles(
             id=issue_proc_id
         )
         detail = []
+        detail.append({
+            "params": {
+                "delete_article_which_is_duplicated": delete_article_which_is_duplicated,
+                "delete_article_which_sps_pkg_is_missing": delete_article_which_sps_pkg_is_missing,
+                "delete_sps_pkg_which_ppx_is_missing": delete_sps_pkg_which_ppx_is_missing,
+            }
+        })
         issue = issue_proc.issue
-        response = ArticleProc.exclude_invalid_items(user, issue)
-        detail.append({"operation": "ArticleProc.exclude_invalid_items", "response": response})
-        response = Article.exclude_invalid_records(user, issue, response.get("sps_pkg_id_list"), timeout=timeout)
-        detail.append({"operation": "Article.exclude_invalid_records", "response": response})
-        if response.get("deleted_sps_pkg_ids"):
-            response = ArticleProc.exclude_invalid_items(user, issue)
-            detail.append({"operation": "ArticleProc.exclude_invalid_items", "response": response})
+        # Filtra Article por issue e 
+        # completa Article.sps_pkg.ppx com Article.pp_xml
+        response = Article.complete_sps_pkg_ppx(user, issue)
+        detail.append({
+            "operation": "Article.complete_sps_pkg_ppx",
+            "response": response,
+        })
+        # Filtra ArticleProc por issue_proc_id e 
+        # completa ArticleProc.sps_pkg.ppx requisitando novamente pid v3 usando sps_pkg.file
+        response = ArticleProc.complete_sps_pkg_ppx(
+            user, issue_proc_id_list=[issue_proc_id])
+        detail.append({
+            "operation": "ArticleProc.complete_sps_pkg_ppx",
+            "response": response,
+        })
+        if delete_sps_pkg_which_ppx_is_missing or delete_sps_pkg_which_is_duplicated:
+            # exclue os SPSPkg cujos ppx is None ou que tem ppx duplicados (mantém 1)
+            response = SPSPkg.exclude_invalid_records(
+                user, 
+                issue_proc.pid,
+                delete_sps_pkg_which_ppx_is_missing,
+                delete_sps_pkg_which_is_duplicated,
+            )
+            detail.append({
+                "operation": "SPSPkg.exclude_invalid_records",
+                "response": response,
+            })
+        if delete_article_which_sps_pkg_is_missing or delete_article_which_is_duplicated:
+            # exclue os Article cujos sps_pkg is None ou que tem sps_pkg duplicados (mantém 1)
+            response = Article.exclude_invalid_records(
+                user,
+                issue,
+                delete_article_which_sps_pkg_is_missing,
+                delete_article_which_is_duplicated,
+                timeout=timeout,
+            )
+            detail.append({
+                "operation": "Article.exclude_invalid_records",
+                "response": response,
+            })
+        if delete_article_procs_which_sps_pkg_is_missing or delete_article_procs_which_is_duplicated:
+            # exclue os ArticleProc cujos sps_pkg is None ou que tem sps_pkg duplicados (mantém 1)
+            response = ArticleProc.exclude_invalid_records(
+                user,
+                issue_proc_id,
+                delete_article_procs_which_sps_pkg_is_missing,
+                delete_article_procs_which_is_duplicated,
+            )
+            detail.append({
+                "operation": "ArticleProc.exclude_invalid_records",
+                "response": response,
+            })
         return detail
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1924,13 +2234,45 @@ def task_check_article_webpages(
     article_proc_id=None,
 ):
     """
-    Cria/atualiza ArticleCollections do artigo e verifica disponibilidade de páginas.
+    Verifica a disponibilidade das páginas web de um artigo e atualiza o pid_status.
 
-    1. Recupera o Article pelo id.
-    2. Garante existência das ArticleCollections via
+    1. Recupera o ``ArticleProc`` pelo id e, a partir dele, o ``Article``.
+    2. Garante existência das ``ArticleCollection`` via
        ``article.create_or_update_article_collections``.
-    3. Delega verificação para ``article.check_availability``, filtrada por
-       collection_id e website_kind.
+    3. Executa a verificação via ``article.check_availability``, filtrada
+       por ``collection_id`` e ``website_kind`` (``purpose``).
+    4. Consulta o resultado consolidado em
+       ``article.available_on_classic_website`` e
+       ``article.available_on_public_website``; para cada resposta
+       válida (``valid=True``), atualiza ``article_proc.pid_status``
+       via ``ArticleProc.set_pid_status``.
+
+    Agendada (assíncrono) por ``task_publish_article`` após publicação
+    bem-sucedida, e também por
+    ``task_track_classic_website_article_pids_for_collection`` e
+    ``task_check_articles_availability`` (verificação avulsa/em lote).
+
+    Parameters
+    ----------
+    article_id : int, optional
+        Não utilizado diretamente no corpo desta task (o artigo é obtido
+        via ``article_proc.article``); mantido para compatibilidade e
+        para os logs de erro.
+    collection_id : int, optional
+        Coleção usada para filtrar a verificação em
+        ``article.check_availability``.
+    website_kind : str, optional
+        ``QA``/``PUBLIC``/``CLASSIC``; repassado como ``purpose`` para
+        ``article.check_availability``.
+    collection_acron : str, optional
+        Recebido mas não utilizado no corpo atual desta task.
+    timeout : int, optional
+        Recebido mas não repassado explicitamente nesta implementação.
+    force_update : bool, optional
+        Se True, força nova verificação mesmo de páginas já válidas.
+    article_proc_id : int
+        ID do ``ArticleProc`` cujo artigo será verificado (obrigatório;
+        usado para localizar o registro e propagar o resultado).
     """
     try:
         user = _get_user(user_id, username)
@@ -1987,10 +2329,30 @@ def task_check_article_page_availability(
     force_update=None,
 ):
     """
-    Verifica disponibilidade de uma única ArticleWebPage.
+    Verifica disponibilidade de uma única ``ArticleWebPage``.
 
-    Chama ``ArticleWebPage.check_availability`` e propaga o resultado
-    automaticamente: Page → ArticleCollection.
+    Chama ``page.check_page`` (que faz a requisição HTTP e atualiza o
+    status da página) e propaga o resultado automaticamente:
+    ``ArticleWebPage`` → ``ArticleCollection``.
+
+    Parameters
+    ----------
+    webpage_id : int
+        ID da ``ArticleWebPage`` a verificar (obrigatório).
+    article_metadata : dict, optional
+        Metadados do artigo usados para validar o conteúdo da página.
+    timeout : int, optional
+        Timeout HTTP em segundos para a requisição.
+    force_update : bool, optional
+        Se True, re-verifica mesmo se a página já estiver com status
+        válido.
+
+    Note
+    ----
+    Nenhuma outra task deste módulo agenda ou chama
+    ``task_check_article_page_availability`` diretamente; se estiver em
+    uso, é provavelmente disparada por código de ``ArticleWebPage``/
+    ``article.check_availability`` fora deste arquivo.
     """
     try:
         if not webpage_id:
@@ -2024,8 +2386,17 @@ def task_update_article_proc_availability(
     Callback pós-verificação: atualiza pid_status no ArticleProc.
 
     Consulta o ``ArticleCollection`` correspondente e, se todas as páginas
-    estiverem válidas (status=VALID), define ``pid_status`` como
-    PID_STATUS_PUBLIC_VALID via ``ArticleProc.set_pid_status``.
+    estiverem válidas (``is_available=True``), define ``pid_status`` como
+    ``PID_STATUS_PUBLIC_VALID`` via ``ArticleProc.set_pid_status``.
+
+    Note
+    ----
+    Nenhuma outra task deste módulo agenda ou chama
+    ``task_update_article_proc_availability`` diretamente —
+    ``task_check_article_webpages`` já atualiza o ``pid_status``
+    inline, sem despachar esta task. Confirmar se ela é usada como
+    callback de uma chain/chord definida fora deste arquivo antes de
+    considerá-la parte do pipeline ativo.
     """
     try:
         user = _get_user(user_id, username)
@@ -2067,11 +2438,14 @@ def task_check_articles_availability(
     force_update=None,
 ):
     """
-    Verificação em lote: busca artigos por filtros e agenda verificação.
+    Verificação em lote: busca ``ArticleProc`` por filtros e agenda verificação.
 
-    Resolve os artigos que correspondem aos filtros fornecidos, garante a
-    existência de ``ArticleCollection`` para cada um e agenda
-    ``task_check_article_webpages`` (assíncrono) por artigo.
+    Monta um filtro combinando (AND) ``article_pid_v3``,
+    ``publication_year``, ``issue_folder`` e ``collection_acron`` com um
+    filtro (OR) por ``issn_print``/``issn_electronic``, e agenda
+    (assíncrono) ``task_check_article_webpages`` para cada ``ArticleProc``
+    resultante (a criação/atualização da ``ArticleCollection`` é feita
+    dentro de ``task_check_article_webpages``, não aqui).
 
     Parameters
     ----------
@@ -2081,8 +2455,8 @@ def task_check_articles_availability(
         Filtra por ISSN do periódico (OR lógico entre os dois).
     issue_folder / publication_year : str / int, optional
         Filtra por fascículo ou ano de publicação.
-    article_pid_v3 / article_id : str / int, optional
-        Filtra por artigo específico.
+    article_pid_v3 : str, optional
+        Filtra por artigo específico (via ``sps_pkg__pid_v3``).
     collection_acron : str, optional
         Filtra artigos e restringe a verificação à coleção indicada.
     timeout : int, optional
@@ -2162,13 +2536,31 @@ def task_check_migrated_article(
     force_update=None,
 ):
     """
-    Confronta metadados do artigo com a página do site clássico.
+    Confronta metadados do artigo com as páginas do site clássico e do site público.
 
-    Verifica cada página CLASSIC do artigo via ``Article.check_availability``
-    e mapeia o ``webpage_status`` para ``pid_status`` no ``ArticleProc``.
+    1. Garante as ``ArticleCollection`` do artigo
+       (``create_or_update_article_collections``).
+    2. Executa a verificação de disponibilidade
+       (``article.check_availability``).
+    3. Confronta o resultado com o site clássico
+       (``article.available_on_classic_website``) e, se válido, atualiza
+       ``pid_status`` via ``ArticleProc.set_pid_status``.
+    4. Repete a checagem para o site público
+       (``article.available_on_public_website``).
 
-    O ``pid_status`` reflete o resultado mais recente da verificação:
-    CLASSIC_MATCHED, CLASSIC_MISMATCHED, CLASSIC_FOUND ou CLASSIC_NOT_FOUND.
+    O ``pid_status`` resultante reflete o resultado mais recente da
+    verificação (ex.: CLASSIC_MATCHED, CLASSIC_MISMATCHED, CLASSIC_FOUND,
+    CLASSIC_NOT_FOUND, ou os equivalentes de disponibilidade pública),
+    conforme definido em ``migration_choices``.
+
+    Parameters
+    ----------
+    article_proc_id : int
+        ID do ``ArticleProc`` a verificar (obrigatório).
+    timeout : int, optional
+        Recebido mas não utilizado no corpo atual desta task.
+    force_update : bool, optional
+        Recebido mas não utilizado no corpo atual desta task.
     """
     try:
         user = _get_user(user_id, username)

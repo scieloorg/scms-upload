@@ -40,6 +40,11 @@ class ArticleFilterSet(django_filters.FilterSet):
             articlecollection__article__isnull=False
         ).distinct(),
     )
+    absent_sps_pkg = django_filters.BooleanFilter(
+        field_name="sps_pkg_id",
+        lookup_expr="isnull",
+        label=_("Missing SPSPkg"),
+    )
 
     class Meta:
         model = Article
