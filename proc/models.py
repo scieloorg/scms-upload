@@ -33,7 +33,7 @@ from core.utils.sanitize import sanitize_for_json
 from htmlxml.models import HTMLXML
 from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
-from journal.models import Journal
+from journal.models import Journal, JournalHistory
 from migration import choices as migration_choices
 from migration.controller import (
     PkgZipBuilder,
@@ -648,13 +648,12 @@ class BaseProc(CommonControlField):
                 operation.finish(user, exc_traceback=exc_traceback, exception=e)
             else:
                 UnexpectedEvent.create(
+                    action="proc.BaseProc.register_classic_website_data",
+                    item=pid,
                     e=e,
                     exc_traceback=exc_traceback,
                     detail={
-                        "task": "proc.BaseProc.register_classic_website_data",
-                        "username": user.username,
                         "collection": collection.acron,
-                        "pid": pid,
                     },
                 )
 
@@ -1243,6 +1242,13 @@ class JournalProc(BaseProc, ClusterableModel):
             total = item.pop("total")
             items.append({"total": total, "status": item})
         return items
+
+    @property
+    def journal_history(self):
+        return JournalHistory.objects.filter(
+            journal_collection__collection=self.collection,
+            journal_collection__journal=self.journal,
+        )
 
 
 ################################################
@@ -2407,44 +2413,24 @@ class ArticleProc(BaseProc, ClusterableModel):
     @classmethod
     def select_items(
         cls,
-        qs=None,
-        collection_acron=None,
-        journal_acron=None,
+        issue_proc_id=None,
+        collection_acron_list=None,
+        journal_acron_list=None,
         issue_folder=None,
         publication_year=None,
-        issue_proc_id=None,
-        journal_proc_id_list=None,
-        issue_proc_id_list=None,
-        exclude_issue_proc_id_list=None,
-        article_proc_id_list=None,
         status_list=None,
-        force_update=False,
-        sps_pkg_id_list=None,
     ):
-        status_list = tracker_choices.get_valid_status(status_list, force_update)
-        journal_proc_id_list = journal_proc_id_list or []
-        issue_proc_id_list = issue_proc_id_list or []
-        exclude_issue_proc_id_list = exclude_issue_proc_id_list or []
-
         params = {}
-        if sps_pkg_id_list:
-            params["sps_pkg_id__in"] = sps_pkg_id_list
-        if collection_acron:
-            params["collection__acron"] = collection_acron
-        if journal_acron:
-            params["issue_proc__journal_proc__acron"] = journal_acron
-        if journal_proc_id_list:
-            params["issue_proc__journal_proc__id__in"] = journal_proc_id_list
         if publication_year:
             params["issue_proc__issue__publication_year"] = publication_year
         if issue_folder:
             params["issue_proc__issue_folder"] = issue_folder
+        if collection_acron_list:
+            params["collection__acron__in"] = collection_acron_list
+        if journal_acron_list:
+            params["issue_proc__journal_proc__acron__in"] = journal_acron_list
         if issue_proc_id:
-            params["issue_proc__id"] = issue_proc_id
-        if issue_proc_id_list:
-            params["issue_proc__id__in"] = issue_proc_id_list
-        if article_proc_id_list:
-            params["id__in"] = article_proc_id_list
+            params["issue_proc_id"] = issue_proc_id
 
         qs_status = Q()
         if status_list:
@@ -2456,14 +2442,68 @@ class ArticleProc(BaseProc, ClusterableModel):
                 | Q(public_ws_status__in=status_list)
             )
 
-        qs = qs or cls.objects
-        qs = qs.filter(
+        return cls.objects.filter(
             qs_status,
             **params,
         )
-        if exclude_issue_proc_id_list:
-            return qs.exclude(issue_proc__id__in=exclude_issue_proc_id_list)
-        return qs
+
+    @classmethod
+    def get_journal_and_issue_proc_ids(
+        cls,
+        collection_acron_list=None,
+        journal_acron_list=None,
+        issue_folder=None,
+        publication_year=None,
+        status_list=None,
+        force_migrate_document_records=None,
+        force_migrate_document_files=None,
+    ):
+        """
+        Retorna os IDs de JournalProc e IssueProc agrupados por periódico.
+
+        Realiza a busca combinada em ArticleProc e IssueProc aplicando os
+        filtros informados e agrupa os IDs de fascículos (issue_proc_id) em
+        um conjunto mapeado pela tupla identificadora do periódico
+        (journal_proc_id, journal_acron).
+
+        Returns:
+            dict: Dicionário no formato:
+                {
+                    (journal_proc_id, journal_acron): {issue_proc_id1, issue_proc_id2, ...},
+                    ...
+                }
+        """
+        list_from_article = set(
+            cls.select_items(
+                collection_acron_list=collection_acron_list,
+                journal_acron_list=journal_acron_list,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                status_list=status_list,
+            ).values_list(
+                "issue_proc__journal_proc_id", "issue_proc__journal_proc__acron", "issue_proc_id"
+            )
+        )
+        list_from_issue = set(
+            IssueProc.select_items(
+                collection_acron_list=collection_acron_list,
+                journal_acron_list=journal_acron_list,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                article_status_list=status_list,
+                force_migrate_document_records=force_migrate_document_records,
+                force_migrate_document_files=force_migrate_document_files,
+            ).values_list(
+                "journal_proc_id", "journal_proc__acron", "id"
+            )
+        )
+        items_to_process = {}
+        items = list_from_issue | list_from_article
+        for journal_proc_id, journal_acron, issue_proc_id in items:
+            items_to_process.setdefault((journal_proc_id, journal_acron), set()).add(
+                issue_proc_id
+            )
+        return items_to_process
 
     @classmethod
     def filter_by_status(cls, STATUS):
