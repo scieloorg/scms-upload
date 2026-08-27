@@ -296,12 +296,19 @@ def process_journal_result(
     )
 
     # Cria/atualiza o journal
-    journal = Journal.create_or_update(
-        user=user,
-        official_journal=official_journal,
-        title=result.get("title"),
-        short_title=result.get("short_title"),
-    )
+    try:
+        journal = Journal.get_registered(
+            journal_title=result.get("title"),
+            issn_electronic=official.get("issn_electronic"),
+            issn_print=official.get("issn_print"),
+        )
+    except Journal.DoesNotExist:
+        journal = Journal.create_or_update(
+            user=user,
+            official_journal=official_journal,
+            title=result.get("title"),
+            short_title=result.get("short_title"),
+        )
     journal.core_synchronized = False
     journal.contact_address = result.get("contact_address")
     journal.contact_name = result.get("contact_name")
