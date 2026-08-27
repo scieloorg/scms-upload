@@ -171,6 +171,26 @@ class HTMLXMLViewSet(CommonControlFieldViewSet):
     ]
 
 
+class SPSPkgFilterSet(django_filters.FilterSet):
+    has_ppx = django_filters.BooleanFilter(
+        field_name='ppx_id',
+        lookup_expr='isnull',
+        exclude=True,
+        label=_('Has pid provider xml')
+    )
+
+    class Meta:
+        model = SPSPkg
+        fields = [
+            'origin',
+            'registered_in_core',
+            'valid_texts',
+            'valid_components',
+            'is_public',
+            'has_ppx',
+        ]
+
+
 class SPSPkgViewSet(CommonControlFieldViewSet):
     model = SPSPkg
     menu_label = _("SPS Package")
@@ -179,6 +199,7 @@ class SPSPkgViewSet(CommonControlFieldViewSet):
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 10
+    filterset_class = SPSPkgFilterSet  # <--- Filtro customizado associado
 
     list_display = [
         "sps_pkg_name",
@@ -192,18 +213,40 @@ class SPSPkgViewSet(CommonControlFieldViewSet):
         "updated",
     ]
 
-    list_filter = [
-        "origin",
-        "registered_in_core",
-        "valid_texts",
-        "valid_components",
-        "is_public",
-    ]
-
+    # Obs: list_filter foi removido para evitar conflitos com o filterset_class
     search_fields = [
         "pid_v3",
         "sps_pkg_name",
     ]
+
+
+class ArticleProcFilterSet(django_filters.FilterSet):
+    has_sps_pkg = django_filters.BooleanFilter(
+        field_name='sps_pkg_id',
+        lookup_expr='isnull',
+        exclude=True,
+        label=_('Has SPS Package')
+    )
+    has_sps_pkg_article = django_filters.BooleanFilter(
+        field_name='sps_pkg__article',
+        lookup_expr='isnull',
+        exclude=True,
+        label=_('Has SPS Package Article')
+    )
+
+    class Meta:
+        model = ArticleProc
+        fields = [
+            'collection',
+            'pid_status',
+            'migration_status',
+            'xml_status',
+            'sps_pkg_status',
+            'qa_ws_status',
+            'public_ws_status',
+            'has_sps_pkg',
+            'has_sps_pkg_article',
+        ]
 
 
 class ArticleProcViewSet(CommonControlFieldViewSet):
@@ -214,7 +257,6 @@ class ArticleProcViewSet(CommonControlFieldViewSet):
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 10
-    
     list_display = [
         "__str__",
         "xml_status",
@@ -225,15 +267,7 @@ class ArticleProcViewSet(CommonControlFieldViewSet):
         "pid_status",
         "updated",
     ]
-    list_filter = [
-        "collection",
-        "pid_status",
-        "migration_status",
-        "xml_status",
-        "sps_pkg_status",
-        "qa_ws_status",
-        "public_ws_status",
-    ]
+    filterset_class = ArticleProcFilterSet
     search_fields = [
         "sps_pkg__pid_v3",
         "pid",

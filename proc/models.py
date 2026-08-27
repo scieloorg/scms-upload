@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
-from django.db.models import Count, Q
+from django.db.models import Count, Q, F
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -58,6 +58,10 @@ from tracker.models import UnexpectedEvent, format_traceback
 
 
 class NoDocumentRecordsToMigrateError(Exception):
+    ...
+
+
+class ArticleProcSaveProcessedXMLError(Exception):
     ...
 
 
@@ -644,13 +648,12 @@ class BaseProc(CommonControlField):
                 operation.finish(user, exc_traceback=exc_traceback, exception=e)
             else:
                 UnexpectedEvent.create(
+                    action="proc.BaseProc.register_classic_website_data",
+                    item=pid,
                     e=e,
                     exc_traceback=exc_traceback,
                     detail={
-                        "task": "proc.BaseProc.register_classic_website_data",
-                        "username": user.username,
                         "collection": collection.acron,
-                        "pid": pid,
                     },
                 )
 
@@ -2263,13 +2266,15 @@ class ArticleProc(BaseProc, ClusterableModel):
             detail["file_type"] = migrated_data.file_type
             if detail["file_type"] == "html":
                 xml_file_path = self.get_xml_from_html(user, detail)
-                xml_with_pre = None
+                xml_with_pre = list(
+                    XMLWithPre.create(path=xml_file_path)
+                )[0]
             else:
                 xml_with_pre = self.get_xml_from_native(detail)
                 xml_file_path = None
 
             self.save_processed_xml(
-                xml_with_pre, xml_file_path, detail,
+                xml_with_pre, detail,
                 migrated_document_publication_day,
             )
             self.xml_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -2350,24 +2355,26 @@ class ArticleProc(BaseProc, ClusterableModel):
             )
 
     def save_processed_xml(
-        self, xml_with_pre, xml_file_path, detail,
+        self, xml_with_pre, detail,
         migrated_document_publication_day,
     ):
         try:
-            if not xml_with_pre and xml_file_path:
-                xml_with_pre = list(
-                    XMLWithPre.create(path=xml_file_path)
-                )[0]
             if not xml_with_pre:
-                raise ValueError("No XML with pre to process")
+                raise ValueError("ArticleProc.save_processed_xml requires xml_with_pre")
+
+            # se necessario, completa xml_with_pre.v2
             if self.pid and xml_with_pre.v2 != self.pid:
                 xml_with_pre.v2 = self.pid
+
+            # se necessario, completa xml_with_pre.order
             order = str(int(self.pid[-5:]))
             if (
                 not xml_with_pre.order
                 or str(int(xml_with_pre.order)) != order
             ):
                 xml_with_pre.order = order
+
+            # se necessario, completa xml_with_pre.article_publication_date
             try:
                 article_date = xml_with_pre.article_publication_date
             except Exception:
@@ -2377,69 +2384,53 @@ class ArticleProc(BaseProc, ClusterableModel):
                     migrated_document_publication_day
                     or xml_with_pre.get_complete_publication_date()
                 )
+
+            # padroniza o nome do pacote
+            xml_with_pre.built_sps_pkg_name = xml_with_pre.build_sps_pkg_name()
+
+            # atualiza detalhe da operação
             detail.update(xml_with_pre.data)
+
             try:
+                # apagar arquivo atual para poupar espaço
                 os.unlink(self.processed_xml.path)
             except Exception:
                 pass
+
+            # o arquivo será gravado com o nome xml_with_pre.built_sps_pkg_name 
             self.processed_xml.save(
                 xml_with_pre.sps_pkg_name + ".xml",
                 ContentFile(xml_with_pre.tostring()),
                 save=False,
             )
         except Exception as e:
-            logging.exception(f"Exception: save_processed_xml: {e}")
-            raise XMLVersionXmlWithPreError(
+            raise ArticleProcSaveProcessedXMLError(
                 _(
-                    "Unable to get xml with pre from migrated article "
-                    "{}: {} {}"
-                ).format(
-                    xml_file_path or xml_with_pre.sps_pkg_name + ".xml",
-                    type(e), e,
-                )
+                    "Unable to save processed xml from {}: {}"
+                ).format(self.pkg_name, traceback.format_exc())
             )
 
     @classmethod
     def select_items(
         cls,
-        qs=None,
-        collection_acron=None,
-        journal_acron=None,
+        issue_proc_id=None,
+        collection_acron_list=None,
+        journal_acron_list=None,
         issue_folder=None,
         publication_year=None,
-        issue_proc_id=None,
-        journal_proc_id_list=None,
-        issue_proc_id_list=None,
-        exclude_issue_proc_id_list=None,
-        article_proc_id_list=None,
         status_list=None,
-        force_update=False,
-        sps_pkg_id_list=None,
     ):
-        status_list = tracker_choices.get_valid_status(status_list, force_update)
-        journal_proc_id_list = journal_proc_id_list or []
-        issue_proc_id_list = issue_proc_id_list or []
-        exclude_issue_proc_id_list = exclude_issue_proc_id_list or []
-
         params = {}
-        if sps_pkg_id_list:
-            params["sps_pkg_id__in"] = sps_pkg_id_list
-        if collection_acron:
-            params["collection__acron"] = collection_acron
-        if journal_acron:
-            params["issue_proc__journal_proc__acron"] = journal_acron
-        if journal_proc_id_list:
-            params["issue_proc__journal_proc__id__in"] = journal_proc_id_list
         if publication_year:
             params["issue_proc__issue__publication_year"] = publication_year
         if issue_folder:
             params["issue_proc__issue_folder"] = issue_folder
+        if collection_acron_list:
+            params["collection__acron__in"] = collection_acron_list
+        if journal_acron_list:
+            params["issue_proc__journal_proc__acron__in"] = journal_acron_list
         if issue_proc_id:
-            params["issue_proc__id"] = issue_proc_id
-        if issue_proc_id_list:
-            params["issue_proc__id__in"] = issue_proc_id_list
-        if article_proc_id_list:
-            params["id__in"] = article_proc_id_list
+            params["issue_proc_id"] = issue_proc_id
 
         qs_status = Q()
         if status_list:
@@ -2451,14 +2442,68 @@ class ArticleProc(BaseProc, ClusterableModel):
                 | Q(public_ws_status__in=status_list)
             )
 
-        qs = qs or cls.objects
-        qs = qs.filter(
+        return cls.objects.filter(
             qs_status,
             **params,
         )
-        if exclude_issue_proc_id_list:
-            return qs.exclude(issue_proc__id__in=exclude_issue_proc_id_list)
-        return qs
+
+    @classmethod
+    def get_journal_and_issue_proc_ids(
+        cls,
+        collection_acron_list=None,
+        journal_acron_list=None,
+        issue_folder=None,
+        publication_year=None,
+        status_list=None,
+        force_migrate_document_records=None,
+        force_migrate_document_files=None,
+    ):
+        """
+        Retorna os IDs de JournalProc e IssueProc agrupados por periódico.
+
+        Realiza a busca combinada em ArticleProc e IssueProc aplicando os
+        filtros informados e agrupa os IDs de fascículos (issue_proc_id) em
+        um conjunto mapeado pela tupla identificadora do periódico
+        (journal_proc_id, journal_acron).
+
+        Returns:
+            dict: Dicionário no formato:
+                {
+                    (journal_proc_id, journal_acron): {issue_proc_id1, issue_proc_id2, ...},
+                    ...
+                }
+        """
+        list_from_article = set(
+            cls.select_items(
+                collection_acron_list=collection_acron_list,
+                journal_acron_list=journal_acron_list,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                status_list=status_list,
+            ).values_list(
+                "issue_proc__journal_proc_id", "issue_proc__journal_proc__acron", "issue_proc_id"
+            )
+        )
+        list_from_issue = set(
+            IssueProc.select_items(
+                collection_acron_list=collection_acron_list,
+                journal_acron_list=journal_acron_list,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                article_status_list=status_list,
+                force_migrate_document_records=force_migrate_document_records,
+                force_migrate_document_files=force_migrate_document_files,
+            ).values_list(
+                "journal_proc_id", "journal_proc__acron", "id"
+            )
+        )
+        items_to_process = {}
+        items = list_from_issue | list_from_article
+        for journal_proc_id, journal_acron, issue_proc_id in items:
+            items_to_process.setdefault((journal_proc_id, journal_acron), set()).add(
+                issue_proc_id
+            )
+        return items_to_process
 
     @classmethod
     def filter_by_status(cls, STATUS):
@@ -2658,49 +2703,189 @@ class ArticleProc(BaseProc, ClusterableModel):
             )
 
     @classmethod
-    def get_sps_pkg_ids_which_pid_v2_is_incorrect(cls, items=None, issue=None):
-        if issue and not items:
-            items = cls.objects.filter(
-                pid__isnull=False,
-                migrated_data__isnull=False,
-                sps_pkg__pid_v2__isnull=False,
-                issue_proc__issue=issue,
-            )
-        if not items.exists():
-            return set()
+    def mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect(
+        cls, user, journal_proc, issue_proc_id_list=None
+    ):
+        """
+        Marca para reprocessamento os ArticleProc cujo sps_pkg.pid_v2 está
+        preenchido mas não corresponde ao pid do ArticleProc (migrated_data.pid).
+        """
+        params = {}
+        if issue_proc_id_list:
+            params["issue_proc_id__in"] = issue_proc_id_list
+        elif journal_proc:
+            params["issue_proc__journal_proc"] = journal_proc
 
-        from django.db.models import F
-        return set(
-            items
-            .exclude(migrated_data__pid=F("sps_pkg__pid_v2"))
-            .values_list("sps_pkg_id", flat=True)
+        items = cls.objects.filter(
+            pid__isnull=False,
+            migrated_data_id__isnull=False,
+            sps_pkg_id__isnull=False,
+            **params,
+        ).exclude(migrated_data__pid=F("sps_pkg__pid_v2"))
+
+        marked_to_reproc = []
+        failures = {}
+        for item in items.iterator():
+            try:
+                item.updated_by = user
+                item.xml_status = tracker_choices.PROGRESS_STATUS_REPROC
+                item.propagate_reproc_or_todo_status()
+                marked_to_reproc.append(item.pid)
+            except Exception:
+                failures[item.pid] = traceback.format_exc()
+
+        return {
+            "marked_to_reproc": marked_to_reproc,
+            "failures": failures,
+        }
+
+    @classmethod
+    def complete_sps_pkg_ppx(
+        cls, user, journal_proc=None, issue_proc_id_list=None
+    ):
+        """
+        Completa sps_pkg.ppx (campo novo)
+        """
+        params = {}
+        if issue_proc_id_list:
+            params["issue_proc_id__in"] = issue_proc_id_list
+        elif journal_proc:
+            params["issue_proc__journal_proc"] = journal_proc
+
+        sps_pkg_id_list = cls.objects.filter(
+            sps_pkg__ppx_id__isnull=True,
+            **params,
+        ).values_list("sps_pkg_id", flat=True)
+        return SPSPkg.complete_ppx(
+            user,
+            sps_pkg_id_list=sps_pkg_id_list,
+            pkg_name_substr=None,
+            pid_v2_subst=None,
         )
 
     @classmethod
-    def exclude_invalid_items(cls, user, issue):
+    def delete_related_items(cls, qs):
+        return qs.delete()        
+
+    @classmethod
+    def exclude_invalid_records(
+        cls,
+        user,
+        issue_proc_id,
+        delete_article_proc_which_sps_pkg_is_missing=True,
+        delete_article_proc_which_is_duplicated=True,
+    ):
         try:
-            # obtém sps_pkg_ids cujo pid_v2 não corresponde ao ArticleProc.pid
-            sps_pkg_id_list = cls.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
-
-            # completa sps_pkg.pid_v2 com os valores de sps_pkg.xml_with_pre.v2
-            SPSPkg.complete_pid_v2(user, sps_pkg_id_list=sps_pkg_id_list)
-
-            # obtém novamente sps_pkg_ids cujo pid_v2 não corresponde ao cls.pid
-            sps_pkg_id_list = cls.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
-
-            qs = cls.objects.filter(
-                Q(sps_pkg_id__in=sps_pkg_id_list)|Q(sps_pkg__isnull=True),
-                issue_proc__issue=issue,
+            return cls._exclude_invalid_records(
+                user,
+                issue_proc_id,
+                delete_article_proc_which_sps_pkg_is_missing,
+                delete_article_proc_which_is_duplicated,
             )
-            items = qs.values("pid", "sps_pkg__sps_pkg_name")
-            qs.delete()
-            return {"sps_pkg_id_list": list(sps_pkg_id_list), "deleted": list(items)}
         except Exception as e:
-            return {
-                "error": str(e),
-                "error_type": str(type(e)),
-                "traceback": traceback.format_exc()
+            return {"error": str(e), "error_type": str(type(e)), "traceback": traceback.format_exc()}
+
+    @classmethod
+    def _exclude_invalid_records(
+        cls,
+        user,
+        issue_proc_id,
+        delete_article_proc_which_sps_pkg_is_missing=True,
+        delete_article_proc_which_is_duplicated=True,
+    ):
+        total_deletado = 0
+        response = {}
+        exceptions = []
+        article_procs = cls.objects.filter(issue_proc_id=issue_proc_id)
+        response["total_article_procs"]= article_procs.count()
+        response["params"] = {
+            "delete_article_proc_which_sps_pkg_is_missing": delete_article_proc_which_sps_pkg_is_missing,
+            "delete_article_proc_which_is_duplicated": delete_article_proc_which_is_duplicated,            
+        }
+
+        if delete_article_proc_which_sps_pkg_is_missing:
+            # 1. Remoção por falta de sps_pkg
+            to_delete = article_procs.filter(sps_pkg_id__isnull=True)
+            if to_delete:
+                try:
+                    qtd_deleted, _ignored = cls.delete_related_items(to_delete)
+                    response["total_delete_article_proc_which_sps_pkg_is_missing"] = qtd_deleted
+                    total_deletado += qtd_deleted
+                    # consulta novamente
+                    article_procs = cls.objects.filter(
+                        issue_proc_id=issue_proc_id,
+                        sps_pkg_id__isnull=False,
+                    )
+                except Exception as e:
+                    exceptions.append({
+                        "action": "deleting due to missing sps_pkg",
+                        "exception": traceback.format_exc()
+                    })
+
+        if delete_article_proc_which_is_duplicated:
+            # 2. Remoção por duplicidade
+            results = []
+            multiple_values = (
+                article_procs
+                .filter(sps_pkg_id__isnull=False)
+                .values("sps_pkg_id")
+                .annotate(total=Count("id"))
+                .filter(total__gt=1)
+                .values_list("sps_pkg_id", flat=True)
+            )
+            total_delete_article_proc_which_is_duplicated = 0
+            for value in list(multiple_values or []):
+                data, error = cls.process_duplicated_sps_pkg(value, article_procs)
+                if data:
+                    results.append(data)
+                    total_delete_article_proc_which_is_duplicated += data["total_deleted"]
+                elif error:
+                    exceptions.append(error)
+            response["results"] = results
+            total_deletado += total_delete_article_proc_which_is_duplicated
+            response["total_delete_article_proc_which_is_duplicated"] = total_delete_article_proc_which_is_duplicated
+        response["total_deleted_items"] = total_deletado
+        response["exceptions"] = exceptions
+        return response
+
+    @classmethod
+    def process_duplicated_sps_pkg(cls, value, article_procs):
+        """
+        Processa e remove duplicadas para um determinado `sps_pkg_id` (value).
+        Retorna uma tupla contendo (data_dict, exception_dict).
+        """
+        try:
+            data = {
+                "value": value,
             }
+
+            # Filtra os registros que possuem este valor específico duplicado
+            duplicated_items = article_procs.filter(sps_pkg_id=value)
+            data["total"] = duplicated_items.count()
+
+            article_id = duplicated_items.values_list(
+                "sps_pkg__article_id", flat=True
+            ).distinct()
+
+            if article_id:
+                keep = duplicated_items.order_by("-updated").first()
+                to_delete = duplicated_items.exclude(id=keep.id)
+            else:
+                # apagar todos article_proc cujo sps_pkg__article is None
+                to_delete = duplicated_items
+
+            # Executa a deleção
+            qtd_deletada, _ignored = cls.delete_related_items(to_delete)
+            data["total_deleted"] = qtd_deletada
+            return data, None
+
+        except Exception as e:
+            exception_data = {
+                "action": "removing duplicity",
+                "value": value,
+                "exception": traceback.format_exc(),
+            }
+            return None, exception_data
 
     def update_sps_pkg_status(self):
         if self.sps_pkg:
