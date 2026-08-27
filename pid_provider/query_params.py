@@ -1,5 +1,3 @@
-from functools import cached_property
-
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
@@ -13,7 +11,10 @@ def compare(registered_items, input_data):
     total_score = 0
     items = []
     for label, registered_item in registered_items.items():
-        result = compare_items(label, registered_item, input_data.get(label))
+        try:
+            result = compare_items(label, registered_item, input_data[label])
+        except KeyError:
+            continue
         items.append(result)
         total_score += result["score"]
     return {
@@ -98,8 +99,7 @@ class QueryBuilderPidProviderXML:
         # "ARTIGO DE REVISÃO").
         self.z_body_fragment = xml_adapter.xml_with_pre.body_fragment_fingerprint
         self.adapter_data = xml_adapter.data
-        self.compare_data = xml_adapter.get_data_to_compare()
-        self.xml_with_pre_data = xml_adapter.xml_with_pre.get_article_data(300)
+        self.xml_with_pre_data = xml_adapter.xml_with_pre.readable_data
 
     @property
     def pkg_name_list(self):
@@ -132,7 +132,7 @@ class QueryBuilderPidProviderXML:
             self.xml_with_pre_data.get("surnames"),
             self.xml_with_pre_data.get("collab"),
             self.xml_with_pre_data.get("links"),
-            self.xml_with_pre_data.get("partial_body"),
+            self.xml_with_pre_data.get("body_fragment"),
         ]
         if any(items):
             return
