@@ -3,12 +3,14 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 
 from config.menu import get_menu_order
+from core.users.permission_policies import TeamScopedSnippetViewSetMixin
 
 from .models import Institution
 
 
-class InstitutionViewSet(SnippetViewSet):
+class InstitutionViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     model = Institution
+    allow_unscoped_queryset = True
     menu_label = _("Institution")
     menu_icon = "folder"
     menu_order = get_menu_order("institution")

@@ -1,0 +1,24 @@
+{% extends "wagtailadmin/base.html" %}
+{% load i18n wagtailadmin_tags %}
+
+{% block titletag %}{{ title }}{% endblock %}
+
+{% block content %}
+    {% include "wagtailadmin/shared/header.html" with title=title icon="warning" %}
+
+    <div class="nice-padding">
+        <p>{{ message }}</p>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="package_id" value="{{ package.pk }}">
+
+            <button type="submit" class="button button-longrunning">
+                {{ submit_label }}
+            </button>
+            <a href="{{ cancel_url }}" class="button button-secondary">
+                {% trans "Cancel" %}
+            </a>
+        </form>
+    </div>
+{% endblock %}

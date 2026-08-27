@@ -15,17 +15,13 @@ from proc.controller import (
     JournalDataChecker,
     IssueDataChecker,
 )
-from upload.utils import file_utils, xml_utils
-
-pp = PidRequester()
-
+from team.models import get_user_membership_ids
 from upload.models import (
     Package,
     ValidationReport,
     choices,
 )
 from upload.utils import file_utils, xml_utils
-
 
 pp = PidRequester()
 
@@ -283,22 +279,42 @@ def _identify_file_error(package):
 
 
 def _check_article_and_journal(package, xml_with_pre, user):
-    # verifica se o XML está registrado no sistema
     response = {}
     try:
-        response = pp.is_registered_xml_with_pre(xml_with_pre, xml_with_pre.filename)
-        logging.info(f"is_registered_xml_with_pre: {response}")
-        # verifica se o XML é esperado (novo, requer correção, requer atualização)
-        name, ext = os.path.splitext(xml_with_pre.filename)
-        _check_package_is_expected(response, package, name)
-        logging.info(f"_check_package_is_expected: {response}")
-
-        # verifica se journal e issue estão registrados
         xmltree = xml_with_pre.xmltree
 
         journal_checker = UploadJournalDataChecker.from_xmltree(xmltree, user)
         journal_checker.check(response)
         logging.info(f"UploadJournalDataChecker.check: {response}")
+        journal = response.get("journal")
+
+        membership = get_user_membership_ids(user)
+        if (
+            not user
+            or not getattr(user, "is_authenticated", False)
+            or (
+                not user.is_superuser
+                and (
+                    not journal
+                    or journal.id not in membership.get("journal_list_ids", [])
+                )
+            )
+        ):
+            journal_title = journal.title if journal else _("Unknown")
+            raise UnexpectedPackageError(
+                _("User is not authorized to submit packages for journal '{}'.").format(
+                    journal_title
+                )
+            )
+
+        response.update(
+            pp.is_registered_xml_with_pre(xml_with_pre, xml_with_pre.filename)
+        )
+        logging.info(f"is_registered_xml_with_pre: {response}")
+
+        name, ext = os.path.splitext(xml_with_pre.filename)
+        _check_package_is_expected(response, package, name)
+        logging.info(f"_check_package_is_expected: {response}")
 
         issue_checker = UploadIssueDataChecker.from_xmltree(
             xmltree, user, response["journal"]
@@ -306,8 +322,6 @@ def _check_article_and_journal(package, xml_with_pre, user):
         issue_checker.check(response)
         logging.info(f"UploadIssueDataChecker.check: {response}")
 
-        # verifica a consistência dos dados de journal e issue
-        # no XML e na base de dados
         _check_xml_and_registered_data_compatibility(
             response, journal_checker, issue_checker
         )

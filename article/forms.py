@@ -2,6 +2,7 @@ from django.utils.translation import gettext_lazy as _
 
 from article import choices
 from core.forms import CoreAdminModelForm
+from core.users.scoped_queryset import scope_by_membership
 
 
 class ArticleForm(CoreAdminModelForm):
@@ -20,10 +21,29 @@ class ArticleForm(CoreAdminModelForm):
 
 
 class RelatedItemForm(CoreAdminModelForm):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if not self.for_user or not self.for_user.is_superuser:
+            for field_name in ("source_article", "target_article"):
+                self.fields[field_name].queryset = scope_by_membership(
+                    self.for_user,
+                    self.fields[field_name].queryset,
+                    journal_field="journal",
+                )
 
 
 class RequestArticleChangeForm(CoreAdminModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if not self.for_user or not self.for_user.is_superuser:
+            self.fields["article"].queryset = scope_by_membership(
+                self.for_user,
+                self.fields["article"].queryset,
+                journal_field="journal",
+            )
+
     def clean(self):
         cleaned_data = super().clean()
         if cleaned_data:

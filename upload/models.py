@@ -1,8 +1,8 @@
-import json
-import sys
 import csv
+import json
 import logging
 import os
+import sys
 import zlib
 from datetime import date, datetime, timedelta
 from random import randint
@@ -16,25 +16,17 @@ from django.db.models import Count, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
-from packtools.sps.pid_provider.xml_sps_lib import (
-    XMLWithPre,
-)
-from wagtail.admin.panels import (
-    FieldPanel,
-    InlinePanel,
-    ObjectList,
-    TabbedInterface,
-)
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
+from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article import choices as article_choices
 from article.models import Article
-from collection.models import Collection
 from collection import choices as collection_choices
-from core.widgets import ReadOnlyPrettyJSONWidget
+from collection.models import Collection
 from core.models import CommonControlField
-from issue.models import Issue
+from core.widgets import ReadOnlyPrettyJSONWidget
 from package import choices as package_choices
 from package.models import SPSPkg
 from pid_provider.models import PidProviderXML
@@ -43,19 +35,24 @@ from proc.source_core_api import IssueDataChecker
 from team.models import CollectionTeamMember
 from upload import choices
 from upload.forms import (
-    ReadyToPublishPackageForm,
+    PackageZipForm,
     QAPackageForm,
+    ReadyToPublishPackageForm,
     UploadPackageForm,
     UploadValidatorForm,
     ValidationResultForm,
     XMLErrorReportForm,
-    PackageZipForm,
 )
-from upload.permission_helper import ACCESS_ALL_PACKAGES, ASSIGN_PACKAGE, FINISH_DEPOSIT
+from upload.permissions import (
+    ACCESS_PACKAGES,
+    ASSIGN_PACKAGE,
+    FINISH_DEPOSIT,
+    PUBLISH_PACKAGE,
+    REPUBLISH_PACKAGE,
+)
 from upload.utils import file_utils
 from upload.utils.package_utils import update_zip_file
 from upload.utils.zip_pkg import PkgZip
-
 
 User = get_user_model()
 
@@ -315,8 +312,13 @@ class Package(CommonControlField, ClusterableModel):
         verbose_name_plural = _("Package admin")
         permissions = (
             (FINISH_DEPOSIT, _("Can finish deposit")),
-            (ACCESS_ALL_PACKAGES, _("Can access all packages from all users")),
+            (
+                ACCESS_PACKAGES,
+                _("Can access packages from all users within authorized scope"),
+            ),
             (ASSIGN_PACKAGE, _("Can assign package")),
+            (PUBLISH_PACKAGE, _("Can publish package")),
+            (REPUBLISH_PACKAGE, _("Can republish package")),
         )
         indexes = [
             models.Index(
@@ -782,7 +784,8 @@ class Package(CommonControlField, ClusterableModel):
         - Não houver erros bloqueadores.
         - O total de problemas for zero.
         - As porcentagens de erros e avisos XML estiverem dentro dos limites aceitáveis.
-        - As porcentagens de erros XML contestados e declarados impossíveis de corrigir estiverem dentro dos limites aceitáveis.
+        - As porcentagens de erros XML contestados e declarados impossíveis de
+          corrigir estiverem dentro dos limites aceitáveis.
         """
         return self.upload_validator.is_acceptable_package(self)
 
@@ -969,11 +972,11 @@ class Package(CommonControlField, ClusterableModel):
         """
         try:
             xml_pub_date = xml_with_pre.article_publication_date
-        except Exception as e:
+        except Exception:
             xml_pub_date = xml_with_pre.get_complete_publication_date()
         try:
             xml_pub_date = datetime.fromisoformat(xml_pub_date)
-        except Exception as e:
+        except Exception:
             xml_pub_date = None
 
         changed_date = None
@@ -1193,7 +1196,7 @@ class Package(CommonControlField, ClusterableModel):
         filename = filename or os.path.basename(self.file.path)
         try:
             self.file.delete(save=True)
-        except Exception as e:
+        except Exception:
             pass
         self.file.save(filename, ContentFile(content))
 
@@ -1209,7 +1212,7 @@ class Package(CommonControlField, ClusterableModel):
             category,
             reset_validations=False,
         )
-        validation_result = report.add_validation_result(
+        report.add_validation_result(
             status=choices.VALIDATION_RESULT_FAILURE,
             message=self.qa_comment,
             data=data,
@@ -1516,9 +1519,9 @@ class BaseValidationResult(CommonControlField):
         # subject = group
         # message = advice
         try:
-            s = json.dumps(self.data)
+            json.dumps(self.data)
             data = self.data
-        except Exception as e:
+        except Exception:
             data = str(self.data)
         return dict(
             subject=self.subject,
@@ -1919,7 +1922,7 @@ class XMLInfoReport(BaseValidationReport, ClusterableModel):
     def save_file(self, filename, content):
         try:
             self.file.delete(save=True)
-        except Exception as e:
+        except Exception:
             pass
         self.file.save(filename, ContentFile(content))
 
@@ -2126,7 +2129,8 @@ class UploadValidator(CommonControlField):
         - Não houver erros bloqueadores.
         - O total de problemas for zero.
         - As porcentagens de erros e avisos XML estiverem dentro dos limites aceitáveis.
-        - As porcentagens de erros XML contestados e declarados impossíveis de corrigir estiverem dentro dos limites aceitáveis.
+        - As porcentagens de erros XML contestados e declarados impossíveis de
+          corrigir estiverem dentro dos limites aceitáveis.
         """
         if not package.is_validation_finished:
             return False
@@ -2270,7 +2274,7 @@ class PidV2Generator:
             return PidReservation.get(name_list=name_list).pid_v2
         except PidReservation.DoesNotExist:
             pass
-        
+
         self.issue_pid = self.get_issue_pid(user, journal, issue)
         if not self.issue_pid:
             self.log.append(
@@ -2301,7 +2305,7 @@ class PidV2Generator:
             PidReservation.create(
                 pid_v2=pid_v2, pkg_name=self.xml_with_pre.sps_pkg_name
             )
-        except Exception as exc:
+        except Exception:
             self.log.append(
                 _("Unable to reserve pid_v2 {} for {}").format(
                     pid_v2, self.xml_with_pre.sps_pkg_name
@@ -2311,7 +2315,7 @@ class PidV2Generator:
     def update_pid_provider_v2(self, pid_v3, pid_v2):
         try:
             PidProviderXML.objects.filter(v3=pid_v3).update(v2=pid_v2)
-        except Exception as exc:
+        except Exception:
             self.log.append(
                 _("Unable to update pid_provider ({}) with {}").format(pid_v3, pid_v2)
             )
@@ -2392,15 +2396,15 @@ class PidV2Generator:
 
     @staticmethod
     def is_free(pid_v2):
-        logging.info(f"PidV2Generator.is_free?")
+        logging.info("PidV2Generator.is_free?")
         if PidProviderXML._is_registered_pid(v2=pid_v2):
-            logging.info(f"PidV2Generator.is_free False PidProviderXML ")
+            logging.info("PidV2Generator.is_free False PidProviderXML ")
             return False
         try:
             PidReservation.get(pid_v2=pid_v2)
-            logging.info(f"PidV2Generator.is_free False PidReservation ")
+            logging.info("PidV2Generator.is_free False PidReservation ")
         except PidReservation.DoesNotExist:
-            logging.info(f"PidV2Generator.is_free True PidReservation.DoesNotExist ")
+            logging.info("PidV2Generator.is_free True PidReservation.DoesNotExist ")
             return True
         except Exception as exc:
             logging.exception(exc)

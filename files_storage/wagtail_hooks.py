@@ -1,11 +1,15 @@
 from django.utils.translation import gettext_lazy as _
 
 from config.menu import get_menu_order
+from core.users.permission_policies import SuperuserOnlySnippetViewSetMixin
 from core.views import CommonControlFieldViewSet
 from files_storage.models import MinioConfiguration
 
 
-class MinioConfigurationViewSet(CommonControlFieldViewSet):
+class MinioConfigurationViewSet(
+    SuperuserOnlySnippetViewSetMixin,
+    CommonControlFieldViewSet,
+):
     model = MinioConfiguration
     menu_label = _("Minio Configuration")
     menu_icon = "folder"
@@ -24,4 +28,3 @@ class MinioConfigurationViewSet(CommonControlFieldViewSet):
         "host",
         "bucket",
     )
-

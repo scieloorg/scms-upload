@@ -556,7 +556,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     @property
     def collection_list(self):
-        return "|".join(c.acron3 for c in self.collections.all())
+        return "|".join(c.acron for c in self.collections.all())
 
     @classmethod
     def get_queryset(

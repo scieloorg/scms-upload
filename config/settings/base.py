@@ -73,7 +73,7 @@ WAGTAIL = [
     "wagtail_localize.modeladmin",
     "wagtail.embeds",
     "wagtail.sites",
-    "wagtail.users",
+    "core.wagtail_users.ProtectedWagtailUsersAppConfig",
     "wagtail.snippets",
     "wagtail.documents",
     "wagtail.images",

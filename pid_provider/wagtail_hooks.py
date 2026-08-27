@@ -3,12 +3,25 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSetGroup
 
 from config.menu import get_menu_order
+from core.users.permission_policies import (
+    SuperuserOnlySnippetViewSetMixin,
+    TeamScopedSnippetViewSetMixin,
+)
 from core.views import CommonControlFieldViewSet
-from pid_provider.models import XMLURL, XMLVersion, FixPidV2, OtherPid, PidProviderConfig, PidProviderXML, PidProviderXMLRegistration
+from pid_provider.models import (
+    XMLURL,
+    FixPidV2,
+    OtherPid,
+    PidProviderConfig,
+    PidProviderXML,
+    PidProviderXMLRegistration,
+    XMLVersion,
+)
 
 
-class PidProviderXMLViewSet(CommonControlFieldViewSet):
+class PidProviderXMLViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = PidProviderXML
+    collection_field = "collections"
     menu_label = _("Pid Provider XMLs")
     menu_icon = "folder"
     menu_order = 300
@@ -59,8 +72,9 @@ class PidProviderXMLViewSet(CommonControlFieldViewSet):
     export_filename = "pid_provider_xmls"
 
 
-class OtherPidViewSet(CommonControlFieldViewSet):
+class OtherPidViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = OtherPid
+    collection_field = "pid_provider_xml__collections"
     menu_label = _("Pid Changes")
     menu_icon = "folder"
     menu_order = 300
@@ -91,7 +105,10 @@ class OtherPidViewSet(CommonControlFieldViewSet):
     export_filename = "other_pids"
 
 
-class PidProviderConfigViewSet(CommonControlFieldViewSet):
+class PidProviderConfigViewSet(
+    SuperuserOnlySnippetViewSetMixin,
+    CommonControlFieldViewSet,
+):
     model = PidProviderConfig
     menu_label = _("Pid Provider Config")
     menu_icon = "folder"
@@ -113,8 +130,9 @@ class PidProviderConfigViewSet(CommonControlFieldViewSet):
     export_filename = "pid_provider_config"
 
 
-class FixPidV2ViewSet(CommonControlFieldViewSet):
+class FixPidV2ViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = FixPidV2
+    collection_field = "pid_provider_xml__collections"
     menu_label = _("Fix pid v2")
     menu_icon = "folder"
     add_to_settings_menu = False
@@ -151,8 +169,9 @@ class FixPidV2ViewSet(CommonControlFieldViewSet):
     export_filename = "fix_pid_v2"
 
 
-class XMLVersionViewSet(CommonControlFieldViewSet):
+class XMLVersionViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = XMLVersion
+    collection_field = "pid_provider_xml__collections"
     menu_label = _("XML Versions")
     menu_icon = "folder"
     menu_order = 300
@@ -176,7 +195,8 @@ class XMLVersionViewSet(CommonControlFieldViewSet):
         "available_since",
     )
 
-class XMLURLViewSet(CommonControlFieldViewSet):
+
+class XMLURLViewSet(SuperuserOnlySnippetViewSetMixin, CommonControlFieldViewSet):
     model = XMLURL
     menu_label = _("XML URLs")
     menu_icon = "folder"
@@ -201,8 +221,9 @@ class XMLURLViewSet(CommonControlFieldViewSet):
     )
 
 
-class PidProviderXMLRegistrationViewSet(CommonControlFieldViewSet):
+class PidProviderXMLRegistrationViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = PidProviderXMLRegistration
+    collection_field = "pid_provider_xml__collections"
     icon = "doc-empty-inverse"
     menu_label = _("PID Registration Events")
     menu_name = "pid_provider_xml_registration"
@@ -228,7 +249,6 @@ class PidProviderXMLRegistrationViewSet(CommonControlFieldViewSet):
     list_per_page = 50
 
     def get_queryset(self, request):
-        # super = CommonControlFieldViewSet
         queryset = super().get_queryset(request)
         if queryset is None:
             queryset = self.model._default_manager.all()

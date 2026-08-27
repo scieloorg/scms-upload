@@ -1,14 +1,4 @@
-from django.http import HttpResponseRedirect
-
-from django.utils.translation import gettext_lazy as _
 from wagtail.snippets.views.snippets import CreateView, EditView, SnippetViewSet
-from wagtail.admin import messages
-
-
-class CommonControlFieldCreateView(CreateView):
-    def form_valid(self, form):
-        self.object = form.save_all(self.request.user)
-        return HttpResponseRedirect(self.get_success_url())
 
 
 class CommonControlFieldViewSet(SnippetViewSet):

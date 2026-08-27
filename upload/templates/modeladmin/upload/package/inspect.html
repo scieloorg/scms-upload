@@ -1,8 +1,8 @@
-{% extends "modeladmin/inspect.html" %}
-{% load i18n modeladmin_tags wagtailadmin_tags wagtailcore_tags %}
+{% extends "wagtailadmin/generic/inspect.html" %}
+{% load i18n l10n wagtailadmin_tags wagtailcore_tags %}
 
 {% block header %}
-    {% include "modeladmin/includes/header_with_history.html" with title=view.get_page_title subtitle=view.get_page_subtitle icon=view.header_icon merged=1 latest_log_entry=latest_log_entry history_url=history_url %}
+    {{ block.super }}
 
     {% if linked %}
     <div class="nice-padding">
@@ -33,14 +33,16 @@
             {% for field in fields %}
                 <dt class="{{ field.type|lower }}">{{ field.label }}</dt>
                 <dd>
-                    {% if field.value.files %}
+                    {% if field.component %}
+                        {% component field.component %}
+                    {% elif field.value.files %}
                         <ul>
                             {% for fi in field.value.files %}
                                 <li>{{ fi }}</li>
                             {% endfor %}
                         </ul>
                     {% else %}
-                        {{ field.value }}
+                        {{ field.value|localize }}
                     {% endif %}
                 </dd>
             {% endfor %}
@@ -230,7 +232,6 @@
                     {% if summary.total_xml_errors or summary.total_xml_warnings or summary.critical_errors %}
                         <div>
                             <a class="button" href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
-                                <!-- User must finish the error review -->
                                 {% trans 'Download XML errors report' %}
                             </a>
                         </div>
@@ -239,10 +240,4 @@
             </div>
         </div>
     {% endif %}
-
-    </div>
-    <div class="nice-padding row">
-        <div>...........</div>
-    </div>
-
 {% endblock %}

@@ -29,7 +29,7 @@ from package.models import SPSPkg
 from pid_provider.models import PidProviderXML
 from pid_provider.choices import PPXML_STATUS_INVALID
 from . import choices
-from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
+from .permissions import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
 
 User = get_user_model()
 
