@@ -83,7 +83,7 @@ class JournalCollectionViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     search_fields = (
         "journal__title",
         "collection__name",
-        "collection__acron3",
+        "collection__acron",
     )
     export_filename = "journal_collections"
 
