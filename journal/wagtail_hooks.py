@@ -108,32 +108,6 @@ class JournalCollectionViewSet(SnippetViewSet):
     export_filename = "journal_collections"
 
 
-class JournalCollectionViewSet(SnippetViewSet):
-    model = JournalCollection
-    menu_label = _("Journal Collection")
-    menu_icon = "site"
-    menu_order = get_menu_order("journal_collection")
-    add_to_settings_menu = False
-
-    list_display = (
-        "journal",
-        "collection",
-        "creator",
-        "updated",
-        "created",
-        "updated_by",
-    )
-    list_filter = (
-        "collection",
-    )
-    search_fields = (
-        "journal__title",     # ajuste para o campo textual real de Journal
-        "collection__name",   # ajuste para o campo textual real de Collection
-        "collection__acron3", # se existir, ajuda muito na busca por sigla
-    )
-    export_filename = "journal_collections"
-
-
 # Grupo de ViewSets
 class JournalViewSetGroup(SnippetViewSetGroup):
     menu_icon = "folder"
