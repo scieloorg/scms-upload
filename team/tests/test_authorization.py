@@ -4,9 +4,9 @@ from django.contrib.auth.models import Group
 from team.authorization import get_user_accessible_apps, user_app_access
 from team.authorization_matrix import (
     APP_ACCESS,
-    CRUD_ACTIONS,
     FULL_ACCESS,
     GROUP_ACCESS,
+    MANAGE_ACTIONS,
     NO_ACCESS,
     READ_ACCESS,
     build_group_access,
@@ -36,7 +36,7 @@ def test_build_group_access_converts_each_rule_section():
         "example": {
             TeamGroups.COLLECTION_ADMIN: {
                 "access": FULL_ACCESS,
-                "models": {"item": CRUD_ACTIONS},
+                "models": {"item": MANAGE_ACTIONS},
                 "custom": ("approve_item",),
             },
             TeamGroups.COLLECTION_MEMBER: {"access": READ_ACCESS},
@@ -47,7 +47,7 @@ def test_build_group_access_converts_each_rule_section():
 
     assert group_access[TeamGroups.COLLECTION_ADMIN] == {
         "apps": {"example": FULL_ACCESS},
-        "models": {"example": {"item": CRUD_ACTIONS}},
+        "models": {"example": {"item": MANAGE_ACTIONS}},
         "custom": {"example": ("approve_item",)},
     }
     assert group_access[TeamGroups.COLLECTION_MEMBER] == {

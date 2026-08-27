@@ -4,9 +4,9 @@ import pytest
 from django.contrib.auth.models import Group, Permission
 
 from team.authorization_matrix import (
-    CRUD_ACTIONS,
     FULL_ACCESS,
     GROUP_ACCESS,
+    MANAGE_ACTIONS,
     READ_ACCESS,
 )
 from team.constants import TeamGroups
@@ -20,7 +20,7 @@ def expected_permissions(group_name):
     group_access = GROUP_ACCESS[group_name]
     expected = set()
     action_by_access = {
-        FULL_ACCESS: CRUD_ACTIONS,
+        FULL_ACCESS: MANAGE_ACTIONS,
         READ_ACCESS: ("view",),
     }
 
@@ -90,6 +90,13 @@ def test_command_is_idempotent():
     }
 
     assert second_state == first_state
+
+
+def test_command_does_not_assign_delete_permissions():
+    Command().handle(stdout=StringIO(), sync_users=False)
+
+    for group in Group.objects.filter(name__in=TeamGroups.ALL):
+        assert not group.permissions.filter(codename__startswith="delete_").exists()
 
 
 def test_command_removes_group_without_active_membership(django_user_model):

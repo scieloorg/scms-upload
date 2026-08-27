@@ -2,7 +2,7 @@ from django.contrib.auth.models import Group, Permission
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from team.authorization_matrix import CRUD_ACTIONS, FULL_ACCESS, GROUP_ACCESS
+from team.authorization_matrix import FULL_ACCESS, GROUP_ACCESS, MANAGE_ACTIONS
 from team.constants import TeamGroups
 from team.models import CollectionTeamMember, CompanyTeamMember, JournalTeamMember
 from team.signals import sync_user_groups, system_group_update
@@ -67,7 +67,7 @@ class Command(BaseCommand):
                 if app_label in model_permissions:
                     continue
 
-                actions = CRUD_ACTIONS if access == FULL_ACCESS else ("view",)
+                actions = MANAGE_ACTIONS if access == FULL_ACCESS else ("view",)
                 permissions.update(self._standard_app_permissions(app_label, actions))
 
             for app_label, matrix in model_permissions.items():

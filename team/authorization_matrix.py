@@ -7,7 +7,7 @@ from upload.permissions import (
     REPUBLISH_PACKAGE,
 )
 
-CRUD_ACTIONS = ("add", "change", "delete", "view")
+MANAGE_ACTIONS = ("add", "change", "view")
 VIEW_ACTIONS = ("view",)
 FULL_ACCESS = "full"
 READ_ACCESS = "read"
@@ -120,8 +120,8 @@ APP_ACCESS = {
         TeamGroups.COLLECTION_ADMIN: {
             "access": FULL_ACCESS,
             "models": {
-                "collectionteammember": CRUD_ACTIONS,
-                "company": CRUD_ACTIONS,
+                "collectionteammember": MANAGE_ACTIONS,
+                "company": MANAGE_ACTIONS,
             },
         },
         TeamGroups.COLLECTION_MEMBER: {
@@ -133,8 +133,8 @@ APP_ACCESS = {
         TeamGroups.JOURNAL_ADMIN: {
             "access": FULL_ACCESS,
             "models": {
-                "journalcompanycontract": CRUD_ACTIONS,
-                "journalteammember": CRUD_ACTIONS,
+                "journalcompanycontract": MANAGE_ACTIONS,
+                "journalteammember": MANAGE_ACTIONS,
             },
         },
         TeamGroups.JOURNAL_MEMBER: {
@@ -148,7 +148,7 @@ APP_ACCESS = {
             "access": FULL_ACCESS,
             "models": {
                 "company": VIEW_ACTIONS,
-                "companyteammember": CRUD_ACTIONS,
+                "companyteammember": MANAGE_ACTIONS,
                 "journalcompanycontract": VIEW_ACTIONS,
             },
         },
@@ -168,7 +168,7 @@ APP_ACCESS = {
     "upload": {
         TeamGroups.COLLECTION_ADMIN: {
             "access": FULL_ACCESS,
-            "models": {"*": CRUD_ACTIONS},
+            "models": {"*": MANAGE_ACTIONS},
             "custom": (
                 ACCESS_PACKAGES,
                 ASSIGN_PACKAGE,
