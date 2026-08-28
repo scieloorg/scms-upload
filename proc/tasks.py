@@ -402,30 +402,36 @@ def task_migrate_and_publish_journals_by_collection(
 
         classic_website = migration_controller.get_classic_website(collection_acron)
         collection = Collection.objects.get(acron=collection_acron)
+
+        # cria ou atualiza MigratedJournal / JournalProc
         create_or_update_migrated_journal(
             user, collection, classic_website, force_import_acron_id_file
         )
+        status = tracker_choices.get_valid_status(status, force_update)
+        fix_publication_status(collection)
 
         journal_filter = {}
         if journal_acron:
             journal_filter["acron"] = journal_acron
 
-        status = tracker_choices.get_valid_status(status, force_update)
-        query_by_status = (
-            Q(qa_ws_status__in=status)
-            | Q(public_ws_status__in=status)
-        )
-        if not force_core_sync:
+        if force_core_sync:
+            items_to_process = JournalProc.objects.filter(
+                collection=collection, **journal_filter
+            )
+        else:
             # seleciona também aqueles que não estão sincronizados
+            query_by_status = (
+                Q(qa_ws_status__in=status)
+                | Q(public_ws_status__in=status)
+            )
             query_by_status |= Q(migration_status__in=status)
-            query_by_status |= Q(journal__core_synchronized=False)         
+            query_by_status |= Q(journal__core_synchronized__in=(False, None))
+            items_to_process = JournalProc.objects.filter(
+                query_by_status, collection=collection, **journal_filter
+            )
 
         # para force_core_sync=True, o filtro migration_status deixa de ser relevante
 
-        fix_publication_status(collection)
-        items_to_process = JournalProc.objects.filter(
-            query_by_status, collection=collection, **journal_filter
-        )
         task_exec.total_to_process = items_to_process.count()
         if not task_exec.total_to_process:
             task_exec.finish()
