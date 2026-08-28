@@ -439,73 +439,27 @@ def task_migrate_and_publish_journals_by_collection(
 
         qa_api_data = get_api_data(collection, "journal", "QA")
         public_api_data = get_api_data(collection, "journal", "PUBLIC")
-        total_processed = 0
-        for journal_proc in items_to_process:
-            try:
-                detail = {}
-                event = journal_proc.start(user, "migrate journal")
 
-                if force_core_sync:
-                    fetch_and_create_journal(
-                        user,
-                        collection_acron=collection.acron,
-                        issn_electronic=journal_proc.issn_electronic,
-                        issn_print=journal_proc.issn_print,
-                        force_update=force_core_sync,
-                    )
-                    detail["journal_data_source"] = "core data"
-                else:
-                    # cria journal a partir de migrated journal
-                    journal_proc.create_or_update_item(
-                        user, force_update, migration_controller.create_or_update_journal
-                    )
-                    detail["journal_data_source"] = "classic website data"
-                if qa_api_data and not qa_api_data.get("error"):
-                    detail["task_publish_journal_on_qa_website"] = "scheduled"
-                    task_publish_journal.apply_async(
-                        kwargs=dict(
-                            user_id=user_id,
-                            username=username,
-                            website_kind="QA",
-                            journal_proc_id=journal_proc.id,
-                            api_data=qa_api_data,
-                            force_update=force_update,
-                        )
-                    )
-                if public_api_data and not public_api_data.get("error"):
-                    detail["task_publish_journal_on_public_website"] = "scheduled"
-                    task_publish_journal.apply_async(
-                        kwargs=dict(
-                            user_id=user_id,
-                            username=username,
-                            website_kind="PUBLIC",
-                            journal_proc_id=journal_proc.id,
-                            api_data=public_api_data,
-                            force_update=force_update,
-                        )
-                    )
-                event.finish(user, completed=True, detail=detail)
-                total_processed += 1
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                if event:
-                    event.finish(
-                        user,
-                        completed=False,
-                        exception=e,
-                        exc_traceback=exc_traceback,
-                        detail=detail,
-                    )
-                else:
-                    UnexpectedEvent.create(
-                        action="proc.tasks.task_migrate_and_publish_journals_by_collection",
-                        item=f"{journal_proc}",
-                        e=e,
-                        exc_traceback=exc_traceback,
-                        detail=detail,
-                    )
-        task_exec.total_processed = total_processed
-        task_exec.finish()
+        total_scheduled = 0
+        scheduled = []
+        for journal_proc in items_to_process:
+            scheduled.append(str(journal_proc))
+            task_migrate_and_publish_journal.apply_async(
+                kwargs=dict(
+                    user_id=user_id,
+                    username=username,
+                    journal_proc_id=journal_proc.id,
+                    force_update=force_update,
+                    force_core_sync=force_core_sync,
+                    collection_acron=collection.acron,
+                    qa_api_data=qa_api_data,
+                    public_api_data=public_api_data,
+                )
+            )
+            total_scheduled += 1
+
+        task_exec.total_processed = total_scheduled
+        task_exec.finish(data={"scheduled": scheduled})
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         try:
@@ -518,6 +472,96 @@ def task_migrate_and_publish_journals_by_collection(
                 exc_traceback=exc_traceback,
                 detail=task_params,
             )
+
+
+@celery_app.task(bind=True)
+def task_migrate_and_publish_journal(
+    self,
+    user_id=None,
+    username=None,
+    journal_proc_id=None,
+    force_update=False,
+    force_core_sync=False,
+    collection_acron=None,
+    qa_api_data=None,
+    public_api_data=None,
+):
+    """
+    Migra e publica um único periódico (JournalProc).
+
+    Extraído de ``task_migrate_and_publish_journals_by_collection`` para
+    permitir processamento assíncrono por periódico.
+    """
+    detail = {}
+    event = None
+    journal_proc = None
+    try:
+        user = _get_user(user_id, username)
+        journal_proc = JournalProc.objects.get(id=journal_proc_id)
+
+        event = journal_proc.start(user, "migrate journal")
+
+        if force_core_sync:
+            fetch_and_create_journal(
+                user,
+                collection_acron=collection_acron,
+                issn_electronic=journal_proc.issn_electronic,
+                issn_print=journal_proc.issn_print,
+                force_update=force_core_sync,
+            )
+            detail["journal_data_source"] = "core data"
+        else:
+            journal_proc.create_or_update_item(
+                user, force_update, migration_controller.create_or_update_journal
+            )
+            detail["journal_data_source"] = "classic website data"
+
+        if qa_api_data and not qa_api_data.get("error"):
+            detail["task_publish_journal_on_qa_website"] = "scheduled"
+            task_publish_journal.apply_async(
+                kwargs=dict(
+                    user_id=user_id,
+                    username=username,
+                    website_kind="QA",
+                    journal_proc_id=journal_proc.id,
+                    api_data=qa_api_data,
+                    force_update=force_update,
+                )
+            )
+        if public_api_data and not public_api_data.get("error"):
+            detail["task_publish_journal_on_public_website"] = "scheduled"
+            task_publish_journal.apply_async(
+                kwargs=dict(
+                    user_id=user_id,
+                    username=username,
+                    website_kind="PUBLIC",
+                    journal_proc_id=journal_proc.id,
+                    api_data=public_api_data,
+                    force_update=force_update,
+                )
+            )
+
+        event.finish(user, completed=True, detail=detail)
+        return True
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        if event:
+            event.finish(
+                user,
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
+                detail=detail,
+            )
+        else:
+            UnexpectedEvent.create(
+                action="proc.tasks.task_migrate_and_publish_journal",
+                item=f"{journal_proc or journal_proc_id}",
+                e=e,
+                exc_traceback=exc_traceback,
+                detail=detail,
+            )
+        return False
 
 
 @celery_app.task(bind=True)
