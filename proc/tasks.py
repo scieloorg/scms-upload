@@ -158,7 +158,7 @@ class TaskExecution:
     def add_number(self, name, number):
         self.stats[name] = number
 
-    def finish(self, exception=None, exc_traceback=None):
+    def finish(self, exception=None, exc_traceback=None, data=None):
         try:
             if exception or exc_traceback or self.exceptions:
                 completed = False
@@ -174,6 +174,8 @@ class TaskExecution:
                 "exceptions": self.exceptions,
                 "status_changes": self.status_changes
             }
+            if data:
+                detail["data"] = data
             try:
                 json.dumps(detail)
             except Exception as x:
@@ -185,6 +187,7 @@ class TaskExecution:
                     except Exception as exxx:
                         fixed_detail[key] = str(value)
                 detail = fixed_detail
+
             self.task_tracker.finish(
                 completed=completed,
                 exception=exception,
