@@ -197,12 +197,10 @@ class TaskExecution:
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             UnexpectedEvent.create(
+                action="proc.tasks.TaskExecution.finish",
+                item=self.item,
                 e=e,
                 exc_traceback=exc_traceback,
-                detail={
-                    "task": "proc.tasks.TaskExecution.finish",
-                    "item": self.item,
-                },
             )
 
     def update_total_status(self, label, issue_proc_id=None):
