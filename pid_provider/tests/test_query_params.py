@@ -13,6 +13,11 @@ Atualizado para cobrir a correção do falso-match na branch journal-article:
   dois existe no XML de entrada, `z_partial_body__isnull=True` — nunca
   `z_partial_body__in=(None, None)`, que em SQL jamais casaria com
   candidatos NULL (NULL = NULL é UNKNOWN, não True).
+- QueryBuilderPidProviderXML agora lê xml_adapter.xml_with_pre.readable_data
+  (não mais get_article_data(300)), que expõe "body_fragment" no lugar de
+  "partial_body".
+- compare() agora PULA (continue) labels ausentes em input_data, em vez
+  de tratá-los como None — mudança de comportamento coberta em CompareTests.
 
 ATENÇÃO: ajuste o caminho de import abaixo (`pid_provider.query_params`)
 para o módulo real onde essas classes/funções estão definidas no projeto,
@@ -47,7 +52,7 @@ def make_xml_adapter(
     surnames=None,
     collab=None,
     links=None,
-    partial_body=None,
+    body_fragment=None,
     body_fragment_fingerprint=None,
     body_fingerprint=None,
 ):
@@ -58,10 +63,13 @@ def make_xml_adapter(
     body_fragment_fingerprint: valor de
     xml_adapter.xml_with_pre.body_fragment_fingerprint, o novo sinal
     (hash de um fragmento estável do corpo) usado em partial_body_query.
+
+    body_fragment: valor de xml_adapter.xml_with_pre.readable_data["body_fragment"],
+    usado por validate_input_data. Substitui o antigo "partial_body", que
+    não existe mais em readable_data.
     """
     adapter = MagicMock()
     adapter.data = data or {}
-    adapter.get_data_to_compare.return_value = {}
     adapter.v3 = v3
     adapter.v2 = v2
     adapter.aop_pid = aop_pid
@@ -71,12 +79,17 @@ def make_xml_adapter(
     adapter.xml_with_pre.deprecated_sps_pkg_name_list = deprecated_sps_pkg_name_list or []
     adapter.xml_with_pre.body_fragment_fingerprint = body_fragment_fingerprint
     adapter.xml_with_pre.body_fingerprint = body_fingerprint
-    adapter.xml_with_pre.get_article_data.return_value = {
+    # QueryBuilderPidProviderXML.__init__ lê xml_with_pre.readable_data
+    # como ATRIBUTO (não mais xml_with_pre.get_article_data(...) chamado
+    # como método) — precisa ser um dict de verdade, não um MagicMock
+    # não configurado, senão validate_input_data quebra ao tentar iterar
+    # sobre um MagicMock.
+    adapter.xml_with_pre.readable_data = {
         "article_titles": article_titles or [],
         "surnames": surnames,
         "collab": collab,
         "links": links,
-        "partial_body": partial_body,
+        "body_fragment": body_fragment,
     }
     return adapter
 
@@ -127,6 +140,18 @@ class ValidateInputDataTests(SimpleTestCase):
         qbuilder = QueryBuilderPidProviderXML(adapter)
         qbuilder.validate_input_data()  # não deve levantar
 
+    def test_passes_when_only_body_fragment_present(self):
+        """
+        Cobre especificamente a chave nova "body_fragment" (antes
+        "partial_body"), que validate_input_data passou a checar.
+        """
+        adapter = make_xml_adapter(
+            data={"pub_year": "2026", "issn_electronic": "0000-1111"},
+            body_fragment="um fragmento de corpo qualquer",
+        )
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        qbuilder.validate_input_data()  # não deve levantar
+
     def test_raises_not_enough_parameters_when_all_empty(self):
         adapter = make_xml_adapter(
             data={"pub_year": "2026", "issn_electronic": "0000-1111"},
@@ -140,6 +165,15 @@ class ValidateInputDataTests(SimpleTestCase):
         adapter = make_xml_adapter(
             data={"pub_year": "2026", "issn_electronic": "0000-1111"},
             article_titles=["", None],
+        )
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        with self.assertRaises(exceptions.NotEnoughParametersToGetPidProviderXMLError):
+            qbuilder.validate_input_data()
+
+    def test_raises_not_enough_parameters_when_body_fragment_is_blank(self):
+        adapter = make_xml_adapter(
+            data={"pub_year": "2026", "issn_electronic": "0000-1111"},
+            body_fragment="",
         )
         qbuilder = QueryBuilderPidProviderXML(adapter)
         with self.assertRaises(exceptions.NotEnoughParametersToGetPidProviderXMLError):
@@ -557,6 +591,15 @@ class CompareItemsTests(SimpleTestCase):
 
 
 class CompareTests(SimpleTestCase):
+    """
+    compare() agora PULA (continue) labels ausentes em input_data, em vez
+    de tratá-los como None via .get(label). Isso muda o comportamento em
+    dois cenários que precisam de cobertura separada:
+    - alguns labels ausentes, outros presentes: os ausentes são
+      simplesmente ignorados no cálculo do score;
+    - TODOS os labels ausentes: items fica vazio e
+      total_score / len(items) levanta ZeroDivisionError.
+    """
 
     @patch("pid_provider.query_params.how_similar")
     def test_aggregates_scores_from_all_items(self, mock_how_similar):
@@ -570,11 +613,32 @@ class CompareTests(SimpleTestCase):
         self.assertEqual(result["total_score"], 1.5)  # 1 (match) + 0.5 (mocked)
         self.assertEqual(result["percentual_score"], 0.75)
 
-    def test_missing_input_key_is_treated_as_none(self):
-        registered_items = {"z_collab": None}
-        input_data = {}
+    def test_missing_input_key_is_skipped_not_treated_as_none(self):
+        """
+        Antes: label ausente em input_data era comparado como None e
+        contribuía com score 1 (None == None). Agora: o label ausente é
+        pulado inteiramente, não aparece em items nem em total_score.
+        """
+        registered_items = {"z_collab": None, "z_surnames": "Silva"}
+        input_data = {"z_surnames": "Silva"}  # z_collab ausente
 
         result = compare(registered_items, input_data)
 
+        self.assertEqual(len(result["items"]), 1)
+        self.assertEqual(result["items"][0]["label"], "z_surnames")
         self.assertEqual(result["total_score"], 1)
         self.assertEqual(result["percentual_score"], 1)
+
+    def test_all_labels_missing_raises_zero_division_error(self):
+        """
+        Caso extremo: se NENHUM label de registered_items existir em
+        input_data, items fica vazio e a divisão por len(items)=0
+        levanta ZeroDivisionError. Documentando o comportamento atual —
+        se isso não for desejável, compare() precisa de uma guarda
+        explícita para items vazio.
+        """
+        registered_items = {"z_collab": None}
+        input_data = {}
+
+        with self.assertRaises(ZeroDivisionError):
+            compare(registered_items, input_data)
