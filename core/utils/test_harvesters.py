@@ -151,6 +151,21 @@ class HarvestDocumentsTest(TestCase):
         self.assertIn("limit=50", called_url)
         self.assertIn("page=1", called_url)
 
+    def test_uses_https_when_domain_has_no_protocol(self):
+        harvester = _make_harvester(domain="www.scielo.br")
+
+        self.assertTrue(harvester.base_url.startswith("https://www.scielo.br/"))
+
+    @patch("core.utils.harvesters.fetch_data")
+    def test_filters_counter_dict_by_journal(self, mock_fetch):
+        mock_fetch.return_value = {"pages": 0, "documents": {}}
+        harvester = _make_harvester(journal_acron="rsp")
+
+        list(harvester.harvest_documents())
+
+        called_url = mock_fetch.call_args[0][0]
+        self.assertIn("journal=rsp", called_url)
+
 
 # ---------------------------------------------------------------------------
 # format_normalized
@@ -259,6 +274,36 @@ class FormatRawTest(TestCase):
         raw = self.harvester.format_raw("abc123", ITEM_JTEST)
         self.assertIn("jtest", raw["url"])
         self.assertIn("abc123", raw["url"])
+
+    def test_boolean_false_status_is_not_public(self):
+        item = {**ITEM_JTEST, "status": False}
+
+        raw = self.harvester.format_raw("abc123", item)
+
+        self.assertFalse(raw["is_public"])
+
+    def test_string_false_status_is_not_public(self):
+        item = {**ITEM_JTEST, "status": "false"}
+
+        raw = self.harvester.format_raw("abc123", item)
+
+        self.assertFalse(raw["is_public"])
+
+    def test_only_explicit_true_status_is_public(self):
+        boolean_item = {**ITEM_JTEST, "status": True}
+        string_item = {**ITEM_JTEST, "status": "true"}
+
+        self.assertTrue(
+            self.harvester.format_raw("abc123", boolean_item)["is_public"]
+        )
+        self.assertTrue(
+            self.harvester.format_raw("abc123", string_item)["is_public"]
+        )
+
+    def test_missing_status_is_not_public(self):
+        raw = self.harvester.format_raw("abc123", ITEM_JTEST)
+
+        self.assertFalse(raw["is_public"])
 
 
 # ---------------------------------------------------------------------------
