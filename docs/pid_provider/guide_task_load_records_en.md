@@ -15,12 +15,12 @@ published articles, which would compromise data integrity.
 **What it does:**
 
 1. Connects to the OPAC API (e.g., `https://www.scielo.br/api/v1/counter_dict`)
-2. Retrieves document metadata from the specified collection and date range
+2. Retrieves document metadata from the specified journal and date range
 3. For each document found, dispatches a subtask (`task_load_record_from_xml_url`)
-   that downloads the XML and creates or updates records in **PidProviderXML** and **XMLURL**
+   that downloads the XML and creates or updates **PidProviderXML**, preserving the OPAC PID v3
 
-> **Important:** This task **only** creates or updates `PidProviderXML` and
-> `XMLURL` records. It does **not** create `Article` records.
+> **Important:** This task **only** creates or updates `PidProviderXML`. It
+> does **not** create `SPSPkg` or `Article`; run the standard migration afterwards.
 
 ---
 
@@ -61,6 +61,7 @@ In the **Keyword arguments** field (JSON format), enter the task parameters:
 {
   "username": "admin",
   "collection_acron": "scl",
+  "journal_acron": "rsp",
   "from_date": "2024-01-01",
   "until_date": "2024-12-31",
   "limit": 100,
@@ -84,6 +85,7 @@ pick it up according to the configured schedule.
 | `username` | str | `None` | Username of the user running the task. |
 | `user_id` | int | `None` | User ID (alternative to `username`). |
 | `collection_acron` | str | `"scl"` | Collection acronym (e.g., `"scl"` for Brazil). |
+| `journal_acron` | str | required | Journal acronym used to restrict harvesting. |
 | `from_date` | str | `"2000-01-01"` | Start date in ISO format (`YYYY-MM-DD`). |
 | `until_date` | str | today | End date in ISO format (`YYYY-MM-DD`). |
 | `limit` | int | `100` | Number of documents per API page. |
@@ -96,7 +98,7 @@ pick it up according to the configured schedule.
 ## Verifying Results
 
 After the task completes, verify the results by checking the
-`PidProviderXML` and `XMLURL` models.
+`PidProviderXML` model.
 
 ### Checking PidProviderXML Records
 
@@ -121,25 +123,6 @@ records = PidProviderXML.objects.filter(collections=col)
 print(f"Total records for 'scl': {records.count()}")
 ```
 
-### Checking XMLURL Records
-
-In the Django admin, navigate to **PID PROVIDER > XMLURL** to see the
-URL processing status.
-
-```python
-from pid_provider.models import XMLURL
-
-# List recent XMLURL records
-recent_urls = XMLURL.objects.order_by("-updated")[:20]
-for url_record in recent_urls:
-    print(f"URL: {url_record.url} | Status: {url_record.status} | "
-          f"PID: {url_record.pid}")
-
-# Check for failed URLs
-failed = XMLURL.objects.exclude(status="").exclude(exceptions="")
-print(f"URLs with errors: {failed.count()}")
-```
-
 ---
 
 ## Troubleshooting
@@ -157,7 +140,7 @@ Issues are categorized by criticality level:
 | 🔴 | Connection to OPAC API fails (network/DNS error) | Verify that the `opac_domain` is reachable and includes `https://`. Check firewall rules and DNS resolution. Review `UnexpectedEvent` records for error details. |
 | 🟡 | No records appear after task execution | Check that `from_date` and `until_date` cover a range with published documents. Verify the `collection_acron` is correct. Review Celery worker logs for warnings. |
 | 🟡 | Records exist but are not updated | Set `force_update` to `true` in the kwargs to force reprocessing of existing records. |
-| 🟡 | XMLURL records show error status | Check the `exceptions` field in `XMLURL` for details. Common causes include invalid XML URLs or temporary server errors. The records will be retried in future runs. |
+| 🟡 | XML download fails or PID v3 differs | Check `UnexpectedEvent`; it records the journal, PID, URL, and failing stage. |
 | 🟢 | Task runs slowly | Reduce the `limit` parameter to process fewer documents per page, or increase `timeout` if the OPAC API is slow. This does not affect data correctness. |
 | 🟢 | Some documents are skipped with warnings | Documents without a valid `journal_acronym` are skipped. Check Celery worker logs for `WARNING` messages. These are typically incomplete records in the OPAC API. |
 
@@ -166,15 +149,17 @@ Issues are categorized by criticality level:
 Errors are recorded in the `UnexpectedEvent` model:
 
 ```python
+from django.db.models import Q
 from tracker.models import UnexpectedEvent
 
 errors = UnexpectedEvent.objects.filter(
-    detail__task="task_load_records_from_counter_dict"
+    Q(detail__task="task_load_records_from_counter_dict")
+    | Q(action="PidProvider.provide_pid_for_xml_uri")
 ).order_by("-created")[:10]
 
 for error in errors:
     print(f"Date: {error.created}")
-    print(f"Exception: {error.exception}")
+    print(f"Exception: {error.exception_msg}")
     print(f"Details: {error.detail}")
     print("---")
 ```
