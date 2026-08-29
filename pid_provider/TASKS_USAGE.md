@@ -7,16 +7,17 @@ into the PidProviderXML model without creating Article records.
 ## Tasks
 
 ### 1. task_load_records_from_counter_dict
-Processes a specific collection using the OPAC harvester. Processes one collection at a time.
+Processes a specific journal using the OPAC harvester.
 
 **Usage:**
 ```python
 from pid_provider.tasks import task_load_records_from_counter_dict
 
-# Load records from Brazil collection
+# Load records from one journal in the Brazil collection
 task_load_records_from_counter_dict.delay(
     username="admin",
     collection_acron="scl",
+    journal_acron="rsp",
     from_date="2024-01-01",
     until_date="2024-12-31",
     limit=100,
@@ -29,6 +30,7 @@ task_load_records_from_counter_dict.delay(
 - `username` (str, optional): Username of the user executing the task
 - `user_id` (int, optional): User ID (alternative to username)
 - `collection_acron` (str, optional): Collection acronym. Default: "scl" (Brazil)
+- `journal_acron` (str, required): Journal acronym used to restrict harvesting
 - `from_date` (str, optional): Start date in ISO format (YYYY-MM-DD)
 - `until_date` (str, optional): End date in ISO format (YYYY-MM-DD)
 - `limit` (int, optional): Number of documents per page
@@ -56,8 +58,9 @@ task_load_record_from_xml_url.delay(
 
 ## Important Notes
 
-1. **No Article Creation**: Unlike similar tasks in the core repository, these tasks 
-   **only create/update PidProviderXML records**. They do NOT create Article records.
+1. **No SPSPkg or Article Creation**: These tasks only create/update
+   `PidProviderXML`. Run the standard migration afterwards to create `SPSPkg`
+   and `Article`.
 
 2. **Error Handling**: All errors are logged using the `UnexpectedEvent` model for 
    proper tracking and debugging.
@@ -71,10 +74,11 @@ task_load_record_from_xml_url.delay(
 ## Example: Full Workflow
 
 ```python
-# 1. Start the task for Brazil collection
+# 1. Start the task for one journal in the Brazil collection
 task_id = task_load_records_from_counter_dict.delay(
     username="admin",
     collection_acron="scl",
+    journal_acron="rsp",
     from_date="2024-01-01",
     until_date="2024-12-31",
     limit=50  # Process 50 documents per page
@@ -99,11 +103,10 @@ Monitor task execution through:
 
 ```python
 # Check for errors
+from django.db.models import Q
 from tracker.models import UnexpectedEvent
 recent_errors = UnexpectedEvent.objects.filter(
-    detail__task__in=[
-        "task_load_records_from_counter_dict",
-        "task_load_record_from_xml_url"
-    ]
+    Q(detail__task="task_load_records_from_counter_dict")
+    | Q(action="PidProvider.provide_pid_for_xml_uri")
 ).order_by("-created")[:10]
 ```
