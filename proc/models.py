@@ -2712,9 +2712,9 @@ class ArticleProc(BaseProc, ClusterableModel):
         """
         params = {}
         if collection_acron_list:
-            params["collection_acron__in"] = collection_acron_list
-        elif journal_acron_list:
-            params["journal_acron__in"] = journal_acron_list
+            params["collection__acron__in"] = collection_acron_list
+        if journal_acron_list:
+            params["issue_proc__journal_proc__acron__in"] = journal_acron_list
 
         items = cls.objects.filter(
             pid__isnull=False,
