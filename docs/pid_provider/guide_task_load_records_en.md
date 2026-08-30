@@ -91,7 +91,7 @@ pick it up according to the configured schedule.
 | `limit` | int | `100` | Number of documents per API page. |
 | `timeout` | int | `5` | HTTP request timeout in seconds. |
 | `force_update` | bool | `false` | Force update even if the record already exists. |
-| `opac_domain` | str | `"www.scielo.br"` | OPAC domain to harvest from. **Must include the protocol** (e.g., `https://www.scielo.br`). Using `https://` ensures a secure connection to the official SciELO website. If the protocol is omitted, the system defaults to `http://`. |
+| `opac_domain` | str | `"www.scielo.br"` | OPAC domain to harvest from. It may include the protocol (e.g., `https://www.scielo.br`); if omitted, the system defaults to `https://`. |
 
 ---
 
