@@ -11,10 +11,7 @@ from pid_provider.tasks import (
 class LoadRecordsFromCounterDictTests(SimpleTestCase):
     @patch("pid_provider.tasks.UnexpectedEvent.create")
     @patch("pid_provider.tasks.OPACHarvester")
-    @patch("pid_provider.tasks._get_user")
-    def test_requires_journal_acron(self, get_user, harvester, create_event):
-        get_user.return_value = Mock()
-
+    def test_requires_journal_acron(self, harvester, create_event):
         task_load_records_from_counter_dict.run()
 
         harvester.assert_not_called()
@@ -26,14 +23,11 @@ class LoadRecordsFromCounterDictTests(SimpleTestCase):
 
     @patch("pid_provider.tasks.task_load_record_from_xml_url.delay")
     @patch("pid_provider.tasks.OPACHarvester")
-    @patch("pid_provider.tasks._get_user")
     def test_dispatches_only_public_documents_from_selected_journal(
         self,
-        get_user,
         harvester_class,
         load_record,
     ):
-        get_user.return_value = Mock()
         harvester = harvester_class.return_value
         public_item = {"status": True, "journal_acronym": "rsp"}
         private_item = {"status": False, "journal_acronym": "rsp"}
@@ -77,15 +71,12 @@ class LoadRecordsFromCounterDictTests(SimpleTestCase):
     @patch("pid_provider.tasks.UnexpectedEvent.create")
     @patch("pid_provider.tasks.task_load_record_from_xml_url.delay")
     @patch("pid_provider.tasks.OPACHarvester")
-    @patch("pid_provider.tasks._get_user")
     def test_records_document_dispatch_failure_with_document_context(
         self,
-        get_user,
         harvester_class,
         load_record,
         create_event,
     ):
-        get_user.return_value = Mock()
         harvester = harvester_class.return_value
         harvester.harvest_documents.return_value = [
             ("failed-pid", {"status": True, "journal_acronym": "rsp"}),
