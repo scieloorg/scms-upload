@@ -93,7 +93,7 @@ la ejecutará según la programación configurada.
 | `limit` | int | `100` | Número de documentos por página de la API. |
 | `timeout` | int | `5` | Tiempo de espera de la solicitud HTTP en segundos. |
 | `force_update` | bool | `false` | Forzar la actualización aunque el registro ya exista. |
-| `opac_domain` | str | `"www.scielo.br"` | Dominio del OPAC desde donde recopilar. **Debe incluir el protocolo** (ej., `https://www.scielo.br`). Usar `https://` garantiza una conexión segura con el sitio web oficial de SciELO. Si se omite el protocolo, el sistema usará `http://` por defecto. |
+| `opac_domain` | str | `"www.scielo.br"` | Dominio del OPAC desde donde recopilar. Puede incluir el protocolo (ej., `https://www.scielo.br`); si se omite, el sistema usará `https://` por defecto. |
 
 ---
 
