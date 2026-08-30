@@ -115,8 +115,6 @@ def task_load_records_from_counter_dict(
     count = 0
 
     try:
-        _get_user(self.request, username=username, user_id=user_id)
-
         if not journal_acron:
             raise ValueError("journal_acron is required")
 
