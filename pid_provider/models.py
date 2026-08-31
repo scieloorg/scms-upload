@@ -8,6 +8,7 @@ from datetime import datetime
 from functools import cached_property
 from zlib import crc32
 
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.exceptions import FieldError
 from django.db import IntegrityError, models
@@ -36,6 +37,8 @@ from pid_provider.query_params import (
     zero_to_none,
     compare,
     QueryBuilderPidProviderXML,
+    fix_get_article_data,
+    fix_get_data_to_compare,
 )
 from tracker.models import BaseEvent, UnexpectedEvent
 
@@ -122,8 +125,7 @@ class XMLVersion(CommonControlField):
         ]
 
     def __str__(self):
-        pkg_name = self.pid_provider_xml.pkg_name if self.pid_provider_xml else "-"
-        return f"{pkg_name} {self.created}"
+        return f"{self.pid_provider_xml.pkg_name if self.pid_provider_xml else '-'} {self.created}"
 
     @classmethod
     @profile_classmethod
@@ -459,8 +461,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         FieldPanel("registered_in_core", read_only=True),
     ]
     panel_b = [
-        AutocompletePanel("collections", read_only=True),
-        FieldPanel("current_version", read_only=True),
+        AutocompletePanel("current_version", read_only=True),
         InlinePanel("other_pid", label=_("Other PID")),
     ]
     panel_c = [
@@ -616,23 +617,20 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             "v2": self.v2,
             "aop_pid": self.aop_pid,
             "pkg_name": self.pkg_name,
-            "finger_print": self.current_version and self.current_version.finger_print,
             "registered_in_core": self.registered_in_core,
             "ppx_id": self.id
         }
-        _data.update(self.get_readable_data())
+        _data["registered_data"] = self.get_readable_data()
         _data.update(self.record_status)
         return _data
 
     @property
     def record_status(self):
         """Retorna os timestamps e o estado do registro ('created' ou 'updated').
-
-        Calcula a variação entre `created` e `updated` para definir o estado de 
+        Calcula a variação entre `created` e `updated` para definir o estado de
         persistência. Utilizado para direcionar o código HTTP de resposta:
         - 'created' -> 201 Created
         - 'updated' -> 200 OK ou 204 No Content
-
         Returns:
             dict: Dicionário com `created`, `updated` em ISO 8601 e `record_status`.
         """
@@ -644,7 +642,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 d["updated"] = self.updated.isoformat()
                 if (self.updated - self.created).total_seconds() > 1:
                     d["record_status"] = "updated"
-        return d         
+        return d
 
     @classmethod
     @profile_classmethod
@@ -679,26 +677,35 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         return True
 
     def get_readable_data(self):
-        if self.readable_data:
-            return self.readable_data
+        readable_data = self.readable_data or {}
+        if readable_data:
+            try:
+                readable_data.pop("partial_body")
+            except KeyError:
+                pass
+            return readable_data
         if self.xml_with_pre:
-            return self.xml_with_pre.readable_data
+            return fix_get_article_data(self.xml_with_pre)
         return {}
 
     @property
     def data_to_compare(self):
-        xml_with_pre = self.xml_with_pre
-        readable_data = self.readable_data or {}
-        titles = readable_data.get("article_titles") or xml_with_pre.article_titles_texts
-        body_fragment = readable_data.get("body_fragment") or xml_with_pre.body_fragment
-        return {
-            "article_titles": titles,
+        data = {}
+        readable = self.get_readable_data()
+        if readable:
+            titles = readable.get("article_titles")
+            body_fragment = readable.get("body_fragment")
+            if titles:
+                data["article_titles"] = titles
+            if body_fragment:
+                data["body_fragment"] = body_fragment
+        data.update({
             "z_surnames": self.z_surnames,
             "z_collab": self.z_collab,
             "z_links": self.z_links,
-            "body_fragment_fingerprint": self.z_partial_body, # nao foi alterado o nome da coluna da tabela
-            "body_fragment": body_fragment,
-        }
+            "body_fragment_fingerprint": self.z_partial_body,
+        })
+        return data
 
     @classmethod
     @profile_classmethod
@@ -758,6 +765,13 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             ISSN obrigatório ausente
         NotEnoughParametersToGetPidProviderXMLError
             Parâmetros insuficientes para identificar documento
+
+        Notes
+        -----
+        Gravação em `PidProviderXMLRegistration`: por padrão, só ocorre se houver
+        erro (`error_type`) ou ambiguidade (`matched_items`), prevenindo inchaço
+        da tabela em fluxos limpos. Esse comportamento pode ser alterado no
+        Wagtail Admin em Configurações > Pid Provider Setting (`record_all_registration_events`).
         """
         try:
             # outputs
@@ -774,7 +788,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
             input_data = {}
             input_data.update(xml_with_pre.data)
-            input_data.update(xml_with_pre.readable_data)
+            input_data.update(fix_get_article_data(xml_with_pre))
             input_data["origin"] = origin
             response["input_data"] = input_data
 
@@ -862,8 +876,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         finally:
             response["event_status"] = event_status
             record_all = PidProviderSetting.load().record_all_registration_events
-            matched_items = (select_record_response or {}).get("matched_items")
-            if record_all or error_type or matched_items:
+            if record_all or error_type or (select_record_response or {}).get("matched_items"):
                 PidProviderXMLRegistration.record(
                     user=user,
                     pid_provider_xml=registered,
@@ -1014,6 +1027,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             )
             return
 
+        if not registered.readable_data:
+            return
+
         # verifica se é necessário atualizar
         if registered.is_equal_to(xml_with_pre):
             # XML fornecido é igual ao registrado, não precisa continuar
@@ -1091,12 +1107,12 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         checamos truthiness (nunca .exists()/.count() sobre queryset).
         """
         unmatched_items = {}
-        xml_adapter_data_to_compare = xml_adapter.get_data_to_compare()
+        xml_adapter_data_to_compare = fix_get_data_to_compare(xml_adapter)
         for label, results in selection_results:
             if not results:
                 continue
 
-            result = PidProviderXML.get_best_match(results, xml_adapter_data_to_compare)
+            result = PidProviderXML.get_best_match(results, xml_adapter_data_to_compare)            
 
             matched = result.get("matched")
             unmatched = result.get("unmatched")
@@ -1133,18 +1149,17 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         if not results.exists():
             # pid v3 é inédito
             raise cls.DoesNotExist
-        
-        xml_adapter_data_to_compare = xml_adapter.get_data_to_compare()
+
+        xml_adapter_data_to_compare = fix_get_data_to_compare(xml_adapter)
         result = PidProviderXML.get_best_match(results, xml_adapter_data_to_compare)
+
         registered = result.get("registered")
         if not registered:
-            xml_data = xml_adapter.xml_with_pre.readable_data
-            items = [item.data for item in results]
             raise PidProviderXMLPidV3ConflictError(
-                _("{} belongs to {}, not to {}").format(
-                    xml_pid_v3, items, xml_data
+                _("{} do not belong to {}. Result: {}").format(
+                    xml_pid_v3, xml_adapter_data_to_compare, result,
                 )
-            )        
+            )
         return registered
 
     @staticmethod
@@ -1169,10 +1184,10 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             ao consumir o retorno, nunca acesso direto.
 
             - ``"unmatched"``: presente apenas se houver ao menos 1
-            candidato com ``percentual_score`` <= 0.6. Lista de
+            candidato com ``percentual_score`` <= min_rate. Lista de
             ``item.data`` desses candidatos.
             - ``"registered"``: presente apenas se houver ao menos 1
-            candidato aprovado (score > 0.6). Contém o OBJETO
+            candidato aprovado (score > min_rate). Contém o OBJETO
             ``PidProviderXML`` (não o dict ``.data``) do candidato com
             maior score — em caso de empate, o critério de desempate é
             ``updated`` mais recente e, em seguida, maior ``id``.
@@ -1185,20 +1200,26 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         detail = {}
         found = []
         items = {}
+        responses = {}
+        min_rate = 0.6
+        if len(xml_adapter_data) <= 4:
+            min_rate = 0.49
         for item in results:
             item_data = item.data_to_compare
             response = compare(item_data, xml_adapter_data)
             items[item.id] = item
+            responses[item.id] = response
             found.append((response["percentual_score"], item.updated.isoformat(), item.id))
 
         found = sorted(found, reverse=True)
         matched = []
         unmatched = []
         for percentual_score, updated, item_id in found:
-            if percentual_score > 0.6:
-                matched.append(items[item_id].data)
+            data = {"data": items[item_id].data, "response": responses[item_id]}
+            if percentual_score > min_rate:
+                matched.append(data)
             else:
-                unmatched.append(items[item_id].data)
+                unmatched.append(data)
         if matched:
             detail["registered"] = items[found[0][-1]]
             if len(matched) > 1:
@@ -1229,7 +1250,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         self.z_links = xml_adapter.z_links
         self.z_partial_body = xml_adapter.xml_with_pre.body_fragment_fingerprint
 
-        self.readable_data = xml_adapter.xml_with_pre.readable_data
+        self.readable_data = fix_get_article_data(xml_adapter.xml_with_pre)
 
     @profile_method
     def _add_dates(self, xml_adapter, origin_date, available_since):
@@ -1401,6 +1422,8 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             response["registered"] = True
             response.update(registered.data)
             response["is_equal"] = registered.is_equal_to(xml_with_pre)
+            if not registered.readable_data:
+                response["is_equal"] = False
             return response
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1954,8 +1977,7 @@ class PidProviderSetting(BaseGenericSetting):
         default=False,
         verbose_name=_("Gravar todos os eventos de auditoria"),
         help_text=_(
-            "Quando ativo, grava auditoria em PidProviderXMLRegistration "
-            "mesmo para fluxos limpos (created, updated, skipped)."
+            "Quando ativo, grava auditoria em PidProviderXMLRegistration mesmo para fluxos limpos (created, updated, skipped)."
         ),
     )
 
@@ -1968,9 +1990,11 @@ class PidProviderSetting(BaseGenericSetting):
 
 
 # -----------------------------------------------------------------------------
-# Auditoria por documento. Por padrão, grava apenas em erros ou ambiguidades
-# (matched_items). Caso a opção no Wagtail Admin esteja ativa, grava todos os
-# eventos. FK nullable porque erros e casos sem correspondência podem não ter PPX.
+# [models.py] MODELO NOVO — PidProviderXMLRegistration
+# Auditoria por documento. Por padrão, grava apenas em exceções, erros, conflitos
+# ou ambiguidades (matched_items). Caso a opção no Wagtail Admin esteja ativa,
+# grava em todos os eventos.
+# FK nullable (unmatched/error podem não ter PPX).
 # -----------------------------------------------------------------------------
 class PidProviderXMLRegistration(CommonControlField):
     LIGHTWEIGHT_STATUSES = {"created", "updated", "skipped"}
