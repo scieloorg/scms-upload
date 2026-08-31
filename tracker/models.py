@@ -63,7 +63,7 @@ class BaseEvent(models.Model):
         obj = cls()
         obj.detail = detail
         obj.name = name
-        obj.completed = False
+        obj.completed = None
         obj.save()
         return obj
 
@@ -218,7 +218,7 @@ class TaskTracker(BaseEvent):
         obj = cls()
         obj.detail = detail
         obj.name = name
-        obj.completed = False
+        obj.completed = None
         obj.item = item
         obj.save()
         return obj
