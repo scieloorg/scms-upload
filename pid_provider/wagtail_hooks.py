@@ -4,7 +4,14 @@ from wagtail.snippets.views.snippets import SnippetViewSetGroup
 
 from config.menu import get_menu_order
 from core.views import CommonControlFieldViewSet
-from pid_provider.models import XMLURL, XMLVersion, FixPidV2, OtherPid, PidProviderConfig, PidProviderXML, PidProviderXMLRegistration
+from pid_provider.models import (
+    FixPidV2,
+    OtherPid,
+    PidProviderConfig,
+    PidProviderXML,
+    PidProviderXMLRegistration,
+    XMLVersion,
+)
 
 
 class PidProviderXMLViewSet(CommonControlFieldViewSet):
@@ -176,31 +183,6 @@ class XMLVersionViewSet(CommonControlFieldViewSet):
         "available_since",
     )
 
-class XMLURLViewSet(CommonControlFieldViewSet):
-    model = XMLURL
-    menu_label = _("XML URLs")
-    menu_icon = "folder"
-    menu_order = 300
-    add_to_settings_menu = False
-    list_per_page = 10
-
-    # Configuração de listagem
-    list_display = [
-        "url",
-        "status",
-        "pid",
-    ]
-    list_filter = {
-        "status": ["exact"],
-        "is_public": ["exact"],
-    }
-    search_fields = (
-        "url",
-        "status",
-        "pid",
-    )
-
-
 class PidProviderXMLRegistrationViewSet(CommonControlFieldViewSet):
     model = PidProviderXMLRegistration
     icon = "doc-empty-inverse"
@@ -246,7 +228,6 @@ class PidProviderViewSetGroup(SnippetViewSetGroup):
         FixPidV2ViewSet,
         PidProviderConfigViewSet,
         XMLVersionViewSet,
-        XMLURLViewSet,
         PidProviderXMLRegistrationViewSet,
     )
 

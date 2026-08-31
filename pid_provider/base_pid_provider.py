@@ -1,12 +1,12 @@
 import sys
 
-# from django.utils.translation import gettext_lazy as _
+from django.db import transaction
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre, get_xml_with_pre
 
 from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutura
     profile_method,
 )
-from pid_provider.models import PidProviderXML, XMLURL
+from pid_provider.models import PidProviderXML
 from tracker.models import UnexpectedEvent
 
 
@@ -161,64 +161,108 @@ class BasePidProvider:
         detail=None,
         auto_solve_pid_conflict=None,
         document_item=None,
+        expected_pid_v3=None,
     ):
         """
         Fornece / Valida PID de um XML disponível por um URI
         
-        This method handles three types of exceptions:
-        a) Failure to obtain XML - registers only URL, status, and PID in XMLURL
-        b) Successfully obtain XML but fail to create PidProviderXML record - 
-           registers everything + saves compressed XML content
-        c) Unexpected errors - logs in UnexpectedEvent
+        Obtém o XML, valida o PID v3 informado pela fonte e cria ou atualiza
+        PidProviderXML. Falhas são registradas em UnexpectedEvent.
 
         Returns
         -------
             dict
         """
-        # a) Try to obtain XML from URI
         try:
             xml_with_pre = list(XMLWithPre.create(uri=xml_uri))[0]
         except Exception as e:
-            return XMLURL.record(user, xml_uri, "xml_fetch_failed", document_item, exception=e)
-
-        # b) Try to create PidProviderXML record
-        try:
-            response = self.provide_pid_for_xml_with_pre(
-                xml_with_pre,
+            return self._handle_uri_error(
+                e,
+                "xml_fetch_failed",
+                xml_uri,
                 name,
                 user,
-                origin_date=origin_date,
-                force_update=force_update,
-                is_published=is_published,
-                origin=xml_uri,
-                registered_in_core=registered_in_core,
-                auto_solve_pid_conflict=auto_solve_pid_conflict,
+                origin_date,
+                force_update,
+                is_published,
+                document_item,
+                expected_pid_v3,
             )
 
-            resp = dict(response)  # make a copy to avoid mutating original
-            try:
-                resp.pop("xml_with_pre", None)  # Remove xml_with_pre from response for logging
-            except AttributeError:
-                pass  # If xml_with_pre is not present or cannot be removed, ignore and log rest of response
+        if expected_pid_v3 and xml_with_pre.v3 != expected_pid_v3:
+            return self._handle_uri_error(
+                ValueError(
+                    f"PID v3 mismatch: counter_dict={expected_pid_v3}, "
+                    f"xml={xml_with_pre.v3}"
+                ),
+                "pid_v3_mismatch",
+                xml_uri,
+                name,
+                user,
+                origin_date,
+                force_update,
+                is_published,
+                document_item,
+                expected_pid_v3,
+            )
 
-            if response.get("error_type") or response.get("error_msg") or response.get("error_message"):
-                XMLURL.record(user, xml_uri, "pid_provider_xml_failed", document_item, response=resp, xml_with_pre=xml_with_pre, name=name)
-            else:
-                XMLURL.record(user, xml_uri, "success", document_item, response=resp, xml_with_pre=xml_with_pre, name=name)
+        try:
+            with transaction.atomic():
+                response = self.provide_pid_for_xml_with_pre(
+                    xml_with_pre,
+                    name,
+                    user,
+                    origin_date=origin_date,
+                    force_update=force_update,
+                    is_published=is_published,
+                    origin=xml_uri,
+                    registered_in_core=registered_in_core,
+                    auto_solve_pid_conflict=auto_solve_pid_conflict,
+                )
+
+                error_msg = response.get("error_msg") or response.get(
+                    "error_message"
+                )
+                if response.get("error_type") or error_msg:
+                    raise ValueError(error_msg or response.get("error_type"))
             return response
         except Exception as e:
-            return self._handle_unexpected_error(e, xml_uri, name, user, origin_date, force_update, is_published, document_item)
+            return self._handle_uri_error(
+                e,
+                "pid_provider_xml_failed",
+                xml_uri,
+                name,
+                user,
+                origin_date,
+                force_update,
+                is_published,
+                document_item,
+                expected_pid_v3,
+            )
 
-    def _handle_unexpected_error(self, exception, xml_uri, name, user, origin_date, force_update, is_published, document_item):
-        """Handle exception type c) - Unexpected error during processing"""
+    def _handle_uri_error(
+        self,
+        exception,
+        stage,
+        xml_uri,
+        name,
+        user,
+        origin_date,
+        force_update,
+        is_published,
+        document_item,
+        expected_pid_v3,
+    ):
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        
+
         UnexpectedEvent.create(
             exception=exception,
             exc_traceback=exc_traceback,
+            item=expected_pid_v3,
+            action="PidProvider.provide_pid_for_xml_uri",
             detail={
                 "operation": "PidProvider.provide_pid_for_xml_uri",
-                "exception_type": "unexpected_error",
+                "stage": stage,
                 "input": dict(
                     xml_uri=xml_uri,
                     user=user.username,
@@ -227,16 +271,20 @@ class BasePidProvider:
                     force_update=force_update,
                     is_published=is_published,
                     document_item=document_item,
+                    expected_pid_v3=expected_pid_v3,
                 ),
             },
         )
-        
-        return dict(
+
+        response = dict(
             error_msg=str(exception),
-            error_type=str(exc_type),
-            exc_value=str(exc_value),
-            exc_traceback=str(exc_traceback),
+            error_type=str(type(exception)),
         )
+        if exc_value is not None:
+            response["exc_value"] = str(exc_value)
+        if exc_traceback is not None:
+            response["exc_traceback"] = str(exc_traceback)
+        return response
 
     @classmethod
     @profile_method

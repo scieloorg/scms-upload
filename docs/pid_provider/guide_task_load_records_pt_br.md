@@ -15,13 +15,14 @@ publicados, comprometendo a integridade dos dados.
 **O que ela faz:**
 
 1. Conecta-se à API do OPAC (ex., `https://www.scielo.br/api/v1/counter_dict`)
-2. Obtém metadados dos documentos da coleção e intervalo de datas especificados
+2. Obtém metadados dos documentos do periódico e intervalo de datas especificados
 3. Para cada documento encontrado, despacha uma subtarefa
    (`task_load_record_from_xml_url`) que baixa o XML e cria ou atualiza
-   registros em **PidProviderXML** e **XMLURL**
+   registros em **PidProviderXML**, preservando o PID v3 presente no OPAC
 
 > **Importante:** Esta tarefa **apenas** cria ou atualiza registros
-> `PidProviderXML` e `XMLURL`. Ela **não** cria registros de `Article`.
+> `PidProviderXML`. Ela **não** cria `SPSPkg` nem `Article`; execute depois a
+> migração padrão para concluir essas etapas.
 
 ---
 
@@ -62,6 +63,7 @@ No campo **Keyword arguments** (formato JSON), insira os parâmetros da tarefa:
 {
   "username": "admin",
   "collection_acron": "scl",
+  "journal_acron": "rsp",
   "from_date": "2024-01-01",
   "until_date": "2024-12-31",
   "limit": 100,
@@ -85,19 +87,20 @@ executá-la conforme o agendamento configurado.
 | `username` | str | `None` | Nome do usuário que executa a tarefa. |
 | `user_id` | int | `None` | ID do usuário (alternativa ao `username`). |
 | `collection_acron` | str | `"scl"` | Acrônimo da coleção (ex., `"scl"` para Brasil). |
+| `journal_acron` | str | obrigatório | Acrônimo do periódico usado para restringir a coleta. |
 | `from_date` | str | `"2000-01-01"` | Data inicial no formato ISO (`YYYY-MM-DD`). |
 | `until_date` | str | hoje | Data final no formato ISO (`YYYY-MM-DD`). |
 | `limit` | int | `100` | Número de documentos por página da API. |
 | `timeout` | int | `5` | Tempo limite da requisição HTTP em segundos. |
 | `force_update` | bool | `false` | Forçar atualização mesmo se o registro já existir. |
-| `opac_domain` | str | `"www.scielo.br"` | Domínio do OPAC de onde coletar. **Deve incluir o protocolo** (ex., `https://www.scielo.br`). Usar `https://` garante uma conexão segura com o site oficial do SciELO. Se o protocolo for omitido, o sistema usará `http://` por padrão. |
+| `opac_domain` | str | `"www.scielo.br"` | Domínio do OPAC de onde coletar. Pode incluir o protocolo (ex., `https://www.scielo.br`); se for omitido, o sistema usará `https://` por padrão. |
 
 ---
 
 ## Verificação dos Resultados
 
-Após a conclusão da tarefa, verifique os resultados consultando os modelos
-`PidProviderXML` e `XMLURL`.
+Após a conclusão da tarefa, verifique os resultados consultando o modelo
+`PidProviderXML`.
 
 ### Verificar Registros PidProviderXML
 
@@ -122,25 +125,6 @@ registros = PidProviderXML.objects.filter(collections=col)
 print(f"Total de registros para 'scl': {registros.count()}")
 ```
 
-### Verificar Registros XMLURL
-
-No Django admin, navegue até **PID PROVIDER > XMLURL** para ver o status de
-processamento das URLs.
-
-```python
-from pid_provider.models import XMLURL
-
-# Listar registros XMLURL recentes
-urls_recentes = XMLURL.objects.order_by("-updated")[:20]
-for url_registro in urls_recentes:
-    print(f"URL: {url_registro.url} | Status: {url_registro.status} | "
-          f"PID: {url_registro.pid}")
-
-# Verificar URLs com falha
-com_falha = XMLURL.objects.exclude(status="").exclude(exceptions="")
-print(f"URLs com erros: {com_falha.count()}")
-```
-
 ---
 
 ## Solução de Problemas
@@ -156,9 +140,9 @@ Os problemas são categorizados por nível de criticidade:
 | 🔴 | O worker do Celery não está em execução | Inicie o worker do Celery: `celery -A config worker -l info`. Sem um worker em execução, nenhuma tarefa será processada. |
 | 🔴 | O agendador Celery Beat não está em execução | Inicie o Celery Beat: `celery -A config beat -l info`. Sem o Beat, as tarefas periódicas não serão despachadas. |
 | 🔴 | Falha na conexão com a API do OPAC (erro de rede/DNS) | Verifique se o `opac_domain` está acessível e inclui `https://`. Revise as regras de firewall e a resolução DNS. Consulte os registros de `UnexpectedEvent` para detalhes do erro. |
-| 🟡 | Nenhum registro aparece após a execução da tarefa | Verifique se `from_date` e `until_date` cobrem um intervalo com documentos publicados. Confirme se `collection_acron` está correto. Revise os logs do worker do Celery para avisos. |
+| 🟡 | Nenhum registro aparece após a execução da tarefa | Verifique se `from_date` e `until_date` cobrem um intervalo com documentos publicados. Confirme `collection_acron` e o `journal_acron` obrigatório. Revise os logs do worker do Celery. |
 | 🟡 | Os registros existem mas não são atualizados | Defina `force_update` como `true` nos kwargs para forçar o reprocessamento de registros existentes. |
-| 🟡 | Registros XMLURL mostram status de erro | Verifique o campo `exceptions` no `XMLURL` para detalhes. Causas comuns incluem URLs de XML inválidas ou erros temporários do servidor. Os registros serão reprocessados em execuções futuras. |
+| 🟡 | Falha ao baixar XML ou PID v3 divergente | Consulte `UnexpectedEvent`; o evento registra o periódico, o PID, a URL e a etapa que falhou. |
 | 🟢 | A tarefa executa lentamente | Reduza o parâmetro `limit` para processar menos documentos por página, ou aumente `timeout` se a API do OPAC estiver lenta. Isso não afeta a correção dos dados. |
 | 🟢 | Alguns documentos são ignorados com avisos | Documentos sem um `journal_acronym` válido são ignorados. Verifique os logs do worker do Celery para mensagens de `WARNING`. Estes são tipicamente registros incompletos na API do OPAC. |
 
@@ -167,15 +151,17 @@ Os problemas são categorizados por nível de criticidade:
 Os erros são registrados no modelo `UnexpectedEvent`:
 
 ```python
+from django.db.models import Q
 from tracker.models import UnexpectedEvent
 
 erros = UnexpectedEvent.objects.filter(
-    detail__task="task_load_records_from_counter_dict"
+    Q(detail__task="task_load_records_from_counter_dict")
+    | Q(action="PidProvider.provide_pid_for_xml_uri")
 ).order_by("-created")[:10]
 
 for erro in erros:
     print(f"Data: {erro.created}")
-    print(f"Exceção: {erro.exception}")
+    print(f"Exceção: {erro.exception_msg}")
     print(f"Detalhes: {erro.detail}")
     print("---")
 ```
