@@ -2704,17 +2704,17 @@ class ArticleProc(BaseProc, ClusterableModel):
 
     @classmethod
     def mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect(
-        cls, user, journal_proc, issue_proc_id_list=None
+        cls, user, journal_acron_list, collection_acron_list=None
     ):
         """
         Marca para reprocessamento os ArticleProc cujo sps_pkg.pid_v2 está
         preenchido mas não corresponde ao pid do ArticleProc (migrated_data.pid).
         """
         params = {}
-        if issue_proc_id_list:
-            params["issue_proc_id__in"] = issue_proc_id_list
-        elif journal_proc:
-            params["issue_proc__journal_proc"] = journal_proc
+        if collection_acron_list:
+            params["collection__acron__in"] = collection_acron_list
+        if journal_acron_list:
+            params["issue_proc__journal_proc__acron__in"] = journal_acron_list
 
         items = cls.objects.filter(
             pid__isnull=False,
@@ -2734,10 +2734,12 @@ class ArticleProc(BaseProc, ClusterableModel):
             except Exception:
                 failures[item.pid] = traceback.format_exc()
 
-        return {
-            "marked_to_reproc": marked_to_reproc,
-            "failures": failures,
-        }
+        response = {}
+        if marked_to_reproc:
+            response["marked_to_reproc"] = marked_to_reproc
+        if failures:
+            response["failures"] = failures
+        return response
 
     @classmethod
     def complete_sps_pkg_ppx(
