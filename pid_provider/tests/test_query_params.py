@@ -16,8 +16,8 @@ Atualizado para cobrir a correção do falso-match na branch journal-article:
 - QueryBuilderPidProviderXML agora lê xml_adapter.xml_with_pre.readable_data
   (não mais get_article_data(300)), que expõe "body_fragment" no lugar de
   "partial_body".
-- compare() agora PULA (continue) labels ausentes em input_data, em vez
-  de tratá-los como None — mudança de comportamento coberta em CompareTests.
+- compare() trata labels ausentes em input_data como None via .get(label)
+  (não os pula) — comportamento coberto em CompareTests.
 
 ATENÇÃO: ajuste o caminho de import abaixo (`pid_provider.query_params`)
 para o módulo real onde essas classes/funções estão definidas no projeto,
@@ -76,6 +76,12 @@ def make_xml_adapter(
     adapter.pkg_name = pkg_name
     adapter.sps_pkg_name = sps_pkg_name
     adapter.order = order
+    # QueryBuilderPidProviderXML lê z_partial_body como ATRIBUTO direto do
+    # adapter (self.z_partial_body = xml_adapter.z_partial_body), não via
+    # xml_adapter.data.get("z_partial_body") -- por isso precisa ser
+    # configurado explicitamente aqui, senão vira um MagicMock não
+    # configurado (nunca None nem o valor esperado).
+    adapter.z_partial_body = (data or {}).get("z_partial_body")
     adapter.xml_with_pre.deprecated_sps_pkg_name_list = deprecated_sps_pkg_name_list or []
     adapter.xml_with_pre.body_fragment_fingerprint = body_fragment_fingerprint
     adapter.xml_with_pre.body_fingerprint = body_fingerprint
@@ -562,10 +568,21 @@ class CompareItemsTests(SimpleTestCase):
     def test_different_scalars_uses_how_similar_and_includes_registered(
         self, mock_how_similar
     ):
+        """
+        Quando score != 1, o response inclui "registered" E "input_data"
+        (não apenas "registered") -- ambos úteis para inspecionar a
+        divergência.
+        """
         mock_how_similar.return_value = 0.4
         result = compare_items("z_surnames", "Silva", "Souza")
         self.assertEqual(
-            result, {"label": "z_surnames", "score": 0.4, "registered": "Silva"}
+            result,
+            {
+                "label": "z_surnames",
+                "score": 0.4,
+                "registered": "Silva",
+                "input_data": "Souza",
+            },
         )
         mock_how_similar.assert_called_once_with("Souza", "Silva")
 
@@ -576,7 +593,13 @@ class CompareItemsTests(SimpleTestCase):
         mock_how_similar.return_value = 0.2
         result = compare_items("z_links", "algum-link", None)
         self.assertEqual(
-            result, {"label": "z_links", "score": 0.2, "registered": "algum-link"}
+            result,
+            {
+                "label": "z_links",
+                "score": 0.2,
+                "registered": "algum-link",
+                "input_data": None,
+            },
         )
         mock_how_similar.assert_called_once_with("", "algum-link")
 
@@ -586,19 +609,24 @@ class CompareItemsTests(SimpleTestCase):
     ):
         mock_how_similar.return_value = 0.3
         result = compare_items("z_links", None, "algum-link")
-        self.assertEqual(result, {"label": "z_links", "score": 0.3, "registered": None})
+        self.assertEqual(
+            result,
+            {
+                "label": "z_links",
+                "score": 0.3,
+                "registered": None,
+                "input_data": "algum-link",
+            },
+        )
         mock_how_similar.assert_called_once_with("algum-link", "")
 
 
 class CompareTests(SimpleTestCase):
     """
-    compare() agora PULA (continue) labels ausentes em input_data, em vez
-    de tratá-los como None via .get(label). Isso muda o comportamento em
-    dois cenários que precisam de cobertura separada:
-    - alguns labels ausentes, outros presentes: os ausentes são
-      simplesmente ignorados no cálculo do score;
-    - TODOS os labels ausentes: items fica vazio e
-      total_score / len(items) levanta ZeroDivisionError.
+    compare() usa input_data.get(label) para cada label de
+    registered_items -- um label ausente em input_data é tratado como
+    None (não é pulado): sempre gera uma entrada em "items", e conta no
+    cálculo de total_score/percentual_score via compare_items(None, ...).
     """
 
     @patch("pid_provider.query_params.how_similar")
@@ -613,32 +641,44 @@ class CompareTests(SimpleTestCase):
         self.assertEqual(result["total_score"], 1.5)  # 1 (match) + 0.5 (mocked)
         self.assertEqual(result["percentual_score"], 0.75)
 
-    def test_missing_input_key_is_skipped_not_treated_as_none(self):
+    def test_missing_input_key_is_treated_as_none_not_skipped(self):
         """
-        Antes: label ausente em input_data era comparado como None e
-        contribuía com score 1 (None == None). Agora: o label ausente é
-        pulado inteiramente, não aparece em items nem em total_score.
+        Um label ausente em input_data vira None via .get(label) -- se o
+        valor registrado também é falsy (None), compare_items considera
+        os dois "iguais" (score 1), então o label ausente ENTRA em items
+        e contribui com score 1, não é descartado.
         """
         registered_items = {"z_collab": None, "z_surnames": "Silva"}
-        input_data = {"z_surnames": "Silva"}  # z_collab ausente
+        input_data = {"z_surnames": "Silva"}  # z_collab ausente -> None
+
+        result = compare(registered_items, input_data)
+
+        self.assertEqual(len(result["items"]), 2)
+        labels = {item["label"] for item in result["items"]}
+        self.assertEqual(labels, {"z_collab", "z_surnames"})
+        self.assertEqual(result["total_score"], 2)
+        self.assertEqual(result["percentual_score"], 1)
+
+    def test_missing_input_key_with_truthy_registered_value_lowers_score(self):
+        """
+        Se o label ausente em input_data tem um valor registrado truthy,
+        o None resultante de .get(label) NÃO é igual ao registrado --
+        cai no ramo how_similar (não é match automático).
+        """
+        registered_items = {"z_surnames": "Silva"}
+        input_data = {}  # z_surnames ausente -> None
 
         result = compare(registered_items, input_data)
 
         self.assertEqual(len(result["items"]), 1)
         self.assertEqual(result["items"][0]["label"], "z_surnames")
-        self.assertEqual(result["total_score"], 1)
-        self.assertEqual(result["percentual_score"], 1)
+        self.assertLess(result["items"][0]["score"], 1)
 
-    def test_all_labels_missing_raises_zero_division_error(self):
+    def test_empty_registered_items_raises_zero_division_error(self):
         """
-        Caso extremo: se NENHUM label de registered_items existir em
-        input_data, items fica vazio e a divisão por len(items)=0
-        levanta ZeroDivisionError. Documentando o comportamento atual —
-        se isso não for desejável, compare() precisa de uma guarda
-        explícita para items vazio.
+        Único caso em que items fica vazio: registered_items já vem
+        vazio -- não há nada para iterar, então
+        total_score / len(items) levanta ZeroDivisionError.
         """
-        registered_items = {"z_collab": None}
-        input_data = {}
-
         with self.assertRaises(ZeroDivisionError):
-            compare(registered_items, input_data)
+            compare({}, {"z_surnames": "Silva"})
