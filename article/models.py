@@ -20,7 +20,7 @@ from migration.models import ClassicWebsiteConfiguration
 from article.page_checker import check_url, check_content, format_url, format_classic_url
 from article.forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from collection.choices import PUBLIC
-from collection.models import Language, Collection
+from collection.models import Language, Collection, WebSiteConfiguration
 from core.models import CommonControlField, HTMLTextModel
 from doi.models import DOIWithLang
 from issue.models import TOC, Issue, TocSection
@@ -1244,8 +1244,6 @@ class ArticleCollection(CommonControlField):
         Substitui os antigos create_or_update_websites() +
         create_or_update_classic_website_pages().
         """
-        from collection.models import WebSiteConfiguration
-
         article = self.article
         existing_ids = set()
 
@@ -1255,6 +1253,12 @@ class ArticleCollection(CommonControlField):
             enabled=True,
         ):
             purpose = ws_config.purpose  # "PUBLIC" ou "QA"
+            keep = self.article.pages.filter(
+                purpose=purpose,
+                url__startswith=ws_config.url
+            ).values_list("id", flat=True)
+            self.article.pages.filter(purpose=purpose).exclude(id__in=keep).clean()
+
             for item in article.get_webpage_items(ws_config.url, purpose):
                 page = ArticleWebPage.get_or_create_from_item(
                     user, self.article, self.collection, item
