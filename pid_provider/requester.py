@@ -94,7 +94,7 @@ class PidRequester(BasePidProvider):
             "aop_pid": xml_with_pre.aop_pid,
         }
         registered = PidRequester.get_registration_demand(
-            user, article_proc, xml_with_pre
+            user, article_proc, xml_with_pre, force_update,
         )
         if registered.get("error_type"):
             return registered
@@ -126,7 +126,7 @@ class PidRequester(BasePidProvider):
         return registered
 
     @staticmethod
-    def get_registration_demand(user, article_proc, xml_with_pre):
+    def get_registration_demand(user, article_proc, xml_with_pre, force_update):
         """
         Obtém a indicação de demanda de registro no Upload e/ou Core.
 
@@ -146,6 +146,15 @@ class PidRequester(BasePidProvider):
         """
         # Inicia operação de logging para rastreamento
         op = article_proc.start(user, ">>> get registration demand")
+
+        if force_update:
+            registered = {
+                "force_update": True,
+                "do_remote_registration": True,
+                "do_local_registration": True,
+            }
+            op.finish(user, completed=True, detail=registered)
+            return registered
 
         # Verifica se o XML já está registrado e obtém dados de comparação
         registered = PidProviderXML.is_registered(xml_with_pre)
