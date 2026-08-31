@@ -279,3 +279,4 @@ core/media/
 !.envs/.local/
 !.envs/.production/
 src/
+test.db

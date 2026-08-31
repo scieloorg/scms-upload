@@ -51,6 +51,23 @@ class ArticleAdminInspectView(InspectView):
             for rac in self.instance.requestarticlechange_set.all():
                 data["requested_changes"].append(rac)
 
+        try:
+            from doi.models import CrossrefDeposit, CrossrefConfiguration
+
+            data["crossref_deposits"] = list(
+                CrossrefDeposit.objects.filter(article=self.instance).order_by(
+                    "-updated"
+                )[:5]
+            )
+            data["has_crossref_config"] = CrossrefConfiguration.objects.filter(
+                journal=self.instance.journal
+            ).exists()
+        except Exception:
+            data["crossref_deposits"] = []
+            data["has_crossref_config"] = False
+
+        data["article_id"] = self.instance.id
+
         return super().get_context_data(**data)
 
 
