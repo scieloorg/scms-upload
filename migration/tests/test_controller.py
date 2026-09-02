@@ -17,51 +17,13 @@ módulo for diferente de "migration.controller" no seu projeto.
 """
 
 import unittest
+from importlib import import_module
 from unittest import mock
 from unittest.mock import MagicMock, call, patch
-from importlib import import_module
-
-MODULE = "migration.controller"
-
-import sys
-import types
-
 
 from migration import controller as migration_controller
 
-# ---------------------------------------------------------------------------
-# Stubs para módulos externos que podem não estar instalados no ambiente de
-# teste (packtools, scielo_classic_website). Isso permite executar os testes
-# mesmo sem essas dependências completas instaladas; se elas já existirem,
-# os stubs não são usados (o import real do módulo sob teste prevalece).
-# ---------------------------------------------------------------------------
-def _ensure_stub_module(name):
-    if name not in sys.modules:
-        sys.modules[name] = types.ModuleType(name)
-    return sys.modules[name]
-
-
-for _name in [
-    "packtools",
-    "packtools.sps",
-    "packtools.sps.models",
-    "packtools.sps.models.article_and_subarticles",
-    "packtools.sps.models.v2",
-    "packtools.sps.models.v2.article_assets",
-    "packtools.sps.pid_provider",
-    "packtools.sps.pid_provider.xml_sps_lib",
-    "scielo_classic_website",
-    "scielo_classic_website.classic_ws",
-    "scielo_classic_website.iid2json",
-    "scielo_classic_website.iid2json.id2json3",
-]:
-    _ensure_stub_module(_name)
-
-sys.modules["packtools.sps.models.article_and_subarticles"].ArticleAndSubArticles = MagicMock()
-sys.modules["packtools.sps.models.v2.article_assets"].ArticleAssets = MagicMock()
-sys.modules["packtools.sps.pid_provider.xml_sps_lib"].XMLWithPre = MagicMock()
-sys.modules["scielo_classic_website"].classic_ws = MagicMock()
-sys.modules["scielo_classic_website.iid2json.id2json3"].get_doc_records = MagicMock()
+MODULE = "migration.controller"
 
 
 class FakeClassicWebsiteJournal:
