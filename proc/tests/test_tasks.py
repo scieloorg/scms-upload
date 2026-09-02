@@ -267,8 +267,8 @@ class TaskExecutionFinishTest(TestCase):
 
         mock_unexpected_event.create.assert_called_once()
         kwargs = mock_unexpected_event.create.call_args.kwargs
-        self.assertEqual(kwargs["detail"]["task"], "proc.tasks.TaskExecution.finish")
-        self.assertEqual(kwargs["detail"]["item"], "item-x")
+        self.assertEqual(kwargs["action"], "proc.tasks.TaskExecution.finish")
+        self.assertEqual(kwargs["item"], "item-x")
 
 
 class TaskExecutionUpdateTotalStatusTest(TestCase):
@@ -560,15 +560,22 @@ class TaskFetchAndCreateJournalTest(TestCase):
         self.assertIsNotNone(kwargs["exc_traceback"])
 
 
-class TaskExcludeInvalidIssueArticlesTest(TestCase):
-    """Testes para task_exclude_invalid_issue_articles (não usa TaskExecution)."""
+class TaskFixIssueArticlesTest(TestCase):
+    """Testes para task_fix_issue_articles (não usa TaskExecution).
 
-    @patch("proc.tasks.Article")
+    Renomeada de task_exclude_invalid_issue_articles (commit ba92d1335be2):
+    agora sempre reconcilia sps_pkg.ppx (Article.complete_sps_pkg_ppx e
+    ArticleProc.complete_sps_pkg_ppx) e só executa as exclusões destrutivas
+    (SPSPkg/Article/ArticleProc.exclude_invalid_records) quando as flags
+    delete_* correspondentes são True.
+    """
+
     @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.Article")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks._get_user")
-    def test_happy_path_without_deleted_sps_pkg_ids_calls_exclude_invalid_items_once(
-        self, mock_get_user, mock_issue_proc, mock_article_proc, mock_article
+    def test_default_flags_only_reconciles_ppx_without_deleting(
+        self, mock_get_user, mock_issue_proc, mock_article, mock_article_proc
     ):
         mock_get_user.return_value = "USER"
         mock_issue = MagicMock()
@@ -576,56 +583,115 @@ class TaskExcludeInvalidIssueArticlesTest(TestCase):
         mock_issue_proc.objects.select_related.return_value.get.return_value = (
             mock_issue_proc_instance
         )
-        mock_article_proc.exclude_invalid_items.return_value = {
-            "sps_pkg_id_list": [1, 2]
-        }
-        mock_article.exclude_invalid_records.return_value = {
-            "deleted_sps_pkg_ids": []
-        }
+        mock_article.complete_sps_pkg_ppx.return_value = {"completed": 1}
+        mock_article_proc.complete_sps_pkg_ppx.return_value = {"completed": 2}
 
-        result = tasks.task_exclude_invalid_issue_articles(
-            issue_proc_id=10, username="bob", user_id=None, public_api_data={"x": 1}
+        result = tasks.task_fix_issue_articles(
+            issue_proc_id=10, username="bob", user_id=None
         )
 
         mock_issue_proc.objects.select_related.assert_called_once_with("issue")
         mock_issue_proc.objects.select_related.return_value.get.assert_called_once_with(
             id=10
         )
-        mock_article_proc.exclude_invalid_items.assert_called_once_with(
-            "USER", mock_issue
+        mock_article.complete_sps_pkg_ppx.assert_called_once_with("USER", mock_issue)
+        mock_article_proc.complete_sps_pkg_ppx.assert_called_once_with(
+            "USER", issue_proc_id_list=[10]
         )
-        mock_article.exclude_invalid_records.assert_called_once_with(
-            "USER", mock_issue, [1, 2], timeout=None
-        )
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]["operation"], "ArticleProc.exclude_invalid_items")
-        self.assertEqual(result[1]["operation"], "Article.exclude_invalid_records")
+        mock_article.exclude_invalid_records.assert_not_called()
+        mock_article_proc.exclude_invalid_records.assert_not_called()
 
-    @patch("proc.tasks.Article")
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result[0], {"params": {
+            "delete_article_which_is_duplicated": False,
+            "delete_article_which_sps_pkg_is_missing": False,
+            "delete_sps_pkg_which_ppx_is_missing": False,
+        }})
+        self.assertEqual(result[1]["operation"], "Article.complete_sps_pkg_ppx")
+        self.assertEqual(result[2]["operation"], "ArticleProc.complete_sps_pkg_ppx")
+
+    @patch("proc.tasks.SPSPkg")
     @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.Article")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks._get_user")
-    def test_reruns_exclude_invalid_items_when_deleted_sps_pkg_ids_present(
-        self, mock_get_user, mock_issue_proc, mock_article_proc, mock_article
+    def test_delete_sps_pkg_flags_trigger_sps_pkg_exclude_invalid_records(
+        self, mock_get_user, mock_issue_proc, mock_article, mock_article_proc, mock_sps_pkg
+    ):
+        mock_get_user.return_value = "USER"
+        mock_issue = MagicMock()
+        mock_issue_proc_instance = MagicMock(issue=mock_issue, pid="ISSUE-PID")
+        mock_issue_proc.objects.select_related.return_value.get.return_value = (
+            mock_issue_proc_instance
+        )
+        mock_sps_pkg.exclude_invalid_records.return_value = {"deleted": [1]}
+
+        result = tasks.task_fix_issue_articles(
+            issue_proc_id=10,
+            delete_sps_pkg_which_ppx_is_missing=True,
+            delete_sps_pkg_which_is_duplicated=True,
+        )
+
+        mock_sps_pkg.exclude_invalid_records.assert_called_once_with(
+            "USER", "ISSUE-PID", True, True
+        )
+        operations = [item.get("operation") for item in result if "operation" in item]
+        self.assertIn("SPSPkg.exclude_invalid_records", operations)
+        mock_article.exclude_invalid_records.assert_not_called()
+        mock_article_proc.exclude_invalid_records.assert_not_called()
+
+    @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.Article")
+    @patch("proc.tasks.IssueProc")
+    @patch("proc.tasks._get_user")
+    def test_delete_article_flags_trigger_article_exclude_invalid_records(
+        self, mock_get_user, mock_issue_proc, mock_article, mock_article_proc
     ):
         mock_get_user.return_value = "USER"
         mock_issue = MagicMock()
         mock_issue_proc.objects.select_related.return_value.get.return_value = (
             MagicMock(issue=mock_issue)
         )
-        mock_article_proc.exclude_invalid_items.side_effect = [
-            {"sps_pkg_id_list": [1]},
-            {"sps_pkg_id_list": []},
-        ]
-        mock_article.exclude_invalid_records.return_value = {
-            "deleted_sps_pkg_ids": [99]
-        }
+        mock_article.exclude_invalid_records.return_value = {"deleted": [2]}
 
-        result = tasks.task_exclude_invalid_issue_articles(issue_proc_id=10)
+        result = tasks.task_fix_issue_articles(
+            issue_proc_id=10,
+            timeout=30,
+            delete_article_which_sps_pkg_is_missing=True,
+            delete_article_which_is_duplicated=True,
+        )
 
-        self.assertEqual(mock_article_proc.exclude_invalid_items.call_count, 2)
-        self.assertEqual(len(result), 3)
-        self.assertEqual(result[2]["operation"], "ArticleProc.exclude_invalid_items")
+        mock_article.exclude_invalid_records.assert_called_once_with(
+            "USER", mock_issue, True, True, timeout=30
+        )
+        operations = [item.get("operation") for item in result if "operation" in item]
+        self.assertIn("Article.exclude_invalid_records", operations)
+        mock_article_proc.exclude_invalid_records.assert_not_called()
+
+    @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.Article")
+    @patch("proc.tasks.IssueProc")
+    @patch("proc.tasks._get_user")
+    def test_delete_article_proc_flags_trigger_article_proc_exclude_invalid_records(
+        self, mock_get_user, mock_issue_proc, mock_article, mock_article_proc
+    ):
+        mock_get_user.return_value = "USER"
+        mock_issue_proc.objects.select_related.return_value.get.return_value = (
+            MagicMock(issue=MagicMock())
+        )
+        mock_article_proc.exclude_invalid_records.return_value = {"deleted": [3]}
+
+        result = tasks.task_fix_issue_articles(
+            issue_proc_id=10,
+            delete_article_procs_which_sps_pkg_is_missing=True,
+            delete_article_procs_which_is_duplicated=True,
+        )
+
+        mock_article_proc.exclude_invalid_records.assert_called_once_with(
+            "USER", 10, True, True
+        )
+        operations = [item.get("operation") for item in result if "operation" in item]
+        self.assertIn("ArticleProc.exclude_invalid_records", operations)
 
     @patch("proc.tasks.UnexpectedEvent")
     @patch("proc.tasks.IssueProc")
@@ -638,7 +704,7 @@ class TaskExcludeInvalidIssueArticlesTest(TestCase):
             "db error"
         )
 
-        result = tasks.task_exclude_invalid_issue_articles(issue_proc_id=10)
+        result = tasks.task_fix_issue_articles(issue_proc_id=10)
 
         self.assertIn("exc_type", result)
         self.assertIn("exc_value", result)
