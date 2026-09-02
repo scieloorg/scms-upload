@@ -951,7 +951,8 @@ class ImportJournalAcronIdRecordsTests(unittest.TestCase):
                 "total_id_file_records_to_migrate": 1,
                 "total_issues": 1,
             },
-            "issue_pids": ["S0000-000020000001"],
+            "issue_pids": ["0000-000020000001", "0000-000020000002"],
+            "pending_issue_pids": ["0000-000020000001"],
         }
         mock_journal_acron_id_file.create_or_update.return_value = journal_id_file
 
@@ -972,15 +973,19 @@ class ImportJournalAcronIdRecordsTests(unittest.TestCase):
         self.assertEqual(detail["exceptions"], [])
         mock_id_file_record.create_or_update.assert_called_once()
         journal_proc.issueproc_set.filter.assert_called_once_with(
-            pid__in=["S0000-000020000001"]
+            pid__in=["0000-000020000001"]
         )
         self.assertEqual(detail["issue_proc_id_list"], [11, 12])
         self.assertEqual(detail["stats"], journal_id_file.data["stats"])
 
+    @patch("migration.controller.get_bases_work_acron_id_file_records")
     @patch("migration.controller.JournalAcronIdFile")
     @patch("migration.controller.get_classic_website")
     def test_ja_atualizado_sem_force_update_retorna_mensagem(
-        self, mock_get_cw, mock_journal_acron_id_file
+        self,
+        mock_get_cw,
+        mock_journal_acron_id_file,
+        mock_get_records,
     ):
         user = MagicMock()
         journal_proc = self._make_journal_proc()
@@ -990,8 +995,21 @@ class ImportJournalAcronIdRecordsTests(unittest.TestCase):
         mock_get_cw.return_value = classic_website
 
         journal_id_file = MagicMock()
-        journal_id_file.data = {"id_file_record_need_to_be_updated": False}
+        journal_id_file.data = {
+            "id_file_record_need_to_be_updated": False,
+            "stats": {
+                "total_id_file_records": 1,
+                "total_id_file_records_to_migrate": 1,
+                "total_issues": 1,
+            },
+            "issue_pids": ["0034-891020040002"],
+            "pending_issue_pids": ["0034-891020040002"],
+        }
         mock_journal_acron_id_file.create_or_update.return_value = journal_id_file
+
+        issueproc_qs = MagicMock()
+        issueproc_qs.values_list.return_value = [11]
+        journal_proc.issueproc_set.filter.return_value = issueproc_qs
 
         detail = migration_controller.import_journal_acron_id_records(
             user, MagicMock(), journal_proc, force_update=False
@@ -999,6 +1017,13 @@ class ImportJournalAcronIdRecordsTests(unittest.TestCase):
 
         self.assertIn("message", detail)
         self.assertIn("up-to-date", detail["message"])
+        mock_get_records.assert_not_called()
+        self.assertEqual(detail["journal_id_file_data"], journal_id_file.data)
+        self.assertEqual(detail["stats"], journal_id_file.data["stats"])
+        journal_proc.issueproc_set.filter.assert_called_once_with(
+            pid__in=["0034-891020040002"]
+        )
+        self.assertEqual(detail["issue_proc_id_list"], [11])
 
     @patch("migration.controller.JournalAcronIdFile")
     @patch("migration.controller.get_classic_website")
