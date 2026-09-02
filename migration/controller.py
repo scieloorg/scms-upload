@@ -728,15 +728,20 @@ def import_journal_acron_id_records(
     """
     Para um dado JournalAcronIdFile, criar itens em IdFileRecord
     """
-    detail = {}
     exceptions = []
+    source_path = None
+    message = None
+    tb = None
+    journal_id_file_data = {}
+    stats = {}
+    issue_proc_id_list = []
+
+    params = {
+        "journal_acron": journal_proc.acron,
+        "force_update": force_update,
+    }
 
     try:
-        detail["params"] = {
-            "journal_acron": journal_proc.acron,
-            "force_update": force_update,
-        }
-        source_path = None
         collection = journal_proc.collection
         journal_acron = journal_proc.acron
         collection_acron = collection.acron
@@ -747,7 +752,7 @@ def import_journal_acron_id_records(
             journal_acron,
             journal_acron + ".id",
         )
-        detail["source_path"] = source_path
+
         journal_id_file = JournalAcronIdFile.create_or_update(
             user=user,
             collection=collection,
@@ -755,12 +760,10 @@ def import_journal_acron_id_records(
             source_path=source_path,
             force_update=force_update,
         )
-        journal_id_file_data = journal_id_file.data
-        detail.update(journal_id_file_data)
-        
-        id_file_record_need_to_be_updated = journal_id_file_data.get("id_file_record_need_to_be_updated")
-        
-        if not force_update and not id_file_record_need_to_be_updated:
+
+        if not force_update and not journal_id_file.data.get(
+            "id_file_record_need_to_be_updated"
+        ):
             raise IdFileRecordIsAlreadyUptodate(
                 _("IdFileRecord is already up-to-date with acron.id")
             )
@@ -781,47 +784,33 @@ def import_journal_acron_id_records(
             )
 
         journal_id_file_data = journal_id_file.data
-        detail.update(journal_id_file_data)
+        stats = journal_id_file_data.get("stats") or {}
 
-        issue_pids = IdFileRecord.objects.filter(
-            item_type="article", todo=True, parent=journal_id_file,
-        ).annotate(
-            pid_sliced=Substr("item_pid", 2, Length("item_pid") - 6)
-        ).values_list("pid_sliced", flat=True).distinct()
+        issue_pids = journal_id_file_data.get("issue_pids") or []
 
-        journal_proc.issueproc_set.all().filter(
-            pid__in=issue_pids,
-        ).exclude(
-            docs_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
-        ).update(
-            docs_status=tracker_choices.PROGRESS_STATUS_REPROC,
-            updated_by=user,
+        issue_proc_id_list = list(
+            journal_proc.issueproc_set.filter(pid__in=issue_pids).values_list("id", flat=True)
         )
-        detail["stats"]["total_issueproc_docs_status_to_process"] = journal_proc.issueproc_set.all().filter(
-            docs_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
-        ).count()
 
-        article_proc_model.objects.filter(
-            issue_proc__pid__in=issue_pids
-        ).exclude(
-            migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
-        ).update(
-            migration_status=tracker_choices.PROGRESS_STATUS_REPROC,
-            updated_by=user,
-        )
-        detail["stats"]["total_articleproc_migration_status_to_process"] = article_proc_model.objects.filter(
-            migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO
-        ).count()
-
-    except FileNotFoundError as e:
-        detail["message"] = f"File not found: {source_path}"
+    except FileNotFoundError:
+        message = f"File not found: {source_path}"
     except IdFileRecordIsAlreadyUptodate as e:
-        detail["message"] = str(e)
-    except Exception as e:
-        detail["traceback"] = traceback.format_exc()
+        message = str(e)
+    except Exception:
+        tb = traceback.format_exc()
 
-    detail["exceptions"] = exceptions
-
+    detail = {
+        "params": params,
+        "source_path": source_path,
+        "journal_id_file_data": journal_id_file_data,
+        "stats": stats,
+        "issue_proc_id_list": issue_proc_id_list,
+        "exceptions": exceptions,
+    }
+    if message:
+        detail["message"] = message
+    if tb:
+        detail["traceback"] = tb
     return detail
 
 
