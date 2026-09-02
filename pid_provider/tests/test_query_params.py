@@ -23,6 +23,7 @@ ATENÇÃO: ajuste o caminho de import abaixo (`pid_provider.query_params`)
 para o módulo real onde essas classes/funções estão definidas no projeto,
 caso seja diferente.
 """
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
@@ -34,6 +35,7 @@ from pid_provider.query_params import (
     compare,
     compare_items,
     compare_lists,
+    fix_xml_with_pre_data,
     get_score,
     zero_to_none,
 )
@@ -46,6 +48,7 @@ def make_xml_adapter(
     aop_pid=None,
     pkg_name=None,
     sps_pkg_name=None,
+    pkg_name_variations=None,
     deprecated_sps_pkg_name_list=None,
     order=None,
     article_titles=None,
@@ -82,7 +85,10 @@ def make_xml_adapter(
     # configurado explicitamente aqui, senão vira um MagicMock não
     # configurado (nunca None nem o valor esperado).
     adapter.z_partial_body = (data or {}).get("z_partial_body")
-    adapter.xml_with_pre.deprecated_sps_pkg_name_list = deprecated_sps_pkg_name_list or []
+    adapter.xml_with_pre.pkg_name_variations = pkg_name_variations or []
+    adapter.xml_with_pre.deprecated_sps_pkg_name_list = (
+        deprecated_sps_pkg_name_list or []
+    )
     adapter.xml_with_pre.body_fragment_fingerprint = body_fragment_fingerprint
     adapter.xml_with_pre.body_fingerprint = body_fingerprint
     # QueryBuilderPidProviderXML.__init__ lê xml_with_pre.readable_data
@@ -98,6 +104,28 @@ def make_xml_adapter(
         "body_fragment": body_fragment,
     }
     return adapter
+
+
+class FixXMLWithPreDataTests(SimpleTestCase):
+    def test_adds_sorted_pkg_names_without_falsy_values(self):
+        xml_with_pre = SimpleNamespace(
+            data={"v3": "pid-v3"},
+            pkg_name_variations={"pkg-b", None, "", "pkg-a"},
+        )
+
+        result = fix_xml_with_pre_data(xml_with_pre)
+
+        self.assertEqual(
+            result,
+            {"v3": "pid-v3", "pkg_names": ["pkg-a", "pkg-b"]},
+        )
+
+    def test_keeps_data_when_pkg_name_variations_is_unavailable(self):
+        xml_with_pre = SimpleNamespace(data={"v3": "pid-v3"})
+
+        result = fix_xml_with_pre_data(xml_with_pre)
+
+        self.assertEqual(result, {"v3": "pid-v3"})
 
 
 class ValidateInputDataTests(SimpleTestCase):
@@ -188,14 +216,31 @@ class ValidateInputDataTests(SimpleTestCase):
 
 class PkgNameListTests(SimpleTestCase):
 
-    def test_combines_all_sources_and_drops_falsy(self):
+    def test_uses_pkg_name_variations_and_drops_falsy(self):
+        adapter = make_xml_adapter(
+            data={},
+            pkg_name="pkg-a",
+            sps_pkg_name="pkg-b",
+            pkg_name_variations=["pkg-c", "pkg-d", "", None, "pkg-a"],
+            deprecated_sps_pkg_name_list=["not-used"],
+        )
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        self.assertEqual(
+            qbuilder.pkg_name_list,
+            {"pkg-a", "pkg-b", "pkg-c", "pkg-d"},
+        )
+
+    def test_uses_deprecated_names_when_variations_are_unavailable(self):
         adapter = make_xml_adapter(
             data={},
             pkg_name="pkg-a",
             sps_pkg_name="pkg-b",
             deprecated_sps_pkg_name_list=["pkg-c", "", None, "pkg-a"],
         )
+        del adapter.xml_with_pre.pkg_name_variations
+
         qbuilder = QueryBuilderPidProviderXML(adapter)
+
         self.assertEqual(qbuilder.pkg_name_list, {"pkg-a", "pkg-b", "pkg-c"})
 
     def test_empty_when_no_names_available(self):
