@@ -1,10 +1,17 @@
-from functools import cached_property
-
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from core.utils.similarity import how_similar
 from pid_provider import exceptions
+
+
+def fix_xml_with_pre_data(xml_with_pre):
+    data = xml_with_pre.data
+    try:
+        data["pkg_names"] = sorted(xml_with_pre.pkg_name_variations)
+    except AttributeError:
+        pass
+    return data
 
 
 def fix_get_data_to_compare(xml_adapter):
