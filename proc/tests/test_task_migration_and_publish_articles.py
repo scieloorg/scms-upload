@@ -115,7 +115,7 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
 
     @patch("proc.tasks.get_total_status_data")
     @patch("proc.tasks.task_migrate_and_publish_articles_by_issue")
-    @patch("proc.tasks.task_exclude_invalid_issue_articles")
+    @patch("proc.tasks.task_fix_issue_articles")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.migration_controller")
     @patch("proc.tasks.fix_publication_status")
@@ -213,7 +213,7 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
 
     @patch("proc.tasks.get_total_status_data")
     @patch("proc.tasks.task_migrate_and_publish_articles_by_issue")
-    @patch("proc.tasks.task_exclude_invalid_issue_articles")
+    @patch("proc.tasks.task_fix_issue_articles")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.migration_controller")
     @patch("proc.tasks.fix_publication_status")
@@ -242,20 +242,21 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
             user_id=None,
         )
 
+        common_kwargs = dict(
+            username="user1",
+            user_id=None,
+            public_api_data={"public": True},
+            delete_article_which_is_duplicated=False,
+            delete_article_which_sps_pkg_is_missing=False,
+            delete_sps_pkg_which_is_duplicated=False,
+            delete_sps_pkg_which_ppx_is_missing=False,
+            delete_article_procs_which_sps_pkg_is_missing=False,
+            delete_article_procs_which_is_duplicated=False,
+        )
         mock_exclude_invalid.assert_has_calls(
             [
-                call(
-                    issue_proc_id=10,
-                    username="user1",
-                    user_id=None,
-                    public_api_data={"public": True},
-                ),
-                call(
-                    issue_proc_id=20,
-                    username="user1",
-                    user_id=None,
-                    public_api_data={"public": True},
-                ),
+                call(issue_proc_id=10, **common_kwargs),
+                call(issue_proc_id=20, **common_kwargs),
             ]
         )
         calls = mock_by_issue.delay.call_args_list
