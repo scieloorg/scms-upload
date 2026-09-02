@@ -93,17 +93,9 @@ def ensure_issue_data_is_updated(user, issue, force_update=False):
     return checker.ensure_proc_exists(force_update)
 
 
-def get_total_status_data(total_status_data, journal_proc_id, issue_proc_id=None):
-    journal_total_status = JournalProc.get_total_status(journal_proc_id)
-    issue_total_status = IssueProc.get_total_status(journal_proc_id, "article", issue_proc_id)
-    article_total_status = ArticleProc.get_total_status(journal_proc_id, issue_proc_id)
-    
-    total_status_data_updated = {}
-    if journal_total_status != total_status_data.get("journal"):
-        total_status_data_updated["journal"] = journal_total_status
-    if issue_total_status != total_status_data.get("issue"):
-        total_status_data_updated["issue"] = issue_total_status
-    if article_total_status != total_status_data.get("article"):
-        total_status_data_updated["article"] = article_total_status
-
-    return total_status_data_updated
+def get_total_status_data(journal_proc_id, issue_proc_id=None):
+    return {
+        "journal": JournalProc.get_total_status(journal_proc_id),
+        "issue": IssueProc.get_total_status(journal_proc_id, "article", issue_proc_id),
+        "article": ArticleProc.get_total_status(journal_proc_id, issue_proc_id),
+    }

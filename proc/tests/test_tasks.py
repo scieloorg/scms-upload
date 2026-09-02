@@ -289,14 +289,14 @@ class TaskExecutionUpdateTotalStatusTest(TestCase):
         }
         task_exec.update_total_status("Start", issue_proc_id=7)
 
-        mock_get_total_status_data.assert_called_once_with({}, 42, 7)
+        mock_get_total_status_data.assert_called_once_with(42, 7)
         self.assertEqual(
             task_exec.status_changes["journal"],
-            [{"label": "Start", "total_status": ["TODO"]}],
+            [{"events": ["Start"], "total_status": ["TODO"]}],
         )
         self.assertEqual(
             task_exec.status_changes["issue"],
-            [{"label": "Start", "total_status": ["DONE"]}],
+            [{"events": ["Start"], "total_status": ["DONE"]}],
         )
 
         mock_get_total_status_data.return_value = {
@@ -305,13 +305,17 @@ class TaskExecutionUpdateTotalStatusTest(TestCase):
         }
         task_exec.update_total_status("Next", issue_proc_id=7)
 
-        mock_get_total_status_data.assert_called_with(
-            {"journal": ["TODO"], "issue": ["DONE"]}, 42, 7
-        )
+        mock_get_total_status_data.assert_called_with(42, 7)
         self.assertEqual(len(task_exec.status_changes["journal"]), 2)
         self.assertEqual(
             task_exec.status_changes["journal"][1],
-            {"label": "Next", "total_status": ["DONE"]},
+            {"events": ["Next"], "total_status": ["DONE"]},
+        )
+        # "issue" total_status did not change -> appended to the same entry
+        self.assertEqual(len(task_exec.status_changes["issue"]), 1)
+        self.assertEqual(
+            task_exec.status_changes["issue"][0],
+            {"events": ["Start", "Next"], "total_status": ["DONE"]},
         )
 
     @patch("proc.tasks.get_total_status_data")
@@ -327,7 +331,7 @@ class TaskExecutionUpdateTotalStatusTest(TestCase):
 
         task_exec.update_total_status("Label")
 
-        mock_get_total_status_data.assert_called_once_with({"journal": []}, None, None)
+        mock_get_total_status_data.assert_called_once_with(None, None)
 
 
 class GetUserTest(TestCase):
