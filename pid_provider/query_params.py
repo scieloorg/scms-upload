@@ -8,7 +8,9 @@ from pid_provider import exceptions
 def fix_xml_with_pre_data(xml_with_pre):
     data = xml_with_pre.data
     try:
-        data["pkg_names"] = sorted(xml_with_pre.pkg_name_variations)
+        data["pkg_names"] = sorted(
+            item for item in (xml_with_pre.pkg_name_variations or ()) if item
+        )
     except AttributeError:
         pass
     return data
@@ -229,7 +231,13 @@ class QueryBuilderPidProviderXML:
             pkg_names.add(self.xml_adapter.pkg_name)
         if self.xml_adapter.sps_pkg_name:
             pkg_names.add(self.xml_adapter.sps_pkg_name)
-        pkg_names.update(self.xml_adapter.xml_with_pre.deprecated_sps_pkg_name_list)
+        try:
+            variations = self.xml_adapter.xml_with_pre.pkg_name_variations
+        except AttributeError:
+            variations = (
+                self.xml_adapter.xml_with_pre.deprecated_sps_pkg_name_list
+            )
+        pkg_names.update(variations or ())
         return set(item for item in pkg_names if item)
     
     def validate_input_data(self):
