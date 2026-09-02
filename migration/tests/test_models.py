@@ -1,7 +1,11 @@
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-from migration.models import MigratedData
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+
+from collection.models import Collection
+from migration.models import IdFileRecord, JournalAcronIdFile, MigratedData
 
 
 class MigratedDataCreateOrUpdateTestCase(unittest.TestCase):
@@ -77,3 +81,47 @@ class MigratedDataCreateOrUpdateTestCase(unittest.TestCase):
         mock_exclude_qs.delete.assert_called_once()
         # Verify the most recent was kept and saved
         mock_recent.save.assert_called_once()
+
+
+class JournalAcronIdFileDataTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="migration-user")
+        self.collection = Collection.objects.create(
+            creator=self.user,
+            acron="scl",
+            name="SciELO",
+        )
+        self.journal_id_file = JournalAcronIdFile.objects.create(
+            creator=self.user,
+            collection=self.collection,
+            journal_acron="rsp",
+            source_path="/bases-work/rsp/rsp.id",
+        )
+
+    def create_article_record(self, item_pid, todo):
+        return IdFileRecord.objects.create(
+            creator=self.user,
+            parent=self.journal_id_file,
+            item_type="article",
+            item_pid=item_pid,
+            data={},
+            todo=todo,
+        )
+
+    def test_separates_all_issue_pids_from_pending_issue_pids(self):
+        self.create_article_record("S0034-89102004000200001", todo=True)
+        self.create_article_record("S0034-89102004000300001", todo=False)
+
+        data = self.journal_id_file.data
+
+        self.assertEqual(
+            data["issue_pids"],
+            ["0034-891020040002", "0034-891020040003"],
+        )
+        self.assertEqual(
+            data["pending_issue_pids"],
+            ["0034-891020040002"],
+        )
+        self.assertEqual(data["stats"]["total_id_file_records"], 2)
+        self.assertEqual(data["stats"]["total_id_file_records_to_migrate"], 1)
+        self.assertEqual(data["stats"]["total_issues"], 2)
