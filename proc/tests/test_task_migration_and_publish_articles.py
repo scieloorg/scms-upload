@@ -37,7 +37,7 @@ class TaskMigrateAndPublishArticlesTest(TestCase):
         mock_tracker_instance = MagicMock()
         mock_task_tracker.create.return_value = mock_tracker_instance
         mock_article_proc.get_journal_and_issue_proc_ids.return_value = {
-            (1, "abc"): {10, 11},
+            (1, "abc"): {"issue_proc_id_list": {10, 11}, "issue_folder": None},
         }
 
         task_migrate_and_publish_articles(
@@ -97,7 +97,7 @@ class TaskMigrateAndPublishArticlesTest(TestCase):
     ):
         # journal_acron do dict agrupado prevalece sobre o parâmetro de filtro
         mock_article_proc.get_journal_and_issue_proc_ids.return_value = {
-            (2, "xyz"): {30},
+            (2, "xyz"): {"issue_proc_id_list": {30}, "issue_folder": None},
         }
 
         task_migrate_and_publish_articles(
@@ -115,7 +115,7 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
 
     @patch("proc.tasks.get_total_status_data")
     @patch("proc.tasks.task_migrate_and_publish_articles_by_issue")
-    @patch("proc.tasks.task_exclude_invalid_issue_articles")
+    @patch("proc.tasks.task_fix_issue_articles")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.migration_controller")
     @patch("proc.tasks.fix_publication_status")
@@ -213,7 +213,7 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
 
     @patch("proc.tasks.get_total_status_data")
     @patch("proc.tasks.task_migrate_and_publish_articles_by_issue")
-    @patch("proc.tasks.task_exclude_invalid_issue_articles")
+    @patch("proc.tasks.task_fix_issue_articles")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.migration_controller")
     @patch("proc.tasks.fix_publication_status")
@@ -242,20 +242,21 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
             user_id=None,
         )
 
+        common_kwargs = dict(
+            username="user1",
+            user_id=None,
+            public_api_data={"public": True},
+            delete_article_which_is_duplicated=False,
+            delete_article_which_sps_pkg_is_missing=False,
+            delete_sps_pkg_which_is_duplicated=False,
+            delete_sps_pkg_which_ppx_is_missing=False,
+            delete_article_procs_which_sps_pkg_is_missing=False,
+            delete_article_procs_which_is_duplicated=False,
+        )
         mock_exclude_invalid.assert_has_calls(
             [
-                call(
-                    issue_proc_id=10,
-                    username="user1",
-                    user_id=None,
-                    public_api_data={"public": True},
-                ),
-                call(
-                    issue_proc_id=20,
-                    username="user1",
-                    user_id=None,
-                    public_api_data={"public": True},
-                ),
+                call(issue_proc_id=10, **common_kwargs),
+                call(issue_proc_id=20, **common_kwargs),
             ]
         )
         calls = mock_by_issue.delay.call_args_list
@@ -452,6 +453,8 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_article_proc.objects.select_related.return_value.filter.return_value = (
             mock_articles
         )
+        mock_articles.exists.return_value = True
+        mock_articles.first.return_value.issue_proc = mock_issue
         ids_qs = make_id_queryset([101, 102])
         mock_filtered = MagicMock()
         mock_filtered.values_list.return_value = ids_qs
@@ -464,7 +467,11 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_website_config.objects.filter.return_value = [website]
 
         task_publish_issue_articles(
-            issue_proc_id=5, user_id=None, username=None, force_update=False
+            issue_proc_id=5,
+            user_id=None,
+            username=None,
+            articleprocs_id_list=[101, 102],
+            force_update=False,
         )
 
         mock_fix_pub_status.assert_called_once_with(mock_issue.collection)
@@ -546,6 +553,8 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_article_proc.objects.select_related.return_value.filter.return_value = (
             mock_articles
         )
+        mock_articles.exists.return_value = True
+        mock_articles.first.return_value.issue_proc = MagicMock()
         ids_qs = make_id_queryset([101, 102])
         mock_filtered = MagicMock()
         mock_filtered.values_list.return_value = ids_qs
@@ -556,7 +565,7 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_website_config.objects.filter.return_value = [website]
         mock_publish_article.side_effect = [RuntimeError("fail1"), None]
 
-        task_publish_issue_articles(issue_proc_id=5)
+        task_publish_issue_articles(issue_proc_id=5, articleprocs_id_list=[101, 102])
 
         self.assertEqual(mock_publish_article.call_count, 2)
         mock_task_sync_issue.delay.assert_called_once()
@@ -589,6 +598,8 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_article_proc.objects.select_related.return_value.filter.return_value = (
             mock_articles
         )
+        mock_articles.exists.return_value = True
+        mock_articles.first.return_value.issue_proc = MagicMock()
         mock_filtered = MagicMock()
         mock_filtered.values_list.side_effect = [
             make_id_queryset([101]),
@@ -602,7 +613,7 @@ class TaskPublishIssueArticlesTest(TestCase):
         public_website.get_data.return_value = {"kind": "public"}
         mock_website_config.objects.filter.return_value = [qa_website, public_website]
 
-        task_publish_issue_articles(issue_proc_id=5)
+        task_publish_issue_articles(issue_proc_id=5, articleprocs_id_list=[101, 201])
 
         self.assertEqual(mock_task_sync_issue.delay.call_count, 2)
         website_kinds = [
