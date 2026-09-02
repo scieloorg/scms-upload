@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 
 from django.core.files.base import ContentFile
 from django.db import DataError, IntegrityError, models
-from django.db.models.functions import Substr
 from django.db.models import Q
+from django.db.models.functions import Length, Substr
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -873,6 +873,9 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
     @property
     def data(self):
         qs = self.id_file_records.filter(item_type="article")
+        issue_records = qs.annotate(
+            issue_pid=Substr("item_pid", 2, Length("item_pid") - 6)
+        )
 
         journal_last_updated = self.updated.isoformat()
         total = qs.count()
@@ -884,7 +887,12 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             record_last_updated = journal_last_updated
 
         issue_pids = list(
-            qs.annotate(issue_pid=Substr("item_pid", 2, 13))
+            issue_records.values_list("issue_pid", flat=True)
+            .distinct()
+            .order_by("issue_pid")
+        )
+        pending_issue_pids = list(
+            issue_records.filter(todo=True)
             .values_list("issue_pid", flat=True)
             .distinct()
             .order_by("issue_pid")
@@ -899,6 +907,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             "id_file_record_last_updated": record_last_updated,
             "id_file_record_need_to_be_updated": need_to_be_updated,
             "issue_pids": issue_pids,
+            "pending_issue_pids": pending_issue_pids,
             "stats": {
                 "total_id_file_records": total,
                 "total_id_file_records_to_migrate": total_to_migrate,
