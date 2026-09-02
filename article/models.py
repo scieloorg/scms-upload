@@ -1253,11 +1253,11 @@ class ArticleCollection(CommonControlField):
             enabled=True,
         ):
             purpose = ws_config.purpose  # "PUBLIC" ou "QA"
-            keep = self.article.pages.filter(
+            keep = list(self.article.pages.filter(
                 purpose=purpose,
                 url__startswith=ws_config.url
-            ).values_list("id", flat=True)
-            self.article.pages.filter(purpose=purpose).exclude(id__in=keep).clean()
+            ).values_list("id", flat=True))
+            self.article.pages.filter(purpose=purpose).exclude(id__in=keep).delete()
 
             for item in article.get_webpage_items(ws_config.url, purpose):
                 page = ArticleWebPage.get_or_create_from_item(
@@ -1269,6 +1269,11 @@ class ArticleCollection(CommonControlField):
         classic_ws = self.classic_website
         if classic_ws and classic_ws.url:
             purpose = choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC
+            keep = list(self.article.pages.filter(
+                purpose=purpose,
+                url__startswith=classic_ws.url
+            ).values_list("id", flat=True))
+            self.article.pages.filter(purpose=purpose).exclude(id__in=keep).delete()
             for item in article.get_html_urls(
                 classic_ws.url, purpose
             ):
