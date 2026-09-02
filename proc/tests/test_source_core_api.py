@@ -388,14 +388,54 @@ class TestFetchAndProcessIssues(TestCase):
             {"volume": "10", "number": "1", "year": "2024"},
         )
 
-    @patch("proc.source_core_api.Issue.get_or_create")
+    @patch("proc.source_core_api.Issue.create_or_update")
     @patch("proc.source_core_api.JournalProc.objects.filter")
     def test_process_issue_result_creates_issue_and_issue_proc(
         self, mock_journal_proc_filter, mock_issue_get_or_create
     ):
+        # season/month presentes no resultado da API: dispara o save()
+        # otimizado (issue.save() só é chamado quando há campo extra a
+        # persistir além do que Issue.create_or_update já gravou).
         mock_issue = MagicMock()
         mock_issue_get_or_create.return_value = mock_issue
-        
+
+        mock_journal_proc = MagicMock()
+        mock_journal_proc.collection = MagicMock()
+        mock_journal_proc_filter.return_value = [mock_journal_proc]
+
+        result_data = {
+            "volume": "10",
+            "number": "1",
+            "supplement": None,
+            "year": 2024,
+            "order": 1,
+            "issue_pid_suffix": "v10n1",
+            "season": "Jan-Mar",
+            "month": "1",
+        }
+
+        with patch("proc.source_core_api.IssueProc.objects.get") as mock_issue_proc_get:
+            mock_issue_proc_get.side_effect = IssueProc.DoesNotExist
+            with patch("proc.source_core_api.IssueProc.create_from_journal_proc_and_issue") as mock_create_issue_proc:
+                process_issue_result(self.user, self.journal, result_data)
+
+                self.assertEqual(mock_issue.season, "Jan-Mar")
+                self.assertEqual(mock_issue.month, "1")
+                mock_issue.save.assert_called_once()
+                mock_create_issue_proc.assert_called_once_with(
+                    self.user, mock_journal_proc, mock_issue
+                )
+
+    @patch("proc.source_core_api.Issue.create_or_update")
+    @patch("proc.source_core_api.JournalProc.objects.filter")
+    def test_process_issue_result_skips_save_when_no_season_or_month(
+        self, mock_journal_proc_filter, mock_issue_get_or_create
+    ):
+        # sem season/month no resultado da API, issue.save() é evitado
+        # (Issue.create_or_update já persistiu os demais campos).
+        mock_issue = MagicMock()
+        mock_issue_get_or_create.return_value = mock_issue
+
         mock_journal_proc = MagicMock()
         mock_journal_proc.collection = MagicMock()
         mock_journal_proc_filter.return_value = [mock_journal_proc]
@@ -414,7 +454,7 @@ class TestFetchAndProcessIssues(TestCase):
             with patch("proc.source_core_api.IssueProc.create_from_journal_proc_and_issue") as mock_create_issue_proc:
                 process_issue_result(self.user, self.journal, result_data)
 
-                mock_issue.save.assert_called_once()
+                mock_issue.save.assert_not_called()
                 mock_create_issue_proc.assert_called_once_with(
                     self.user, mock_journal_proc, mock_issue
                 )
