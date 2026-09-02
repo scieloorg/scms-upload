@@ -336,6 +336,11 @@ LOGGING = {
             "level": "DEBUG",
             "propagate": False,
         },
+        "django_tasks": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
     "root": {"level": "INFO", "handlers": ["console"]},
 }
