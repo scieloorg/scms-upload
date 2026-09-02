@@ -351,18 +351,64 @@ class CreateOrUpdateIssueTests(unittest.TestCase):
         journal_proc.journal = MagicMock()
         JournalProcCls.get.return_value = journal_proc
 
+        # sem Issue ainda vinculado ao IssueProc: força o caminho de criação
+        # (Issue.create_or_update), não o de reaproveitamento (issue.update).
+        issue_proc.issue = None
+
         fake_issue = MagicMock()
-        mock_issue_cls.get_or_create.return_value = fake_issue
+        mock_issue_cls.create_or_update.return_value = fake_issue
 
         result = migration_controller.create_or_update_issue(
             user, issue_proc, force_update=True, JournalProc=JournalProcCls
         )
 
         self.assertIs(result, fake_issue)
-        mock_issue_cls.get_or_create.assert_called_once()
+        mock_issue_cls.create_or_update.assert_called_once()
         issue_proc.update.assert_called_once()
         mock_toc.create_or_update.assert_called_once_with(user, fake_issue, ordered=True)
         mock_toc_section.create_or_update.assert_called_once()
+
+    @patch("migration.controller.classic_ws")
+    @patch("migration.controller.Issue")
+    @patch("migration.controller.TOC")
+    @patch("migration.controller.Language")
+    @patch("migration.controller.TocSection")
+    def test_reaproveita_issue_ja_vinculado_ao_issue_proc(
+        self, mock_toc_section, mock_language, mock_toc, mock_issue_cls, mock_classic_ws
+    ):
+        # issue_proc.issue já existe (remigração): reaproveita o Issue via
+        # issue.update(**kwargs) em vez de Issue.create_or_update, evitando
+        # duplicidade (#1024).
+        user = MagicMock()
+        issue_proc = MagicMock()
+        JournalProcCls = MagicMock()
+
+        fake_classic_issue = MagicMock()
+        fake_classic_issue.journal = "S0000-00002020000100001"
+        fake_classic_issue.publication_year = "2020"
+        fake_classic_issue.volume = "10"
+        fake_classic_issue.number = "1"
+        fake_classic_issue.supplement = None
+        fake_classic_issue.total_documents = 5
+        fake_classic_issue.order = "00012020000100001"
+        fake_classic_issue.issue_label = "v10n1"
+        fake_classic_issue.sections_by_code = {}
+        mock_classic_ws.Issue.return_value = fake_classic_issue
+
+        journal_proc = MagicMock()
+        journal_proc.journal = MagicMock()
+        JournalProcCls.get.return_value = journal_proc
+
+        existing_issue = MagicMock()
+        issue_proc.issue = existing_issue
+
+        result = migration_controller.create_or_update_issue(
+            user, issue_proc, force_update=True, JournalProc=JournalProcCls
+        )
+
+        self.assertIs(result, existing_issue)
+        existing_issue.update.assert_called_once()
+        mock_issue_cls.create_or_update.assert_not_called()
 
     @patch("migration.controller.classic_ws")
     def test_journal_proc_inexistente_levanta_valueerror(self, mock_classic_ws):
