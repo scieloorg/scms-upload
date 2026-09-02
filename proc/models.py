@@ -1648,7 +1648,6 @@ class IssueProc(BaseProc, ClusterableModel):
             self.files_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
-            ArticleProc.mark_for_reprocessing(self)
             migration_result = migrate_issue_files_function(
                 user,
                 collection=self.collection,
@@ -1842,28 +1841,21 @@ class IssueProc(BaseProc, ClusterableModel):
                 issue_proc=self,
             )
             total_articleprocs = article_procs.count()
-            total_article_procs_to_process = article_procs.filter(
-                migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
-            ).count()
+
             input_data["total_articleprocs"] = total_articleprocs
-            input_data["total_articleproc_migration_status_to_process"] = total_article_procs_to_process
             input_data["force_update"] = force_update
             input_data["docs_status"] = self.docs_status
 
             force_update = (
                 force_update or
-                self.docs_status not in tracker_choices.PROGRESS_STATUS_REGULAR_TODO or
-                bool(total_article_procs_to_process) or
-                not total_articleprocs
+                not total_articleprocs or
+                self.docs_status in tracker_choices.PROGRESS_STATUS_REGULAR_TODO
             )
 
             if not force_update:
                 # obtém somente os registros por fazer (todo=True)
                 id_file_records = id_file_records.filter(todo=True)
-                input_data["total_id_file_records_to_migrate"] = id_file_records.count()
-
-            if input_data["total_id_file_records_to_migrate"] == 0:
-                raise NoDocumentRecordsToMigrateError("No document records to migrate")
+            input_data["total_id_file_records_to_migrate"] = id_file_records.count()
 
             journal_data = self.journal_proc.migrated_data.data
             issue_data = self.migrated_data.data
@@ -1897,10 +1889,6 @@ class IssueProc(BaseProc, ClusterableModel):
 
             new_status = self.get_new_docs_status(total_id_file_records)
 
-        except NoDocumentRecordsToMigrateError:
-            new_status = self.get_new_docs_status(total_id_file_records)
-            exception = traceback.format_exc()
-
         except Exception:
             exception = traceback.format_exc()
             new_status = tracker_choices.PROGRESS_STATUS_BLOCKED
@@ -1918,16 +1906,15 @@ class IssueProc(BaseProc, ClusterableModel):
             "total": total,
         }
 
-    def get_new_docs_status(self, total_id_file_records=None, total_articleprocs=None):
+    def get_new_docs_status(self, total_id_file_records=None):
         if total_id_file_records is None:
             total_id_file_records = IdFileRecord.document_records_to_migrate(
                 collection=self.collection,
                 issue_pid=self.pid,
             ).count()
-        if total_articleprocs is None:
-            total_articleprocs = ArticleProc.objects.filter(
-                issue_proc=self,
-            ).count()
+        total_articleprocs = ArticleProc.objects.filter(
+            issue_proc=self,
+        ).count()
         if total_id_file_records == 0:
             return tracker_choices.PROGRESS_STATUS_BLOCKED
         if total_articleprocs == 0:
@@ -2441,7 +2428,6 @@ class ArticleProc(BaseProc, ClusterableModel):
                 | Q(qa_ws_status__in=status_list)
                 | Q(public_ws_status__in=status_list)
             )
-
         return cls.objects.filter(
             qs_status,
             **params,
@@ -2469,7 +2455,10 @@ class ArticleProc(BaseProc, ClusterableModel):
         Returns:
             dict: Dicionário no formato:
                 {
-                    (journal_proc_id, journal_acron): {issue_proc_id1, issue_proc_id2, ...},
+                    (journal_proc_id, journal_acron): {
+                        "issue_proc_id_list": {issue_proc_id1, issue_proc_id2, ...},
+                        "issue_folder": issue_folder,
+                    },
                     ...
                 }
         """
@@ -2500,9 +2489,25 @@ class ArticleProc(BaseProc, ClusterableModel):
         items_to_process = {}
         items = list_from_issue | list_from_article
         for journal_proc_id, journal_acron, issue_proc_id in items:
-            items_to_process.setdefault((journal_proc_id, journal_acron), set()).add(
-                issue_proc_id
-            )
+            items_to_process.setdefault(
+                (journal_proc_id, journal_acron),
+                {"issue_proc_id_list": set(), "issue_folder": issue_folder},
+            )["issue_proc_id_list"].add(issue_proc_id)
+
+        if not items_to_process:
+            # Nenhum ArticleProc/IssueProc pendente encontrado, mas os
+            # periódicos filtrados ainda devem ser processados (ex.: para
+            # importar/atualizar o acron.id). Retorna as chaves dos
+            # periódicos com conjunto de issue_proc_id vazio.
+            for journal_proc_id, journal_acron in JournalProc.select_items(
+                collection_acron_list=collection_acron_list,
+                journal_acron_list=journal_acron_list,
+                has_issue_proc=True,
+            ).values_list("id", "acron"):
+                items_to_process[(journal_proc_id, journal_acron)] = {
+                    "issue_proc_id_list": set(),
+                    "issue_folder": issue_folder,
+                }
         return items_to_process
 
     @classmethod
@@ -2758,6 +2763,8 @@ class ArticleProc(BaseProc, ClusterableModel):
             sps_pkg__ppx_id__isnull=True,
             **params,
         ).values_list("sps_pkg_id", flat=True)
+        if not sps_pkg_id_list:
+            return {}
         return SPSPkg.complete_ppx(
             user,
             sps_pkg_id_list=sps_pkg_id_list,
@@ -2952,21 +2959,37 @@ class ArticleProc(BaseProc, ClusterableModel):
             self.updated_by = user
             self.save()
 
+    # @classmethod
+    # def get_total_status(cls, journal_proc_id, issue_proc_id=None):
+    #     params = {}
+    #     if issue_proc_id:
+    #         params["issue_proc_id"] = issue_proc_id
+    #     items = []
+    #     for item in cls.objects.filter(issue_proc__journal_proc_id=journal_proc_id, **params).values(
+    #         "xml_status",
+    #         "sps_pkg_status",
+    #         "migration_status",
+    #         "qa_ws_status",
+    #         "public_ws_status"
+    #     ).annotate(
+    #         total=Count("id"),
+    #     ).order_by("-total"):
+    #         total = item.pop("total")
+    #         items.append({"total": total, "status": item})
+    #     return items
     @classmethod
     def get_total_status(cls, journal_proc_id, issue_proc_id=None):
         params = {}
         if issue_proc_id:
             params["issue_proc_id"] = issue_proc_id
-        items = []
-        for item in cls.objects.filter(issue_proc__journal_proc_id=journal_proc_id, **params).values(
-            "xml_status",
-            "sps_pkg_status",
-            "migration_status",
-            "qa_ws_status",
-            "public_ws_status"
-        ).annotate(
-            total=Count("id"),
-        ).order_by("-total"):
-            total = item.pop("total")
-            items.append({"total": total, "status": item})
-        return items
+        return list(
+            cls.objects.filter(issue_proc__journal_proc_id=journal_proc_id, **params).values(
+                "xml_status",
+                "sps_pkg_status",
+                "migration_status",
+                "qa_ws_status",
+                "public_ws_status"
+            ).annotate(
+                total=Count("id"),
+            )
+        )
