@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.db.models import Q
-from django.db.models.functions import Substr, Length
 from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
@@ -35,11 +34,6 @@ from location.models import Location
 from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile, ClassicWebsiteConfiguration
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
-
-
-
-class IdFileRecordIsAlreadyUptodate(Exception):
-    pass
 
 def get_classic_website_config(collection_acron):
     return ClassicWebsiteConfiguration.objects.get(collection__acron=collection_acron)
@@ -761,32 +755,30 @@ def import_journal_acron_id_records(
             force_update=force_update,
         )
 
-        if not force_update and not journal_id_file.data.get(
+        if force_update or journal_id_file.data.get(
             "id_file_record_need_to_be_updated"
         ):
-            raise IdFileRecordIsAlreadyUptodate(
-                _("IdFileRecord is already up-to-date with acron.id")
-            )
+            for item in get_bases_work_acron_id_file_records(
+                source_path,
+                classic_website,
+            ):
+                if item.get("exception"):
+                    exceptions.append(item.get("exception"))
+                    continue
 
-        for item in get_bases_work_acron_id_file_records(
-            source_path,
-            classic_website,
-        ):
-            if item.get("exception"):
-                exceptions.append(item.get("exception"))
-                continue
-
-            item["force_update"] = force_update
-            IdFileRecord.create_or_update(
-                user,
-                journal_id_file,
-                **item,
-            )
+                item["force_update"] = force_update
+                IdFileRecord.create_or_update(
+                    user,
+                    journal_id_file,
+                    **item,
+                )
+        else:
+            message = str(_("IdFileRecord is already up-to-date with acron.id"))
 
         journal_id_file_data = journal_id_file.data
         stats = journal_id_file_data.get("stats") or {}
 
-        issue_pids = journal_id_file_data.get("issue_pids") or []
+        issue_pids = journal_id_file_data.get("pending_issue_pids") or []
 
         issue_proc_id_list = list(
             journal_proc.issueproc_set.filter(pid__in=issue_pids).values_list("id", flat=True)
@@ -794,8 +786,6 @@ def import_journal_acron_id_records(
 
     except FileNotFoundError:
         message = f"File not found: {source_path}"
-    except IdFileRecordIsAlreadyUptodate as e:
-        message = str(e)
     except Exception:
         tb = traceback.format_exc()
 
