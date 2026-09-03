@@ -1674,7 +1674,10 @@ class FixPidV2(CommonControlField):
         ]
 
     def __str__(self):
-        return f"{self.pid_provider_xml.v3}"
+        if self.pid_provider_xml and self.pid_provider_xml.v3:
+            return f"{self.pid_provider_xml.v3}"
+
+        return self.correct_pid_v2 or self.incorrect_pid_v2 or "-"
 
     @staticmethod
     @profile_staticmethod
@@ -1683,7 +1686,7 @@ class FixPidV2(CommonControlField):
 
     @profile_method
     def autocomplete_label(self):
-        return f"{self.pid_provider_xml.v3}"
+        return str(self)
 
     @classmethod
     @profile_classmethod
