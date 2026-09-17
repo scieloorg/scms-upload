@@ -85,7 +85,7 @@ pick it up according to the configured schedule.
 | `username` | str | `None` | Username of the user running the task. |
 | `user_id` | int | `None` | User ID (alternative to `username`). |
 | `collection_acron` | str | `"scl"` | Collection acronym (e.g., `"scl"` for Brazil). |
-| `journal_acron` | str | required | Journal acronym used to restrict harvesting. |
+| `journal_acron` | str | `None` | Journal acronym used to restrict harvesting. When omitted, all journals in the collection are collected. |
 | `from_date` | str | `"2000-01-01"` | Start date in ISO format (`YYYY-MM-DD`). |
 | `until_date` | str | today | End date in ISO format (`YYYY-MM-DD`). |
 | `limit` | int | `100` | Number of documents per API page. |

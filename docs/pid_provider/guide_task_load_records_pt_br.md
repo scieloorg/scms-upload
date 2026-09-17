@@ -87,7 +87,7 @@ executá-la conforme o agendamento configurado.
 | `username` | str | `None` | Nome do usuário que executa a tarefa. |
 | `user_id` | int | `None` | ID do usuário (alternativa ao `username`). |
 | `collection_acron` | str | `"scl"` | Acrônimo da coleção (ex., `"scl"` para Brasil). |
-| `journal_acron` | str | obrigatório | Acrônimo do periódico usado para restringir a coleta. |
+| `journal_acron` | str | `None` | Acrônimo do periódico usado para restringir a coleta. Se omitido, coleta todos os periódicos da coleção. |
 | `from_date` | str | `"2000-01-01"` | Data inicial no formato ISO (`YYYY-MM-DD`). |
 | `until_date` | str | hoje | Data final no formato ISO (`YYYY-MM-DD`). |
 | `limit` | int | `100` | Número de documentos por página da API. |
@@ -140,7 +140,7 @@ Os problemas são categorizados por nível de criticidade:
 | 🔴 | O worker do Celery não está em execução | Inicie o worker do Celery: `celery -A config worker -l info`. Sem um worker em execução, nenhuma tarefa será processada. |
 | 🔴 | O agendador Celery Beat não está em execução | Inicie o Celery Beat: `celery -A config beat -l info`. Sem o Beat, as tarefas periódicas não serão despachadas. |
 | 🔴 | Falha na conexão com a API do OPAC (erro de rede/DNS) | Verifique se o `opac_domain` está acessível e inclui `https://`. Revise as regras de firewall e a resolução DNS. Consulte os registros de `UnexpectedEvent` para detalhes do erro. |
-| 🟡 | Nenhum registro aparece após a execução da tarefa | Verifique se `from_date` e `until_date` cobrem um intervalo com documentos publicados. Confirme `collection_acron` e o `journal_acron` obrigatório. Revise os logs do worker do Celery. |
+| 🟡 | Nenhum registro aparece após a execução da tarefa | Verifique se `from_date` e `until_date` cobrem um intervalo com documentos publicados. Confirme `collection_acron`. Revise os logs do worker do Celery. |
 | 🟡 | Os registros existem mas não são atualizados | Defina `force_update` como `true` nos kwargs para forçar o reprocessamento de registros existentes. |
 | 🟡 | Falha ao baixar XML ou PID v3 divergente | Consulte `UnexpectedEvent`; o evento registra o periódico, o PID, a URL e a etapa que falhou. |
 | 🟢 | A tarefa executa lentamente | Reduza o parâmetro `limit` para processar menos documentos por página, ou aumente `timeout` se a API do OPAC estiver lenta. Isso não afeta a correção dos dados. |
