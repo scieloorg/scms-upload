@@ -7,7 +7,8 @@ into the PidProviderXML model without creating Article records.
 ## Tasks
 
 ### 1. task_load_records_from_counter_dict
-Processes a specific journal using the OPAC harvester.
+Processes journals using the OPAC harvester. When `journal_acron` is omitted,
+it processes all journals in the collection.
 
 **Usage:**
 ```python
@@ -30,7 +31,8 @@ task_load_records_from_counter_dict.delay(
 - `username` (str, optional): Username of the user executing the task
 - `user_id` (int, optional): User ID (alternative to username)
 - `collection_acron` (str, optional): Collection acronym. Default: "scl" (Brazil)
-- `journal_acron` (str, required): Journal acronym used to restrict harvesting
+- `journal_acron` (str, optional): Journal acronym used to restrict harvesting.
+  When omitted, all journals in the collection are processed.
 - `from_date` (str, optional): Start date in ISO format (YYYY-MM-DD)
 - `until_date` (str, optional): End date in ISO format (YYYY-MM-DD)
 - `limit` (int, optional): Number of documents per page

@@ -105,8 +105,9 @@ def task_load_records_from_counter_dict(
         opac_domain (str, optional): Domínio do OPAC (padrão: "www.scielo.br").
         stop (int, optional): Quantidade máxima de subtarefas disparadas.
             Se None, processa todos os documentos disponíveis.
-        journal_acron (str): Acrônimo do periódico usado para restringir
-            a coleta (ex: "rsp").
+        journal_acron (str, optional): Acrônimo do periódico usado para
+            restringir a coleta (ex: "rsp"). Se omitido, coleta todos os
+            periódicos da coleção.
 
     Side Effects:
         - Dispara task_load_record_from_xml_url para cada documento público.
@@ -115,9 +116,6 @@ def task_load_records_from_counter_dict(
     count = 0
 
     try:
-        if not journal_acron:
-            raise ValueError("journal_acron is required")
-
         # Define coleção padrão se não especificada (apenas Brasil)
         if not collection_acron:
             collection_acron = "scl"

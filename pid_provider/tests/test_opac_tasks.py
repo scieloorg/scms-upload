@@ -9,16 +9,50 @@ from pid_provider.tasks import (
 
 
 class LoadRecordsFromCounterDictTests(SimpleTestCase):
-    @patch("pid_provider.tasks.UnexpectedEvent.create")
+    @patch("pid_provider.tasks.task_load_record_from_xml_url.delay")
     @patch("pid_provider.tasks.OPACHarvester")
-    def test_requires_journal_acron(self, harvester, create_event):
-        task_load_records_from_counter_dict.run()
+    def test_dispatches_documents_from_all_journals_when_journal_acron_is_omitted(
+        self,
+        harvester_class,
+        load_record,
+    ):
+        harvester = harvester_class.return_value
+        rsp_item = {"status": True, "journal_acronym": "rsp"}
+        csp_item = {"status": True, "journal_acronym": "csp"}
+        harvester.harvest_documents.return_value = [
+            ("rsp-pid", rsp_item),
+            ("csp-pid", csp_item),
+        ]
+        harvester.format_raw.side_effect = [
+            {
+                "url": "https://www.scielo.br/j/rsp/a/rsp-pid/?format=xml",
+                "origin_date": "2026-08-01",
+                "is_public": True,
+                "item": rsp_item,
+            },
+            {
+                "url": "https://www.scielo.br/j/csp/a/csp-pid/?format=xml",
+                "origin_date": "2026-08-01",
+                "is_public": True,
+                "item": csp_item,
+            },
+        ]
 
-        harvester.assert_not_called()
-        create_event.assert_called_once()
+        task_load_records_from_counter_dict.run(collection_acron="scl")
+
+        harvester_class.assert_called_once_with(
+            domain="www.scielo.br",
+            collection_acron="scl",
+            from_date=None,
+            until_date=None,
+            limit=100,
+            timeout=5,
+            journal_acron=None,
+        )
+        self.assertEqual(load_record.call_count, 2)
         self.assertEqual(
-            create_event.call_args.kwargs["detail"]["task"],
-            "task_load_records_from_counter_dict",
+            {call.kwargs["pid_v3"] for call in load_record.call_args_list},
+            {"rsp-pid", "csp-pid"},
         )
 
     @patch("pid_provider.tasks.task_load_record_from_xml_url.delay")

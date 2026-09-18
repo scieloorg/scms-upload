@@ -87,7 +87,7 @@ la ejecutará según la programación configurada.
 | `username` | str | `None` | Nombre de usuario que ejecuta la tarea. |
 | `user_id` | int | `None` | ID de usuario (alternativa a `username`). |
 | `collection_acron` | str | `"scl"` | Acrónimo de la colección (ej., `"scl"` para Brasil). |
-| `journal_acron` | str | obligatorio | Acrónimo de la revista usado para restringir la recolección. |
+| `journal_acron` | str | `None` | Acrónimo de la revista usado para restringir la recolección. Si se omite, se recolectan todas las revistas de la colección. |
 | `from_date` | str | `"2000-01-01"` | Fecha de inicio en formato ISO (`YYYY-MM-DD`). |
 | `until_date` | str | hoy | Fecha final en formato ISO (`YYYY-MM-DD`). |
 | `limit` | int | `100` | Número de documentos por página de la API. |
