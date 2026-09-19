@@ -2814,7 +2814,12 @@ class ArticleProc(BaseProc, ClusterableModel):
 
         if delete_article_proc_which_sps_pkg_is_missing:
             # 1. Remoção por falta de sps_pkg
-            to_delete = article_procs.filter(sps_pkg_id__isnull=True)
+            # Preserva itens pendentes (TODO/REPROC): sem sps_pkg é o esperado.
+            to_delete = article_procs.filter(sps_pkg_id__isnull=True).exclude(
+                Q(migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO)
+                | Q(xml_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO)
+                | Q(sps_pkg_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO)
+            )
             if to_delete:
                 try:
                     qtd_deleted, _ignored = cls.delete_related_items(to_delete)
