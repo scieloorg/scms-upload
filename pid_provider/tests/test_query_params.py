@@ -267,14 +267,31 @@ class IdentifierQueriesTests(SimpleTestCase):
         expected = Q(v2="V2-1") | (Q(v2="AOP-1") | Q(aop_pid="AOP-1"))
         self.assertEqual(qbuilder.identifier_queries, expected)
 
-    def test_includes_pkg_names_and_main_doi(self):
+    def test_includes_main_doi(self):
         adapter = make_xml_adapter(
             data={"main_doi": "10.1234/xyz"},
             pkg_name="pkg-a",
         )
         qbuilder = QueryBuilderPidProviderXML(adapter)
-        expected = Q(pkg_name__in={"pkg-a"}) | Q(main_doi="10.1234/xyz")
+        # MUDANÇA DE CONTRATO: pkg_name não entra mais em identifier_queries
+        # -- foi extraído para pkg_name_queries (ver PkgNameQueriesTests),
+        # executado como etapa própria em select_records, separada da
+        # busca por identificadores diretos.
+        expected = Q(main_doi="10.1234/xyz")
         self.assertEqual(qbuilder.identifier_queries, expected)
+
+
+class PkgNameQueriesTests(SimpleTestCase):
+
+    def test_empty_when_no_pkg_names_available(self):
+        adapter = make_xml_adapter(data={})
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        self.assertEqual(qbuilder.pkg_name_queries, Q())
+
+    def test_uses_pkg_name_list_with_in_lookup(self):
+        adapter = make_xml_adapter(data={}, pkg_name="pkg-a")
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        self.assertEqual(qbuilder.pkg_name_queries, Q(pkg_name__in={"pkg-a"}))
 
 
 class IssnQueryTests(SimpleTestCase):
@@ -495,9 +512,16 @@ class ArticleDataQueryTests(SimpleTestCase):
 
 
 class GetArticleDataQueryTests(SimpleTestCase):
-    """Método usado em select_records (models.py)."""
+    """Método usado em select_records (models.py).
 
-    def test_issue_true_combines_article_data_issue_and_location_params(self):
+    MUDANÇA DE CONTRATO: get_article_data_query(issue, flexible) ganhou um
+    segundo eixo obrigatório, `flexible` -- False (estrito) reproduz o
+    comportamento antigo (exige article_data_query); True dispensa
+    article_data_query, casando só por fascículo/localização (ou pela
+    ausência delas, quando issue=False).
+    """
+
+    def test_issue_true_flexible_false_combines_article_data_issue_and_location_params(self):
         adapter = make_xml_adapter(
             data={
                 "z_surnames": "Silva",
@@ -512,7 +536,7 @@ class GetArticleDataQueryTests(SimpleTestCase):
             body_fragment_fingerprint=None,
         )
         qbuilder = QueryBuilderPidProviderXML(adapter)
-        result = qbuilder.get_article_data_query(issue=True)
+        result = qbuilder.get_article_data_query(issue=True, flexible=False)
         expected = (
             qbuilder.article_data_query
             & Q(**qbuilder.issue_params)
@@ -520,20 +544,55 @@ class GetArticleDataQueryTests(SimpleTestCase):
         )
         self.assertEqual(result, expected)
 
-    def test_issue_false_requires_issue_and_location_fields_null(self):
+    def test_issue_true_flexible_true_omits_article_data_query(self):
+        adapter = make_xml_adapter(
+            data={
+                "z_surnames": "Silva",
+                "pub_year": "2026",
+                "volume": "10",
+                "number": "2",
+                "suppl": None,
+                "elocation_id": "e1",
+                "fpage": "10",
+                "lpage": "20",
+            },
+            body_fragment_fingerprint=None,
+        )
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        result = qbuilder.get_article_data_query(issue=True, flexible=True)
+        expected = Q(**qbuilder.issue_params) & Q(**qbuilder.article_location_params)
+        self.assertEqual(result, expected)
+
+    def test_issue_false_flexible_false_requires_issue_and_location_fields_null(self):
         adapter = make_xml_adapter(
             data={"z_surnames": "Silva"}, body_fragment_fingerprint=None
         )
         qbuilder = QueryBuilderPidProviderXML(adapter)
-        result = qbuilder.get_article_data_query(issue=False)
-        expected = qbuilder.article_data_query & Q(
+        result = qbuilder.get_article_data_query(issue=False, flexible=False)
+        expected = Q(
             volume__isnull=True,
             number__isnull=True,
             suppl__isnull=True,
             elocation_id__isnull=True,
             fpage__isnull=True,
             lpage__isnull=True,
+        ) & qbuilder.article_data_query
+        self.assertEqual(result, expected)
+
+    def test_issue_false_flexible_true_uses_location_params_instead_of_article_data_query(self):
+        adapter = make_xml_adapter(
+            data={"z_surnames": "Silva"}, body_fragment_fingerprint=None
         )
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        result = qbuilder.get_article_data_query(issue=False, flexible=True)
+        expected = Q(
+            volume__isnull=True,
+            number__isnull=True,
+            suppl__isnull=True,
+            elocation_id__isnull=True,
+            fpage__isnull=True,
+            lpage__isnull=True,
+        ) & Q(**qbuilder.article_location_params)
         self.assertEqual(result, expected)
 
     def test_issue_true_and_false_produce_different_queries(self):
@@ -543,8 +602,19 @@ class GetArticleDataQueryTests(SimpleTestCase):
         )
         qbuilder = QueryBuilderPidProviderXML(adapter)
         self.assertNotEqual(
-            qbuilder.get_article_data_query(issue=True),
-            qbuilder.get_article_data_query(issue=False),
+            qbuilder.get_article_data_query(issue=True, flexible=False),
+            qbuilder.get_article_data_query(issue=False, flexible=False),
+        )
+
+    def test_flexible_true_and_false_produce_different_queries(self):
+        adapter = make_xml_adapter(
+            data={"z_surnames": "Silva", "pub_year": "2026"},
+            body_fragment_fingerprint=None,
+        )
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+        self.assertNotEqual(
+            qbuilder.get_article_data_query(issue=True, flexible=False),
+            qbuilder.get_article_data_query(issue=True, flexible=True),
         )
 
 
@@ -669,9 +739,15 @@ class CompareItemsTests(SimpleTestCase):
 class CompareTests(SimpleTestCase):
     """
     compare() usa input_data.get(label) para cada label de
-    registered_items -- um label ausente em input_data é tratado como
-    None (não é pulado): sempre gera uma entrada em "items", e conta no
-    cálculo de total_score/percentual_score via compare_items(None, ...).
+    registered_items.
+
+    MUDANÇA DE CONTRATO: quando o valor registrado E o valor de entrada
+    são ambos falsy/None para um label, esse label é IGNORADO do cálculo
+    de total_score/percentual_score (ainda aparece em "items", marcado
+    com "ignored": True e score 1.0, mas não conta no divisor). Um label
+    ausente em input_data vira None via .get(label); só é ignorado se o
+    valor registrado também for falsy -- caso contrário (registrado
+    truthy), cai no ramo how_similar normalmente.
     """
 
     @patch("pid_provider.query_params.how_similar")
@@ -686,12 +762,12 @@ class CompareTests(SimpleTestCase):
         self.assertEqual(result["total_score"], 1.5)  # 1 (match) + 0.5 (mocked)
         self.assertEqual(result["percentual_score"], 0.75)
 
-    def test_missing_input_key_is_treated_as_none_not_skipped(self):
+    def test_missing_input_key_with_falsy_registered_value_is_ignored(self):
         """
         Um label ausente em input_data vira None via .get(label) -- se o
-        valor registrado também é falsy (None), compare_items considera
-        os dois "iguais" (score 1), então o label ausente ENTRA em items
-        e contribui com score 1, não é descartado.
+        valor registrado também é falsy (None), o label é IGNORADO do
+        divisor (não conta em total_score/percentual_score), mas ainda
+        aparece em "items" com score 1.0 e "ignored": True.
         """
         registered_items = {"z_collab": None, "z_surnames": "Silva"}
         input_data = {"z_surnames": "Silva"}  # z_collab ausente -> None
@@ -701,8 +777,11 @@ class CompareTests(SimpleTestCase):
         self.assertEqual(len(result["items"]), 2)
         labels = {item["label"] for item in result["items"]}
         self.assertEqual(labels, {"z_collab", "z_surnames"})
-        self.assertEqual(result["total_score"], 2)
-        self.assertEqual(result["percentual_score"], 1)
+        ignored_item = next(i for i in result["items"] if i["label"] == "z_collab")
+        self.assertTrue(ignored_item["ignored"])
+        # z_collab (ignorado) não conta: total_score = só o score de z_surnames (1)
+        self.assertEqual(result["total_score"], 1.0)
+        self.assertEqual(result["percentual_score"], 1.0)
 
     def test_missing_input_key_with_truthy_registered_value_lowers_score(self):
         """
@@ -719,11 +798,27 @@ class CompareTests(SimpleTestCase):
         self.assertEqual(result["items"][0]["label"], "z_surnames")
         self.assertLess(result["items"][0]["score"], 1)
 
-    def test_empty_registered_items_raises_zero_division_error(self):
+    def test_empty_registered_items_returns_zero_percentual_score(self):
         """
-        Único caso em que items fica vazio: registered_items já vem
-        vazio -- não há nada para iterar, então
-        total_score / len(items) levanta ZeroDivisionError.
+        MUDANÇA DE CONTRATO: registered_items vazio não levanta mais
+        ZeroDivisionError -- total_items fica em 0 e percentual_score
+        usa o fallback 0.0 (guard `if total_items > 0 else 0.0`).
         """
-        with self.assertRaises(ZeroDivisionError):
-            compare({}, {"z_surnames": "Silva"})
+        result = compare({}, {"z_surnames": "Silva"})
+        self.assertEqual(result["items"], [])
+        self.assertEqual(result["total_score"], 0.0)
+        self.assertEqual(result["percentual_score"], 0.0)
+
+    def test_all_fields_falsy_on_both_sides_returns_zero_percentual_score(self):
+        """
+        Quando TODOS os labels são falsy/None em ambos os lados, todos
+        são ignorados do divisor -- total_items fica em 0 mesmo com
+        "items" não vazio, e percentual_score cai no fallback 0.0 (e não
+        1.0, que seria o resultado errado de considerar os "ignored"
+        como score cheio).
+        """
+        result = compare({"z_collab": None, "z_links": None}, {})
+        self.assertEqual(len(result["items"]), 2)
+        self.assertTrue(all(item["ignored"] for item in result["items"]))
+        self.assertEqual(result["total_score"], 0.0)
+        self.assertEqual(result["percentual_score"], 0.0)
