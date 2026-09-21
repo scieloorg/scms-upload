@@ -9,11 +9,11 @@ from pid_provider import exceptions
 def fix_xml_with_pre_data(xml_with_pre):
     data = xml_with_pre.data
     try:
-        data["pkg_names"] = sorted(
-            item for item in (xml_with_pre.pkg_name_variations or ()) if item
-        )
+        pkg_names = xml_with_pre.pkg_name_variations
     except AttributeError:
-        pass
+        return data
+
+    data["pkg_names"] = sorted(item for item in (pkg_names or []) if item)
     return data
 
 
@@ -37,11 +37,7 @@ def fix_get_data_to_compare(xml_adapter):
     # o valor para z_partial_body na comparação é body_fragment_fingerprint
     xml_with_pre = xml_adapter.xml_with_pre
     data["body_fragment_fingerprint"] = xml_with_pre.body_fragment_fingerprint
-    # xml_with_pre não expõe "surnames" como atributo direto nesta versão do
-    # packtools -- só vem dentro do dict de get_article_data() -- por isso
-    # reaproveitamos fix_get_article_data() para obter o mesmo valor usado
-    # em PidProviderXML.data_to_compare (readable_data["surnames"]).
-    data["surnames"] = fix_get_article_data(xml_with_pre).get("surnames")
+    data["surnames"] = xml_with_pre.surnames
     data["pid_v2"] = xml_with_pre.v2
     return data
 
@@ -234,19 +230,20 @@ class QueryBuilderPidProviderXML:
         todos os nomes depreciados/alternativos já usados no passado.
         Valores falsy são descartados.
         """
+        try:
+            pkg_names = self.xml_adapter.xml_with_pre.pkg_name_variations
+        except AttributeError:
+            pass
+        else:
+            return {item for item in (pkg_names or []) if item}
+
         pkg_names = set()
         if self.xml_adapter.pkg_name:
             pkg_names.add(self.xml_adapter.pkg_name)
         if self.xml_adapter.sps_pkg_name:
             pkg_names.add(self.xml_adapter.sps_pkg_name)
-        try:
-            variations = self.xml_adapter.xml_with_pre.pkg_name_variations
-        except AttributeError:
-            variations = (
-                self.xml_adapter.xml_with_pre.deprecated_sps_pkg_name_list
-            )
-        pkg_names.update(variations or ())
-        return set(item for item in pkg_names if item)
+        pkg_names.update(self.xml_adapter.xml_with_pre.deprecated_sps_pkg_name_list)
+        return {item for item in pkg_names if item}
     
     def validate_input_data(self):
         """
@@ -486,7 +483,7 @@ class QueryBuilderPidProviderXML:
         """
         if issue:
             q = (
-                Q(**self.issue_params) &
+                Q(**self.issue_params) & 
                 Q(**self.article_location_params)
             )
             if flexible:
@@ -504,7 +501,6 @@ class QueryBuilderPidProviderXML:
         if flexible:
             return q & Q(**self.article_location_params)
         return q & self.article_data_query
-
 
 def get_best_match(results, xml_adapter_data):
     """
