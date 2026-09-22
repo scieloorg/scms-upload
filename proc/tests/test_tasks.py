@@ -1085,7 +1085,9 @@ class TaskCheckArticleWebpagesTest(TestCase):
         )
 
         mock_article_proc.objects.get.assert_called_once_with(pk=77)
-        article.create_or_update_article_collections.assert_called_once_with("USER")
+        article.create_or_update_article_collections.assert_called_once_with(
+            "USER", force_update=False
+        )
         article.check_availability.assert_called_once_with(
             "USER", collection_id=5, purpose="QA", force_update=False
         )
@@ -1397,8 +1399,12 @@ class TaskCheckMigratedArticleTest(TestCase):
 
         tasks.task_check_migrated_article(article_proc_id=5)
 
-        article.create_or_update_article_collections.assert_called_once_with("USER")
-        article.check_availability.assert_called_once_with("USER")
+        article.create_or_update_article_collections.assert_called_once_with(
+            "USER", force_update=None
+        )
+        article.check_availability.assert_called_once_with(
+            "USER", force_update=None, timeout=None
+        )
         self.assertEqual(article_proc.set_pid_status.call_count, 2)
         article_proc.set_pid_status.assert_any_call("USER", "CLASSIC_MATCHED")
         article_proc.set_pid_status.assert_any_call("USER", "PUBLIC_VALID")
