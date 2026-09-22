@@ -12,10 +12,8 @@ User = get_user_model()
 
 def build_get_article_data_query_side_effect(queries):
     """
-    Constrói o side_effect para `qbuilder.get_article_data_query(issue, flexible)`.
-
-    `queries` é um dict {(issue, flexible): Q(...)} com as 4 combinações
-    possíveis dos dois eixos independentes que o método agora recebe.
+    Constrói o side_effect para `qbuilder.get_article_data_query(issue,
+    flexible)`. `queries` é um dict {(issue, flexible): Q}.
     """
     def _side_effect(issue, flexible):
         return queries[(issue, flexible)]
@@ -24,7 +22,7 @@ def build_get_article_data_query_side_effect(queries):
 
 class PidProviderXMLSelectRecordsTests(TestCase):
     """
-    select_records é um generator: apenas yield-a tuplas
+    select_records agora é um generator: apenas yield-a tuplas
     (label, lista_de_candidatos_materializada) com os candidatos de
     cada estratégia de busca. Cada branch é convertida com list(...)
     dentro do próprio método (ver docstring de select_records), então
@@ -33,14 +31,29 @@ class PidProviderXMLSelectRecordsTests(TestCase):
     Ele NÃO chama mais best_matches nem levanta DoesNotExist —
     essa orquestração ficou fora deste método.
 
-    MUDANÇA DE CONTRATO: agora são 3 branches -- "ids",
-    "journal-issue-article-strict" e "journal-issue-article-flexible" --
-    e as duas últimas combinam via OR as variantes com/sem issue de
-    `qbuilder.get_article_data_query(issue, flexible)`, que ganhou o
-    segundo eixo `flexible` (False = exige article_data_query, como
-    antes; True = dispensa, casando só por fascículo/localização).
-    Também, "ids" só filtra quando `identifier_queries != Q()` -- uma Q
-    vazia produz lista vazia sem tocar o banco.
+    IMPORTANTE (pós-diff): a antiga branch única "journal-issue-article"
+    (OR das 4 combinações de issue x flexible + .distinct()) foi
+    dividida em duas branches sequenciais, na mesma lógica "para na
+    primeira que resolver" do resto do generator:
+    - "journal-issue-article-strict": OR de (issue=True, flexible=False)
+      e (issue=False, flexible=False) -- exige os hashes textuais.
+    - "journal-issue-article-flexible": OR de (issue=True, flexible=True)
+      e (issue=False, flexible=True) -- dispensa os hashes textuais, só
+      é avaliada se a branch strict não resolver (é um generator lazy).
+    Nenhuma das duas usa mais .distinct(): get_article_data_query só
+    filtra campos do próprio PidProviderXML (sem join), então OR nunca
+    duplica linha.
+
+    IMPORTANTE (pós-diff 2): a branch "journal-issue" (fallback que
+    casava só por issue_params, ignorando conteúdo/localização) foi
+    removida — considerada excessivamente permissiva (poderia trazer
+    todos os artigos de um mesmo fascículo como candidatos).
+
+    IMPORTANTE (pós-diff 3): a branch "pkg_name" foi removida de
+    select_records — pkg_name deixou de ser usado como critério de
+    busca de candidatos (ver QueryBuilderPidProviderXML.pkg_name_queries,
+    que continua existindo/testada isoladamente, mas não é mais
+    consumida aqui).
     """
 
     def setUp(self):
@@ -56,38 +69,31 @@ class PidProviderXMLSelectRecordsTests(TestCase):
 
     @patch("pid_provider.models.QueryBuilderPidProviderXML")
     def test_select_records_yields_three_labeled_lists_in_order(self, mock_qbuilder_cls):
-        """O generator deve produzir, nesta ordem: ids, journal-issue-article-strict, journal-issue-article-flexible."""
+        """O generator deve produzir, nesta ordem: ids, strict, flexible."""
         mock_qbuilder = mock_qbuilder_cls.return_value
         mock_qbuilder.identifier_queries = Q(v3="12345")
         mock_qbuilder.issn_query = Q(issn_print="1234-5678")
 
-        # strict (flexible=False): só o registro com pub_year=2026 bate
-        # (issue=False,flexible=False vira um filtro que não bate em nada aqui)
-        # flexible (flexible=True): qualquer registro com z_surnames="Silva" bate,
-        # incluindo o que só tem pub_year=1999
         mock_qbuilder.get_article_data_query.side_effect = (
             build_get_article_data_query_side_effect({
-                (True, False): Q(pub_year=2026, z_surnames="Silva"),
-                (False, False): Q(pub_year=9999),
-                (True, True): Q(pub_year=2026),
-                (False, True): Q(z_surnames="Silva"),
+                (True, False): Q(volume="strict-issue"),
+                (False, False): Q(volume="strict-noissue"),
+                (True, True): Q(volume="flexible-issue"),
+                (False, True): Q(volume="flexible-noissue"),
             })
         )
 
         record_by_id = PidProviderXML.objects.create(
             creator=self.user, v3="12345", registered_in_core=True
         )
-        record_strict = PidProviderXML.objects.create(
-            creator=self.user,
-            issn_print="1234-5678",
-            pub_year=2026,
-            z_surnames="Silva",
+        record_strict_issue = PidProviderXML.objects.create(
+            creator=self.user, issn_print="1234-5678", volume="strict-issue",
+        )
+        record_strict_noissue = PidProviderXML.objects.create(
+            creator=self.user, issn_print="1234-5678", volume="strict-noissue",
         )
         record_flexible_only = PidProviderXML.objects.create(
-            creator=self.user,
-            issn_print="1234-5678",
-            pub_year=1999,
-            z_surnames="Silva",
+            creator=self.user, issn_print="1234-5678", volume="flexible-issue",
         )
 
         results = list(PidProviderXML.select_records(self.xml_adapter_mock))
@@ -102,36 +108,33 @@ class PidProviderXMLSelectRecordsTests(TestCase):
             ["ids", "journal-issue-article-strict", "journal-issue-article-flexible"],
         )
 
-        # cada branch já vem materializada como list (não QuerySet)
         for _label, candidates in results:
             self.assertIsInstance(candidates, list)
 
-        # get_article_data_query deve ter sido chamado com as 4 combinações
-        # (issue, flexible), nesta ordem: (True, False), (False, False),
-        # (True, True), (False, True)
-        calls = [
-            (c.kwargs.get("issue"), c.kwargs.get("flexible"))
-            for c in mock_qbuilder.get_article_data_query.call_args_list
-        ]
-        self.assertEqual(
-            calls, [(True, False), (False, False), (True, True), (False, True)]
-        )
-
         # 1) ids: só o registro com v3 correspondente
-        ids_list = results[0][1]
-        self.assertIn(record_by_id, ids_list)
-        self.assertNotIn(record_strict, ids_list)
-        self.assertNotIn(record_flexible_only, ids_list)
+        self.assertEqual(results[0][1], [record_by_id])
 
-        # 2) journal-issue-article-strict: só o que bate no pub_year certo
+        # 2) strict: os 2 candidatos das combinações flexible=False
         strict_list = results[1][1]
-        self.assertIn(record_strict, strict_list)
+        self.assertEqual(len(strict_list), 2)
+        self.assertIn(record_strict_issue, strict_list)
+        self.assertIn(record_strict_noissue, strict_list)
         self.assertNotIn(record_flexible_only, strict_list)
 
-        # 3) journal-issue-article-flexible: pega os dois (dispensa pub_year)
+        # 3) flexible: o candidato que só casa quando os hashes textuais
+        # são dispensados
         flexible_list = results[2][1]
-        self.assertIn(record_strict, flexible_list)
         self.assertIn(record_flexible_only, flexible_list)
+        self.assertNotIn(record_strict_issue, flexible_list)
+
+        # get_article_data_query foi chamado com as 4 combinações
+        calls = {
+            (c.kwargs.get("issue"), c.kwargs.get("flexible"))
+            for c in mock_qbuilder.get_article_data_query.call_args_list
+        }
+        self.assertEqual(
+            calls, {(True, False), (False, False), (True, True), (False, True)}
+        )
 
     @patch("pid_provider.models.QueryBuilderPidProviderXML")
     def test_select_records_empty_lists_when_no_match(self, mock_qbuilder_cls):
@@ -141,10 +144,10 @@ class PidProviderXMLSelectRecordsTests(TestCase):
         mock_qbuilder.issn_query = Q(issn_print="0000-0000")
         mock_qbuilder.get_article_data_query.side_effect = (
             build_get_article_data_query_side_effect({
-                (True, False): Q(pub_year=1900, z_surnames="Ninguem"),
-                (False, False): Q(pub_year=1900, z_surnames="Ninguem"),
-                (True, True): Q(z_surnames="Ninguem"),
-                (False, True): Q(z_surnames="Ninguem"),
+                (True, False): Q(volume="nao_existe"),
+                (False, False): Q(volume="nao_existe"),
+                (True, True): Q(volume="nao_existe"),
+                (False, True): Q(volume="nao_existe"),
             })
         )
 
@@ -157,34 +160,36 @@ class PidProviderXMLSelectRecordsTests(TestCase):
             self.assertEqual(len(candidates), 0)
 
     @patch("pid_provider.models.QueryBuilderPidProviderXML")
-    def test_select_records_ids_is_empty_without_query_when_identifier_queries_is_empty(
+    def test_select_records_skips_query_when_identifier_is_empty(
         self, mock_qbuilder_cls
     ):
         """
-        Quando identifier_queries é Q() (nenhum identificador no XML de
-        entrada), a branch "ids" produz [] diretamente, SEM filtrar o
-        banco -- filter(Q()) traria todos os registros, o que não é o
-        comportamento desejado para "nenhum critério".
+        Quando identifier_queries retorna Q() (nenhum identificador no
+        XML de entrada), select_records NÃO deve filtrar com Q() vazia —
+        isso casaria com TODOS os registros de PidProviderXML, e não é
+        esse o comportamento esperado para "nenhum critério disponível".
+        A branch "ids" deve vir vazia mesmo havendo registros na base.
         """
         mock_qbuilder = mock_qbuilder_cls.return_value
         mock_qbuilder.identifier_queries = Q()
         mock_qbuilder.issn_query = Q(issn_print="0000-0000")
         mock_qbuilder.get_article_data_query.side_effect = (
             build_get_article_data_query_side_effect({
-                (True, False): Q(pub_year=1900),
-                (False, False): Q(pub_year=1900),
-                (True, True): Q(pub_year=1900),
-                (False, True): Q(pub_year=1900),
+                (True, False): Q(volume="nao_existe"),
+                (False, False): Q(volume="nao_existe"),
+                (True, True): Q(volume="nao_existe"),
+                (False, True): Q(volume="nao_existe"),
             })
         )
 
-        PidProviderXML.objects.create(
-            creator=self.user, v3="ANY", issn_print="0000-0000"
-        )
+        # existe pelo menos um registro na base; se "ids" filtrasse com
+        # Q(), ele apareceria indevidamente nessa branch
+        PidProviderXML.objects.create(creator=self.user, v3="qualquer-outro")
 
-        results = dict(PidProviderXML.select_records(self.xml_adapter_mock))
+        results = list(PidProviderXML.select_records(self.xml_adapter_mock))
 
-        self.assertEqual(results["ids"], [])
+        labels = dict(results)
+        self.assertEqual(labels["ids"], [])
 
     @patch("pid_provider.models.QueryBuilderPidProviderXML")
     def test_select_records_is_lazy_until_iterated(self, mock_qbuilder_cls):
@@ -192,10 +197,10 @@ class PidProviderXMLSelectRecordsTests(TestCase):
         Por ser generator, nada é executado na chamada da função:
         QueryBuilderPidProviderXML(...) e validate_input_data() só
         rodam quando o generator é de fato consumido (primeiro next()).
-        get_article_data_query só é chamado a partir do 2º/3º next(),
-        já que a 1ª branch ("ids") não depende dele -- e cada uma dessas
-        branches chama get_article_data_query DUAS vezes (issue=True e
-        issue=False), pois o OR precisa avaliar os dois lados.
+        A branch "ids" não usa get_article_data_query; "strict" chama-o
+        2 vezes (issue=True/False, flexible=False); "flexible" só é
+        avaliada (e get_article_data_query só sobe pra 4 chamadas) se o
+        consumidor pedir o 3º next().
         """
         mock_qbuilder = mock_qbuilder_cls.return_value
         mock_qbuilder.identifier_queries = Q(v3="qualquer")
@@ -224,10 +229,11 @@ class PidProviderXMLSelectRecordsTests(TestCase):
 
         next(gen)  # yield "journal-issue-article-strict"
         self.assertEqual(mock_qbuilder.get_article_data_query.call_count, 2)
-        mock_qbuilder.get_article_data_query.assert_any_call(issue=True, flexible=False)
-        mock_qbuilder.get_article_data_query.assert_any_call(issue=False, flexible=False)
+        strict_calls = {
+            (c.kwargs.get("issue"), c.kwargs.get("flexible"))
+            for c in mock_qbuilder.get_article_data_query.call_args_list
+        }
+        self.assertEqual(strict_calls, {(True, False), (False, False)})
 
         next(gen)  # yield "journal-issue-article-flexible"
         self.assertEqual(mock_qbuilder.get_article_data_query.call_count, 4)
-        mock_qbuilder.get_article_data_query.assert_any_call(issue=True, flexible=True)
-        mock_qbuilder.get_article_data_query.assert_any_call(issue=False, flexible=True)
