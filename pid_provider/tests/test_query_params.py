@@ -16,13 +16,20 @@ Atualizado para cobrir a correção do falso-match na branch journal-article:
 - QueryBuilderPidProviderXML agora lê xml_adapter.xml_with_pre.readable_data
   (não mais get_article_data(300)), que expõe "body_fragment" no lugar de
   "partial_body".
-- compare() trata labels ausentes em input_data como None via .get(label)
-  (não os pula) — comportamento coberto em CompareTests.
+- compare() trata labels ausentes em input_data como None via .get(label);
+  quando o valor registrado e o de entrada são AMBOS falsy/None, o label
+  é ignorado no cálculo de total_score/percentual_score (não conta no
+  divisor) — comportamento coberto em CompareTests.
+- fix_get_data_to_compare() agora também inclui "surnames" e "pid_v2"
+  (lidos de xml_adapter.xml_with_pre) no dict de comparação, além de
+  "body_fragment_fingerprint" — comportamento coberto em
+  FixGetDataToCompareTests.
 
 ATENÇÃO: ajuste o caminho de import abaixo (`pid_provider.query_params`)
 para o módulo real onde essas classes/funções estão definidas no projeto,
 caso seja diferente.
 """
+import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -35,6 +42,7 @@ from pid_provider.query_params import (
     compare,
     compare_items,
     compare_lists,
+    fix_get_data_to_compare,
     fix_xml_with_pre_data,
     get_score,
     zero_to_none,
@@ -48,7 +56,6 @@ def make_xml_adapter(
     aop_pid=None,
     pkg_name=None,
     sps_pkg_name=None,
-    pkg_name_variations=None,
     deprecated_sps_pkg_name_list=None,
     order=None,
     article_titles=None,
@@ -85,7 +92,7 @@ def make_xml_adapter(
     # configurado explicitamente aqui, senão vira um MagicMock não
     # configurado (nunca None nem o valor esperado).
     adapter.z_partial_body = (data or {}).get("z_partial_body")
-    adapter.xml_with_pre.pkg_name_variations = pkg_name_variations or []
+    del adapter.xml_with_pre.pkg_name_variations
     adapter.xml_with_pre.deprecated_sps_pkg_name_list = (
         deprecated_sps_pkg_name_list or []
     )
@@ -107,25 +114,75 @@ def make_xml_adapter(
 
 
 class FixXMLWithPreDataTests(SimpleTestCase):
-    def test_adds_sorted_pkg_names_without_falsy_values(self):
+
+    def test_uses_json_safe_normalized_pkg_name_variations(self):
         xml_with_pre = SimpleNamespace(
-            data={"v3": "pid-v3"},
+            data={"pid_v3": "V3", "pkg_names": ["legacy"]},
             pkg_name_variations={"pkg-b", None, "", "pkg-a"},
         )
 
         result = fix_xml_with_pre_data(xml_with_pre)
 
-        self.assertEqual(
-            result,
-            {"v3": "pid-v3", "pkg_names": ["pkg-a", "pkg-b"]},
-        )
+        self.assertEqual(result["pkg_names"], ["pkg-a", "pkg-b"])
+        json.dumps(result)
 
-    def test_keeps_data_when_pkg_name_variations_is_unavailable(self):
-        xml_with_pre = SimpleNamespace(data={"v3": "pid-v3"})
+    def test_keeps_original_pkg_names_when_attribute_is_unavailable(self):
+        xml_with_pre = SimpleNamespace(data={"pkg_names": ["legacy"]})
 
         result = fix_xml_with_pre_data(xml_with_pre)
 
-        self.assertEqual(result, {"v3": "pid-v3"})
+        self.assertEqual(result, {"pkg_names": ["legacy"]})
+
+
+class FixGetDataToCompareTests(SimpleTestCase):
+    """
+    fix_get_data_to_compare() parte de xml_adapter.get_data_to_compare()
+    e adiciona/sobrescreve, direto de xml_adapter.xml_with_pre:
+    "body_fragment_fingerprint", "surnames" e "pid_v2" (este último lido
+    de xml_with_pre.v2, usado como critério extra de desambiguidade
+    quando não há dados textuais suficientes para comparar).
+    """
+
+    def test_adds_body_fragment_fingerprint_surnames_and_pid_v2(self):
+        adapter = MagicMock()
+        adapter.get_data_to_compare.return_value = {"z_surnames": "Silva"}
+        adapter.xml_with_pre.body_fragment_fingerprint = "fp-corpo"
+        adapter.xml_with_pre.surnames = "Silva Souza"
+        adapter.xml_with_pre.v2 = "V2-1"
+
+        result = fix_get_data_to_compare(adapter)
+
+        self.assertEqual(
+            result,
+            {
+                "z_surnames": "Silva",
+                "body_fragment_fingerprint": "fp-corpo",
+                "surnames": "Silva Souza",
+                "pid_v2": "V2-1",
+            },
+        )
+
+    def test_overwrites_preexisting_keys_from_get_data_to_compare(self):
+        """
+        Se get_data_to_compare() já retornar "surnames"/"pid_v2"/
+        "body_fragment_fingerprint", os valores lidos de xml_with_pre
+        prevalecem (são atribuídos por último).
+        """
+        adapter = MagicMock()
+        adapter.get_data_to_compare.return_value = {
+            "surnames": "valor-antigo",
+            "pid_v2": "valor-antigo",
+            "body_fragment_fingerprint": "valor-antigo",
+        }
+        adapter.xml_with_pre.body_fragment_fingerprint = "fp-novo"
+        adapter.xml_with_pre.surnames = "Silva"
+        adapter.xml_with_pre.v2 = "V2-novo"
+
+        result = fix_get_data_to_compare(adapter)
+
+        self.assertEqual(result["surnames"], "Silva")
+        self.assertEqual(result["pid_v2"], "V2-novo")
+        self.assertEqual(result["body_fragment_fingerprint"], "fp-novo")
 
 
 class ValidateInputDataTests(SimpleTestCase):
@@ -216,31 +273,32 @@ class ValidateInputDataTests(SimpleTestCase):
 
 class PkgNameListTests(SimpleTestCase):
 
-    def test_uses_pkg_name_variations_and_drops_falsy(self):
+    def test_uses_authoritative_variations_and_drops_falsy(self):
         adapter = make_xml_adapter(
             data={},
-            pkg_name="pkg-a",
-            sps_pkg_name="pkg-b",
-            pkg_name_variations=["pkg-c", "pkg-d", "", None, "pkg-a"],
-            deprecated_sps_pkg_name_list=["not-used"],
+            pkg_name="fallback-name",
+            sps_pkg_name="fallback-sps-name",
+            deprecated_sps_pkg_name_list=["fallback-deprecated-name"],
         )
-        qbuilder = QueryBuilderPidProviderXML(adapter)
-        self.assertEqual(
-            qbuilder.pkg_name_list,
-            {"pkg-a", "pkg-b", "pkg-c", "pkg-d"},
-        )
+        adapter.xml_with_pre.pkg_name_variations = {
+            "pkg-b",
+            None,
+            "",
+            "pkg-a",
+        }
 
-    def test_uses_deprecated_names_when_variations_are_unavailable(self):
+        qbuilder = QueryBuilderPidProviderXML(adapter)
+
+        self.assertEqual(qbuilder.pkg_name_list, {"pkg-a", "pkg-b"})
+
+    def test_combines_all_sources_and_drops_falsy(self):
         adapter = make_xml_adapter(
             data={},
             pkg_name="pkg-a",
             sps_pkg_name="pkg-b",
             deprecated_sps_pkg_name_list=["pkg-c", "", None, "pkg-a"],
         )
-        del adapter.xml_with_pre.pkg_name_variations
-
         qbuilder = QueryBuilderPidProviderXML(adapter)
-
         self.assertEqual(qbuilder.pkg_name_list, {"pkg-a", "pkg-b", "pkg-c"})
 
     def test_empty_when_no_names_available(self):
@@ -250,6 +308,12 @@ class PkgNameListTests(SimpleTestCase):
 
 
 class IdentifierQueriesTests(SimpleTestCase):
+    """
+    identifier_queries cobre apenas identificadores diretos (v3, v2,
+    aop_pid, main_doi). pkg_name foi extraído para pkg_name_queries
+    (ver PkgNameQueriesTests) para ser executado como etapa própria em
+    select_records, depois de identifier_queries.
+    """
 
     def test_empty_when_nothing_set(self):
         adapter = make_xml_adapter(data={})
@@ -273,25 +337,23 @@ class IdentifierQueriesTests(SimpleTestCase):
             pkg_name="pkg-a",
         )
         qbuilder = QueryBuilderPidProviderXML(adapter)
-        # MUDANÇA DE CONTRATO: pkg_name não entra mais em identifier_queries
-        # -- foi extraído para pkg_name_queries (ver PkgNameQueriesTests),
-        # executado como etapa própria em select_records, separada da
-        # busca por identificadores diretos.
+        # pkg_name NÃO entra em identifier_queries (ver pkg_name_queries)
         expected = Q(main_doi="10.1234/xyz")
         self.assertEqual(qbuilder.identifier_queries, expected)
 
 
 class PkgNameQueriesTests(SimpleTestCase):
 
-    def test_empty_when_no_pkg_names_available(self):
-        adapter = make_xml_adapter(data={})
+    def test_empty_when_no_pkg_names(self):
+        adapter = make_xml_adapter(data={}, pkg_name=None, sps_pkg_name=None)
         qbuilder = QueryBuilderPidProviderXML(adapter)
         self.assertEqual(qbuilder.pkg_name_queries, Q())
 
-    def test_uses_pkg_name_list_with_in_lookup(self):
+    def test_includes_pkg_names(self):
         adapter = make_xml_adapter(data={}, pkg_name="pkg-a")
         qbuilder = QueryBuilderPidProviderXML(adapter)
-        self.assertEqual(qbuilder.pkg_name_queries, Q(pkg_name__in={"pkg-a"}))
+        expected = Q(pkg_name__in={"pkg-a"})
+        self.assertEqual(qbuilder.pkg_name_queries, expected)
 
 
 class IssnQueryTests(SimpleTestCase):
@@ -512,14 +574,7 @@ class ArticleDataQueryTests(SimpleTestCase):
 
 
 class GetArticleDataQueryTests(SimpleTestCase):
-    """Método usado em select_records (models.py).
-
-    MUDANÇA DE CONTRATO: get_article_data_query(issue, flexible) ganhou um
-    segundo eixo obrigatório, `flexible` -- False (estrito) reproduz o
-    comportamento antigo (exige article_data_query); True dispensa
-    article_data_query, casando só por fascículo/localização (ou pela
-    ausência delas, quando issue=False).
-    """
+    """Método usado em select_records (models.py)."""
 
     def test_issue_true_flexible_false_combines_article_data_issue_and_location_params(self):
         adapter = make_xml_adapter(
@@ -544,7 +599,13 @@ class GetArticleDataQueryTests(SimpleTestCase):
         )
         self.assertEqual(result, expected)
 
-    def test_issue_true_flexible_true_omits_article_data_query(self):
+    def test_issue_true_flexible_true_drops_article_data_query(self):
+        """
+        `flexible=True` dispensa a exigência dos hashes textuais
+        (article_data_query) -- só fascículo e localização precisam
+        bater, mesmo que o conteúdo do artigo (corrigido/errata) tenha
+        mudado.
+        """
         adapter = make_xml_adapter(
             data={
                 "z_surnames": "Silva",
@@ -579,7 +640,7 @@ class GetArticleDataQueryTests(SimpleTestCase):
         ) & qbuilder.article_data_query
         self.assertEqual(result, expected)
 
-    def test_issue_false_flexible_true_uses_location_params_instead_of_article_data_query(self):
+    def test_issue_false_flexible_true_drops_article_data_query(self):
         adapter = make_xml_adapter(
             data={"z_surnames": "Silva"}, body_fragment_fingerprint=None
         )
@@ -675,17 +736,31 @@ class CompareItemsTests(SimpleTestCase):
         result = compare_items("z_surnames", "Silva", "Silva")
         self.assertEqual(result, {"label": "z_surnames", "score": 1})
 
-    def test_none_and_falsy_are_treated_as_equal(self):
+    def test_z_prefixed_field_none_vs_empty_is_not_normalized_to_equal(self):
+        """
+        compare_items não normaliza falsy como equivalente (None != "");
+        esse tipo de ignore só existe em compare(), e mesmo lá é uma
+        checagem estrita de `is None`, não de falsy em geral. Aqui, sem
+        bater a igualdade e com label "z_"-prefixado (hash), cai direto
+        no ramo de score 0 -- campos hash não usam comparação fuzzy
+        (how_similar), pois um hash é igual ou não é.
+        """
         result = compare_items("z_collab", None, "")
-        self.assertEqual(result, {"label": "z_collab", "score": 1})
+        self.assertEqual(
+            result,
+            {"label": "z_collab", "score": 0, "registered": None, "input_data": ""},
+        )
 
     @patch("pid_provider.query_params.how_similar")
-    def test_different_scalars_uses_how_similar_and_includes_registered(
+    def test_different_scalars_for_hash_label_scores_zero_without_how_similar(
         self, mock_how_similar
     ):
         """
-        Quando score != 1, o response inclui "registered" E "input_data"
-        (não apenas "registered") -- ambos úteis para inspecionar a
+        Para um label "z_"-prefixado (hash), scalars diferentes NÃO
+        passam por how_similar() -- um hash é igual ou não é, não faz
+        sentido comparação fuzzy. O score vira 0 direto e how_similar
+        nunca chega a ser chamado. Quando score != 1, o response ainda
+        inclui "registered" E "input_data" -- úteis para inspecionar a
         divergência.
         """
         mock_how_similar.return_value = 0.4
@@ -694,15 +769,15 @@ class CompareItemsTests(SimpleTestCase):
             result,
             {
                 "label": "z_surnames",
-                "score": 0.4,
+                "score": 0,
                 "registered": "Silva",
                 "input_data": "Souza",
             },
         )
-        mock_how_similar.assert_called_once_with("Souza", "Silva")
+        mock_how_similar.assert_not_called()
 
     @patch("pid_provider.query_params.how_similar")
-    def test_none_input_data_falls_back_to_empty_string_for_how_similar(
+    def test_none_input_data_for_hash_label_scores_zero_without_how_similar(
         self, mock_how_similar
     ):
         mock_how_similar.return_value = 0.2
@@ -711,15 +786,15 @@ class CompareItemsTests(SimpleTestCase):
             result,
             {
                 "label": "z_links",
-                "score": 0.2,
+                "score": 0,
                 "registered": "algum-link",
                 "input_data": None,
             },
         )
-        mock_how_similar.assert_called_once_with("", "algum-link")
+        mock_how_similar.assert_not_called()
 
     @patch("pid_provider.query_params.how_similar")
-    def test_none_registered_falls_back_to_empty_string_for_how_similar(
+    def test_none_registered_for_hash_label_scores_zero_without_how_similar(
         self, mock_how_similar
     ):
         mock_how_similar.return_value = 0.3
@@ -728,30 +803,39 @@ class CompareItemsTests(SimpleTestCase):
             result,
             {
                 "label": "z_links",
-                "score": 0.3,
+                "score": 0,
                 "registered": None,
                 "input_data": "algum-link",
             },
         )
-        mock_how_similar.assert_called_once_with("algum-link", "")
+        mock_how_similar.assert_not_called()
 
 
 class CompareTests(SimpleTestCase):
     """
     compare() usa input_data.get(label) para cada label de
-    registered_items.
+    registered_items -- um label ausente em input_data é tratado como
+    None via .get(label).
 
-    MUDANÇA DE CONTRATO: quando o valor registrado E o valor de entrada
-    são ambos falsy/None para um label, esse label é IGNORADO do cálculo
-    de total_score/percentual_score (ainda aparece em "items", marcado
-    com "ignored": True e score 1.0, mas não conta no divisor). Um label
-    ausente em input_data vira None via .get(label); só é ignorado se o
-    valor registrado também for falsy -- caso contrário (registrado
-    truthy), cai no ramo how_similar normalmente.
+    Quando registered_item e o valor de entrada são AMBOS None (checagem
+    estrita de `is None`, não falsy em geral -- um "" registrado não
+    entra nesse ramo), o label é descartado do cálculo de
+    total_score/percentual_score (entra em "items" marcado com
+    "ignored": True e score 1.0, mas não é somado a total_score nem
+    conta no divisor). Isso evita que campos vazios em ambos os lados
+    infle artificialmente o score de candidatos com pouca informação
+    real para comparar.
     """
 
     @patch("pid_provider.query_params.how_similar")
     def test_aggregates_scores_from_all_items(self, mock_how_similar):
+        """
+        title bate exato (score 1, sem chamar how_similar). z_surnames
+        diverge, mas por ser label "z_"-prefixado (hash) também não
+        chama how_similar -- vai direto para score 0. A soma reflete
+        isso: 1 (match) + 0 (hash mismatch), não o valor mockado de
+        how_similar.
+        """
         mock_how_similar.return_value = 0.5
         registered_items = {"title": "Título A", "z_surnames": "Silva"}
         input_data = {"title": "Título A", "z_surnames": "Souza"}
@@ -759,15 +843,17 @@ class CompareTests(SimpleTestCase):
         result = compare(registered_items, input_data)
 
         self.assertEqual(len(result["items"]), 2)
-        self.assertEqual(result["total_score"], 1.5)  # 1 (match) + 0.5 (mocked)
-        self.assertEqual(result["percentual_score"], 0.75)
+        self.assertEqual(result["total_score"], 1.0)  # 1 (match) + 0 (hash mismatch)
+        self.assertEqual(result["percentual_score"], 0.5)
+        mock_how_similar.assert_not_called()
 
     def test_missing_input_key_with_falsy_registered_value_is_ignored(self):
         """
-        Um label ausente em input_data vira None via .get(label) -- se o
-        valor registrado também é falsy (None), o label é IGNORADO do
-        divisor (não conta em total_score/percentual_score), mas ainda
-        aparece em "items" com score 1.0 e "ignored": True.
+        Um label ausente em input_data vira None via .get(label). Se o
+        valor registrado também é falsy (None), o par é considerado sem
+        informação em ambos os lados: entra em "items" com
+        "ignored": True e score 1.0, mas NÃO é somado a total_score nem
+        conta no divisor de percentual_score.
         """
         registered_items = {"z_collab": None, "z_surnames": "Silva"}
         input_data = {"z_surnames": "Silva"}  # z_collab ausente -> None
@@ -777,9 +863,12 @@ class CompareTests(SimpleTestCase):
         self.assertEqual(len(result["items"]), 2)
         labels = {item["label"] for item in result["items"]}
         self.assertEqual(labels, {"z_collab", "z_surnames"})
-        ignored_item = next(i for i in result["items"] if i["label"] == "z_collab")
-        self.assertTrue(ignored_item["ignored"])
-        # z_collab (ignorado) não conta: total_score = só o score de z_surnames (1)
+        ignored_item = next(
+            item for item in result["items"] if item["label"] == "z_collab"
+        )
+        self.assertTrue(ignored_item.get("ignored"))
+        self.assertEqual(ignored_item["score"], 1.0)
+        # z_collab (ignorado) não entra na soma; só z_surnames (score 1) conta
         self.assertEqual(result["total_score"], 1.0)
         self.assertEqual(result["percentual_score"], 1.0)
 
@@ -787,7 +876,8 @@ class CompareTests(SimpleTestCase):
         """
         Se o label ausente em input_data tem um valor registrado truthy,
         o None resultante de .get(label) NÃO é igual ao registrado --
-        cai no ramo how_similar (não é match automático).
+        não é match automático nem ignorado (aqui, por ser label
+        "z_"-prefixado, o score vem do ramo hash, não de how_similar).
         """
         registered_items = {"z_surnames": "Silva"}
         input_data = {}  # z_surnames ausente -> None
@@ -796,29 +886,48 @@ class CompareTests(SimpleTestCase):
 
         self.assertEqual(len(result["items"]), 1)
         self.assertEqual(result["items"][0]["label"], "z_surnames")
+        self.assertNotIn("ignored", result["items"][0])
         self.assertLess(result["items"][0]["score"], 1)
 
     def test_empty_registered_items_returns_zero_percentual_score(self):
         """
-        MUDANÇA DE CONTRATO: registered_items vazio não levanta mais
-        ZeroDivisionError -- total_items fica em 0 e percentual_score
-        usa o fallback 0.0 (guard `if total_items > 0 else 0.0`).
+        Quando registered_items vem vazio, não há nada para iterar:
+        items fica vazio e total_items permanece 0. Diferente da versão
+        anterior, percentual_score agora usa um guard explícito
+        (total_items > 0) e retorna 0.0 em vez de levantar
+        ZeroDivisionError.
         """
         result = compare({}, {"z_surnames": "Silva"})
-        self.assertEqual(result["items"], [])
-        self.assertEqual(result["total_score"], 0.0)
-        self.assertEqual(result["percentual_score"], 0.0)
+        self.assertEqual(result, {"items": [], "total_score": 0.0, "percentual_score": 0.0})
 
     def test_all_fields_falsy_on_both_sides_returns_zero_percentual_score(self):
         """
-        Quando TODOS os labels são falsy/None em ambos os lados, todos
-        são ignorados do divisor -- total_items fica em 0 mesmo com
-        "items" não vazio, e percentual_score cai no fallback 0.0 (e não
-        1.0, que seria o resultado errado de considerar os "ignored"
-        como score cheio).
+        z_collab é None nos dois lados -> ignorado (checagem estrita de
+        `is None`). z_links é "" no registrado e ausente (None via
+        .get) na entrada -- falsy, mas "" não é `is None`, então NÃO
+        entra no ramo de ignore: vai para compare_items, que, por ser
+        label "z_"-prefixado (hash), marca a divergência com score 0
+        em vez de ignorar. Mesmo assim, total_score e percentual_score
+        terminam em 0.0 nos dois campos -- só por caminhos diferentes:
+        um por ser ignorado (não soma nem conta no divisor), outro por
+        comparar e não bater (soma 0 e conta no divisor). Não há
+        confusão entre "sem dados para comparar" (0.0) e "comparou e
+        tudo bateu" (1.0).
         """
-        result = compare({"z_collab": None, "z_links": None}, {})
+        registered_items = {"z_collab": None, "z_links": ""}
+        input_data = {"z_collab": None}
+
+        result = compare(registered_items, input_data)
+
         self.assertEqual(len(result["items"]), 2)
-        self.assertTrue(all(item["ignored"] for item in result["items"]))
+        ignored_item = next(
+            item for item in result["items"] if item["label"] == "z_collab"
+        )
+        compared_item = next(
+            item for item in result["items"] if item["label"] == "z_links"
+        )
+        self.assertTrue(ignored_item.get("ignored"))
+        self.assertNotIn("ignored", compared_item)
+        self.assertEqual(compared_item["score"], 0)
         self.assertEqual(result["total_score"], 0.0)
         self.assertEqual(result["percentual_score"], 0.0)
