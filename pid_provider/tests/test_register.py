@@ -59,13 +59,23 @@ MUDANÇAS DE CONTRATO EM RELAÇÃO À VERSÃO ANTERIOR DESTE ARQUIVO
    continua sem ser chamado dentro de register().
 
 6. Os caminhos "conflict" e "unmatched" continuam setando `event_status`
-   explicitamente antes de re-levantar a exceção. NOVO: "unmatched_items"
-   sem "registered" não levanta mais UnmatchedPidProviderXMLError
-   internamente -- vira "created" (o pop("registered") dá KeyError ->
-   DoesNotExist). E "multiple_matched_items" (candidatos empatados em
-   score com "registered") agora gera `event_status="multiple"` (não
-   mais "unmatched"), levantando cls.MultipleObjectsReturned antes de
-   sequer tentar dar pop em "registered".
+   explicitamente antes de re-levantar a exceção.
+
+7.5. **O `raise exceptions.UnmatchedPidProviderXMLError` interno foi removido.**
+   Antes, quando `select_record_response` não tinha "registered" mas tinha
+   "unmatched_items", o `except KeyError` do `pop("registered")` levantava
+   `UnmatchedPidProviderXMLError` explicitamente (capturada junto com
+   `MultipleObjectsReturned`, virando `event_status="unmatched"`). Agora
+   esse `except KeyError` sempre levanta `cls.DoesNotExist` diretamente,
+   então esse caminho vira um "created" normal (`registered=None`). Em
+   compensação, o `finally` passou a checar também
+   `select_record_response.get("unmatched_items")` (antes só
+   "matched_items") como gatilho para gravar auditoria — então o evento
+   ainda é registrado, só que com `event_status="created"`, não mais
+   "unmatched". `UnmatchedPidProviderXMLError` ainda existe e ainda é
+   capturada nesse except-clause, mas agora só chega lá se ALGO MAIS a
+   levantar diretamente (ex.: mockando `select_record` para levantá-la),
+   não mais internamente por `register()`.
 
 7. **`register()` agora faz `input_data.update(xml_with_pre.readable_data)`**
    em vez de `input_data.update(xml_with_pre.get_article_data())`, alinhado
@@ -280,7 +290,6 @@ class MatchedItemsLoggingTest(RegisterTestBase):
 
         kwargs = self.assert_recorded_status("updated")
         self.assertIs(kwargs.get("pid_provider_xml"), saved)
-        self.assertIn("select_record_response", response)
 
     def test_skipped_with_matched_items_still_logs_audit(self):
         existing = MagicMock(name="existing_ppx")
@@ -361,12 +370,6 @@ class ForbiddenPathTest(RegisterTestBase):
 
 class UnmatchedPathTest(RegisterTestBase):
     def test_unmatched_when_select_record_raises_unmatched(self):
-        """
-        select_record() em si não levanta mais UnmatchedPidProviderXMLError
-        (ver os dois testes abaixo), mas o except continua existindo em
-        register() -- este teste força o mock a levantá-la diretamente,
-        simulando um chamador externo/futuro que ainda a use.
-        """
         with patch(f"{PATCH_BASE}.select_record") as m_select:
             m_select.side_effect = exceptions.UnmatchedPidProviderXMLError("unmatched")
             response = PidProviderXML.register(self.xml, "file.xml", self.user)
@@ -374,22 +377,25 @@ class UnmatchedPathTest(RegisterTestBase):
         self.assert_recorded_status("unmatched")
         self.assertIn("error_msg", response)
 
-    def test_unmatched_items_without_registered_becomes_created_and_still_logs_audit(self):
+    def test_unmatched_items_without_registered_now_falls_through_to_created(self):
         """
         MUDANÇA DE CONTRATO: select_record() retornando "unmatched_items"
         sem "registered" NÃO levanta mais UnmatchedPidProviderXMLError
-        internamente -- o `pop("registered")` dá KeyError e cai direto em
-        `except cls.DoesNotExist`, que trata como "created" (documento
-        inédito), igual ao caso em que não há candidato nenhum. A
-        auditoria ainda é gravada porque `unmatched_items` é truthy no
-        `finally` (matched_items or unmatched_items).
+        internamente (esse raise foi removido de register()). O
+        `pop("registered")` simplesmente dá KeyError, register() trata
+        como cls.DoesNotExist e segue o fluxo normal de "created"
+        (registered=None). A auditoria AINDA é gravada nesse caso -- não
+        por event_status="unmatched" (que não existe mais aqui), mas
+        porque o `finally` de register() passou a checar também
+        `select_record_response.get("unmatched_items")` como gatilho de
+        gravação (antes só olhava "matched_items").
         """
         with patch(f"{PATCH_BASE}.select_record") as m_select, \
              patch(f"{PATCH_BASE}.PidProviderXML.complete_missing_xml_pids") as m_cmp, \
              patch(f"{PATCH_BASE}.PidProviderXML.is_updated") as m_upd, \
              patch(f"{PATCH_BASE}.PidProviderXML._save") as m_save:
 
-            m_select.return_value = {"unmatched_items": {"journal": [{"id": 1}]}}
+            m_select.return_value = {"unmatched_items": [{"id": 1}]}
             m_cmp.return_value = {}
             m_upd.return_value = None
             saved = MagicMock(name="saved_ppx")
@@ -401,7 +407,7 @@ class UnmatchedPathTest(RegisterTestBase):
         self.assertEqual(response.get("event_status"), "created")
         self.assertNotIn("error_msg", response)
         kwargs = self.assert_recorded_status("created")
-        self.assertIn("select_record_response", response)
+        self.assertIs(kwargs.get("pid_provider_xml"), saved)
 
     def test_multiple_objects_returned_is_multiple(self):
         with patch(f"{PATCH_BASE}.select_record") as m_select:
@@ -409,20 +415,24 @@ class UnmatchedPathTest(RegisterTestBase):
             response = PidProviderXML.register(self.xml, "file.xml", self.user)
 
         self.assert_recorded_status("multiple")
+        self.assertIn("error_msg", response)
 
-    def test_multiple_matched_items_in_response_is_multiple(self):
+    def test_multiple_matched_items_in_select_record_response_is_multiple(self):
         """
-        MUDANÇA DE CONTRATO: quando select_record() retorna
-        "multiple_matched_items" (candidatos empatados em score com
-        "registered" -- ver get_best_match), register() trata isso como
-        ambiguidade e levanta cls.MultipleObjectsReturned internamente,
-        mesmo que "registered" também esteja presente no retorno.
+        Quando select_record() retorna "multiple_matched_items" (candidatos
+        empatados no score máximo aprovado com "registered"), register()
+        levanta cls.MultipleObjectsReturned internamente antes de aceitar
+        "registered" -- a escolha entre eles seria arbitrária (desempate
+        por `updated`/`id` em get_best_match). Esse caminho vira
+        event_status="multiple" e é convertido em
+        QueryDocumentMultipleObjectsReturnedError, distinto de "unmatched"
+        (reservado para quando select_record() levanta
+        UnmatchedPidProviderXMLError diretamente).
         """
-        existing = MagicMock(name="existing_ppx")
         with patch(f"{PATCH_BASE}.select_record") as m_select:
             m_select.return_value = {
-                "registered": existing,
-                "multiple_matched_items": {"journal": [{"id": 1}, {"id": 2}]},
+                "registered": MagicMock(name="tied_winner"),
+                "multiple_matched_items": {"journal": [{"id": 2}]},
             }
             response = PidProviderXML.register(self.xml, "file.xml", self.user)
 
