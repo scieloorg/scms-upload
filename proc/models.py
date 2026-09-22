@@ -2478,6 +2478,8 @@ class ArticleProc(BaseProc, ClusterableModel):
                 "issue_proc__journal_proc_id", "issue_proc__journal_proc__acron", "issue_proc_id"
             )
         )
+        # IssueProc.journal_proc é anulável: fascículos sem periódico não têm
+        # journal_proc_id e ficam fora do agrupamento.
         list_from_issue = set(
             IssueProc.select_items(
                 collection_acron_list=collection_acron_list,
@@ -2487,7 +2489,9 @@ class ArticleProc(BaseProc, ClusterableModel):
                 article_status_list=status_list,
                 force_migrate_document_records=force_migrate_document_records,
                 force_migrate_document_files=force_migrate_document_files,
-            ).values_list(
+            )
+            .filter(journal_proc__isnull=False)
+            .values_list(
                 "journal_proc_id", "journal_proc__acron", "id"
             )
         )
