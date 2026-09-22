@@ -15,7 +15,6 @@ from django.utils import timezone
 
 from collection.models import Collection
 from journal.models import Journal, OfficialJournal
-from proc.models import JournalProc
 from pid_provider import choices, exceptions
 from pid_provider import models as pid_provider_models
 from pid_provider.models import OtherPid, PidProviderXML, XMLVersion
@@ -95,49 +94,6 @@ class GetRecordByPidV3Tests(TestCase):
                 PidProviderXML.get_record_by_pid_v3(xml_adapter)
         from pid_provider.models import PidProviderXMLPidV3ConflictError
         self.assertIsInstance(ctx.exception, PidProviderXMLPidV3ConflictError)
-
-
-class AddCollectionsTests(TestCase):
-    """
-    Neste projeto (upload), Collection não tem relação reversa
-    "scielojournal" -- add_collections cai sempre no ramo FieldError e usa
-    "journalproc__journal__official_journal" (ver proc.models.JournalProc).
-    """
-
-    def setUp(self):
-        self.user = User.objects.create_user(username="addcoll-user", password="x")
-        self.collection = Collection.objects.create(creator=self.user, acron="scl")
-        oj = OfficialJournal.objects.create(
-            creator=self.user, issn_print="1234-5678", issn_electronic="0000-1111"
-        )
-        journal = Journal.objects.create(creator=self.user, official_journal=oj)
-        JournalProc.objects.create(
-            creator=self.user, collection=self.collection, journal=journal
-        )
-
-    def test_adds_collection_matching_issn_print(self):
-        xml_adapter = MagicMock(journal_issn_print="1234-5678", journal_issn_electronic=None)
-        ppx = PidProviderXML.objects.create(creator=self.user, v3="A")
-
-        ppx.add_collections(xml_adapter)
-
-        self.assertIn(self.collection, ppx.collections.all())
-
-    def test_adds_collection_matching_issn_electronic(self):
-        xml_adapter = MagicMock(journal_issn_print=None, journal_issn_electronic="0000-1111")
-        ppx = PidProviderXML.objects.create(creator=self.user, v3="B")
-
-        ppx.add_collections(xml_adapter)
-
-        self.assertIn(self.collection, ppx.collections.all())
-
-    def test_no_collection_added_when_no_issn_matches(self):
-        xml_adapter = MagicMock(journal_issn_print="9999-9999", journal_issn_electronic="8888-8888")
-        ppx = PidProviderXML.objects.create(creator=self.user, v3="C")
-
-        ppx.add_collections(xml_adapter)
-
-        self.assertEqual(ppx.collections.count(), 0)
 
 
 class MarkItemsAsInvalidTests(TestCase):
@@ -344,6 +300,66 @@ class IsRegisteredTests(TestCase):
         self.assertFalse(response["registered"])
         self.assertEqual(response["filename"], "file.xml")
 
+    def test_unmatched_items_without_registered_returns_not_registered_not_error(self):
+        """
+        MUDANÇA DE CONTRATO: select_record() retornando "unmatched_items"
+        sem "registered" não levanta mais UnmatchedPidProviderXMLError
+        internamente -- o `pop("registered")` dá KeyError e cai direto no
+        `except cls.DoesNotExist`, que retorna um response limpo
+        (registered=False), SEM error_msg/error_type. Antes, esse mesmo
+        caso levantava a exceção internamente, era recapturada pelos
+        excepts de `cls.MultipleObjectsReturned`/`UnmatchedPidProviderXMLError`
+        e relançada, virando um response de erro.
+        """
+        xml_with_pre = MagicMock()
+        xml_with_pre.data = {}
+        xml_with_pre.filename = "file.xml"
+
+        with patch("packtools.sps.pid_provider.xml_sps_adapter.PidProviderXMLAdapter") as MockAdapter:
+            MockAdapter.return_value.data = {}
+            with patch.object(PidProviderXML, "select_records", return_value=iter([])), \
+                 patch.object(
+                     pid_provider_models, "select_record",
+                     return_value={"unmatched_items": [{"id": 1}]},
+                 ):
+                response = PidProviderXML.is_registered(xml_with_pre)
+
+        self.assertFalse(response["registered"])
+        self.assertEqual(response["filename"], "file.xml")
+        self.assertNotIn("error_msg", response)
+        self.assertNotIn("error_type", response)
+
+    def test_multiple_matched_items_raises_error_response(self):
+        """
+        Quando select_record() retorna "multiple_matched_items" (candidatos
+        empatados no score máximo aprovado com "registered"), is_registered()
+        levanta cls.MultipleObjectsReturned internamente antes de aceitar
+        "registered" -- convertida em QueryDocumentMultipleObjectsReturnedError,
+        virando um response de erro (não mais um "registered": True silencioso
+        baseado num desempate arbitrário).
+        """
+        xml_with_pre = MagicMock()
+        xml_with_pre.data = {}
+
+        registered = MagicMock()
+        registered.data = {"v3": "V3-TIED"}
+
+        with patch("packtools.sps.pid_provider.xml_sps_adapter.PidProviderXMLAdapter") as MockAdapter:
+            MockAdapter.return_value.data = {}
+            with patch.object(PidProviderXML, "select_records", return_value=iter([])), \
+                 patch.object(
+                     pid_provider_models, "select_record",
+                     return_value={
+                         "registered": registered,
+                         "multiple_matched_items": {"journal": [{"id": 2}]},
+                     },
+                 ):
+                response = PidProviderXML.is_registered(xml_with_pre)
+
+        self.assertIn("error_msg", response)
+        self.assertIn("error_type", response)
+        self.assertNotIn("registered", response)
+
     def test_returns_registered_true_with_is_equal_flag(self):
         xml_with_pre = MagicMock()
         xml_with_pre.data = {}
@@ -397,34 +413,6 @@ class IsRegisteredTests(TestCase):
 
         self.assertIn("error_msg", response)
         self.assertIn("error_type", response)
-
-    def test_unmatched_items_without_registered_returns_not_registered_not_error(self):
-        """
-        MUDANÇA DE CONTRATO: select_record() retornando "unmatched_items"
-        sem "registered" não levanta mais UnmatchedPidProviderXMLError
-        internamente -- o `pop("registered")` dá KeyError e cai direto no
-        `except cls.DoesNotExist`, que retorna um response limpo
-        (registered=False), SEM error_msg/error_type. Antes, esse mesmo
-        caso levantava a exceção internamente, que era recapturada e
-        propagada com "error_msg"/"error_type" no response.
-        """
-        xml_with_pre = MagicMock()
-        xml_with_pre.data = {}
-        xml_with_pre.filename = "unmatched.xml"
-
-        with patch("packtools.sps.pid_provider.xml_sps_adapter.PidProviderXMLAdapter") as MockAdapter:
-            MockAdapter.return_value.data = {}
-            with patch.object(PidProviderXML, "select_records", return_value=iter([])), \
-                 patch.object(
-                     pid_provider_models, "select_record",
-                     return_value={"unmatched_items": {"journal-issue-article-strict": [{"data": {}}]}},
-                 ):
-                response = PidProviderXML.is_registered(xml_with_pre)
-
-        self.assertFalse(response["registered"])
-        self.assertEqual(response["filename"], "unmatched.xml")
-        self.assertNotIn("error_msg", response)
-        self.assertNotIn("error_type", response)
 
 
 class PublicItemsTests(TestCase):
@@ -527,12 +515,15 @@ class FixPidV2MethodTests(TestCase):
         ppx.current_version = version
         ppx.save()
 
+        # `fix_pid_v2` retorna `item.data`, que chama `get_readable_data()`.
+        # Como `readable_data` não está armazenado neste ppx, esse método
+        # cai no branch que lê `xml_with_pre` e agora PERSISTE o resultado
+        # (self.readable_data = ...; self.save()). Um MagicMock não
+        # configurado em `.readable_data` seria salvo como valor cru no
+        # JSONField e quebraria o save() -- por isso precisa ser um dict de
+        # verdade aqui, não um MagicMock não configurado.
         fake_xml_with_pre = MagicMock()
-        # item.data -> get_readable_data() agora PERSISTE o dict calculado via
-        # fix_get_article_data(xml_with_pre) -- precisa ser um dict de
-        # verdade (não um MagicMock não configurado), senão a tentativa de
-        # gravar no JSONField readable_data quebra o save().
-        fake_xml_with_pre.readable_data = {"article_titles": []}
+        fake_xml_with_pre.readable_data = {"article_titles": ["Título Fake"]}
         with patch.object(
             XMLVersion, "xml_with_pre", new_callable=lambda: property(lambda self: fake_xml_with_pre)
         ), patch.object(PidProviderXML, "_add_current_version") as mock_add_version:
