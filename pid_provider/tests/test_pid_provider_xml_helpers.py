@@ -438,7 +438,8 @@ class DataToCompareTests(TestCase):
             creator=self.user, v3="A", v2="V2-FALLBACK", readable_data=None
         )
         data = ppx.data_to_compare
-        self.assertEqual(data["pid_v2"], "V2-FALLBACK")
+        # lista: o documento pode ter pid v2 diferente em cada coleção
+        self.assertEqual(data["pid_v2"], ["V2-FALLBACK"])
 
 
 class DataPropertyTests(TestCase):
