@@ -22,11 +22,18 @@ class CollectionViewSet(CommonControlFieldViewSet):
 
     list_display = (
         "acron",
+        "name",
+        "platform_status",
+        "network_classification",
         "created",
         "updated",
         "updated_by",
     )
-    list_filter = ("acron",)
+    list_filter = (
+        "acron",
+        "platform_status",
+        "network_classification",
+    )
     search_fields = (
         "name",
         "acron",
