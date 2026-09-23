@@ -33,8 +33,29 @@ class Collection(CommonControlField):
         _("Collection Acronym"), max_length=16, null=True, blank=True
     )
     name = models.CharField(_("Collection Name"), max_length=64, null=True, blank=True)
+    platform_status = models.CharField(
+        _("Platform Status"),
+        choices=choices.PLATFORM_STATUS,
+        max_length=20,
+        null=True,
+        blank=True,
+    )
+    network_classification = models.CharField(
+        _("Network classification"),
+        choices=choices.NETWORK_CLASSIFICATION,
+        max_length=20,
+        null=True,
+        blank=True,
+    )
 
     base_form_class = CoreAdminModelForm
+
+    panels = [
+        FieldPanel("acron"),
+        FieldPanel("name"),
+        FieldPanel("platform_status"),
+        FieldPanel("network_classification"),
+    ]
 
     autocomplete_search_field = "name"
 
@@ -48,16 +69,41 @@ class Collection(CommonControlField):
         raise ValueError("Collection.get requires acron")
 
     @classmethod
-    def get_or_create(cls, acron, name=None, user=None):
+    def get_or_create(
+        cls,
+        acron,
+        name=None,
+        user=None,
+        platform_status=None,
+        network_classification=None,
+    ):
         try:
-            return Collection.get(acron=acron)
+            collection = Collection.get(acron=acron)
         except Collection.DoesNotExist:
             collection = Collection()
             collection.acron = acron
             collection.name = name
+            collection.platform_status = platform_status
+            collection.network_classification = network_classification
             collection.creator = user
             collection.save()
             return collection
+
+        # completa / atualiza os dados informados
+        changed = False
+        if platform_status and collection.platform_status != platform_status:
+            collection.platform_status = platform_status
+            changed = True
+        if (
+            network_classification
+            and collection.network_classification != network_classification
+        ):
+            collection.network_classification = network_classification
+            changed = True
+        if changed:
+            collection.updated_by = user
+            collection.save()
+        return collection
     
     def get_website_config(self, purpose, content_type):
         ws = WebSiteConfiguration.get(collection=self, purpose=purpose)
