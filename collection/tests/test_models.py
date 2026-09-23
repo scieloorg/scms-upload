@@ -278,3 +278,52 @@ class ClassicWebsiteConfigurationQueryFilterTest(TestCase):
         qs = self._filtered_qs(self.other_user)
         self.assertEqual(qs.count(), 0)
 
+
+
+class CollectionGetOrCreateTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="colgetorcreate", password="x")
+
+    def test_creates_with_platform_status_and_network_classification(self):
+        collection = Collection.get_or_create(
+            acron="psi",
+            name="PePSIC",
+            user=self.user,
+            platform_status="classic",
+            network_classification="thematic",
+        )
+        collection.refresh_from_db()
+        self.assertEqual(collection.platform_status, "classic")
+        self.assertEqual(collection.network_classification, "thematic")
+        self.assertEqual(collection.get_platform_status_display(), "Classic")
+        self.assertEqual(collection.get_network_classification_display(), "Thematic")
+
+    def test_creates_without_new_fields(self):
+        collection = Collection.get_or_create(acron="scl", user=self.user)
+        self.assertIsNone(collection.platform_status)
+        self.assertIsNone(collection.network_classification)
+
+    def test_updates_existing_when_values_given(self):
+        Collection.get_or_create(acron="scl", user=self.user)
+        collection = Collection.get_or_create(
+            acron="scl",
+            user=self.user,
+            platform_status="migrating",
+            network_classification="scielonetwork",
+        )
+        collection.refresh_from_db()
+        self.assertEqual(collection.platform_status, "migrating")
+        self.assertEqual(collection.network_classification, "scielonetwork")
+        self.assertEqual(Collection.objects.filter(acron="scl").count(), 1)
+
+    def test_keeps_existing_values_when_not_given(self):
+        Collection.get_or_create(
+            acron="scl",
+            user=self.user,
+            platform_status="new",
+            network_classification="scielonetwork",
+        )
+        collection = Collection.get_or_create(acron="scl", user=self.user)
+        collection.refresh_from_db()
+        self.assertEqual(collection.platform_status, "new")
+        self.assertEqual(collection.network_classification, "scielonetwork")
