@@ -419,9 +419,6 @@ class QueryBuilderPidProviderXML:
             "fpage_seq": self.adapter_data.get("fpage_seq"),
             "lpage": self.adapter_data.get("lpage"),
         }
-        order = self.xml_adapter.order
-        if order:
-            data["v2__endswith"] = order
         return data
 
     @property
@@ -621,9 +618,7 @@ def select_record(xml_adapter, selection_results):
     for label, results in selection_results:
         if not results:
             continue
-
         result = get_best_match(results, xml_adapter_data_to_compare)
-
         matched = result.get("matched")
         multiple_matched = result.get("multiple_matched")
         unmatched = result.get("unmatched")
