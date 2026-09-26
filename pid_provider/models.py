@@ -6,7 +6,6 @@ from datetime import datetime
 from functools import cached_property
 from zlib import crc32
 
-from django.apps import apps
 from django.core.files.base import ContentFile
 from django.core.exceptions import FieldError
 from django.db import IntegrityError, models
@@ -31,6 +30,10 @@ from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutu
     profile_staticmethod,
 )
 from pid_provider import choices, exceptions
+from pid_provider.multi_collection import (
+    get_journal_pid_from_v2,
+    get_xml_collections,
+)
 from pid_provider.query_params import (
     zero_to_none,
     QueryBuilderPidProviderXML,
@@ -115,6 +118,9 @@ def xml_url_zipfile_path(instance, filename):
 class XMLVersion(CommonControlField):
     """
     Tem função de guardar a versão do XML
+
+    A versão do XML de cada coleção, quando o periódico está em mais de uma
+    coleção, é indicada por CollectionPidV2.current_version
     """
 
     pid_provider_xml = models.ForeignKey(
@@ -354,91 +360,22 @@ class OtherPid(CommonControlField):
         return self.updated or self.created
 
 
-# classificação da coleção principal (Collection.network_classification)
-MAIN_NETWORK_CLASSIFICATION = "scielonetwork"
-
-
-def get_journal_pid_from_v2(pid_v2):
-    """
-    Retorna o PID do periódico (issn_scielo) contido no PID v2
-    Ex.: S0103-65642009000300003 -> 0103-6564
-    """
-    if pid_v2 and len(pid_v2) == 23:
-        return pid_v2[1:10]
-    return None
-
-
-def get_journal_collections(issn_print=None, issn_electronic=None):
-    """
-    Retorna os dados do periódico em cada coleção em que está presente,
-    identificado por seus ISSNs.
-
-    Um mesmo periódico pode ter PID (issn_scielo) e acrônimo diferentes
-    em cada coleção. Ex.: Psicologia USP
-    - scl: pusp, 0103-6564
-    - psi: psicousp, 1678-5177
-
-    Returns
-    -------
-    list of dict
-        [{"collection": Collection, "journal_acron": str, "journal_pid": str,
-          "is_main": bool}]
-        is_main indica se a coleção é a principal (Rede SciELO)
-    """
-    if not issn_print and not issn_electronic:
-        return []
-    try:
-        # Core
-        model = apps.get_model("journal", "SciELOJournal")
-        issn_path = "journal__official"
-        acron_field = "journal_acron"
-        pid_field = "issn_scielo"
-    except LookupError:
-        # Upload
-        model = apps.get_model("proc", "JournalProc")
-        issn_path = "journal__official_journal"
-        acron_field = "acron"
-        pid_field = "pid"
-
-    q = Q()
-    if issn_print:
-        q |= Q(**{f"{issn_path}__issn_print": issn_print})
-    if issn_electronic:
-        q |= Q(**{f"{issn_path}__issn_electronic": issn_electronic})
-
-    items = []
-    for item in model.objects.filter(q, collection__isnull=False).select_related(
-        "collection"
-    ):
-        items.append(
-            {
-                "collection": item.collection,
-                "journal_acron": getattr(item, acron_field),
-                "journal_pid": getattr(item, pid_field),
-                "is_main": (
-                    getattr(item.collection, "network_classification", None)
-                    == MAIN_NETWORK_CLASSIFICATION
-                ),
-            }
-        )
-    return items
-
-
 class CollectionPidV2(CommonControlField):
     """
-    Registro do PID v2 do documento em cada coleção.
+    Registro do PID v2 e da versão do XML do documento em cada coleção,
+    quando o periódico está em mais de uma coleção.
 
     Um mesmo periódico pode estar em mais de uma coleção com PIDs
-    (issn_scielo) diferentes e, consequentemente, seus artigos têm PIDs v2
-    diferentes em cada coleção. Ex.: Psicologia USP
+    (issn_scielo) e/ou acrônimos diferentes e, consequentemente, seus
+    artigos têm PIDs v2 e XML diferentes em cada coleção.
+    Ex.: Psicologia USP
     - scl: S0103-65642009000300003
     - psi: S1678-51772009000300003
 
-    PidProviderXML.v2 mantém o PID v2 da coleção principal
-    (network_classification="scielonetwork") ou, na falta dela, o primeiro
-    PID v2 registrado. Este modelo guarda o PID v2 de cada coleção,
-    evitando que PidProviderXML.v2 alterne entre os valores das coleções
-    a cada registro.
+    PidProviderXML.v2 e PidProviderXML.current_version mantêm os dados da
+    coleção principal (network_classification="scielonetwork"). Na falta
+    dela, PidProviderXML.v2 mantém o primeiro PID v2 registrado e
+    PidProviderXML.current_version fica vazio (ver get_current_version).
     """
 
     pid_provider_xml = ParentalKey(
@@ -453,11 +390,16 @@ class CollectionPidV2(CommonControlField):
     journal_acron = models.CharField(
         _("Journal acronym"), max_length=25, null=True, blank=True
     )
+    # versão atual do XML recebido desta coleção
+    current_version = models.ForeignKey(
+        XMLVersion, on_delete=models.SET_NULL, null=True, blank=True
+    )
 
     panels = [
         FieldPanel("collection", read_only=True),
         FieldPanel("journal_acron", read_only=True),
         FieldPanel("pid_v2", read_only=True),
+        AutocompletePanel("current_version", read_only=True),
     ]
 
     class Meta:
@@ -469,31 +411,112 @@ class CollectionPidV2(CommonControlField):
     def __str__(self):
         return f"{self.collection} {self.journal_acron} {self.pid_v2}"
 
+    @staticmethod
+    def is_equal_to(pid_provider_xml, xml_with_pre):
+        if not pid_provider_xml:
+            return False
+        for item in pid_provider_xml.collection_pids_v2.filter(collection__acron=xml_with_pre.collection):
+            version = item.current_version
+            if version:
+                return bool(version and version.is_equal_to(xml_with_pre))
+        return False
+
+    @property
+    def journal_pid(self):
+        # ISSN adotado como PID do periódico na coleção (issn_scielo)
+        return get_journal_pid_from_v2(self.pid_v2)
+
+    @classmethod
+    def get(cls, pid_provider_xml, collection):
+        return cls.objects.get(pid_provider_xml=pid_provider_xml, collection=collection)
+
+    @classmethod
+    def create(
+        cls,
+        user,
+        pid_provider_xml,
+        collection,
+        pid_v2,
+        journal_acron=None,
+        current_version=None,
+    ):
+        try:
+            obj = cls()
+            obj.pid_v2 = pid_v2
+            obj.journal_acron = journal_acron
+            obj.creator = user
+            obj.pid_provider_xml = pid_provider_xml
+            obj.collection = collection
+            obj.current_version = current_version
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(pid_provider_xml, collection)
+    
     @classmethod
     @profile_classmethod
     def create_or_update(
-        cls, user, pid_provider_xml, collection, pid_v2, journal_acron=None
+        cls,
+        user,
+        pid_provider_xml,
+        collection,
+        pid_v2,
+        journal_acron=None,
+        current_version=None,
     ):
-        if not (user and pid_provider_xml and collection and pid_v2):
+        if not (user and pid_provider_xml and collection and pid_v2 and journal_acron and current_version):
             raise ValueError(
                 f"CollectionPidV2.create_or_update requires user ({user}) and pid_provider_xml ({pid_provider_xml}) and collection ({collection}) and pid_v2 ({pid_v2})"
             )
         try:
-            obj = cls.objects.get(
-                pid_provider_xml=pid_provider_xml, collection=collection
-            )
-            if obj.pid_v2 == pid_v2 and obj.journal_acron == journal_acron:
-                return obj
+            obj = cls.get(pid_provider_xml, collection)
+            obj.pid_v2 = pid_v2
+            obj.journal_acron = journal_acron
             obj.updated_by = user
+            obj.current_version = current_version
+            obj.save()
+            return obj
         except cls.DoesNotExist:
-            obj = cls()
-            obj.creator = user
-            obj.pid_provider_xml = pid_provider_xml
-            obj.collection = collection
-        obj.pid_v2 = pid_v2
-        obj.journal_acron = journal_acron
-        obj.save()
-        return obj
+            return cls.create(
+                user,
+                pid_provider_xml,
+                collection,
+                pid_v2,
+                journal_acron,
+                current_version,
+            )
+
+    @staticmethod
+    def get_current_version(pid_provider_xml, collection=None, collection_acron=None):
+        """
+        Retorna a versão atual do XML da coleção solicitada ou, se a coleção
+        não foi fornecida, a versão da coleção principal
+        (PidProviderXML.current_version)
+        """
+        if not pid_provider_xml:
+            return
+        if not collection and not collection_acron:
+            return pid_provider_xml.current_version
+
+        params = {"current_version__isnull": False}
+        if collection:
+            params["collection"] = collection
+        else:
+            params["collection__acron"] = collection_acron
+        item = pid_provider_xml.collection_pids_v2.filter(
+            **params
+        ).select_related("current_version").first()
+        if item:
+            return item.current_version
+        return None
+
+    @property
+    def data(self):
+        return {
+            "pid_v2": self.pid_v2,
+            "journal_acron": self.journal_acron,
+            "collection_acron": self.collection.acron,
+        }
 
 
 class PidProviderXMLManager(models.Manager):
@@ -749,11 +772,17 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     def public_items(cls, from_date):
         now = datetime.utcnow().isoformat()[:10]
         # select_related("current_version") já vem do manager
+        # documento pode ter somente a versão de uma coleção
+        # (ver CollectionPidV2.get_current_version)
         return cls.objects.filter(
             (Q(available_since__isnull=True) | Q(available_since__lte=now))
-            & (Q(created__gte=from_date) | Q(updated__gte=from_date)),
-            current_version__pid_provider_xml__v3__isnull=False,
-        ).iterator()
+            & (Q(created__gte=from_date) | Q(updated__gte=from_date))
+            & (
+                Q(current_version__isnull=False)
+                | Q(collection_pids_v2__current_version__isnull=False)
+            ),
+            v3__isnull=False,
+        ).distinct().iterator()
 
     @property
     def created_updated(self):
@@ -761,14 +790,10 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     @property
     def collection_pids_v2_data(self):
-        if not self.pk:
-            return {}
-        # acron3 (Core) ou acron (Upload)
-        return {
-            getattr(item.collection, "acron3", None) or item.collection.acron: item.pid_v2
-            for item in self.collection_pids_v2.select_related("collection")
-            if item.collection
-        }
+        items = []
+        for item in self.collection_pids_v2.all():
+            items.append(item.data)
+        return items
 
     @property
     def pid_v2_list(self):
@@ -821,10 +846,14 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     @classmethod
     @profile_classmethod
-    def get_xml_with_pre(cls, v3):
+    def get_xml_with_pre(cls, v3, collection=None, collection_acron=None):
+        """
+        Retorna o XML da versão atual da coleção ou da coleção principal
+        (ver CollectionPidV2.get_current_version)
+        """
         try:
             # select_related("current_version") já vem do manager
-            return cls.objects.get(v3=v3).xml_with_pre
+            return cls.objects.get(v3=v3).get_current_version(collection, collection_acron).xml_with_pre
         except cls.DoesNotExist:
             return None
         except Exception:
@@ -1039,7 +1068,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             except PidProviderXMLPidV3ConflictError as exc:
                 event_status = "conflict"
                 raise exc
-
             # analisa se continua o registro
             try:
                 PidProviderXML.is_updated(
@@ -1059,6 +1087,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 )
                 # data to return
                 response.update(registered.data)
+                response["v2"] = xml_with_pre.v2
             except exceptions.ForbiddenPidProviderXMLRegistrationError:
                 event_status = "forbidden"
                 raise
@@ -1111,7 +1140,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             registered_pid=registered and registered.v3,
             auto_solve_pid_conflict=auto_solve_pid_conflict,
         )
-
         if valid_pid != xml_with_pre.v3:
             xml_with_pre.v3 = valid_pid
             xml_changed["pid_v3"] = valid_pid
@@ -1164,17 +1192,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         available_since=None,
         registered_in_core=None,
     ):
-        journal_collections = get_journal_collections(
-            xml_adapter.journal_issn_print, xml_adapter.journal_issn_electronic
-        )
-        main_v2 = None
-        previous_v2 = registered and registered.v2
         if registered:
-            # o pid v2 do XML pode ser o pid v2 do documento em outra coleção
-            # neste caso, o pid v2 principal é o da coleção principal
-            main_v2 = registered.get_main_pid_v2(xml_adapter.v2, journal_collections)
             registered_changed = registered.check_registered_pids_changed(
-                xml_adapter.xml_with_pre, ignore_v2=bool(main_v2)
+                xml_adapter.xml_with_pre
             )
             registered.updated_by = user
         else:
@@ -1185,8 +1205,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         registered.proc_status = choices.PPXML_STATUS_TODO
         registered._add_dates(xml_adapter, origin_date, available_since)
         registered._add_data(xml_adapter, registered_in_core)
-        if main_v2:
-            registered.v2 = main_v2
         registered._add_journal(xml_adapter)
         registered._add_issue(xml_adapter)
  
@@ -1194,109 +1212,57 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
  
         if registered_changed:
             registered._add_other_pid(registered_changed, user)
-        registered._add_current_version(xml_adapter.xml_with_pre, user)
- 
-        registered.add_collections(xml_adapter)
-        registered._add_collection_pids_v2(
-            user, journal_collections, [previous_v2, xml_adapter.v2, registered.v2]
-        )
+        registered.save()
+
+        registered.add_collections(user, xml_adapter)
         return registered
 
-    def is_pid_v2_from_another_collection(self, pid_v2, journal_collections):
+    def get_current_version(self, collection=None, collection_acron=None):
         """
-        Verifica se pid_v2 (do XML) é o pid v2 do documento em outra coleção,
-        ou seja, se pid_v2 e self.v2 têm PIDs de periódico diferentes e
-        ambos correspondem a PIDs do mesmo periódico em coleções distintas.
-        Ex.: Psicologia USP
-            scl: S0103-65642009000300003
-            psi: S1678-51772009000300003
-
-        Se os PIDs de periódico forem iguais, trata-se de correção de pid v2.
+        Retorna a versão atual do XML da coleção ou da coleção principal
+        (ver CollectionPidV2.get_current_version)
         """
-        if not pid_v2 or not self.v2 or pid_v2 == self.v2:
-            return False
-        registered_journal_pid = get_journal_pid_from_v2(self.v2)
-        xml_journal_pid = get_journal_pid_from_v2(pid_v2)
-        if not registered_journal_pid or not xml_journal_pid:
-            return False
-        if registered_journal_pid == xml_journal_pid:
-            return False
-        if self.pk and self.collection_pids_v2.filter(pid_v2=pid_v2).exists():
-            return True
-        journal_pids = {item["journal_pid"] for item in journal_collections or []}
-        return registered_journal_pid in journal_pids and xml_journal_pid in journal_pids
+        if not collection and not collection_acron:
+            return self.current_version
+        return CollectionPidV2.get_current_version(self, collection, collection_acron)
 
-    def get_main_pid_v2(self, pid_v2, journal_collections):
+    def add_collections(self, user, xml_adapter):
         """
-        Retorna o pid v2 principal quando pid_v2 (do XML) é o pid v2 do
-        documento em outra coleção:
-        - pid_v2, se pid_v2 é da coleção principal (scielonetwork) e
-          self.v2 não é
-        - self.v2, nos demais casos (mantém o registrado)
+        Adiciona as coleções do periódico e registra o pid v2 e a versão do
+        XML da coleção de origem do XML (CollectionPidV2)
 
-        Retorna None se pid_v2 não é de outra coleção, ou seja, o pid v2
-        do XML prevalece (fluxo normal, incluindo correção de pid v2).
+        Somente o XML da coleção principal é a versão atual do documento
+        (self.current_version)
         """
-        if not self.is_pid_v2_from_another_collection(pid_v2, journal_collections):
-            return None
-        main_journal_pids = {
-            item["journal_pid"]
-            for item in journal_collections or []
-            if item.get("is_main")
-        }
-        if (
-            get_journal_pid_from_v2(pid_v2) in main_journal_pids
-            and get_journal_pid_from_v2(self.v2) not in main_journal_pids
-        ):
-            return pid_v2
-        return self.v2
+        xml_with_pre = xml_adapter.xml_with_pre
+        collection_acron = xml_with_pre.collection
 
-    def _add_collection_pids_v2(self, user, journal_collections, pids_v2):
-        """
-        Registra o pid v2 do documento para cada coleção cujo PID do
-        periódico corresponde ao PID do periódico contido no pid v2
-
-        pids_v2 em ordem de precedência crescente: para a mesma coleção,
-        prevalece o último (ex.: pid v2 corrigido sobre o anterior)
-        """
-        for pid_v2 in dict.fromkeys(item for item in pids_v2 if item):
-            journal_pid = get_journal_pid_from_v2(pid_v2)
-            for item in journal_collections or []:
-                if item["journal_pid"] != journal_pid:
-                    continue
-                try:
-                    CollectionPidV2.create_or_update(
-                        user,
-                        pid_provider_xml=self,
-                        collection=item["collection"],
-                        pid_v2=pid_v2,
-                        journal_acron=item["journal_acron"],
-                    )
-                except Exception as e:
-                    logging.exception(e)
-
-    def add_collections(self, xml_adapter):
-        q = Q()
-        issn_print = xml_adapter.journal_issn_print
-        issn_electronic = xml_adapter.journal_issn_electronic
-
-        try:
-            Collection.objects.filter(scielojournal__isnull=True).exists()
-            issn_path = "scielojournal__journal__official"
-        except FieldError:
-            issn_path = "journalproc__journal__official_journal"
-
-        if issn_print:
-            q |= Q(**{f"{issn_path}__issn_print": issn_print})
-        if issn_electronic:
-            q |= Q(**{f"{issn_path}__issn_electronic": issn_electronic})
-
-        for collection in Collection.objects.filter(q):
+        for xml_collection in get_xml_collections(xml_with_pre):
+            collection = xml_collection["collection"]
             self.collections.add(collection)
+
+            if collection.acron != collection_acron:
+                continue
+            if xml_collection["is_main"]:
+                self.v2 = xml_with_pre.v2
+                self._add_current_version(xml_with_pre, user)
+            current_version = XMLVersion.get_or_create(user, self, xml_with_pre)
+            CollectionPidV2.create_or_update(
+                user,
+                self,
+                collection,
+                xml_with_pre.v2,
+                journal_acron=xml_collection["journal_acron"],
+                current_version=current_version,
+            )
 
     @staticmethod
     def is_updated(
-        xml_with_pre, registered, force_update, origin_date, registered_in_core
+        xml_with_pre,
+        registered,
+        force_update,
+        origin_date,
+        registered_in_core,
     ):
         """
         XML é versão AOP, mas
@@ -1322,6 +1288,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             return
 
         # verifica se é necessário atualizar
+        # compara com a versão da mesma coleção (legado)
         if registered.is_equal_to(xml_with_pre):
             # XML fornecido é igual ao registrado, não precisa continuar
             logging.info(f"Skip update: equal")
@@ -1345,9 +1312,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     @profile_method
     def is_equal_to(self, xml_with_pre):
-        return bool(
-            self.current_version and self.current_version.is_equal_to(xml_with_pre)
-        )
+        return CollectionPidV2.is_equal_to(self, xml_with_pre)
 
     @classmethod
     @profile_classmethod
@@ -1375,7 +1340,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         )
 
         selected_journal = objects.filter(qbuilder.issn_query)
-
         # 2) busca exata com journal + issue + dados do artigo
         yield (
             "journal-issue-article-strict",
@@ -1432,7 +1396,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         self.pkg_name = xml_adapter.sps_pkg_name
         self.article_pub_year = xml_adapter.article_pub_year
         self.v3 = xml_adapter.v3
-        self.v2 = xml_adapter.v2
         self.aop_pid = xml_adapter.aop_pid
 
         self.fpage = xml_adapter.fpage
@@ -1478,7 +1441,16 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         self.pub_year = xml_adapter.pub_year or xml_adapter.article_pub_year
 
     @profile_method
-    def _add_current_version(self, xml_with_pre, user, delete=False):
+    def _add_current_version(
+        self, xml_with_pre, user, delete=False
+    ):
+        """
+        Registra a versão do XML
+
+        Se o periódico está em mais de uma coleção, registra a versão para as
+        coleções do XML (CollectionPidV2) e somente a versão da coleção
+        principal é a versão atual do documento (self.current_version)
+        """
         if delete:
             try:
                 self.current_version.delete()
@@ -1496,25 +1468,25 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 {
                     "pid_type": "pid_v3",
                     "pid_in_xml": xml_with_pre.v3,
-                    "version": self.current_version,
                     "registered": self.v3,
                 }
             )
-        if not ignore_v2 and self.v2 != xml_with_pre.v2:
-            registered_changed.append(
-                {
-                    "pid_type": "pid_v2",
-                    "pid_in_xml": xml_with_pre.v2,
-                    "version": self.current_version,
-                    "registered": self.v2,
-                }
-            )
+        for item in self.collection_pids_v2.filter(collection__acron=xml_with_pre.collection):
+            if not ignore_v2 and item.pid_v2 != xml_with_pre.v2:
+                registered_changed.append(
+                    {
+                        "pid_type": "pid_v2",
+                        "pid_in_xml": xml_with_pre.v2,
+                        "registered": self.v2,
+                    }
+                )
+                break
+    
         if self.aop_pid != xml_with_pre.aop_pid:
             registered_changed.append(
                 {
                     "pid_type": "aop_pid",
                     "pid_in_xml": xml_with_pre.aop_pid,
-                    "version": self.current_version,
                     "registered": self.aop_pid,
                 }
             )
@@ -1665,7 +1637,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         try:
             if correct_pid_v2 == item.v2:
                 return item.data
-            xml_with_pre = item.current_version.xml_with_pre
+            xml_with_pre = item.get_current_version().xml_with_pre
             xml_with_pre.v2 = correct_pid_v2
             item._add_current_version(xml_with_pre, user, delete=True)
             item.v2 = correct_pid_v2
@@ -1693,7 +1665,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     def mark_items_as_invalid(cls, issns):
         # select_related("current_version") já vem do manager
         # (necessário aqui pois o loop acessa item.xml_with_pre, que usa
-        # self.current_version)
+        # self.get_current_version())
         items = cls.objects.filter(
             Q(issn_print__in=issns) | Q(issn_electronic__in=issns),
         )
@@ -1814,7 +1786,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                     user=user,
                     pid_type="pid_v3",
                     pid_in_xml=item.v3,
-                    version=item.current_version,
+                    version=item.get_current_version(),
                     pid_provider_xml=most_recent_item,
                 )
         except Exception as exception:
