@@ -1,6 +1,8 @@
 import logging
 
 from langdetect import detect
+from django import forms
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -16,6 +18,34 @@ from core.models import CommonControlField
 
 
 class LanguageGetOrCreateError(Exception): ...
+
+
+class ChoiceArrayField(ArrayField):
+    """
+    ArrayField cujo formulário apresenta as opções do base_field
+    como múltipla escolha (checkboxes), em vez de texto separado por vírgula.
+    """
+
+    def formfield(self, **kwargs):
+        defaults = {
+            "form_class": forms.TypedMultipleChoiceField,
+            "choices": self.base_field.choices,
+            "coerce": self.base_field.to_python,
+            "widget": forms.CheckboxSelectMultiple,
+        }
+        defaults.update(kwargs)
+        # Ignora ArrayField.formfield (SimpleArrayField)
+        return super(ArrayField, self).formfield(**defaults)
+
+
+def normalize_network_classification(network_classification):
+    """
+    Retorna network_classification como lista ou None
+    Ex.: "scielonetwork" -> ["scielonetwork"]
+    """
+    if isinstance(network_classification, str):
+        network_classification = [network_classification]
+    return list(network_classification or []) or None
 
 
 class Collection(CommonControlField):
@@ -40,10 +70,12 @@ class Collection(CommonControlField):
         null=True,
         blank=True,
     )
-    network_classification = models.CharField(
-        _("Network classification"),
-        choices=choices.NETWORK_CLASSIFICATION,
-        max_length=20,
+    network_classification = ChoiceArrayField(
+        models.CharField(
+            max_length=20,
+            choices=choices.NETWORK_CLASSIFICATION,
+        ),
+        verbose_name=_("Network classification"),
         null=True,
         blank=True,
     )
@@ -54,7 +86,7 @@ class Collection(CommonControlField):
         FieldPanel("acron"),
         FieldPanel("name"),
         FieldPanel("platform_status"),
-        FieldPanel("network_classification"),
+        FieldPanel("network_classification", widget=forms.CheckboxSelectMultiple),
     ]
 
     autocomplete_search_field = "name"
@@ -77,6 +109,9 @@ class Collection(CommonControlField):
         platform_status=None,
         network_classification=None,
     ):
+        network_classification = normalize_network_classification(
+            network_classification
+        )
         try:
             collection = Collection.get(acron=acron)
         except Collection.DoesNotExist:
@@ -104,7 +139,19 @@ class Collection(CommonControlField):
             collection.updated_by = user
             collection.save()
         return collection
-    
+
+    @classmethod
+    def get_national_journal_collections(cls):
+        """
+        Retorna as coleções cuja classificação de rede
+        é exclusivamente scielonetwork
+        """
+        return cls.objects.filter(network_classification=["scielonetwork"])
+
+    @property
+    def is_national_journal_collection(self):
+        return self.network_classification == ["scielonetwork"]
+
     def get_website_config(self, purpose, content_type):
         ws = WebSiteConfiguration.get(collection=self, purpose=purpose)
         return ws.get_data(content_type=content_type)
