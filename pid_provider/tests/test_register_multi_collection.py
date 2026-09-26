@@ -7,7 +7,14 @@ Ex.: Psicologia USP
 - psi: acron=psicousp, pid=1678-5177, artigo S1678-51772009000300003
 
 Os XML têm o mesmo conteúdo, diferem no pid v2 (e no acrônimo do
-periódico) e não têm pid v3 (como os XML gerados a partir do site clássico).
+periódico), informam a coleção de origem (custom-meta, como em
+ArticleProc) e não têm pid v3 (como os XML gerados a partir do site clássico).
+
+- somente o XML da coleção principal é a versão atual do documento
+  (PidProviderXML.current_version)
+- o pid v2 principal (PidProviderXML.v2) é o da coleção principal ou, na
+  falta dela, o primeiro registrado
+- o pid v2 e a versão do XML de cada coleção ficam em CollectionPidV2
 """
 
 from tempfile import TemporaryDirectory
@@ -18,7 +25,12 @@ from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from collection.models import Collection
 from journal.models import Journal, OfficialJournal
-from pid_provider.models import CollectionPidV2, OtherPid, PidProviderXML
+from pid_provider.models import (
+    CollectionPidV2,
+    OtherPid,
+    PidProviderXML,
+    XMLVersion,
+)
 from proc.models import JournalProc
 
 User = get_user_model()
@@ -86,17 +98,93 @@ XML_TEMPLATE = """<!DOCTYPE article PUBLIC "-//NLM//DTD JATS (Z39.96) Journal Pu
 """
 
 
-def make_xml_with_pre(pid_v2, journal_acron):
-    xml_content = XML_TEMPLATE.format(pid_v2=pid_v2, journal_acron=journal_acron)
-    return list(XMLWithPre.create(xml_content=xml_content))[0]
+TITLE = "A constituição do sujeito e o laço social"
+UPDATED_TITLE = "A constituição do sujeito e do laço social"
+
+# Errata: documento próprio (article-type="correction"), com pid v2 próprio,
+# sem resumo e sem autores, contendo somente os trechos "onde se lê X,
+# leia-se Y" e o related-article que aponta para o artigo corrigido
+SCL_ERRATUM_V2 = "S0103-65642009000300010"
+PSI_ERRATUM_V2 = "S1678-51772009000300010"
+
+ERRATUM_TEMPLATE = """<!DOCTYPE article PUBLIC "-//NLM//DTD JATS (Z39.96) Journal Publishing DTD v1.1 20151215//EN" "https://jats.nlm.nih.gov/publishing/1.1/JATS-journalpublishing1.dtd">
+<article xmlns:mml="http://www.w3.org/1998/Math/MathML" xmlns:xlink="http://www.w3.org/1999/xlink" article-type="correction" dtd-version="1.1" specific-use="sps-1.9" xml:lang="pt">
+  <front>
+    <journal-meta>
+      <journal-id journal-id-type="publisher-id">{journal_acron}</journal-id>
+      <journal-title-group>
+        <journal-title>Psicologia USP</journal-title>
+      </journal-title-group>
+      <issn pub-type="ppub">0103-6564</issn>
+      <issn pub-type="epub">1678-5177</issn>
+    </journal-meta>
+    <article-meta>
+      <article-id specific-use="scielo-v2" pub-id-type="publisher-id">{pid_v2}</article-id>
+      <article-id pub-id-type="other">00010</article-id>
+      <article-categories>
+        <subj-group subj-group-type="heading">
+          <subject>Errata</subject>
+        </subj-group>
+      </article-categories>
+      <title-group>
+        <article-title>Errata</article-title>
+      </title-group>
+      <pub-date date-type="pub" publication-format="electronic">
+        <day>15</day>
+        <month>10</month>
+        <year>2009</year>
+      </pub-date>
+      <pub-date date-type="collection" publication-format="electronic">
+        <year>2009</year>
+      </pub-date>
+      <volume>20</volume>
+      <issue>3</issue>
+      <fpage>351</fpage>
+      <lpage>351</lpage>
+      <related-article ext-link-type="doi" id="ra1" related-article-type="corrected-article" xlink:href="10.1590/S0103-65642009000300003"/>
+    </article-meta>
+  </front>
+  <body>
+    <p>No artigo "A constituição do sujeito e o laço social", publicado no v. 20, n. 3, p. 333-350, 2009:</p>
+    <p>Onde se lê: "A constituição do sujeito e o laço social"</p>
+    <p>Leia-se: "A constituição do sujeito e do laço social"</p>
+  </body>
+</article>
+"""
+
+
+def make_xml_with_pre(pid_v2, journal_acron, collection=None, content=None):
+    xml_content = content or XML_TEMPLATE.format(
+        pid_v2=pid_v2, journal_acron=journal_acron
+    )
+    xml_with_pre = list(XMLWithPre.create(xml_content=xml_content))[0]
+    if collection:
+        # coleção de origem do XML (ver ArticleProc)
+        xml_with_pre.collection = collection
+    return xml_with_pre
 
 
 def scl_xml():
-    return make_xml_with_pre(SCL_V2, "pusp")
+    return make_xml_with_pre(SCL_V2, "pusp", "scl")
 
 
 def psi_xml():
-    return make_xml_with_pre(PSI_V2, "psicousp")
+    return make_xml_with_pre(PSI_V2, "psicousp", "psi")
+
+
+def updated_xml(pid_v2, journal_acron, collection):
+    # nova versão do XML do mesmo artigo (mesmo pid v2), com o título corrigido
+    content = XML_TEMPLATE.format(
+        pid_v2=pid_v2, journal_acron=journal_acron
+    ).replace(TITLE, UPDATED_TITLE)
+    return make_xml_with_pre(pid_v2, journal_acron, collection, content)
+
+
+def erratum_xml(pid_v2, journal_acron, collection):
+    content = ERRATUM_TEMPLATE.format(
+        pid_v2=pid_v2, journal_acron=journal_acron
+    )
+    return make_xml_with_pre(pid_v2, journal_acron, collection, content)
 
 
 class RegisterSameArticleInDifferentCollectionsTestBase(TestCase):
@@ -111,10 +199,10 @@ class RegisterSameArticleInDifferentCollectionsTestBase(TestCase):
 
         self.user = User.objects.create_user(username="multicol-register")
         self.scl = Collection.objects.create(
-            acron="scl", network_classification="scielonetwork", creator=self.user
+            acron="scl", network_classification=["scielonetwork"], creator=self.user
         )
         self.psi = Collection.objects.create(
-            acron="psi", network_classification="thematic", creator=self.user
+            acron="psi", network_classification=["thematic"], creator=self.user
         )
         official_journal = OfficialJournal.objects.create(
             title="Psicologia USP",
@@ -164,12 +252,27 @@ class RegisterSameArticleInDifferentCollectionsTestBase(TestCase):
         )
         self.assertEqual(
             {
-                (item.collection.acron, item.journal_acron, item.pid_v2)
+                (item.collection.acron, item.journal_acron, item.journal_pid, item.pid_v2)
                 for item in CollectionPidV2.objects.filter(
                     pid_provider_xml=registered
                 )
             },
-            {("scl", "pusp", SCL_V2), ("psi", "psicousp", PSI_V2)},
+            {
+                ("scl", "pusp", ISSN_PRINT, SCL_V2),
+                ("psi", "psicousp", ISSN_ELECTRONIC, PSI_V2),
+            },
+        )
+
+    def collection_current_version(self, registered, collection):
+        return CollectionPidV2.objects.get(
+            pid_provider_xml=registered, collection=collection
+        ).current_version
+
+    def assert_current_version_is_from(self, registered, collection):
+        registered.refresh_from_db()
+        self.assertEqual(
+            registered.current_version,
+            self.collection_current_version(registered, collection),
         )
 
     def assert_no_pid_v2_change(self, registered):
@@ -270,7 +373,7 @@ class RegisterThematicCollectionFirstTest(
     def test_thematic_collection_does_not_replace_main_v2_afterwards(self):
         self.register(psi_xml(), "psi")
         self.register(scl_xml(), "scl")
-        self.register(psi_xml(), "psi")
+        self.register(updated_xml(PSI_V2, "psicousp", "psi"), "psi")
 
         registered = PidProviderXML.objects.get()
         self.assertEqual(registered.v2, SCL_V2)
@@ -294,3 +397,375 @@ class RegisterWithoutMainCollectionTest(
         self.assertEqual(registered.v2, PSI_V2)
         self.assert_pids_v2_by_collection(registered)
         self.assert_no_pid_v2_change(registered)
+
+
+class RegisterWithoutCollectionInXMLTest(
+    RegisterSameArticleInDifferentCollectionsTestBase
+):
+    """XML não informa a coleção de origem"""
+
+    def test_no_version_is_registered(self):
+        response = self.register(make_xml_with_pre(SCL_V2, "pusp"), "scl")
+
+        registered = PidProviderXML.objects.get()
+        self.assertEqual(response["v2"], SCL_V2)
+        self.assertEqual(
+            set(registered.collections.values_list("acron", flat=True)),
+            {"scl", "psi"},
+        )
+        self.assertFalse(CollectionPidV2.objects.exists())
+        self.assertIsNone(registered.current_version)
+        self.assertFalse(XMLVersion.objects.exists())
+
+
+class XMLVersionByCollectionTest(RegisterSameArticleInDifferentCollectionsTestBase):
+    """
+    O XML de cada coleção chega em momentos diferentes na migração:
+    cada coleção tem sua versão atual e a versão atual do documento é a da
+    coleção principal
+    """
+
+    def test_each_collection_has_its_own_current_version(self):
+        self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+
+        registered = PidProviderXML.objects.get()
+        scl_version = self.collection_current_version(registered, self.scl)
+        psi_version = self.collection_current_version(registered, self.psi)
+        self.assertNotEqual(scl_version, psi_version)
+        self.assertEqual(scl_version.xml_with_pre.v2, SCL_V2)
+        self.assertEqual(psi_version.xml_with_pre.v2, PSI_V2)
+        self.assertEqual(scl_version.xml_with_pre.collection, "scl")
+        self.assertEqual(psi_version.xml_with_pre.collection, "psi")
+
+    def test_current_version_is_the_main_collection_version(self):
+        self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+
+        registered = PidProviderXML.objects.get()
+        self.assert_current_version_is_from(registered, self.scl)
+        self.assertEqual(registered.xml_with_pre.v2, SCL_V2)
+
+    def test_main_collection_version_becomes_current_version(self):
+        self.register(psi_xml(), "psi")
+        registered = PidProviderXML.objects.get()
+        # somente a coleção principal completa current_version
+        self.assertIsNone(registered.current_version)
+        self.assertIsNotNone(self.collection_current_version(registered, self.psi))
+
+        self.register(scl_xml(), "scl")
+
+        self.assert_current_version_is_from(registered, self.scl)
+
+    def test_same_xml_of_the_collection_is_skipped(self):
+        self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+
+        total = XMLVersion.objects.count()
+
+        responses = [self.register(scl_xml(), "scl"), self.register(psi_xml(), "psi")]
+
+        self.assertEqual(
+            [response["event_status"] for response in responses],
+            ["skipped", "skipped"],
+        )
+        self.assertEqual(XMLVersion.objects.count(), total)
+
+    def test_is_registered_compares_with_version_of_the_same_collection(self):
+        response = self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+
+        # XML com o pid v3 atribuído (como no pacote após o registro)
+        for xml_with_pre in (scl_xml(), psi_xml()):
+            xml_with_pre.v3 = response["v3"]
+            with self.subTest(v2=xml_with_pre.v2):
+                self.assertTrue(
+                    PidProviderXML.is_registered(xml_with_pre)["is_equal"]
+                )
+
+    def test_get_xml_with_pre_by_collection(self):
+        response = self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+        v3 = response["v3"]
+
+        self.assertEqual(PidProviderXML.get_xml_with_pre(v3).v2, SCL_V2)
+        self.assertEqual(PidProviderXML.get_xml_with_pre(v3, self.scl).v2, SCL_V2)
+        self.assertEqual(PidProviderXML.get_xml_with_pre(v3, self.psi).v2, PSI_V2)
+        self.assertEqual(
+            PidProviderXML.get_xml_with_pre(v3, collection_acron="psi").v2, PSI_V2
+        )
+
+    def test_get_xml_with_pre_of_collection_without_version(self):
+        response = self.register(scl_xml(), "scl")
+
+        self.assertIsNone(PidProviderXML.get_xml_with_pre(response["v3"], self.psi))
+
+
+class XMLVersionWithoutMainCollectionTest(
+    RegisterSameArticleInDifferentCollectionsTestBase
+):
+    def setUp(self):
+        super().setUp()
+        Collection.objects.update(network_classification=None)
+
+    def test_current_version_is_not_registered(self):
+        self.register(psi_xml(), "psi")
+        self.register(scl_xml(), "scl")
+
+        registered = PidProviderXML.objects.get()
+        # sem coleção principal, current_version não é completado
+        self.assertIsNone(registered.current_version)
+        self.assertIsNone(PidProviderXML.get_xml_with_pre(registered.v3))
+        self.assertEqual(
+            PidProviderXML.get_xml_with_pre(registered.v3, self.psi).v2, PSI_V2
+        )
+        self.assertEqual(
+            PidProviderXML.get_xml_with_pre(registered.v3, self.scl).v2, SCL_V2
+        )
+
+    def test_update_of_the_same_collection_updates_its_version(self):
+        self.register(psi_xml(), "psi")
+        self.register(scl_xml(), "scl")
+        updated = updated_xml(PSI_V2, "psicousp", "psi")
+
+        self.register(updated, "psi")
+
+        registered = PidProviderXML.objects.get()
+        self.assertEqual(
+            registered.get_current_version(self.psi).finger_print,
+            updated.finger_print,
+        )
+        self.assertNotEqual(
+            registered.get_current_version(self.scl).finger_print,
+            updated.finger_print,
+        )
+
+
+class XMLVersionOfJournalWithSameDataInCollectionsTest(
+    RegisterSameArticleInDifferentCollectionsTestBase
+):
+    """
+    Periódico com o mesmo PID e acrônimo em todas as coleções: o XML de
+    cada coleção difere somente na coleção de origem
+    """
+
+    def setUp(self):
+        super().setUp()
+        JournalProc.objects.filter(collection=self.psi).update(
+            pid=ISSN_PRINT, acron="pusp"
+        )
+
+    def test_each_collection_is_registered_when_its_xml_arrives(self):
+        self.register(scl_xml(), "scl")
+
+        registered = PidProviderXML.objects.get()
+        self.assertEqual(registered.collections.count(), 2)
+        self.assertEqual(registered.collection_pids_v2_data, {"scl": SCL_V2})
+
+        self.register(make_xml_with_pre(SCL_V2, "pusp", "psi"), "psi")
+
+        registered = PidProviderXML.objects.get()
+        self.assertEqual(
+            {
+                (item.collection.acron, item.pid_v2, item.current_version.xml_with_pre.collection)
+                for item in CollectionPidV2.objects.all()
+            },
+            {("scl", SCL_V2, "scl"), ("psi", SCL_V2, "psi")},
+        )
+        self.assert_current_version_is_from(registered, self.scl)
+        self.assert_no_pid_v2_change(registered)
+
+
+class XMLVersionOfJournalWithDifferentAcronInCollectionsTest(
+    RegisterSameArticleInDifferentCollectionsTestBase
+):
+    """
+    Periódico com o mesmo PID, mas acrônimos diferentes nas coleções
+    (no site novo, o acrônimo é a chave do periódico): o XML de cada
+    coleção difere no journal-id
+    """
+
+    def setUp(self):
+        super().setUp()
+        JournalProc.objects.filter(collection=self.psi).update(pid=ISSN_PRINT)
+
+    def test_different_article_pid_v2_with_same_journal_pid(self):
+        # pid v2 do artigo depende também do pid do fascículo e da ordem
+        psi_v2 = "S0103-65642009000300007"
+        self.register(make_xml_with_pre(SCL_V2, "pusp", "scl"), "scl")
+        self.register(make_xml_with_pre(psi_v2, "psicousp", "psi"), "psi")
+
+        registered = PidProviderXML.objects.get()
+        self.assertEqual(registered.v2, SCL_V2)
+        self.assert_no_pid_v2_change(registered)
+        self.assertEqual(
+            registered.collection_pids_v2_data, {"scl": SCL_V2, "psi": psi_v2}
+        )
+        self.assertEqual(
+            PidProviderXML.get_xml_with_pre(registered.v3, self.psi).v2, psi_v2
+        )
+        self.assertEqual(
+            PidProviderXML.get_xml_with_pre(registered.v3, self.scl).v2, SCL_V2
+        )
+
+    def test_same_pid_v2_with_different_journal_acron(self):
+        self.register(make_xml_with_pre(SCL_V2, "pusp", "scl"), "scl")
+        self.register(make_xml_with_pre(SCL_V2, "psicousp", "psi"), "psi")
+
+        registered = PidProviderXML.objects.get()
+        self.assertEqual(registered.v2, SCL_V2)
+        self.assertEqual(
+            {
+                (item.collection.acron, item.journal_acron, item.pid_v2)
+                for item in CollectionPidV2.objects.all()
+            },
+            {("scl", "pusp", SCL_V2), ("psi", "psicousp", SCL_V2)},
+        )
+        self.assertEqual(
+            PidProviderXML.get_xml_with_pre(registered.v3, self.psi).journal_acron,
+            "psicousp",
+        )
+        self.assertEqual(
+            PidProviderXML.get_xml_with_pre(registered.v3, self.scl).journal_acron,
+            "pusp",
+        )
+
+
+class MigrationCollectionVersionsTest(
+    RegisterSameArticleInDifferentCollectionsTestBase
+):
+    """
+    Migração: o XML de cada coleção (pid v2 e journal-id da coleção)
+    cria / atualiza somente a versão desta coleção
+    """
+
+    def assert_collection_xml(self, registered, collection, acron, pid_v2):
+        xml_with_pre = PidProviderXML.get_xml_with_pre(registered.v3, collection)
+        self.assertEqual(xml_with_pre.journal_acron, acron)
+        self.assertEqual(xml_with_pre.v2, pid_v2)
+        self.assertEqual(xml_with_pre.v3, registered.v3)
+        self.assertEqual(xml_with_pre.collection, collection.acron)
+        return xml_with_pre
+
+    def test_other_collections_are_registered_when_their_xml_arrives(self):
+        self.register(scl_xml(), "scl")
+
+        registered = PidProviderXML.objects.get()
+        self.assertFalse(
+            CollectionPidV2.objects.filter(collection=self.psi).exists()
+        )
+
+        self.register(psi_xml(), "psi")
+
+        self.assert_collection_xml(registered, self.scl, "pusp", SCL_V2)
+        self.assert_collection_xml(registered, self.psi, "psicousp", PSI_V2)
+
+    def test_xml_of_a_collection_updates_only_its_version(self):
+        self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+
+        self.register(updated_xml(SCL_V2, "pusp", "scl"), "scl")
+
+        registered = PidProviderXML.objects.get()
+        scl = self.assert_collection_xml(registered, self.scl, "pusp", SCL_V2)
+        psi = self.assert_collection_xml(registered, self.psi, "psicousp", PSI_V2)
+        self.assertIn(UPDATED_TITLE, scl.tostring())
+        self.assertNotIn(UPDATED_TITLE, psi.tostring())
+        self.assert_current_version_is_from(registered, self.scl)
+
+    def test_xml_collection_is_identified_by_custom_meta(self):
+        self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+
+        # acrônimo não corresponde a nenhuma coleção
+        self.register(updated_xml(SCL_V2, "psicologiausp", "scl"), "scl")
+
+        registered = PidProviderXML.objects.get()
+        scl = self.assert_collection_xml(registered, self.scl, "psicologiausp", SCL_V2)
+        psi = self.assert_collection_xml(registered, self.psi, "psicousp", PSI_V2)
+        self.assertIn(UPDATED_TITLE, scl.tostring())
+        self.assertNotIn(UPDATED_TITLE, psi.tostring())
+
+    def test_same_xml_is_skipped(self):
+        first = scl_xml()
+        self.register(first, "scl")
+        total = XMLVersion.objects.count()
+
+        again = scl_xml()
+        again.v3 = first.v3
+        response = self.register(again, "scl")
+
+        self.assertEqual(response["event_status"], "skipped")
+        self.assertEqual(XMLVersion.objects.count(), total)
+
+
+class ErratumInDifferentCollectionsTest(
+    RegisterSameArticleInDifferentCollectionsTestBase
+):
+    """
+    A errata não é uma nova versão do artigo: é outro documento, com pid v2
+    próprio, que aponta para o artigo corrigido (related-article).
+    Registrar a errata não altera o registro do artigo.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+        self.article = PidProviderXML.objects.get()
+
+    def get_erratum(self):
+        return PidProviderXML.objects.exclude(pk=self.article.pk).get()
+
+    def test_erratum_is_registered_as_another_document(self):
+        response = self.register(
+            erratum_xml(SCL_ERRATUM_V2, "pusp", "scl"), "scl"
+        )
+
+        self.assertEqual(PidProviderXML.objects.count(), 2)
+        erratum = self.get_erratum()
+        self.assertEqual(response["v3"], erratum.v3)
+        self.assertNotEqual(erratum.v3, self.article.v3)
+        self.assertEqual(erratum.v2, SCL_ERRATUM_V2)
+
+    def test_erratum_of_both_collections_is_registered_once(self):
+        first = self.register(erratum_xml(SCL_ERRATUM_V2, "pusp", "scl"), "scl")
+        second = self.register(
+            erratum_xml(PSI_ERRATUM_V2, "psicousp", "psi"), "psi"
+        )
+
+        self.assertEqual(PidProviderXML.objects.count(), 2)
+        erratum = self.get_erratum()
+        self.assertEqual(first["v3"], erratum.v3)
+        self.assertEqual(second["v3"], erratum.v3)
+        self.assertEqual(erratum.v2, SCL_ERRATUM_V2)
+        self.assertEqual(
+            erratum.collection_pids_v2_data,
+            {"scl": SCL_ERRATUM_V2, "psi": PSI_ERRATUM_V2},
+        )
+        self.assert_no_pid_v2_change(erratum)
+
+    def test_erratum_does_not_change_the_article(self):
+        article_versions = {
+            collection.acron: self.collection_current_version(
+                self.article, collection
+            ).pk
+            for collection in (self.scl, self.psi)
+        }
+
+        self.register(erratum_xml(SCL_ERRATUM_V2, "pusp", "scl"), "scl")
+        self.register(erratum_xml(PSI_ERRATUM_V2, "psicousp", "psi"), "psi")
+
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.v2, SCL_V2)
+        self.assert_pids_v2_by_collection(self.article)
+        self.assert_no_pid_v2_change(self.article)
+        self.assertEqual(
+            {
+                collection.acron: self.collection_current_version(
+                    self.article, collection
+                ).pk
+                for collection in (self.scl, self.psi)
+            },
+            article_versions,
+        )
