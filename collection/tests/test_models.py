@@ -294,9 +294,8 @@ class CollectionGetOrCreateTest(TestCase):
         )
         collection.refresh_from_db()
         self.assertEqual(collection.platform_status, "classic")
-        self.assertEqual(collection.network_classification, "thematic")
+        self.assertEqual(collection.network_classification, ["thematic"])
         self.assertEqual(collection.get_platform_status_display(), "Classic")
-        self.assertEqual(collection.get_network_classification_display(), "Thematic")
 
     def test_creates_without_new_fields(self):
         collection = Collection.get_or_create(acron="scl", user=self.user)
@@ -313,7 +312,7 @@ class CollectionGetOrCreateTest(TestCase):
         )
         collection.refresh_from_db()
         self.assertEqual(collection.platform_status, "migrating")
-        self.assertEqual(collection.network_classification, "scielonetwork")
+        self.assertEqual(collection.network_classification, ["scielonetwork"])
         self.assertEqual(Collection.objects.filter(acron="scl").count(), 1)
 
     def test_keeps_existing_values_when_not_given(self):
@@ -326,4 +325,16 @@ class CollectionGetOrCreateTest(TestCase):
         collection = Collection.get_or_create(acron="scl", user=self.user)
         collection.refresh_from_db()
         self.assertEqual(collection.platform_status, "new")
-        self.assertEqual(collection.network_classification, "scielonetwork")
+        self.assertEqual(collection.network_classification, ["scielonetwork"])
+
+    def test_accepts_list_of_network_classification(self):
+        collection = Collection.get_or_create(
+            acron="psi",
+            user=self.user,
+            network_classification=["scielonetwork", "thematic"],
+        )
+        collection.refresh_from_db()
+        self.assertEqual(
+            collection.network_classification, ["scielonetwork", "thematic"]
+        )
+        self.assertNotIn(collection, Collection.get_national_journal_collections())
