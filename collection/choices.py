@@ -32,3 +32,16 @@ WEBSITE_KIND = [
     (QA, _("QA")),
     (PUBLIC, _("PUBLIC")),
 ]
+
+PLATFORM_STATUS = [
+    ("classic", _("Classic")),
+    ("new", _("New")),
+    ("migrating", _("Migrating")),
+    ("migrated", _("Migrated")),
+]
+
+NETWORK_CLASSIFICATION = [
+    ("scielonetwork", _("SciELO Network")),
+    ("thematic", _("Thematic")),
+    ("independent", _("Independent")),
+]

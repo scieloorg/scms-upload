@@ -1,6 +1,8 @@
 {"user_id":1,
  "collection_acron": "scl",
  "collection_name": "SciELO Brasil",
+ "collection_platform_status": "new",
+ "collection_network_classification": "scielonetwork",
  "url": "new.scielo.br",
 
  "websites": [
