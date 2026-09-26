@@ -64,6 +64,15 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
+                    "current_version",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="pid_provider.xmlversion",
+                    ),
+                ),
+                (
                     "creator",
                     models.ForeignKey(
                         editable=False,
