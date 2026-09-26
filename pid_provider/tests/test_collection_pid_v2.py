@@ -1,12 +1,17 @@
 """
-Testes para periódicos presentes em mais de uma coleção com PIDs
-diferentes (e, consequentemente, artigos com PIDs v2 diferentes).
+Testes de unidade para periódicos presentes em mais de uma coleção com
+dados diferentes (PID e/ou acrônimo) e, consequentemente, artigos com
+PIDs v2 e XML diferentes em cada coleção.
 
 Ex.: Psicologia USP
 - scl: acron=pusp, pid=0103-6564, artigo S0103-65642009000300003
 - psi: acron=psicousp, pid=1678-5177, artigo S1678-51772009000300003
+
+Os cenários de registro com XML real estão em
+test_register_multi_collection.py
 """
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
@@ -14,14 +19,13 @@ from django.test import SimpleTestCase, TestCase
 
 from collection.models import Collection
 from journal.models import Journal, OfficialJournal
-from pid_provider.models import (
-    CollectionPidV2,
-    OtherPid,
-    PidProviderXML,
-    XMLVersion,
-    get_journal_collections,
+from pid_provider.models import CollectionPidV2, PidProviderXML, XMLVersion
+from pid_provider.multi_collection import (
     get_journal_pid_from_v2,
+    get_xml_collections,
+    normalize_acron,
 )
+from pid_provider.query_params import compare
 from proc.models import JournalProc
 
 User = get_user_model()
@@ -32,322 +36,334 @@ ISSN_PRINT = "0103-6564"
 ISSN_ELECTRONIC = "1678-5177"
 
 
-def make_xml_adapter(v2, v3="V3-PSICOUSP-0000000001"):
-    xml_with_pre = MagicMock(name="xml_with_pre")
-    xml_with_pre.v2 = v2
-    xml_with_pre.v3 = v3
-    xml_with_pre.aop_pid = None
-    xml_with_pre.readable_data = {"article_titles": ["Titulo"]}
-    xml_with_pre.body_fragment_fingerprint = "fingerprint"
-    xml_with_pre.get_complete_publication_date.return_value = "2009-12-01"
-
-    adapter = MagicMock(name="xml_adapter")
-    adapter.xml_with_pre = xml_with_pre
-    adapter.v2 = v2
-    adapter.v3 = v3
-    adapter.aop_pid = None
-    adapter.sps_pkg_name = "0103-6564-pusp-20-03-0003"
-    adapter.article_pub_year = "2009"
-    adapter.fpage = "3"
-    adapter.fpage_seq = None
-    adapter.lpage = "20"
-    adapter.main_doi = None
-    adapter.elocation_id = None
-    adapter.z_surnames = "surnames"
-    adapter.z_collab = None
-    adapter.z_links = None
-    adapter.journal_issn_print = ISSN_PRINT
-    adapter.journal_issn_electronic = ISSN_ELECTRONIC
-    adapter.volume = "20"
-    adapter.number = "3"
-    adapter.suppl = None
-    adapter.pub_year = "2009"
-    return adapter
-
-
-class GetJournalPidFromV2Test(SimpleTestCase):
-    def test_returns_journal_pid(self):
-        self.assertEqual(get_journal_pid_from_v2(SCL_V2), "0103-6564")
-
-    def test_returns_none_for_invalid_pid(self):
-        self.assertIsNone(get_journal_pid_from_v2(None))
-        self.assertIsNone(get_journal_pid_from_v2("S0103-6564"))
+def make_xml_with_pre(
+    v2=None,
+    journal_acron=None,
+    collection=None,
+    issn_print=ISSN_PRINT,
+    issn_electronic=ISSN_ELECTRONIC,
+):
+    return SimpleNamespace(
+        v2=v2,
+        v3="V3-PSICOUSP-0000000001",
+        aop_pid=None,
+        journal_acron=journal_acron,
+        collection=collection,
+        journal_issn_print=issn_print,
+        journal_issn_electronic=issn_electronic,
+    )
 
 
 class MultiCollectionJournalTestBase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="multicol", password="x")
-        self.scl = Collection.objects.create(acron="scl", creator=self.user)
-        self.psi = Collection.objects.create(acron="psi", creator=self.user)
-        official_journal = OfficialJournal.objects.create(
-            title="Psicologia USP",
-            issn_print=ISSN_PRINT,
-            issn_electronic=ISSN_ELECTRONIC,
-            creator=self.user,
+        self.scl = Collection.objects.create(
+            acron="scl", network_classification=["scielonetwork"], creator=self.user
+        )
+        self.psi = Collection.objects.create(
+            acron="psi", network_classification=["thematic"], creator=self.user
         )
         journal = Journal.objects.create(
-            official_journal=official_journal, creator=self.user
-        )
-        JournalProc.objects.create(
-            journal=journal,
-            collection=self.scl,
-            acron="pusp",
-            pid=ISSN_PRINT,
+            official_journal=OfficialJournal.objects.create(
+                title="Psicologia USP",
+                issn_print=ISSN_PRINT,
+                issn_electronic=ISSN_ELECTRONIC,
+                creator=self.user,
+            ),
             creator=self.user,
         )
-        JournalProc.objects.create(
-            journal=journal,
+        # psi é criada antes de scl para verificar que a principal vem primeiro
+        for collection, acron, pid in (
+            (self.psi, "psicousp", ISSN_ELECTRONIC),
+            (self.scl, "pusp", ISSN_PRINT),
+        ):
+            JournalProc.objects.create(
+                journal=journal,
+                collection=collection,
+                acron=acron,
+                pid=pid,
+                creator=self.user,
+            )
+
+    def create_pid_provider_xml(self, v2=SCL_V2):
+        return PidProviderXML.objects.create(
+            v3="V3-PSICOUSP-0000000001", v2=v2, creator=self.user
+        )
+
+    def create_version(self, registered, finger_print):
+        return XMLVersion.objects.create(
+            pid_provider_xml=registered, finger_print=finger_print, creator=self.user
+        )
+
+    def create_collection_pid_v2(self, registered, collection, pid_v2, version):
+        return CollectionPidV2.create_or_update(
+            self.user,
+            pid_provider_xml=registered,
+            collection=collection,
+            pid_v2=pid_v2,
+            journal_acron="pusp" if collection == self.scl else "psicousp",
+            current_version=version,
+        )
+
+
+class GetJournalPidFromV2Test(SimpleTestCase):
+    def test_get_journal_pid_from_v2(self):
+        self.assertEqual(get_journal_pid_from_v2(SCL_V2), ISSN_PRINT)
+        self.assertEqual(get_journal_pid_from_v2(PSI_V2), ISSN_ELECTRONIC)
+        self.assertIsNone(get_journal_pid_from_v2(None))
+        self.assertIsNone(get_journal_pid_from_v2("S0103-6564"))
+
+
+class NormalizeAcronTest(SimpleTestCase):
+    def test_normalize_acron(self):
+        self.assertEqual(normalize_acron(" PUSP "), "pusp")
+        self.assertIsNone(normalize_acron(None))
+
+
+class GetXMLCollectionsTest(MultiCollectionJournalTestBase):
+    def result(self, xml_with_pre):
+        return [
+            (
+                item["collection"].acron,
+                item["journal_acron"],
+                item["journal_pid"],
+                item["is_main"],
+            )
+            for item in get_xml_collections(xml_with_pre)
+        ]
+
+    def test_returns_journal_data_by_collection_with_main_first(self):
+        self.assertEqual(
+            self.result(make_xml_with_pre(PSI_V2, "psicousp")),
+            [
+                ("scl", "pusp", ISSN_PRINT, True),
+                ("psi", "psicousp", ISSN_ELECTRONIC, False),
+            ],
+        )
+
+    def test_identifies_journal_by_pid_v2_or_acron(self):
+        # sem ISSN, somente a coleção com o PID ou o acrônimo do periódico
+        expected = [("psi", "psicousp", ISSN_ELECTRONIC, False)]
+        cases = (
+            # somente pelo PID do periódico contido no pid v2
+            make_xml_with_pre(PSI_V2, issn_print=None, issn_electronic=None),
+            # pelo acrônimo (normalizado), PID do periódico desconhecido
+            make_xml_with_pre(
+                "S0000-00002009000300003",
+                " PSICOUSP ",
+                issn_print=None,
+                issn_electronic=None,
+            ),
+        )
+        for xml_with_pre in cases:
+            with self.subTest(v2=xml_with_pre.v2, acron=xml_with_pre.journal_acron):
+                self.assertEqual(self.result(xml_with_pre), expected)
+
+    def test_no_main_collection(self):
+        Collection.objects.update(network_classification=None)
+        self.assertEqual(
+            {item[3] for item in self.result(make_xml_with_pre(SCL_V2, "pusp"))},
+            {False},
+        )
+
+    def test_empty_without_journal_identification(self):
+        xml_with_pre = make_xml_with_pre(
+            None, "pusp", issn_print=None, issn_electronic=None
+        )
+        self.assertEqual(get_xml_collections(xml_with_pre), [])
+
+    def test_empty_when_journal_is_not_found(self):
+        xml_with_pre = make_xml_with_pre(
+            "S0000-00002009000300003",
+            "xxx",
+            issn_print="0000-0000",
+            issn_electronic="0000-0001",
+        )
+        self.assertEqual(get_xml_collections(xml_with_pre), [])
+
+
+class CollectionPidV2Test(MultiCollectionJournalTestBase):
+    def test_journal_pid(self):
+        self.assertEqual(CollectionPidV2(pid_v2=PSI_V2).journal_pid, ISSN_ELECTRONIC)
+        self.assertIsNone(CollectionPidV2().journal_pid)
+
+    def test_create_or_update_requires_all_data(self):
+        registered = self.create_pid_provider_xml()
+        version = self.create_version(registered, "v1")
+        params = dict(
+            user=self.user,
+            pid_provider_xml=registered,
             collection=self.psi,
-            acron="psicousp",
-            pid=ISSN_ELECTRONIC,
-            creator=self.user,
+            pid_v2=PSI_V2,
+            journal_acron="psicousp",
+            current_version=version,
         )
+        for name in params:
+            with self.subTest(missing=name):
+                with self.assertRaises(ValueError):
+                    CollectionPidV2.create_or_update(**{**params, name: None})
+        self.assertFalse(CollectionPidV2.objects.exists())
 
-    def save(self, registered, v2):
-        with patch.object(PidProviderXML, "_add_current_version"):
-            return PidProviderXML._save(registered, make_xml_adapter(v2), self.user)
+    def test_create_or_update(self):
+        registered = self.create_pid_provider_xml()
+        first = self.create_version(registered, "v1")
+        second = self.create_version(registered, "v2")
 
+        self.create_collection_pid_v2(registered, self.psi, PSI_V2, first)
+        obj = self.create_collection_pid_v2(registered, self.psi, PSI_V2, second)
 
-class GetJournalCollectionsTest(MultiCollectionJournalTestBase):
-    def test_returns_acron_and_pid_by_collection(self):
-        items = get_journal_collections(ISSN_PRINT, ISSN_ELECTRONIC)
-        result = {
-            (item["collection"].acron, item["journal_acron"], item["journal_pid"])
-            for item in items
-        }
+        obj.refresh_from_db()
+        self.assertEqual(obj.current_version, second)
+        self.assertEqual(obj.journal_acron, "psicousp")
         self.assertEqual(
-            result,
-            {("scl", "pusp", ISSN_PRINT), ("psi", "psicousp", ISSN_ELECTRONIC)},
+            CollectionPidV2.objects.filter(pid_provider_xml=registered).count(), 1
         )
 
-    def test_returns_empty_list_without_issn(self):
-        self.assertEqual(get_journal_collections(None, None), [])
+    def test_get_current_version(self):
+        registered = self.create_pid_provider_xml()
+        psi_version = self.create_version(registered, "psi")
+        self.create_collection_pid_v2(registered, self.psi, PSI_V2, psi_version)
 
-
-class IsPidV2FromAnotherCollectionTest(MultiCollectionJournalTestBase):
-    def setUp(self):
-        super().setUp()
-        self.journal_collections = get_journal_collections(
-            ISSN_PRINT, ISSN_ELECTRONIC
-        )
-
-    def test_true_for_pid_v2_of_another_collection(self):
-        ppx = PidProviderXML(v2=SCL_V2)
-        self.assertTrue(
-            ppx.is_pid_v2_from_another_collection(PSI_V2, self.journal_collections)
-        )
-
-    def test_false_for_same_journal_pid(self):
-        # mesmo PID de periódico: correção de pid v2
-        ppx = PidProviderXML(v2=SCL_V2)
-        self.assertFalse(
-            ppx.is_pid_v2_from_another_collection(
-                "S0103-65642009000300099", self.journal_collections
-            )
-        )
-
-    def test_false_for_unknown_journal_pid(self):
-        ppx = PidProviderXML(v2=SCL_V2)
-        self.assertFalse(
-            ppx.is_pid_v2_from_another_collection(
-                "S9999-99992009000300003", self.journal_collections
-            )
-        )
-
-    def test_false_for_equal_or_missing_pid_v2(self):
-        ppx = PidProviderXML(v2=SCL_V2)
-        self.assertFalse(
-            ppx.is_pid_v2_from_another_collection(SCL_V2, self.journal_collections)
-        )
-        self.assertFalse(
-            ppx.is_pid_v2_from_another_collection(None, self.journal_collections)
-        )
-
-
-class SaveMultiCollectionTest(MultiCollectionJournalTestBase):
-    def test_keeps_registered_v2_and_registers_v2_by_collection(self):
-        registered = self.save(None, SCL_V2)
-        self.assertEqual(registered.v2, SCL_V2)
-
-        registered = self.save(registered, PSI_V2)
-        registered.refresh_from_db()
-
-        # v2 principal não muda
-        self.assertEqual(registered.v2, SCL_V2)
-        # não é tratado como mudança de pid v2
-        self.assertFalse(
-            OtherPid.objects.filter(
-                pid_provider_xml=registered, pid_type="pid_v2"
-            ).exists()
-        )
-        items = {
-            (item.collection.acron, item.journal_acron, item.pid_v2)
-            for item in CollectionPidV2.objects.filter(pid_provider_xml=registered)
-        }
+        # sem versão da coleção principal
+        self.assertIsNone(CollectionPidV2.get_current_version(registered))
+        self.assertIsNone(CollectionPidV2.get_current_version(registered, self.scl))
         self.assertEqual(
-            items,
-            {("scl", "pusp", SCL_V2), ("psi", "psicousp", PSI_V2)},
+            CollectionPidV2.get_current_version(registered, self.psi), psi_version
         )
         self.assertEqual(
-            registered.data["collection_pids_v2"], {"scl": SCL_V2, "psi": PSI_V2}
+            CollectionPidV2.get_current_version(registered, collection_acron="psi"),
+            psi_version,
         )
 
-    def test_registering_again_does_not_duplicate(self):
-        registered = self.save(None, SCL_V2)
-        registered = self.save(registered, PSI_V2)
-        registered = self.save(registered, SCL_V2)
-        registered = self.save(registered, PSI_V2)
-        registered.refresh_from_db()
-
-        self.assertEqual(registered.v2, SCL_V2)
-        self.assertEqual(
-            CollectionPidV2.objects.filter(pid_provider_xml=registered).count(), 2
-        )
-
-    def test_pid_v2_correction_of_same_journal_still_changes_v2(self):
-        registered = self.save(None, SCL_V2)
-        # OtherPid requer a versão do XML
-        registered.current_version = XMLVersion.objects.create(
-            pid_provider_xml=registered, creator=self.user
-        )
+        registered.current_version = self.create_version(registered, "scl")
         registered.save()
-        fixed_v2 = "S0103-65642009000300099"
-        registered = self.save(registered, fixed_v2)
-        registered.refresh_from_db()
-
-        self.assertEqual(registered.v2, fixed_v2)
-        self.assertTrue(
-            OtherPid.objects.filter(
-                pid_provider_xml=registered, pid_type="pid_v2", pid_in_xml=SCL_V2
-            ).exists()
-        )
         self.assertEqual(
-            CollectionPidV2.objects.get(
-                pid_provider_xml=registered, collection=self.scl
-            ).pid_v2,
-            fixed_v2,
+            CollectionPidV2.get_current_version(registered),
+            registered.current_version,
         )
+        self.assertIsNone(CollectionPidV2.get_current_version(None))
 
+    def test_is_equal_to_compares_with_version_of_the_same_collection(self):
+        registered = self.create_pid_provider_xml()
+        psi_version = self.create_version(registered, "psi")
+        self.create_collection_pid_v2(registered, self.psi, PSI_V2, psi_version)
 
-class FindByCollectionPidV2Test(MultiCollectionJournalTestBase):
-    def setUp(self):
-        super().setUp()
-        registered = self.save(None, SCL_V2)
-        self.registered = self.save(registered, PSI_V2)
-
-    def test_is_registered_pid_v2(self):
-        self.assertTrue(PidProviderXML._is_registered_pid(v2=PSI_V2))
-        self.assertTrue(PidProviderXML._is_registered_pid(v2=SCL_V2))
-
-    def test_select_records_finds_by_pid_v2_of_another_collection(self):
-        xml_adapter = make_xml_adapter(PSI_V2, v3=None)
-        with patch("pid_provider.models.QueryBuilderPidProviderXML") as qbuilder_cls:
-            from pid_provider.query_params import QueryBuilderPidProviderXML
-
-            qbuilder = qbuilder_cls.return_value
-            qbuilder.identifier_queries = QueryBuilderPidProviderXML.identifier_queries.fget(
-                MagicMock(xml_adapter=xml_adapter, adapter_data={})
+        with patch.object(XMLVersion, "is_equal_to", return_value=True) as is_equal:
+            self.assertTrue(
+                CollectionPidV2.is_equal_to(registered, make_xml_with_pre(collection="psi"))
             )
-            label, results = next(PidProviderXML.select_records(xml_adapter))
+            self.assertEqual(is_equal.call_count, 1)
+            self.assertFalse(
+                CollectionPidV2.is_equal_to(registered, make_xml_with_pre(collection="scl"))
+            )
+            self.assertFalse(
+                CollectionPidV2.is_equal_to(registered, make_xml_with_pre(collection=None))
+            )
+            self.assertFalse(
+                CollectionPidV2.is_equal_to(None, make_xml_with_pre(collection="psi"))
+            )
+            self.assertEqual(is_equal.call_count, 1)
 
-        self.assertEqual(label, "ids")
-        self.assertEqual(results, [self.registered])
 
+class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
+    def test_get_current_version(self):
+        registered = self.create_pid_provider_xml()
+        psi_version = self.create_version(registered, "psi")
+        self.create_collection_pid_v2(registered, self.psi, PSI_V2, psi_version)
+        registered.current_version = self.create_version(registered, "scl")
+        registered.save()
 
-class MainCollectionPidV2Test(MultiCollectionJournalTestBase):
-    """
-    O pid v2 principal (PidProviderXML.v2) é o da coleção principal
-    (network_classification="scielonetwork")
-    """
-
-    def setUp(self):
-        super().setUp()
-        self.scl.network_classification = "scielonetwork"
-        self.scl.save()
-        self.psi.network_classification = "thematic"
-        self.psi.save()
-
-    def test_get_journal_collections_indicates_main_collection(self):
-        items = get_journal_collections(ISSN_PRINT, ISSN_ELECTRONIC)
-        result = {item["collection"].acron: item["is_main"] for item in items}
-        self.assertEqual(result, {"scl": True, "psi": False})
-
-    def test_main_collection_v2_replaces_v2_of_another_collection(self):
-        # registrado primeiro pela coleção temática
-        registered = self.save(None, PSI_V2)
-        self.assertEqual(registered.v2, PSI_V2)
-
-        registered = self.save(registered, SCL_V2)
-        registered.refresh_from_db()
-
-        self.assertEqual(registered.v2, SCL_V2)
-        self.assertFalse(
-            OtherPid.objects.filter(
-                pid_provider_xml=registered, pid_type="pid_v2"
-            ).exists()
+        self.assertEqual(registered.get_current_version(), registered.current_version)
+        self.assertEqual(registered.get_current_version(self.psi), psi_version)
+        self.assertEqual(
+            registered.get_current_version(collection_acron="psi"), psi_version
         )
+        self.assertIsNone(registered.get_current_version(self.scl))
+
+    def test_add_collections_registers_only_the_xml_collection(self):
+        registered = self.create_pid_provider_xml(PSI_V2)
+        xml_adapter = MagicMock(
+            xml_with_pre=make_xml_with_pre(PSI_V2, "psicousp", collection="psi")
+        )
+        version = self.create_version(registered, "psi")
+
+        with patch.object(XMLVersion, "get_or_create", return_value=version):
+            registered.add_collections(self.user, xml_adapter)
+
+        registered.refresh_from_db()
+        self.assertEqual(
+            set(registered.collections.values_list("acron", flat=True)),
+            {"scl", "psi"},
+        )
+        self.assertEqual(registered.collection_pids_v2_data, {"psi": PSI_V2})
+        self.assertEqual(registered.get_current_version(self.psi), version)
+        # somente o XML da coleção principal é a versão atual do documento
+        self.assertIsNone(registered.current_version)
+
+    def test_add_collections_main_collection_xml_is_the_current_version(self):
+        registered = self.create_pid_provider_xml(SCL_V2)
+        xml_adapter = MagicMock(
+            xml_with_pre=make_xml_with_pre(SCL_V2, "pusp", collection="scl")
+        )
+        version = self.create_version(registered, "scl")
+
+        with patch.object(XMLVersion, "get_or_create", return_value=version):
+            registered.add_collections(self.user, xml_adapter)
+
+        registered.refresh_from_db()
+        self.assertEqual(registered.current_version, version)
+        self.assertEqual(registered.get_current_version(self.scl), version)
+
+    def test_add_collections_without_xml_collection(self):
+        registered = self.create_pid_provider_xml(SCL_V2)
+        xml_adapter = MagicMock(xml_with_pre=make_xml_with_pre(SCL_V2, "pusp"))
+
+        with patch.object(XMLVersion, "get_or_create") as get_or_create:
+            registered.add_collections(self.user, xml_adapter)
+
+        get_or_create.assert_not_called()
+        registered.refresh_from_db()
+        self.assertEqual(registered.collections.count(), 2)
+        self.assertFalse(registered.collection_pids_v2.exists())
+        self.assertIsNone(registered.current_version)
+
+    def test_check_registered_pids_changed_compares_pid_v2_of_the_same_collection(self):
+        registered = self.create_pid_provider_xml(SCL_V2)
+        self.create_collection_pid_v2(
+            registered, self.psi, PSI_V2, self.create_version(registered, "psi")
+        )
+        cases = (
+            # (pid v2 do XML, coleção do XML, houve mudança)
+            (PSI_V2, "psi", False),
+            ("S1678-51772009000300099", "psi", True),
+            # coleção sem pid v2 registrado
+            (PSI_V2, "scl", False),
+        )
+        for pid_v2, collection, expected in cases:
+            with self.subTest(pid_v2=pid_v2, collection=collection):
+                xml_with_pre = make_xml_with_pre(pid_v2, collection=collection)
+                changed = registered.check_registered_pids_changed(xml_with_pre)
+                self.assertEqual(
+                    any(item["pid_type"] == "pid_v2" for item in changed), expected
+                )
+
+
+class DataToCompareTest(MultiCollectionJournalTestBase):
+    def test_uses_all_pids_v2_when_unreadable(self):
+        registered = self.create_pid_provider_xml(SCL_V2)
+        for collection, pid_v2 in ((self.scl, SCL_V2), (self.psi, PSI_V2)):
+            self.create_collection_pid_v2(
+                registered, collection, pid_v2, self.create_version(registered, pid_v2)
+            )
+        self.assertEqual(registered.pid_v2_list, [SCL_V2, PSI_V2])
         self.assertEqual(
             registered.collection_pids_v2_data, {"scl": SCL_V2, "psi": PSI_V2}
         )
 
-    def test_v2_of_another_collection_does_not_replace_main_collection_v2(self):
-        registered = self.save(None, SCL_V2)
-        registered = self.save(registered, PSI_V2)
-        registered.refresh_from_db()
-
-        self.assertEqual(registered.v2, SCL_V2)
-
-    def test_records_previous_v2_when_main_v2_is_replaced(self):
-        # registro anterior à existência de CollectionPidV2
-        registered = self.save(None, PSI_V2)
-        CollectionPidV2.objects.all().delete()
-
-        registered = self.save(registered, SCL_V2)
-
-        self.assertEqual(
-            registered.collection_pids_v2_data, {"scl": SCL_V2, "psi": PSI_V2}
-        )
-
-    def test_get_main_pid_v2(self):
-        journal_collections = get_journal_collections(ISSN_PRINT, ISSN_ELECTRONIC)
-        self.assertEqual(
-            PidProviderXML(v2=PSI_V2).get_main_pid_v2(SCL_V2, journal_collections),
-            SCL_V2,
-        )
-        self.assertEqual(
-            PidProviderXML(v2=SCL_V2).get_main_pid_v2(PSI_V2, journal_collections),
-            SCL_V2,
-        )
-        # correção de pid v2: o do XML prevalece
-        self.assertIsNone(
-            PidProviderXML(v2=SCL_V2).get_main_pid_v2(
-                "S0103-65642009000300099", journal_collections
-            )
-        )
-
-
-class DataToCompareMultiCollectionTest(MultiCollectionJournalTestBase):
-    def setUp(self):
-        super().setUp()
-        registered = self.save(None, SCL_V2)
-        self.registered = self.save(registered, PSI_V2)
-
-    def test_pid_v2_list_has_main_v2_first(self):
-        self.assertEqual(self.registered.pid_v2_list, [SCL_V2, PSI_V2])
-
-    def test_data_to_compare_uses_all_pids_v2_when_unreadable(self):
         with patch.object(PidProviderXML, "get_readable_data", return_value={}):
-            data = self.registered.data_to_compare
-        self.assertEqual(data["pid_v2"], [SCL_V2, PSI_V2])
+            registered_data = registered.data_to_compare
+        self.assertEqual(registered_data["pid_v2"], [SCL_V2, PSI_V2])
 
-    def test_compare_matches_pid_v2_of_another_collection(self):
-        from pid_provider.query_params import compare
-
-        with patch.object(PidProviderXML, "get_readable_data", return_value={}):
-            registered_data = self.registered.data_to_compare
-        input_data = dict(registered_data)
-        input_data["pid_v2"] = PSI_V2
-
-        result = compare(registered_data, input_data)
-        pid_v2_item = [item for item in result["items"] if item["label"] == "pid_v2"][0]
+        result = compare(registered_data, {**registered_data, "pid_v2": PSI_V2})
+        pid_v2_item = next(i for i in result["items"] if i["label"] == "pid_v2")
         self.assertEqual(pid_v2_item["score"], 1)
