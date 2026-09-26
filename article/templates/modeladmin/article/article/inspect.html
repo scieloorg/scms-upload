@@ -66,4 +66,58 @@
         </table>
     </div>
 
+    <div class="nice-padding">
+        <h3>{% trans "Crossref DOI Deposit" %}</h3>
+        {% if has_crossref_config %}
+            <p>
+                <a href="{% url 'doi:deposit_article_doi' %}?article_id={{ article_id }}"
+                   class="button bicolor button--icon">
+                    <span class="icon-wrapper">
+                        <svg class="icon icon-upload icon" aria-hidden="true" focusable="false">
+                            <use href="#icon-upload"></use>
+                        </svg>
+                    </span>
+                    {% trans "Deposit DOI to Crossref" %}
+                </a>
+                <a href="{% url 'doi:deposit_article_doi' %}?article_id={{ article_id }}&force=true"
+                   class="button button-secondary bicolor button--icon">
+                    <span class="icon-wrapper">
+                        <svg class="icon icon-upload icon" aria-hidden="true" focusable="false">
+                            <use href="#icon-upload"></use>
+                        </svg>
+                    </span>
+                    {% trans "Re-deposit DOI to Crossref" %}
+                </a>
+            </p>
+        {% else %}
+            <p class="help-block help-warning">
+                {% trans "No Crossref configuration found for this journal. Please configure Crossref settings before depositing." %}
+            </p>
+        {% endif %}
+
+        {% if crossref_deposits %}
+            <h4>{% trans "Recent deposits" %}</h4>
+            <table class="listing">
+                <thead>
+                    <tr>
+                        <th>{% trans 'Date' %}</th>
+                        <th>{% trans 'Status' %}</th>
+                        <th>{% trans 'Batch ID' %}</th>
+                        <th>{% trans 'HTTP Status' %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for deposit in crossref_deposits %}
+                        <tr>
+                            <td>{{ deposit.updated }}</td>
+                            <td>{{ deposit.get_status_display }}</td>
+                            <td>{{ deposit.batch_id|default:"-" }}</td>
+                            <td>{{ deposit.response_status|default:"-" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+
 {% endblock %}
