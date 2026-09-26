@@ -431,7 +431,7 @@ class ArticleLocationParamsTests(SimpleTestCase):
         adapter = make_xml_adapter(data={}, order="00003")
         qbuilder = QueryBuilderPidProviderXML(adapter)
         params = qbuilder.article_location_params
-        self.assertEqual(params["v2__endswith"], "00003")
+        self.assertNotIn("v2__endswith", params)
 
 
 class PartialBodyQueryTests(SimpleTestCase):
