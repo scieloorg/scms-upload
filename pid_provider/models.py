@@ -374,8 +374,8 @@ class CollectionPidV2(CommonControlField):
 
     PidProviderXML.v2 e PidProviderXML.current_version mantêm os dados da
     coleção principal (network_classification="scielonetwork"). Na falta
-    dela, PidProviderXML.v2 mantém o primeiro PID v2 registrado e
-    PidProviderXML.current_version fica vazio (ver get_current_version).
+    dela, PidProviderXML.v2 e PidProviderXML.current_version ficam vazios
+    (ver get_current_version).
     """
 
     pid_provider_xml = ParentalKey(
@@ -516,6 +516,7 @@ class CollectionPidV2(CommonControlField):
             "pid_v2": self.pid_v2,
             "journal_acron": self.journal_acron,
             "collection_acron": self.collection.acron,
+            "is_main": self.collection.is_national_journal_collection,
         }
 
 
@@ -1598,6 +1599,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 raise exc
             response["registered"] = True
             response.update(registered.data)
+            # pid v2 do XML de entrada (como em register), completado com o
+            # registrado quando ausente (ver complete_missing_xml_pids)
+            response["v2"] = xml_with_pre.v2 or registered.v2
             response["is_equal"] = registered.is_equal_to(xml_with_pre)
             if not registered.readable_data:
                 response["is_equal"] = False
