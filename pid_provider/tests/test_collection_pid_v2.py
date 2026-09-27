@@ -35,6 +35,20 @@ PSI_V2 = "S1678-51772009000300003"
 ISSN_PRINT = "0103-6564"
 ISSN_ELECTRONIC = "1678-5177"
 
+# CollectionPidV2.data
+SCL_DATA = {
+    "pid_v2": SCL_V2,
+    "journal_acron": "pusp",
+    "collection_acron": "scl",
+    "is_main": True,
+}
+PSI_DATA = {
+    "pid_v2": PSI_V2,
+    "journal_acron": "psicousp",
+    "collection_acron": "psi",
+    "is_main": False,
+}
+
 
 def make_xml_with_pre(
     v2=None,
@@ -295,7 +309,7 @@ class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
             set(registered.collections.values_list("acron", flat=True)),
             {"scl", "psi"},
         )
-        self.assertEqual(registered.collection_pids_v2_data, {"psi": PSI_V2})
+        self.assertEqual(registered.collection_pids_v2_data, [PSI_DATA])
         self.assertEqual(registered.get_current_version(self.psi), version)
         # somente o XML da coleção principal é a versão atual do documento
         self.assertIsNone(registered.current_version)
@@ -356,8 +370,8 @@ class DataToCompareTest(MultiCollectionJournalTestBase):
                 registered, collection, pid_v2, self.create_version(registered, pid_v2)
             )
         self.assertEqual(registered.pid_v2_list, [SCL_V2, PSI_V2])
-        self.assertEqual(
-            registered.collection_pids_v2_data, {"scl": SCL_V2, "psi": PSI_V2}
+        self.assertCountEqual(
+            registered.collection_pids_v2_data, [SCL_DATA, PSI_DATA]
         )
 
         with patch.object(PidProviderXML, "get_readable_data", return_value={}):
