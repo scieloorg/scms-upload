@@ -12,8 +12,8 @@ ArticleProc) e não têm pid v3 (como os XML gerados a partir do site clássico)
 
 - somente o XML da coleção principal é a versão atual do documento
   (PidProviderXML.current_version)
-- o pid v2 principal (PidProviderXML.v2) é o da coleção principal ou, na
-  falta dela, o primeiro registrado
+- o pid v2 principal (PidProviderXML.v2) é somente o da coleção principal;
+  a resposta do registro traz o pid v2 do XML recebido
 - o pid v2 e a versão do XML de cada coleção ficam em CollectionPidV2
 """
 
@@ -39,6 +39,20 @@ SCL_V2 = "S0103-65642009000300003"
 PSI_V2 = "S1678-51772009000300003"
 ISSN_PRINT = "0103-6564"
 ISSN_ELECTRONIC = "1678-5177"
+
+
+def pid_v2_data(pid_v2, journal_acron, collection_acron, is_main):
+    # CollectionPidV2.data
+    return {
+        "pid_v2": pid_v2,
+        "journal_acron": journal_acron,
+        "collection_acron": collection_acron,
+        "is_main": is_main,
+    }
+
+
+SCL_DATA = pid_v2_data(SCL_V2, "pusp", "scl", True)
+PSI_DATA = pid_v2_data(PSI_V2, "psicousp", "psi", False)
 
 XML_TEMPLATE = """<!DOCTYPE article PUBLIC "-//NLM//DTD JATS (Z39.96) Journal Publishing DTD v1.1 20151215//EN" "https://jats.nlm.nih.gov/publishing/1.1/JATS-journalpublishing1.dtd">
 <article xmlns:mml="http://www.w3.org/1998/Math/MathML" xmlns:xlink="http://www.w3.org/1999/xlink" article-type="research-article" dtd-version="1.1" specific-use="sps-1.9" xml:lang="pt">
@@ -246,9 +260,13 @@ class RegisterSameArticleInDifferentCollectionsTestBase(TestCase):
         self.assertEqual(first["ppx_id"], second["ppx_id"])
         return registered
 
-    def assert_pids_v2_by_collection(self, registered):
-        self.assertEqual(
-            registered.collection_pids_v2_data, {"scl": SCL_V2, "psi": PSI_V2}
+    def assert_pids_v2_by_collection(self, registered, main="scl"):
+        self.assertCountEqual(
+            registered.collection_pids_v2_data,
+            [
+                pid_v2_data(SCL_V2, "pusp", "scl", main == "scl"),
+                pid_v2_data(PSI_V2, "psicousp", "psi", main == "psi"),
+            ],
         )
         self.assertEqual(
             {
@@ -305,10 +323,9 @@ class RegisterMainCollectionFirstTest(
 
         registered = PidProviderXML.objects.get()
         self.assertEqual(registered.v2, SCL_V2)
-        self.assertEqual(second["v2"], SCL_V2)
-        self.assertEqual(
-            second["collection_pids_v2"], {"scl": SCL_V2, "psi": PSI_V2}
-        )
+        # a resposta traz o pid v2 do XML recebido
+        self.assertEqual(second["v2"], PSI_V2)
+        self.assertCountEqual(second["collection_pids_v2"], [SCL_DATA, PSI_DATA])
         self.assert_pids_v2_by_collection(registered)
         self.assert_no_pid_v2_change(registered)
 
@@ -335,7 +352,8 @@ class RegisterMainCollectionFirstTest(
                 response = PidProviderXML.is_registered(xml_with_pre)
                 self.assertTrue(response["registered"])
                 self.assertEqual(response["v3"], created["v3"])
-                self.assertEqual(response["v2"], SCL_V2)
+                # a resposta traz o pid v2 do XML de entrada
+                self.assertEqual(response["v2"], xml_with_pre.v2)
 
     def test_pids_v2_of_both_collections_are_not_free(self):
         self.register(scl_xml(), "scl")
@@ -389,13 +407,22 @@ class RegisterWithoutMainCollectionTest(
         super().setUp()
         Collection.objects.update(network_classification=None)
 
-    def test_first_registered_v2_is_kept(self):
-        self.register(psi_xml(), "psi")
-        self.register(scl_xml(), "scl")
+    def test_main_v2_is_not_registered(self):
+        first = self.register(psi_xml(), "psi")
+        second = self.register(scl_xml(), "scl")
 
+        # a resposta traz o pid v2 do XML recebido
+        self.assertEqual(first["v2"], PSI_V2)
+        self.assertEqual(second["v2"], SCL_V2)
         registered = PidProviderXML.objects.get()
-        self.assertEqual(registered.v2, PSI_V2)
-        self.assert_pids_v2_by_collection(registered)
+        # sem coleção principal, v2 não é completado
+        self.assertIsNone(registered.v2)
+        for xml_with_pre in (psi_xml(), scl_xml()):
+            with self.subTest(v2=xml_with_pre.v2):
+                response = PidProviderXML.is_registered(xml_with_pre)
+                self.assertTrue(response["registered"])
+                self.assertEqual(response["v2"], xml_with_pre.v2)
+        self.assert_pids_v2_by_collection(registered, main=None)
         self.assert_no_pid_v2_change(registered)
 
 
@@ -560,7 +587,7 @@ class XMLVersionOfJournalWithSameDataInCollectionsTest(
 
         registered = PidProviderXML.objects.get()
         self.assertEqual(registered.collections.count(), 2)
-        self.assertEqual(registered.collection_pids_v2_data, {"scl": SCL_V2})
+        self.assertEqual(registered.collection_pids_v2_data, [SCL_DATA])
 
         self.register(make_xml_with_pre(SCL_V2, "pusp", "psi"), "psi")
 
@@ -598,8 +625,9 @@ class XMLVersionOfJournalWithDifferentAcronInCollectionsTest(
         registered = PidProviderXML.objects.get()
         self.assertEqual(registered.v2, SCL_V2)
         self.assert_no_pid_v2_change(registered)
-        self.assertEqual(
-            registered.collection_pids_v2_data, {"scl": SCL_V2, "psi": psi_v2}
+        self.assertCountEqual(
+            registered.collection_pids_v2_data,
+            [SCL_DATA, pid_v2_data(psi_v2, "psicousp", "psi", False)],
         )
         self.assertEqual(
             PidProviderXML.get_xml_with_pre(registered.v3, self.psi).v2, psi_v2
@@ -739,9 +767,12 @@ class ErratumInDifferentCollectionsTest(
         self.assertEqual(first["v3"], erratum.v3)
         self.assertEqual(second["v3"], erratum.v3)
         self.assertEqual(erratum.v2, SCL_ERRATUM_V2)
-        self.assertEqual(
+        self.assertCountEqual(
             erratum.collection_pids_v2_data,
-            {"scl": SCL_ERRATUM_V2, "psi": PSI_ERRATUM_V2},
+            [
+                pid_v2_data(SCL_ERRATUM_V2, "pusp", "scl", True),
+                pid_v2_data(PSI_ERRATUM_V2, "psicousp", "psi", False),
+            ],
         )
         self.assert_no_pid_v2_change(erratum)
 
