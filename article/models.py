@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, models
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -680,19 +680,24 @@ class Article(ClusterableModel, CommonControlField):
         """
         Obtém ou cria ArticleCollection para cada coleção do journal
         e delega a criação das ArticleWebPages.
+
+        As páginas de uma coleção são reconstruídas automaticamente
+        quando a WebSiteConfiguration vigente foi alterada após a
+        última reconstrução (``ArticleCollection.is_stale``), sem que
+        o chamador precise decidir isso via ``force_update``.
         """
         items = []
         if not force_update:
             force_update = self.pages.filter(url__startswith="None").exists()
-        if not list(self.webpages) or not self.article_collections.exists() or force_update:
-            try:
-                for journal_proc in self.journal.journalproc_set.all():
-                    collection = journal_proc.collection
-                    art_col = ArticleCollection.get_or_create(user, self, collection)
+        try:
+            for journal_proc in self.journal.journalproc_set.all():
+                collection = journal_proc.collection
+                art_col = ArticleCollection.get_or_create(user, self, collection)
+                if force_update or art_col.is_stale():
                     art_col.create_or_update_pages(user)
-                    items.append(art_col)
-            except Exception as e:
-                logging.exception(e)
+                items.append(art_col)
+        except Exception as e:
+            logging.exception(e)
         return items
 
     # ── Convenience: acesso a ArticleCollection ──
@@ -976,7 +981,7 @@ class Article(ClusterableModel, CommonControlField):
         # Verifica a disponibilidade do artigo
         for item in duplicated_items:
             try:
-                item.create_or_update_article_collections(user)
+                item.create_or_update_article_collections(user, force_update=True)
                 item.check_availability(user, force_update=True, timeout=timeout)
                 for coll in item.article_collections.all():
                     page_status = item.available_on_public_website(coll.collection)
@@ -1224,6 +1229,19 @@ class ArticleCollection(CommonControlField):
 
     # ── Helpers de configuração ──
 
+    def is_stale(self):
+        """
+        Indica se a WebSiteConfiguration vigente da coleção foi
+        alterada após a última reconstrução das páginas deste
+        ArticleCollection, ou se ele ainda não possui páginas.
+        """
+        if not self.pages.exists():
+            return True
+        latest_config_update = WebSiteConfiguration.objects.filter(
+            collection=self.collection, enabled=True
+        ).aggregate(Max("updated"))["updated__max"]
+        return bool(latest_config_update) and latest_config_update > self.updated
+
     @property
     def classic_website(self):
         """ClassicWebsiteConfiguration da coleção, se existir."""
@@ -1294,7 +1312,11 @@ class ArticleCollection(CommonControlField):
 
         # Remove páginas órfãs
         self.pages.exclude(id__in=existing_ids).delete()
-       
+
+        # Marca o momento da reconstrução, usado por is_stale() para
+        # detectar automaticamente futuras mudanças de WebSiteConfiguration
+        self.save(update_fields=["updated"])
+
     @property
     def pages(self):
         return ArticleWebPage.objects.filter(
