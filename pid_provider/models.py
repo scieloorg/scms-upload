@@ -729,7 +729,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     @property
     def collection_list(self):
-        return "|".join(c.acron3 for c in self.collections.all())
+        return "|".join(c.acron for c in self.collections.all())
 
     @classmethod
     def get_queryset(
@@ -1008,6 +1008,10 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             event_status = None
             error_type = None
             select_record_response = None
+
+            # garante network_classification das coleções antes de
+            # identificar a coleção principal (ver add_collections)
+            Collection.ensure_network_classification(user)
 
             # inputs
             pkg_name = filename
