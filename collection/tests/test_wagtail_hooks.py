@@ -11,22 +11,22 @@ class CollectionFilterSetTest(TestCase):
     def setUp(self):
         user = User.objects.create(username="tester")
         Collection.objects.create(
-            acron3="scl", network_classification=["scielonetwork"], creator=user
+            acron="scl", network_classification=["scielonetwork"], creator=user
         )
         Collection.objects.create(
-            acron3="spa",
+            acron="spa",
             network_classification=["scielonetwork", "thematic"],
             creator=user,
         )
         Collection.objects.create(
-            acron3="psi", network_classification=["thematic"], creator=user
+            acron="psi", network_classification=["thematic"], creator=user
         )
-        Collection.objects.create(acron3="xyz", creator=user)
+        Collection.objects.create(acron="xyz", creator=user)
 
     def filter_acronyms(self, data):
         filterset = CollectionFilterSet(data, queryset=Collection.objects.all())
         self.assertTrue(filterset.is_valid(), filterset.errors)
-        return sorted(filterset.qs.values_list("acron3", flat=True))
+        return sorted(filterset.qs.values_list("acron", flat=True))
 
     def test_without_filter_returns_all(self):
         self.assertEqual(self.filter_acronyms({}), ["psi", "scl", "spa", "xyz"])
