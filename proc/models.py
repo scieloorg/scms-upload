@@ -2372,6 +2372,11 @@ class ArticleProc(BaseProc, ClusterableModel):
                     or xml_with_pre.get_complete_publication_date()
                 )
 
+            # identifica a coleção de origem do XML (custom-meta)
+            collection_acron = self.collection.acron
+            if collection_acron != xml_with_pre.collection:
+                xml_with_pre.collection = collection_acron
+
             # padroniza o nome do pacote
             xml_with_pre.built_sps_pkg_name = xml_with_pre.build_sps_pkg_name()
 
