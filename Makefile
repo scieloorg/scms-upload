@@ -121,20 +121,23 @@ django_dump_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
 django_load_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
 	$(DOCKER_COMPOSE) -f $(compose) run --rm django python manage.py loaddata --database=default fixtures/auth.json
 
-dump_data: BACKUP_FILE = dump_`date +%d-%m-%Y"_"%H_%M_%S`.sql
-dump_data: ## Dump database into .sql $(compose)
-	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'pg_dumpall -c -U $$POSTGRES_USER -f /backups/"$(BACKUP_FILE)"'
+dump_data: BACKUP_FILE := dump_$(shell date +%d-%m-%Y_%H_%M_%S).sql.gz
+dump_data: ## Dump database into .sql.gz $(compose)
+	@echo "Dumping data to $(BACKUP_FILE) ..."
+	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'pg_dumpall -c -U $$POSTGRES_USER | gzip > /backups/$(BACKUP_FILE)'
+	@echo "Checking $(BACKUP_FILE) file compression ..."
+	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'gunzip -t /backups/$(BACKUP_FILE)'
 	@echo "Database dump complete at $(BACKUP_FILE)"
 
 restore_data: RESTORE_FILE = $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-restore_data: ## Restore database into from latest.sql file $(compose)
+restore_data: ## Restore database into from latest.sql.gz file $(compose)
 	@echo "Restoring Postgres data ..."
 	@if [ -z "$(RESTORE_FILE)" ]; then \
 		echo "File to restore not defined. Use: make restore_data compose=$(compose) <dump file name>.sql"; \
 		exit 1; \
 	fi; \
 	echo "Restoring data from $(RESTORE_FILE) ..."; \
-	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'psql -U $$POSTGRES_USER -f /backups/"$(RESTORE_FILE)" $$POSTGRES_DB';
+	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'gunzip -c /backups/"$(RESTORE_FILE)" | psql -U $$POSTGRES_USER $$POSTGRES_DB';
 	@echo "Restore data from $(RESTORE_FILE) complete!"
 
 ############################################
