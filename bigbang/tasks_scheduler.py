@@ -47,6 +47,9 @@ FETCH_AND_CREATE_JOURNAL_PRIORITY = 1
 PRESS_RELEASE_MINUTES = MINUTES[10]
 PRESS_RELEASE_PRIORITY = 1
 
+DATA_AVAILABILITY_STATUS_MINUTES = MINUTES[10]
+DATA_AVAILABILITY_STATUS_PRIORITY = 9
+
 TITLE_DB_MIGRATION_PRIORITY = 0
 ISSUE_DB_MIGRATION_PRIORITY = 0
 ARTICLE_DB_MIGRATION_PRIORITY = 4
@@ -109,6 +112,7 @@ def schedule_subtasks(username):
     enabled = False
     _schedule_fetch_and_create_journal(username, enabled)  # Nova tarefa adicionada
     _schedule_try_fetch_and_register_press_release(username, enabled)
+    _schedule_update_data_availability_status(username, enabled)
 
 
 def _schedule_check_article_availability(username, enabled=False):
@@ -419,4 +423,30 @@ def _schedule_try_fetch_and_register_press_release(username, enabled=False):
         day_of_week="*",
         hour="*",
         minute=PRESS_RELEASE_MINUTES,
+    )
+
+
+def _schedule_update_data_availability_status(username, enabled=False):
+    """
+    Agenda a tarefa de extrair data_availability_status do XML
+    dos artigos já carregados
+    Deixa a tarefa desabilitada por padrão
+    """
+    schedule_task(
+        task="article.tasks.task_update_data_availability_status",
+        name="task_update_data_availability_status",
+        kwargs=dict(
+            collection_acron=None,
+            journal_acron=None,
+            publication_year=None,
+            force_update=False,
+            batch_size=None,
+        ),
+        description=_("Extract data availability status of loaded articles"),
+        priority=DATA_AVAILABILITY_STATUS_PRIORITY,
+        enabled=enabled,
+        run_once=True,
+        day_of_week="*",
+        hour="*",
+        minute=DATA_AVAILABILITY_STATUS_MINUTES,
     )
