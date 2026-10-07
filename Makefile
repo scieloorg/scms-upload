@@ -133,7 +133,7 @@ restore_data: RESTORE_FILE = $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOAL
 restore_data: ## Restore database into from latest.sql.gz file $(compose)
 	@echo "Restoring Postgres data ..."
 	@if [ -z "$(RESTORE_FILE)" ]; then \
-		echo "File to restore not defined. Use: make restore_data compose=$(compose) <dump file name>.sql"; \
+		echo "File to restore not defined. Use: make restore_data compose=$(compose) <dump file name>.sql.gz"; \
 		exit 1; \
 	fi; \
 	echo "Restoring data from $(RESTORE_FILE) ..."; \
