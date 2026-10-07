@@ -34,6 +34,39 @@ from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
 User = get_user_model()
 
 
+DATA_AVAILABILITY_XPATH = (
+    './body//sec[@sec-type="data-availability"]'
+    ' | ./body//fn[@fn-type="data-availability"]'
+    ' | ./back//sec[@sec-type="data-availability"]'
+    ' | ./back//fn[@fn-type="data-availability"]'
+)
+
+
+def get_data_availability_status(xmltree):
+    """
+    Obtém o status de disponibilidade de dados do artigo principal
+    (sub-articles são desconsiderados, pois traduções repetem a declaração).
+
+    Retorna o primeiro specific-use reconhecido; DAS_INVALID se há declaração
+    sem specific-use reconhecido; DAS_ABSENT se não há declaração.
+    """
+    if xmltree is None:
+        return None
+    root = xmltree.find(".") if hasattr(xmltree, "getroot") else xmltree
+    nodes = root.xpath(DATA_AVAILABILITY_XPATH)
+    if not nodes:
+        return choices.DAS_ABSENT
+    valid = dict(choices.DATA_AVAILABILITY_STATUS)
+    for node in nodes:
+        specific_use = (node.get("specific-use") or "").strip()
+        if specific_use in valid and specific_use not in (
+            choices.DAS_ABSENT,
+            choices.DAS_INVALID,
+        ):
+            return specific_use
+    return choices.DAS_INVALID
+
+
 def get_compiled_status(status_list):
     """Recalcula status a partir das ArticleWebPage filhas."""
     
@@ -142,6 +175,13 @@ class Article(ClusterableModel, CommonControlField):
     )
     position = models.PositiveIntegerField(_("Position"), blank=True, null=True)
     first_publication_date = models.DateField(null=True, blank=True)
+    data_availability_status = models.CharField(
+        _("Data availability status"),
+        max_length=32,
+        choices=choices.DATA_AVAILABILITY_STATUS,
+        blank=True,
+        null=True,
+    )
     first_pubdate_iso = models.CharField(
         _("First publication date ISO"), max_length=10, blank=True, null=True
     )
@@ -178,6 +218,7 @@ class Article(ClusterableModel, CommonControlField):
     )
     panel_article_details.children = [
         FieldPanel("first_pubdate_iso", read_only=True),
+        FieldPanel("data_availability_status", read_only=True),
         FieldPanel("article_type", read_only=True),
         FieldPanel("status", read_only=True),
         InlinePanel(relation_name="title_with_lang", label="Title with Language"),
@@ -369,6 +410,7 @@ class Article(ClusterableModel, CommonControlField):
         obj.status = obj.status or choices.AS_READY_TO_PUBLISH
         obj.add_pages(xml_with_pre)
         obj.add_article_publication_date()
+        obj.add_data_availability_status(xml_with_pre)
         obj.add_pp_xml()
         obj.add_position(position, xml_with_pre.fpage)
         obj.save()
@@ -493,6 +535,37 @@ class Article(ClusterableModel, CommonControlField):
             self.first_pubdate_iso = value
             self.first_publication_date = datetime.fromisoformat(value).date()
             self.save()
+
+    @classmethod
+    def update_data_availability_status(cls, queryset=None, force_update=False):
+        """
+        Preenche data_availability_status de artigos já existentes
+        a partir do XML do sps_pkg.
+        """
+        qs = queryset if queryset is not None else cls.objects.all()
+        qs = qs.filter(sps_pkg__isnull=False)
+        if not force_update:
+            qs = qs.filter(data_availability_status__isnull=True)
+        updated = 0
+        for article in qs.iterator():
+            try:
+                xml_with_pre = article.sps_pkg.xml_with_pre
+                if not xml_with_pre:
+                    continue
+                article.add_data_availability_status(xml_with_pre)
+                article.save(update_fields=["data_availability_status"])
+                updated += 1
+            except Exception as e:
+                logging.exception(e)
+        return updated
+
+    def add_data_availability_status(self, xml_with_pre):
+        try:
+            self.data_availability_status = get_data_availability_status(
+                xml_with_pre.xmltree
+            )
+        except Exception as e:
+            logging.exception(e)
 
     def add_position(self, position=None, fpage=None):
         try:
