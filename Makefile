@@ -124,7 +124,7 @@ django_load_auth: ## Run manage.py dumpdata auth --indent=2 $(compose)
 dump_data: BACKUP_FILE := dump_$(shell date +%d-%m-%Y_%H_%M_%S).sql.gz
 dump_data: ## Dump database into .sql.gz $(compose)
 	@echo "Dumping data to $(BACKUP_FILE) ..."
-	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'pg_dumpall -c -U $$POSTGRES_USER | gzip > /backups/$(BACKUP_FILE)'
+	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -o pipefail -c 'pg_dumpall -c -U $$POSTGRES_USER | gzip > /backups/$(BACKUP_FILE)'
 	@echo "Checking $(BACKUP_FILE) file compression ..."
 	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'gunzip -t /backups/$(BACKUP_FILE)'
 	@echo "Database dump complete at $(BACKUP_FILE)"
@@ -137,7 +137,7 @@ restore_data: ## Restore database into from latest.sql.gz file $(compose)
 		exit 1; \
 	fi; \
 	echo "Restoring data from $(RESTORE_FILE) ..."; \
-	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -c 'gunzip -c /backups/"$(RESTORE_FILE)" | psql -U $$POSTGRES_USER $$POSTGRES_DB';
+	$(DOCKER_COMPOSE) -f $(compose) exec postgres bash -o pipefail -c 'gunzip -t /backups/"$(RESTORE_FILE)" && gunzip -c /backups/"$(RESTORE_FILE)" | psql -U $$POSTGRES_USER $$POSTGRES_DB';
 	@echo "Restore data from $(RESTORE_FILE) complete!"
 
 ############################################
