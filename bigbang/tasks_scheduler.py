@@ -47,6 +47,9 @@ FETCH_AND_CREATE_JOURNAL_PRIORITY = 1
 PRESS_RELEASE_MINUTES = MINUTES[10]
 PRESS_RELEASE_PRIORITY = 1
 
+COMPLETE_NETWORK_CLASSIFICATION_MINUTES = MINUTES[10]
+COMPLETE_NETWORK_CLASSIFICATION_PRIORITY = 1
+
 TITLE_DB_MIGRATION_PRIORITY = 0
 ISSUE_DB_MIGRATION_PRIORITY = 0
 ARTICLE_DB_MIGRATION_PRIORITY = 4
@@ -109,6 +112,7 @@ def schedule_subtasks(username):
     enabled = False
     _schedule_fetch_and_create_journal(username, enabled)  # Nova tarefa adicionada
     _schedule_try_fetch_and_register_press_release(username, enabled)
+    _schedule_complete_network_classification(username, enabled)
 
 
 def _schedule_check_article_availability(username, enabled=False):
@@ -395,6 +399,29 @@ def _schedule_fetch_and_create_journal(username, enabled=False):
         day_of_week="*",
         hour="*",
         minute=FETCH_AND_CREATE_JOURNAL_MINUTES,
+    )
+
+
+def _schedule_complete_network_classification(username, enabled=False):
+    """
+    Agenda a tarefa de preencher network_classification das coleções
+    que estão sem esse dado (necessário para identificar a coleção
+    principal de periódicos presentes em mais de uma coleção)
+    Deixa a tarefa desabilitada por padrão
+    """
+    schedule_task(
+        task="collection.tasks.task_complete_network_classification",
+        name="complete_network_classification",
+        kwargs=dict(
+            username=username,
+        ),
+        description=_("Completa a classificação de rede das coleções"),
+        priority=COMPLETE_NETWORK_CLASSIFICATION_PRIORITY,
+        enabled=enabled,
+        run_once=True,
+        day_of_week="*",
+        hour="*",
+        minute=COMPLETE_NETWORK_CLASSIFICATION_MINUTES,
     )
 
 

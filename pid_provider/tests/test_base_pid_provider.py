@@ -6,8 +6,11 @@ from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase, override_settings
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
+from collection.models import Collection
+from journal.models import Journal, OfficialJournal
 from pid_provider.base_pid_provider import BasePidProvider
 from pid_provider.models import PidProviderXML, XMLVersion
+from proc.models import JournalProc
 
 
 class ProvidePidForXMLURITests(SimpleTestCase):
@@ -105,13 +108,37 @@ class ProvidePidForXMLURIIntegrationTests(TestCase):
         self.xml_content = fixture_path.read_text()
         self.pid_v3 = "s8JQvV57hfnwnMSFWS38G8S"
 
+        # somente o XML da coleção principal é a versão atual do documento
+        collection = Collection.objects.create(
+            acron="scl", network_classification=["scielonetwork"], creator=self.user
+        )
+        JournalProc.objects.create(
+            journal=Journal.objects.create(
+                official_journal=OfficialJournal.objects.create(
+                    issn_print="0102-4450",
+                    issn_electronic="1678-460X",
+                    creator=self.user,
+                ),
+                creator=self.user,
+            ),
+            collection=collection,
+            acron="ln",
+            pid="0102-4450",
+            creator=self.user,
+        )
+
+    def xml_with_pre(self, xml_content):
+        xml_with_pre = list(XMLWithPre.create(xml_content=xml_content))[0]
+        xml_with_pre.collection = "scl"
+        return xml_with_pre
+
     def test_creates_and_versions_xml_while_preserving_opac_pid_v3(self):
-        first_xml = list(XMLWithPre.create(xml_content=self.xml_content))[0]
+        first_xml = self.xml_with_pre(self.xml_content)
         updated_content = self.xml_content.replace(
             "<article-title>Adendo</article-title>",
             "<article-title>Adendo atualizado</article-title>",
         )
-        updated_xml = list(XMLWithPre.create(xml_content=updated_content))[0]
+        updated_xml = self.xml_with_pre(updated_content)
 
         with patch(
             "pid_provider.base_pid_provider.XMLWithPre.create",
