@@ -19,7 +19,7 @@ from django.test import SimpleTestCase, TestCase
 
 from collection.models import Collection
 from journal.models import Journal, OfficialJournal
-from pid_provider.models import PidProviderXML, XMLVersion
+from pid_provider.models import CollectionPidV2, PidProviderXML, XMLVersion
 from pid_provider.multi_collection import (
     get_journal_pid_from_v2,
     get_xml_collections,
@@ -35,14 +35,16 @@ PSI_V2 = "S1678-51772009000300003"
 ISSN_PRINT = "0103-6564"
 ISSN_ELECTRONIC = "1678-5177"
 
-# XMLVersion.collection_pid_v2_data
+# CollectionPidV2.data
 SCL_DATA = {
     "pid_v2": SCL_V2,
+    "journal_acron": "pusp",
     "collection_acron": "scl",
     "is_main": True,
 }
 PSI_DATA = {
     "pid_v2": PSI_V2,
+    "journal_acron": "psicousp",
     "collection_acron": "psi",
     "is_main": False,
 }
@@ -102,14 +104,26 @@ class MultiCollectionJournalTestBase(TestCase):
             v3="V3-PSICOUSP-0000000001", v2=v2, creator=self.user
         )
 
-    def create_version(self, registered, finger_print, collection=None, pid_v2=None):
+    def create_version(self, registered, finger_print):
         return XMLVersion.objects.create(
             pid_provider_xml=registered,
             finger_print=finger_print,
-            collection=collection,
-            pid_v2=pid_v2,
             creator=self.user,
         )
+
+    def create_collection_version(
+        self, registered, finger_print, collection, pid_v2, journal_acron
+    ):
+        version = self.create_version(registered, finger_print)
+        CollectionPidV2.create_or_update(
+            self.user,
+            registered,
+            collection,
+            pid_v2,
+            journal_acron=journal_acron,
+            current_version=version,
+        )
+        return version
 
 
 class GetJournalPidFromV2Test(SimpleTestCase):
@@ -191,7 +205,9 @@ class GetXMLCollectionsTest(MultiCollectionJournalTestBase):
 class CurrentVersionByCollectionTest(MultiCollectionJournalTestBase):
     def test_get_current_version(self):
         registered = self.create_pid_provider_xml()
-        psi_version = self.create_version(registered, "psi", self.psi, PSI_V2)
+        psi_version = self.create_collection_version(
+            registered, "psi", self.psi, PSI_V2, "psicousp"
+        )
 
         # sem versão da coleção principal
         self.assertIsNone(registered.get_current_version())
@@ -201,8 +217,8 @@ class CurrentVersionByCollectionTest(MultiCollectionJournalTestBase):
             registered.get_current_version(collection_acron="psi"), psi_version
         )
 
-        registered.current_version = self.create_version(
-            registered, "scl", self.scl, SCL_V2
+        registered.current_version = self.create_collection_version(
+            registered, "scl", self.scl, SCL_V2, "pusp"
         )
         registered.save()
         self.assertEqual(registered.get_current_version(), registered.current_version)
@@ -211,37 +227,32 @@ class CurrentVersionByCollectionTest(MultiCollectionJournalTestBase):
         )
         self.assertIsNone(PidProviderXML().get_current_version(self.psi))
 
-    def test_current_version_of_collection_is_the_most_recent(self):
+    def test_current_version_of_collection_is_the_last_registered(self):
         registered = self.create_pid_provider_xml()
-        first = self.create_version(registered, "psi-1", self.psi, PSI_V2)
-        second = self.create_version(registered, "psi-2", self.psi, PSI_V2)
+        self.create_collection_version(registered, "psi-1", self.psi, PSI_V2, "psicousp")
+        second = self.create_collection_version(
+            registered, "psi-2", self.psi, PSI_V2, "psicousp"
+        )
         # versão sem coleção não é versão de coleção
         self.create_version(registered, None)
 
         self.assertEqual(registered.get_current_version(self.psi), second)
+        # um único registro por coleção
+        self.assertEqual(registered.collection_pids_v2.count(), 1)
 
-        # versão registrada novamente (XMLVersion.get_or_create)
-        first.save()
-        self.assertEqual(registered.get_current_version(self.psi), first)
-
-    def test_get_collections_current_versions(self):
+    def test_collection_pids_v2_data(self):
         registered = self.create_pid_provider_xml()
-        self.create_version(registered, "scl-1", self.scl, SCL_V2)
-        scl_version = self.create_version(registered, "scl-2", self.scl, SCL_V2)
-        psi_version = self.create_version(registered, "psi", self.psi, PSI_V2)
+        self.create_collection_version(registered, "scl", self.scl, SCL_V2, "pusp")
+        self.create_collection_version(registered, "psi", self.psi, PSI_V2, "psicousp")
         self.create_version(registered, None)
 
         self.assertCountEqual(
-            registered.get_collections_current_versions(), [scl_version, psi_version]
-        )
-        self.assertCountEqual(
             registered.collection_pids_v2_data, [SCL_DATA, PSI_DATA]
         )
-        self.assertEqual(PidProviderXML().get_collections_current_versions(), [])
 
     def test_is_equal_to_compares_with_version_of_the_same_collection(self):
         registered = self.create_pid_provider_xml()
-        self.create_version(registered, "psi", self.psi, PSI_V2)
+        self.create_collection_version(registered, "psi", self.psi, PSI_V2, "psicousp")
 
         with patch.object(XMLVersion, "is_equal_to", return_value=True) as is_equal:
             self.assertTrue(
@@ -254,6 +265,9 @@ class CurrentVersionByCollectionTest(MultiCollectionJournalTestBase):
             self.assertFalse(
                 registered.is_equal_to(make_xml_with_pre(collection=None))
             )
+            self.assertFalse(
+                PidProviderXML().is_equal_to(make_xml_with_pre(collection="psi"))
+            )
             self.assertEqual(is_equal.call_count, 1)
 
 
@@ -262,16 +276,14 @@ class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
         registered = self.create_pid_provider_xml(PSI_V2)
         xml_with_pre = make_xml_with_pre(PSI_V2, "psicousp", collection="psi")
         xml_adapter = MagicMock(xml_with_pre=xml_with_pre)
-        version = self.create_version(registered, "psi", self.psi, PSI_V2)
+        version = self.create_version(registered, "psi")
 
         with patch.object(
             XMLVersion, "get_or_create", return_value=version
         ) as get_or_create:
             registered.add_collections(self.user, xml_adapter)
 
-        get_or_create.assert_called_once_with(
-            self.user, registered, xml_with_pre, self.psi
-        )
+        get_or_create.assert_called_once_with(self.user, registered, xml_with_pre)
         registered.refresh_from_db()
         self.assertEqual(
             set(registered.collections.values_list("acron", flat=True)),
@@ -287,7 +299,7 @@ class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
         xml_adapter = MagicMock(
             xml_with_pre=make_xml_with_pre(SCL_V2, "pusp", collection="scl")
         )
-        version = self.create_version(registered, "scl", self.scl, SCL_V2)
+        version = self.create_version(registered, "scl")
 
         with patch.object(XMLVersion, "get_or_create", return_value=version):
             registered.add_collections(self.user, xml_adapter)
@@ -296,6 +308,7 @@ class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
         self.assertEqual(registered.current_version, version)
         self.assertEqual(registered.v2, SCL_V2)
         self.assertEqual(registered.get_current_version(self.scl), version)
+        self.assertEqual(registered.collection_pids_v2_data, [SCL_DATA])
 
     def test_add_collections_without_xml_collection(self):
         registered = self.create_pid_provider_xml(SCL_V2)
@@ -308,34 +321,38 @@ class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
         registered.refresh_from_db()
         self.assertEqual(registered.collections.count(), 2)
         self.assertFalse(registered.xmlversion_set.exists())
+        self.assertFalse(registered.collection_pids_v2.exists())
         self.assertIsNone(registered.current_version)
 
-    def test_add_current_version_keeps_the_collection_of_the_replaced_version(self):
+    def test_add_current_version_replaces_the_current_version(self):
         # ex.: fix_pid_v2
         registered = self.create_pid_provider_xml(SCL_V2)
-        registered.current_version = self.create_version(
-            registered, "scl", self.scl, SCL_V2
-        )
+        old_version = self.create_version(registered, "scl")
+        registered.current_version = old_version
         registered.save()
         xml_with_pre = make_xml_with_pre(SCL_V2, "pusp", collection="scl")
-        new_version = self.create_version(registered, "scl-fixed", self.scl, SCL_V2)
+        new_version = self.create_version(registered, "scl-fixed")
 
         with patch.object(
             XMLVersion, "get_or_create", return_value=new_version
         ) as get_or_create:
             registered._add_current_version(xml_with_pre, self.user, delete=True)
 
-        get_or_create.assert_called_once_with(
-            self.user, registered, xml_with_pre, self.scl
-        )
+        get_or_create.assert_called_once_with(self.user, registered, xml_with_pre)
         self.assertEqual(registered.current_version, new_version)
+        self.assertFalse(XMLVersion.objects.filter(pk=old_version.pk).exists())
 
 
 class DataToCompareTest(MultiCollectionJournalTestBase):
     def test_uses_all_pids_v2_when_unreadable(self):
         registered = self.create_pid_provider_xml(SCL_V2)
-        for collection, pid_v2 in ((self.scl, SCL_V2), (self.psi, PSI_V2)):
-            self.create_version(registered, pid_v2, collection, pid_v2)
+        for collection, pid_v2, acron in (
+            (self.scl, SCL_V2, "pusp"),
+            (self.psi, PSI_V2, "psicousp"),
+        ):
+            self.create_collection_version(
+                registered, pid_v2, collection, pid_v2, acron
+            )
         self.assertEqual(registered.pid_v2_list, [SCL_V2, PSI_V2])
 
         with patch.object(PidProviderXML, "get_readable_data", return_value={}):
