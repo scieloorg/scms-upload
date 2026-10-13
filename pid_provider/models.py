@@ -413,7 +413,7 @@ class CollectionPidV2(CommonControlField):
 
     @staticmethod
     def is_equal_to(pid_provider_xml, xml_with_pre):
-        if not pid_provider_xml:
+        if not pid_provider_xml or not pid_provider_xml.pk:
             return False
         for item in pid_provider_xml.collection_pids_v2.filter(collection__acron=xml_with_pre.collection):
             version = item.current_version
@@ -497,6 +497,8 @@ class CollectionPidV2(CommonControlField):
             return
         if not collection and not collection_acron:
             return pid_provider_xml.current_version
+        if not pid_provider_xml.pk:
+            return
 
         params = {"current_version__isnull": False}
         if collection:
