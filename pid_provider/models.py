@@ -517,8 +517,8 @@ class CollectionPidV2(CommonControlField):
         return {
             "pid_v2": self.pid_v2,
             "journal_acron": self.journal_acron,
-            "collection_acron": self.collection.acron,
-            "is_main": self.collection.is_national_journal_collection,
+            "collection_acron": self.collection and self.collection.acron,
+            "is_main": bool(self.collection and self.collection.is_national_journal_collection),
         }
 
 
