@@ -400,6 +400,9 @@ class RegisterThematicCollectionFirstTest(
         self.assert_pids_v2_by_collection(registered)
 
 
+# sem completar network_classification (articlemeta), que tornaria scl
+# a coleção principal
+@override_settings(COLLECTION_ENSURE_NETWORK_CLASSIFICATION=False)
 class RegisterWithoutMainCollectionTest(
     RegisterSameArticleInDifferentCollectionsTestBase
 ):
@@ -569,6 +572,7 @@ class XMLVersionByCollectionTest(RegisterSameArticleInDifferentCollectionsTestBa
         self.assertIsNone(PidProviderXML.get_xml_with_pre(response["v3"], self.psi))
 
 
+@override_settings(COLLECTION_ENSURE_NETWORK_CLASSIFICATION=False)
 class XMLVersionWithoutMainCollectionTest(
     RegisterSameArticleInDifferentCollectionsTestBase
 ):
