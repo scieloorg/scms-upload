@@ -748,6 +748,7 @@ class RegisterResponseSchemaTest(RegisterTestBase):
         expected_keys = {
             "input_data",
             "xml_adapter_data",
+            "v2",
             "v3",
             "record_status",
             "skipped",
