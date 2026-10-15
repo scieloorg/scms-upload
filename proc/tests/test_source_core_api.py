@@ -298,6 +298,19 @@ class TestProcessJournalResult(TestCase):
         self.assertEqual(journal.journal_acron, "rbt")
         self.assertTrue(JournalProc.objects.filter(journal=journal, acron="rbt").exists())
 
+    def test_process_journal_result_persists_contact_location(self):
+        self.result_data["location"] = {
+            "city_name": "São Paulo", "state_name": "São Paulo",
+            "state_acronym": "SP", "country_name": "Brasil", "country_acronym": "BR",
+        }
+
+        journal = process_journal_result(self.user, self.result_data)
+
+        journal.refresh_from_db()
+        self.assertEqual(journal.contact_location.city.name, "São Paulo")
+        self.assertEqual(journal.contact_location.state.acronym, "SP")
+        self.assertEqual(journal.contact_location.country.acronym, "BR")
+
 
 class TestIssueDataChecker(TestCase):
     """Testes unitários para IssueDataChecker."""
