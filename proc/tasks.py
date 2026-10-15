@@ -1941,10 +1941,13 @@ def task_check_article_webpages(
         )
 
         article = article_proc.article
-        article.create_or_update_article_collections(user)
+        article.create_or_update_article_collections(user, force_update=force_update)
         collection = article_proc.collection
         data = {}
-        article.check_availability(user, collection_id=collection_id, purpose=website_kind, force_update=force_update)
+        article.check_availability(
+            user, collection_id=collection_id, purpose=website_kind,
+            force_update=force_update, timeout=timeout,
+        )
         responses = [
             article.available_on_classic_website(collection),
             article.available_on_public_website(collection),
@@ -2182,8 +2185,8 @@ def task_check_migrated_article(
                 f"ArticleProc {article_proc_id} has no article"
             )
         
-        article.create_or_update_article_collections(user)
-        article.check_availability(user)
+        article.create_or_update_article_collections(user, force_update=force_update)
+        article.check_availability(user, force_update=force_update, timeout=timeout)
 
         logging.info("pageslist(article.webpages): {}".format(list(article.webpages)))
         response = article.available_on_classic_website(article_proc.collection)
