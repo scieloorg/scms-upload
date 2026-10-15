@@ -314,7 +314,7 @@ def create_or_update_issue(
     if not journal_proc.journal:
         raise ValueError(f"Missing JournalProc.journal for {journal_proc}")
 
-    issue = Issue.get_or_create(
+    params = dict(
         journal=journal_proc.journal,
         publication_year=classic_website_issue.publication_year,
         volume=classic_website_issue.volume,
@@ -328,6 +328,12 @@ def create_or_update_issue(
         order=int(classic_website_issue.order[-4:]),
         issue_pid_suffix=classic_website_issue.order[-4:],
     )
+    issue = issue_proc.issue
+    if issue:
+        issue.update(**params)
+    else:
+        issue = Issue.create_or_update(**params)
+
     issue_proc.update(
         user=user,
         journal_proc=journal_proc,

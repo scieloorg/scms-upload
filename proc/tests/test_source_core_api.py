@@ -398,13 +398,13 @@ class TestFetchAndProcessIssues(TestCase):
             {"volume": "10", "number": "1", "year": "2024"},
         )
 
-    @patch("proc.source_core_api.Issue.get_or_create")
+    @patch("proc.source_core_api.Issue.create_or_update")
     @patch("proc.source_core_api.JournalProc.objects.filter")
     def test_process_issue_result_creates_issue_and_issue_proc(
-        self, mock_journal_proc_filter, mock_issue_get_or_create
+        self, mock_journal_proc_filter, mock_issue_create_or_update
     ):
         mock_issue = MagicMock()
-        mock_issue_get_or_create.return_value = mock_issue
+        mock_issue_create_or_update.return_value = mock_issue
         
         mock_journal_proc = MagicMock()
         mock_journal_proc.collection = MagicMock()
@@ -424,7 +424,7 @@ class TestFetchAndProcessIssues(TestCase):
             with patch("proc.source_core_api.IssueProc.create_from_journal_proc_and_issue") as mock_create_issue_proc:
                 process_issue_result(self.user, self.journal, result_data)
 
-                mock_issue.save.assert_called_once()
+                mock_issue.save.assert_not_called()
                 mock_create_issue_proc.assert_called_once_with(
                     self.user, mock_journal_proc, mock_issue
                 )
