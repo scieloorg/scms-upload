@@ -147,7 +147,7 @@ class TaskExecution:
     def add_number(self, name, number):
         self.stats[name] = number
 
-    def finish(self, exception=None, exc_traceback=None):
+    def finish(self, exception=None, exc_traceback=None, data=None):
         try:
             if exception or exc_traceback or self.exceptions:
                 completed = False
@@ -163,6 +163,8 @@ class TaskExecution:
                 "exceptions": self.exceptions,
                 "status_changes": self.status_changes
             }
+            if data:
+                detail["data"] = data
             try:
                 json.dumps(detail)
             except Exception as x:
@@ -174,6 +176,7 @@ class TaskExecution:
                     except Exception as exxx:
                         fixed_detail[key] = str(value)
                 detail = fixed_detail
+
             self.task_tracker.finish(
                 completed=completed,
                 exception=exception,
@@ -183,29 +186,21 @@ class TaskExecution:
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             UnexpectedEvent.create(
+                action="proc.tasks.TaskExecution.finish",
+                item=self.item,
                 e=e,
                 exc_traceback=exc_traceback,
-                detail={
-                    "task": "proc.tasks.TaskExecution.finish",
-                    "item": self.item,
-                },
             )
 
     def update_total_status(self, label, issue_proc_id=None):
-        previous = {}
-        for key, items in self.status_changes.items():
-            try:
-                previous[key] = items[-1]["total_status"]
-            except (IndexError, KeyError):
-                previous[key] = []
-
-        result = get_total_status_data(previous, self.journal_proc_id, issue_proc_id)
+        """Agrupa eventos consecutivos que possuem os mesmos totais por status."""
+        result = get_total_status_data(self.journal_proc_id, issue_proc_id)
         for key, items in result.items():
-            data = {
-                "label": label,
-                "total_status": items
-            }
-            self.status_changes.setdefault(key, []).append(data)
+            changes = self.status_changes.setdefault(key, [])
+            if changes and changes[-1]["total_status"] == items:
+                changes[-1]["events"].append(label)
+            else:
+                changes.append({"events": [label], "total_status": items})
 
 
 def _get_user(user_id, username):
