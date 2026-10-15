@@ -281,7 +281,9 @@ class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
         with patch.object(
             XMLVersion, "get_or_create", return_value=version
         ) as get_or_create:
-            registered.add_collections(self.user, xml_adapter)
+            registered.add_collections(
+                self.user, xml_adapter, get_xml_collections(xml_adapter.xml_with_pre)
+            )
 
         get_or_create.assert_called_once_with(self.user, registered, xml_with_pre)
         registered.refresh_from_db()
@@ -302,7 +304,9 @@ class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
         version = self.create_version(registered, "scl")
 
         with patch.object(XMLVersion, "get_or_create", return_value=version):
-            registered.add_collections(self.user, xml_adapter)
+            registered.add_collections(
+                self.user, xml_adapter, get_xml_collections(xml_adapter.xml_with_pre)
+            )
 
         registered.refresh_from_db()
         self.assertEqual(registered.current_version, version)
@@ -315,7 +319,9 @@ class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
         xml_adapter = MagicMock(xml_with_pre=make_xml_with_pre(SCL_V2, "pusp"))
 
         with patch.object(XMLVersion, "get_or_create") as get_or_create:
-            registered.add_collections(self.user, xml_adapter)
+            registered.add_collections(
+                self.user, xml_adapter, get_xml_collections(xml_adapter.xml_with_pre)
+            )
 
         get_or_create.assert_not_called()
         registered.refresh_from_db()
