@@ -1361,11 +1361,14 @@ def task_migrate_and_publish_articles_by_issue(
 
         total_processed = 0
         exceptions = {}
+        articleprocs_id_list = []
         for article_proc in article_procs:
             try:
                 # faz o fluxo completo do artigo: get_xml e cria sps_pkg
                 article = article_proc.migrate_article(user, force_update)
-                total_processed += 1
+                if article:
+                    articleprocs_id_list.append(article_proc.id)
+                    total_processed += 1
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 exceptions[article_proc.pid] = traceback.format_exc()
@@ -1380,6 +1383,7 @@ def task_migrate_and_publish_articles_by_issue(
             user_id=user_id,
             username=username,
             issue_proc_id=issue_proc_id,
+            articleprocs_id_list=articleprocs_id_list,
             status=status,
             force_update=force_update,
         )
@@ -1398,6 +1402,7 @@ def task_publish_issue_articles(
     issue_proc_id=None,
     status=None,
     force_update=False,
+    articleprocs_id_list=None,
 ):
     """
     Publica artigos de um fascículo e sincroniza o fascículo no site.
@@ -1405,6 +1410,9 @@ def task_publish_issue_articles(
     Para cada WebSiteConfiguration habilitado da coleção:
     1. Publica cada artigo via task_publish_article (síncrono).
     2. Agenda task_sync_issue (assíncrono).
+
+    Uma lista explícita restringe a publicação aos artigos migrados; sem
+    lista, mantém a seleção do fascículo usada pela publicação avulsa.
     """
     task_params = {
         "user_id": user_id,
@@ -1412,12 +1420,16 @@ def task_publish_issue_articles(
         "issue_proc_id": issue_proc_id,
         "status": status,
         "force_update": force_update,
+        "articleprocs_id_list": articleprocs_id_list,
     }
     task_exec = TaskExecution(
         name="proc.tasks.task_publish_issue_articles",
         item=f"{issue_proc_id}",
         params=task_params,
     )
+    websites_summary = []
+    total_processed = 0
+    total_to_process = 0
     try:
         user = _get_user(user_id, username)
         issue_proc = IssueProc.objects.select_related(
@@ -1438,24 +1450,26 @@ def task_publish_issue_articles(
                 sps_pkg__pid_v3__isnull=False,
             )
         )
+        if articleprocs_id_list is not None:
+            articles = articles.filter(id__in=articleprocs_id_list)
 
         collection = issue_proc.collection
         fix_publication_status(collection)
         task_exec.update_total_status(("Updated publication status"), issue_proc_id)
 
-        total_processed = 0
-        total_to_process = 0
         for website in WebSiteConfiguration.objects.filter(
             collection=collection, enabled=True
         ):
-            api_data = website.get_data(content_type="article")
             website_kind = website.purpose
 
-            query_by_status = Q()
             if website_kind == QA:
                 query_by_status = Q(qa_ws_status__in=status)
             elif website_kind == PUBLIC:
                 query_by_status = Q(public_ws_status__in=status)
+            else:
+                continue
+
+            api_data = website.get_data(content_type="article")
 
             total_published = 0
             total_to_publish = 0
@@ -1478,6 +1492,14 @@ def task_publish_issue_articles(
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     task_exec.add_exception(traceback.format_exc())
             total_processed += total_published
+            websites_summary.append({
+                "website": str(website),
+                "website_id": website.id,
+                "purpose": website_kind,
+                "total_to_publish": total_to_publish,
+                "total_published": total_published,
+                "total_failed": total_to_publish - total_published,
+            })
             task_exec.update_total_status(
                 (f"Total article published on {website_kind}: {total_published}/{total_to_publish}"),
                 issue_proc_id
@@ -1491,12 +1513,16 @@ def task_publish_issue_articles(
                 api_data=api_data,
             )
             task_exec.add_event({"operation": "Scheduled issue synchronization"})
+        task_exec.add_event({"websites": websites_summary})
         task_exec.total_to_process = total_to_process
         task_exec.total_processed = total_processed
         
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
+        task_exec.add_event({"websites": websites_summary})
+        task_exec.total_to_process = total_to_process
+        task_exec.total_processed = total_processed
         task_exec.finish(exception=e, exc_traceback=exc_traceback)
 
 
