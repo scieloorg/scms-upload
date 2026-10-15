@@ -1020,8 +1020,12 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             input_data = None
             xml_adapter_data = None
 
-            input_data = {}
-            input_data.update(fix_xml_with_pre_data(xml_with_pre))
+            input_data = fix_xml_with_pre_data(xml_with_pre)
+            xml_collections = get_xml_collections(xml_with_pre)
+            if not xml_collections:
+                raise exceptions.RequiredCollectionErrorToGetPidProviderXMLError(
+                    "Unable to identify collection from XML. Please provide collection_acron or ensure XML has valid collection information."
+                )
             input_data.update(fix_get_article_data(xml_with_pre))
             input_data["origin"] = origin
             response["input_data"] = input_data
@@ -1091,6 +1095,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                     origin_date,
                     available_since,
                     registered_in_core,
+                    xml_collections,
                 )
                 # data to return
                 response.update(registered.data)
@@ -1201,6 +1206,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         origin_date=None,
         available_since=None,
         registered_in_core=None,
+        xml_collections=None,
     ):
         if registered:
             registered_changed = registered.check_registered_pids_changed(
@@ -1224,7 +1230,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             registered._add_other_pid(registered_changed, user)
         registered.save()
 
-        registered.add_collections(user, xml_adapter)
+        registered.add_collections(user, xml_adapter, xml_collections)
         return registered
 
     def get_current_version(self, collection=None, collection_acron=None):
@@ -1236,7 +1242,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             return self.current_version
         return CollectionPidV2.get_current_version(self, collection, collection_acron)
 
-    def add_collections(self, user, xml_adapter):
+    def add_collections(self, user, xml_adapter, xml_collections):
         """
         Adiciona as coleções do periódico e registra o pid v2 e a versão do
         XML da coleção de origem do XML (CollectionPidV2)
@@ -1247,7 +1253,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         xml_with_pre = xml_adapter.xml_with_pre
         collection_acron = xml_with_pre.collection
 
-        for xml_collection in get_xml_collections(xml_with_pre):
+        for xml_collection in xml_collections:
             collection = xml_collection["collection"]
             self.collections.add(collection)
 
@@ -1488,7 +1494,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                         "pid_type": "pid_v2",
                         "pid_in_xml": xml_with_pre.v2,
                         "version": item.current_version,
-                        "registered": self.v2,
+                        "registered": item.pid_v2,
                     }
                 )
                 break
