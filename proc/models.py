@@ -2688,8 +2688,15 @@ class ArticleProc(BaseProc, ClusterableModel):
             # obtém novamente sps_pkg_ids cujo pid_v2 não corresponde ao cls.pid
             sps_pkg_id_list = cls.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
 
+            # Sem pacote é esperado enquanto alguma etapa aguarda processamento.
+            pending = (
+                Q(migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO)
+                | Q(xml_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO)
+                | Q(sps_pkg_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO)
+            )
             qs = cls.objects.filter(
-                Q(sps_pkg_id__in=sps_pkg_id_list)|Q(sps_pkg__isnull=True),
+                Q(sps_pkg_id__in=sps_pkg_id_list)
+                | (Q(sps_pkg__isnull=True) & ~pending),
                 issue_proc__issue=issue,
             )
             items = qs.values("pid", "sps_pkg__sps_pkg_name")
