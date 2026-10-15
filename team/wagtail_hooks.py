@@ -43,7 +43,7 @@ class CollectionTeamMemberViewSet(SnippetViewSet):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
-        return CollectionTeamMember.members(request.user)
+        return CollectionTeamMember.get_queryset_for_user(request.user, qs)
 
 
 class CompanyViewSet(SnippetViewSet):
@@ -71,6 +71,12 @@ class CompanyViewSet(SnippetViewSet):
         "url",
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return Company.get_queryset_for_user(request.user, qs)
+
 
 class JournalTeamMemberViewSet(SnippetViewSet):
     model = JournalTeamMember
@@ -95,6 +101,12 @@ class JournalTeamMemberViewSet(SnippetViewSet):
         "user__name",
         "journal__title",
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return JournalTeamMember.get_queryset_for_user(request.user, qs)
 
 
 class CompanyTeamMemberViewSet(SnippetViewSet):
@@ -121,6 +133,12 @@ class CompanyTeamMemberViewSet(SnippetViewSet):
         "company__name",
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return CompanyTeamMember.get_queryset_for_user(request.user, qs)
+
 
 class JournalCompanyContractViewSet(SnippetViewSet):
     model = JournalCompanyContract
@@ -143,6 +161,12 @@ class JournalCompanyContractViewSet(SnippetViewSet):
         "journal__title",
         "company__name",
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return JournalCompanyContract.get_queryset_for_user(request.user, qs)
 
 
 class TeamViewSetGroup(SnippetViewSetGroup):
