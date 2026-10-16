@@ -613,6 +613,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @profile_property
     def data(self):
         _data = {
+            "ppx_id": self.pk,
             "v3": self.v3,
             "v2": self.v2,
             "aop_pid": self.aop_pid,

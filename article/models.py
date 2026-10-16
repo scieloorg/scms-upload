@@ -307,8 +307,10 @@ class Article(ClusterableModel, CommonControlField):
     # ── get / dedup ──
 
     @classmethod
-    def get(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None):
+    def get(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, sps_pkg=None):
         params = {}
+        if sps_pkg:
+            params["sps_pkg"] = sps_pkg
         if pid_v2:
             params["pid_v2"] = pid_v2
         if pid_v3:
@@ -317,7 +319,7 @@ class Article(ClusterableModel, CommonControlField):
             params["sps_pkg__sps_pkg_name"] = sps_pkg_name
 
         if not params:
-            raise ValueError("Article.get requires pid_v3 or pid_v2 or sps_pkg_name")
+            raise ValueError("Article.get requires sps_pkg, pid_v3, pid_v2 or sps_pkg_name")
         
         return cls.objects.get(**params)
     
@@ -354,30 +356,20 @@ class Article(ClusterableModel, CommonControlField):
     @classmethod
     def create_or_update(cls, user, sps_pkg, issue=None, journal=None, position=None):
         if not sps_pkg:
-            raise ValueError("create_article requires sps_pkg with pid_v2")
+            raise ValueError("create_article requires sps_pkg")
 
         xml_with_pre = sps_pkg.xml_with_pre
         if not xml_with_pre:
             raise ValueError(f"SPSPkg {sps_pkg} is missing xml_with_pre")
 
-        pid_v2 = xml_with_pre.v2
-        pid_v3 = sps_pkg.pid_v3
-        if not pid_v2:
-            raise ValueError(f"SPSPkg {sps_pkg} xml_with_pre is missing pid_v2")
-
         try:
-            try:
-                name_list = xml_with_pre.pkg_name_variations
-            except AttributeError:
-                name_list = [xml_with_pre.sps_pkg_name]
-                name_list.extend(xml_with_pre.deprecated_sps_pkg_name_list)
-            obj = cls.get_first(sps_pkg.sps_pkg_name, pid_v2, pid_v3, delete=True, name_list=name_list)
+            obj = cls.get(sps_pkg=sps_pkg)
         except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
 
-        obj.pid_v3 = pid_v3
-        obj.pid_v2 = pid_v2
+        obj.pid_v3 = sps_pkg.pid_v3
+        obj.pid_v2 = sps_pkg.pid_v2
         obj.sps_pkg = sps_pkg
         obj.article_type = xml_with_pre.xmltree.find(".").get("article-type")
 
@@ -414,15 +406,19 @@ class Article(ClusterableModel, CommonControlField):
                 logging.exception(e)
 
     def add_pp_xml(self, save=False):
-        if not self.pp_xml:
+        if self.sps_pkg_id and self.sps_pkg.ppx_id:
+            self.pp_xml = self.sps_pkg.ppx
+        elif not self.pp_xml:
             try:
                 self.pp_xml = PidProviderXML.get_by_pid_v3(pid_v3=self.pid_v3)
             except PidProviderXML.DoesNotExist:
-                pass
-            else:
-                if save:
-                    self.save()
-                return self
+                return
+        else:
+            return
+
+        if save:
+            self.save()
+        return self
 
     def add_related_item(self, target_doi, target_article_type):
         self.save()

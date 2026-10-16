@@ -11,6 +11,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.core.files.base import ContentFile
 from django.db import models
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -32,6 +33,7 @@ from core.utils.requester import fetch_data
 from core.utils.file_utils import delete_files
 from files_storage.models import FileLocation, MinioConfiguration
 from package import choices
+from pid_provider.models import PidProviderXML
 from pid_provider.requester import PidRequester
 
 
@@ -290,6 +292,10 @@ class SPSPkgComponent(FileLocation, Orderable):
 class SPSPkg(CommonControlField, ClusterableModel):
     pid_v3 = models.CharField(max_length=23, null=True, blank=True)
     pid_v2 = models.CharField(max_length=23, null=True, blank=True)
+
+    ppx = models.ForeignKey(
+        PidProviderXML, null=True, blank=True, on_delete=models.SET_NULL
+    )
     
     sps_pkg_name = models.CharField(_("SPS Name"), max_length=100, null=True, blank=True)
 
@@ -428,22 +434,46 @@ class SPSPkg(CommonControlField, ClusterableModel):
             return False
 
     @classmethod
-    def _get_or_create(cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2):
-        try:
-            obj = cls.objects.get(sps_pkg_name=sps_pkg_name)            
-        except cls.MultipleObjectsReturned:
-            items = cls.objects.filter(sps_pkg_name=sps_pkg_name).order_by("-updated")
-            obj = items.first()
-            cls.delete_queryset(items.exclude(id=obj.id))
-        except cls.DoesNotExist:
-            obj = cls()
-            obj.creator = user
-            obj.sps_pkg_name = sps_pkg_name
+    def _get_or_create(
+        cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2, ppx_id=None
+    ):
+        if not ppx_id:
+            raise ValueError("SPSPkg._get_or_create requires ppx_id")
+
+        obj = cls.objects.filter(ppx_id=ppx_id).order_by("-updated", "-id").first()
+        if obj is None:
+            params = {}
+            query = Q()
+            for field, value in (
+                ("pid_v3", pid_v3), ("pid_v2", pid_v2), ("sps_pkg_name", sps_pkg_name)
+            ):
+                if value:
+                    params[field] = value
+                    query |= Q(**{field: value})
+
+            if not params:
+                raise ValueError("SPSPkg._get_or_create requires package identifiers")
+
+            candidates = list(cls.objects.filter(ppx_id__isnull=True).filter(query))
+            if len(candidates) > 1 and any(
+                any(getattr(item, field) != value for field, value in params.items())
+                for item in candidates
+            ):
+                raise cls.MultipleObjectsReturned(
+                    "Conflicting package identifiers: {}".format(
+                        [item.pk for item in candidates]
+                    )
+                )
+            obj = candidates[0] if candidates else cls(creator=user)
+
+        obj.sps_pkg_name = sps_pkg_name
         obj.pid_v3 = pid_v3
         obj.pid_v2 = pid_v2
         obj.registered_in_core = registered_in_core
         obj.updated_by = user
+        obj.ppx_id = ppx_id
         obj.save()
+
         return obj
 
     @classmethod
@@ -510,6 +540,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
     @property
     def data(self):
         return dict(
+            sps_pkg_name=self.sps_pkg_name,
+            pid_v3=self.pid_v3,
+            pid_v2=self.pid_v2,
+            ppx_id=self.ppx_id,
             is_complete=self.is_complete,
             registered_in_core=self.registered_in_core,
             valid_texts=self.valid_texts,
@@ -580,9 +614,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 obj = cls._get_or_create(
                     user=user,
                     pid_v3=response["v3"],
-                    sps_pkg_name=response["pkg_name"],
+                    sps_pkg_name=xml_with_pre.sps_pkg_name,
                     registered_in_core=response.get("registered_in_core"),
                     pid_v2=response["v2"],
+                    ppx_id=response.get("ppx_id"),
                 )
 
                 if response.get("changed"):
