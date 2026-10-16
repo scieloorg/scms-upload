@@ -1051,36 +1051,16 @@ def task_migrate_and_publish_articles(
         if collection_acron:
             collection_acron_list += [collection_acron]
 
-        items_to_process = {}
         status = tracker_choices.get_valid_status(status, force_update)
-
-        if publication_year or issue_folder:
-            selected_issue_procs = IssueProc.select_items(
-                collection_acron_list=collection_acron_list,
-                journal_acron_list=journal_acron_list,
-                publication_year=publication_year,
-                issue_folder=issue_folder,
-                force_migrate_document_records=force_migrate_document_records,
-                force_migrate_document_files=force_migrate_document_files,
-                article_status_list=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
-            )
-            issue_proc_ids = selected_issue_procs.values_list(
-                "journal_proc_id", "journal_proc__acron", "id"
-            ).distinct()
-            for journal_proc_id, journal_acron, issue_proc_id in issue_proc_ids:
-                items_to_process.setdefault((journal_proc_id, journal_acron), []).append(
-                    issue_proc_id
-                )
-        else:
-            journal_proc_ids = JournalProc.select_items(
-                collection_acron_list=collection_acron_list,
-                journal_acron_list=journal_acron_list,
-                has_issue_proc=True,
-            ).values_list("id", "acron")
-            items_to_process = {
-                (journal_proc_id, journal_acron): None
-                for journal_proc_id, journal_acron in journal_proc_ids
-            }
+        items_to_process = ArticleProc.get_journal_and_issue_proc_ids(
+            collection_acron_list=collection_acron_list,
+            journal_acron_list=journal_acron_list,
+            publication_year=publication_year,
+            issue_folder=issue_folder,
+            force_migrate_document_records=force_migrate_document_records,
+            force_migrate_document_files=force_migrate_document_files,
+            status_list=status,
+        )
 
         total_journals_to_process = len(items_to_process)
         task_exec.add_number(
@@ -1101,7 +1081,7 @@ def task_migrate_and_publish_articles(
             kwargs.update(kwargs_)            
             kwargs["journal_proc_id"] = journal_proc_id
             kwargs["journal_acron"] = journal_acron
-            kwargs["issue_proc_id_list"] = items_to_process[key]
+            kwargs["issue_proc_id_list"] = list(items_to_process[key]["issue_proc_id_list"])
             kwargs["status"] = status
             
             total_processed += 1
@@ -1201,42 +1181,36 @@ def task_migrate_and_publish_articles_by_journal(
         total_processed = 0
         total_to_process = 0
 
-        issue_proc_and_related_article_proc_id_list = {}
-        if issue_proc_id_list:
-            task_exec.add_number("total issue_proc_id_list", len(issue_proc_id_list))
-            selected_article_proc_items = []
-        else:
-            selected_issue_procs = IssueProc.select_items(
-                journal_proc_id_list=[journal_proc_id],
-                force_migrate_document_records=force_migrate_document_records,
-                force_migrate_document_files=force_migrate_document_files,
-                article_status_list=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
-            )
-            issue_proc_id_list = list(
-                selected_issue_procs.values_list("id", flat=True)
-            )
-            task_exec.add_number("total issue_proc todo or reproc", len(issue_proc_id_list))
-            selected_article_proc_items = (
-                ArticleProc.select_items(
-                    journal_proc_id_list=[journal_proc_id],
-                    exclude_issue_proc_id_list=issue_proc_id_list,
-                    status_list=status,
-                    force_update=force_update,
-                )
-                .values_list("issue_proc_id", "id")
-                .distinct()
-            )
-            task_exec.add_number("total articles todo or reproc", selected_article_proc_items.count())
+        issue_proc_id_list = set(issue_proc_id_list or []) | set(response.get("issue_proc_id_list") or [])
+        selected_issue_procs = IssueProc.select_items(
+            journal_proc_id_list=[journal_proc_id],
+            publication_year=publication_year,
+            issue_folder=issue_folder,
+            force_migrate_document_records=force_migrate_document_records,
+            force_migrate_document_files=force_migrate_document_files,
+            article_status_list=status,
+        )
+        issue_proc_id_list.update(selected_issue_procs.values_list("id", flat=True))
+        eligible_issues = IssueProc.objects.filter(journal_proc_id=journal_proc_id)
+        if publication_year:
+            eligible_issues = eligible_issues.filter(issue__publication_year=publication_year)
+        if issue_folder:
+            eligible_issues = eligible_issues.filter(issue_folder=issue_folder)
+        issue_proc_id_list.intersection_update(eligible_issues.values_list("id", flat=True))
 
         issue_proc_and_related_article_proc_id_list = {
-            issue_proc_id: []
-            for issue_proc_id in (issue_proc_id_list or [])
+            issue_proc_id: [] for issue_proc_id in issue_proc_id_list
         }
-        if selected_article_proc_items:
-            for issue_proc_id, article_proc_id in selected_article_proc_items:
-                issue_proc_and_related_article_proc_id_list.setdefault(
-                    issue_proc_id, []
-                ).append(article_proc_id)
+        selected_articles = ArticleProc.select_items(
+            journal_proc_id_list=[journal_proc_id],
+            publication_year=publication_year,
+            issue_folder=issue_folder,
+            exclude_issue_proc_id_list=list(issue_proc_id_list),
+            status_list=status,
+            force_update=force_update,
+        ).values_list("issue_proc_id", "id")
+        for issue_proc_id, article_proc_id in selected_articles:
+            issue_proc_and_related_article_proc_id_list.setdefault(issue_proc_id, []).append(article_proc_id)
 
         total_to_process = len(issue_proc_and_related_article_proc_id_list)
         task_exec.add_number("total issue_proc todo or reproc", total_to_process)
