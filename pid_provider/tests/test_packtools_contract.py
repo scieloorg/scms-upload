@@ -2,12 +2,13 @@ from pathlib import Path
 from unittest.mock import PropertyMock, patch
 
 import pytest
+from django.contrib.auth import get_user_model
 from lxml import etree
 from packtools.sps.pid_provider.xml_sps_adapter import PidProviderXMLAdapter
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from package.models import SPSPkg
-from pid_provider.models import PidProviderXML
+from pid_provider.models import PidProviderXML, PidProviderXMLRegistration
 from pid_provider.query_params import QueryBuilderPidProviderXML, compare
 from upload.utils.package_utils import render_html
 
@@ -76,3 +77,27 @@ def test_migration_html_and_upload_preview_render_real_xml(xml):
 
     assert "<html" in preview
     assert "10.1590/2236-8906-108/2020" in preview
+
+
+@pytest.mark.django_db
+def test_ambiguous_registration_persists_audit_without_changing_candidates(xml):
+    user = get_user_model().objects.create_user(username="ambiguous-pid")
+    adapter = PidProviderXMLAdapter(xml)
+    candidates = []
+    for _ in range(2):
+        record = PidProviderXML(creator=user)
+        record._add_data(adapter, registered_in_core=False)
+        record.save()
+        candidates.append(record)
+
+    with patch.object(PidProviderXML, "select_records", return_value=[("ids", candidates)]):
+        response = PidProviderXML.register(xml, "sample.xml", user, force_update=True)
+
+    assert response["event_status"] == "multiple"
+    assert PidProviderXML.objects.count() == 2
+    event = PidProviderXMLRegistration.objects.get()
+    assert event.event_status == "multiple"
+    assert event.pid_provider_xml_id is None
+    selection = event.detail["select_record_response"]
+    assert selection["registered"]["id"] in [record.id for record in candidates]
+    assert len(selection["multiple_matched_items"]["ids"]) == 2

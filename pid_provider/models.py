@@ -8,6 +8,7 @@ from datetime import datetime
 from functools import cached_property
 from zlib import crc32
 
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.exceptions import FieldError
 from django.db import IntegrityError, models
@@ -765,23 +766,29 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             try:
                 records = cls.select_records(xml_adapter)
                 select_record_response = cls.select_record(xml_adapter, records)
+                if select_record_response.get("multiple_matched_items"):
+                    raise cls.MultipleObjectsReturned
+                if (
+                    select_record_response.get("matched_items")
+                    or select_record_response.get("unmatched_items")
+                ):
+                    response["select_record_response"] = select_record_response
                 try:
                     registered = select_record_response.pop("registered")
                 except KeyError:
-                    unmatched_items = select_record_response.get("unmatched_items")
-                    if unmatched_items:
-                        raise exceptions.UnmatchedPidProviderXMLError
                     raise cls.DoesNotExist
                 event_status = "updated"
-                if select_record_response.get("matched_items"):
-                    response["select_record_response"] = select_record_response
             except cls.DoesNotExist as exc:
                 registered = None
                 event_status = "created"
-            except (cls.MultipleObjectsReturned, exceptions.UnmatchedPidProviderXMLError) as exc:
-                event_status = "unmatched"
+            except cls.MultipleObjectsReturned as exc:
+                event_status = "multiple"
                 response["select_record_response"] = select_record_response
                 raise exceptions.QueryDocumentMultipleObjectsReturnedError(exc)
+            except exceptions.UnmatchedPidProviderXMLError:
+                event_status = "unmatched"
+                response["select_record_response"] = select_record_response
+                raise
             except (
                 exceptions.RequiredPublicationYearErrorToGetPidProviderXMLError,
                 exceptions.RequiredISSNErrorToGetPidProviderXMLError,
@@ -840,8 +847,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         finally:
             response["event_status"] = event_status
             record_all = PidProviderSetting.load().record_all_registration_events
-            matched_items = (select_record_response or {}).get("matched_items")
-            if record_all or error_type or matched_items:
+            selection = select_record_response or {}
+            candidates = selection.get("matched_items") or selection.get("unmatched_items")
+            if record_all or error_type or candidates:
                 PidProviderXMLRegistration.record(
                     user=user,
                     pid_provider_xml=registered,
@@ -1077,6 +1085,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             result = PidProviderXML.get_best_match(results, xml_adapter_data_to_compare)
 
             matched = result.get("matched")
+            multiple_matched = result.get("multiple_matched")
             unmatched = result.get("unmatched")
             registered = result.get("registered")
             if registered:
@@ -1086,6 +1095,8 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 }
                 if matched:
                     response["matched_items"] = {label: matched}
+                if multiple_matched:
+                    response["multiple_matched_items"] = {label: multiple_matched}
                 if unmatched:
                     response["unmatched_items"] = {label: unmatched}
                 return response
@@ -1125,60 +1136,42 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     @staticmethod
     def get_best_match(results, xml_adapter_data):
-        """
-        Compara uma lista de candidatos (PidProviderXML) com os dados do XML
-        recebido e classifica os candidatos por similaridade.
-
-        Parameters
-        ----------
-        results : list[PidProviderXML]
-            Lista JÁ MATERIALIZADA (não queryset) de candidatos a comparar.
-        xml_adapter_data : dict
-            Dados de comparação do XML de entrada, ou seja, o retorno de
-            ``xml_adapter.get_data_to_compare()``.
-
-        Returns
-        -------
-        dict
-            Todas as chaves abaixo são OPCIONAIS — só aparecem quando há
-            conteúdo para elas. Use ``.get(...)`` ou ``"chave" in result``
-            ao consumir o retorno, nunca acesso direto.
-
-            - ``"unmatched"``: presente apenas se houver ao menos 1
-            candidato com ``percentual_score`` <= 0.6. Lista de
-            ``item.data`` desses candidatos.
-            - ``"registered"``: presente apenas se houver ao menos 1
-            candidato aprovado (score > 0.6). Contém o OBJETO
-            ``PidProviderXML`` (não o dict ``.data``) do candidato com
-            maior score — em caso de empate, o critério de desempate é
-            ``updated`` mais recente e, em seguida, maior ``id``.
-            - ``"matched"``: presente apenas se houver 2 OU MAIS candidatos
-            aprovados. Contém ``item.data`` dos candidatos aprovados
-            EXCLUINDO o que já está em ``"registered"`` (ou seja, é a
-            lista de aprovados a partir do 2º colocado), na mesma ordem
-            de score decrescente.
-        """
+        """Classifica candidatos e sinaliza empates no maior score aprovado."""
         detail = {}
         found = []
         items = {}
+        responses = {}
+        min_rate = settings.PID_PROVIDER_MIN_RATE
         for item in results:
             item_data = item.data_to_compare
             response = compare(item_data, xml_adapter_data)
             items[item.id] = item
+            responses[item.id] = response
             found.append((response["percentual_score"], item.updated.isoformat(), item.id))
-
         found = sorted(found, reverse=True)
+
         matched = []
         unmatched = []
         for percentual_score, updated, item_id in found:
-            if percentual_score > 0.6:
-                matched.append(items[item_id].data)
+            data = {"data": items[item_id].data, "response": responses[item_id]}
+            if percentual_score > min_rate:
+                matched.append(data)
             else:
-                unmatched.append(items[item_id].data)
+                unmatched.append(data)
         if matched:
-            detail["registered"] = items[found[0][-1]]
+            registered_id = found[0][-1]
+            detail["registered"] = items[registered_id]
+            max_percentual_score = responses[registered_id]["percentual_score"]
             if len(matched) > 1:
-                detail["matched"] = matched[1:]
+                detail["matched"] = []
+                detail["multiple_matched"] = []
+                for matched_item in matched[1:]:
+                    if matched_item["response"]["percentual_score"] == max_percentual_score:
+                        detail["multiple_matched"].append(matched_item)
+                    else:
+                        detail["matched"].append(matched_item)
+                if detail["multiple_matched"]:
+                    detail["multiple_matched"].insert(0, matched[0])
         if unmatched:
             detail["unmatched"] = unmatched
         return detail
@@ -1350,22 +1343,26 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             try:
                 records = cls.select_records(xml_adapter)
                 select_record_response = cls.select_record(xml_adapter, records)
+                if select_record_response.get("multiple_matched_items"):
+                    raise cls.MultipleObjectsReturned
+                if (
+                    select_record_response.get("matched_items")
+                    or select_record_response.get("unmatched_items")
+                ):
+                    response["select_record_response"] = select_record_response
                 try:
                     registered = select_record_response.pop("registered")
                 except KeyError:
-                    unmatched_items = select_record_response.get("unmatched_items")
-                    if unmatched_items:
-                        raise exceptions.UnmatchedPidProviderXMLError
                     raise cls.DoesNotExist
-                matched_items = select_record_response.get("matched_items")
-                if matched_items:
-                    response["select_record_response"] = select_record_response
             except cls.DoesNotExist as exc:
                 response.update(
                     {"filename": xml_with_pre.filename, "registered": False}
                 )
                 return response
-            except (cls.MultipleObjectsReturned, exceptions.UnmatchedPidProviderXMLError) as exc:
+            except cls.MultipleObjectsReturned as exc:
+                response["select_record_response"] = select_record_response
+                raise exceptions.QueryDocumentMultipleObjectsReturnedError(exc)
+            except exceptions.UnmatchedPidProviderXMLError:
                 response["select_record_response"] = select_record_response
                 raise
             except (
@@ -1957,6 +1954,7 @@ class PidProviderXMLRegistration(CommonControlField):
     EVENT_FORBIDDEN = "forbidden"
     EVENT_CONFLICT = "conflict"
     EVENT_UNMATCHED = "unmatched"
+    EVENT_MULTIPLE_MATCHED = "multiple"
     EVENT_ERROR = "error"
     EVENT_BAD_REQUEST = "bad_request"
 
@@ -1967,6 +1965,7 @@ class PidProviderXMLRegistration(CommonControlField):
         (EVENT_FORBIDDEN, "forbidden"),
         (EVENT_CONFLICT, "conflict"),
         (EVENT_UNMATCHED, "unmatched"),
+        (EVENT_MULTIPLE_MATCHED, "multiple"),
         (EVENT_BAD_REQUEST, "bad_request"),
         (EVENT_ERROR, "error"),
     )
@@ -2015,16 +2014,17 @@ class PidProviderXMLRegistration(CommonControlField):
 
     @staticmethod
     def _serialize_detail(detail):
-        """
-        O detail do detail contém o objeto PidProviderXML em
-        detail['registered']. Para gravar em JSON, troca pelo v3/id.
-        """
+        """Converte o candidato selecionado em uma referência serializável."""
         if not detail:
             return None
         data = dict(detail)
-        registered = data.get("registered")
-        if registered is not None and hasattr(registered, "v3"):
-            data["registered"] = {"id": registered.id, "v3": registered.v3}
+        selection = data.get("select_record_response")
+        if selection:
+            data["select_record_response"] = dict(selection)
+        for container in (data, data.get("select_record_response") or {}):
+            registered = container.get("registered")
+            if registered is not None and hasattr(registered, "v3"):
+                container["registered"] = {"id": registered.id, "v3": registered.v3}
         return data
 
     @classmethod

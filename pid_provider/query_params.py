@@ -6,18 +6,24 @@ from pid_provider import exceptions
 
 
 def compare(registered_items, input_data):
-    """
-    """
+    """Calcula a média sem contar campos nulos nos dois lados."""
     total_score = 0
+    total_items = 0
     items = []
     for label, registered_item in registered_items.items():
-        result = compare_items(label, registered_item, input_data.get(label))
+        input_item = input_data.get(label)
+        if registered_item is None and input_item is None:
+            items.append({"label": label, "score": 1, "ignored": True})
+            continue
+
+        result = compare_items(label, registered_item, input_item)
         items.append(result)
         total_score += result["score"]
+        total_items += 1
     return {
         "items": items,
         "total_score": total_score,
-        "percentual_score": total_score / len(items)
+        "percentual_score": total_score / total_items if total_items else 0
     }
 
 
@@ -40,13 +46,16 @@ def compare_lists(registered, xml_adapter_titles):
 def compare_items(label, registered, input_data):
     if isinstance(registered, list):
         score = compare_lists(registered, input_data)
-    elif (input_data or None) == (registered or None):
+    elif input_data == registered:
         score = 1
+    elif label.startswith("z_") or "finger" in label:
+        score = 0
     else:
         score = how_similar(input_data or "", registered or "")
     response = {"label": label, "score": score}
     if score != 1:
         response["registered"] = registered
+        response["input_data"] = input_data
     return response
 
 

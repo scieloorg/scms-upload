@@ -512,69 +512,61 @@ class CompareListsTests(SimpleTestCase):
 
 class CompareItemsTests(SimpleTestCase):
 
-    def test_list_field_uses_compare_lists(self):
-        result = compare_items("titles", ["a", "b"], ["a", "b"])
-        self.assertEqual(result, {"label": "titles", "score": 1})
-
-    def test_equal_scalars_score_one_without_registered_key(self):
-        result = compare_items("z_surnames", "Silva", "Silva")
-        self.assertEqual(result, {"label": "z_surnames", "score": 1})
-
-    def test_none_and_falsy_are_treated_as_equal(self):
-        result = compare_items("z_collab", None, "")
-        self.assertEqual(result, {"label": "z_collab", "score": 1})
+    def test_lists_and_equal_scalars_score_one(self):
+        for label, registered, incoming in (
+            ("titles", ["a", "b"], ["a", "b"]),
+            ("z_surnames", "hash", "hash"),
+        ):
+            with self.subTest(label=label):
+                self.assertEqual(
+                    compare_items(label, registered, incoming),
+                    {"label": label, "score": 1},
+                )
 
     @patch("pid_provider.query_params.how_similar")
-    def test_different_scalars_uses_how_similar_and_includes_registered(
-        self, mock_how_similar
-    ):
-        mock_how_similar.return_value = 0.4
-        result = compare_items("z_surnames", "Silva", "Souza")
+    def test_different_hashes_never_use_text_similarity(self, similarity):
+        for label, registered, incoming in (
+            ("z_surnames", "abc", "abd"),
+            ("body_fragment_fingerprint", "abc", "abd"),
+            ("z_collab", None, ""),
+            ("z_links", None, "hash"),
+        ):
+            with self.subTest(label=label):
+                result = compare_items(label, registered, incoming)
+                self.assertEqual(result["score"], 0)
+                self.assertEqual(result["registered"], registered)
+                self.assertEqual(result["input_data"], incoming)
+        similarity.assert_not_called()
+
+    @patch("pid_provider.query_params.how_similar", return_value=0.4)
+    def test_text_uses_similarity_and_reports_both_values(self, similarity):
         self.assertEqual(
-            result, {"label": "z_surnames", "score": 0.4, "registered": "Silva"}
+            compare_items("body_fragment", "original", "corrigido"),
+            {"label": "body_fragment", "score": 0.4,
+             "registered": "original", "input_data": "corrigido"},
         )
-        mock_how_similar.assert_called_once_with("Souza", "Silva")
-
-    @patch("pid_provider.query_params.how_similar")
-    def test_none_input_data_falls_back_to_empty_string_for_how_similar(
-        self, mock_how_similar
-    ):
-        mock_how_similar.return_value = 0.2
-        result = compare_items("z_links", "algum-link", None)
-        self.assertEqual(
-            result, {"label": "z_links", "score": 0.2, "registered": "algum-link"}
-        )
-        mock_how_similar.assert_called_once_with("", "algum-link")
-
-    @patch("pid_provider.query_params.how_similar")
-    def test_none_registered_falls_back_to_empty_string_for_how_similar(
-        self, mock_how_similar
-    ):
-        mock_how_similar.return_value = 0.3
-        result = compare_items("z_links", None, "algum-link")
-        self.assertEqual(result, {"label": "z_links", "score": 0.3, "registered": None})
-        mock_how_similar.assert_called_once_with("algum-link", "")
+        similarity.assert_called_once_with("corrigido", "original")
 
 
 class CompareTests(SimpleTestCase):
 
-    @patch("pid_provider.query_params.how_similar")
-    def test_aggregates_scores_from_all_items(self, mock_how_similar):
-        mock_how_similar.return_value = 0.5
-        registered_items = {"title": "Título A", "z_surnames": "Silva"}
-        input_data = {"title": "Título A", "z_surnames": "Souza"}
-
-        result = compare(registered_items, input_data)
-
-        self.assertEqual(len(result["items"]), 2)
-        self.assertEqual(result["total_score"], 1.5)  # 1 (match) + 0.5 (mocked)
-        self.assertEqual(result["percentual_score"], 0.75)
-
-    def test_missing_input_key_is_treated_as_none(self):
-        registered_items = {"z_collab": None}
-        input_data = {}
-
-        result = compare(registered_items, input_data)
+    def test_ignores_null_pairs_without_inflating_similarity(self):
+        result = compare(
+            {"article_titles": ["Título A"], "z_surnames": "abc", "z_collab": None},
+            {"article_titles": ["Título A"], "z_surnames": "abd"},
+        )
 
         self.assertEqual(result["total_score"], 1)
-        self.assertEqual(result["percentual_score"], 1)
+        self.assertEqual(result["percentual_score"], 0.5)
+        self.assertTrue(result["items"][-1]["ignored"])
+
+    def test_empty_or_only_null_data_cannot_identify_document(self):
+        for registered in ({}, {"z_collab": None}):
+            with self.subTest(registered=registered):
+                self.assertEqual(compare(registered, {})["percentual_score"], 0)
+
+    def test_empty_values_are_compared_instead_of_ignored(self):
+        result = compare({"titles": [], "body_fragment": ""}, {"titles": []})
+
+        self.assertEqual(len(result["items"]), 2)
+        self.assertFalse(any(item.get("ignored") for item in result["items"]))
