@@ -910,7 +910,35 @@ class Article(ClusterableModel, CommonControlField):
         )
 
     @classmethod
-    def exclude_invalid_records(cls, user, issue, sps_pkg_id_list, timeout=None):
+    def complete_sps_pkg_ppx(cls, user, issue):
+        response = {"success": [], "failures": []}
+        articles = cls.objects.filter(
+            issue=issue, sps_pkg__ppx__isnull=True,
+            sps_pkg__isnull=False, pp_xml__isnull=False,
+        ).select_related("sps_pkg", "pp_xml")
+        for article in articles:
+            try:
+                if not article.pp_xml.xml_with_pre:
+                    continue
+                package = article.sps_pkg
+                if cls.objects.filter(sps_pkg=package, pp_xml__isnull=False).exclude(
+                    pp_xml_id=article.pp_xml_id
+                ).exists():
+                    raise ValueError("Conflicting article/PID links")
+                SPSPkg.objects.filter(pk=package.pk, ppx__isnull=True).update(
+                    ppx_id=article.pp_xml_id, updated_by=user
+                )
+                response["success"].append(package.pk)
+            except Exception:
+                response["failures"].append({
+                    "sps_pkg_id": article.sps_pkg_id, "error": traceback.format_exc()
+                })
+        return response
+
+    @classmethod
+    def exclude_invalid_records(cls, user, issue, sps_pkg_id_list=None, timeout=None, *, delete=False):
+        if not delete:
+            return {"total_deleted_items": 0}
         try:
             return cls._exclude_invalid_records(user, issue, sps_pkg_id_list, timeout)
         except Exception as e:

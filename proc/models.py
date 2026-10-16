@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -2719,7 +2719,6 @@ class ArticleProc(BaseProc, ClusterableModel):
         if not items.exists():
             return set()
 
-        from django.db.models import F
         return set(
             items
             .exclude(migrated_data__pid=F("sps_pkg__pid_v2"))
@@ -2727,7 +2726,24 @@ class ArticleProc(BaseProc, ClusterableModel):
         )
 
     @classmethod
-    def exclude_invalid_items(cls, user, issue):
+    def complete_sps_pkg_ppx(cls, user, journal_proc=None, issue_proc_id_list=None):
+        if issue_proc_id_list is not None:
+            items = cls.objects.filter(issue_proc_id__in=issue_proc_id_list)
+        elif journal_proc:
+            items = cls.objects.filter(issue_proc__journal_proc=journal_proc)
+        else:
+            raise ValueError("ArticleProc reconciliation requires an explicit scope")
+        package_ids = list(items.filter(sps_pkg__ppx__isnull=True).exclude(
+            sps_pkg__isnull=True
+        ).values_list("sps_pkg_id", flat=True).distinct())
+        if not package_ids:
+            return {"success": [], "failures": []}
+        return SPSPkg.complete_ppx(user, sps_pkg_id_list=package_ids)
+
+    @classmethod
+    def exclude_invalid_items(cls, user, issue, *, delete=False):
+        if not delete:
+            return {"sps_pkg_id_list": [], "deleted": []}
         try:
             # obtém sps_pkg_ids cujo pid_v2 não corresponde ao ArticleProc.pid
             sps_pkg_id_list = cls.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)

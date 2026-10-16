@@ -98,7 +98,8 @@ def test_current_acron_file_still_returns_persisted_pending_issues(migration_dat
     assert acron_file.data["issue_pids"] == [issue.pid for issue in issues[:2]]
 
 
-def test_journal_task_combines_imported_issues_without_losing_filters(migration_data):
+@pytest.mark.parametrize("failures", [[], [{"error": "reconciliation failed"}]])
+def test_journal_task_combines_imported_issues_without_losing_filters(migration_data, failures):
     user, journal, issues, _, _ = migration_data
     with patch.object(tasks, "_get_user", return_value=user), patch.object(
         tasks, "fix_publication_status"
@@ -109,7 +110,7 @@ def test_journal_task_combines_imported_issues_without_losing_filters(migration_
     ), patch.object(
         tasks, "get_api_data", return_value={}
     ), patch.object(
-        tasks, "task_exclude_invalid_issue_articles"
+        tasks, "task_exclude_invalid_issue_articles", return_value={"failures": failures}
     ), patch.object(
         tasks.task_migrate_and_publish_articles_by_issue, "delay"
     ) as schedule:
@@ -119,9 +120,8 @@ def test_journal_task_combines_imported_issues_without_losing_filters(migration_
             publication_year="2024",
         )
 
-    assert {call.kwargs["issue_proc_id"] for call in schedule.call_args_list} == {
-        issue.pk for issue in issues[:2]
-    }
+    expected = {issue.pk for issue in issues[:2]}
+    assert {call.kwargs["issue_proc_id"] for call in schedule.call_args_list} == expected
 
 
 def test_document_import_retries_all_only_when_needed(migration_data):

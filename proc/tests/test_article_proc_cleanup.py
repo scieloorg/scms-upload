@@ -53,7 +53,7 @@ class ArticleProcCleanupTests(TestCase):
             )
 
         with patch.object(SPSPkg, "complete_pid_v2"):
-            response = ArticleProc.exclude_invalid_items(self.user, self.issue)
+            response = ArticleProc.exclude_invalid_items(self.user, self.issue, delete=True)
 
         self.assertNotIn("error", response)
         self.assertCountEqual(
@@ -73,7 +73,7 @@ class ArticleProcCleanupTests(TestCase):
             "get_sps_pkg_ids_which_pid_v2_is_incorrect",
             return_value={invalid_package.pk},
         ):
-            response = ArticleProc.exclude_invalid_items(self.user, self.issue)
+            response = ArticleProc.exclude_invalid_items(self.user, self.issue, delete=True)
 
         self.assertNotIn("error", response)
         self.assertCountEqual(

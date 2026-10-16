@@ -1220,7 +1220,7 @@ def task_migrate_and_publish_articles_by_journal(
             article_proc_id_list,
         ) in issue_proc_and_related_article_proc_id_list.items():
             total_processed += 1
-            # executa sincronamente a eliminação de registros ArticleProc e Article cujo conteúdo é defeituoso
+            # Completa os vínculos legados antes de agendar a migração.
             response = task_exclude_invalid_issue_articles(
                 issue_proc_id=issue_proc_id,
                 username=username,
@@ -1756,37 +1756,18 @@ def task_exclude_invalid_issue_articles(
     timeout=None,
     public_api_data=None,
 ):
-    """
-    Remove artigos duplicados e inconsistentes de um fascículo.
-
-    Executa ``Article.fix_sps_pkg_names`` e ``Article.exclude_invalid_issue_articles``
-    para o fascículo associado ao ``IssueProc`` informado.
-    Chamada automaticamente por ``task_migrate_and_publish_articles_by_issue``
-    antes de iniciar a migração dos artigos.
-    """
+    """Completa vínculos legados sem excluir registros ou bloquear a migração."""
     try:
-        detail = None
         user = _get_user(user_id=user_id, username=username)
-        issue_proc = IssueProc.objects.select_related("issue").get(
-            id=issue_proc_id
-        )
-        detail = []
-        issue = issue_proc.issue
-        response = ArticleProc.exclude_invalid_items(user, issue)
-        detail.append({"operation": "ArticleProc.exclude_invalid_items", "response": response})
-        response = Article.exclude_invalid_records(user, issue, response.get("sps_pkg_id_list"), timeout=timeout)
-        detail.append({"operation": "Article.exclude_invalid_records", "response": response})
-        if response.get("deleted_sps_pkg_ids"):
-            response = ArticleProc.exclude_invalid_items(user, issue)
-            detail.append({"operation": "ArticleProc.exclude_invalid_items", "response": response})
-        return detail
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        return {
-            "exc_type": str(exc_type),
-            "exc_value": str(exc_value),
-            "traceback": traceback.format_exc()
-        }
+        processor = IssueProc.objects.select_related("issue").get(pk=issue_proc_id)
+        return [
+            {"operation": "Article.complete_sps_pkg_ppx",
+             "response": Article.complete_sps_pkg_ppx(user, processor.issue)},
+            {"operation": "ArticleProc.complete_sps_pkg_ppx",
+             "response": ArticleProc.complete_sps_pkg_ppx(user, issue_proc_id_list=[processor.pk])},
+        ]
+    except Exception:
+        return {"error": traceback.format_exc()}
 
 
 @celery_app.task(bind=True)

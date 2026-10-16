@@ -2,6 +2,7 @@ import logging
 import mimetypes
 import os
 import sys
+import traceback
 import glob
 from io import BytesIO
 from shutil import copyfile
@@ -961,6 +962,52 @@ class SPSPkg(CommonControlField, ClusterableModel):
         # em caso de data incompleta, tenta retornar a data completa, completando com 06 o mes ausente e com 15 o dia ausente
         return xml_with_pre.get_complete_publication_date()
     
+    def add_ppx(self, user, save=False):
+        responses = list(pid_provider_app.is_registered_xml_zip(self.file.path))
+        if len(responses) != 1:
+            return {"error": "Expected exactly one registered XML", "total_results": len(responses)}
+        response = responses[0]
+        if response.get("error_type") or not response.get("ppx_id"):
+            return {
+                "error": response.get("error_msg") or "Unable to identify package XML",
+                "error_type": response.get("error_type"),
+                "event_status": response.get("event_status"),
+            }
+        if self.ppx_id and self.ppx_id != response["ppx_id"]:
+            return {"error": "Package already linked to another PID record"}
+
+        self.ppx_id = response["ppx_id"]
+        self.updated_by = user
+        if save:
+            type(self).objects.filter(pk=self.pk).update(ppx_id=self.ppx_id, updated_by=user)
+        return {}
+
+    @classmethod
+    def complete_ppx(cls, user, sps_pkg_id_list=None, pkg_name_substr=None, pid_v2_subst=None):
+        query = Q()
+        if sps_pkg_id_list:
+            query |= Q(pk__in=sps_pkg_id_list)
+        if pkg_name_substr:
+            query |= Q(sps_pkg_name__contains=pkg_name_substr)
+        if pid_v2_subst:
+            query |= Q(pid_v2__contains=pid_v2_subst)
+        if query == Q():
+            raise ValueError("SPSPkg.complete_ppx requires an explicit scope")
+
+        response = {"success": [], "failures": []}
+        for package in cls.objects.filter(query, ppx__isnull=True).iterator():
+            try:
+                result = package.add_ppx(user, save=True)
+                if result.get("error"):
+                    response["failures"].append(dict(result, sps_pkg_id=package.pk))
+                else:
+                    response["success"].append(package.pk)
+            except Exception:
+                response["failures"].append({
+                    "sps_pkg_id": package.pk, "error": traceback.format_exc()
+                })
+        return response
+
     @classmethod
     def complete_pid_v2(cls, user, sps_pkg_id_list=None):
         filters = {
