@@ -45,10 +45,26 @@ Type inside de project ```make help```:
         django_compilemessages             Run ./manage.py compilemessages $(COMPOSE_FILE_DEV)
         django_dump_auth                   Run manage.py dumpdata auth --indent=2 $(COMPOSE_FILE_DEV)
         django_load_auth                   Run manage.py dumpdata auth --indent=2 $(COMPOSE_FILE_DEV)
-        dump_data                          Dump database into .sql $(COMPOSE_FILE_DEV)
-        restore_data                       Restore database into from latest.sql file $(COMPOSE_FILE_DEV)
+        dump_data                          Dump database into .sql.gz $(COMPOSE_FILE_DEV)
+        restore_data                       Restore database from .sql.gz file $(COMPOSE_FILE_DEV)
 
 ```
+
+Database backups created by `dump_data` contain plain SQL compressed with gzip:
+
+```bash
+make dump_data compose=local.yml
+make restore_data compose=local.yml RESTORE_FILE=dump_01-01-2026_12_00_00.sql.gz
+```
+
+The files are read from `/backups` in the PostgreSQL container. Restore into an
+isolated environment: the SQL produced by `pg_dumpall -c` recreates databases
+and roles. Gzip integrity is checked before restoration, and pipeline command
+failures stop the Make target. SQL statement errors retain the existing `psql`
+behavior and do not necessarily stop the restore.
+
+PostgreSQL custom-format dumps (`PGDMP`), including those wrapped in gzip,
+require `pg_restore` and are not accepted by this SQL restore target.
 
 To build the stack for development enviroment you can use the following command:
 
