@@ -71,12 +71,12 @@ def make_xml_adapter(
     adapter.xml_with_pre.deprecated_sps_pkg_name_list = deprecated_sps_pkg_name_list or []
     adapter.xml_with_pre.body_fragment_fingerprint = body_fragment_fingerprint
     adapter.xml_with_pre.body_fingerprint = body_fingerprint
-    adapter.xml_with_pre.get_article_data.return_value = {
+    adapter.xml_with_pre.readable_data = {
         "article_titles": article_titles or [],
         "surnames": surnames,
         "collab": collab,
         "links": links,
-        "partial_body": partial_body,
+        "body_fragment": partial_body,
     }
     return adapter
 

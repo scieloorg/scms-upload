@@ -3,7 +3,7 @@
 # ========================================
 pytz==2023.3.post1  # https://github.com/stub42/pytz
 python-dateutil==2.9.0.post0  # https://github.com/dateutil/dateutil
-tenacity==8.2.3  # https://pypi.org/project/tenacity/
+tenacity==8.5.0  # https://pypi.org/project/tenacity/
 psutil==6.0.0  # System monitoring
 
 # ========================================
@@ -15,7 +15,7 @@ certifi>=2024.2.2  # SSL certificates
 # ========================================
 # Image Processing
 # ========================================
-Pillow==10.4.0  # https://github.com/python-pillow/Pillow
+Pillow==12.3.0  # https://github.com/python-pillow/Pillow
 
 # ========================================
 # Web Server & Caching
@@ -53,7 +53,7 @@ flower==2.0.1  # https://github.com/mher/flower
 # ========================================
 # Wagtail CMS
 # ========================================
-wagtail==7.1.1  # https://github.com/wagtail/wagtail - UPGRADE de 6.4.2
+wagtail==7.4.3  # https://github.com/wagtail/wagtail
 wagtail-django-recaptcha==2.2.0  # UPGRADE de 2.1.1
 wagtailmenus==3.1.9
 wagtail-localize==1.12.2  # UPGRADE de 1.9.0
@@ -69,14 +69,14 @@ minio==7.2.8  # Mantendo versão maior
 # ========================================
 # XML Processing & Data Parsing
 # ========================================
-lxml==5.3.0  # https://github.com/lxml/lxml - Mantendo versão maior
+lxml==6.1.0  # https://github.com/lxml/lxml
 feedparser==6.0.11
 langdetect==1.0.9
 
 # ========================================
 # HTTP & Networking
 # ========================================
-aiohttp==3.10.5  # Async HTTP client - Mantendo versão maior
+aiohttp==3.14.3  # Async HTTP client
 urllib3==2.2.3  # Mantendo versão maior
 requests>=2.32.3  # Mantendo versão maior
 tornado>=6.4.1  # Pinned by Snyk - Mantendo versão maior
@@ -90,7 +90,7 @@ iso639-lang==2.6.3  # Mantendo versão maior
 # SciELO Specific Packages
 # ========================================
 # Using specific versions for stability
--e git+https://github.com/scieloorg/packtools.git@4.16.11#egg=packtools
+-e git+https://github.com/scieloorg/packtools.git@4.17.8#egg=packtools
 -e git+https://github.com/scieloorg/scielo_scholarly_data#egg=scielo_scholarly_data
 -e git+https://github.com/scieloorg/opac_schema.git@v2.66#egg=opac_schema
 -e git+https://github.com/scieloorg/scielo_migration.git@1.10.8#egg=scielo_classic_website
