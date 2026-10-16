@@ -8,6 +8,7 @@ from packtools.sps.pid_provider.xml_sps_adapter import PidProviderXMLAdapter
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from package.models import SPSPkg
+from pid_provider.base_pid_provider import BasePidProvider
 from pid_provider.models import PidProviderXML, PidProviderXMLRegistration
 from pid_provider.query_params import compare, get_data_to_compare
 from upload.utils.package_utils import render_html
@@ -142,7 +143,9 @@ def test_migration_html_and_upload_preview_render_real_xml(xml):
 
 
 @pytest.mark.django_db
-def test_ambiguous_registration_persists_audit_without_changing_candidates(xml):
+@pytest.mark.parametrize("entry", ["direct", "opac"])
+def test_ambiguous_registration_persists_audit_without_changing_candidates(xml, entry, settings, tmp_path):
+    settings.MEDIA_ROOT = str(tmp_path)
     user = get_user_model().objects.create_user(username="ambiguous-pid")
     adapter = PidProviderXMLAdapter(xml)
     candidates = []
@@ -153,7 +156,14 @@ def test_ambiguous_registration_persists_audit_without_changing_candidates(xml):
         candidates.append(record)
 
     with patch.object(PidProviderXML, "select_records", return_value=[("ids", candidates)]):
-        response = PidProviderXML.register(xml, "sample.xml", user, force_update=True)
+        if entry == "direct":
+            response = PidProviderXML.register(xml, "sample.xml", user, force_update=True)
+        else:
+            with patch("pid_provider.base_pid_provider.XMLWithPre.create", return_value=[xml]):
+                response = BasePidProvider().provide_pid_for_xml_uri(
+                    "https://www.scielo.br/sample.xml", "sample.xml", user,
+                    force_update=True, expected_pid_v3=xml.v3,
+                )
 
     assert response["event_status"] == "multiple"
     assert PidProviderXML.objects.count() == 2
