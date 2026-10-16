@@ -5,6 +5,15 @@ from core.utils.similarity import how_similar
 from pid_provider import exceptions
 
 
+def get_data_to_compare(xml_adapter):
+    """Inclui sobrenomes e PID v2 nos dados usados para comparar candidatos."""
+    data = xml_adapter.get_data_to_compare()
+    data["surnames"] = xml_adapter.xml_with_pre.surnames
+    data["pid_v2"] = xml_adapter.xml_with_pre.v2
+
+    return data
+
+
 def compare(registered_items, input_data):
     """Calcula a média sem contar campos nulos nos dois lados."""
     total_score = 0
@@ -107,20 +116,6 @@ class QueryBuilderPidProviderXML:
         self.adapter_data = xml_adapter.data
         self.xml_with_pre_data = xml_adapter.xml_with_pre.readable_data
 
-    @property
-    def pkg_name_list(self):
-        # --- Resolução Consolidada de Package Names ---
-        pkg_names = set()
-        # 1. Nome enviado originalmente via parâmetro no construtor
-        if self.xml_adapter.pkg_name:
-            pkg_names.add(self.xml_adapter.pkg_name)
-        # 2. Nome oficial atual gerado pelo motor de cálculo do XML
-        if self.xml_adapter.sps_pkg_name:
-            pkg_names.add(self.xml_adapter.sps_pkg_name)
-        # 3. Consolida todas as listas de nomes depreciados/alternativos
-        pkg_names.update(self.xml_adapter.xml_with_pre.deprecated_sps_pkg_name_list)
-        return set(item for item in pkg_names if item)
-    
     def validate_input_data(self):
         if not self.adapter_data.get("pub_year"):
             raise exceptions.RequiredPublicationYearErrorToGetPidProviderXMLError()
@@ -149,10 +144,9 @@ class QueryBuilderPidProviderXML:
     @property
     def identifier_queries(self):
         """
-        Constrói queries para busca por identificadores (v3, v2, aop_pid, pkg_name, DOI).
+        Constrói queries por identificadores diretos (v3, v2, aop_pid e DOI).
         """
         q = Q()
-        other_pids = set()
         
         # PIDs diretos do xml_adapter (não envelopados no data dict)
         v3 = self.xml_adapter.v3
@@ -171,11 +165,6 @@ class QueryBuilderPidProviderXML:
         if aop_pid:
             q |= Q(v2=aop_pid) | Q(aop_pid=aop_pid)
             
-        # Package names históricos e atuais
-        pkg_names = self.pkg_name_list
-        if pkg_names:
-            q |= Q(pkg_name__in=pkg_names)
-
         main_doi = self.adapter_data.get("main_doi")
         if main_doi:
             q |= Q(main_doi=main_doi)
@@ -285,16 +274,11 @@ class QueryBuilderPidProviderXML:
             z_links=z_links,
         ) & self.partial_body_query
 
-    def get_article_data_query(self, issue):
+    def get_article_data_query(self, issue, flexible=False):
         if issue:
-            return (
-                self.article_data_query & 
-                Q(**self.issue_params) & 
-                Q(**self.article_location_params)
-            )
-        return (
-            self.article_data_query & 
-            Q(
+            q = Q(**self.issue_params) & Q(**self.article_location_params)
+        else:
+            q = Q(
                 volume__isnull=True,
                 number__isnull=True,
                 suppl__isnull=True,
@@ -302,4 +286,9 @@ class QueryBuilderPidProviderXML:
                 fpage__isnull=True,
                 lpage__isnull=True,
             )
-        )
+            if flexible:
+                q &= Q(**self.article_location_params)
+
+        if flexible:
+            return q
+        return self.article_data_query & q

@@ -146,24 +146,6 @@ class ValidateInputDataTests(SimpleTestCase):
             qbuilder.validate_input_data()
 
 
-class PkgNameListTests(SimpleTestCase):
-
-    def test_combines_all_sources_and_drops_falsy(self):
-        adapter = make_xml_adapter(
-            data={},
-            pkg_name="pkg-a",
-            sps_pkg_name="pkg-b",
-            deprecated_sps_pkg_name_list=["pkg-c", "", None, "pkg-a"],
-        )
-        qbuilder = QueryBuilderPidProviderXML(adapter)
-        self.assertEqual(qbuilder.pkg_name_list, {"pkg-a", "pkg-b", "pkg-c"})
-
-    def test_empty_when_no_names_available(self):
-        adapter = make_xml_adapter(data={}, pkg_name=None, sps_pkg_name=None)
-        qbuilder = QueryBuilderPidProviderXML(adapter)
-        self.assertEqual(qbuilder.pkg_name_list, set())
-
-
 class IdentifierQueriesTests(SimpleTestCase):
 
     def test_empty_when_nothing_set(self):
@@ -182,13 +164,13 @@ class IdentifierQueriesTests(SimpleTestCase):
         expected = Q(v2="V2-1") | (Q(v2="AOP-1") | Q(aop_pid="AOP-1"))
         self.assertEqual(qbuilder.identifier_queries, expected)
 
-    def test_includes_pkg_names_and_main_doi(self):
+    def test_package_name_is_not_a_direct_identifier(self):
         adapter = make_xml_adapter(
             data={"main_doi": "10.1234/xyz"},
             pkg_name="pkg-a",
         )
         qbuilder = QueryBuilderPidProviderXML(adapter)
-        expected = Q(pkg_name__in={"pkg-a"}) | Q(main_doi="10.1234/xyz")
+        expected = Q(main_doi="10.1234/xyz")
         self.assertEqual(qbuilder.identifier_queries, expected)
 
 

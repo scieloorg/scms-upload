@@ -34,6 +34,7 @@ from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutu
 )
 from pid_provider import choices, exceptions
 from pid_provider.query_params import (
+    get_data_to_compare,
     zero_to_none,
     compare,
     QueryBuilderPidProviderXML,
@@ -658,26 +659,47 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         return True
 
     def get_readable_data(self):
-        if self.readable_data:
-            return self.readable_data
-        if self.xml_with_pre:
-            return self.xml_with_pre.readable_data
-        return {}
+        readable = dict(self.readable_data or {})
+        readable.pop("partial_body", None)
+        if not readable:
+            xml_with_pre = self.xml_with_pre
+            if xml_with_pre:
+                readable = xml_with_pre.readable_data
+
+        if readable != self.readable_data:
+            self.readable_data = readable
+            if self.pk:
+                try:
+                    # O cache não deve alterar a data usada para ordenar candidatos.
+                    self.save(update_fields=["readable_data"])
+                except Exception:
+                    logging.exception(
+                        "Unable to cache readable data for PID record %s", self.pk
+                    )
+
+        return readable
 
     @property
     def data_to_compare(self):
+        data = {}
         readable = self.get_readable_data()
-        titles = readable.get("article_titles")
-        body_fragment = readable.get("body_fragment")
-        return {
-            "article_titles": titles or self.xml_with_pre.article_titles_texts,
+        if readable:
+            for field in ("article_titles", "body_fragment", "surnames"):
+                if readable.get(field):
+                    data[field] = readable[field]
+        else:
+            # Sem texto legível, o PID v2 ajuda a distinguir hashes coincidentes.
+            data["pid_v2"] = self.v2
+
+        data.update({
             "z_surnames": self.z_surnames,
             "z_collab": self.z_collab,
             "z_links": self.z_links,
-            # A coluna mantém o nome legado; seu valor já é o fingerprint.
+            # A coluna legada também armazena fingerprints nas versões atuais.
             "body_fragment_fingerprint": self.z_partial_body,
-            "body_fragment": body_fragment or self.xml_with_pre.body_fragment,
-        }
+        })
+
+        return data
 
     @classmethod
     @profile_classmethod
@@ -1031,18 +1053,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @classmethod
     @profile_classmethod
     def select_records(cls, xml_adapter):
-        """
-        Gera pares (label, lista_de_candidatos) para cada estratégia de
-        correspondência, do mais específico ao mais genérico.
-
-        Cada branch é materializada (list(...)) uma única vez aqui, para
-        que o consumidor (select_record) nunca precise avaliar a queryset
-        mais de uma vez (evita repetir .exists() + .count() + iteração,
-        que geram queries separadas no banco). Por ser um generator, uma
-        branch só é construída e avaliada quando o consumidor de fato
-        solicita o próximo item — se a primeira branch já resolver, as
-        demais nunca chegam a rodar no banco.
-        """
+        """Materializa cada estratégia de busca apenas quando consumida."""
         qbuilder = QueryBuilderPidProviderXML(xml_adapter)
         qbuilder.validate_input_data()
 
@@ -1050,23 +1061,28 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         objects = cls.objects.all()
 
         # 1) correspondência direta por identificadores
-        yield "ids", list(objects.filter(qbuilder.identifier_queries))
+        identifiers = qbuilder.identifier_queries
+        yield "ids", list(objects.filter(identifiers)) if identifiers != Q() else []
 
         selected_journal = objects.filter(qbuilder.issn_query)
 
-        # 2) journal + issue + dados do artigo
+        # 2) correspondência estrita, com ou sem fascículo
         yield (
-            "journal-issue-article",
+            "journal-issue-article-strict",
             list(
                 selected_journal.filter(
-                    qbuilder.get_article_data_query(issue=True)
+                    qbuilder.get_article_data_query(issue=True, flexible=False)
+                    | qbuilder.get_article_data_query(issue=False, flexible=False)
                 )
             ),
         )
 
-        # 3) journal + dados do artigo
-        yield "journal-article", list(
-            selected_journal.filter(qbuilder.get_article_data_query(issue=False))
+        # 3) permite correções de texto, mantendo fascículo/localização
+        yield "journal-issue-article-flexible", list(
+            selected_journal.filter(
+                qbuilder.get_article_data_query(issue=True, flexible=True)
+                | qbuilder.get_article_data_query(issue=False, flexible=True)
+            )
         )
 
     @staticmethod
@@ -1077,7 +1093,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         checamos truthiness (nunca .exists()/.count() sobre queryset).
         """
         unmatched_items = {}
-        xml_adapter_data_to_compare = xml_adapter.get_data_to_compare()
+        xml_adapter_data_to_compare = get_data_to_compare(xml_adapter)
         for label, results in selection_results:
             if not results:
                 continue
@@ -1121,7 +1137,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             # pid v3 é inédito
             raise cls.DoesNotExist
         
-        xml_adapter_data_to_compare = xml_adapter.get_data_to_compare()
+        xml_adapter_data_to_compare = get_data_to_compare(xml_adapter)
         result = PidProviderXML.get_best_match(results, xml_adapter_data_to_compare)
         registered = result.get("registered")
         if not registered:
@@ -1374,6 +1390,8 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             response["registered"] = True
             response.update(registered.data)
             response["is_equal"] = registered.is_equal_to(xml_with_pre)
+            if not registered.readable_data:
+                response["is_equal"] = False
             return response
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()

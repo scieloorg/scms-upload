@@ -22,6 +22,8 @@ class PidProviderXMLSelectRecordTests(TestCase):
     def _make_xml_adapter(self, data_to_compare=None):
         xml_adapter = MagicMock()
         xml_adapter.get_data_to_compare.return_value = data_to_compare or {}
+        xml_adapter.xml_with_pre.surnames = []
+        xml_adapter.xml_with_pre.v2 = None
         return xml_adapter
 
     @patch("pid_provider.models.PidProviderXML.get_best_match")
@@ -213,4 +215,6 @@ class PidProviderXMLSelectRecordTests(TestCase):
 
         PidProviderXML.select_record(xml_adapter, [("journal", candidates)])
 
-        mock_get_best_match.assert_called_once_with(candidates, {"title": "Foo"})
+        mock_get_best_match.assert_called_once_with(
+            candidates, {"title": "Foo", "surnames": [], "pid_v2": None}
+        )
