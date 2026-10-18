@@ -2360,6 +2360,8 @@ class ArticleProc(BaseProc, ClusterableModel):
                     migrated_document_publication_day
                     or xml_with_pre.get_complete_publication_date()
                 )
+            if xml_file_path:
+                xml_with_pre.add_pkg_name(built_name=xml_with_pre.build_sps_pkg_name())
             detail.update(xml_with_pre.data)
             try:
                 os.unlink(self.processed_xml.path)

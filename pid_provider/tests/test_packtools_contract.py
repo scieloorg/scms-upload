@@ -11,6 +11,7 @@ from package.models import SPSPkg
 from pid_provider.base_pid_provider import BasePidProvider
 from pid_provider.models import PidProviderXML, PidProviderXMLRegistration
 from pid_provider.query_params import compare, get_data_to_compare
+from proc.models import ArticleProc
 from upload.utils.package_utils import render_html
 
 
@@ -140,6 +141,19 @@ def test_migration_html_and_upload_preview_render_real_xml(xml):
 
     assert "<html" in preview
     assert "10.1590/2236-8906-108/2020" in preview
+
+
+def test_converted_html_keeps_full_package_name(settings, tmp_path):
+    settings.MEDIA_ROOT = str(tmp_path / "media")
+    converted_xml = tmp_path / "01.xml"
+    converted_xml.write_bytes(XML_PATH.read_bytes())
+    package_name = "2236-8906-Hoehnea-49-e1082020"
+    article = ArticleProc(pid="S2236-89062022000100001", pkg_name="01")
+
+    article.save_processed_xml(None, str(converted_xml), {}, None)
+
+    assert Path(article.processed_xml.name).name == package_name + ".xml"
+    assert article.xml_with_pre.sps_pkg_name == package_name
 
 
 @pytest.mark.django_db
