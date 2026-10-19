@@ -865,3 +865,79 @@ class ErratumInDifferentCollectionsTest(
             },
             article_versions,
         )
+
+
+class RegisterCollectionPidV2GuaranteesTest(
+    RegisterSameArticleInDifferentCollectionsTestBase
+):
+    """
+    O XML de scl registra o pid v2 de scl (CollectionPidV2) ou o registro
+    falha, sem registro parcial
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.register(psi_xml(), "psi")
+        self.psi_registered = PidProviderXML.objects.get()
+
+    def register_with_error(self, xml_with_pre, filename):
+        return PidProviderXML.register(
+            xml_with_pre, filename, self.user, origin_date="2026-01-01"
+        )
+
+    def assert_psi_registered_unchanged(self):
+        registered = PidProviderXML.objects.get()
+        self.assertEqual(registered.v3, self.psi_registered.v3)
+        self.assertIsNone(registered.v2)
+        self.assertIsNone(registered.current_version)
+        self.assertEqual(registered.collection_pids_v2_data, [PSI_DATA])
+        self.assertFalse(OtherPid.objects.exists())
+        self.assertEqual(XMLVersion.objects.count(), 1)
+
+    def test_journal_not_found_in_the_xml_collection_is_an_error(self):
+        JournalProc.objects.filter(collection=self.scl).delete()
+
+        response = self.register_with_error(scl_xml(), "scl")
+
+        self.assertEqual(response["event_status"], "error")
+        self.assertEqual(
+            response["error_type"],
+            str(exceptions.XMLCollectionNotFoundErrorToGetPidProviderXMLError),
+        )
+        self.assertIn("scl", response["error_msg"])
+        self.assert_psi_registered_unchanged()
+
+    def test_journal_acron_of_the_xml_is_used_when_missing_in_collection(self):
+        JournalProc.objects.filter(collection=self.scl).update(acron=None)
+
+        self.register(scl_xml(), "scl")
+
+        registered = PidProviderXML.objects.get()
+        self.assertEqual(registered.v2, SCL_V2)
+        self.assert_pids_v2_by_collection(registered)
+
+    def test_failure_to_register_collection_pid_v2_does_not_leave_partial_record(self):
+        with patch.object(
+            CollectionPidV2, "create_or_update", side_effect=ValueError("failure")
+        ):
+            response = self.register_with_error(scl_xml(), "scl")
+
+        # o documento foi identificado (event_status "updated"), mas o
+        # registro falhou
+        self.assertEqual(response["error_type"], str(ValueError))
+        self.assertIn("failure", response["error_msg"])
+        # v2 e current_version de scl não ficam gravados sem o CollectionPidV2
+        self.assert_psi_registered_unchanged()
+
+    def test_scl_xml_is_registered_after_failure(self):
+        with patch.object(
+            CollectionPidV2, "create_or_update", side_effect=ValueError("failure")
+        ):
+            self.register_with_error(scl_xml(), "scl")
+
+        response = self.register(scl_xml(), "scl")
+
+        registered = PidProviderXML.objects.get()
+        self.assertEqual(response["v3"], self.psi_registered.v3)
+        self.assertEqual(registered.v2, SCL_V2)
+        self.assert_pids_v2_by_collection(registered)
