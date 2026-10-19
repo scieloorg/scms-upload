@@ -245,6 +245,7 @@ def task_load_record_from_xml_url(
             auto_solve_pid_conflict=False,
             document_item=document_item,
             expected_pid_v3=pid_v3,
+            collection_acron=collection_acron,
         )
 
         if result.get("error_msg"):
