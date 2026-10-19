@@ -8,7 +8,7 @@ from zlib import crc32
 
 from django.core.files.base import ContentFile
 from django.core.exceptions import FieldError
-from django.db import IntegrityError, models
+from django.db import IntegrityError, models, transaction
 from django.db.models import Prefetch, Q, Count
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -33,6 +33,7 @@ from pid_provider import choices, exceptions
 from pid_provider.multi_collection import (
     get_journal_pid_from_v2,
     get_xml_collections,
+    normalize_acron,
 )
 from pid_provider.query_params import (
     zero_to_none,
@@ -1026,6 +1027,17 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 raise exceptions.RequiredCollectionErrorToGetPidProviderXMLError(
                     "Unable to identify collection from XML. Please provide collection_acron or ensure XML has valid collection information."
                 )
+            # a coleção de origem informada no XML (custom-meta) deve ser uma
+            # das coleções do periódico, senão o pid v2 e a versão do XML da
+            # coleção não seriam registrados (ver add_collections)
+            if xml_with_pre.collection and not any(
+                item["collection"].acron == xml_with_pre.collection
+                for item in xml_collections
+            ):
+                raise exceptions.XMLCollectionNotFoundErrorToGetPidProviderXMLError(
+                    f"Journal not found in the XML collection ({xml_with_pre.collection}). "
+                    f"Journal collections: {[item['collection'].acron for item in xml_collections]}"
+                )
             input_data.update(fix_get_article_data(xml_with_pre))
             input_data["origin"] = origin
             response["input_data"] = input_data
@@ -1088,15 +1100,18 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                     origin_date,
                     registered_in_core,
                 )
-                registered = cls._save(
-                    registered,
-                    xml_adapter,
-                    user,
-                    origin_date,
-                    available_since,
-                    registered_in_core,
-                    xml_collections,
-                )
+                # evita registro parcial (ex.: pid v2 da coleção principal
+                # gravado sem o CollectionPidV2) em caso de falha
+                with transaction.atomic():
+                    registered = cls._save(
+                        registered,
+                        xml_adapter,
+                        user,
+                        origin_date,
+                        available_since,
+                        registered_in_core,
+                        xml_collections,
+                    )
                 # data to return
                 response.update(registered.data)
                 # garante que o valor de v2 seja o da entrada, da coleção processada, e não o da coleção principal (que pode ser diferente)
@@ -1268,7 +1283,12 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 self,
                 collection,
                 xml_with_pre.v2,
-                journal_acron=xml_collection["journal_acron"],
+                # na falta do acrônimo do periódico na coleção, usa o do XML,
+                # que é o da coleção de origem do XML
+                journal_acron=(
+                    xml_collection["journal_acron"]
+                    or normalize_acron(xml_with_pre.journal_acron)
+                ),
                 current_version=current_version,
             )
 
