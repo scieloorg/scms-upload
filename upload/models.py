@@ -44,6 +44,7 @@ from upload.forms import (
     ValidationResultForm,
     XMLErrorReportForm,
 )
+from upload.panels import decision_panels
 from upload.permissions import (
     ACCESS_PACKAGES,
     ASSIGN_PACKAGE,
@@ -1398,15 +1399,7 @@ class QAPackage(Package):
         FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
         FieldPanel("status", read_only=True),
     ]
-    panel_decision = [
-        AutocompletePanel("analyst"),
-        FieldPanel("qa_decision"),
-        FieldPanel("qa_comment"),
-        FieldPanel("force_journal_publication"),
-        FieldPanel("force_issue_publication"),
-        FieldPanel("order"),
-        AutocompletePanel("linked"),
-    ]
+    panel_decision = decision_panels()
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
     ]
@@ -1442,15 +1435,7 @@ class ReadyToPublishPackage(Package):
         FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
         FieldPanel("status", read_only=True),
     ]
-    panel_decision = [
-        AutocompletePanel("analyst"),
-        FieldPanel("qa_decision"),
-        FieldPanel("qa_comment"),
-        FieldPanel("force_journal_publication"),
-        FieldPanel("force_issue_publication"),
-        FieldPanel("order"),
-        AutocompletePanel("linked"),
-    ]
+    panel_decision = decision_panels()
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
     ]
