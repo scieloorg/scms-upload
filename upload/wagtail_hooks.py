@@ -2,7 +2,9 @@ import logging
 
 from django.contrib.admin.utils import quote
 from django.db.models import Q
-from django.urls import include, path
+from django.templatetags.static import static
+from django.urls import include, path, re_path
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail.admin.ui.tables import TitleColumn
@@ -30,6 +32,9 @@ from upload.bulk_actions.republish import (
     RepublishPublicBulkAction,
     RepublishQABulkAction,
 )
+from upload.filters import PackageValidationReportFilterSet, XMLErrorReportFilterSet, XMLInfoReportFilterSet
+from upload.menu import UploadSectionMenu
+from upload.models import ArchivedPackage, Package, PackageZip, PkgValidationResult, QAPackage, ReadyToPublishPackage, UploadValidator, ValidationReport, XMLError, XMLErrorReport, XMLInfo, XMLInfoReport, choices
 from upload.permission_policies import UploadModelPermissionPolicy
 from upload.permissions import ACCESS_PACKAGES
 from upload.querysets import get_scoped_package_queryset, scope_package_queryset
@@ -41,22 +46,7 @@ from upload.views import (
     ValidationReportEditView,
     XMLErrorReportEditView,
     XMLInfoReportEditView,
-)
-
-from upload.models import (
-    ArchivedPackage,
-    Package,
-    PackageZip,
-    PkgValidationResult,
-    QAPackage,
-    ReadyToPublishPackage,
-    UploadValidator,
-    ValidationReport,
-    XMLError,
-    XMLErrorReport,
-    XMLInfo,
-    XMLInfoReport,
-    choices,
+    redirect_upload_url,
 )
 
 MODEL_PERMISSION_ACTIONS = ("add", "change", "delete", "view")
@@ -146,10 +136,12 @@ class BaseUploadViewSet(CommonControlFieldViewSet):
 
 
 class PackageZipViewSet(BaseUploadViewSet):
+    menu_name = "submission"
+    url_prefix = "upload/submissions"
     model = PackageZip
     add_view_class = PackageZipCreateView
-    menu_label = _("Package upload")
-    menu_icon = "folder"
+    menu_label = _("Packages")
+    menu_icon = "upload"
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 20
@@ -183,6 +175,8 @@ class PackageZipViewSet(BaseUploadViewSet):
 
 
 class PackageViewSet(BaseUploadViewSet):
+    menu_name = "documents"
+    url_prefix = "upload/documents"
     model = Package
     denied_permission_actions = ("delete",)
 
@@ -191,8 +185,8 @@ class PackageViewSet(BaseUploadViewSet):
     inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
-    menu_label = _("Package admin")
-    menu_icon = "folder"
+    menu_label = _("Documents")
+    menu_icon = "doc-full"
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 20
@@ -379,8 +373,9 @@ class XMLErrorReportViewSet(BaseUploadViewSet):
     model = XMLErrorReport
     package_scope_field = "package"
     edit_view_class = XMLErrorReportEditView
-    menu_label = _("XML Error Reports")
-    menu_icon = "error"
+    menu_label = _("XML errors")
+    url_prefix = "upload/validation/reports/xml-errors"
+    menu_icon = "clipboard-list"
     add_to_settings_menu = False
     list_display = (
         "package",
@@ -388,10 +383,7 @@ class XMLErrorReportViewSet(BaseUploadViewSet):
         "title",
         "creation",
     )
-    list_filter = (
-        "category",
-        "creation",
-    )
+    filterset_class = XMLErrorReportFilterSet
     search_fields = (
         "title",
         "package__name",
@@ -403,7 +395,8 @@ class XMLErrorViewSet(BaseUploadViewSet):
     model = XMLError
     package_scope_field = "report__package"
     menu_label = _("XML errors")
-    menu_icon = "error"
+    url_prefix = "upload/validation/results/xml-errors"
+    menu_icon = "warning"
     add_to_settings_menu = False
     list_display = (
         "subject",
@@ -432,8 +425,9 @@ class XMLInfoReportViewSet(BaseUploadViewSet):
     model = XMLInfoReport
     package_scope_field = "package"
     edit_view_class = XMLInfoReportEditView
-    menu_label = _("XML Info Reports")
-    menu_icon = "error"
+    menu_label = _("XML information")
+    url_prefix = "upload/validation/reports/xml-information"
+    menu_icon = "info-circle"
     add_to_settings_menu = False
     list_display = (
         "package",
@@ -441,10 +435,7 @@ class XMLInfoReportViewSet(BaseUploadViewSet):
         "title",
         "creation",
     )
-    list_filter = (
-        "category",
-        "creation",
-    )
+    filterset_class = XMLInfoReportFilterSet
     search_fields = (
         "title",
         "package__name",
@@ -485,8 +476,9 @@ class ValidationReportViewSet(BaseUploadViewSet):
     model = ValidationReport
     package_scope_field = "package"
     edit_view_class = ValidationReportEditView
-    menu_label = _("Validation Reports")
-    menu_icon = "error"
+    menu_label = _("Package checks")
+    url_prefix = "upload/validation/reports/package-checks"
+    menu_icon = "clipboard-list"
     add_to_settings_menu = False
     list_display = (
         "package",
@@ -494,10 +486,7 @@ class ValidationReportViewSet(BaseUploadViewSet):
         "title",
         "creation",
     )
-    list_filter = (
-        "category",
-        "creation",
-    )
+    filterset_class = PackageValidationReportFilterSet
     search_fields = (
         "title",
         "package__name",
@@ -508,8 +497,9 @@ class ValidationReportViewSet(BaseUploadViewSet):
 class ValidationViewSet(BaseUploadViewSet):
     model = PkgValidationResult
     package_scope_field = "report__package"
-    menu_label = _("Validations")
-    menu_icon = "error"
+    menu_label = _("Package checks")
+    url_prefix = "upload/validation/results/package-checks"
+    menu_icon = "list-ul"
     add_to_settings_menu = False
     list_display = (
         "subject",
@@ -527,8 +517,10 @@ class ValidationViewSet(BaseUploadViewSet):
 
 class UploadValidatorViewSet(BaseUploadViewSet):
     model = UploadValidator
-    menu_label = _("Upload Validator")
-    menu_icon = "folder"
+    menu_label = _("Validation rules")
+    menu_name = "validation-rules"
+    url_prefix = "upload/validation/rules"
+    menu_icon = "sliders"
     add_to_settings_menu = False
     list_display = (
         "collection",
@@ -610,43 +602,82 @@ class ArchivedPackageViewSet(BaseUploadViewSet):
         return scope_package_queryset(qs, request.user)
 
 
-class UploadViewSetGroup(SnippetViewSetGroup):
-    menu_icon = "folder"
-    menu_label = "Upload"
+class UploadTrackingViewSetGroup(SnippetViewSetGroup):
+    menu_label = _("Workflow")
+    menu_name = "upload-tracking"
+    add_to_admin_menu = False
     items = [
         PackageZipViewSet,
         PackageViewSet,
-        QualityAnalysisPackageViewSet,
-        ReadyToPublishPackageViewSet,
-        ArchivedPackageViewSet,
+    ]
+
+
+class ValidationReportsViewSetGroup(SnippetViewSetGroup):
+    menu_label = _("Reports")
+    menu_name = "upload-reports"
+    add_to_admin_menu = False
+    items = [
+        XMLErrorReportViewSet,
+        XMLInfoReportViewSet,
+        ValidationReportViewSet,
+    ]
+
+
+class ValidationResultsViewSetGroup(SnippetViewSetGroup):
+    menu_label = _("Individual results")
+    menu_name = "upload-results"
+    add_to_admin_menu = False
+    items = [XMLErrorViewSet, ValidationViewSet]
+
+
+class UploadSettingsViewSetGroup(SnippetViewSetGroup):
+    menu_label = _("Settings")
+    menu_name = "upload-settings"
+    add_to_admin_menu = False
+    items = [UploadValidatorViewSet]
+
+
+class UploadViewSetGroup(SnippetViewSetGroup):
+    menu_icon = "upload"
+    menu_label = "Upload"
+    menu_name = "upload"
+    items = [
+        UploadTrackingViewSetGroup,
+        ValidationReportsViewSetGroup,
+        ValidationResultsViewSetGroup,
+        UploadSettingsViewSetGroup,
     ]
     menu_order = get_menu_order("upload")
 
 
+    def get_menu_item(self, order=None):
+        item = super().get_menu_item(order=order)
+        item.menu = UploadSectionMenu(items=self.get_submenu_items())
+        return item
+
+
 register_snippet(UploadViewSetGroup)
-
-
-class UploadReportsViewSetGroup(SnippetViewSetGroup):
-    menu_icon = "folder"
-    menu_label = _("Error management")
-    items = [
-        # os itens a seguir possibilitam que na página Package.inspect
-        # funcionem os links para os relatórios
-        XMLErrorViewSet,
-        XMLErrorReportViewSet,
-        XMLInfoReportViewSet,
-        ValidationViewSet,
-        ValidationReportViewSet,
-        UploadValidatorViewSet,
-    ]
-    menu_order = get_menu_order("upload-error")
-
-
-register_snippet(UploadReportsViewSetGroup)
+for document_viewset in (QualityAnalysisPackageViewSet, ReadyToPublishPackageViewSet, ArchivedPackageViewSet):
+    document_viewset.add_to_admin_menu = False
+    register_snippet(document_viewset)
 
 
 @hooks.register("register_admin_urls")
 def register_disclosure_url():
     return [
+        re_path(
+            r"^snippets/upload/(?P<model_name>xmlerrorreport|xmlinforeport|"
+            r"validationreport|xmlerror|pkgvalidationresult|uploadvalidator|"
+            r"packagezip|package|qapackage|readytopublishpackage|archivedpackage)/"
+            r"(?P<subpath>.*)$",
+            redirect_upload_url,
+        ),
         path("upload/", include("upload.urls", namespace="upload")),
     ]
+
+
+@hooks.register("insert_global_admin_css")
+def upload_menu_css():
+    return format_html(
+        '<link rel="stylesheet" href="{}">', static("upload/css/menu.css")
+    )

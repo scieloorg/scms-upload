@@ -278,7 +278,7 @@ class PackageScopingTest(TestCase):
                 with self.subTest(user=user.username):
                     self.client.force_login(user)
                     response = self.client.get(
-                        f"/admin/snippets/upload/package/inspect/{self.package_1.pk}/"
+                        f"/admin/upload/documents/inspect/{self.package_1.pk}/"
                     )
 
                     self.assertEqual(response.status_code, 200)
@@ -377,7 +377,7 @@ class PackageScopingTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             response.url,
-            "/admin/snippets/upload/readytopublishpackage/",
+            "/admin/upload/decisions/",
         )
         delay.assert_called_once_with(
             username=self.analyst_user.username,
