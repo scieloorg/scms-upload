@@ -43,7 +43,7 @@ from upload.views import (
     XMLInfoReportEditView,
 )
 
-from .models import (
+from upload.models import (
     ArchivedPackage,
     Package,
     PackageZip,
@@ -260,10 +260,12 @@ class PackageViewSet(BaseUploadViewSet):
 
 class QualityAnalysisPackageViewSet(BaseUploadViewSet):
     model = QAPackage
+    url_prefix = "upload/quality-review"
     denied_permission_actions = ("delete",)
     index_view_class = PackageActionIndexView
-    menu_label = _("Quality control admin")
-    menu_icon = "folder"
+    menu_label = _("Quality review")
+    menu_name = "quality-review"
+    menu_icon = "search"
     menu_order = 200
     edit_view_class = QAPackageEditView
     inspect_view_enabled = True
@@ -301,7 +303,6 @@ class QualityAnalysisPackageViewSet(BaseUploadViewSet):
     def get_queryset(self, request):
         status = [
             choices.PS_VALIDATED_WITH_ERRORS,
-            choices.PS_PENDING_CORRECTION,
             choices.PS_PENDING_QA_DECISION,
         ]
         params = {
@@ -318,9 +319,11 @@ class QualityAnalysisPackageViewSet(BaseUploadViewSet):
 
 class ReadyToPublishPackageViewSet(BaseUploadViewSet):
     model = ReadyToPublishPackage
+    url_prefix = "upload/decisions"
     denied_permission_actions = ("delete",)
-    menu_label = _("Publication admin")
-    menu_icon = "folder"
+    menu_label = _("Decisions")
+    menu_name = "publication"
+    menu_icon = "tasks"
     menu_order = 200
     edit_view_class = ReadyToPublishPackageEditView
     inspect_view_enabled = True
@@ -359,15 +362,15 @@ class ReadyToPublishPackageViewSet(BaseUploadViewSet):
 
     def get_queryset(self, request):
         status = [
+            choices.PS_PENDING_CORRECTION,
+            choices.PS_PENDING_QA_DECISION,
+            choices.PS_VALIDATED_WITH_ERRORS,
             choices.PS_READY_TO_PREVIEW,
             choices.PS_PREVIEW,
             choices.PS_READY_TO_PUBLISH,
             choices.PS_PUBLISHED,
         ]
-        params = {
-            "blocking_errors": 0,
-        }
-        qs = super().get_queryset(request).filter(status__in=status, **params)
+        qs = super().get_queryset(request).filter(status__in=status)
 
         return scope_package_queryset(qs, request.user)
 
@@ -550,11 +553,13 @@ class UploadValidatorViewSet(BaseUploadViewSet):
 
 class ArchivedPackageViewSet(BaseUploadViewSet):
     model = ArchivedPackage
+    url_prefix = "upload/archive"
     denied_permission_actions = ("delete",)
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
-    menu_label = _("Archived Packages")
-    menu_icon = "folder"
+    menu_label = _("Archived")
+    menu_name = "archive"
+    menu_icon = "history"
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 20
@@ -596,7 +601,11 @@ class ArchivedPackageViewSet(BaseUploadViewSet):
     )
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request).filter(~Q(status__in=choices.PS_WIP))
+        qs = (
+            super()
+            .get_queryset(request)
+            .exclude(status__in=(*choices.PS_WIP, choices.PS_PENDING_CORRECTION))
+        )
 
         return scope_package_queryset(qs, request.user)
 

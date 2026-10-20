@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 
 from upload import choices
 from upload.authorization import user_can_act_on_package
-from upload.permissions import ASSIGN_PACKAGE, FINISH_DEPOSIT
+from upload.permissions import FINISH_DEPOSIT, REQUEST_CORRECTION
 
 
 def get_package_action_buttons(
@@ -17,6 +17,26 @@ def get_package_action_buttons(
 
     buttons = []
     query = f"?package_id={package.pk}"
+    if package.status in (
+        choices.PS_PENDING_CORRECTION,
+        choices.PS_PENDING_QA_DECISION,
+        choices.PS_VALIDATED_WITH_ERRORS,
+        choices.PS_PREVIEW,
+        choices.PS_READY_TO_PREVIEW,
+        choices.PS_READY_TO_PUBLISH,
+        choices.PS_PUBLISHED,
+    ) and user_can_act_on_package(user, REQUEST_CORRECTION, package):
+        buttons.append(
+            button_class(
+                _("Decisions"),
+                icon_name="tasks",
+                url=reverse(
+                    "wagtailsnippets_upload_readytopublishpackage:edit",
+                    args=[package.pk],
+                ),
+                priority=30,
+            )
+        )
 
     if (
         include_finish_deposit
@@ -25,21 +45,10 @@ def get_package_action_buttons(
     ):
         buttons.append(
             button_class(
-                _("Finish deposit"),
+                _("Submit validation responses"),
+                icon_name="check",
                 url=reverse("upload:finish_deposit") + query,
                 priority=40,
-            )
-        )
-
-    if package.status in (
-        choices.PS_PENDING_QA_DECISION,
-        choices.PS_VALIDATED_WITH_ERRORS,
-    ) and user_can_act_on_package(user, ASSIGN_PACKAGE, package):
-        buttons.append(
-            button_class(
-                _("Accept / Reject the package or delegate it"),
-                url=reverse("upload:assign") + query,
-                priority=50,
             )
         )
 
@@ -49,9 +58,12 @@ def get_package_action_buttons(
         buttons.append(
             button_class(
                 _("Archive"),
+                icon_name="history",
                 url=reverse("upload:archive_package") + query,
                 priority=60,
             )
         )
 
     return buttons
+
+

@@ -1,3 +1,4 @@
+import json
 from io import StringIO
 from unittest.mock import PropertyMock, patch
 
@@ -9,24 +10,15 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import Http404
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
-from wagtail.admin.widgets import ListingButton
 from wagtail.snippets.views.snippets import SnippetViewSet
 
+from article.models import Article
 from collection.models import Collection
 from core.users.permission_policies import TeamScopedSnippetViewSetMixin
 from journal.models import Journal, JournalCollection, OfficialJournal
 from team.management.commands.create_user_groups import (
     Command as CreateUserGroupsCommand,
 )
-from team.models import (
-    CollectionTeamMember,
-    Company,
-    CompanyTeamMember,
-    JournalCompanyContract,
-    JournalTeamMember,
-    TeamRole,
-)
-from upload.admin_buttons import get_package_action_buttons
 from upload.authorization import user_can_act_on_package
 from upload.models import (
     Package,
@@ -38,11 +30,21 @@ from upload.models import (
 from upload.permissions import PUBLISH_PACKAGE, REQUEST_CORRECTION
 from upload.querysets import get_scoped_package_queryset
 from upload.wagtail_hooks import (
+    ReadyToPublishPackageViewSet,
+    ArchivedPackageViewSet,
     PackageViewSet,
     PackageZipViewSet,
     QualityAnalysisPackageViewSet,
     ValidationReportViewSet,
     ValidationViewSet,
+)
+from team.models import (
+    CollectionTeamMember,
+    Company,
+    CompanyTeamMember,
+    JournalCompanyContract,
+    JournalTeamMember,
+    TeamRole,
 )
 
 User = get_user_model()
@@ -247,24 +249,9 @@ class PackageScopingTest(TestCase):
         with self.assertRaises(PermissionDenied):
             viewset.delete_view(request, pk=str(self.package_1.pk))
 
-    def test_native_package_action_respects_state_and_permission(self):
-        buttons = get_package_action_buttons(
-            self.analyst_user,
-            self.package_1,
-            ListingButton,
-        )
-
-        self.assertEqual(len(buttons), 1)
-        self.assertIsInstance(buttons[0], ListingButton)
-        self.assertEqual(
-            buttons[0].url,
-            reverse("upload:assign") + f"?package_id={self.package_1.pk}",
-        )
-
     @patch("upload.views.package_utils.get_languages", return_value=[])
-    def test_package_inspect_renders_native_action_buttons(self, _get_languages):
-        self.client.force_login(self.superuser)
-
+    @patch.object(Package, "files_list", new_callable=PropertyMock, return_value={"files": []})
+    def test_package_inspect_renders_actions_for_administrator_and_analyst(self, _get_languages, _files_list):
         summary = {
             "is_validation_finished": True,
             "conclusion": "",
@@ -273,30 +260,31 @@ class PackageScopingTest(TestCase):
             "total_validations": 0,
             "critical_errors": 0,
         }
+        decisions_url = reverse(
+            "wagtailsnippets_upload_readytopublishpackage:edit",
+            args=[self.package_1.pk],
+        )
+        finish_url = (
+            reverse("upload:finish_deposit") + f"?package_id={self.package_1.pk}"
+        )
+
         with patch.object(
-            Package,
-            "files_list",
-            new_callable=PropertyMock,
-            return_value={"files": []},
-        ), patch.object(
             Package,
             "summary",
             new_callable=PropertyMock,
             return_value=summary,
         ):
-            response = self.client.get(
-                f"/admin/snippets/upload/package/inspect/{self.package_1.pk}/"
-            )
+            for user in (self.superuser, self.analyst_user):
+                with self.subTest(user=user.username):
+                    self.client.force_login(user)
+                    response = self.client.get(
+                        f"/admin/snippets/upload/package/inspect/{self.package_1.pk}/"
+                    )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            reverse("upload:finish_deposit") + f"?package_id={self.package_1.pk}",
-        )
-        self.assertContains(
-            response,
-            reverse("upload:assign") + f"?package_id={self.package_1.pk}",
-        )
+                    self.assertEqual(response.status_code, 200)
+                    self.assertContains(response, decisions_url)
+                    self.assertContains(response, finish_url)
+
 
     def test_inactive_membership_denies_native_upload_policy(self):
         CollectionTeamMember.objects.filter(user=self.analyst_user).update(
@@ -519,6 +507,111 @@ class PackageScopingTest(TestCase):
                 pk=str(self.package_2.pk),
             )
 
+    def correction_form(self, user, responsible, decision=choices.PS_PENDING_CORRECTION):
+        return ReadyToPublishPackageViewSet().get_form_class()(
+            data={
+                "qa_decision": decision,
+                "qa_comment": "Corrigir a identificação da revista.",
+                "correction_assignee": responsible.pk,
+                "analyst": json.dumps({"pk": self.package_1.analyst_id}),
+                "article": "null",
+                "linked": "[]",
+                "order": 0,
+                "upload_proc_result-TOTAL_FORMS": "0",
+                "upload_proc_result-INITIAL_FORMS": "0",
+                "upload_proc_result-MIN_NUM_FORMS": "0",
+                "upload_proc_result-MAX_NUM_FORMS": "1000",
+            },
+            instance=self.package_1,
+            for_user=user,
+        )
+
+    def add_company_scope_outside_collection(self):
+        self.analyst_user.is_staff = True
+        self.analyst_user.save()
+        company = Company.objects.create(name="Beta XML", creator=self.superuser)
+        colleague = User.objects.create_user(username="beta_depositor")
+        for user in (self.analyst_user, colleague):
+            CompanyTeamMember.objects.create(
+                user=user,
+                company=company,
+                creator=self.superuser,
+            )
+        JournalCompanyContract.objects.create(
+            company=company,
+            journal=self.journal_2,
+            is_active=True,
+            creator=self.superuser,
+        )
+        self.package_2.creator = colleague
+        self.package_2.status = choices.PS_PREVIEW
+        self.package_2.save()
+
+        return colleague
+
+
+    def test_collection_visibility_does_not_extend_to_other_company_documents(self):
+        self.add_company_scope_outside_collection()
+        other_company_package = Package.objects.create(
+            journal=self.journal_2,
+            creator=self.unrelated_user,
+            status=choices.PS_PREVIEW,
+        )
+
+        scoped = get_scoped_package_queryset(self.analyst_user)
+        self.assertIn(self.package_1, scoped)
+        self.assertIn(self.package_2, scoped)
+        self.assertNotIn(other_company_package, scoped)
+
+
+    def test_mixed_roles_allow_corrections_but_reject_publication_in_company_scope(
+        self,
+    ):
+        colleague = self.add_company_scope_outside_collection()
+        self.assertTrue(
+            user_can_act_on_package(self.analyst_user, PUBLISH_PACKAGE, self.package_1)
+        )
+        self.assertFalse(
+            user_can_act_on_package(self.analyst_user, PUBLISH_PACKAGE, self.package_2)
+        )
+        self.client.force_login(self.analyst_user)
+        url = f"/admin/upload/decisions/edit/{self.package_2.pk}/"
+        data = self.correction_form(
+            self.analyst_user, colleague, choices.PS_READY_TO_PUBLISH
+        ).data
+
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("qa_decision", response.context["form"].errors)
+        self.package_2.refresh_from_db()
+        self.assertIsNone(self.package_2.qa_decision)
+
+        data["qa_decision"] = choices.PS_PENDING_CORRECTION
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
+        self.package_2.refresh_from_db()
+        self.assertEqual(self.package_2.status, choices.PS_PENDING_CORRECTION)
+        self.assertEqual(self.package_2.assignee, colleague)
+
+
+    def test_publication_rejects_linked_packages_and_articles_from_company_only_scope(
+        self,
+    ):
+        self.add_company_scope_outside_collection()
+        article = Article.objects.create(journal=self.journal_2, creator=self.superuser)
+        for field, value in (
+            ("article", json.dumps({"pk": article.pk})),
+            ("linked", json.dumps([{"pk": self.package_2.pk}])),
+        ):
+            with self.subTest(field=field):
+                form = self.correction_form(
+                    self.analyst_user, self.analyst_user, choices.PS_READY_TO_PUBLISH
+                )
+                form.data[field] = value
+                self.assertFalse(form.is_valid())
+                self.assertIn(field, form.errors)
+
+
     def test_publication_permission_does_not_follow_a_journal_membership(self):
         JournalTeamMember.objects.create(
             user=self.analyst_user,
@@ -549,3 +642,139 @@ class PackageScopingTest(TestCase):
         self.assertTrue(user.has_perm("upload.publish_package"))
         self.assertFalse(user_can_act_on_package(user, PUBLISH_PACKAGE, self.package_1))
 
+
+    def test_correction_is_assigned_to_company_colleague_and_stays_active(self):
+        colleague = User.objects.create_user(username="colleague")
+        CompanyTeamMember.objects.create(
+            user=colleague,
+            company=self.company,
+            creator=self.superuser,
+            is_active_member=True,
+        )
+        self.package_1.analyst = CollectionTeamMember.objects.get(user=self.analyst_user)
+        self.package_1.save()
+        form = self.correction_form(self.analyst_user, colleague)
+        form.data["order"] = "999"
+        form.data["force_journal_publication"] = "on"
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["order"], self.package_1.order)
+        self.assertFalse(form.cleaned_data["force_journal_publication"])
+        package = form.save_all(self.analyst_user)
+        self.assertTrue(package.process_qa_decision(self.analyst_user))
+        package.refresh_from_db()
+        self.assertEqual(package.assignee, colleague)
+        self.assertEqual(package.analyst.user, self.analyst_user)
+        self.assertEqual(package.status, choices.PS_PENDING_CORRECTION)
+        request = self.factory.get("/")
+        request.user = colleague
+        self.assertIn(package, PackageViewSet().get_queryset(request))
+        request.user = self.analyst_user
+        self.assertNotIn(package, QualityAnalysisPackageViewSet().get_queryset(request))
+        self.assertNotIn(package, ArchivedPackageViewSet().get_queryset(request))
+
+    def test_company_member_can_request_correction_but_cannot_publish(self):
+        self.package_1.analyst = CollectionTeamMember.objects.get(user=self.analyst_user)
+        self.package_1.save()
+        form = self.correction_form(self.company_user, self.company_user)
+        self.assertTrue(form.is_valid(), form.errors)
+        form = self.correction_form(
+            self.company_user,
+            self.company_user,
+            choices.PS_READY_TO_PUBLISH,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("qa_decision", form.errors)
+
+        self.package_1.refresh_from_db()
+        self.package_1.status = choices.PS_PREVIEW
+        self.package_1.save()
+        self.client.force_login(self.company_user)
+        url = f"/admin/upload/decisions/edit/{self.package_1.pk}/"
+        response = self.client.post(url, form.data)
+        self.assertEqual(response.status_code, 200)
+        self.package_1.refresh_from_db()
+        self.assertEqual(self.package_1.status, choices.PS_PREVIEW)
+        self.assertIsNone(self.package_1.qa_decision)
+        form = self.correction_form(self.company_user, self.company_user)
+        response = self.client.post(url, form.data)
+        self.assertEqual(response.status_code, 302)
+        self.package_1.refresh_from_db()
+        self.assertEqual(self.package_1.status, choices.PS_PENDING_CORRECTION)
+        self.assertEqual(self.package_1.assignee, self.company_user)
+        self.assertEqual(self.package_1.updated_by, self.company_user)
+
+    def test_correction_rejects_recipient_outside_company_and_missing_reason(self):
+        form = self.correction_form(self.analyst_user, self.unrelated_user)
+        form.data["qa_comment"] = " "
+        self.assertFalse(form.is_valid())
+        self.assertIn("correction_assignee", form.errors)
+        self.assertIn("qa_comment", form.errors)
+
+    def test_company_review_does_not_expose_another_companys_documents(self):
+        other_company = Company.objects.create(name="Other", creator=self.superuser)
+        CompanyTeamMember.objects.create(
+            company=other_company,
+            user=self.unrelated_user,
+            is_active_member=True,
+            creator=self.superuser,
+        )
+        JournalCompanyContract.objects.create(
+            company=other_company,
+            journal=self.journal_1,
+            is_active=True,
+            creator=self.superuser,
+        )
+        self.package_2.journal = self.journal_1
+        self.package_2.save()
+        self.assertNotIn(self.package_2, get_scoped_package_queryset(self.company_user))
+        form = self.correction_form(self.company_user, self.unrelated_user)
+        self.assertFalse(form.is_valid())
+        self.assertIn("correction_assignee", form.errors)
+
+    def test_pending_correction_can_be_reassigned_with_decision_history(self):
+        form = self.correction_form(self.company_user, self.company_user)
+        self.assertTrue(form.is_valid(), form.errors)
+        package = form.save_all(self.company_user)
+        package.process_qa_decision(self.company_user)
+        original = package.upload_proc_result.get(name="process_qa_decision")
+        self.package_1.refresh_from_db()
+        form = self.correction_form(self.analyst_user, self.company_user)
+        form.data["qa_comment"] = "Conferir também as referências."
+        self.assertTrue(form.is_valid(), form.errors)
+        package = form.save_all(self.analyst_user)
+        package.process_qa_decision(self.analyst_user)
+        original.refresh_from_db()
+        self.assertEqual(original.detail["comment"], "Corrigir a identificação da revista.")
+        self.assertEqual(
+            package.upload_proc_result.filter(name="process_qa_decision").count(), 2
+        )
+        self.client.force_login(self.company_user)
+        response = self.client.get(f"/admin/upload/decisions/edit/{package.pk}/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_review_can_be_delegated_to_journal_member_without_publication_right(self):
+        reviewer = User.objects.create_user(username="journal_reviewer", is_staff=True)
+        JournalTeamMember.objects.create(
+            user=reviewer,
+            journal=self.journal_1,
+            creator=self.superuser,
+            is_active_member=True,
+        )
+        form = self.correction_form(
+            self.company_user, self.company_user, choices.PS_PENDING_QA_DECISION
+        )
+        form.data["reviewer"] = reviewer.pk
+        self.assertTrue(form.is_valid(), form.errors)
+        saved = form.save_all(self.company_user)
+        saved.process_qa_decision(self.company_user)
+        saved.refresh_from_db()
+        self.assertEqual(saved.assignee, reviewer)
+        self.assertEqual(saved.status, choices.PS_PENDING_QA_DECISION)
+        self.assertFalse(reviewer.has_perm("upload.publish_package"))
+        self.assertIn(saved, get_scoped_package_queryset(reviewer))
+        form = self.correction_form(
+            self.company_user, self.company_user, choices.PS_PENDING_QA_DECISION
+        )
+        form.data["reviewer"] = self.unrelated_user.pk
+        self.assertFalse(form.is_valid())
+        self.assertIn("reviewer", form.errors)
