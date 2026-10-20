@@ -35,6 +35,7 @@ from proc.models import IssueProc, Operation
 from proc.source_core_api import IssueDataChecker
 from team.models import CollectionTeamMember
 from upload import choices
+from upload.document_workflow import work_situation
 from upload.forms import (
     PackageZipForm,
     QAPackageForm,
@@ -116,7 +117,6 @@ class PackageZip(CommonControlField):
 
     panels = [
         FieldPanel("file"),
-        FieldPanel("show_package_validations"),
     ]
 
     base_form_class = PackageZipForm
@@ -438,7 +438,10 @@ class Package(CommonControlField, ClusterableModel):
 
         super(Package, self).save(*args, **kwargs)
 
+    def work_situation(self):
+        return work_situation(self)
 
+    work_situation.short_description = _("Work status")
 
     @property
     def xml_with_pre(self):

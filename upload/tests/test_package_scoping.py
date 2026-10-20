@@ -19,6 +19,15 @@ from journal.models import Journal, JournalCollection, OfficialJournal
 from team.management.commands.create_user_groups import (
     Command as CreateUserGroupsCommand,
 )
+from team.models import (
+    CollectionTeamMember,
+    Company,
+    CompanyTeamMember,
+    JournalCompanyContract,
+    JournalTeamMember,
+    TeamRole,
+)
+from upload.filters import DocumentFilterSet
 from upload.authorization import user_can_act_on_package
 from upload.models import (
     Package,
@@ -30,21 +39,13 @@ from upload.models import (
 from upload.permissions import PUBLISH_PACKAGE, REQUEST_CORRECTION
 from upload.querysets import get_scoped_package_queryset
 from upload.wagtail_hooks import (
-    ReadyToPublishPackageViewSet,
     ArchivedPackageViewSet,
     PackageViewSet,
     PackageZipViewSet,
     QualityAnalysisPackageViewSet,
+    ReadyToPublishPackageViewSet,
     ValidationReportViewSet,
     ValidationViewSet,
-)
-from team.models import (
-    CollectionTeamMember,
-    Company,
-    CompanyTeamMember,
-    JournalCompanyContract,
-    JournalTeamMember,
-    TeamRole,
 )
 
 User = get_user_model()
@@ -141,7 +142,7 @@ class PackageScopingTest(TestCase):
         )
 
     def test_analyst_sees_packages_in_collection(self):
-        request = self.factory.get("/admin/snippets/upload/package/")
+        request = self.factory.get("/admin/upload/documents/")
         request.user = self.analyst_user
 
         viewset = PackageViewSet()
@@ -152,7 +153,7 @@ class PackageScopingTest(TestCase):
 
     def test_package_queryset_filters_by_package_zip_id(self):
         request = self.factory.get(
-            "/admin/snippets/upload/package/",
+            "/admin/upload/documents/",
             {"pkg_zip_id": self.pkg_zip_1.pk},
         )
         request.user = self.superuser
@@ -163,7 +164,7 @@ class PackageScopingTest(TestCase):
         self.assertNotIn(self.package_2, qs)
 
     def test_company_user_sees_only_own_contracted_packages(self):
-        request = self.factory.get("/admin/snippets/upload/package/")
+        request = self.factory.get("/admin/upload/documents/")
         request.user = self.company_user
 
         viewset = PackageViewSet()
@@ -173,7 +174,7 @@ class PackageScopingTest(TestCase):
         self.assertNotIn(self.package_2, qs)
 
     def test_user_without_contract_sees_no_packages(self):
-        request = self.factory.get("/admin/snippets/upload/package/")
+        request = self.factory.get("/admin/upload/documents/")
         request.user = self.unrelated_user
 
         viewset = PackageViewSet()
@@ -214,7 +215,7 @@ class PackageScopingTest(TestCase):
         self.assertNotIn(unrelated_result, result_queryset)
 
     def test_company_user_package_zip_scoping(self):
-        request = self.factory.get("/admin/snippets/upload/packagezip/")
+        request = self.factory.get("/admin/upload/submissions/")
         request.user = self.company_user
 
         viewset = PackageZipViewSet()
@@ -224,7 +225,7 @@ class PackageScopingTest(TestCase):
         self.assertIn(self.pkg_zip_1, qs)
 
     def test_collection_member_sees_package_zip_from_scoped_package(self):
-        request = self.factory.get("/admin/snippets/upload/packagezip/")
+        request = self.factory.get("/admin/upload/submissions/")
         request.user = self.analyst_user
 
         qs = PackageZipViewSet().get_queryset(request)
@@ -241,9 +242,7 @@ class PackageScopingTest(TestCase):
             )
         )
 
-        request = self.factory.get(
-            f"/admin/snippets/upload/package/delete/{self.package_1.pk}/"
-        )
+        request = self.factory.get(f"/admin/upload/documents/delete/{self.package_1.pk}/")
         request.user = self.superuser
 
         with self.assertRaises(PermissionDenied):
@@ -285,6 +284,41 @@ class PackageScopingTest(TestCase):
                     self.assertContains(response, decisions_url)
                     self.assertContains(response, finish_url)
 
+
+    def test_decision_navigation_returns_to_documents(self):
+        self.client.force_login(self.superuser)
+        documents_url = reverse("wagtailsnippets_upload_package:list")
+
+        for model in ("qapackage", "readytopublishpackage"):
+            with self.subTest(model=model):
+                response = self.client.get(
+                    reverse(f"wagtailsnippets_upload_{model}:list")
+                )
+                self.assertRedirects(
+                    response, documents_url, fetch_redirect_response=False
+                )
+                response = self.client.get(
+                    reverse(
+                        f"wagtailsnippets_upload_{model}:edit",
+                        args=[self.package_1.pk],
+                    )
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    response.context["view"].index_url_name,
+                    "wagtailsnippets_upload_package:list",
+                )
+
+    def test_archive_navigation_opens_archived_document_queue(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(
+            reverse("wagtailsnippets_upload_archivedpackage:list")
+        )
+        self.assertRedirects(
+            response,
+            reverse("wagtailsnippets_upload_package:list") + "?queue=archived",
+            fetch_redirect_response=False,
+        )
 
     def test_inactive_membership_denies_native_upload_policy(self):
         CollectionTeamMember.objects.filter(user=self.analyst_user).update(
@@ -391,7 +425,7 @@ class PackageScopingTest(TestCase):
             model = Package
 
         viewset = BadViewSet()
-        request = self.factory.get("/admin/snippets/upload/package/")
+        request = self.factory.get("/admin/upload/documents/")
         request.user = self.superuser
 
         with self.assertRaises(ImproperlyConfigured):
@@ -404,7 +438,7 @@ class PackageScopingTest(TestCase):
             allow_unscoped_queryset = True
 
         viewset = ConflictedViewSet()
-        request = self.factory.get("/admin/snippets/upload/package/")
+        request = self.factory.get("/admin/upload/documents/")
         request.user = self.superuser
 
         with self.assertRaises(ImproperlyConfigured):
@@ -416,7 +450,7 @@ class PackageScopingTest(TestCase):
             allow_unscoped_queryset = True
 
         viewset = GlobalViewSet()
-        request = self.factory.get("/admin/snippets/upload/package/")
+        request = self.factory.get("/admin/upload/documents/")
         request.user = self.superuser
 
         qs = viewset.get_queryset(request)
@@ -434,33 +468,25 @@ class PackageScopingTest(TestCase):
         viewset = ScopedPackageViewSet()
 
         # Edit View
-        request = self.factory.get(
-            f"/admin/snippets/upload/package/edit/{self.package_2.pk}/"
-        )
+        request = self.factory.get(f"/admin/upload/documents/edit/{self.package_2.pk}/")
         request.user = self.company_user
         with self.assertRaises(Http404):
             viewset.edit_view(request, pk=str(self.package_2.pk))
 
         # Delete View
-        request = self.factory.get(
-            f"/admin/snippets/upload/package/delete/{self.package_2.pk}/"
-        )
+        request = self.factory.get(f"/admin/upload/documents/delete/{self.package_2.pk}/")
         request.user = self.company_user
         with self.assertRaises(Http404):
             viewset.delete_view(request, pk=str(self.package_2.pk))
 
         # Inspect View
-        request = self.factory.get(
-            f"/admin/snippets/upload/package/inspect/{self.package_2.pk}/"
-        )
+        request = self.factory.get(f"/admin/upload/documents/inspect/{self.package_2.pk}/")
         request.user = self.company_user
         with self.assertRaises(Http404):
             viewset.inspect_view(request, pk=str(self.package_2.pk))
 
         # Copy View
-        request = self.factory.get(
-            f"/admin/snippets/upload/package/copy/{self.package_2.pk}/"
-        )
+        request = self.factory.get(f"/admin/upload/documents/copy/{self.package_2.pk}/")
         request.user = self.company_user
         with self.assertRaises(Http404):
             viewset.copy_view(request, pk=str(self.package_2.pk))
@@ -477,16 +503,14 @@ class PackageScopingTest(TestCase):
         viewset = ScopedPackageViewSet()
 
         # In-scope inspect view execution succeeds
-        request = self.factory.get(
-            f"/admin/snippets/upload/package/inspect/{self.package_1.pk}/"
-        )
+        request = self.factory.get(f"/admin/upload/documents/inspect/{self.package_1.pk}/")
         request.user = self.company_user
         response = viewset.inspect_view(request, pk=str(self.package_1.pk))
         self.assertEqual(response.status_code, 200)
 
     def test_actual_upload_custom_views_reject_out_of_scope_object(self):
         inspect_request = self.factory.get(
-            f"/admin/snippets/upload/package/inspect/{self.package_2.pk}/"
+            f"/admin/upload/documents/inspect/{self.package_2.pk}/"
         )
         inspect_request.user = self.company_user
 
@@ -497,7 +521,7 @@ class PackageScopingTest(TestCase):
             )
 
         edit_request = self.factory.get(
-            f"/admin/snippets/upload/qapackage/edit/{self.package_2.pk}/"
+            f"/admin/upload/quality-review/edit/{self.package_2.pk}/"
         )
         edit_request.user = self.company_user
 
@@ -752,6 +776,26 @@ class PackageScopingTest(TestCase):
         response = self.client.get(f"/admin/upload/decisions/edit/{package.pk}/")
         self.assertEqual(response.status_code, 200)
 
+    def test_document_queues_count_only_visible_documents(self):
+        self.package_1.status = choices.PS_PENDING_CORRECTION
+        self.package_1.assignee = self.company_user
+        self.package_1.save()
+        self.client.force_login(self.company_user)
+        response = self.client.get("/admin/upload/documents/?queue=mine")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["object_list"]), [self.package_1])
+        counts = {
+            str(item["label"]): item["count"]
+            for item in response.context["document_queues"]
+        }
+        self.assertEqual(max(counts.values()), 1)
+        self.package_1.status = choices.PS_ARCHIVED
+        self.package_1.save()
+        response = self.client.get("/admin/upload/documents/")
+        self.assertEqual(list(response.context["object_list"]), [])
+        response = self.client.get("/admin/upload/documents/?queue=archived")
+        self.assertEqual(list(response.context["object_list"]), [self.package_1])
+
     def test_review_can_be_delegated_to_journal_member_without_publication_right(self):
         reviewer = User.objects.create_user(username="journal_reviewer", is_staff=True)
         JournalTeamMember.objects.create(
@@ -778,3 +822,75 @@ class PackageScopingTest(TestCase):
         form.data["reviewer"] = self.unrelated_user.pk
         self.assertFalse(form.is_valid())
         self.assertIn("reviewer", form.errors)
+
+    def test_document_status_filter_matches_display_and_includes_archived(self):
+        self.client.force_login(self.company_user)
+        self.package_1.status = choices.PS_PREVIEW
+        self.package_1.qa_ws_status = choices.PUBLISHED
+        self.package_1.public_ws_status = choices.UNRELEASED
+        self.package_1.save()
+        url = reverse("wagtailsnippets_upload_package:list")
+
+        response = self.client.get(url, {"status": choices.PS_PREVIEW})
+        self.assertEqual(list(response.context["object_list"]), [self.package_1])
+        status_field = DocumentFilterSet().form.fields["status"]
+        self.assertEqual(
+            str(dict(status_field.choices)[choices.PS_PREVIEW]),
+            str(self.package_1.work_situation()),
+        )
+        self.assertEqual(
+            str(status_field.label),
+            str(Package.work_situation.short_description),
+        )
+        response = self.client.get(
+            url,
+            {
+                "qa_ws_status": choices.PUBLISHED,
+                "public_ws_status": choices.UNRELEASED,
+            },
+        )
+        self.assertEqual(list(response.context["object_list"]), [self.package_1])
+        response = self.client.get(url, {"public_ws_status": choices.PUBLISHED})
+        self.assertEqual(list(response.context["object_list"]), [])
+
+        self.package_1.status = choices.PS_ARCHIVED
+        self.package_1.save()
+        response = self.client.get(url, {"status": choices.PS_ARCHIVED})
+        self.assertEqual(list(response.context["object_list"]), [self.package_1])
+        self.assertNotIn(self.package_2, response.context["object_list"])
+        response = self.client.get(url)
+        self.assertEqual(list(response.context["object_list"]), [])
+
+    def test_document_error_filters_select_presence_instead_of_exact_count(self):
+        self.client.force_login(self.company_user)
+        self.package_1.blocking_errors = 2
+        self.package_1.critical_errors = 3
+        self.package_1.save()
+        url = reverse("wagtailsnippets_upload_package:list")
+
+        for field in ("blocking_errors", "critical_errors"):
+            with self.subTest(field=field):
+                response = self.client.get(url, {field: "true"})
+                self.assertEqual(list(response.context["object_list"]), [self.package_1])
+                response = self.client.get(url, {field: "false"})
+                self.assertEqual(list(response.context["object_list"]), [])
+
+    def test_package_name_filter_is_partial_and_respects_scope(self):
+        self.client.force_login(self.company_user)
+        response = self.client.get("/admin/upload/documents/", {"package": "pkg"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["object_list"]), [self.package_1])
+        response = self.client.get("/admin/upload/documents/", {"package": "missing"})
+        self.assertEqual(list(response.context["object_list"]), [])
+
+    def test_submission_filters_use_dates_and_document_presence_within_scope(self):
+        self.client.force_login(self.company_user)
+        empty = PackageZip.objects.create(name="empty", creator=self.company_user)
+        url = "/admin/upload/submissions/"
+        response = self.client.get(url, {"has_documents": "true"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["object_list"]), [self.pkg_zip_1])
+        response = self.client.get(url, {"has_documents": "false"})
+        self.assertEqual(list(response.context["object_list"]), [empty])
+        response = self.client.get(url, {"created_from": "2099-01-01"})
+        self.assertEqual(list(response.context["object_list"]), [])

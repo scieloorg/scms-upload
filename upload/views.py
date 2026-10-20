@@ -30,6 +30,7 @@ from upload.permissions import (
     REQUEST_CORRECTION,
 )
 from django.urls import reverse
+from django.utils.html import format_html
 
 
 class PackageZipCreateView(CreateView):
@@ -54,8 +55,20 @@ class PackageZipCreateView(CreateView):
                 ),
             )
         )
-        if pkg_zip.show_package_validations:
-            return redirect(f"/admin/snippets/upload/package/?q={pkg_zip.name}")
+        documents_url = reverse("wagtailsnippets_upload_package:list")
+        messages.success(
+            self.request,
+            format_html(
+                '{} <a href="{}?pkg_zip_id={}">{}</a>',
+                _(
+                    "Package received. Processing runs in the background. "
+                    "Follow its progress in Document tracking."
+                ),
+                documents_url,
+                pkg_zip.pk,
+                _("View documents"),
+            ),
+        )
 
         return HttpResponseRedirect(self.get_success_url())
 
