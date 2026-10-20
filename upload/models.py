@@ -1184,7 +1184,9 @@ class Package(CommonControlField, ClusterableModel):
             }
             response = {}
             response.update(detail)
-            operation = self.start(user, f"Package.publish on {website_kind}")
+            operation = UploadProcResult.create(
+                user, self, f"Package.publish on {website_kind}"
+            )
             if api_data.get("error"):
                 response = api_data
             else:
