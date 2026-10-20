@@ -10,6 +10,7 @@ from upload.models import (
     XMLError,
     XMLErrorReport,
 )
+from upload.wagtail_hooks import UploadValidatorViewSet
 
 
 @pytest.mark.django_db
@@ -99,3 +100,29 @@ def test_completed_review_summary_preserves_reaction_totals(legacy_numbers):
     assert summary["conclusion"]
 
 
+@pytest.mark.django_db
+def test_validation_limits_accept_zero_and_reject_out_of_range(django_user_model):
+    user = django_user_model.objects.create_user(username="coordinator")
+    form_class = UploadValidatorViewSet().get_form_class()
+    data = {
+        "max_xml_warnings_percentage": 0,
+        "max_xml_errors_percentage": 0,
+        "max_impossible_to_fix_percentage": 0,
+        "decision_for_critical_errors": choices.PS_VALIDATED_WITH_ERRORS,
+        "publication_rule": choices.MANUAL_PUBLICATION,
+        "validation_params": "{}",
+    }
+    form = form_class(data=data, for_user=user)
+    assert form.is_valid(), form.errors
+    invalid = dict(
+        data,
+        max_xml_warnings_percentage=101,
+        max_xml_errors_percentage=-1,
+        max_impossible_to_fix_percentage=101,
+    )
+    form = form_class(data=invalid, for_user=user)
+    assert set(form.errors) == {
+        "max_xml_warnings_percentage",
+        "max_xml_errors_percentage",
+        "max_impossible_to_fix_percentage",
+    }

@@ -280,17 +280,34 @@ class XMLErrorReportForm(CoreAdminModelForm):
 
 
 class UploadValidatorForm(CoreAdminModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["max_xml_warnings_percentage"].help_text = _(
+            "Maximum share of XML warnings among all validation results. Enter 0 to 100; 0 allows no warnings."
+        )
+        self.fields["max_xml_errors_percentage"].help_text = _(
+            "Maximum share of XML errors among all validation results. Enter 0 to 100. Critical issues are handled separately."
+        )
+        self.fields["max_impossible_to_fix_percentage"].help_text = _(
+            "After report review is complete, maximum share of XML findings declared impossible to correct, among all XML findings. Enter 0 to 100."
+        )
+        self.fields["decision_for_critical_errors"].help_text = _(
+            "Choose whether critical issues require corrections or remain available for analysis. The strict publication policy always requires corrections."
+        )
+        self.fields["validation_params"].help_text = _(
+            "Technical parameters sent to Packtools to check XML content. Journal data is added automatically. This field is read-only."
+        )
+
     def clean(self):
         cleaned_data = super().clean()
-        if cleaned_data:
-            max_x = cleaned_data.get("max_xml_errors_percentage")
-            if not max_x or not (0 <= max_x <= 100):
-                self.add_error(
-                    "max_xml_errors_percentage", _("Value must be from 0 to 100")
-                )
+        for field_name in (
+            "max_xml_warnings_percentage",
+            "max_xml_errors_percentage",
+            "max_impossible_to_fix_percentage",
+        ):
+            value = cleaned_data.get(field_name)
+            if value is not None and not 0 <= value <= 100:
+                self.add_error(field_name, _("Value must be from 0 to 100"))
 
-            max_x = cleaned_data.get("max_impossible_to_fix_percentage")
-            if not max_x or not (0 <= max_x <= 100):
-                self.add_error(
-                    "max_impossible_to_fix_percentage", _("Value must be from 0 to 100")
-                )
+        return cleaned_data
