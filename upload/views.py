@@ -14,7 +14,7 @@ from wagtail.snippets.views.snippets import CreateView
 from collection.choices import WEBSITE_KIND
 from core.users.permission_policies import TeamScopedEditView
 from upload.authorization import user_can_act_on_package
-from upload.models import Package, PkgValidationResult, choices
+from upload.models import Package, UploadProcResult, choices
 from upload.permissions import (
     ASSIGN_PACKAGE,
     FINISH_DEPOSIT,
@@ -22,7 +22,12 @@ from upload.permissions import (
     REPUBLISH_PACKAGE,
     REQUEST_CORRECTION,
 )
-from upload.publication_status import publication_situation
+from upload.publication_status import (
+    PUBLICATION_ATTEMPT_PREFIX,
+    PUBLICATION_FAILED,
+    PUBLICATION_QUEUED,
+    publication_situation,
+)
 from upload.querysets import get_scoped_package_queryset
 from upload.tasks import (
     task_receive_packages,
@@ -186,6 +191,69 @@ class QAPackageEditView(PackageDecisionMixin, TeamScopedEditView):
 
 class ReadyToPublishPackageEditView(PackageDecisionMixin, TeamScopedEditView):
     pass
+
+
+@transaction.atomic
+def retry_publication(request):
+    if not request.user.has_perm(f"upload.{PUBLISH_PACKAGE}"):
+        messages.error(request, _("Operation not available"))
+        return redirect("wagtailsnippets_upload_package:list")
+
+    package_id = request.POST.get("package_id") or request.GET.get("package_id")
+    package = get_object_or_404(
+        Package.objects.filter(
+            pk__in=get_scoped_package_queryset(request.user, PUBLISH_PACKAGE).values(
+                "pk"
+            ),
+        ).select_for_update(),
+        pk=package_id,
+    )
+    destination = reverse("wagtailsnippets_upload_package:inspect", args=[package.pk])
+    purpose = "PUBLIC" if package.status == choices.PS_READY_TO_PUBLISH else "QA"
+    if (
+        package.status not in (choices.PS_READY_TO_PREVIEW, choices.PS_READY_TO_PUBLISH)
+        or publication_situation(package, purpose)["state"] != PUBLICATION_FAILED
+    ):
+        messages.error(
+            request, _("No failed publication attempt is available to retry.")
+        )
+        return redirect(destination)
+
+    if request.method != "POST":
+        return render(
+            request,
+            "upload/admin/package/confirm_action.html",
+            {
+                "title": _("Retry publication"),
+                "message": _(
+                    "Retry the failed publication using the existing authorization. The document and its validation results will be preserved."
+                ),
+                "submit_label": _("Retry publication"),
+                "package": package,
+                "cancel_url": destination,
+            },
+        )
+
+    attempt = UploadProcResult.create(
+        request.user,
+        package,
+        f"{PUBLICATION_ATTEMPT_PREFIX} {[purpose]}",
+    )
+    attempt.detail = {"state": PUBLICATION_QUEUED, "websites": [purpose]}
+    attempt.save(update_fields=["detail"])
+    transaction.on_commit(
+        partial(
+            task_upload_workflow_publish_article.apply_async,
+            kwargs={
+                "user_id": request.user.pk,
+                "username": request.user.username,
+                "upload_package_id": package.pk,
+                "websites": [purpose],
+            },
+        )
+    )
+    messages.success(request, _("Publication retry scheduled."))
+    return redirect(destination)
 
 
 def finish_deposit(request):

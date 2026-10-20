@@ -27,16 +27,20 @@ from team.models import (
     JournalTeamMember,
     TeamRole,
 )
-from upload.filters import DocumentFilterSet
 from upload.authorization import user_can_act_on_package
+from upload.bulk_actions.republish import RepublishPublicBulkAction
+from upload.filters import DocumentFilterSet
 from upload.models import (
     Package,
     PackageZip,
     PkgValidationResult,
+    ReadyToPublishPackage,
+    UploadProcResult,
     ValidationReport,
     choices,
 )
 from upload.permissions import PUBLISH_PACKAGE, REQUEST_CORRECTION
+from upload.publication_status import PUBLICATION_ATTEMPT_PREFIX
 from upload.querysets import get_scoped_package_queryset
 from upload.wagtail_hooks import (
     ArchivedPackageViewSet,
@@ -242,7 +246,9 @@ class PackageScopingTest(TestCase):
             )
         )
 
-        request = self.factory.get(f"/admin/upload/documents/delete/{self.package_1.pk}/")
+        request = self.factory.get(
+            f"/admin/upload/documents/delete/{self.package_1.pk}/"
+        )
         request.user = self.superuser
 
         with self.assertRaises(PermissionDenied):
@@ -281,7 +287,6 @@ class PackageScopingTest(TestCase):
                     self.assertEqual(response.status_code, 200)
                     self.assertContains(response, decisions_url)
                     self.assertContains(response, finish_url)
-
 
     def test_decision_navigation_returns_to_documents(self):
         self.client.force_login(self.superuser)
@@ -472,13 +477,17 @@ class PackageScopingTest(TestCase):
             viewset.edit_view(request, pk=str(self.package_2.pk))
 
         # Delete View
-        request = self.factory.get(f"/admin/upload/documents/delete/{self.package_2.pk}/")
+        request = self.factory.get(
+            f"/admin/upload/documents/delete/{self.package_2.pk}/"
+        )
         request.user = self.company_user
         with self.assertRaises(Http404):
             viewset.delete_view(request, pk=str(self.package_2.pk))
 
         # Inspect View
-        request = self.factory.get(f"/admin/upload/documents/inspect/{self.package_2.pk}/")
+        request = self.factory.get(
+            f"/admin/upload/documents/inspect/{self.package_2.pk}/"
+        )
         request.user = self.company_user
         with self.assertRaises(Http404):
             viewset.inspect_view(request, pk=str(self.package_2.pk))
@@ -501,7 +510,9 @@ class PackageScopingTest(TestCase):
         viewset = ScopedPackageViewSet()
 
         # In-scope inspect view execution succeeds
-        request = self.factory.get(f"/admin/upload/documents/inspect/{self.package_1.pk}/")
+        request = self.factory.get(
+            f"/admin/upload/documents/inspect/{self.package_1.pk}/"
+        )
         request.user = self.company_user
         response = viewset.inspect_view(request, pk=str(self.package_1.pk))
         self.assertEqual(response.status_code, 200)
@@ -529,7 +540,9 @@ class PackageScopingTest(TestCase):
                 pk=str(self.package_2.pk),
             )
 
-    def correction_form(self, user, responsible, decision=choices.PS_PENDING_CORRECTION):
+    def correction_form(
+        self, user, responsible, decision=choices.PS_PENDING_CORRECTION
+    ):
         return ReadyToPublishPackageViewSet().get_form_class()(
             data={
                 "qa_decision": decision,
@@ -571,7 +584,6 @@ class PackageScopingTest(TestCase):
 
         return colleague
 
-
     def test_collection_visibility_does_not_extend_to_other_company_documents(self):
         self.add_company_scope_outside_collection()
         other_company_package = Package.objects.create(
@@ -584,7 +596,6 @@ class PackageScopingTest(TestCase):
         self.assertIn(self.package_1, scoped)
         self.assertIn(self.package_2, scoped)
         self.assertNotIn(other_company_package, scoped)
-
 
     def test_mixed_roles_allow_corrections_but_reject_publication_in_company_scope(
         self,
@@ -615,7 +626,6 @@ class PackageScopingTest(TestCase):
         self.assertEqual(self.package_2.status, choices.PS_PENDING_CORRECTION)
         self.assertEqual(self.package_2.assignee, colleague)
 
-
     def test_publication_rejects_linked_packages_and_articles_from_company_only_scope(
         self,
     ):
@@ -632,7 +642,6 @@ class PackageScopingTest(TestCase):
                 form.data[field] = value
                 self.assertFalse(form.is_valid())
                 self.assertIn(field, form.errors)
-
 
     def test_publication_permission_does_not_follow_a_journal_membership(self):
         JournalTeamMember.objects.create(
@@ -652,6 +661,77 @@ class PackageScopingTest(TestCase):
             )
         )
 
+    @patch("upload.views.task_upload_workflow_publish_article.apply_async")
+    @patch("upload.views.task_republish_articles.delay")
+    def test_mixed_roles_reject_publication_retry_and_entire_republish_selection(
+        self, republish, retry
+    ):
+        self.add_company_scope_outside_collection()
+        self.package_2.status = choices.PS_READY_TO_PUBLISH
+        self.package_2.save()
+        attempt = UploadProcResult.create(
+            self.analyst_user,
+            self.package_2,
+            f"{PUBLICATION_ATTEMPT_PREFIX} ['PUBLIC']",
+        )
+        attempt.finish(
+            self.analyst_user,
+            completed=False,
+            detail={"state": "failed", "websites": ["PUBLIC"]},
+        )
+        self.client.force_login(self.analyst_user)
+
+        for method in (self.client.get, self.client.post):
+            response = method(
+                reverse("upload:retry_publication"),
+                {"package_id": self.package_2.pk},
+                follow=True,
+            )
+            self.assertEqual(response.status_code, 404)
+            response = method(
+                reverse("upload:republish_selected"),
+                {
+                    "package_ids": f"{self.package_1.pk},{self.package_2.pk}",
+                    "website_kind": "PUBLIC",
+                },
+            )
+            self.assertEqual(response.status_code, 302)
+        retry.assert_not_called()
+        republish.assert_not_called()
+
+        request = self.factory.post("/")
+        request.user = self.analyst_user
+        with patch(
+            "upload.bulk_actions.republish.task_republish_articles.delay"
+        ) as native_republish:
+            bulk_request = self.factory.get(
+                "/", {"id": [self.package_1.pk, self.package_2.pk]}
+            )
+            bulk_request.user = self.analyst_user
+            with self.assertRaises(PermissionDenied):
+                RepublishPublicBulkAction(
+                    bulk_request, ReadyToPublishPackage
+                ).get_actionable_objects()
+            with self.assertRaises(PermissionDenied):
+                RepublishPublicBulkAction.execute_action(
+                    [], website_kind="PUBLIC", request=request
+                )
+            with self.assertRaises(PermissionDenied):
+                RepublishPublicBulkAction.execute_action(
+                    [self.package_1, self.package_2],
+                    website_kind="PUBLIC",
+                    request=request,
+                )
+            native_republish.assert_not_called()
+            self.assertEqual(
+                RepublishPublicBulkAction.execute_action(
+                    [self.package_1],
+                    website_kind="PUBLIC",
+                    request=request,
+                ),
+                (1, 0),
+            )
+            native_republish.assert_called_once()
 
     def test_direct_permission_does_not_replace_a_role_authorized_for_the_journal(self):
         self.company_user.user_permissions.add(
@@ -664,7 +744,6 @@ class PackageScopingTest(TestCase):
         self.assertTrue(user.has_perm("upload.publish_package"))
         self.assertFalse(user_can_act_on_package(user, PUBLISH_PACKAGE, self.package_1))
 
-
     def test_correction_is_assigned_to_company_colleague_and_stays_active(self):
         colleague = User.objects.create_user(username="colleague")
         CompanyTeamMember.objects.create(
@@ -673,7 +752,9 @@ class PackageScopingTest(TestCase):
             creator=self.superuser,
             is_active_member=True,
         )
-        self.package_1.analyst = CollectionTeamMember.objects.get(user=self.analyst_user)
+        self.package_1.analyst = CollectionTeamMember.objects.get(
+            user=self.analyst_user
+        )
         self.package_1.save()
         form = self.correction_form(self.analyst_user, colleague)
         form.data["order"] = "999"
@@ -695,7 +776,9 @@ class PackageScopingTest(TestCase):
         self.assertNotIn(package, ArchivedPackageViewSet().get_queryset(request))
 
     def test_company_member_can_request_correction_but_cannot_publish(self):
-        self.package_1.analyst = CollectionTeamMember.objects.get(user=self.analyst_user)
+        self.package_1.analyst = CollectionTeamMember.objects.get(
+            user=self.analyst_user
+        )
         self.package_1.save()
         form = self.correction_form(self.company_user, self.company_user)
         self.assertTrue(form.is_valid(), form.errors)
@@ -766,7 +849,9 @@ class PackageScopingTest(TestCase):
         package = form.save_all(self.analyst_user)
         package.process_qa_decision(self.analyst_user)
         original.refresh_from_db()
-        self.assertEqual(original.detail["comment"], "Corrigir a identificação da revista.")
+        self.assertEqual(
+            original.detail["comment"], "Corrigir a identificação da revista."
+        )
         self.assertEqual(
             package.upload_proc_result.filter(name="process_qa_decision").count(), 2
         )
@@ -869,7 +954,9 @@ class PackageScopingTest(TestCase):
         for field in ("blocking_errors", "critical_errors"):
             with self.subTest(field=field):
                 response = self.client.get(url, {field: "true"})
-                self.assertEqual(list(response.context["object_list"]), [self.package_1])
+                self.assertEqual(
+                    list(response.context["object_list"]), [self.package_1]
+                )
                 response = self.client.get(url, {field: "false"})
                 self.assertEqual(list(response.context["object_list"]), [])
 

@@ -3,7 +3,8 @@ from django.utils.translation import gettext_lazy as _
 
 from upload import choices
 from upload.authorization import user_can_act_on_package
-from upload.permissions import FINISH_DEPOSIT, REQUEST_CORRECTION
+from upload.permissions import FINISH_DEPOSIT, PUBLISH_PACKAGE, REQUEST_CORRECTION
+from upload.publication_status import PUBLICATION_FAILED, publication_situation
 
 
 def get_package_action_buttons(
@@ -64,6 +65,21 @@ def get_package_action_buttons(
             )
         )
 
+    if package.status in (choices.PS_READY_TO_PREVIEW, choices.PS_READY_TO_PUBLISH):
+        purpose = "PUBLIC" if package.status == choices.PS_READY_TO_PUBLISH else "QA"
+        if (
+            user_can_act_on_package(user, PUBLISH_PACKAGE, package)
+            and publication_situation(package, purpose)["state"] == PUBLICATION_FAILED
+        ):
+            buttons.append(
+                button_class(
+                    _("Retry publication"),
+                    icon_name="rotate",
+                    url=reverse("upload:retry_publication") + query,
+                    priority=35,
+                )
+            )
+
     return buttons
 
 
@@ -88,4 +104,3 @@ def get_package_website_links(package):
         if page:
             links.append({"label": purpose, "url": page.url})
     return links
-
