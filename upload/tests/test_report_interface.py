@@ -27,6 +27,12 @@ def test_generated_report_can_be_downloaded_but_not_changed(client):
     assert 'name="file-clear"' not in response.content.decode()
     assert 'type="file"' not in response.content.decode()
     assert report.file.url in response.content.decode()
+    document_url = (
+        reverse("wagtailsnippets_upload_package:inspect", args=[package.pk])
+        + "?tab=validations#xi"
+    )
+    assert response.context["breadcrumbs_items"][-2]["url"] == document_url
+    assert response.context["view"].get_success_url() == document_url
 
     data = {
         "file-clear": "on",

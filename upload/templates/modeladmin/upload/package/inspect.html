@@ -1,243 +1,40 @@
 {% extends "wagtailadmin/generic/inspect.html" %}
-{% load i18n l10n wagtailadmin_tags wagtailcore_tags %}
+{% load i18n static %}
 
-{% block header %}
+{% block extra_css %}
     {{ block.super }}
-
-    {% if linked %}
-    <div class="nice-padding">
-        <p class="back">
-            <a href="{{ view.index_url }}?q={{ pkg_zip_name }}">
-                {% icon name="arrow-left" classname="default" %}
-                {% blocktrans trimmed with view.verbose_name as model_name %}Back to {{ pkg_zip_name }} list{% endblocktrans %}
-            </a>
-        </p>
-        {% for lk in linked %}
-            <p class="back">
-                <a href="/admin/snippets/upload/package/inspect/{{ lk.id }}/">
-                    {% icon name="arrow-left" classname="default" %}
-                    {% blocktrans trimmed with lk.status as st %}Go to {{ lk }} validation reports ({{ st }}) {% endblocktrans %}
-
-                    
-                </a>
-            </p>
-        {% endfor %}
-    </div>
-    {% endif %}
+    <link rel="stylesheet" href="{% static 'upload/css/reports.css' %}">
+    <link rel="stylesheet" href="{% static 'upload/css/document-inspect.css' %}">
 {% endblock %}
 
-{% block fields_output %}
-    {% if fields %}
-        <h3>{% trans "Details" %}</h3>
-        <dl>
-            {% for field in fields %}
-                <dt class="{{ field.type|lower }}">{{ field.label }}</dt>
-                <dd>
-                    {% if field.component %}
-                        {% component field.component %}
-                    {% elif field.value.files %}
-                        <ul>
-                            {% for fi in field.value.files %}
-                                <li>{{ fi }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        {{ field.value|localize }}
-                    {% endif %}
-                </dd>
-            {% endfor %}
-        </dl>
-    {% endif %}
-{% endblock %}
+{% block fields_output %}{% endblock %}
 
 {% block content %}
     {{ block.super }}
 
-    {% if blocking_errors %}
-    <div class="nice-padding">
-        {% for error in blocking_errors %}
-            <div class="help-block help-critical" style="border: 2px solid #cd3238; background-color: #fce4e4; padding: 15px; margin-bottom: 10px;">
-                <svg class="icon icon-warning icon" aria-hidden="true"><use href="#icon-warning"></use></svg>
-                <p><strong>{{ error }}</strong></p>
-            </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if category != 'generated-by-the-system' %}
-
-    <div class="nice-padding">
-        <h3>{% trans "XML" %}</h3>
-        <div>
-        <textarea rows="10" readonly="true">{{ xml }}</textarea>
-        </div>
-    </div>
-
-    <div class="nice-padding">
-        <h3>{% trans "Package validations" %}</h3>
-        <table class="listing">
-            <thead>
-                <tr>
-                    <th>{% trans 'Name' %}</th>
-                    <th>{% trans 'Date' %}</th>
-                    <th>{% trans 'Blocking issues' %}</th>
-                    <th>{% trans 'Critical issues' %}</th>
-                    <th>{% trans 'Errors' %}</th>
-                    <th>{% trans 'Warnings' %}</th>
-                    <th>{% trans 'Link' %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for report in reports %}
-                    <tr>
-                        <td class='title'>{{ report.title }}</td>
-                        <td>{{ report.updated }}</td>
-                        <td>{{ report.total_blocking }}</td>
-                        <td>{{ report.total_critical }}</td>
-                        <td>{{ report.total_errors }}</td>
-                        <td>{{ report.total_warnings }}</td>
-                        <td>
-                            <a name="vr{{ report.id }}"/>
-                            {% if report.creation == 'doing' %}
-                                <a class="button" href Reload page="">{% trans 'Processing...' %}</a>
-                            {% else %}
-                                <a class="button" href="/admin/snippets/upload/validationreport/edit/{{ report.id }}/">
-                                    {% if perms.upload.send_validation_error_resolution and report.errors %}
-                                        {% trans 'Resolve errors' %}
-                                    {% else %}
-                                        {% trans 'View report' %}
-                                    {% endif %}
-                                </a>  
-                            {% endif %}                      
-                        </td>
-                    </tr>
+    <div class="nice-padding document-inspect">
+        <nav aria-label="{% trans 'Document sections' %}">
+            <ul class="document-sections">
+                {% for section in document_sections %}
+                    <li>
+                        <a class="document-section-link"
+                           href="?tab={{ section.key }}"
+                           {% if section.selected %}aria-current="page"{% endif %}>
+                            {{ section.label }}
+                        </a>
+                    </li>
                 {% endfor %}
-            </tbody>
-        </table>
-        <h3>{% trans "XML Validations" %}</h3>
-        <div>
-            <div class="help-block help-warning" name="help-to-fix">
-                <svg class="icon icon-warning icon" aria-hidden="true"><use href="#icon-warning"></use></svg><a href="#xref-help-to-fix"><sup>*</sup></a></sup>
-                {% trans 'By default the system sets all the XML errors were accepted by the XML producer and will be corrected. In case of disagreement, review the errors and set a different opinion' %}
-            </div>
-        </div>
-        <table class="listing">
-            <thead>
-                <tr>
-                    <th>{% trans 'Name' %}</th>
-                    <th>{% trans 'Date' %}</th>
-                    <th>{% trans 'Critical issues' %}</th>
-                    <th>{% trans 'Errors' %}</th>
-                    <th>{% trans 'Warnings' %}</th>
-                    <th>{% trans 'Accepted to fix' %}<sup><a name="xref-help-to-fix" href="#help-to-fix">*</a></sup></th>
-                    <th>{% trans 'Contested issues' %}</th>
-                    <th>{% trans 'Declared impossible to fix' %}</th>
-                    <th>{% trans 'Link' %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for report in xml_error_reports %}
-                    <tr>
-                        <td class="title">{{ report.title }}</td>
-                        <td>{{ report.updated }}</td>
-                        <td>{{ report.total_critical }}</td>
-                        <td>{{ report.total_error }}</td>
-                        <td>{{ report.total_warning }}</td>
-                        <td>{{ report.reaction_to_fix }}</td>
-                        <td>{{ report.reaction_not_to_fix }}</td>
-                        <td>{{ report.reaction_impossible_to_fix }}</td>
-                        <td>
-                            <a name="xer{{ report.id }}"/>
-                            {% if report.creation == 'doing' %}
-                                <a class="button" href="">{% trans 'Processing... Reload page' %}</a>
-                            {% else %}
-                                <a class="button" href="/admin/snippets/upload/xmlerrorreport/edit/{{ report.id }}/">
-                                    {% if report.xml_producer_ack %}
-                                        {% trans 'Error review completed' %}
-                                    {% else %}
-                                        {% if perms.upload.send_validation_error_resolution %}
-                                            {% trans 'Review the XML errors' %}
-                                        {% else %}
-                                            {% trans 'View the XML errors' %}
-                                        {% endif %}
-                                        
-                                    {% endif %}
-                                </a>
-                                ({% trans 'Pending conclusion' %})<br/>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        
-        <table class="listing">
-            <thead>
-                <tr>
-                    <th>{% trans 'Name' %}</th>
-                    <th>{% trans 'Date' %}</th>
-                    <th>{% trans 'Validations' %}</th>
-                    <th>{% trans 'Link' %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for report in xml_info_reports %}
-                    <tr>
-                        <td class='title'>{{ report.title }}</td>
-                        <td>{{ report.updated }}</td>
-                        <td>{{ report.total }}</td>    
-                        <td>
-                            <a name="xi"/>
-                            <a class="button" href="/admin/snippets/upload/xmlinforeport/edit/{{ report.id }}/">{% trans 'View report' %}</a>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+            </ul>
+        </nav>
+
+        {% if active_tab == "overview" %}
+            {% include "upload/documents/inspect/overview.html" %}
+        {% elif active_tab == "validations" %}
+            {% include "upload/documents/inspect/validations.html" %}
+        {% elif active_tab == "files" %}
+            {% include "upload/documents/inspect/files.html" %}
+        {% elif active_tab == "history" %}
+            {% include "upload/documents/inspect/history.html" %}
+        {% endif %}
     </div>
-    {% endif %}
-
-    {% if not summary.is_validation_finished %}
-        <div class="nice-padding row">
-            <a class="button" href="">
-                {% trans 'Processing validations... Reload page. ' %}
-            </a>
-        </div>
-    {% else %}
-        <div class="nice-padding row">
-            <p>{% trans 'Validations finished!' %}</p>
-        </div>
-        <div class="nice-padding row">
-            <h3>{% trans "Summary" %}</h3>
-
-           <div class="row">
-                <div class="12">
-                    <ul>
-                        <li>{% trans "XML warnings" %}: {{ summary.total_xml_warnings }} / {{ summary.total_validations }}</li>
-                        <li>{% trans "XML errors" %}: {{ summary.total_xml_errors }} / {{ summary.total_validations }}</li>
-                        <li>{% trans "Critical issues" %}: {{ summary.critical_errors }}</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        <div class="nice-padding row">
-            <div class="row">
-                <div class="12">
-                    {% if summary.conclusion %}
-                        <div class="help-block help-info">
-                            <svg class="icon icon-help icon" aria-hidden="true"><use href="#icon-help"></use></svg>
-                            <p>{{ summary.conclusion }}</p>
-                        </div>
-                    {% endif %}
-                    {% if summary.total_xml_errors or summary.total_xml_warnings or summary.critical_errors %}
-                        <div>
-                            <a class="button" href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
-                                {% trans 'Download XML errors report' %}
-                            </a>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    {% endif %}
 {% endblock %}

@@ -5,23 +5,16 @@ from django.contrib import messages
 from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.html import format_html
+from django.utils.http import content_disposition_header
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.widgets import Button
 from wagtail.snippets.views.snippets import CreateView
 
 from collection.choices import WEBSITE_KIND
-from core.users.permission_policies import TeamScopedEditView, TeamScopedInspectView
-from upload.admin_buttons import get_package_action_buttons
+from core.users.permission_policies import TeamScopedEditView
 from upload.authorization import user_can_act_on_package
 from upload.models import Package, PkgValidationResult, choices
-from upload.querysets import get_scoped_package_queryset
-from upload.tasks import (
-    task_receive_packages,
-    task_republish_articles,
-    task_upload_workflow_publish_article,
-)
-from upload.utils import package_utils
-from upload.utils.package_utils import render_html
 from upload.permissions import (
     ASSIGN_PACKAGE,
     FINISH_DEPOSIT,
@@ -29,8 +22,14 @@ from upload.permissions import (
     REPUBLISH_PACKAGE,
     REQUEST_CORRECTION,
 )
-from django.urls import reverse
-from django.utils.html import format_html
+from upload.publication_status import publication_situation
+from upload.querysets import get_scoped_package_queryset
+from upload.tasks import (
+    task_receive_packages,
+    task_republish_articles,
+    task_upload_workflow_publish_article,
+)
+from upload.utils.package_utils import render_html
 
 
 class PackageZipCreateView(CreateView):
@@ -73,49 +72,16 @@ class PackageZipCreateView(CreateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
-class PackageAdminInspectView(TeamScopedInspectView):
-    def get_header_more_buttons(self):
-        buttons = super().get_header_more_buttons()
-        buttons.extend(
-            get_package_action_buttons(
-                self.request.user,
-                self.object,
-                Button,
-                include_finish_deposit=self.model is Package,
-            )
-        )
-
-        return sorted(buttons)
-
-    def get_context_data(self, **kwargs):
-        blocking_errors = list(
-            PkgValidationResult.objects.filter(
-                report__package=self.object,
-                status=choices.VALIDATION_RESULT_BLOCKING,
-            ).values_list("message", flat=True)
-        )
-        data = {
-            "pkg_zip_name": self.object.pkg_zip.name,
-            "linked": self.object.linked.all(),
-            "validation_results": {},
-            "package_id": self.object.id,
-            "original_pkg": self.object.file.name,
-            "status": self.object.status,
-            "category": self.object.category,
-            "languages": package_utils.get_languages(self.object.file.name),
-            "pdfs": [],
-            "reports": list(self.object.reports),
-            "xml_error_reports": list(self.object.xml_error_reports),
-            "xml_info_reports": list(self.object.xml_info_reports),
-            "summary": self.object.summary,
-            "xml": self.object.xml,
-            "blocking_errors": blocking_errors,
-        }
-
-        return super().get_context_data(**data)
-
-
 class XMLInfoReportEditView(TeamScopedEditView):
+    def get_success_url(self):
+        return self.get_package_url()
+
+    def get_breadcrumbs_items(self):
+        items = super().get_breadcrumbs_items()
+        items.insert(-1, {"url": self.get_package_url(), "label": _("Document")})
+
+        return items
+
     def form_valid(self, form):
         form.save_all(self.request.user)
 
@@ -186,7 +152,9 @@ class PackageDecisionMixin:
         if permission == PUBLISH_PACKAGE and not package.journal:
             messages.error(
                 self.request,
-                _("Package journal was not identified in the system or is not registered"),
+                _(
+                    "Package journal was not identified in the system or is not registered"
+                ),
             )
             return HttpResponseRedirect(self.get_success_url())
 
@@ -194,7 +162,9 @@ class PackageDecisionMixin:
         if permission == PUBLISH_PACKAGE and not package.issue:
             messages.error(
                 self.request,
-                _("Package issue was not identified in the system or is not registered"),
+                _(
+                    "Package issue was not identified in the system or is not registered"
+                ),
             )
             return HttpResponseRedirect(self.get_success_url())
 
@@ -238,18 +208,22 @@ def finish_deposit(request):
             request,
             "upload/admin/package/confirm_action.html",
             {
-                "title": _("Finish deposit"),
-                "message": _("Confirm finishing the deposit for package '{}'?").format(
-                    package
+                "title": _("Submit validation responses"),
+                "message": _(
+                    "The ZIP has already been received. Submit the validation responses to determine whether the document needs corrections or can proceed with processing."
                 ),
-                "submit_label": _("Finish deposit"),
+                "submit_label": _("Submit validation responses"),
                 "package": package,
-                "cancel_url": reverse("wagtailsnippets_upload_package:inspect", args=[package_id]),
+                "cancel_url": reverse(
+                    "wagtailsnippets_upload_package:inspect", args=[package_id]
+                ),
             },
         )
 
     if package.finish_deposit(task_upload_workflow_publish_article):
-        messages.success(request, _("Package has been deposited"))
+        messages.success(
+            request, _("Validation responses processed. Check the document status.")
+        )
         return redirect("wagtailsnippets_upload_package:list")
 
     if not package.is_error_review_finished:
@@ -298,6 +272,15 @@ def display_xml(request):
         package = get_object_or_404(
             get_scoped_package_queryset(request.user), pk=package_id
         )
+        if request.GET.get("download") == "1":
+            response = HttpResponse(
+                package.xml, content_type="application/xml; charset=utf-8"
+            )
+            response["Content-Disposition"] = content_disposition_header(
+                True,
+                f"{package.package_name}.xml",
+            )
+            return response
         return render(
             request=request,
             template_name="modeladmin/upload/package/xml.html",
@@ -469,4 +452,3 @@ def redirect_upload_url(request, model_name, subpath):
         url += "?" + query
 
     return redirect(url, preserve_request=request.method not in ("GET", "HEAD"))
-

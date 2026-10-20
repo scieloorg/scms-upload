@@ -248,9 +248,7 @@ class PackageScopingTest(TestCase):
         with self.assertRaises(PermissionDenied):
             viewset.delete_view(request, pk=str(self.package_1.pk))
 
-    @patch("upload.views.package_utils.get_languages", return_value=[])
-    @patch.object(Package, "files_list", new_callable=PropertyMock, return_value={"files": []})
-    def test_package_inspect_renders_actions_for_administrator_and_analyst(self, _get_languages, _files_list):
+    def test_package_inspect_renders_actions_for_administrator_and_analyst(self):
         summary = {
             "is_validation_finished": True,
             "conclusion": "",

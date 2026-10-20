@@ -33,6 +33,7 @@ from upload.bulk_actions.republish import (
     RepublishPublicBulkAction,
     RepublishQABulkAction,
 )
+from upload.document_views import PackageAdminInspectView
 from upload.document_workflow import QUEUE_LABELS, document_queue_filter
 from upload.filters import (
     DocumentFilterSet,
@@ -70,7 +71,6 @@ from upload.tables import (
     SubmissionActionsColumn,
 )
 from upload.views import (
-    PackageAdminInspectView,
     PackageZipCreateView,
     QAPackageEditView,
     ReadyToPublishPackageEditView,
@@ -316,7 +316,6 @@ class PackageViewSet(BaseUploadViewSet):
         "created",
         "updated",
         "expiration_date",
-        "files_list",
     )
 
     def get_queryset(self, request):
@@ -697,7 +696,6 @@ class ArchivedPackageViewSet(BaseUploadViewSet):
         "created",
         "updated",
         "expiration_date",
-        "files_list",
     )
 
     def get_queryset(self, request):
