@@ -12,6 +12,7 @@ from wagtail.snippets.views.snippets import CreateView
 from collection.choices import WEBSITE_KIND
 from core.users.permission_policies import TeamScopedEditView, TeamScopedInspectView
 from upload.admin_buttons import get_package_action_buttons
+from upload.authorization import user_can_act_on_package
 from upload.models import Package, PkgValidationResult, choices
 from upload.permissions import (
     ASSIGN_PACKAGE,
@@ -142,7 +143,7 @@ class PackageDecisionMixin:
         )
 
     def form_valid(self, form):
-        if not self.request.user.has_perm(f"upload.{self.required_permission}"):
+        if not user_can_act_on_package(self.request.user, self.required_permission, form.instance):
             messages.error(self.request, self.permission_error_message)
             return HttpResponseRedirect(self.get_success_url())
 
@@ -201,7 +202,7 @@ def finish_deposit(request):
         return redirect("/admin/snippets/upload/package/")
 
     package = get_object_or_404(
-        get_scoped_package_queryset(request.user),
+        get_scoped_package_queryset(request.user, FINISH_DEPOSIT),
         pk=package_id,
     )
 
@@ -312,7 +313,9 @@ def assign(request):
         messages.error(request, _("Package not informed"))
         return redirect("/admin/snippets/upload/package/")
 
-    get_object_or_404(get_scoped_package_queryset(request.user), pk=package_id)
+    get_object_or_404(
+        get_scoped_package_queryset(request.user, ASSIGN_PACKAGE), pk=package_id
+    )
 
     return redirect(f"/admin/snippets/upload/qapackage/edit/{package_id}/")
 
@@ -382,7 +385,7 @@ def republish_selected(request):
             return redirect("/admin/snippets/upload/readytopublishpackage/")
 
         scoped_ids = set(
-            get_scoped_package_queryset(request.user)
+            get_scoped_package_queryset(request.user, REPUBLISH_PACKAGE)
             .filter(pk__in=package_ids)
             .values_list("pk", flat=True)
         )
@@ -413,7 +416,7 @@ def republish_selected(request):
         return redirect("/admin/snippets/upload/readytopublishpackage/")
 
     scoped_ids = set(
-        get_scoped_package_queryset(request.user)
+        get_scoped_package_queryset(request.user, REPUBLISH_PACKAGE)
         .filter(pk__in=package_ids)
         .values_list("pk", flat=True)
     )

@@ -23,9 +23,11 @@ from team.models import (
     Company,
     CompanyTeamMember,
     JournalCompanyContract,
+    JournalTeamMember,
     TeamRole,
 )
 from upload.admin_buttons import get_package_action_buttons
+from upload.authorization import user_can_act_on_package
 from upload.models import (
     Package,
     PackageZip,
@@ -33,6 +35,7 @@ from upload.models import (
     ValidationReport,
     choices,
 )
+from upload.permissions import PUBLISH_PACKAGE, REQUEST_CORRECTION
 from upload.querysets import get_scoped_package_queryset
 from upload.wagtail_hooks import (
     PackageViewSet,
@@ -515,3 +518,34 @@ class PackageScopingTest(TestCase):
                 edit_request,
                 pk=str(self.package_2.pk),
             )
+
+    def test_publication_permission_does_not_follow_a_journal_membership(self):
+        JournalTeamMember.objects.create(
+            user=self.analyst_user,
+            journal=self.journal_2,
+            role=TeamRole.MEMBER,
+            creator=self.superuser,
+        )
+        self.assertIn(self.package_2, get_scoped_package_queryset(self.analyst_user))
+        self.assertTrue(self.analyst_user.has_perm("upload.publish_package"))
+        self.assertFalse(
+            user_can_act_on_package(self.analyst_user, PUBLISH_PACKAGE, self.package_2)
+        )
+        self.assertTrue(
+            user_can_act_on_package(
+                self.analyst_user, REQUEST_CORRECTION, self.package_2
+            )
+        )
+
+
+    def test_direct_permission_does_not_replace_a_role_authorized_for_the_journal(self):
+        self.company_user.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="upload",
+                codename=PUBLISH_PACKAGE,
+            )
+        )
+        user = User.objects.get(pk=self.company_user.pk)
+        self.assertTrue(user.has_perm("upload.publish_package"))
+        self.assertFalse(user_can_act_on_package(user, PUBLISH_PACKAGE, self.package_1))
+

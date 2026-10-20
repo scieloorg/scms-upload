@@ -2,6 +2,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from upload import choices
+from upload.authorization import user_can_act_on_package
 from upload.permissions import ASSIGN_PACKAGE, FINISH_DEPOSIT
 
 
@@ -20,7 +21,7 @@ def get_package_action_buttons(
     if (
         include_finish_deposit
         and package.status == choices.PS_VALIDATED_WITH_ERRORS
-        and user.has_perm(f"upload.{FINISH_DEPOSIT}")
+        and user_can_act_on_package(user, FINISH_DEPOSIT, package)
     ):
         buttons.append(
             button_class(
@@ -33,7 +34,7 @@ def get_package_action_buttons(
     if package.status in (
         choices.PS_PENDING_QA_DECISION,
         choices.PS_VALIDATED_WITH_ERRORS,
-    ) and user.has_perm(f"upload.{ASSIGN_PACKAGE}"):
+    ) and user_can_act_on_package(user, ASSIGN_PACKAGE, package):
         buttons.append(
             button_class(
                 _("Accept / Reject the package or delegate it"),

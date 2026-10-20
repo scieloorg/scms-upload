@@ -44,7 +44,14 @@ from upload.forms import (
     ValidationResultForm,
     XMLErrorReportForm,
 )
-from upload.permissions import ACCESS_PACKAGES, ASSIGN_PACKAGE, FINISH_DEPOSIT, PUBLISH_PACKAGE, REPUBLISH_PACKAGE
+from upload.permissions import (
+    ACCESS_PACKAGES,
+    ASSIGN_PACKAGE,
+    FINISH_DEPOSIT,
+    PUBLISH_PACKAGE,
+    REPUBLISH_PACKAGE,
+    REQUEST_CORRECTION,
+)
 from upload.utils import file_utils
 from upload.utils.package_utils import update_zip_file
 from upload.utils.zip_pkg import PkgZip
@@ -348,6 +355,7 @@ class Package(CommonControlField, ClusterableModel):
                 _("Can access packages from all users within authorized scope"),
             ),
             (ASSIGN_PACKAGE, _("Can assign package")),
+            (REQUEST_CORRECTION, _("Can request document corrections")),
             (PUBLISH_PACKAGE, _("Can publish package")),
             (REPUBLISH_PACKAGE, _("Can republish package")),
         )
