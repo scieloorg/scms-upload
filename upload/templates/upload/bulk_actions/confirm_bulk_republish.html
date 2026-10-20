@@ -1,16 +1,18 @@
-{% extends 'wagtailadmin/bulk_actions/confirmation/base.html' %}
+{% extends "wagtailadmin/bulk_actions/confirmation/base.html" %}
+
 {% load i18n wagtailadmin_tags %}
 
 {% block titletag %}
     {% if items|length == 1 %}
-        Republish ({{ website_kind }}) - {{ items.0.item }}
+        {% trans "Republish" %} ({{ website_kind }}) - {{ items.0.item }}
     {% else %}
-        Republish ({{ website_kind }}) — {{ items|length }} {{ model_opts.verbose_name_plural|capfirst }}
+        {% trans "Republish" %} ({{ website_kind }}) — {{ items|length }} {{ model_opts.verbose_name_plural|capfirst }}
     {% endif %}
 {% endblock %}
 
 {% block header %}
-    {% include "wagtailadmin/shared/header.html" with title="Republish" subtitle=website_kind icon=header_icon only %}
+    {% trans "Republish" as republish_title %}
+    {% include "wagtailadmin/shared/header.html" with title=republish_title subtitle=website_kind icon=header_icon only %}
 {% endblock header %}
 
 {% block items_with_access %}
@@ -23,7 +25,11 @@
         <ul>
             {% for snippet in items %}
                 <li>
-                    <a href="{{ snippet.edit_url }}" target="_blank" rel="noreferrer">{{ snippet.item }}</a>
+                    <a href="{{ snippet.edit_url }}"
+                       target="_blank"
+                       rel="noreferrer">
+                        {{ snippet.item }}
+                    </a>
                 </li>
             {% endfor %}
         </ul>
@@ -40,8 +46,8 @@
     {% if items %}
         {% trans "Yes, republish" as action_button_text %}
         {% trans "Cancel" as no_action_button_text %}
-        {% include 'wagtailadmin/bulk_actions/confirmation/form.html' %}
+        {% include "wagtailadmin/bulk_actions/confirmation/form.html" %}
     {% else %}
-        {% include 'wagtailadmin/bulk_actions/confirmation/go_back.html' %}
+        {% include "wagtailadmin/bulk_actions/confirmation/go_back.html" %}
     {% endif %}
 {% endblock form_section %}

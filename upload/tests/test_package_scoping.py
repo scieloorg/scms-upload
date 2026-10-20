@@ -411,7 +411,7 @@ class PackageScopingTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             response.url,
-            "/admin/upload/decisions/",
+            reverse("wagtailsnippets_upload_package:list"),
         )
         delay.assert_called_once_with(
             username=self.analyst_user.username,

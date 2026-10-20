@@ -398,7 +398,7 @@ def republish_selected(request):
     """
     if not request.user.has_perm(f"upload.{REPUBLISH_PACKAGE}"):
         messages.error(request, _("Operation not available"))
-        return redirect("wagtailsnippets_upload_readytopublishpackage:list")
+        return redirect("wagtailsnippets_upload_package:list")
 
     if request.method == "POST":
         website_kind = request.POST.get("website_kind") or None
@@ -409,7 +409,7 @@ def republish_selected(request):
 
         if not package_ids:
             messages.error(request, _("No packages selected."))
-            return redirect("wagtailsnippets_upload_readytopublishpackage:list")
+            return redirect("wagtailsnippets_upload_package:list")
 
         scoped_ids = set(
             get_scoped_package_queryset(request.user, REPUBLISH_PACKAGE)
@@ -418,7 +418,7 @@ def republish_selected(request):
         )
         if scoped_ids != set(package_ids):
             messages.error(request, _("One or more packages are outside your scope."))
-            return redirect("wagtailsnippets_upload_readytopublishpackage:list")
+            return redirect("wagtailsnippets_upload_package:list")
 
         task_republish_articles.delay(
             username=request.user.username,
@@ -433,14 +433,14 @@ def republish_selected(request):
             )
             % {"count": len(package_ids), "website": website_kind or _("all")},
         )
-        return redirect("wagtailsnippets_upload_readytopublishpackage:list")
+        return redirect("wagtailsnippets_upload_package:list")
 
     package_ids_raw = request.GET.get("package_ids", "")
     package_ids = [pk for pk in package_ids_raw.split(",") if pk.strip().isdigit()]
 
     if not package_ids:
         messages.error(request, _("No packages selected."))
-        return redirect("wagtailsnippets_upload_readytopublishpackage:list")
+        return redirect("wagtailsnippets_upload_package:list")
 
     scoped_ids = set(
         get_scoped_package_queryset(request.user, REPUBLISH_PACKAGE)
@@ -449,7 +449,7 @@ def republish_selected(request):
     )
     if scoped_ids != {int(pk) for pk in package_ids}:
         messages.error(request, _("One or more packages are outside your scope."))
-        return redirect("wagtailsnippets_upload_readytopublishpackage:list")
+        return redirect("wagtailsnippets_upload_package:list")
 
     return render(
         request,

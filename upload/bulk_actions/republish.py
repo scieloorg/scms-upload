@@ -1,11 +1,9 @@
 from django.core.exceptions import PermissionDenied
-from django.utils.functional import classproperty
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
-
 from wagtail.snippets.bulk_actions.snippet_bulk_action import SnippetBulkAction
 
-
+from upload.models import ReadyToPublishPackage
 from upload.permissions import REPUBLISH_PACKAGE
 from upload.querysets import get_scoped_package_queryset
 from upload.tasks import task_republish_articles
@@ -14,15 +12,10 @@ from upload.tasks import task_republish_articles
 class BaseRepublishBulkAction(SnippetBulkAction):
     """Classe base — não registrar diretamente."""
 
-    website_kind: str
-
     template_name = "upload/bulk_actions/confirm_bulk_republish.html"
     action_priority = 50
 
-    @classproperty
-    def models(cls):
-        from upload.models import ReadyToPublishPackage
-        return [ReadyToPublishPackage]
+    models = [ReadyToPublishPackage]
 
     def check_perm(self, obj):
         return (
@@ -31,7 +24,6 @@ class BaseRepublishBulkAction(SnippetBulkAction):
             .exists()
         )
 
-
     def get_actionable_objects(self):
         objects, denied = super().get_actionable_objects()
         if denied["items_with_no_access"]:
@@ -39,17 +31,17 @@ class BaseRepublishBulkAction(SnippetBulkAction):
 
         return objects, denied
 
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["website_kind"] = self.website_kind
+
         return context
 
     def get_execution_context(self):
         return {
             **super().get_execution_context(),
             "website_kind": self.website_kind,
-            "request": self.request,   # ← necessário para user_id/username
+            "request": self.request,
         }
 
     @classmethod
@@ -77,8 +69,8 @@ class BaseRepublishBulkAction(SnippetBulkAction):
 
     def get_success_message(self, num_parent_objects, num_child_objects):
         return ngettext(
-            "%(count)d pacote enviado para republicação (%(website_kind)s).",
-            "%(count)d pacotes enviados para republicação (%(website_kind)s).",
+            "%(count)d package scheduled for republication (%(website_kind)s).",
+            "%(count)d packages scheduled for republication (%(website_kind)s).",
             num_parent_objects,
         ) % {
             "count": num_parent_objects,
