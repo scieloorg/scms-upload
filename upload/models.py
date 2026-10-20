@@ -44,7 +44,7 @@ from upload.forms import (
     ValidationResultForm,
     XMLErrorReportForm,
 )
-from upload.panels import decision_panels
+from upload.panels import ReportFilePanel, decision_panels
 from upload.permissions import (
     ACCESS_PACKAGES,
     ASSIGN_PACKAGE,
@@ -662,9 +662,7 @@ class Package(CommonControlField, ClusterableModel):
             + xml_numbers["total"]
             + pkg_numbers["total"]
         )
-        self.critical_errors = (
-            pkg_numbers["total_critical"] + xml_numbers["total_critical"]
-        )
+        self.critical_errors = pkg_numbers["total_critical"] + xml_numbers["total_critical"]
         self.xml_errors_percentage = calculate_percentage(
             xml_numbers["total_error"], total_validations
         )
@@ -683,6 +681,8 @@ class Package(CommonControlField, ClusterableModel):
             "total_xml_critical": xml_numbers["total_critical"],
             "total_xml_errors": xml_numbers["total_error"],
             "total_xml_warnings": xml_numbers["total_warning"],
+            "total_contested_xml_errors": xml_numbers["total_not-to-fix"],
+            "total_declared_impossible_to_fix": xml_numbers["total_unable-to-fix"],
             "total_xml_issues": xml_numbers["total"],
             "total_pkg_issues": pkg_numbers["total"] - pkg_numbers.get("total_ok", 0),
         }
@@ -717,6 +717,16 @@ class Package(CommonControlField, ClusterableModel):
             "declared_impossible_to_fix_percentage": self.declared_impossible_to_fix_percentage,
         }
         metrics.update(self.numbers or {})
+        # Older packages do not persist these reaction totals in numbers.
+        if (
+            "total_contested_xml_errors" not in metrics
+            or "total_declared_impossible_to_fix" not in metrics
+        ):
+            reactions = XMLError.get_numbers(package=self)
+            metrics.setdefault("total_contested_xml_errors", reactions["total_not-to-fix"])
+            metrics.setdefault(
+                "total_declared_impossible_to_fix", reactions["total_unable-to-fix"]
+            )
         return metrics
 
     def get_conclusion(self):
@@ -750,7 +760,7 @@ class Package(CommonControlField, ClusterableModel):
 
             else:
                 msgs.append(_("Finish the deposit"))
-            return ". ".join(msgs)
+            return ". ".join(str(message) for message in msgs)
         else:
             return _("Review and comment the errors")
 
@@ -1949,7 +1959,7 @@ class XMLInfoReport(BaseValidationReport, ClusterableModel):
     file = models.FileField(
         _("Report File"), upload_to=upload_package_directory_path, null=True, blank=True
     )
-    panels = BaseValidationReport.panels + [FieldPanel("file")]
+    panels = BaseValidationReport.panels + [ReportFilePanel("file", read_only=True)]
 
     ValidationResultClass = XMLInfo
 

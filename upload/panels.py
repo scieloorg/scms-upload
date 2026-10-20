@@ -1,8 +1,15 @@
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 
+class ReportFilePanel(FieldPanel):
+    def format_value_for_display(self, value):
+        if not value:
+            return super().format_value_for_display(value)
+
+        return format_html('<a href="{}">{}</a>', value.url, _("Download report"))
 
 
 class DecisionPanel(MultiFieldPanel):

@@ -2,7 +2,14 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from upload import choices
-from upload.models import Package, PkgValidationResult, UploadValidator, ValidationReport
+from upload.models import (
+    Package,
+    PkgValidationResult,
+    UploadValidator,
+    ValidationReport,
+    XMLError,
+    XMLErrorReport,
+)
 
 
 @pytest.mark.django_db
@@ -54,5 +61,41 @@ def test_only_unsuccessful_package_validations_count_as_issues(
     assert validator.get_pos_validation_status(package) == expected_status
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize("legacy_numbers", [False, True])
+def test_completed_review_summary_preserves_reaction_totals(legacy_numbers):
+    user = get_user_model().objects.create_user(username="reviewer")
+    package = Package.objects.create(creator=user, status=choices.PS_PREVIEW)
+    UploadValidator.objects.create(creator=user)
+    report = XMLErrorReport.objects.create(
+        package=package,
+        creator=user,
+        category=choices.VAL_CAT_XML_CONTENT,
+        xml_producer_ack=True,
+    )
+    for reaction in (
+        choices.ER_REACTION_NOT_TO_FIX,
+        choices.ER_REACTION_NOT_TO_FIX,
+        choices.ER_REACTION_IMPOSSIBLE_TO_FIX,
+        choices.ER_REACTION_FIX,
+    ):
+        XMLError(
+            report=report,
+            creator=user,
+            status=choices.VALIDATION_RESULT_FAILURE,
+            reaction=reaction,
+        ).save()
+    package.calculate_validation_numbers()
+    if legacy_numbers:
+        package.numbers.pop("total_contested_xml_errors")
+        package.numbers.pop("total_declared_impossible_to_fix")
+        package.save()
+    package.refresh_from_db()
+
+    summary = package.summary
+    assert summary["is_error_review_finished"] is True
+    assert summary["total_contested_xml_errors"] == 2
+    assert summary["total_declared_impossible_to_fix"] == 1
+    assert summary["conclusion"]
 
 

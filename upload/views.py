@@ -115,19 +115,28 @@ class XMLInfoReportEditView(TeamScopedEditView):
 
     def get_package_url(self):
         report = self.object
-        return f"/admin/snippets/upload/package/inspect/{report.package.id}/?#xi"
+        return (
+            reverse("wagtailsnippets_upload_package:inspect", args=[report.package_id])
+            + "?tab=validations#xi"
+        )
 
 
 class ValidationReportEditView(XMLInfoReportEditView):
     def get_package_url(self):
         report = self.object
-        return f"/admin/snippets/upload/package/inspect/{report.package.id}/?#vr{report.id}"
+        return (
+            reverse("wagtailsnippets_upload_package:inspect", args=[report.package_id])
+            + f"?tab=validations#vr{report.id}"
+        )
 
 
 class XMLErrorReportEditView(XMLInfoReportEditView):
     def get_package_url(self):
         report = self.object
-        return f"/admin/snippets/upload/package/inspect/{report.package.id}/?#xer{report.id}"
+        return (
+            reverse("wagtailsnippets_upload_package:inspect", args=[report.package_id])
+            + f"?tab=validations#xer{report.id}"
+        )
 
 
 class PackageDecisionMixin:
