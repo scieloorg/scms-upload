@@ -14,7 +14,9 @@ from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
 from django.db.models import Count, Q
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
@@ -45,7 +47,7 @@ from upload.forms import (
     ValidationResultForm,
     XMLErrorReportForm,
 )
-from upload.panels import ReportFilePanel, decision_panels
+from upload.panels import ReportFilePanel, ReportTitlePanel, decision_panels
 from upload.permissions import (
     ACCESS_PACKAGES,
     ASSIGN_PACKAGE,
@@ -63,6 +65,14 @@ User = get_user_model()
 
 class UploadProcResult(Operation, Orderable):
     proc = ParentalKey("Package", related_name="upload_proc_result")
+
+    @property
+    def decision_display(self):
+        detail = self.detail or {}
+        decision = detail.get("decision")
+        return dict(choices.QA_DECISION).get(
+            decision, detail.get("decision_label") or decision
+        )
 
 
 def calculate_percentage(value, total):
@@ -1265,13 +1275,11 @@ class Package(CommonControlField, ClusterableModel):
     def register_qa_comment_as_error(self, user, data=None):
         data = data or {}
         data.update({"qa_decision": self.qa_decision})
-        report_title = _("QA decision report")
-        category = choices.VAL_CAT_QA_CONCLUSION
         report = ValidationReport.create_or_update(
             user,
             self,
-            report_title,
-            category,
+            gettext_noop("QA decision report"),
+            choices.VAL_CAT_QA_CONCLUSION,
             reset_validations=False,
         )
         report.add_validation_result(
@@ -1808,11 +1816,11 @@ class BaseValidationReport(CommonControlField):
 
     panels = [
         AutocompletePanel("package", read_only=True),
-        FieldPanel("title", read_only=True),
+        ReportTitlePanel("title", read_only=True),
     ]
 
     def __str__(self):
-        return f"{self.package} {self.title}"
+        return f"{self.package} {self.display_title()}"
 
     class Meta:
         abstract = True
@@ -1842,6 +1850,17 @@ class BaseValidationReport(CommonControlField):
                 ]
             ),
         ]
+
+    @display(description=_("Title"), ordering="title")
+    def display_title(self):
+        if not self.title:
+            return self.title
+
+        title, separator, group = self.title.partition(": ")
+        if title == "XML Error Report" and separator:
+            return f"{gettext(title)}: {group}"
+
+        return gettext(self.title)
 
     @classmethod
     def get(cls, package=None, title=None, category=None):
@@ -1899,7 +1918,7 @@ class BaseValidationReport(CommonControlField):
             "creation": self.creation,
             "id": self.id,
             "category": self.category,
-            "title": self.title,
+            "title": self.display_title(),
         }
         data.update(self.get_numbers())
         logging.info(data)

@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from packtools.sps.validation import xml_validator as packtools_xml_data_checker
 
 from upload.models import XMLError, XMLErrorReport, XMLInfo, XMLInfoReport, choices
@@ -40,14 +40,14 @@ class XMLDataChecker:
                 "journal_acron": self.journal.journal_acron,
                 "journal_data": journal_data,
             }
-        except Exception as e:
+        except Exception:
             return {}
 
     def create_info_report(self):
         self.info_report = XMLInfoReport.create_or_update(
             self.user,
             self.package,
-            _("XML Info Report"),
+            gettext_noop("XML Info Report"),
             choices.VAL_CAT_XML_CONTENT,
             reset_validations=False,
         )
@@ -56,7 +56,7 @@ class XMLDataChecker:
         return XMLErrorReport.create_or_update(
             self.user,
             self.package,
-            _("XML Error Report") + f': {report_name}',
+            f"{gettext_noop('XML Error Report')}: {report_name}",
             choices.VAL_CAT_XML_CONTENT,
             reset_validations=False,
         )

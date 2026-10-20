@@ -486,7 +486,7 @@ class XMLErrorReportViewSet(BaseUploadViewSet):
     list_display = (
         "package",
         "category",
-        "title",
+        "display_title",
         "creation",
     )
     filterset_class = XMLErrorReportFilterSet
@@ -538,7 +538,7 @@ class XMLInfoReportViewSet(BaseUploadViewSet):
     list_display = (
         "package",
         "category",
-        "title",
+        "display_title",
         "creation",
     )
     filterset_class = XMLInfoReportFilterSet
@@ -589,7 +589,7 @@ class ValidationReportViewSet(BaseUploadViewSet):
     list_display = (
         "package",
         "category",
-        "title",
+        "display_title",
         "creation",
     )
     filterset_class = PackageValidationReportFilterSet

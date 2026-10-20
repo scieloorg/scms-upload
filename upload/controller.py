@@ -3,6 +3,7 @@ import os
 
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from packtools.sps.pid_provider.xml_sps_lib import GetXMLItemsError, XMLWithPre
 
 from article import choices as article_choices
@@ -19,10 +20,12 @@ from upload.utils import file_utils, xml_utils
 pp = PidRequester()
 
 
-class UnexpectedPackageError(Exception): ...
+class UnexpectedPackageError(Exception):
+    ...
 
 
-class PackageDataError(Exception): ...
+class PackageDataError(Exception):
+    ...
 
 
 class UploadJournalDataChecker(JournalDataChecker):
@@ -207,7 +210,7 @@ def receive_package(user, package):
                 report = ValidationReport.create_or_update(
                     user=user,
                     package=package,
-                    title=_("Package file"),
+                    title=gettext_noop("Package file"),
                     category=choices.VAL_CAT_PACKAGE_FILE,
                     reset_validations=True,
                 )
@@ -259,7 +262,7 @@ def _identify_file_error(package):
     report = ValidationReport.create_or_update(
         package.creator,
         package,
-        _("File Report"),
+        gettext_noop("File Report"),
         choices.VAL_CAT_PACKAGE_FILE,
         reset_validations=True,
     )

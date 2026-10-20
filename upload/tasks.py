@@ -5,6 +5,7 @@ from celery import chord
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from packtools.sps.validation.xml_structure import StructureValidator
 
@@ -175,7 +176,11 @@ def task_validate_assets(package_id, xml_path, package_files, xml_assets):
     package = Package.objects.get(pk=package_id)
 
     report = ValidationReport.create_or_update(
-        package.creator, package, _("Assets Report"), choices.VAL_CAT_ASSET, True
+        package.creator,
+        package,
+        gettext_noop("Assets Report"),
+        choices.VAL_CAT_ASSET,
+        True,
     )
 
     for asset in xml_assets:
@@ -210,7 +215,7 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
     report = ValidationReport.create_or_update(
         package.creator,
         package,
-        _("Renditions Report"),
+        gettext_noop("Renditions Report"),
         choices.VAL_CAT_RENDITION,
         True,
     )
@@ -244,7 +249,7 @@ def task_validate_renditions_content(package_id, xml_path):
     report = ValidationReport.create_or_update(
         package.creator,
         package,
-        _("Renditions content report"),
+        gettext_noop("Renditions content report"),
         choices.VAL_CAT_RENDITION_CONTENT,
         True,
     )
@@ -385,7 +390,11 @@ def task_validate_xml_structure(
             return
 
         report = ValidationReport.create_or_update(
-            package.creator, package, _("DTD Report"), choices.VAL_CAT_XML_FORMAT, True
+            package.creator,
+            package,
+            gettext_noop("DTD Report"),
+            choices.VAL_CAT_XML_FORMAT,
+            True,
         )
         try:
             for item in summary["dtd_errors"]:
@@ -419,7 +428,7 @@ def task_validate_xml_structure(
         report = ValidationReport.create_or_update(
             package.creator,
             package,
-            _("Style checker Report"),
+            gettext_noop("Style checker Report"),
             choices.VAL_CAT_STYLE,
             True,
         )
@@ -511,18 +520,16 @@ def task_validate_xml_content(
 
 @celery_app.task(priority=0)
 def task_validate_webpages_content(package_id):
-
     package = Package.objects.get(pk=package_id)
 
     report = ValidationReport.create_or_update(
         package.creator,
         package,
-        _("Web page Report"),
+        gettext_noop("Web page Report"),
         choices.VAL_CAT_WEB_PAGE_CONTENT,
         True,
     )
     try:
-
         for webpage in package.htmls:
             for result in validate_webpage(webpage, package.xml_with_pre):
                 report.add_validation_result(

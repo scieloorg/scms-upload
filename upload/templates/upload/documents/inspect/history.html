@@ -7,7 +7,7 @@
         <article class="document-event">
             <div class="document-event-heading">
                 <time>{{ decision.created }}</time>
-                <strong>{{ decision.detail.decision_label|default:decision.detail.decision }}</strong>
+                <strong>{{ decision.decision_display }}</strong>
             </div>
             <p>
                 {{ decision.creator }} · {% trans "Assignee" %}:

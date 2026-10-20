@@ -1,7 +1,15 @@
+from django.utils.functional import cached_property
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
+
+
+class ReportTitlePanel(FieldPanel):
+    class BoundPanel(FieldPanel.BoundPanel):
+        @cached_property
+        def value_from_instance(self):
+            return self.instance.display_title()
 
 
 class ReportFilePanel(FieldPanel):
