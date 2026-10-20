@@ -9,6 +9,7 @@ from random import randint
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 
+from django.contrib.admin import display
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
@@ -43,13 +44,7 @@ from upload.forms import (
     ValidationResultForm,
     XMLErrorReportForm,
 )
-from upload.permissions import (
-    ACCESS_PACKAGES,
-    ASSIGN_PACKAGE,
-    FINISH_DEPOSIT,
-    PUBLISH_PACKAGE,
-    REPUBLISH_PACKAGE,
-)
+from upload.permissions import ACCESS_PACKAGES, ASSIGN_PACKAGE, FINISH_DEPOSIT, PUBLISH_PACKAGE, REPUBLISH_PACKAGE
 from upload.utils import file_utils
 from upload.utils.package_utils import update_zip_file
 from upload.utils.zip_pkg import PkgZip
@@ -109,7 +104,7 @@ class PackageZip(CommonControlField):
             "Unchecked to be redirect to package upload. Checked to be redirect to package validation"
         ),
     )
-    name = models.CharField(max_length=40, null=True, blank=True)
+    name = models.CharField(_("Name"), max_length=40, null=True, blank=True)
 
     panels = [
         FieldPanel("file"),
@@ -119,8 +114,8 @@ class PackageZip(CommonControlField):
     base_form_class = PackageZipForm
 
     class Meta:
-        verbose_name = _("Zip file")
-        verbose_name_plural = _("Zip files")
+        verbose_name = _("Package")
+        verbose_name_plural = _("Submitted packages")
         indexes = [
             models.Index(
                 fields=[
@@ -212,6 +207,7 @@ class Package(CommonControlField, ClusterableModel):
     )
     analyst = models.ForeignKey(
         CollectionTeamMember,
+        verbose_name=_("Analyst"),
         blank=True,
         null=True,
         on_delete=models.SET_NULL,
@@ -227,21 +223,40 @@ class Package(CommonControlField, ClusterableModel):
     )
     article = models.ForeignKey(
         "article.Article",
+        verbose_name=_("Article"),
         blank=True,
         null=True,
         on_delete=models.SET_NULL,
     )
     journal = models.ForeignKey(
-        "journal.Journal", blank=True, null=True, on_delete=models.SET_NULL
+        "journal.Journal",
+        verbose_name=_("Journal"),
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
     )
     issue = models.ForeignKey(
-        "issue.Issue", blank=True, null=True, on_delete=models.SET_NULL
+        "issue.Issue",
+        verbose_name=_("Issue"),
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
     )
-    assignee = models.ForeignKey(User, blank=True, null=True, on_delete=models.SET_NULL)
+    assignee = models.ForeignKey(
+        User,
+        verbose_name=_("Assignee"),
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+    )
     expiration_date = models.DateField(_("Expiration date"), null=True, blank=True)
     numbers = models.JSONField(null=True, default=dict)
-    blocking_errors = models.PositiveSmallIntegerField(default=0)
-    critical_errors = models.PositiveSmallIntegerField(default=0)
+    blocking_errors = models.PositiveSmallIntegerField(
+        verbose_name=_("Blocking errors"), default=0
+    )
+    critical_errors = models.PositiveSmallIntegerField(
+        verbose_name=_("Critical errors"), default=0
+    )
     xml_errors_percentage = models.DecimalField(
         verbose_name=_("Error percentual"),
         max_digits=5,
@@ -257,12 +272,22 @@ class Package(CommonControlField, ClusterableModel):
         help_text=_("0 to 100"),
     )
     contested_xml_errors_percentage = models.DecimalField(
-        max_digits=5, decimal_places=2, default=0.00, help_text=_("0 to 100")
+        verbose_name=_("Contested XML errors (%)"),
+        max_digits=5,
+        decimal_places=2,
+        default=0.00,
+        help_text=_("0 to 100"),
     )
     declared_impossible_to_fix_percentage = models.DecimalField(
-        max_digits=5, decimal_places=2, default=0.00, help_text=_("0 to 100")
+        verbose_name=_("XML errors impossible to fix (%)"),
+        max_digits=5,
+        decimal_places=2,
+        default=0.00,
+        help_text=_("0 to 100"),
     )
-    order = models.PositiveSmallIntegerField(default=0, null=True, blank=True)
+    order = models.PositiveSmallIntegerField(
+        verbose_name=_("Order"), default=0, null=True, blank=True
+    )
     pid_v2 = models.CharField(max_length=23, null=True, blank=True)
     linked = models.ManyToManyField(
         "Package",
@@ -273,21 +298,27 @@ class Package(CommonControlField, ClusterableModel):
     )
 
     qa_ws_status = models.CharField(
+        verbose_name=_("QA publication status"),
         max_length=15,
         choices=choices.WEBSITE_STATUS,
         null=True,
         blank=True,
         default=choices.UNRELEASED,
     )
-    qa_ws_pubdate = models.DateTimeField(null=True, blank=True)
+    qa_ws_pubdate = models.DateTimeField(
+        verbose_name=_("QA publication date"), null=True, blank=True
+    )
     public_ws_status = models.CharField(
+        verbose_name=_("Public publication status"),
         max_length=15,
         choices=choices.WEBSITE_STATUS,
         null=True,
         blank=True,
         default=choices.UNRELEASED,
     )
-    public_ws_pubdate = models.DateTimeField(null=True, blank=True)
+    public_ws_pubdate = models.DateTimeField(
+        verbose_name=_("Public publication date"), null=True, blank=True
+    )
 
     panels = [
         # FieldPanel("file"),
@@ -397,6 +428,8 @@ class Package(CommonControlField, ClusterableModel):
             self.article.update_status(rollback=True)
 
         super(Package, self).save(*args, **kwargs)
+
+
 
     @property
     def xml_with_pre(self):
@@ -1184,6 +1217,7 @@ class Package(CommonControlField, ClusterableModel):
                 self.article.update_status(new_status=article_choices.AS_PUBLISHED)
 
     @property
+    @display(description=_("Table of contents sections"))
     def toc_sections(self):
         try:
             return str(self.article.multilingual_sections)
@@ -1579,9 +1613,11 @@ class BaseXMLValidationResult(BaseValidationResult):
     )
     # geralemente article / sub-article e id
     parent = models.CharField(
-        "article / sub-article", null=True, blank=True, max_length=11
+        _("XML element"), null=True, blank=True, max_length=11
     )
-    parent_id = models.CharField("@id", null=True, blank=True, max_length=13)
+    parent_id = models.CharField(
+        _("XML element identifier"), null=True, blank=True, max_length=13
+    )
     parent_article_type = models.CharField(
         "@article-type", null=True, blank=True, max_length=32
     )
@@ -1626,6 +1662,7 @@ class BaseXMLValidationResult(BaseValidationResult):
 class XMLInfo(BaseXMLValidationResult):
     report = ParentalKey(
         "XMLInfoReport",
+        verbose_name=_("Report"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -1642,6 +1679,7 @@ class XMLInfo(BaseXMLValidationResult):
 class XMLError(BaseXMLValidationResult, ClusterableModel):
     report = ParentalKey(
         "XMLErrorReport",
+        verbose_name=_("Report"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -1746,7 +1784,7 @@ class BaseValidationReport(CommonControlField):
         blank=False,
     )
     creation = models.CharField(
-        _("creation"),
+        _("Report generation"),
         max_length=16,
         choices=choices.REPORT_CREATION,
         default=choices.REPORT_CREATION_NONE,
@@ -1873,6 +1911,7 @@ class BaseValidationReport(CommonControlField):
 class PkgValidationResult(BaseValidationResult):
     report = ParentalKey(
         "ValidationReport",
+        verbose_name=_("Report"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -1883,6 +1922,7 @@ class PkgValidationResult(BaseValidationResult):
 class ValidationReport(BaseValidationReport, ClusterableModel):
     package = ParentalKey(
         Package,
+        verbose_name=_("Document"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -1903,6 +1943,7 @@ class ValidationReport(BaseValidationReport, ClusterableModel):
 class XMLInfoReport(BaseValidationReport, ClusterableModel):
     package = ParentalKey(
         Package,
+        verbose_name=_("Document"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -1959,13 +2000,14 @@ class XMLInfoReport(BaseValidationReport, ClusterableModel):
 class XMLErrorReport(BaseValidationReport, ClusterableModel):
     package = ParentalKey(
         Package,
+        verbose_name=_("Document"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name="xml_error_report",
     )
     xml_producer_ack = models.BooleanField(
-        _("The error review is complete"),
+        _("I have reviewed all findings in this report"),
         blank=True,
         null=True,
         default=False,
@@ -2035,18 +2077,35 @@ class XMLErrorReport(BaseValidationReport, ClusterableModel):
 
 class UploadValidator(CommonControlField):
     collection = models.ForeignKey(
-        Collection, null=True, blank=True, on_delete=models.SET_NULL
+        Collection,
+        verbose_name=_("Collection"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
     )
     max_xml_warnings_percentage = models.DecimalField(
-        max_digits=5, decimal_places=2, default=100.00, help_text=_("0 to 100")
+        verbose_name=_("Maximum XML warnings (%)"),
+        max_digits=5,
+        decimal_places=2,
+        default=100.00,
+        help_text=_("0 to 100"),
     )
     max_xml_errors_percentage = models.DecimalField(
-        max_digits=5, decimal_places=2, default=50.00, help_text=_("0 to 100")
+        verbose_name=_("Maximum XML errors (%)"),
+        max_digits=5,
+        decimal_places=2,
+        default=50.00,
+        help_text=_("0 to 100"),
     )
     max_impossible_to_fix_percentage = models.DecimalField(
-        max_digits=5, decimal_places=2, default=50.00, help_text=_("0 to 100")
+        verbose_name=_("Maximum impossible-to-fix errors (%)"),
+        max_digits=5,
+        decimal_places=2,
+        default=50.00,
+        help_text=_("0 to 100"),
     )
     decision_for_critical_errors = models.CharField(
+        verbose_name=_("Decision for critical errors"),
         max_length=32,
         null=True,
         blank=True,
@@ -2054,13 +2113,16 @@ class UploadValidator(CommonControlField):
         default=choices.PS_VALIDATED_WITH_ERRORS,
     )
     publication_rule = models.CharField(
+        verbose_name=_("Publication policy"),
         max_length=16,
         null=True,
         blank=True,
         choices=choices.PUBLICATION_RULE,
         default=choices.FLEXIBLE_AUTO_PUBLICATION,
     )
-    validation_params = models.JSONField(null=True, blank=True)
+    validation_params = models.JSONField(
+        verbose_name=_("Validation parameters"), null=True, blank=True
+    )
 
     panels = [
         FieldPanel("max_xml_warnings_percentage"),
@@ -2076,6 +2138,10 @@ class UploadValidator(CommonControlField):
     #     if self.collection:
     #         return f"{self.collection.name}"
     #     return _("Validation rules")
+
+    class Meta:
+        verbose_name = _("Validation rules")
+        verbose_name_plural = _("Validation rules")
 
     @classmethod
     def get(cls, collection=None):
@@ -2196,6 +2262,8 @@ class ArchivedPackage(Package):
 
     class Meta:
         proxy = True
+        verbose_name = _("Archived document")
+        verbose_name_plural = _("Archived documents")
 
 
 class PidReservation(models.Model):

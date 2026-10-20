@@ -73,24 +73,24 @@ PS_WIP = (
 )
 
 PACKAGE_STATUS = (
-    (PS_REQUIRED_ERRATUM, _("Required erratum")),
-    (PS_REQUIRED_UPDATE, _("Required update")),
+    (PS_REQUIRED_ERRATUM, _("Erratum required")),
+    (PS_REQUIRED_UPDATE, _("Update required")),
     (PS_SUBMITTED, _("Submitted")),
-    (PS_ENQUEUED_FOR_VALIDATION, _("Enqueued for validation")),
-    (PS_VALIDATED_WITH_ERRORS, _("Validated with errors")),
-    (PS_PENDING_QA_DECISION, _("Pending quality analysis decision")),
-    (PS_PENDING_CORRECTION, _("Pending for correction")),
-    (PS_UNEXPECTED, _("Unexpected")),
-    (PS_READY_TO_PREVIEW, _("Ready to preview on QA website")),
-    (PS_PREVIEW, _("Preview")),
-    (PS_READY_TO_PUBLISH, _("Ready to publish on public website")),
-    (PS_PUBLISHED, _("Published")),
+    (PS_ENQUEUED_FOR_VALIDATION, _("Processing")),
+    (PS_VALIDATED_WITH_ERRORS, _("Validation issues found")),
+    (PS_PENDING_QA_DECISION, _("Awaiting quality review")),
+    (PS_PENDING_CORRECTION, _("Awaiting corrections")),
+    (PS_UNEXPECTED, _("Unexpected submission")),
+    (PS_READY_TO_PREVIEW, _("Publication on QA website authorized")),
+    (PS_PREVIEW, _("Published in QA")),
+    (PS_READY_TO_PUBLISH, _("Publication on public website authorized")),
+    (PS_PUBLISHED, _("Published on public site")),
     (PS_ARCHIVED, _("Archived")),
 )
 
 CRITICAL_ERROR_DECISION = (
-    (PS_PENDING_CORRECTION, _("Pending for correction")),
-    (PS_VALIDATED_WITH_ERRORS, _("Validated with errors")),
+    (PS_PENDING_CORRECTION, _("Awaiting corrections")),
+    (PS_VALIDATED_WITH_ERRORS, _("Validation issues found")),
 )
 
 QA_DECISION = (
@@ -142,20 +142,20 @@ VAL_CAT_QA_CONCLUSION = "qa-conclusion"
 
 
 VALIDATION_CATEGORY = (
-    (VAL_CAT_ARTICLE_JOURNAL_COMPATIBILITY, "ARTICLE_JOURNAL_COMPATIBILITY"),
-    (VAL_CAT_ARTICLE_IS_NOT_NEW, "ARTICLE_IS_NOT_NEW"),
-    (VAL_CAT_XML_FORMAT, "XML_FORMAT"),
-    (VAL_CAT_STYLE, "XML_STYLE"),
-    (VAL_CAT_XML_CONTENT, "VAL_CAT_XML_CONTENT"),
-    (VAL_CAT_GROUP_DATA, "VAL_CAT_GROUP_DATA"),
-    (VAL_CAT_BIBLIOMETRICS_DATA, "BIBLIOMETRICS_DATA"),
-    (VAL_CAT_SERVICES_DATA, "SERVICES_DATA"),
-    (VAL_CAT_DATA_CONSISTENCY, "DATA_CONSISTENCY"),
-    (VAL_CAT_CRITERIA_ISSUES, "CRITERIA_ISSUES"),
-    (VAL_CAT_ASSET, "ASSET"),
-    (VAL_CAT_RENDITION, "RENDITION"),
-    (VAL_CAT_PACKAGE_FILE, "PACKAGE_FILE"),
-    (VAL_CAT_QA_CONCLUSION, "QA conclusion"),
+    (VAL_CAT_ARTICLE_JOURNAL_COMPATIBILITY, _("Journal compatibility")),
+    (VAL_CAT_ARTICLE_IS_NOT_NEW, _("Existing article")),
+    (VAL_CAT_XML_FORMAT, _("XML format")),
+    (VAL_CAT_STYLE, _("XML style")),
+    (VAL_CAT_XML_CONTENT, _("XML content")),
+    (VAL_CAT_GROUP_DATA, _("Group data")),
+    (VAL_CAT_BIBLIOMETRICS_DATA, _("Bibliometric data")),
+    (VAL_CAT_SERVICES_DATA, _("Service data")),
+    (VAL_CAT_DATA_CONSISTENCY, _("Data consistency")),
+    (VAL_CAT_CRITERIA_ISSUES, _("Publication criteria")),
+    (VAL_CAT_ASSET, _("Images and other files")),
+    (VAL_CAT_RENDITION, _("Full-text files")),
+    (VAL_CAT_PACKAGE_FILE, _("Package file")),
+    (VAL_CAT_QA_CONCLUSION, _("QA conclusion")),
 )
 
 # Model ValidationResult, Field status
@@ -164,9 +164,9 @@ REPORT_CREATION_WIP = "doing"
 REPORT_CREATION_DONE = "done"
 
 REPORT_CREATION = (
-    (REPORT_CREATION_DONE, "done"),
-    (REPORT_CREATION_WIP, "doing"),
-    (REPORT_CREATION_NONE, ""),
+    (REPORT_CREATION_DONE, _("Completed")),
+    (REPORT_CREATION_WIP, _("In progress")),
+    (REPORT_CREATION_NONE, _("Not specified")),
 )
 
 # Model ValidationResult, Field status
@@ -178,12 +178,12 @@ VALIDATION_RESULT_UNKNOWN = "UKN"
 VALIDATION_RESULT_WARNING = "WARNING"
 
 VALIDATION_RESULT = (
-    (VALIDATION_RESULT_BLOCKING, _("blocking")),
-    (VALIDATION_RESULT_CRITICAL, _("critical")),
-    (VALIDATION_RESULT_FAILURE, _("error")),
-    (VALIDATION_RESULT_UNKNOWN, _("unknown")),
-    (VALIDATION_RESULT_WARNING, _("warning")),
-    (VALIDATION_RESULT_SUCCESS, _("ok")),
+    (VALIDATION_RESULT_BLOCKING, _("Blocking")),
+    (VALIDATION_RESULT_CRITICAL, _("Critical")),
+    (VALIDATION_RESULT_FAILURE, _("Error")),
+    (VALIDATION_RESULT_UNKNOWN, _("Unknown")),
+    (VALIDATION_RESULT_WARNING, _("Warning")),
+    (VALIDATION_RESULT_SUCCESS, _("OK")),
 )
 
 # Model ErrorResolution, Field action
