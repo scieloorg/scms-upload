@@ -1,6 +1,8 @@
 import logging
+from functools import partial
 
 from django.contrib import messages
+from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
@@ -40,10 +42,13 @@ class PackageZipCreateView(CreateView):
             return HttpResponseRedirect(self.get_success_url())
 
         pkg_zip = form.save_all(self.request.user)
-        task_receive_packages.apply_async(
-            kwargs=dict(
-                user_id=self.request.user.id,
-                pkg_zip_id=pkg_zip.id,
+        transaction.on_commit(
+            partial(
+                task_receive_packages.apply_async,
+                kwargs=dict(
+                    user_id=self.request.user.id,
+                    pkg_zip_id=pkg_zip.id,
+                ),
             )
         )
         if pkg_zip.show_package_validations:
