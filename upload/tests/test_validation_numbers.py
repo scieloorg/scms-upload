@@ -1,6 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 
+from collection.models import Collection
 from upload import choices
 from upload.models import (
     Package,
@@ -102,9 +103,15 @@ def test_completed_review_summary_preserves_reaction_totals(legacy_numbers):
 
 @pytest.mark.django_db
 def test_validation_limits_accept_zero_and_reject_out_of_range(django_user_model):
-    user = django_user_model.objects.create_user(username="coordinator")
+    user = django_user_model.objects.create_superuser(
+        username="coordinator", email="coordinator@example.com", password="test"
+    )
+    collection = Collection.objects.create(
+        acron="test", name="Collection", creator=user
+    )
     form_class = UploadValidatorViewSet().get_form_class()
     data = {
+        "collection": collection.pk,
         "max_xml_warnings_percentage": 0,
         "max_xml_errors_percentage": 0,
         "max_impossible_to_fix_percentage": 0,

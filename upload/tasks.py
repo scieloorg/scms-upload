@@ -486,10 +486,7 @@ def task_validate_xml_content(
         else:
             issue = None
 
-        try:
-            params = UploadValidator.get().validation_params
-        except Exception:
-            params = {}
+        params = UploadValidator.for_journal(journal).validation_params or {}
 
         logging.info((issue, journal))
 

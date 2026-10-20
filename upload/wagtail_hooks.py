@@ -26,8 +26,8 @@ from core.users.permission_policies import (
     TeamScopedUnpublishView,
     TeamScopedUsageView,
 )
-from core.users.scoped_queryset import scope_by_membership
 from core.views import CommonControlFieldViewSet
+from team.models import TeamRole
 from upload.admin_buttons import get_package_action_buttons
 from upload.bulk_actions.republish import (
     RepublishPublicBulkAction,
@@ -59,7 +59,10 @@ from upload.models import (
     XMLInfoReport,
     choices,
 )
-from upload.permission_policies import UploadModelPermissionPolicy
+from upload.permission_policies import (
+    UploadModelPermissionPolicy,
+    ValidationRulePermissionPolicy,
+)
 from upload.permissions import ACCESS_PACKAGES
 from upload.publication_status import PUBLICATION_ATTEMPT_PREFIX
 from upload.querysets import get_scoped_package_queryset, scope_package_queryset
@@ -630,6 +633,7 @@ class UploadValidatorViewSet(BaseUploadViewSet):
     add_to_settings_menu = False
     list_display = (
         "collection",
+        "publication_rule",
         "max_xml_warnings_percentage",
         "max_xml_errors_percentage",
         "max_impossible_to_fix_percentage",
@@ -641,12 +645,20 @@ class UploadValidatorViewSet(BaseUploadViewSet):
         "collection__name",
     )
 
+    @property
+    def permission_policy(self):
+        return ValidationRulePermissionPolicy(self.model)
+
     def get_queryset(self, request):
-        return scope_by_membership(
-            request.user,
-            super().get_queryset(request),
-            collection_field="collection",
-        )
+        queryset = super().get_queryset(request)
+        if request.user.is_superuser:
+            return queryset
+
+        return queryset.filter(
+            collection__collectionteammember__user=request.user,
+            collection__collectionteammember__role=TeamRole.MANAGER,
+            collection__collectionteammember__is_active_member=True,
+        ).distinct()
 
 
 class ArchivedPackageViewSet(BaseUploadViewSet):

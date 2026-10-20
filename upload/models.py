@@ -11,6 +11,7 @@ from zipfile import ZipFile
 
 from django.contrib.admin import display
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
 from django.db.models import Count, Q
@@ -704,9 +705,13 @@ class Package(CommonControlField, ClusterableModel):
 
     @property
     def upload_validator(self):
-        if not hasattr(self, "_upload_validator") or not self._upload_validor:
-            self._upload_validor = UploadValidator.get()
-        return self._upload_validor
+        journal = self.journal
+        if not journal and self.issue_id:
+            journal = self.issue.journal
+        if not journal and self.article_id:
+            journal = self.article.journal
+
+        return UploadValidator.for_journal(journal)
 
     def evaluate_validation_numbers(self, blocking_error_status):
         self.status = self.upload_validator.get_pos_validation_status(
@@ -2111,7 +2116,7 @@ class UploadValidator(CommonControlField):
         Collection,
         verbose_name=_("Collection"),
         null=True,
-        blank=True,
+        blank=False,
         on_delete=models.SET_NULL,
     )
     max_xml_warnings_percentage = models.DecimalField(
@@ -2156,6 +2161,7 @@ class UploadValidator(CommonControlField):
     )
 
     panels = [
+        FieldPanel("collection"),
         FieldPanel("max_xml_warnings_percentage"),
         FieldPanel("max_xml_errors_percentage"),
         FieldPanel("max_impossible_to_fix_percentage"),
@@ -2165,27 +2171,44 @@ class UploadValidator(CommonControlField):
     ]
     base_form_class = UploadValidatorForm
 
-    # def __str__(self):
-    #     if self.collection:
-    #         return f"{self.collection.name}"
-    #     return _("Validation rules")
+    def __str__(self):
+        return str(self.collection) if self.collection_id else str(_("Validation rules"))
 
     class Meta:
         verbose_name = _("Validation rules")
         verbose_name_plural = _("Validation rules")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["collection"], name="upload_rule_unique_collection"
+            ),
+        ]
 
     @classmethod
     def get(cls, collection=None):
-        try:
-            return UploadValidator.objects.get(collection=collection)
-        except UploadValidator.DoesNotExist:
-            return UploadValidator.create_default()
+        if collection is not None:
+            try:
+                return cls.objects.get(collection=collection)
+            except cls.DoesNotExist:
+                pass
+
+        return cls(collection=collection, publication_rule=choices.MANUAL_PUBLICATION)
 
     @classmethod
-    def create_default(cls):
-        obj = UploadValidator(creator_id=1, collection=None)
-        obj.save()
-        return obj
+    def for_journal(cls, journal):
+        if not journal:
+            return cls.get()
+
+        collection_ids = list(
+            journal.journal_collections.values_list("collection_id", flat=True).distinct()
+        )
+        if len(collection_ids) != 1:
+            raise ValidationError(
+                _(
+                    "The journal must have exactly one collection to select its validation rules."
+                )
+            )
+
+        return cls.get(collection=Collection.objects.get(pk=collection_ids[0]))
 
     @staticmethod
     def get_publication_rule(collection=None):

@@ -1,5 +1,6 @@
 from core.users.permission_policies import TeamModelPermissionPolicy
 from team.authorization import user_has_active_journal_scope
+from team.models import CollectionTeamMember, TeamRole
 
 
 class UploadModelPermissionPolicy(TeamModelPermissionPolicy):
@@ -26,3 +27,28 @@ class UploadModelPermissionPolicy(TeamModelPermissionPolicy):
         allowed_actions = set(actions) - self.denied_actions
 
         return super().users_with_any_permission(allowed_actions)
+
+
+class ValidationRulePermissionPolicy(UploadModelPermissionPolicy):
+    def has_managed_collection(self, user):
+        if not user or not user.is_authenticated or not user.is_active:
+            return False
+        if user.is_superuser:
+            return True
+
+        return CollectionTeamMember.objects.filter(
+            user=user,
+            role=TeamRole.MANAGER,
+            is_active_member=True,
+            collection__isnull=False,
+        ).exists()
+
+    def user_has_permission(self, user, action):
+        return self.has_managed_collection(user) and super().user_has_permission(
+            user, action
+        )
+
+    def user_has_any_permission(self, user, actions):
+        return self.has_managed_collection(user) and super().user_has_any_permission(
+            user, actions
+        )

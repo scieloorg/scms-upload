@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from core.forms import CoreAdminModelForm
 from core.users.scoped_queryset import scope_by_membership
 from team.authorization import get_user_permission_journal_ids
-from team.models import CollectionTeamMember
+from team.models import CollectionTeamMember, TeamRole
 from upload import choices
 from upload.authorization import user_can_act_on_package
 from upload.permissions import ASSIGN_PACKAGE, PUBLISH_PACKAGE, REQUEST_CORRECTION
@@ -282,6 +282,18 @@ class XMLErrorReportForm(CoreAdminModelForm):
 class UploadValidatorForm(CoreAdminModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        collections = self.fields["collection"].queryset
+        if not self.for_user.is_superuser:
+            collections = collections.filter(
+                collectionteammember__user=self.for_user,
+                collectionteammember__role=TeamRole.MANAGER,
+                collectionteammember__is_active_member=True,
+            ).distinct()
+        self.fields["collection"].queryset = collections
+        self.fields["collection"].required = True
+        if not self.instance.pk and collections.count() == 1:
+            self.initial["collection"] = collections.first().pk
 
         self.fields["max_xml_warnings_percentage"].help_text = _(
             "Maximum share of XML warnings among all validation results. Enter 0 to 100; 0 allows no warnings."
