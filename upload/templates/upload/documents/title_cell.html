@@ -1,0 +1,5 @@
+{% extends "wagtailadmin/tables/title_cell.html" %}
+
+{% block extra %}
+    <div class="document-category">{{ instance.get_category_display }}</div>
+{% endblock %}

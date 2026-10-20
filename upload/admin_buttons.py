@@ -67,3 +67,25 @@ def get_package_action_buttons(
     return buttons
 
 
+def get_package_website_links(package):
+    if not package.article_id:
+        return []
+    links = []
+    for purpose, status in (
+        ("QA", package.qa_ws_status),
+        ("PUBLIC", package.public_ws_status),
+    ):
+        if status != choices.PUBLISHED:
+            continue
+        page = next(
+            (
+                page
+                for page in package.article.pages.all()
+                if page.purpose == purpose and page.fmt == "html" and page.url
+            ),
+            None,
+        )
+        if page:
+            links.append({"label": purpose, "url": page.url})
+    return links
+

@@ -1,0 +1,17 @@
+{% load i18n %}
+
+<td class="document-actions-cell">
+    <div class="document-actions">
+        <a href="{{ documents_url }}"
+           class="button button-small button-secondary">
+            {% trans "Documents" %}
+        </a>
+        {% if instance.file %}
+            <a href="{{ instance.file.url }}"
+               class="button button-small button-secondary"
+               download>
+                {% trans "Download ZIP" %}
+            </a>
+        {% endif %}
+    </div>
+</td>

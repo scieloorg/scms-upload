@@ -9,6 +9,7 @@ from wagtail.admin.filters import DateRangePickerWidget, WagtailFilterSet
 from wagtail.admin.widgets import BooleanRadioSelect
 
 from upload import choices
+from upload.document_workflow import WORK_STATUS_CHOICES
 from upload.models import (
     Package,
     PackageZip,
@@ -16,6 +17,7 @@ from upload.models import (
     XMLErrorReport,
     XMLInfoReport,
 )
+from upload.publication_status import PUBLICATION_STATE_LABELS
 
 CREATION_UNSPECIFIED = "unspecified"
 
@@ -65,9 +67,53 @@ class DocumentFilterSet(WagtailFilterSet):
         label=_("Package"),
     )
 
+    status = ChoiceFilter(
+        label=_("Work status"),
+        choices=WORK_STATUS_CHOICES,
+        empty_label=_("All"),
+    )
+    qa_ws_status = ChoiceFilter(
+        label=_("QA"),
+        choices=[
+            (value, PUBLICATION_STATE_LABELS.get(value, label))
+            for value, label in choices.WEBSITE_STATUS
+        ],
+        empty_label=_("All"),
+    )
+    public_ws_status = ChoiceFilter(
+        label=_("Public"),
+        choices=[
+            (value, PUBLICATION_STATE_LABELS.get(value, label))
+            for value, label in choices.WEBSITE_STATUS
+        ],
+        empty_label=_("All"),
+    )
+    blocking_errors = BooleanFilter(
+        label=_("Blocking errors"),
+        widget=BooleanRadioSelect,
+        method="filter_has_errors",
+    )
+    critical_errors = BooleanFilter(
+        label=_("Critical errors"),
+        widget=BooleanRadioSelect,
+        method="filter_has_errors",
+    )
+
     class Meta:
         model = Package
-        fields = ("package", "blocking_errors", "critical_errors", "category", "status")
+        fields = (
+            "package",
+            "status",
+            "qa_ws_status",
+            "public_ws_status",
+            "category",
+            "blocking_errors",
+            "critical_errors",
+        )
+
+    def filter_has_errors(self, queryset, name, value):
+        lookup = {f"{name}__gt": 0}
+        return queryset.filter(**lookup) if value else queryset.exclude(**lookup)
 
 
 class SubmissionFilterSet(WagtailFilterSet):

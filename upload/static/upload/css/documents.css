@@ -1,0 +1,55 @@
+.document-queues {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+    padding: 0;
+    margin-block: 1rem;
+}
+
+.document-queues .button {
+    margin: 0;
+}
+
+#listing-results {
+    overflow-x: auto;
+}
+
+#listing-results table {
+    min-width: 58rem;
+}
+
+#listing-results .document-title {
+    min-width: 15rem;
+    width: 25%;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.document-category {
+    margin-block-start: 0.375rem;
+    font-weight: normal;
+}
+
+.document-publication {
+    min-width: 10rem;
+}
+
+.document-updated {
+    white-space: nowrap;
+}
+
+.document-actions-cell {
+    min-width: 13rem;
+}
+
+.document-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.document-actions .button {
+    margin: 0;
+    white-space: nowrap;
+}
