@@ -64,7 +64,7 @@
                             },
                             success: function(){
                                 $('#btn-send-resolutions').removeClass('loading');
-                                window.location = "/admin/snippets/upload/package/";
+                                window.location = "{% url 'wagtailsnippets_upload_package:list' %}";
                             },
                         });
                         e.preventDefault();

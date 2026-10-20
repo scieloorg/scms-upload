@@ -2,7 +2,7 @@
 <form method="post" id="form-handle-error-resolution-opinion-{{ validation_result_id }}">
     {% csrf_token %}
     <label for="opinion-{{ validation_result_id }}">{% trans 'Opinion' %}</label>
-    <select aria-label="Select an opinion" id="opinion-{{ validation_result_id }}">
+    <select aria-label="{% trans 'Select an opinion' %}" id="opinion-{{ validation_result_id }}">
         <option value="" {% if not opinion %}selected="selected"{% endif %}>{% trans 'Choose an option' %}</option>
         <option value="fixed" {% if opinion == "fixed" %}selected="selected"{% endif %}>{% trans 'This is not an error' %}</option>
         <option value="fix-demanded" {% if opinion == "fix-demanded" %}selected="selected"{% endif %}>{% trans 'This error has to be fixed' %}</option>
