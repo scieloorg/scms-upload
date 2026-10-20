@@ -871,9 +871,13 @@ class Package(CommonControlField, ClusterableModel):
 
         qa_decision = self.qa_decision
         try:
-            operation = self.start(user, "process_qa_decision")
+            operation = UploadProcResult.create(user, self, "process_qa_decision")
             detail = {
                 "decision": self.qa_decision,
+                "decision_label": str(self.get_qa_decision_display()),
+                "comment": self.qa_comment,
+                "assignee_id": self.assignee_id,
+                "assignee": str(self.assignee) if self.assignee else None,
             }
             logging.info(f"process_qa_decision: {self.qa_decision}")
 

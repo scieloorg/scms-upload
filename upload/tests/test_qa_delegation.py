@@ -1,9 +1,11 @@
-import json
+from io import StringIO
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from collection.models import Collection
+from journal.models import Journal, JournalCollection, OfficialJournal
+from team.management.commands.create_user_groups import Command
 from team.models import CollectionTeamMember, TeamRole
 from upload import choices
 from upload.models import Package
@@ -15,6 +17,7 @@ from upload.wagtail_hooks import (
 
 @pytest.fixture
 def quality_review_context(django_user_model):
+    Command().handle(stdout=StringIO(), sync_users=False)
     admin = django_user_model.objects.create_superuser(
         username="admin",
         email="admin@example.com",
@@ -41,7 +44,15 @@ def quality_review_context(django_user_model):
         is_active_member=True,
         creator=admin,
     )
+    official = OfficialJournal.objects.create(title="Journal", creator=admin)
+    journal = Journal.objects.create(
+        official_journal=official, journal_acron="test", creator=admin
+    )
+    JournalCollection.objects.create(
+        journal=journal, collection=collection, creator=admin
+    )
     package = Package.objects.create(
+        journal=journal,
         name="package",
         status=choices.PS_PREVIEW,
         creator=admin,
@@ -63,7 +74,7 @@ def quality_review_context(django_user_model):
     [QualityAnalysisPackageViewSet, ReadyToPublishPackageViewSet],
 )
 @pytest.mark.django_db
-def test_selecting_only_another_analyst_delegates_quality_review(
+def test_explicit_action_delegates_quality_review(
     quality_review_context,
     viewset_class,
 ):
@@ -73,8 +84,8 @@ def test_selecting_only_another_analyst_delegates_quality_review(
     form_class = viewset_class().get_form_class()
     form = form_class(
         data={
-            "analyst": json.dumps({"pk": bruno_membership.pk}),
-            "qa_decision": "",
+            "reviewer": bruno.pk,
+            "qa_decision": choices.PS_PENDING_QA_DECISION,
             "qa_comment": "",
             "order": package.order,
             "linked": [],
@@ -112,7 +123,7 @@ def test_publication_form_rejects_empty_decision_without_analyst_change(
     form_class = ReadyToPublishPackageViewSet().get_form_class()
     form = form_class(
         data={
-            "analyst": json.dumps({"pk": package.analyst_id}),
+            "reviewer": quality_review_context["bruno"].pk,
             "qa_decision": "",
             "qa_comment": "",
             "order": package.order,

@@ -14,12 +14,6 @@ from core.users.permission_policies import TeamScopedEditView, TeamScopedInspect
 from upload.admin_buttons import get_package_action_buttons
 from upload.authorization import user_can_act_on_package
 from upload.models import Package, PkgValidationResult, choices
-from upload.permissions import (
-    ASSIGN_PACKAGE,
-    FINISH_DEPOSIT,
-    PUBLISH_PACKAGE,
-    REPUBLISH_PACKAGE,
-)
 from upload.querysets import get_scoped_package_queryset
 from upload.tasks import (
     task_receive_packages,
@@ -28,6 +22,14 @@ from upload.tasks import (
 )
 from upload.utils import package_utils
 from upload.utils.package_utils import render_html
+from upload.permissions import (
+    ASSIGN_PACKAGE,
+    FINISH_DEPOSIT,
+    PUBLISH_PACKAGE,
+    REPUBLISH_PACKAGE,
+    REQUEST_CORRECTION,
+)
+from django.urls import reverse
 
 
 class PackageZipCreateView(CreateView):
@@ -129,10 +131,12 @@ class XMLErrorReportEditView(XMLInfoReportEditView):
 
 
 class PackageDecisionMixin:
-    success_message = _("The decision was executed as planned")
-    error_message = _("There was an impediment to executing the decision.")
+    success_message = _("Decision recorded successfully")
+    error_message = _("Unable to complete the operation. Check the form and try again.")
     permission_error_message = _("Operation not available")
-    required_permission = None
+
+    def get_success_url(self):
+        return reverse("wagtailsnippets_upload_package:inspect", args=[self.object.pk])
 
     def get_task_function(self):
         return task_upload_workflow_publish_article
@@ -143,29 +147,32 @@ class PackageDecisionMixin:
         )
 
     def form_valid(self, form):
-        if not user_can_act_on_package(self.request.user, self.required_permission, form.instance):
+        decision = form.cleaned_data.get("qa_decision")
+        if decision == choices.PS_PENDING_CORRECTION:
+            permission = REQUEST_CORRECTION
+        elif decision == choices.PS_PENDING_QA_DECISION:
+            permission = ASSIGN_PACKAGE
+        else:
+            permission = PUBLISH_PACKAGE
+        if not user_can_act_on_package(self.request.user, permission, form.instance):
             messages.error(self.request, self.permission_error_message)
             return HttpResponseRedirect(self.get_success_url())
 
         package = form.save_all(self.request.user)
 
         force_journal_publication = form.cleaned_data.get("force_journal_publication")
-        if not package.journal:
+        if permission == PUBLISH_PACKAGE and not package.journal:
             messages.error(
                 self.request,
-                _(
-                    "Package journal was not identified in the system or is not registered"
-                ),
+                _("Package journal was not identified in the system or is not registered"),
             )
             return HttpResponseRedirect(self.get_success_url())
 
         force_issue_publication = form.cleaned_data.get("force_issue_publication")
-        if not package.issue:
+        if permission == PUBLISH_PACKAGE and not package.issue:
             messages.error(
                 self.request,
-                _(
-                    "Package issue was not identified in the system or is not registered"
-                ),
+                _("Package issue was not identified in the system or is not registered"),
             )
             return HttpResponseRedirect(self.get_success_url())
 
@@ -182,13 +189,11 @@ class PackageDecisionMixin:
 
 
 class QAPackageEditView(PackageDecisionMixin, TeamScopedEditView):
-    required_permission = ASSIGN_PACKAGE
+    pass
 
 
 class ReadyToPublishPackageEditView(PackageDecisionMixin, TeamScopedEditView):
-    required_permission = PUBLISH_PACKAGE
-    success_message = _("Article successfully published")
-    error_message = _("Failed to publish the article. Please try again.")
+    pass
 
 
 def finish_deposit(request):
