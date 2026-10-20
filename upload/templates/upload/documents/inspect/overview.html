@@ -1,0 +1,106 @@
+{% load i18n wagtailadmin_tags %}
+
+<div class="document-actions-bar">
+    <a class="button button-small document-action" href="?tab=validations">
+        {% icon name="view" %}
+        {% trans "View results" %}
+    </a>
+
+    {% for action in document_actions %}
+        <a class="button button-small document-action" href="{{ action.url }}">
+            {% icon name=action.icon_name %}
+            {{ action.label }}
+        </a>
+    {% endfor %}
+
+    {% if validation_in_progress %}
+        <a class="button button-small document-action" href="?tab=overview">
+            {% icon name="rotate" %}
+            {% trans "Refresh" %}
+        </a>
+    {% elif summary.total_xml_errors or summary.total_xml_warnings or summary.critical_errors %}
+        <a class="button button-small document-action"
+           href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
+            {% icon name="download" %}
+            {% trans "Download CSV" %}
+        </a>
+    {% endif %}
+
+    {% for website in website_links %}
+        <a class="button button-small document-action"
+           href="{{ website.url }}"
+           target="_blank"
+           rel="noopener noreferrer">
+            {% if website.label == "PUBLIC" %}
+                {% icon name="globe" %}
+                {% trans "Public" %}
+            {% else %}
+                {% icon name="view" %}
+                QA
+            {% endif %}
+        </a>
+    {% endfor %}
+</div>
+
+<section class="document-section">
+    <h2>{% trans "Current situation" %}</h2>
+
+    <dl class="document-situation">
+        <div>
+            <dt>{% trans "Work status" %}</dt>
+            <dd>
+                {% if validation_in_progress %}
+                    <span class="document-processing-status" role="status">
+                        {% trans "Processing" %}
+                    </span>
+                {% else %}
+                    {{ work_situation }}
+                {% endif %}
+            </dd>
+        </div>
+        <div>
+            <dt>{% trans "Assignee" %}</dt>
+            <dd>{{ object.assignee|default:"—" }}</dd>
+        </div>
+        <div>
+            <dt>QA</dt>
+            <dd>{{ qa_publication.label|default:"—" }}</dd>
+        </div>
+        <div>
+            <dt>{% trans "Public" %}</dt>
+            <dd>{{ public_publication.label|default:"—" }}</dd>
+        </div>
+    </dl>
+
+    {% if object.status == "pending-correction" %}
+        <section class="document-correction" aria-labelledby="correction-request-heading">
+            <h3 id="correction-request-heading">{% trans "Correction request" %}</h3>
+
+            <p class="document-correction-assignee">
+                {% trans "Responsible for corrections" %}:
+                <strong>{{ object.assignee|default:"—" }}</strong>
+            </p>
+
+            {% if latest_decision %}
+                <p class="document-correction-metadata">
+                    {{ latest_decision.creator }} —
+                    <time datetime="{{ latest_decision.created|date:'c' }}">{{ latest_decision.created }}</time>
+                </p>
+            {% endif %}
+
+            <div class="document-correction-instructions">
+                {{ object.qa_comment|default:"—"|linebreaks }}
+            </div>
+        </section>
+    {% endif %}
+
+    {% for error in blocking_errors %}
+        <div class="help-block help-critical">
+            <p>{{ error }}</p>
+        </div>
+    {% endfor %}
+</section>
+
+{% if not validation_in_progress %}
+    {% include "upload/documents/inspect/summary.html" %}
+{% endif %}
