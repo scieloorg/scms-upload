@@ -642,7 +642,7 @@ class Package(CommonControlField, ClusterableModel):
             "total_xml_errors": xml_numbers["total_error"],
             "total_xml_warnings": xml_numbers["total_warning"],
             "total_xml_issues": xml_numbers["total"],
-            "total_pkg_issues": pkg_numbers["total"],
+            "total_pkg_issues": pkg_numbers["total"] - pkg_numbers.get("total_ok", 0),
         }
         self.blocking_errors = pkg_numbers["total_blocking"]
         self.save()
