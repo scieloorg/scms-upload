@@ -1,37 +1,31 @@
-import json
 import logging
-import os
 import sys
-
-from celery.result import AsyncResult
-from django.db.models import Q
+from celery import chord
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from packtools.sps.validation.xml_structure import StructureValidator
-from packtools.utils import SPPackage
-
-from article import choices as article_choices
 from article.models import Article
-from collection import choices as collection_choices
-from collection.models import WebSiteConfiguration
+from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from issue.models import Issue
 from journal.models import Journal
-from proc.controller import ensure_journal_data_is_updated, ensure_issue_data_is_updated
-from proc.models import JournalProc, IssueProc
+from proc.controller import ensure_issue_data_is_updated, ensure_journal_data_is_updated
+from proc.models import JournalProc
 from proc.tasks import TaskExecution
 from publication.api.issue import sync_issue
 from tracker.models import UnexpectedEvent
-from upload import choices
+from upload import choices, publication
 from upload.controller import receive_package
-from upload import publication
-from upload.models import Package, ValidationReport, PackageZip, UploadValidator
-from upload.validation.rendition_validation import validate_rendition
+from upload.models import Package, PackageZip, UploadValidator, ValidationReport
+from upload.utils import file_utils, package_utils
 from upload.validation.html_validation import validate_webpage
+from upload.validation.rendition_validation import validate_rendition
 from upload.validation.xml_data_checker import XMLDataChecker
-from upload import choices, controller, exceptions
-from upload.utils import file_utils, package_utils, xml_utils
+
+
+
 
 
 User = get_user_model()
@@ -197,14 +191,6 @@ def task_validate_assets(package_id, xml_path, package_files, xml_assets):
         )
 
     report.finish_validations()
-    # devido às tarefas serem executadas concorrentemente,
-    # necessário verificar se todas tarefas finalizaram e
-    # então finalizar o pacote
-    package.finish_reception(task_upload_workflow_publish_article)
-    # if package.is_approved:
-    #     task_process_approved_package.apply_async(
-    #         kwargs=dict(package_id=package.id, package_status=package.status)
-    #     )
 
 
 @celery_app.task(priority=0)
@@ -241,14 +227,6 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
         )
 
     report.finish_validations()
-    package.finish_reception(task_upload_workflow_publish_article)
-    # devido às tarefas serem executadas concorrentemente,
-    # necessário verificar se todas tarefas finalizaram e
-    # então finalizar o pacote
-    # if package.is_approved:
-    #     task_process_approved_package.apply_async(
-    #         kwargs=dict(package_id=package.id, package_status=package.status)
-    #     )
 
 
 @celery_app.task(priority=0)
@@ -285,7 +263,6 @@ def task_validate_renditions_content(package_id, xml_path):
             },
         )
     report.finish_validations()
-    package.finish_reception(task_upload_workflow_publish_article)
 
 
 @celery_app.task(bind=True, priority=0)
@@ -328,7 +305,6 @@ def task_receive_package(self, user_id, pkg_id):
 
         xml_with_pre = package.xml_with_pre
         xml_path = xml_with_pre.filename
-        name, ext = os.path.splitext(xml_path)
 
         # FIXME para nao usar o otimizado
         optimised_filepath = task_optimise_package(file_path)
@@ -338,56 +314,47 @@ def task_receive_package(self, user_id, pkg_id):
 
             package_files = optimised_xml_with_pre.filenames
 
-            # Aciona validação de Assets
-            task_validate_assets.apply_async(
-                kwargs={
-                    "package_id": pkg_id,
-                    "xml_path": xml_path,
-                    "package_files": package_files,
-                    "xml_assets": list(optimised_xml_with_pre.assets),
-                },
-            )
+            validations = [
+                task_validate_assets.s(
+                    package_id=pkg_id,
+                    xml_path=xml_path,
+                    package_files=package_files,
+                    xml_assets=list(optimised_xml_with_pre.assets),
+                ),
+                task_validate_renditions.s(
+                    package_id=pkg_id,
+                    xml_path=xml_path,
+                    package_files=package_files,
+                    xml_renditions=list(optimised_xml_with_pre.renditions),
+                ),
+                task_validate_xml_structure.s(
+                    file_path=file_path,
+                    xml_path=xml_path,
+                    package_id=pkg_id,
+                    journal_id=journal_id,
+                    issue_id=issue_id,
+                    article_id=article_id,
+                ),
+                task_validate_xml_content.s(
+                    file_path=file_path,
+                    xml_path=xml_path,
+                    package_id=pkg_id,
+                    journal_id=journal_id,
+                    issue_id=issue_id,
+                    article_id=article_id,
+                ),
+                task_validate_renditions_content.s(
+                    package_id=pkg_id,
+                    xml_path=xml_path,
+                ),
+            ]
+            chord(validations)(task_finish_package_reception.si(pkg_id))
 
-            # Aciona validação de Renditions
-            task_validate_renditions.apply_async(
-                kwargs={
-                    "package_id": pkg_id,
-                    "xml_path": xml_path,
-                    "package_files": package_files,
-                    "xml_renditions": list(optimised_xml_with_pre.renditions),
-                },
-            )
 
-            task_validate_xml_structure.apply_async(
-                kwargs={
-                    "file_path": file_path,
-                    "xml_path": xml_path,
-                    "package_id": pkg_id,
-                    "journal_id": journal_id,
-                    "issue_id": issue_id,
-                    "article_id": article_id,
-                },
-            )
-
-            # Aciona validacao do conteudo do XML
-            task_validate_xml_content.apply_async(
-                kwargs={
-                    "file_path": file_path,
-                    "xml_path": xml_path,
-                    "package_id": pkg_id,
-                    "journal_id": journal_id,
-                    "issue_id": issue_id,
-                    "article_id": article_id,
-                },
-            )
-
-            # Aciona validação do conteúdo de Renditions
-            task_validate_renditions_content.apply_async(
-                kwargs={
-                    "package_id": pkg_id,
-                    "xml_path": xml_path,
-                },
-            )
+@celery_app.task(priority=0)
+def task_finish_package_reception(package_id):
+    package = Package.objects.get(pk=package_id)
+    package.finish_reception(task_upload_workflow_publish_article)
 
 
 @celery_app.task(bind=True, priority=0)
@@ -483,15 +450,6 @@ def task_validate_xml_structure(
 
         report.finish_validations()
 
-        # devido às tarefas serem executadas concorrentemente,
-        # necessário verificar se todas tarefas finalizaram e
-        # então finalizar o pacote
-        package.finish_reception(task_upload_workflow_publish_article)
-        # if package.is_approved:
-        #     task_process_approved_package.apply_async(
-        #         kwargs=dict(package_id=package.id)
-        #     )
-
 
 @celery_app.task(bind=True, priority=0)
 def task_validate_xml_content(
@@ -524,7 +482,6 @@ def task_validate_xml_content(
 
         xml_data_checker = XMLDataChecker(package, journal, issue, params)
         xml_data_checker.validate()
-        package.finish_reception(task_upload_workflow_publish_article)
         operation.finish(package.creator, completed=True)
     except Exception as e:
         logging.exception(e)
