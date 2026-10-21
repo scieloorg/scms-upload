@@ -186,9 +186,6 @@ def task_check_article_availability(
         for journal_proc in JournalProc.objects.filter(
             journal_query, journal__isnull=False
         ):
-            if not journal_proc.journal.journal_acron:
-                journal_proc.journal.journal_acron = journal_proc.acron
-                journal_proc.journal.save()
             for article in Article.objects.filter(
                 article_query, journal=journal_proc.journal
             ):
