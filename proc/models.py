@@ -39,6 +39,7 @@ from migration.controller import (
     PkgZipBuilder,
     XMLVersionXmlWithPreError,
     create_or_update_article,
+    get_classic_website,
 )
 from migration.models import (
     IdFileRecord,
@@ -616,11 +617,20 @@ class BaseProc(CommonControlField):
             if (
                 obj.migration_status != tracker_choices.PROGRESS_STATUS_TODO
                 and not force_update
+                # procs criados a partir do core (ex.: JournalProc com
+                # migration_status=DONE) não têm migrated_data
+                and obj.migrated_data
             ):
                 return obj
 
             operation = obj.start(user, f"get data from classic website {pid}")
 
+            # proc já migrado a partir do core: apenas completa migrated_data,
+            # sem voltar o status (evita remigrar a partir do site clássico)
+            keep_status = (
+                not obj.migrated_data
+                and obj.migration_status == tracker_choices.PROGRESS_STATUS_DONE
+            )
             if data:
                 obj.migrated_data = cls.MigratedDataClass.register_classic_website_data(
                     user,
@@ -630,7 +640,8 @@ class BaseProc(CommonControlField):
                     content_type,
                     force_update,
                 )
-                obj.migration_status = obj.migrated_data.migration_status
+                if not keep_status:
+                    obj.migration_status = obj.migrated_data.migration_status
                 detail = obj.migrated_data.data
             obj.save()
             operation.finish(
@@ -656,6 +667,48 @@ class BaseProc(CommonControlField):
                         "collection": collection.acron,
                     },
                 )
+
+    def _get_classic_website_records(self, classic_website):
+        """
+        Retorna os pares (pid, records) da base do site clássico
+        correspondente ao tipo de processo (title, issue).
+        """
+        raise NotImplementedError
+
+    def get_migrated_data(self, user):
+        """
+        Retorna os dados migrados (migrated_data.data).
+
+        Caso ainda não exista migrated_data (registro não foi obtido da
+        base do site clássico), tenta obtê-lo novamente da base do site
+        clássico. Se não encontrar, lança ValueError.
+        """
+        if self.migrated_data and self.migrated_data.data:
+            return self.migrated_data.data
+
+        classic_website = get_classic_website(self.collection.acron)
+        if classic_website:
+            for pid, records in self._get_classic_website_records(classic_website):
+                if pid != self.pid:
+                    continue
+                obj = self.register_classic_website_data(
+                    user,
+                    self.collection,
+                    self.pid,
+                    records[0],
+                    self.CLASSIC_WEBSITE_CONTENT_TYPE,
+                    force_update=True,
+                )
+                if obj:
+                    self.refresh_from_db()
+                break
+
+        if self.migrated_data and self.migrated_data.data:
+            return self.migrated_data.data
+        raise ValueError(
+            f"{type(self).__name__} {self} ({self.collection.acron} {self.pid}) "
+            "has no migrated data. Check if the record exists in the classic website database."
+        )
 
     @classmethod
     def register_pid(
@@ -1112,6 +1165,10 @@ class JournalProc(BaseProc, ClusterableModel):
         InlinePanel("journal_proc_result", label=_("Event newest to oldest")),
     ]
     MigratedDataClass = MigratedJournal
+    CLASSIC_WEBSITE_CONTENT_TYPE = "journal"
+
+    def _get_classic_website_records(self, classic_website):
+        return classic_website.get_journals_pids_and_records()
 
     edit_handler = TabbedInterface(
         [
@@ -1166,6 +1223,9 @@ class JournalProc(BaseProc, ClusterableModel):
             self.migration_status = migration_status or self.migration_status
             self.set_qa_ws_status(tracker_choices.PROGRESS_STATUS_TODO)
             self.save()
+            if self.journal:
+                # Journal.journal_acron fica vazio se o acrônimo varia por coleção
+                self.journal.update_journal_acron()
         except Exception as e:
             raise exceptions.JournalProcUpdateError(
                 _("Unable to update journal {} {} {} {}").format(
@@ -1344,6 +1404,11 @@ class IssueProc(BaseProc, ClusterableModel):
         default=tracker_choices.PROGRESS_STATUS_TODO,
     )
     MigratedDataClass = MigratedIssue
+    CLASSIC_WEBSITE_CONTENT_TYPE = "issue"
+
+    def _get_classic_website_records(self, classic_website):
+        return classic_website.get_issues_pids_and_records()
+
     base_form_class = IssueProcAdminModelForm
     ProcResult = IssueProcResult
 
@@ -1660,6 +1725,11 @@ class IssueProc(BaseProc, ClusterableModel):
             self.issue_files.clear()
             self.issue_files.set(migration_result.get("migrated", []))
 
+            for item in self.issue_files.values("original_name", "component_type"):
+                logging.info(
+                    item
+                )
+
             if migrated and failures:
                 self.files_status = tracker_choices.PROGRESS_STATUS_PENDING
             elif migrated:
@@ -1857,8 +1927,8 @@ class IssueProc(BaseProc, ClusterableModel):
                 id_file_records = id_file_records.filter(todo=True)
             input_data["total_id_file_records_to_migrate"] = id_file_records.count()
 
-            journal_data = self.journal_proc.migrated_data.data
-            issue_data = self.migrated_data.data
+            journal_data = self.journal_proc.get_migrated_data(user)
+            issue_data = self.get_migrated_data(user)
             exceptions = {}
             for record in id_file_records:
                 try:
@@ -2641,9 +2711,12 @@ class ArticleProc(BaseProc, ClusterableModel):
             if not os.path.isfile(item.file.path):
                 continue
             return item
+        filenames = list(self.issue_proc.issue_files.filter(
+            pkg_name=self.pkg_name,
+        ).values("pkg_name", "component_type", "original_name"))
         raise MigratedFile.DoesNotExist(
-            _("No migrated XML file found for {} ({})").format(
-                self.pkg_name, self.issue_proc
+            _("No migrated XML file found for {} ({}): {}").format(
+                self.pkg_name, self.issue_proc, filenames
             )
         )
 
