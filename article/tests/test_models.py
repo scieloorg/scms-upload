@@ -180,6 +180,12 @@ class ArticleCreateOrUpdateTestCase(unittest.TestCase):
         self.mocks = patcher.start()
         self.addCleanup(patcher.stop)
 
+        # fallback por pid_v3 em create_or_update: por padrão, nenhum Article
+        objects_patcher = patch("article.models.Article.objects")
+        self.mock_objects = objects_patcher.start()
+        self.addCleanup(objects_patcher.stop)
+        self.mock_objects.filter.return_value.first.return_value = None
+
     def _make_sps_pkg(self, pid_v3="pidv3", pid_v2="pidv2"):
         mock_xml_with_pre = Mock()
         mock_xml_with_pre.xmltree.find.return_value.get.return_value = "research-article"
@@ -217,6 +223,27 @@ class ArticleCreateOrUpdateTestCase(unittest.TestCase):
         self.assertEqual(obj.pid_v2, mock_sps_pkg.pid_v2)
         self.mocks["add_journal"].assert_called_once_with(mock_xml_with_pre)
         self.mocks["add_issue"].assert_called_once_with(mock_xml_with_pre)
+
+    @patch.object(Article, "get")
+    def test_updates_article_with_same_pid_v3_and_other_sps_pkg(self, mock_get):
+        """
+        Article com o mesmo pid_v3, mas vinculado a outro SPSPkg (ex.: pacote
+        regerado na migração), deve ser atualizado em vez de criar um novo
+        registro (o que violaria a unicidade de pid_v3 — IntegrityError).
+        """
+        mock_get.side_effect = Article.DoesNotExist()
+        mock_sps_pkg, mock_xml_with_pre = self._make_sps_pkg()
+        mock_user = _mock_model_instance(User)
+
+        existing = Article(pid_v3=mock_sps_pkg.pid_v3)
+        self.mock_objects.filter.return_value.first.return_value = existing
+
+        obj = Article.create_or_update(mock_user, mock_sps_pkg)
+
+        self.mock_objects.filter.assert_called_once_with(pid_v3=mock_sps_pkg.pid_v3)
+        self.assertIs(obj, existing)
+        self.assertEqual(obj.sps_pkg, mock_sps_pkg)
+        self.assertIsNone(obj.creator_id)
 
     @patch.object(Article, "get")
     def test_add_sections_receives_xml_with_pre(self, mock_get):
