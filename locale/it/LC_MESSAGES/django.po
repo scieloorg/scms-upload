@@ -3346,3 +3346,7 @@ msgstr ""
 #: upload/wagtail_hooks.py:693
 msgid "Error management"
 msgstr ""
+
+#: article/templates/article/report/data_availability.html:43
+msgid "Clear"
+msgstr ""

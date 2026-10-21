@@ -163,3 +163,26 @@ ARTICLE_WEBPAGE_PURPOSE = (
     (ARTICLE_WEBPAGE_PURPOSE_QA, "QA"),
     (ARTICLE_WEBPAGE_PURPOSE_CLASSIC, "Classic"),
 )
+
+# Model Article, Field data_availability_status
+# valores de specific-use de sec[@sec-type="data-availability"] |
+# fn[@fn-type="data-availability"], conforme packtools
+DAS_DATA_AVAILABLE = "data-available"
+DAS_DATA_AVAILABLE_UPON_REQUEST = "data-available-upon-request"
+DAS_DATA_NOT_AVAILABLE = "data-not-available"
+DAS_DATA_IN_ARTICLE = "data-in-article"
+DAS_UNINFORMED = "uninformed"
+# não há declaração de disponibilidade de dados no XML
+DAS_ABSENT = "absent"
+# há declaração, mas specific-use ausente ou com valor não reconhecido
+DAS_INVALID = "invalid"
+
+DATA_AVAILABILITY_STATUS = (
+    (DAS_DATA_AVAILABLE, _("Data available")),
+    (DAS_DATA_AVAILABLE_UPON_REQUEST, _("Data available upon request")),
+    (DAS_DATA_NOT_AVAILABLE, _("Data not available")),
+    (DAS_DATA_IN_ARTICLE, _("Data in article")),
+    (DAS_UNINFORMED, _("Uninformed")),
+    (DAS_ABSENT, _("Absent")),
+    (DAS_INVALID, _("Invalid")),
+)

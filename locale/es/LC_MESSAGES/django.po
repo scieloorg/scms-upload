@@ -3414,3 +3414,7 @@ msgstr "Paquetes archivados"
 #: upload/wagtail_hooks.py:693
 msgid "Error management"
 msgstr "Gestión de errores"
+
+#: article/templates/article/report/data_availability.html:43
+msgid "Clear"
+msgstr "Limpiar"
