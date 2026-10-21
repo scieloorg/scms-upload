@@ -263,11 +263,10 @@ class PidRequester(BasePidProvider):
                 detail = resp
                 registered.update(resp)
 
-            op.finish(user, completed=True, detail=detail)
+            op.finish(user, completed=not resp.get("error_type"), detail=detail)
             return resp
         except Exception as e:
             logging.exception(e)
-            logging.error(detail)
             exc_type, exc_value, exc_traceback = sys.exc_info()
             op.finish(user, completed=False, exception=e, exc_traceback=exc_traceback)
             return {"error_msg": str(e), "error_type": str(type(e))}
