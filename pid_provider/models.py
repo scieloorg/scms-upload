@@ -334,7 +334,9 @@ class OtherPid(CommonControlField):
     @classmethod
     @profile_classmethod
     def get_or_create(cls, pid_type, pid_in_xml, version, user, pid_provider_xml):
-        if pid_in_xml and pid_type and version and user and pid_provider_xml:
+        # version é opcional: na falta da coleção principal,
+        # PidProviderXML.current_version fica vazio (ver CollectionPidV2)
+        if pid_in_xml and pid_type and user and pid_provider_xml:
             try:
                 obj = cls.objects.get(
                     pid_provider_xml=pid_provider_xml,
@@ -353,7 +355,7 @@ class OtherPid(CommonControlField):
 
             return obj
         raise ValueError(
-            f"OtherPid.get_or_create requires pid_in_xml ({pid_in_xml}) and pid_type ({pid_type}) and version ({version}) and user ({user}) and pid_provider_xml ({pid_provider_xml})"
+            f"OtherPid.get_or_create requires pid_in_xml ({pid_in_xml}) and pid_type ({pid_type}) and user ({user}) and pid_provider_xml ({pid_provider_xml})"
         )
 
     @property
@@ -1498,12 +1500,17 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @profile_method
     def check_registered_pids_changed(self, xml_with_pre, ignore_v2=False):
         registered_changed = []
+        # versão da coleção do XML ou, na falta dela, a da coleção principal
+        current_version = (
+            self.get_current_version(collection_acron=xml_with_pre.collection)
+            or self.current_version
+        )
         if self.v3 != xml_with_pre.v3:
             registered_changed.append(
                 {
                     "pid_type": "pid_v3",
                     "pid_in_xml": xml_with_pre.v3,
-                    "version": self.current_version,
+                    "version": current_version,
                     "registered": self.v3,
                 }
             )
@@ -1524,7 +1531,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 {
                     "pid_type": "aop_pid",
                     "pid_in_xml": xml_with_pre.aop_pid,
-                    "version": self.current_version,
+                    "version": current_version,
                     "registered": self.aop_pid,
                 }
             )
