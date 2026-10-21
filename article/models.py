@@ -568,7 +568,7 @@ class Article(ClusterableModel, CommonControlField):
 
     # ── URL generators ──
 
-    def get_html_urls(self, website_url, purpose):
+    def get_html_urls(self, website_url, purpose, journal_acron=None):
         """
         Gera dicts de URL para HTML do artigo.
 
@@ -578,6 +578,8 @@ class Article(ClusterableModel, CommonControlField):
         purpose : str
             ARTICLE_WEBPAGE_PURPOSE_CLASSIC, ARTICLE_WEBPAGE_PURPOSE_PUBLIC
             ou ARTICLE_WEBPAGE_PURPOSE_QA.
+        journal_acron : str, optional
+            Acrônimo do periódico na coleção (JournalProc.acron).
 
         Yields
         ------
@@ -590,7 +592,7 @@ class Article(ClusterableModel, CommonControlField):
         if is_classic:
             journal_acron = None
         else:
-            journal_acron = self.journal.journal_acron
+            journal_acron = journal_acron or self.journal.get_acron()
 
         for item in self.htmls:
             lang = item.get("lang")
@@ -611,7 +613,7 @@ class Article(ClusterableModel, CommonControlField):
                 "purpose": purpose,
             }
 
-    def get_pdf_urls(self, website_url, purpose):
+    def get_pdf_urls(self, website_url, purpose, journal_acron=None):
         """
         Gera dicts de URL para PDF do artigo.
 
@@ -619,6 +621,8 @@ class Article(ClusterableModel, CommonControlField):
         ----------
         website_url : str
         purpose : str
+        journal_acron : str, optional
+            Acrônimo do periódico na coleção (JournalProc.acron).
 
         Yields
         ------
@@ -627,6 +631,8 @@ class Article(ClusterableModel, CommonControlField):
         pid_v2 = self.pid_v2
         pid_v3 = self.pid_v3
         is_classic = purpose == choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC
+        if not is_classic:
+            journal_acron = journal_acron or self.journal.get_acron()
 
         for item in self.pdfs:
             lang = item.get("lang")
@@ -637,7 +643,6 @@ class Article(ClusterableModel, CommonControlField):
                     website_url, pid_v2=pid_v2, format="pdf", lang_code=lang
                 )
             else:
-                journal_acron = self.journal.journal_acron
                 url = format_url(
                     website_url, pid_v3, journal_acron, format="pdf", lang_code=lang
                 )
@@ -648,13 +653,15 @@ class Article(ClusterableModel, CommonControlField):
                 "purpose": purpose,
             }
 
-    def get_webpage_items(self, website_url, purpose):
+    def get_webpage_items(self, website_url, purpose, journal_acron=None):
         """Gera todos os itens de página (HTML + PDF) para um purpose."""
-        yield from self.get_html_urls(website_url, purpose)
-        yield from self.get_pdf_urls(website_url, purpose)
+        yield from self.get_html_urls(website_url, purpose, journal_acron)
+        yield from self.get_pdf_urls(website_url, purpose, journal_acron)
 
-    def get_main_article_url(self, website_url):
-        return format_url(website_url, self.pid_v3, self.journal.journal_acron)
+    def get_main_article_url(self, website_url, journal_acron=None):
+        return format_url(
+            website_url, self.pid_v3, journal_acron or self.journal.get_acron()
+        )
 
     # ── repetitions / dedup ──
 
@@ -1264,6 +1271,7 @@ class ArticleCollection(CommonControlField):
         """
         article = self.article
         existing_ids = set()
+        journal_acron = article.journal.get_acron(self.collection)
 
         # ── Websites novos (QA / PUBLIC) ──
         for ws_config in WebSiteConfiguration.objects.filter(
@@ -1277,7 +1285,9 @@ class ArticleCollection(CommonControlField):
             ).values_list("id", flat=True))
             self.article.pages.filter(purpose=purpose).exclude(id__in=keep).delete()
 
-            for item in article.get_webpage_items(ws_config.url, purpose):
+            for item in article.get_webpage_items(
+                ws_config.url, purpose, journal_acron
+            ):
                 page = ArticleWebPage.get_or_create_from_item(
                     user, self.article, self.collection, item
                 )
