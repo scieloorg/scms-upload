@@ -474,11 +474,21 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
             journal_acron,
             issue_folder,
         )
+        # o mesmo arquivo pode ser retornado mais de uma vez
+        # (ex.: arquivos de bases também encontrados como "asset");
+        # mantém o primeiro, que tem o tipo mais específico
+        processed_paths = set()
         for file in files_and_exceptions:
             exception = {}
+            original_path = None
             try:
                 if not file:
                     continue
+
+                original_path = file["relative_path"]
+                if original_path in processed_paths:
+                    continue
+                processed_paths.add(original_path)
 
                 exception["file"] = file.get("path")
                 if file.get("error"):
@@ -493,7 +503,7 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                     MigratedFile.create_or_update(
                         user=user,
                         collection=collection,
-                        original_path=file["relative_path"],
+                        original_path=original_path,
                         source_path=file["path"],
                         component_type=component_type,
                         lang=file.get("lang"),
@@ -507,6 +517,7 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                 )
 
             except Exception as e:
+                exception["original_path"] = original_path
                 exception["error"] = str(e)
                 exception["type"] = str(type(e))
                 exceptions.append(exception)
