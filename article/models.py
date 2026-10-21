@@ -386,8 +386,14 @@ class Article(ClusterableModel, CommonControlField):
         try:
             obj = cls.get(sps_pkg=sps_pkg)
         except cls.DoesNotExist:
-            obj = cls()
-            obj.creator = user
+            obj = None
+            if sps_pkg.pid_v3:
+                # pid_v3 é unique: o artigo pode já existir vinculado
+                # a outro SPSPkg (ex.: pacote regerado na migração)
+                obj = cls.objects.filter(pid_v3=sps_pkg.pid_v3).first()
+            if not obj:
+                obj = cls()
+                obj.creator = user
             obj.sps_pkg = sps_pkg
         except cls.MultipleObjectsReturned:
             items = cls.objects.filter(sps_pkg=sps_pkg).order_by("-updated")
