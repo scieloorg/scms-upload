@@ -2,7 +2,7 @@
 Testes para issue/models.py.
 
 Observação: assume-se que journal.models.Journal pode ser instanciado com
-Journal.objects.create(creator=cls.user, journal_acron="jacron") sem argumentos obrigatórios (todos os campos
+Journal.objects.create(creator=cls.user) sem argumentos obrigatórios (todos os campos
 relevantes para os testes aqui usam null=True/blank=True nos modelos
 observados). Caso o modelo real exija campos obrigatórios, ajuste
 `setUpTestData` abaixo.
