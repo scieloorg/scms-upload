@@ -1,5 +1,3 @@
-from functools import cached_property
-
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
@@ -7,19 +5,34 @@ from core.utils.similarity import how_similar
 from pid_provider import exceptions
 
 
+def get_data_to_compare(xml_adapter):
+    """Inclui sobrenomes e PID v2 nos dados usados para comparar candidatos."""
+    data = xml_adapter.get_data_to_compare()
+    data["surnames"] = xml_adapter.xml_with_pre.surnames
+    data["pid_v2"] = xml_adapter.xml_with_pre.v2
+
+    return data
+
+
 def compare(registered_items, input_data):
-    """
-    """
+    """Calcula a média sem contar campos nulos nos dois lados."""
     total_score = 0
+    total_items = 0
     items = []
     for label, registered_item in registered_items.items():
-        result = compare_items(label, registered_item, input_data.get(label))
+        input_item = input_data.get(label)
+        if registered_item is None and input_item is None:
+            items.append({"label": label, "score": 1, "ignored": True})
+            continue
+
+        result = compare_items(label, registered_item, input_item)
         items.append(result)
         total_score += result["score"]
+        total_items += 1
     return {
         "items": items,
         "total_score": total_score,
-        "percentual_score": total_score / len(items)
+        "percentual_score": total_score / total_items if total_items else 0
     }
 
 
@@ -42,13 +55,16 @@ def compare_lists(registered, xml_adapter_titles):
 def compare_items(label, registered, input_data):
     if isinstance(registered, list):
         score = compare_lists(registered, input_data)
-    elif (input_data or None) == (registered or None):
+    elif input_data == registered:
         score = 1
+    elif label.startswith("z_") or "finger" in label:
+        score = 0
     else:
         score = how_similar(input_data or "", registered or "")
     response = {"label": label, "score": score}
     if score != 1:
         response["registered"] = registered
+        response["input_data"] = input_data
     return response
 
 
@@ -98,23 +114,8 @@ class QueryBuilderPidProviderXML:
         # "ARTIGO DE REVISÃO").
         self.z_body_fragment = xml_adapter.xml_with_pre.body_fragment_fingerprint
         self.adapter_data = xml_adapter.data
-        self.compare_data = xml_adapter.get_data_to_compare()
-        self.xml_with_pre_data = xml_adapter.xml_with_pre.get_article_data(300)
+        self.xml_with_pre_data = xml_adapter.xml_with_pre.readable_data
 
-    @property
-    def pkg_name_list(self):
-        # --- Resolução Consolidada de Package Names ---
-        pkg_names = set()
-        # 1. Nome enviado originalmente via parâmetro no construtor
-        if self.xml_adapter.pkg_name:
-            pkg_names.add(self.xml_adapter.pkg_name)
-        # 2. Nome oficial atual gerado pelo motor de cálculo do XML
-        if self.xml_adapter.sps_pkg_name:
-            pkg_names.add(self.xml_adapter.sps_pkg_name)
-        # 3. Consolida todas as listas de nomes depreciados/alternativos
-        pkg_names.update(self.xml_adapter.xml_with_pre.deprecated_sps_pkg_name_list)
-        return set(item for item in pkg_names if item)
-    
     def validate_input_data(self):
         if not self.adapter_data.get("pub_year"):
             raise exceptions.RequiredPublicationYearErrorToGetPidProviderXMLError()
@@ -132,7 +133,7 @@ class QueryBuilderPidProviderXML:
             self.xml_with_pre_data.get("surnames"),
             self.xml_with_pre_data.get("collab"),
             self.xml_with_pre_data.get("links"),
-            self.xml_with_pre_data.get("partial_body"),
+            self.xml_with_pre_data.get("body_fragment"),
         ]
         if any(items):
             return
@@ -143,10 +144,9 @@ class QueryBuilderPidProviderXML:
     @property
     def identifier_queries(self):
         """
-        Constrói queries para busca por identificadores (v3, v2, aop_pid, pkg_name, DOI).
+        Constrói queries por identificadores diretos (v3, v2, aop_pid e DOI).
         """
         q = Q()
-        other_pids = set()
         
         # PIDs diretos do xml_adapter (não envelopados no data dict)
         v3 = self.xml_adapter.v3
@@ -165,11 +165,6 @@ class QueryBuilderPidProviderXML:
         if aop_pid:
             q |= Q(v2=aop_pid) | Q(aop_pid=aop_pid)
             
-        # Package names históricos e atuais
-        pkg_names = self.pkg_name_list
-        if pkg_names:
-            q |= Q(pkg_name__in=pkg_names)
-
         main_doi = self.adapter_data.get("main_doi")
         if main_doi:
             q |= Q(main_doi=main_doi)
@@ -279,16 +274,11 @@ class QueryBuilderPidProviderXML:
             z_links=z_links,
         ) & self.partial_body_query
 
-    def get_article_data_query(self, issue):
+    def get_article_data_query(self, issue, flexible=False):
         if issue:
-            return (
-                self.article_data_query & 
-                Q(**self.issue_params) & 
-                Q(**self.article_location_params)
-            )
-        return (
-            self.article_data_query & 
-            Q(
+            q = Q(**self.issue_params) & Q(**self.article_location_params)
+        else:
+            q = Q(
                 volume__isnull=True,
                 number__isnull=True,
                 suppl__isnull=True,
@@ -296,4 +286,9 @@ class QueryBuilderPidProviderXML:
                 fpage__isnull=True,
                 lpage__isnull=True,
             )
-        )
+            if flexible:
+                q &= Q(**self.article_location_params)
+
+        if flexible:
+            return q
+        return self.article_data_query & q

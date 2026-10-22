@@ -1,5 +1,6 @@
 import logging
 import sys
+import traceback
 
 from celery import chord
 from django.contrib.auth import get_user_model
@@ -14,8 +15,9 @@ from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from issue.models import Issue
 from journal.models import Journal
-from proc.controller import ensure_issue_data_is_updated, ensure_journal_data_is_updated
-from proc.models import JournalProc
+from package.models import SPSPkg
+from proc.controller import ensure_journal_data_is_updated, ensure_issue_data_is_updated
+from proc.models import JournalProc, IssueProc
 from proc.tasks import TaskExecution
 from publication.api.issue import sync_issue
 from tracker.models import UnexpectedEvent
@@ -917,7 +919,7 @@ def task_republish_articles(
 
     Os parâmetros opcionais restringem o conjunto de pacotes selecionados.
     Para cada fascículo encontrado:
-    1. Remove artigos duplicados/inválidos via Article.exclude_invalid_records.
+    1. Completa os vínculos legados entre artigos, pacotes e registros de PID.
     2. Agenda task_upload_workflow_publish_article para cada artigo válido restante.
     3. Agenda task_sync_issue por IssueProc, despublicando artigos removidos.
     """
@@ -1020,9 +1022,7 @@ def task_publish_issue_articles(
     
         task_exec.item = str(issue)
 
-        response = Article.exclude_invalid_records(
-            user, issue, sps_pkg_id_list=None, timeout=timeout
-        )
+        response = task_exclude_invalid_issue_articles(issue_id, user_id=user.pk, timeout=timeout)
         task_exec.add_event(response)
 
         websites = set()
@@ -1090,37 +1090,25 @@ def task_exclude_invalid_issue_articles(
     user_id=None,
     timeout=None,
 ):
-    """
-    Remove artigos duplicados e inconsistentes de um fascículo.
-
-    Delega para ``Article.exclude_invalid_records``, que cuida de artigos
-    sem pp_xml, com sps_pkg_name repetido ou com pid_v2 repetido dentro
-    do mesmo fascículo.
-    """
-    task_params = {"issue_id": issue_id}
-    issue_str = str(issue_id)
+    """Completa vínculos legados do fascículo sem excluir registros."""
     try:
         user = _get_user(user_id=user_id, username=username)
-        issue = Issue.objects.get(id=issue_id)
-        issue_str = str(issue)
-
-        response = Article.exclude_invalid_records(
-            user, issue, sps_pkg_id_list=None, timeout=timeout
-        )
-        logging.info(
-            "task_exclude_invalid_issue_articles issue=%s response=%s",
-            issue_str,
-            response,
-        )
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            item=issue_str,
-            action="upload.tasks.task_exclude_invalid_issue_articles",
-            e=e,
-            exc_traceback=exc_traceback,
-            detail=task_params,
-        )
+        issue = Issue.objects.get(pk=issue_id)
+        legacy = Article.complete_sps_pkg_ppx(user, issue)
+        package_ids = list(set(Article.objects.filter(
+            issue=issue, sps_pkg__isnull=False
+        ).values_list("sps_pkg_id", flat=True)) | set(Package.objects.filter(
+            issue=issue, sps_pkg__isnull=False
+        ).values_list("sps_pkg_id", flat=True)))
+        identified = SPSPkg.complete_ppx(user, sps_pkg_id_list=package_ids) if package_ids else {
+            "success": [], "failures": []
+        }
+        return [
+            {"operation": "Article.complete_sps_pkg_ppx", "response": legacy},
+            {"operation": "SPSPkg.complete_ppx", "response": identified},
+        ]
+    except Exception:
+        return {"error": traceback.format_exc()}
 
 
 @celery_app.task(bind=True)
@@ -1137,7 +1125,7 @@ def task_exclude_invalid_articles(
     timeout=None,
 ):
     """
-    Orquestra ``task_exclude_invalid_issue_articles`` para um conjunto de fascículos.
+    Orquestra o preenchimento dos vínculos legados para um conjunto de fascículos.
 
     Filtra fascículos pelos critérios fornecidos e agenda
     ``task_exclude_invalid_issue_articles`` para cada um.

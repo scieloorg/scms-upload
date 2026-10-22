@@ -9,7 +9,6 @@ from core.users.permission_policies import (
 )
 from core.views import CommonControlFieldViewSet
 from pid_provider.models import (
-    XMLURL,
     FixPidV2,
     OtherPid,
     PidProviderConfig,
@@ -196,31 +195,6 @@ class XMLVersionViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet
     )
 
 
-class XMLURLViewSet(SuperuserOnlySnippetViewSetMixin, CommonControlFieldViewSet):
-    model = XMLURL
-    menu_label = _("XML URLs")
-    menu_icon = "folder"
-    menu_order = 300
-    add_to_settings_menu = False
-    list_per_page = 10
-
-    # Configuração de listagem
-    list_display = [
-        "url",
-        "status",
-        "pid",
-    ]
-    list_filter = {
-        "status": ["exact"],
-        "is_public": ["exact"],
-    }
-    search_fields = (
-        "url",
-        "status",
-        "pid",
-    )
-
-
 class PidProviderXMLRegistrationViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     model = PidProviderXMLRegistration
     collection_field = "pid_provider_xml__collections"
@@ -266,7 +240,6 @@ class PidProviderViewSetGroup(SnippetViewSetGroup):
         FixPidV2ViewSet,
         PidProviderConfigViewSet,
         XMLVersionViewSet,
-        XMLURLViewSet,
         PidProviderXMLRegistrationViewSet,
     )
 
