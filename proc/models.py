@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -55,10 +55,6 @@ from proc.forms import IssueProcAdminModelForm, ProcAdminModelForm
 from publication.api.publication import get_api_data
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
-
-
-class NoDocumentRecordsToMigrateError(Exception):
-    ...
 
 
 class Operation(CommonControlField):
@@ -1645,7 +1641,6 @@ class IssueProc(BaseProc, ClusterableModel):
             self.files_status = tracker_choices.PROGRESS_STATUS_DOING
             self.save()
 
-            ArticleProc.mark_for_reprocessing(self)
             migration_result = migrate_issue_files_function(
                 user,
                 collection=self.collection,
@@ -1839,28 +1834,21 @@ class IssueProc(BaseProc, ClusterableModel):
                 issue_proc=self,
             )
             total_articleprocs = article_procs.count()
-            total_article_procs_to_process = article_procs.filter(
-                migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
-            ).count()
+
             input_data["total_articleprocs"] = total_articleprocs
-            input_data["total_articleproc_migration_status_to_process"] = total_article_procs_to_process
             input_data["force_update"] = force_update
             input_data["docs_status"] = self.docs_status
 
             force_update = (
                 force_update or
-                self.docs_status not in tracker_choices.PROGRESS_STATUS_REGULAR_TODO or
-                bool(total_article_procs_to_process) or
-                not total_articleprocs
+                not total_articleprocs or
+                self.docs_status in tracker_choices.PROGRESS_STATUS_REGULAR_TODO
             )
 
             if not force_update:
                 # obtém somente os registros por fazer (todo=True)
                 id_file_records = id_file_records.filter(todo=True)
-                input_data["total_id_file_records_to_migrate"] = id_file_records.count()
-
-            if input_data["total_id_file_records_to_migrate"] == 0:
-                raise NoDocumentRecordsToMigrateError("No document records to migrate")
+            input_data["total_id_file_records_to_migrate"] = id_file_records.count()
 
             journal_data = self.journal_proc.migrated_data.data
             issue_data = self.migrated_data.data
@@ -1894,10 +1882,6 @@ class IssueProc(BaseProc, ClusterableModel):
 
             new_status = self.get_new_docs_status(total_id_file_records)
 
-        except NoDocumentRecordsToMigrateError:
-            new_status = self.get_new_docs_status(total_id_file_records)
-            exception = traceback.format_exc()
-
         except Exception:
             exception = traceback.format_exc()
             new_status = tracker_choices.PROGRESS_STATUS_BLOCKED
@@ -1915,16 +1899,15 @@ class IssueProc(BaseProc, ClusterableModel):
             "total": total,
         }
 
-    def get_new_docs_status(self, total_id_file_records=None, total_articleprocs=None):
+    def get_new_docs_status(self, total_id_file_records=None):
         if total_id_file_records is None:
             total_id_file_records = IdFileRecord.document_records_to_migrate(
                 collection=self.collection,
                 issue_pid=self.pid,
             ).count()
-        if total_articleprocs is None:
-            total_articleprocs = ArticleProc.objects.filter(
-                issue_proc=self,
-            ).count()
+        total_articleprocs = ArticleProc.objects.filter(
+            issue_proc=self,
+        ).count()
         if total_id_file_records == 0:
             return tracker_choices.PROGRESS_STATUS_BLOCKED
         if total_articleprocs == 0:
@@ -2377,6 +2360,8 @@ class ArticleProc(BaseProc, ClusterableModel):
                     migrated_document_publication_day
                     or xml_with_pre.get_complete_publication_date()
                 )
+            if xml_file_path:
+                xml_with_pre.add_pkg_name(built_name=xml_with_pre.build_sps_pkg_name())
             detail.update(xml_with_pre.data)
             try:
                 os.unlink(self.processed_xml.path)
@@ -2415,6 +2400,8 @@ class ArticleProc(BaseProc, ClusterableModel):
         status_list=None,
         force_update=False,
         sps_pkg_id_list=None,
+        collection_acron_list=None,
+        journal_acron_list=None,
     ):
         status_list = tracker_choices.get_valid_status(status_list, force_update)
         journal_proc_id_list = journal_proc_id_list or []
@@ -2424,6 +2411,10 @@ class ArticleProc(BaseProc, ClusterableModel):
         params = {}
         if sps_pkg_id_list:
             params["sps_pkg_id__in"] = sps_pkg_id_list
+        if collection_acron_list:
+            params["collection__acron__in"] = collection_acron_list
+        if journal_acron_list:
+            params["issue_proc__journal_proc__acron__in"] = journal_acron_list
         if collection_acron:
             params["collection__acron"] = collection_acron
         if journal_acron:
@@ -2459,6 +2450,67 @@ class ArticleProc(BaseProc, ClusterableModel):
         if exclude_issue_proc_id_list:
             return qs.exclude(issue_proc__id__in=exclude_issue_proc_id_list)
         return qs
+
+    @classmethod
+    def get_journal_and_issue_proc_ids(
+        cls,
+        collection_acron_list=None,
+        journal_acron_list=None,
+        issue_folder=None,
+        publication_year=None,
+        status_list=None,
+        force_migrate_document_records=None,
+        force_migrate_document_files=None,
+    ):
+        """Combina pendências de artigos e fascículos, agrupadas por periódico."""
+        list_from_article = set(
+            cls.select_items(
+                collection_acron_list=collection_acron_list,
+                journal_acron_list=journal_acron_list,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                status_list=status_list,
+            )
+            .filter(issue_proc__journal_proc__isnull=False)
+            .values_list(
+                "issue_proc__journal_proc_id", "issue_proc__journal_proc__acron", "issue_proc_id"
+            )
+        )
+        list_from_issue = set(
+            IssueProc.select_items(
+                collection_acron_list=collection_acron_list,
+                journal_acron_list=journal_acron_list,
+                issue_folder=issue_folder,
+                publication_year=publication_year,
+                article_status_list=status_list,
+                force_migrate_document_records=force_migrate_document_records,
+                force_migrate_document_files=force_migrate_document_files,
+            )
+            .filter(journal_proc__isnull=False)
+            .values_list(
+                "journal_proc_id", "journal_proc__acron", "id"
+            )
+        )
+        items_to_process = {}
+        items = list_from_issue | list_from_article
+        for journal_proc_id, journal_acron, issue_proc_id in items:
+            items_to_process.setdefault(
+                (journal_proc_id, journal_acron),
+                {"issue_proc_id_list": set(), "issue_folder": issue_folder},
+            )["issue_proc_id_list"].add(issue_proc_id)
+
+        if not items_to_process:
+            # Mesmo sem pendências locais, pode haver novidades no acron.id.
+            for journal_proc_id, journal_acron in JournalProc.select_items(
+                collection_acron_list=collection_acron_list,
+                journal_acron_list=journal_acron_list,
+                has_issue_proc=True,
+            ).values_list("id", "acron"):
+                items_to_process[(journal_proc_id, journal_acron)] = {
+                    "issue_proc_id_list": set(),
+                    "issue_folder": issue_folder,
+                }
+        return items_to_process
 
     @classmethod
     def filter_by_status(cls, STATUS):
@@ -2669,7 +2721,6 @@ class ArticleProc(BaseProc, ClusterableModel):
         if not items.exists():
             return set()
 
-        from django.db.models import F
         return set(
             items
             .exclude(migrated_data__pid=F("sps_pkg__pid_v2"))
@@ -2677,7 +2728,24 @@ class ArticleProc(BaseProc, ClusterableModel):
         )
 
     @classmethod
-    def exclude_invalid_items(cls, user, issue):
+    def complete_sps_pkg_ppx(cls, user, journal_proc=None, issue_proc_id_list=None):
+        if issue_proc_id_list is not None:
+            items = cls.objects.filter(issue_proc_id__in=issue_proc_id_list)
+        elif journal_proc:
+            items = cls.objects.filter(issue_proc__journal_proc=journal_proc)
+        else:
+            raise ValueError("ArticleProc reconciliation requires an explicit scope")
+        package_ids = list(items.filter(sps_pkg__ppx__isnull=True).exclude(
+            sps_pkg__isnull=True
+        ).values_list("sps_pkg_id", flat=True).distinct())
+        if not package_ids:
+            return {"success": [], "failures": []}
+        return SPSPkg.complete_ppx(user, sps_pkg_id_list=package_ids)
+
+    @classmethod
+    def exclude_invalid_items(cls, user, issue, *, delete=False):
+        if not delete:
+            return {"sps_pkg_id_list": [], "deleted": []}
         try:
             # obtém sps_pkg_ids cujo pid_v2 não corresponde ao ArticleProc.pid
             sps_pkg_id_list = cls.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
@@ -2688,8 +2756,15 @@ class ArticleProc(BaseProc, ClusterableModel):
             # obtém novamente sps_pkg_ids cujo pid_v2 não corresponde ao cls.pid
             sps_pkg_id_list = cls.get_sps_pkg_ids_which_pid_v2_is_incorrect(issue=issue)
 
+            # Sem pacote é esperado enquanto alguma etapa aguarda processamento.
+            pending = (
+                Q(migration_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO)
+                | Q(xml_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO)
+                | Q(sps_pkg_status__in=tracker_choices.PROGRESS_STATUS_REGULAR_TODO)
+            )
             qs = cls.objects.filter(
-                Q(sps_pkg_id__in=sps_pkg_id_list)|Q(sps_pkg__isnull=True),
+                Q(sps_pkg_id__in=sps_pkg_id_list)
+                | (Q(sps_pkg__isnull=True) & ~pending),
                 issue_proc__issue=issue,
             )
             items = qs.values("pid", "sps_pkg__sps_pkg_name")

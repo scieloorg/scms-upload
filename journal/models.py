@@ -170,15 +170,34 @@ class OfficialJournal(CommonControlField):
 
     @classmethod
     def get(cls, issn_print=None, issn_electronic=None, issnl=None, title=None):
+        issns = []
+        params = {}
         if issn_electronic:
-            return cls.objects.get(issn_electronic=issn_electronic)
+            issns.append(issn_electronic)
+            params["issn_electronic"] = issn_electronic
         if issn_print:
-            return cls.objects.get(issn_print=issn_print)
+            issns.append(issn_print)
+            params["issn_print"] = issn_print
         if issnl:
-            return cls.objects.get(issnl=issnl)
-        raise ValueError(
-            f"{title} - OfficialJournal.get requires issn_print, issn_electronic"
-        )
+            issns.append(issnl)
+            params["issnl"] = issnl
+        if not issns:
+            raise ValueError(
+                "OfficialJournal.get requires issn_print, issn_electronic, issnl"
+            )
+
+        try:
+            return cls.objects.get(**params)
+        except cls.DoesNotExist:
+            pass
+        except cls.MultipleObjectsReturned:
+            return cls.objects.filter(**params).order_by("-updated").first()
+
+        qs = Q(issnl__in=issns) | Q(issn_electronic__in=issns) | Q(issn_print__in=issns)
+        try:
+            return cls.objects.get(qs)
+        except cls.MultipleObjectsReturned:
+            return cls.objects.filter(qs).order_by("-updated").first()
 
     @classmethod
     def create_or_update(
@@ -437,7 +456,7 @@ class Journal(CommonControlField, ClusterableModel):
             obj.official_journal = official_journal or obj.official_journal
             obj.title = title or obj.title
             obj.short_title = short_title or obj.short_title
-            obj.journal_acron = journal_acron
+            obj.journal_acron = journal_acron or obj.journal_acron
             obj.save()
             return obj
         except cls.DoesNotExist:
@@ -623,7 +642,6 @@ class Journal(CommonControlField, ClusterableModel):
             "title": _("Journal Title"),
             "short_title": _("Short Title"),
             "journal_acron": _("Journal Acronym"),
-            "official_journal": _("Official Journal"),
             "contact_name": _("Contact Name"),
             "contact_address": _("Contact Address"),
             "contact_location": _("Contact Location"),
@@ -641,9 +659,8 @@ class Journal(CommonControlField, ClusterableModel):
 
         # Verificar official_journal
         if self.official_journal:
-            if not self.official_journal.issn_electronic:
+            if not self.official_journal.issn_electronic and not self.official_journal.issn_print:
                 missing.append(_("Electronic ISSN"))
-            if not self.official_journal.issn_print:
                 missing.append(_("Print ISSN"))
             if not self.official_journal.title_iso:
                 missing.append(_("ISO Title"))
@@ -659,11 +676,8 @@ class Journal(CommonControlField, ClusterableModel):
             missing.append(_("sponsor"))
 
         # Verificar owner
-        if not self.owner.exists():
+        if not self.owner.exists() and not self.publisher.exists():
             missing.append(_("owner"))
-
-        # Verificar publisher
-        if not self.publisher.exists():
             missing.append(_("publisher"))
 
         # Verificar subject

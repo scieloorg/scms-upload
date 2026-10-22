@@ -1,68 +1,4 @@
-"""
-Testes unitários para PidProviderXML.register.
-
-Estratégia
-----------
-register() é orquestrador: delega a select_record (NÃO select_records),
-complete_missing_xml_pids, is_updated e _save. Os testes isolam register
-desses colaboradores via mock e verificam, para cada caminho, os contratos
-relevantes: valor de response["event_status"], conteúdo do response, e SE/COMO
-PidProviderXMLRegistration.record foi chamado.
-
-MUDANÇAS DE CONTRATO EM RELAÇÃO À VERSÃO ANTERIOR DESTE ARQUIVO
-----------------------------------------------------------------
-1. `select_records` (plural) é um gerador (tem `yield`) que apenas monta
-   querysets candidatos; quem de fato resolve o "melhor match" e decide se
-   há registro é `select_record` (singular, @staticmethod), que recebe esse
-   gerador. Mockar `select_records` sozinho não controla o fluxo — é preciso
-   mockar `select_record`, que é o que register() efetivamente consome.
-
-2. `_save` agora retorna o objeto PidProviderXML salvo diretamente
-   (não mais uma tupla `(objeto, status)`).
-
-3. **register() NÃO grava auditoria sempre por padrão.** No `finally`, a chamada a
-   `PidProviderXMLRegistration.record` só acontece se:
-       error_type (uma exceção foi capturada) OR
-       select_record_response.get("matched_items") (havia ambiguidade) OR
-       PidProviderSetting.record_all_registration_events (configuração ativa)
-   Ou seja: um "created"/"updated"/"skipped" limpo, sem matches concorrentes
-   e sem erro, NÃO gera registro de auditoria por padrão.
-
-4. `is_updated` deixou de retornar um dict "já atualizado" — agora ela
-   LEVANTA exceções para sinalizar o que aconteceu:
-     - `exceptions.SkipSavePidProviderXML`: quando o XML é igual ao
-       registrado, ou quando `origin_date` do registrado é mais recente.
-     - `exceptions.ForbiddenPidProviderXMLRegistrationError`: quando o XML
-       é AOP mas o registrado já é VoR (comportamento antigo, inalterado).
-   Essas exceções agora são capturadas no lugar certo: um `try/except` que
-   envolve a chamada a `is_updated()` E a chamada a `_save()` juntas:
-     - `except ForbiddenPidProviderXMLRegistrationError`: seta
-       `event_status = "forbidden"` e RE-LEVANTA (propaga para o
-       `except Exception` externo, vira erro registrado com esse status).
-       Uma rodada anterior deste diff havia adicionado essa exceção ao
-       tuple de "bad_request" (que só envolve a chamada a `select_record`,
-       não `is_updated`), o que não tinha efeito nenhum — isso foi
-       corrigido: agora forbidden é de fato capturado onde é levantado e
-       gravado como "forbidden", não mais como "updated"/"bad_request".
-     - `except SkipSavePidProviderXML`: seta `event_status = "skipped"`,
-       `response["skipped"] = True`, `response.update(registered.data)`
-       usando o objeto JÁ EXISTENTE (pois `_save` nunca chega a rodar
-       nesse caminho) — e NÃO relevanta, então o fluxo segue normalmente
-       até o `finally` (sem passar por `except Exception`).
-
-5. `event_status = event_status or "error"` foi adicionado no `except`
-   externo. Isso significa: se uma exceção genérica ocorre ANTES de
-   qualquer `event_status` ter sido atribuído, o valor gravado agora é
-   `"error"` (não mais `None`). Se a exceção ocorre DEPOIS que algum status
-   já existia (ex.: "created", "forbidden"), esse status é preservado —
-   `x or "error"` só substitui quando `x` é falsy. `UnexpectedEvent.create`
-   continua sem ser chamado dentro de register().
-
-6. Os caminhos "conflict" e "unmatched" continuam setando `event_status`
-   explicitamente antes de re-levantar a exceção.
-
-Ajuste os caminhos de import (PATCH_BASE) conforme a estrutura do seu projeto.
-"""
+"""Desfechos do registro e acionamento da auditoria do PID Provider."""
 
 from unittest.mock import patch, MagicMock
 
@@ -343,21 +279,45 @@ class UnmatchedPathTest(RegisterTestBase):
         self.assert_recorded_status("unmatched")
         self.assertIn("error_msg", response)
 
-    def test_unmatched_when_unmatched_items_without_registered(self):
-        # select_record retorna dict com unmatched_items e sem "registered"
-        # -> register() levanta UnmatchedPidProviderXMLError internamente
-        with patch(f"{PATCH_BASE}.PidProviderXML.select_record") as m_select:
-            m_select.return_value = {"unmatched_items": [{"id": 1}]}
+    def test_unmatched_candidates_allow_creation_and_trigger_audit(self):
+        with patch(f"{PATCH_BASE}.PidProviderXML.select_record") as select, \
+             patch(f"{PATCH_BASE}.PidProviderXML.complete_missing_xml_pids"), \
+             patch(f"{PATCH_BASE}.PidProviderXML.is_updated"), \
+             patch(f"{PATCH_BASE}.PidProviderXML._save") as save:
+            select.return_value = {"unmatched_items": {"ids": [{"data": {"id": 1}}]}}
+            save.return_value.data = {"v3": "NEW"}
             response = PidProviderXML.register(self.xml, "file.xml", self.user)
 
-        self.assert_recorded_status("unmatched")
+        self.assert_recorded_status("created")
+        self.assertNotIn("error_type", response)
+        self.assertEqual(response["v3"], "NEW")
+        self.assertIsNone(save.call_args.args[0])
+        self.assertIn("unmatched_items", response["select_record_response"])
 
-    def test_multiple_objects_returned_is_unmatched(self):
-        with patch(f"{PATCH_BASE}.PidProviderXML.select_record") as m_select:
-            m_select.side_effect = PidProviderXML.MultipleObjectsReturned()
+    def test_multiple_objects_returned_has_distinct_status(self):
+        with patch(f"{PATCH_BASE}.PidProviderXML.select_record") as select:
+            select.side_effect = PidProviderXML.MultipleObjectsReturned()
             response = PidProviderXML.register(self.xml, "file.xml", self.user)
 
-        self.assert_recorded_status("unmatched")
+        self.assert_recorded_status("multiple")
+        self.assertIn("QueryDocumentMultipleObjectsReturnedError", response["error_type"])
+
+    def test_tied_candidates_block_registration_even_when_forced(self):
+        selection = {"registered": MagicMock(), "multiple_matched_items": {"ids": [1, 2]}}
+        with patch(f"{PATCH_BASE}.PidProviderXML.select_record", return_value=selection), \
+             patch(f"{PATCH_BASE}.PidProviderXML.complete_missing_xml_pids") as complete, \
+             patch(f"{PATCH_BASE}.PidProviderXML._save") as save:
+            response = PidProviderXML.register(
+                self.xml, "file.xml", self.user, force_update=True
+            )
+            check = PidProviderXML.is_registered(self.xml)
+
+        self.assert_recorded_status("multiple")
+        self.assertIn("QueryDocumentMultipleObjectsReturnedError", response["error_type"])
+        self.assertIn("QueryDocumentMultipleObjectsReturnedError", check["error_type"])
+        self.assertIsNone(self.m_record.call_args.kwargs["pid_provider_xml"])
+        complete.assert_not_called()
+        save.assert_not_called()
 
 
 class BadRequestPathTest(RegisterTestBase):

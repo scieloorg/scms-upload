@@ -24,6 +24,7 @@ from journal.models import (
     Sponsor,
     Subject,
 )
+from location.models import Location
 from pid_provider.models import PidProviderConfig
 from proc.exceptions import ProcBaseException
 from proc.models import IssueProc, JournalProc
@@ -313,6 +314,20 @@ def process_journal_result(
     journal.wos_areas = result.get("wos_areas", [])
     journal.logo_url = result.get("url_logo")
     journal.submission_online_url = result.get("submission_online_url")
+
+    loc_data = result.get("location") or {}
+    if loc_data:
+        city_name = loc_data.get("city_name")
+        country_name = loc_data.get("country_name")
+        if city_name or country_name:
+            journal.contact_location = Location.create_or_update(
+                user,
+                city_name=city_name,
+                state_name=loc_data.get("state_name"),
+                state_acronym=loc_data.get("state_acronym"),
+                country_name=country_name,
+                country_acronym=loc_data.get("country_acronym"),
+            )
     journal.save()
 
     journal.journal_email.all().delete()
@@ -452,7 +467,6 @@ def process_journal_result(
     # TODO: Campos da API não processados ainda:
     # - copyright (array)
     # - table_of_contents (array)
-    # - location (object with city_name, state_name, country_name, etc.)
     # - text_language (array)
     # - title_in_database (array)
     # - crossmark_policy (array)
@@ -630,7 +644,7 @@ def process_issue_result(user, journal, result):
     )
 
     # Cria/atualiza o issue com todos os campos da API
-    issue = Issue.get_or_create(
+    issue = Issue.create_or_update(
         journal=journal,
         volume=result.get("volume"),
         supplement=result.get("supplement"),
@@ -639,15 +653,21 @@ def process_issue_result(user, journal, result):
         user=user,
         order=result.get("order"),
         issue_pid_suffix=result.get("issue_pid_suffix"),
+        is_continuous_publishing_model=result.get("is_continuous_publishing_model"),
+        total_documents=result.get("total_documents"),
     )
 
     # Atualiza campos adicionais do issue se disponíveis na API
+    save = False
     if hasattr(issue, "season") and result.get("season"):
         issue.season = result.get("season")
+        save = True
     if hasattr(issue, "month") and result.get("month"):
         issue.month = result.get("month")
+        save = True
 
-    issue.save()
+    if save:
+        issue.save()
 
     for journal_proc in JournalProc.objects.filter(journal=journal):
         try:

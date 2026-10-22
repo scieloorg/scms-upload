@@ -6,6 +6,7 @@ Organização hierárquica das tasks de migração e publicação:
   Journals:
     task_migrate_and_publish_journals
       └─ task_migrate_and_publish_journals_by_collection (por coleção)
+          └─ task_migrate_and_publish_journal (por periódico)
     task_publish_journals
       └─ task_publish_journal (por periódico)
 
@@ -147,7 +148,7 @@ class TaskExecution:
     def add_number(self, name, number):
         self.stats[name] = number
 
-    def finish(self, exception=None, exc_traceback=None):
+    def finish(self, exception=None, exc_traceback=None, data=None):
         try:
             if exception or exc_traceback or self.exceptions:
                 completed = False
@@ -163,6 +164,8 @@ class TaskExecution:
                 "exceptions": self.exceptions,
                 "status_changes": self.status_changes
             }
+            if data:
+                detail["data"] = data
             try:
                 json.dumps(detail)
             except Exception as x:
@@ -174,6 +177,7 @@ class TaskExecution:
                     except Exception as exxx:
                         fixed_detail[key] = str(value)
                 detail = fixed_detail
+
             self.task_tracker.finish(
                 completed=completed,
                 exception=exception,
@@ -183,29 +187,21 @@ class TaskExecution:
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             UnexpectedEvent.create(
+                action="proc.tasks.TaskExecution.finish",
+                item=self.item,
                 e=e,
                 exc_traceback=exc_traceback,
-                detail={
-                    "task": "proc.tasks.TaskExecution.finish",
-                    "item": self.item,
-                },
             )
 
     def update_total_status(self, label, issue_proc_id=None):
-        previous = {}
-        for key, items in self.status_changes.items():
-            try:
-                previous[key] = items[-1]["total_status"]
-            except (IndexError, KeyError):
-                previous[key] = []
-
-        result = get_total_status_data(previous, self.journal_proc_id, issue_proc_id)
+        """Agrupa eventos consecutivos que possuem os mesmos totais por status."""
+        result = get_total_status_data(self.journal_proc_id, issue_proc_id)
         for key, items in result.items():
-            data = {
-                "label": label,
-                "total_status": items
-            }
-            self.status_changes.setdefault(key, []).append(data)
+            changes = self.status_changes.setdefault(key, [])
+            if changes and changes[-1]["total_status"] == items:
+                changes[-1]["events"].append(label)
+            else:
+                changes.append({"events": [label], "total_status": items})
 
 
 def _get_user(user_id, username):
@@ -309,6 +305,7 @@ def task_migrate_and_publish_journals(
     status=None,
     valid_status=None,
     force_import_acron_id_file=False,
+    force_core_sync=False,
 ):
     """
     Ponto de entrada para migração e publicação de periódicos.
@@ -325,6 +322,7 @@ def task_migrate_and_publish_journals(
             "force_update": force_update,
             "status": status,
             "force_import_acron_id_file": force_import_acron_id_file,
+            "force_core_sync": force_core_sync,
         }
         for collection in _get_collections(collection_acron):
             task_migrate_and_publish_journals_by_collection.delay(
@@ -335,12 +333,13 @@ def task_migrate_and_publish_journals(
                 force_update=force_update,
                 status=status,
                 force_import_acron_id_file=force_import_acron_id_file,
+                force_core_sync=force_core_sync,
             )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
             action="proc.tasks.task_migrate_and_publish_journals",
-            item=f"{collection_acron}-{journal_acron}",
+            item=collection_acron,
             e=e,
             exc_traceback=exc_traceback,
             detail={"task_params": task_params},
@@ -357,13 +356,13 @@ def task_migrate_and_publish_journals_by_collection(
     force_update=False,
     status=None,
     force_import_acron_id_file=False,
+    force_core_sync=False,
 ):
     """
     Migra e publica periódicos de uma coleção.
 
-    Importa dados do site clássico via ``create_or_update_migrated_journal``,
-    atualiza cada ``JournalProc`` e agenda ``task_publish_journal`` nos
-    websites QA e PUBLIC.
+    Importa dados do site clássico e agenda uma tarefa de migração e
+    publicação para cada periódico selecionado.
     """
     task_params = {
         "task": "proc.tasks.task_migrate_and_publish_journals",
@@ -374,10 +373,11 @@ def task_migrate_and_publish_journals_by_collection(
         "force_update": force_update,
         "status": status,
         "force_import_acron_id_file": force_import_acron_id_file,
+        "force_core_sync": force_core_sync,
     }
     task_exec = TaskExecution(
         name="proc.tasks.task_migrate_and_publish_journals_by_collection",
-        item=f"{collection_acron}-{journal_acron}",
+        item=f"{collection_acron}",
         params=task_params,
     )
     try:
@@ -385,23 +385,36 @@ def task_migrate_and_publish_journals_by_collection(
 
         classic_website = controller.get_classic_website(collection_acron)
         collection = Collection.objects.get(acron=collection_acron)
+
+        # cria ou atualiza MigratedJournal / JournalProc
         create_or_update_migrated_journal(
-            user, collection, classic_website, force_update
+            user, collection, classic_website, force_import_acron_id_file
         )
+        status = tracker_choices.get_valid_status(status, force_update)
+        fix_publication_status(collection)
 
         journal_filter = {}
         if journal_acron:
             journal_filter["acron"] = journal_acron
-        status = tracker_choices.get_valid_status(status, force_update)
-        query_by_status = (
-            Q(migration_status__in=status)
-            | Q(qa_ws_status__in=status)
-            | Q(public_ws_status__in=status)
-        )
-        fix_publication_status(collection)
-        items_to_process = JournalProc.objects.filter(
-            query_by_status, collection=collection, **journal_filter
-        )
+
+        if force_core_sync:
+            items_to_process = JournalProc.objects.filter(
+                collection=collection, **journal_filter
+            )
+        else:
+            # seleciona também aqueles que não estão sincronizados
+            query_by_status = (
+                Q(qa_ws_status__in=status)
+                | Q(public_ws_status__in=status)
+            )
+            query_by_status |= Q(migration_status__in=status)
+            query_by_status |= Q(journal__core_synchronized__in=(False, None))
+            items_to_process = JournalProc.objects.filter(
+                query_by_status, collection=collection, **journal_filter
+            )
+
+        # para force_core_sync=True, o filtro migration_status deixa de ser relevante
+
         task_exec.total_to_process = items_to_process.count()
         if not task_exec.total_to_process:
             task_exec.finish()
@@ -409,66 +422,27 @@ def task_migrate_and_publish_journals_by_collection(
 
         qa_api_data = get_api_data(collection, "journal", "QA")
         public_api_data = get_api_data(collection, "journal", "PUBLIC")
-        total_processed = 0
+
+        total_scheduled = 0
+        scheduled = []
         for journal_proc in items_to_process:
-            try:
-                detail = {}
-                event = journal_proc.start(user, "migrate journal")
-                completed = journal_proc.create_or_update_item(
-                    user, force_update, controller.create_or_update_journal
+            scheduled.append(str(journal_proc))
+            task_migrate_and_publish_journal.apply_async(
+                kwargs=dict(
+                    user_id=user_id,
+                    username=username,
+                    journal_proc_id=journal_proc.id,
+                    force_update=force_update,
+                    force_core_sync=force_core_sync,
+                    collection_acron=collection.acron,
+                    qa_api_data=qa_api_data,
+                    public_api_data=public_api_data,
                 )
-                if force_update or not journal_proc.journal.core_synchronized:
-                    fetch_and_create_journal(
-                        user,
-                        collection_acron=collection.acron,
-                        issn_electronic=journal_proc.issn_electronic,
-                        issn_print=journal_proc.issn_print,
-                        force_update=force_update,
-                    )
-                if qa_api_data and not qa_api_data.get("error"):
-                    task_publish_journal.apply_async(
-                        kwargs=dict(
-                            user_id=user_id,
-                            username=username,
-                            website_kind="QA",
-                            journal_proc_id=journal_proc.id,
-                            api_data=qa_api_data,
-                            force_update=force_update,
-                        )
-                    )
-                if public_api_data and not public_api_data.get("error"):
-                    task_publish_journal.apply_async(
-                        kwargs=dict(
-                            user_id=user_id,
-                            username=username,
-                            website_kind="PUBLIC",
-                            journal_proc_id=journal_proc.id,
-                            api_data=public_api_data,
-                            force_update=force_update,
-                        )
-                    )
-                event.finish(user, completed=True, detail=detail)
-                total_processed += 1
-            except Exception as e:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                if event:
-                    event.finish(
-                        user,
-                        completed=False,
-                        exception=e,
-                        exc_traceback=exc_traceback,
-                        detail=detail,
-                    )
-                else:
-                    UnexpectedEvent.create(
-                        action="proc.tasks.task_migrate_and_publish_journals_by_collection",
-                        item=f"{journal_proc}",
-                        e=e,
-                        exc_traceback=exc_traceback,
-                        detail=detail,
-                    )
-        task_exec.total_processed = total_processed
-        task_exec.finish()
+            )
+            total_scheduled += 1
+
+        task_exec.total_processed = total_scheduled
+        task_exec.finish(data={"scheduled": scheduled})
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         try:
@@ -476,11 +450,101 @@ def task_migrate_and_publish_journals_by_collection(
         except Exception:
             UnexpectedEvent.create(
                 action="proc.tasks.task_migrate_and_publish_journals_by_collection",
-                item=f"{collection_acron}-{journal_acron}",
+                item=f"{collection_acron}",
                 e=e,
                 exc_traceback=exc_traceback,
                 detail=task_params,
             )
+
+
+@celery_app.task(bind=True)
+def task_migrate_and_publish_journal(
+    self,
+    user_id=None,
+    username=None,
+    journal_proc_id=None,
+    force_update=False,
+    force_core_sync=False,
+    collection_acron=None,
+    qa_api_data=None,
+    public_api_data=None,
+):
+    """
+    Migra e publica um único periódico (JournalProc).
+
+    Extraído de ``task_migrate_and_publish_journals_by_collection`` para
+    permitir processamento assíncrono por periódico.
+    """
+    detail = {}
+    event = None
+    journal_proc = None
+    try:
+        user = _get_user(user_id, username)
+        journal_proc = JournalProc.objects.get(id=journal_proc_id)
+
+        event = journal_proc.start(user, "migrate journal")
+
+        if force_core_sync:
+            fetch_and_create_journal(
+                user,
+                collection_acron=collection_acron,
+                issn_electronic=journal_proc.issn_electronic,
+                issn_print=journal_proc.issn_print,
+                force_update=force_core_sync,
+            )
+            detail["journal_data_source"] = "core data"
+        else:
+            journal_proc.create_or_update_item(
+                user, force_update, controller.create_or_update_journal
+            )
+            detail["journal_data_source"] = "classic website data"
+
+        if qa_api_data and not qa_api_data.get("error"):
+            detail["task_publish_journal_on_qa_website"] = "scheduled"
+            task_publish_journal.apply_async(
+                kwargs=dict(
+                    user_id=user_id,
+                    username=username,
+                    website_kind="QA",
+                    journal_proc_id=journal_proc.id,
+                    api_data=qa_api_data,
+                    force_update=force_update,
+                )
+            )
+        if public_api_data and not public_api_data.get("error"):
+            detail["task_publish_journal_on_public_website"] = "scheduled"
+            task_publish_journal.apply_async(
+                kwargs=dict(
+                    user_id=user_id,
+                    username=username,
+                    website_kind="PUBLIC",
+                    journal_proc_id=journal_proc.id,
+                    api_data=public_api_data,
+                    force_update=force_update,
+                )
+            )
+
+        event.finish(user, completed=True, detail=detail)
+        return True
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        if event:
+            event.finish(
+                user,
+                completed=False,
+                exception=e,
+                exc_traceback=exc_traceback,
+                detail=detail,
+            )
+        else:
+            UnexpectedEvent.create(
+                action="proc.tasks.task_migrate_and_publish_journal",
+                item=f"{journal_proc or journal_proc_id}",
+                e=e,
+                exc_traceback=exc_traceback,
+                detail=detail,
+            )
+        return False
 
 
 @celery_app.task(bind=True)
@@ -987,36 +1051,16 @@ def task_migrate_and_publish_articles(
         if collection_acron:
             collection_acron_list += [collection_acron]
 
-        items_to_process = {}
         status = tracker_choices.get_valid_status(status, force_update)
-
-        if publication_year or issue_folder:
-            selected_issue_procs = IssueProc.select_items(
-                collection_acron_list=collection_acron_list,
-                journal_acron_list=journal_acron_list,
-                publication_year=publication_year,
-                issue_folder=issue_folder,
-                force_migrate_document_records=force_migrate_document_records,
-                force_migrate_document_files=force_migrate_document_files,
-                article_status_list=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
-            )
-            issue_proc_ids = selected_issue_procs.values_list(
-                "journal_proc_id", "journal_proc__acron", "id"
-            ).distinct()
-            for journal_proc_id, journal_acron, issue_proc_id in issue_proc_ids:
-                items_to_process.setdefault((journal_proc_id, journal_acron), []).append(
-                    issue_proc_id
-                )
-        else:
-            journal_proc_ids = JournalProc.select_items(
-                collection_acron_list=collection_acron_list,
-                journal_acron_list=journal_acron_list,
-                has_issue_proc=True,
-            ).values_list("id", "acron")
-            items_to_process = {
-                (journal_proc_id, journal_acron): None
-                for journal_proc_id, journal_acron in journal_proc_ids
-            }
+        items_to_process = ArticleProc.get_journal_and_issue_proc_ids(
+            collection_acron_list=collection_acron_list,
+            journal_acron_list=journal_acron_list,
+            publication_year=publication_year,
+            issue_folder=issue_folder,
+            force_migrate_document_records=force_migrate_document_records,
+            force_migrate_document_files=force_migrate_document_files,
+            status_list=status,
+        )
 
         total_journals_to_process = len(items_to_process)
         task_exec.add_number(
@@ -1037,7 +1081,7 @@ def task_migrate_and_publish_articles(
             kwargs.update(kwargs_)            
             kwargs["journal_proc_id"] = journal_proc_id
             kwargs["journal_acron"] = journal_acron
-            kwargs["issue_proc_id_list"] = items_to_process[key]
+            kwargs["issue_proc_id_list"] = list(items_to_process[key]["issue_proc_id_list"])
             kwargs["status"] = status
             
             total_processed += 1
@@ -1137,42 +1181,36 @@ def task_migrate_and_publish_articles_by_journal(
         total_processed = 0
         total_to_process = 0
 
-        issue_proc_and_related_article_proc_id_list = {}
-        if issue_proc_id_list:
-            task_exec.add_number("total issue_proc_id_list", len(issue_proc_id_list))
-            selected_article_proc_items = []
-        else:
-            selected_issue_procs = IssueProc.select_items(
-                journal_proc_id_list=[journal_proc_id],
-                force_migrate_document_records=force_migrate_document_records,
-                force_migrate_document_files=force_migrate_document_files,
-                article_status_list=tracker_choices.PROGRESS_STATUS_REGULAR_TODO,
-            )
-            issue_proc_id_list = list(
-                selected_issue_procs.values_list("id", flat=True)
-            )
-            task_exec.add_number("total issue_proc todo or reproc", len(issue_proc_id_list))
-            selected_article_proc_items = (
-                ArticleProc.select_items(
-                    journal_proc_id_list=[journal_proc_id],
-                    exclude_issue_proc_id_list=issue_proc_id_list,
-                    status_list=status,
-                    force_update=force_update,
-                )
-                .values_list("issue_proc_id", "id")
-                .distinct()
-            )
-            task_exec.add_number("total articles todo or reproc", selected_article_proc_items.count())
+        issue_proc_id_list = set(issue_proc_id_list or []) | set(response.get("issue_proc_id_list") or [])
+        selected_issue_procs = IssueProc.select_items(
+            journal_proc_id_list=[journal_proc_id],
+            publication_year=publication_year,
+            issue_folder=issue_folder,
+            force_migrate_document_records=force_migrate_document_records,
+            force_migrate_document_files=force_migrate_document_files,
+            article_status_list=status,
+        )
+        issue_proc_id_list.update(selected_issue_procs.values_list("id", flat=True))
+        eligible_issues = IssueProc.objects.filter(journal_proc_id=journal_proc_id)
+        if publication_year:
+            eligible_issues = eligible_issues.filter(issue__publication_year=publication_year)
+        if issue_folder:
+            eligible_issues = eligible_issues.filter(issue_folder=issue_folder)
+        issue_proc_id_list.intersection_update(eligible_issues.values_list("id", flat=True))
 
         issue_proc_and_related_article_proc_id_list = {
-            issue_proc_id: []
-            for issue_proc_id in (issue_proc_id_list or [])
+            issue_proc_id: [] for issue_proc_id in issue_proc_id_list
         }
-        if selected_article_proc_items:
-            for issue_proc_id, article_proc_id in selected_article_proc_items:
-                issue_proc_and_related_article_proc_id_list.setdefault(
-                    issue_proc_id, []
-                ).append(article_proc_id)
+        selected_articles = ArticleProc.select_items(
+            journal_proc_id_list=[journal_proc_id],
+            publication_year=publication_year,
+            issue_folder=issue_folder,
+            exclude_issue_proc_id_list=list(issue_proc_id_list),
+            status_list=status,
+            force_update=force_update,
+        ).values_list("issue_proc_id", "id")
+        for issue_proc_id, article_proc_id in selected_articles:
+            issue_proc_and_related_article_proc_id_list.setdefault(issue_proc_id, []).append(article_proc_id)
 
         total_to_process = len(issue_proc_and_related_article_proc_id_list)
         task_exec.add_number("total issue_proc todo or reproc", total_to_process)
@@ -1182,7 +1220,7 @@ def task_migrate_and_publish_articles_by_journal(
             article_proc_id_list,
         ) in issue_proc_and_related_article_proc_id_list.items():
             total_processed += 1
-            # executa sincronamente a eliminação de registros ArticleProc e Article cujo conteúdo é defeituoso
+            # Completa os vínculos legados antes de agendar a migração.
             response = task_exclude_invalid_issue_articles(
                 issue_proc_id=issue_proc_id,
                 username=username,
@@ -1297,11 +1335,14 @@ def task_migrate_and_publish_articles_by_issue(
 
         total_processed = 0
         exceptions = {}
+        articleprocs_id_list = []
         for article_proc in article_procs:
             try:
                 # faz o fluxo completo do artigo: get_xml e cria sps_pkg
                 article = article_proc.migrate_article(user, force_update)
-                total_processed += 1
+                if article:
+                    articleprocs_id_list.append(article_proc.id)
+                    total_processed += 1
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 exceptions[article_proc.pid] = traceback.format_exc()
@@ -1316,6 +1357,7 @@ def task_migrate_and_publish_articles_by_issue(
             user_id=user_id,
             username=username,
             issue_proc_id=issue_proc_id,
+            articleprocs_id_list=articleprocs_id_list,
             status=status,
             force_update=force_update,
         )
@@ -1334,6 +1376,7 @@ def task_publish_issue_articles(
     issue_proc_id=None,
     status=None,
     force_update=False,
+    articleprocs_id_list=None,
 ):
     """
     Publica artigos de um fascículo e sincroniza o fascículo no site.
@@ -1341,6 +1384,9 @@ def task_publish_issue_articles(
     Para cada WebSiteConfiguration habilitado da coleção:
     1. Publica cada artigo via task_publish_article (síncrono).
     2. Agenda task_sync_issue (assíncrono).
+
+    Uma lista explícita restringe a publicação aos artigos migrados; sem
+    lista, mantém a seleção do fascículo usada pela publicação avulsa.
     """
     task_params = {
         "user_id": user_id,
@@ -1348,12 +1394,16 @@ def task_publish_issue_articles(
         "issue_proc_id": issue_proc_id,
         "status": status,
         "force_update": force_update,
+        "articleprocs_id_list": articleprocs_id_list,
     }
     task_exec = TaskExecution(
         name="proc.tasks.task_publish_issue_articles",
         item=f"{issue_proc_id}",
         params=task_params,
     )
+    websites_summary = []
+    total_processed = 0
+    total_to_process = 0
     try:
         user = _get_user(user_id, username)
         issue_proc = IssueProc.objects.select_related(
@@ -1374,24 +1424,26 @@ def task_publish_issue_articles(
                 sps_pkg__pid_v3__isnull=False,
             )
         )
+        if articleprocs_id_list is not None:
+            articles = articles.filter(id__in=articleprocs_id_list)
 
         collection = issue_proc.collection
         fix_publication_status(collection)
         task_exec.update_total_status(("Updated publication status"), issue_proc_id)
 
-        total_processed = 0
-        total_to_process = 0
         for website in WebSiteConfiguration.objects.filter(
             collection=collection, enabled=True
         ):
-            api_data = website.get_data(content_type="article")
             website_kind = website.purpose
 
-            query_by_status = Q()
             if website_kind == QA:
                 query_by_status = Q(qa_ws_status__in=status)
             elif website_kind == PUBLIC:
                 query_by_status = Q(public_ws_status__in=status)
+            else:
+                continue
+
+            api_data = website.get_data(content_type="article")
 
             total_published = 0
             total_to_publish = 0
@@ -1414,6 +1466,14 @@ def task_publish_issue_articles(
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     task_exec.add_exception(traceback.format_exc())
             total_processed += total_published
+            websites_summary.append({
+                "website": str(website),
+                "website_id": website.id,
+                "purpose": website_kind,
+                "total_to_publish": total_to_publish,
+                "total_published": total_published,
+                "total_failed": total_to_publish - total_published,
+            })
             task_exec.update_total_status(
                 (f"Total article published on {website_kind}: {total_published}/{total_to_publish}"),
                 issue_proc_id
@@ -1427,12 +1487,16 @@ def task_publish_issue_articles(
                 api_data=api_data,
             )
             task_exec.add_event({"operation": "Scheduled issue synchronization"})
+        task_exec.add_event({"websites": websites_summary})
         task_exec.total_to_process = total_to_process
         task_exec.total_processed = total_processed
         
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
+        task_exec.add_event({"websites": websites_summary})
+        task_exec.total_to_process = total_to_process
+        task_exec.total_processed = total_processed
         task_exec.finish(exception=e, exc_traceback=exc_traceback)
 
 
@@ -1692,37 +1756,18 @@ def task_exclude_invalid_issue_articles(
     timeout=None,
     public_api_data=None,
 ):
-    """
-    Remove artigos duplicados e inconsistentes de um fascículo.
-
-    Executa ``Article.fix_sps_pkg_names`` e ``Article.exclude_invalid_issue_articles``
-    para o fascículo associado ao ``IssueProc`` informado.
-    Chamada automaticamente por ``task_migrate_and_publish_articles_by_issue``
-    antes de iniciar a migração dos artigos.
-    """
+    """Completa vínculos legados sem excluir registros ou bloquear a migração."""
     try:
-        detail = None
         user = _get_user(user_id=user_id, username=username)
-        issue_proc = IssueProc.objects.select_related("issue").get(
-            id=issue_proc_id
-        )
-        detail = []
-        issue = issue_proc.issue
-        response = ArticleProc.exclude_invalid_items(user, issue)
-        detail.append({"operation": "ArticleProc.exclude_invalid_items", "response": response})
-        response = Article.exclude_invalid_records(user, issue, response.get("sps_pkg_id_list"), timeout=timeout)
-        detail.append({"operation": "Article.exclude_invalid_records", "response": response})
-        if response.get("deleted_sps_pkg_ids"):
-            response = ArticleProc.exclude_invalid_items(user, issue)
-            detail.append({"operation": "ArticleProc.exclude_invalid_items", "response": response})
-        return detail
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        return {
-            "exc_type": str(exc_type),
-            "exc_value": str(exc_value),
-            "traceback": traceback.format_exc()
-        }
+        processor = IssueProc.objects.select_related("issue").get(pk=issue_proc_id)
+        return [
+            {"operation": "Article.complete_sps_pkg_ppx",
+             "response": Article.complete_sps_pkg_ppx(user, processor.issue)},
+            {"operation": "ArticleProc.complete_sps_pkg_ppx",
+             "response": ArticleProc.complete_sps_pkg_ppx(user, issue_proc_id_list=[processor.pk])},
+        ]
+    except Exception:
+        return {"error": traceback.format_exc()}
 
 
 @celery_app.task(bind=True)
@@ -1941,10 +1986,13 @@ def task_check_article_webpages(
         )
 
         article = article_proc.article
-        article.create_or_update_article_collections(user)
+        article.create_or_update_article_collections(user, force_update=force_update)
         collection = article_proc.collection
         data = {}
-        article.check_availability(user, collection_id=collection_id, purpose=website_kind, force_update=force_update)
+        article.check_availability(
+            user, collection_id=collection_id, purpose=website_kind,
+            force_update=force_update, timeout=timeout,
+        )
         responses = [
             article.available_on_classic_website(collection),
             article.available_on_public_website(collection),
@@ -2182,8 +2230,8 @@ def task_check_migrated_article(
                 f"ArticleProc {article_proc_id} has no article"
             )
         
-        article.create_or_update_article_collections(user)
-        article.check_availability(user)
+        article.create_or_update_article_collections(user, force_update=force_update)
+        article.check_availability(user, force_update=force_update, timeout=timeout)
 
         logging.info("pageslist(article.webpages): {}".format(list(article.webpages)))
         response = article.available_on_classic_website(article_proc.collection)

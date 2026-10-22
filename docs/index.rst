@@ -16,9 +16,9 @@ Welcome to SciELO Upload 's documentation!
 Task Guides / Guías de Tareas / Guias de Tarefas
 ----------------------------------------------------------------------
 
-- `English <pid_provider/guide_task_load_records_en.md>`_
-- `Español <pid_provider/guide_task_load_records_es.md>`_
-- `Português <pid_provider/guide_task_load_records_pt_br.md>`_
+O controle de fontes por URL pertence ao Core. Consulte o guia de
+PID Provider em ``pid_provider/TASKS_USAGE.md`` para os fluxos XML/ZIP
+e os métodos compartilhados disponíveis no Upload.
 
 
 

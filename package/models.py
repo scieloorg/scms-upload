@@ -2,6 +2,7 @@ import logging
 import mimetypes
 import os
 import sys
+import traceback
 import glob
 from io import BytesIO
 from shutil import copyfile
@@ -11,6 +12,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.core.files.base import ContentFile
 from django.db import models
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -32,6 +34,7 @@ from core.utils.requester import fetch_data
 from core.utils.file_utils import delete_files
 from files_storage.models import FileLocation, MinioConfiguration
 from package import choices
+from pid_provider.models import PidProviderXML
 from pid_provider.requester import PidRequester
 
 
@@ -290,6 +293,10 @@ class SPSPkgComponent(FileLocation, Orderable):
 class SPSPkg(CommonControlField, ClusterableModel):
     pid_v3 = models.CharField(max_length=23, null=True, blank=True)
     pid_v2 = models.CharField(max_length=23, null=True, blank=True)
+
+    ppx = models.ForeignKey(
+        PidProviderXML, null=True, blank=True, on_delete=models.SET_NULL
+    )
     
     sps_pkg_name = models.CharField(_("SPS Name"), max_length=100, null=True, blank=True)
 
@@ -428,22 +435,46 @@ class SPSPkg(CommonControlField, ClusterableModel):
             return False
 
     @classmethod
-    def _get_or_create(cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2):
-        try:
-            obj = cls.objects.get(sps_pkg_name=sps_pkg_name)            
-        except cls.MultipleObjectsReturned:
-            items = cls.objects.filter(sps_pkg_name=sps_pkg_name).order_by("-updated")
-            obj = items.first()
-            cls.delete_queryset(items.exclude(id=obj.id))
-        except cls.DoesNotExist:
-            obj = cls()
-            obj.creator = user
-            obj.sps_pkg_name = sps_pkg_name
+    def _get_or_create(
+        cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2, ppx_id=None
+    ):
+        if not ppx_id:
+            raise ValueError("SPSPkg._get_or_create requires ppx_id")
+
+        obj = cls.objects.filter(ppx_id=ppx_id).order_by("-updated", "-id").first()
+        if obj is None:
+            params = {}
+            query = Q()
+            for field, value in (
+                ("pid_v3", pid_v3), ("pid_v2", pid_v2), ("sps_pkg_name", sps_pkg_name)
+            ):
+                if value:
+                    params[field] = value
+                    query |= Q(**{field: value})
+
+            if not params:
+                raise ValueError("SPSPkg._get_or_create requires package identifiers")
+
+            candidates = list(cls.objects.filter(ppx_id__isnull=True).filter(query))
+            if len(candidates) > 1 and any(
+                any(getattr(item, field) != value for field, value in params.items())
+                for item in candidates
+            ):
+                raise cls.MultipleObjectsReturned(
+                    "Conflicting package identifiers: {}".format(
+                        [item.pk for item in candidates]
+                    )
+                )
+            obj = candidates[0] if candidates else cls(creator=user)
+
+        obj.sps_pkg_name = sps_pkg_name
         obj.pid_v3 = pid_v3
         obj.pid_v2 = pid_v2
         obj.registered_in_core = registered_in_core
         obj.updated_by = user
+        obj.ppx_id = ppx_id
         obj.save()
+
         return obj
 
     @classmethod
@@ -510,6 +541,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
     @property
     def data(self):
         return dict(
+            sps_pkg_name=self.sps_pkg_name,
+            pid_v3=self.pid_v3,
+            pid_v2=self.pid_v2,
+            ppx_id=self.ppx_id,
             is_complete=self.is_complete,
             registered_in_core=self.registered_in_core,
             valid_texts=self.valid_texts,
@@ -580,9 +615,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 obj = cls._get_or_create(
                     user=user,
                     pid_v3=response["v3"],
-                    sps_pkg_name=response["pkg_name"],
+                    sps_pkg_name=xml_with_pre.sps_pkg_name,
                     registered_in_core=response.get("registered_in_core"),
                     pid_v2=response["v2"],
+                    ppx_id=response.get("ppx_id"),
                 )
 
                 if response.get("changed"):
@@ -926,6 +962,52 @@ class SPSPkg(CommonControlField, ClusterableModel):
         # em caso de data incompleta, tenta retornar a data completa, completando com 06 o mes ausente e com 15 o dia ausente
         return xml_with_pre.get_complete_publication_date()
     
+    def add_ppx(self, user, save=False):
+        responses = list(pid_provider_app.is_registered_xml_zip(self.file.path))
+        if len(responses) != 1:
+            return {"error": "Expected exactly one registered XML", "total_results": len(responses)}
+        response = responses[0]
+        if response.get("error_type") or not response.get("ppx_id"):
+            return {
+                "error": response.get("error_msg") or "Unable to identify package XML",
+                "error_type": response.get("error_type"),
+                "event_status": response.get("event_status"),
+            }
+        if self.ppx_id and self.ppx_id != response["ppx_id"]:
+            return {"error": "Package already linked to another PID record"}
+
+        self.ppx_id = response["ppx_id"]
+        self.updated_by = user
+        if save:
+            type(self).objects.filter(pk=self.pk).update(ppx_id=self.ppx_id, updated_by=user)
+        return {}
+
+    @classmethod
+    def complete_ppx(cls, user, sps_pkg_id_list=None, pkg_name_substr=None, pid_v2_subst=None):
+        query = Q()
+        if sps_pkg_id_list:
+            query |= Q(pk__in=sps_pkg_id_list)
+        if pkg_name_substr:
+            query |= Q(sps_pkg_name__contains=pkg_name_substr)
+        if pid_v2_subst:
+            query |= Q(pid_v2__contains=pid_v2_subst)
+        if query == Q():
+            raise ValueError("SPSPkg.complete_ppx requires an explicit scope")
+
+        response = {"success": [], "failures": []}
+        for package in cls.objects.filter(query, ppx__isnull=True).iterator():
+            try:
+                result = package.add_ppx(user, save=True)
+                if result.get("error"):
+                    response["failures"].append(dict(result, sps_pkg_id=package.pk))
+                else:
+                    response["success"].append(package.pk)
+            except Exception:
+                response["failures"].append({
+                    "sps_pkg_id": package.pk, "error": traceback.format_exc()
+                })
+        return response
+
     @classmethod
     def complete_pid_v2(cls, user, sps_pkg_id_list=None):
         filters = {

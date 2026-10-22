@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, models
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -20,7 +20,7 @@ from migration.models import ClassicWebsiteConfiguration
 from article.page_checker import check_url, check_content, format_url, format_classic_url
 from article.forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
 from collection.choices import PUBLIC
-from collection.models import Language, Collection
+from collection.models import Language, Collection, WebSiteConfiguration
 from core.models import CommonControlField, HTMLTextModel
 from doi.models import DOIWithLang
 from issue.models import TOC, Issue, TocSection
@@ -307,8 +307,10 @@ class Article(ClusterableModel, CommonControlField):
     # ── get / dedup ──
 
     @classmethod
-    def get(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None):
+    def get(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, sps_pkg=None):
         params = {}
+        if sps_pkg:
+            params["sps_pkg"] = sps_pkg
         if pid_v2:
             params["pid_v2"] = pid_v2
         if pid_v3:
@@ -317,7 +319,7 @@ class Article(ClusterableModel, CommonControlField):
             params["sps_pkg__sps_pkg_name"] = sps_pkg_name
 
         if not params:
-            raise ValueError("Article.get requires pid_v3 or pid_v2 or sps_pkg_name")
+            raise ValueError("Article.get requires sps_pkg, pid_v3, pid_v2 or sps_pkg_name")
         
         return cls.objects.get(**params)
     
@@ -354,30 +356,20 @@ class Article(ClusterableModel, CommonControlField):
     @classmethod
     def create_or_update(cls, user, sps_pkg, issue=None, journal=None, position=None):
         if not sps_pkg:
-            raise ValueError("create_article requires sps_pkg with pid_v2")
+            raise ValueError("create_article requires sps_pkg")
 
         xml_with_pre = sps_pkg.xml_with_pre
         if not xml_with_pre:
             raise ValueError(f"SPSPkg {sps_pkg} is missing xml_with_pre")
 
-        pid_v2 = xml_with_pre.v2
-        pid_v3 = sps_pkg.pid_v3
-        if not pid_v2:
-            raise ValueError(f"SPSPkg {sps_pkg} xml_with_pre is missing pid_v2")
-
         try:
-            try:
-                name_list = xml_with_pre.pkg_name_variations
-            except AttributeError:
-                name_list = [xml_with_pre.sps_pkg_name]
-                name_list.extend(xml_with_pre.deprecated_sps_pkg_name_list)
-            obj = cls.get_first(sps_pkg.sps_pkg_name, pid_v2, pid_v3, delete=True, name_list=name_list)
+            obj = cls.get(sps_pkg=sps_pkg)
         except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
 
-        obj.pid_v3 = pid_v3
-        obj.pid_v2 = pid_v2
+        obj.pid_v3 = sps_pkg.pid_v3
+        obj.pid_v2 = sps_pkg.pid_v2
         obj.sps_pkg = sps_pkg
         obj.article_type = xml_with_pre.xmltree.find(".").get("article-type")
 
@@ -414,15 +406,19 @@ class Article(ClusterableModel, CommonControlField):
                 logging.exception(e)
 
     def add_pp_xml(self, save=False):
-        if not self.pp_xml:
+        if self.sps_pkg_id and self.sps_pkg.ppx_id:
+            self.pp_xml = self.sps_pkg.ppx
+        elif not self.pp_xml:
             try:
                 self.pp_xml = PidProviderXML.get_by_pid_v3(pid_v3=self.pid_v3)
             except PidProviderXML.DoesNotExist:
-                pass
-            else:
-                if save:
-                    self.save()
-                return self
+                return
+        else:
+            return
+
+        if save:
+            self.save()
+        return self
 
     def add_related_item(self, target_doi, target_article_type):
         self.save()
@@ -751,15 +747,15 @@ class Article(ClusterableModel, CommonControlField):
         items = []
         if not force_update:
             force_update = self.pages.filter(url__startswith="None").exists()
-        if not list(self.webpages) or not self.article_collections.exists() or force_update:
-            try:
-                for journal_proc in self.journal.journalproc_set.all():
-                    collection = journal_proc.collection
-                    art_col = ArticleCollection.get_or_create(user, self, collection)
+        try:
+            for journal_proc in self.journal.journalproc_set.all():
+                collection = journal_proc.collection
+                art_col = ArticleCollection.get_or_create(user, self, collection)
+                if force_update or art_col.is_stale():
                     art_col.create_or_update_pages(user)
-                    items.append(art_col)
-            except Exception as e:
-                logging.exception(e)
+                items.append(art_col)
+        except Exception as e:
+            logging.exception(e)
         return items
 
     # ── Convenience: acesso a ArticleCollection ──
@@ -914,7 +910,35 @@ class Article(ClusterableModel, CommonControlField):
         )
 
     @classmethod
-    def exclude_invalid_records(cls, user, issue, sps_pkg_id_list, timeout=None):
+    def complete_sps_pkg_ppx(cls, user, issue):
+        response = {"success": [], "failures": []}
+        articles = cls.objects.filter(
+            issue=issue, sps_pkg__ppx__isnull=True,
+            sps_pkg__isnull=False, pp_xml__isnull=False,
+        ).select_related("sps_pkg", "pp_xml")
+        for article in articles:
+            try:
+                if not article.pp_xml.xml_with_pre:
+                    continue
+                package = article.sps_pkg
+                if cls.objects.filter(sps_pkg=package, pp_xml__isnull=False).exclude(
+                    pp_xml_id=article.pp_xml_id
+                ).exists():
+                    raise ValueError("Conflicting article/PID links")
+                SPSPkg.objects.filter(pk=package.pk, ppx__isnull=True).update(
+                    ppx_id=article.pp_xml_id, updated_by=user
+                )
+                response["success"].append(package.pk)
+            except Exception:
+                response["failures"].append({
+                    "sps_pkg_id": article.sps_pkg_id, "error": traceback.format_exc()
+                })
+        return response
+
+    @classmethod
+    def exclude_invalid_records(cls, user, issue, sps_pkg_id_list=None, timeout=None, *, delete=False):
+        if not delete:
+            return {"total_deleted_items": 0}
         try:
             return cls._exclude_invalid_records(user, issue, sps_pkg_id_list, timeout)
         except Exception as e:
@@ -998,7 +1022,7 @@ class Article(ClusterableModel, CommonControlField):
                 
                 for item in duplicados:
                     try:
-                        item.create_or_update_article_collections(user)
+                        item.create_or_update_article_collections(user, force_update=True)
                         item.check_availability(user, force_update=True, timeout=timeout)
                         for coll in item.article_collections:
                             response = item.available_on_public_website(coll.collection)
@@ -1294,6 +1318,16 @@ class ArticleCollection(CommonControlField):
 
     # ── Helpers de configuração ──
 
+    def is_stale(self):
+        """Detecta páginas ausentes ou configuração habilitada mais recente."""
+        if not self.pages.exists():
+            return True
+
+        latest_config_update = WebSiteConfiguration.objects.filter(
+            collection=self.collection, enabled=True
+        ).aggregate(Max("updated"))["updated__max"]
+        return bool(latest_config_update) and latest_config_update > self.updated
+
     @property
     def classic_website(self):
         """ClassicWebsiteConfiguration da coleção, se existir."""
@@ -1314,8 +1348,6 @@ class ArticleCollection(CommonControlField):
         Substitui os antigos create_or_update_websites() +
         create_or_update_classic_website_pages().
         """
-        from collection.models import WebSiteConfiguration
-
         article = self.article
         existing_ids = set()
 
@@ -1355,7 +1387,9 @@ class ArticleCollection(CommonControlField):
 
         # Remove páginas órfãs
         self.pages.exclude(id__in=existing_ids).delete()
-       
+
+        self.save(update_fields=["updated"])
+
     @property
     def pages(self):
         return ArticleWebPage.objects.filter(
