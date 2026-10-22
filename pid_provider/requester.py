@@ -93,9 +93,7 @@ class PidRequester(BasePidProvider):
             "v2": xml_with_pre.v2,
             "aop_pid": xml_with_pre.aop_pid,
         }
-        registered = PidRequester.get_registration_demand(
-            user, article_proc, xml_with_pre
-        )
+        registered = PidRequester.get_registration_demand(user, article_proc, xml_with_pre)
         if registered.get("error_type"):
             return registered
 
@@ -103,8 +101,8 @@ class PidRequester(BasePidProvider):
         remote_response = self.remote_registration(
             user, article_proc, xml_with_pre, registered
         )
-        if registered.get("error_type"):
-            return registered
+        if remote_response.get("error_type"):
+            return remote_response
 
         # Atualiza registro de Upload
         local_response = self.local_registration(
@@ -117,8 +115,8 @@ class PidRequester(BasePidProvider):
             is_published,
             origin,
         )
-        if registered.get("error_type"):
-            return registered
+        if local_response.get("error_type"):
+            return local_response
 
         registered["xml_with_pre"] = xml_with_pre
         registered["filename"] = name
@@ -242,6 +240,10 @@ class PidRequester(BasePidProvider):
                     origin=origin,
                     registered_in_core=registered.get("registered_in_core"),
                 )
+                if resp.get("error_type"):
+                    op.finish(user, completed=False, detail=resp)
+                    return resp
+
                 resp["registered_in_upload"] = bool(resp.get("v3"))
                 resp["synchronized"] = registered.get("registered_in_core") and bool(
                     resp.get("v3")

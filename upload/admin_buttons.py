@@ -2,7 +2,9 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from upload import choices
-from upload.permissions import ASSIGN_PACKAGE, FINISH_DEPOSIT
+from upload.authorization import user_can_act_on_package
+from upload.permissions import FINISH_DEPOSIT, PUBLISH_PACKAGE, REQUEST_CORRECTION
+from upload.publication_status import PUBLICATION_FAILED, publication_situation
 
 
 def get_package_action_buttons(
@@ -16,29 +18,38 @@ def get_package_action_buttons(
 
     buttons = []
     query = f"?package_id={package.pk}"
+    if package.status in (
+        choices.PS_PENDING_CORRECTION,
+        choices.PS_PENDING_QA_DECISION,
+        choices.PS_VALIDATED_WITH_ERRORS,
+        choices.PS_PREVIEW,
+        choices.PS_READY_TO_PREVIEW,
+        choices.PS_READY_TO_PUBLISH,
+        choices.PS_PUBLISHED,
+    ) and user_can_act_on_package(user, REQUEST_CORRECTION, package):
+        buttons.append(
+            button_class(
+                _("Decisions"),
+                icon_name="tasks",
+                url=reverse(
+                    "wagtailsnippets_upload_readytopublishpackage:edit",
+                    args=[package.pk],
+                ),
+                priority=30,
+            )
+        )
 
     if (
         include_finish_deposit
         and package.status == choices.PS_VALIDATED_WITH_ERRORS
-        and user.has_perm(f"upload.{FINISH_DEPOSIT}")
+        and user_can_act_on_package(user, FINISH_DEPOSIT, package)
     ):
         buttons.append(
             button_class(
-                _("Finish deposit"),
+                _("Submit validation responses"),
+                icon_name="check",
                 url=reverse("upload:finish_deposit") + query,
                 priority=40,
-            )
-        )
-
-    if package.status in (
-        choices.PS_PENDING_QA_DECISION,
-        choices.PS_VALIDATED_WITH_ERRORS,
-    ) and user.has_perm(f"upload.{ASSIGN_PACKAGE}"):
-        buttons.append(
-            button_class(
-                _("Accept / Reject the package or delegate it"),
-                url=reverse("upload:assign") + query,
-                priority=50,
             )
         )
 
@@ -48,9 +59,48 @@ def get_package_action_buttons(
         buttons.append(
             button_class(
                 _("Archive"),
+                icon_name="history",
                 url=reverse("upload:archive_package") + query,
                 priority=60,
             )
         )
 
+    if package.status in (choices.PS_READY_TO_PREVIEW, choices.PS_READY_TO_PUBLISH):
+        purpose = "PUBLIC" if package.status == choices.PS_READY_TO_PUBLISH else "QA"
+        if (
+            user_can_act_on_package(user, PUBLISH_PACKAGE, package)
+            and publication_situation(package, purpose)["state"] == PUBLICATION_FAILED
+        ):
+            buttons.append(
+                button_class(
+                    _("Retry publication"),
+                    icon_name="rotate",
+                    url=reverse("upload:retry_publication") + query,
+                    priority=35,
+                )
+            )
+
     return buttons
+
+
+def get_package_website_links(package):
+    if not package.article_id:
+        return []
+    links = []
+    for purpose, status in (
+        ("QA", package.qa_ws_status),
+        ("PUBLIC", package.public_ws_status),
+    ):
+        if status != choices.PUBLISHED:
+            continue
+        page = next(
+            (
+                page
+                for page in package.article.pages.all()
+                if page.purpose == purpose and page.fmt == "html" and page.url
+            ),
+            None,
+        )
+        if page:
+            links.append({"label": purpose, "url": page.url})
+    return links

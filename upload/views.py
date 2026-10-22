@@ -1,21 +1,32 @@
 import logging
+from functools import partial
 
 from django.contrib import messages
+from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.html import format_html
+from django.utils.http import content_disposition_header
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.widgets import Button
 from wagtail.snippets.views.snippets import CreateView
 
 from collection.choices import WEBSITE_KIND
-from core.users.permission_policies import TeamScopedEditView, TeamScopedInspectView
-from upload.admin_buttons import get_package_action_buttons
-from upload.models import Package, PkgValidationResult, choices
+from core.users.permission_policies import TeamScopedEditView
+from upload.authorization import user_can_act_on_package
+from upload.models import Package, UploadProcResult, choices
 from upload.permissions import (
     ASSIGN_PACKAGE,
     FINISH_DEPOSIT,
     PUBLISH_PACKAGE,
     REPUBLISH_PACKAGE,
+    REQUEST_CORRECTION,
+)
+from upload.publication_status import (
+    PUBLICATION_ATTEMPT_PREFIX,
+    PUBLICATION_FAILED,
+    PUBLICATION_QUEUED,
+    publication_situation,
 )
 from upload.querysets import get_scoped_package_queryset
 from upload.tasks import (
@@ -23,7 +34,6 @@ from upload.tasks import (
     task_republish_articles,
     task_upload_workflow_publish_article,
 )
-from upload.utils import package_utils
 from upload.utils.package_utils import render_html
 
 
@@ -40,61 +50,43 @@ class PackageZipCreateView(CreateView):
             return HttpResponseRedirect(self.get_success_url())
 
         pkg_zip = form.save_all(self.request.user)
-        task_receive_packages.apply_async(
-            kwargs=dict(
-                user_id=self.request.user.id,
-                pkg_zip_id=pkg_zip.id,
+        transaction.on_commit(
+            partial(
+                task_receive_packages.apply_async,
+                kwargs=dict(
+                    user_id=self.request.user.id,
+                    pkg_zip_id=pkg_zip.id,
+                ),
             )
         )
-        if pkg_zip.show_package_validations:
-            return redirect(f"/admin/snippets/upload/package/?q={pkg_zip.name}")
+        documents_url = reverse("wagtailsnippets_upload_package:list")
+        messages.success(
+            self.request,
+            format_html(
+                '{} <a href="{}?pkg_zip_id={}">{}</a>',
+                _(
+                    "Package received. Processing runs in the background. "
+                    "Follow its progress in Document tracking."
+                ),
+                documents_url,
+                pkg_zip.pk,
+                _("View documents"),
+            ),
+        )
 
         return HttpResponseRedirect(self.get_success_url())
 
 
-class PackageAdminInspectView(TeamScopedInspectView):
-    def get_header_more_buttons(self):
-        buttons = super().get_header_more_buttons()
-        buttons.extend(
-            get_package_action_buttons(
-                self.request.user,
-                self.object,
-                Button,
-                include_finish_deposit=self.model is Package,
-            )
-        )
-
-        return sorted(buttons)
-
-    def get_context_data(self, **kwargs):
-        blocking_errors = list(
-            PkgValidationResult.objects.filter(
-                report__package=self.object,
-                status=choices.VALIDATION_RESULT_BLOCKING,
-            ).values_list("message", flat=True)
-        )
-        data = {
-            "pkg_zip_name": self.object.pkg_zip.name,
-            "linked": self.object.linked.all(),
-            "validation_results": {},
-            "package_id": self.object.id,
-            "original_pkg": self.object.file.name,
-            "status": self.object.status,
-            "category": self.object.category,
-            "languages": package_utils.get_languages(self.object.file.name),
-            "pdfs": [],
-            "reports": list(self.object.reports),
-            "xml_error_reports": list(self.object.xml_error_reports),
-            "xml_info_reports": list(self.object.xml_info_reports),
-            "summary": self.object.summary,
-            "xml": self.object.xml,
-            "blocking_errors": blocking_errors,
-        }
-
-        return super().get_context_data(**data)
-
-
 class XMLInfoReportEditView(TeamScopedEditView):
+    def get_success_url(self):
+        return self.get_package_url()
+
+    def get_breadcrumbs_items(self):
+        items = super().get_breadcrumbs_items()
+        items.insert(-1, {"url": self.get_package_url(), "label": _("Document")})
+
+        return items
+
     def form_valid(self, form):
         form.save_all(self.request.user)
 
@@ -107,26 +99,37 @@ class XMLInfoReportEditView(TeamScopedEditView):
 
     def get_package_url(self):
         report = self.object
-        return f"/admin/snippets/upload/package/inspect/{report.package.id}/?#xi"
+        return (
+            reverse("wagtailsnippets_upload_package:inspect", args=[report.package_id])
+            + "?tab=validations#xi"
+        )
 
 
 class ValidationReportEditView(XMLInfoReportEditView):
     def get_package_url(self):
         report = self.object
-        return f"/admin/snippets/upload/package/inspect/{report.package.id}/?#vr{report.id}"
+        return (
+            reverse("wagtailsnippets_upload_package:inspect", args=[report.package_id])
+            + f"?tab=validations#vr{report.id}"
+        )
 
 
 class XMLErrorReportEditView(XMLInfoReportEditView):
     def get_package_url(self):
         report = self.object
-        return f"/admin/snippets/upload/package/inspect/{report.package.id}/?#xer{report.id}"
+        return (
+            reverse("wagtailsnippets_upload_package:inspect", args=[report.package_id])
+            + f"?tab=validations#xer{report.id}"
+        )
 
 
 class PackageDecisionMixin:
-    success_message = _("The decision was executed as planned")
-    error_message = _("There was an impediment to executing the decision.")
+    success_message = _("Decision recorded successfully")
+    error_message = _("Unable to complete the operation. Check the form and try again.")
     permission_error_message = _("Operation not available")
-    required_permission = None
+
+    def get_success_url(self):
+        return reverse("wagtailsnippets_upload_package:inspect", args=[self.object.pk])
 
     def get_task_function(self):
         return task_upload_workflow_publish_article
@@ -137,14 +140,21 @@ class PackageDecisionMixin:
         )
 
     def form_valid(self, form):
-        if not self.request.user.has_perm(f"upload.{self.required_permission}"):
+        decision = form.cleaned_data.get("qa_decision")
+        if decision == choices.PS_PENDING_CORRECTION:
+            permission = REQUEST_CORRECTION
+        elif decision == choices.PS_PENDING_QA_DECISION:
+            permission = ASSIGN_PACKAGE
+        else:
+            permission = PUBLISH_PACKAGE
+        if not user_can_act_on_package(self.request.user, permission, form.instance):
             messages.error(self.request, self.permission_error_message)
             return HttpResponseRedirect(self.get_success_url())
 
         package = form.save_all(self.request.user)
 
         force_journal_publication = form.cleaned_data.get("force_journal_publication")
-        if not package.journal:
+        if permission == PUBLISH_PACKAGE and not package.journal:
             messages.error(
                 self.request,
                 _(
@@ -154,7 +164,7 @@ class PackageDecisionMixin:
             return HttpResponseRedirect(self.get_success_url())
 
         force_issue_publication = form.cleaned_data.get("force_issue_publication")
-        if not package.issue:
+        if permission == PUBLISH_PACKAGE and not package.issue:
             messages.error(
                 self.request,
                 _(
@@ -176,27 +186,88 @@ class PackageDecisionMixin:
 
 
 class QAPackageEditView(PackageDecisionMixin, TeamScopedEditView):
-    required_permission = ASSIGN_PACKAGE
+    pass
 
 
 class ReadyToPublishPackageEditView(PackageDecisionMixin, TeamScopedEditView):
-    required_permission = PUBLISH_PACKAGE
-    success_message = _("Article successfully published")
-    error_message = _("Failed to publish the article. Please try again.")
+    pass
+
+
+@transaction.atomic
+def retry_publication(request):
+    if not request.user.has_perm(f"upload.{PUBLISH_PACKAGE}"):
+        messages.error(request, _("Operation not available"))
+        return redirect("wagtailsnippets_upload_package:list")
+
+    package_id = request.POST.get("package_id") or request.GET.get("package_id")
+    package = get_object_or_404(
+        Package.objects.filter(
+            pk__in=get_scoped_package_queryset(request.user, PUBLISH_PACKAGE).values(
+                "pk"
+            ),
+        ).select_for_update(),
+        pk=package_id,
+    )
+    destination = reverse("wagtailsnippets_upload_package:inspect", args=[package.pk])
+    purpose = "PUBLIC" if package.status == choices.PS_READY_TO_PUBLISH else "QA"
+    if (
+        package.status not in (choices.PS_READY_TO_PREVIEW, choices.PS_READY_TO_PUBLISH)
+        or publication_situation(package, purpose)["state"] != PUBLICATION_FAILED
+    ):
+        messages.error(
+            request, _("No failed publication attempt is available to retry.")
+        )
+        return redirect(destination)
+
+    if request.method != "POST":
+        return render(
+            request,
+            "upload/admin/package/confirm_action.html",
+            {
+                "title": _("Retry publication"),
+                "message": _(
+                    "Retry the failed publication using the existing authorization. The document and its validation results will be preserved."
+                ),
+                "submit_label": _("Retry publication"),
+                "package": package,
+                "cancel_url": destination,
+            },
+        )
+
+    attempt = UploadProcResult.create(
+        request.user,
+        package,
+        f"{PUBLICATION_ATTEMPT_PREFIX} {[purpose]}",
+    )
+    attempt.detail = {"state": PUBLICATION_QUEUED, "websites": [purpose]}
+    attempt.save(update_fields=["detail"])
+    transaction.on_commit(
+        partial(
+            task_upload_workflow_publish_article.apply_async,
+            kwargs={
+                "user_id": request.user.pk,
+                "username": request.user.username,
+                "upload_package_id": package.pk,
+                "websites": [purpose],
+            },
+        )
+    )
+    messages.success(request, _("Publication retry scheduled."))
+    return redirect(destination)
 
 
 def finish_deposit(request):
     if not request.user.has_perm(f"upload.{FINISH_DEPOSIT}"):
         messages.error(request, _("Operation not available"))
-        return redirect("/admin/snippets/upload/package/")
+        return redirect("wagtailsnippets_upload_package:list")
 
     package_id = request.POST.get("package_id") or request.GET.get("package_id")
     if not package_id:
         messages.error(request, _("Package not informed"))
-        return redirect("/admin/snippets/upload/package/")
+        return redirect("wagtailsnippets_upload_package:list")
 
     package = get_object_or_404(
-        get_scoped_package_queryset(request.user),
+        get_scoped_package_queryset(request.user, FINISH_DEPOSIT),
         pk=package_id,
     )
 
@@ -205,26 +276,30 @@ def finish_deposit(request):
             request,
             "upload/admin/package/confirm_action.html",
             {
-                "title": _("Finish deposit"),
-                "message": _("Confirm finishing the deposit for package '{}'?").format(
-                    package
+                "title": _("Submit validation responses"),
+                "message": _(
+                    "The ZIP has already been received. Submit the validation responses to determine whether the document needs corrections or can proceed with processing."
                 ),
-                "submit_label": _("Finish deposit"),
+                "submit_label": _("Submit validation responses"),
                 "package": package,
-                "cancel_url": (f"/admin/snippets/upload/package/inspect/{package_id}/"),
+                "cancel_url": reverse(
+                    "wagtailsnippets_upload_package:inspect", args=[package_id]
+                ),
             },
         )
 
     if package.finish_deposit(task_upload_workflow_publish_article):
-        messages.success(request, _("Package has been deposited"))
-        return redirect("/admin/snippets/upload/package/")
+        messages.success(
+            request, _("Validation responses processed. Check the document status.")
+        )
+        return redirect("wagtailsnippets_upload_package:list")
 
     if not package.is_error_review_finished:
         messages.error(
             request,
             _("The XML package needs review and comment"),
         )
-        return redirect(f"/admin/snippets/upload/package/inspect/{package_id}/")
+        return redirect("wagtailsnippets_upload_package:inspect", pk=package_id)
 
     if not package.is_acceptable_package:
         messages.error(
@@ -236,7 +311,7 @@ def finish_deposit(request):
             _("Correct package based on report and resubmit"),
         )
 
-    return redirect(f"/admin/snippets/upload/package/inspect/{package_id}/")
+    return redirect("wagtailsnippets_upload_package:inspect", pk=package_id)
 
 
 def download_errors(request):
@@ -265,6 +340,15 @@ def display_xml(request):
         package = get_object_or_404(
             get_scoped_package_queryset(request.user), pk=package_id
         )
+        if request.GET.get("download") == "1":
+            response = HttpResponse(
+                package.xml, content_type="application/xml; charset=utf-8"
+            )
+            response["Content-Disposition"] = content_disposition_header(
+                True,
+                f"{package.package_name}.xml",
+            )
+            return response
         return render(
             request=request,
             template_name="modeladmin/upload/package/xml.html",
@@ -301,15 +385,17 @@ def assign(request):
 
     if not user.has_perm(f"upload.{ASSIGN_PACKAGE}"):
         messages.error(request, _("You do not have permission to assign packages."))
-        return redirect("/admin/snippets/upload/package/")
+        return redirect("wagtailsnippets_upload_package:list")
 
     if not package_id:
         messages.error(request, _("Package not informed"))
-        return redirect("/admin/snippets/upload/package/")
+        return redirect("wagtailsnippets_upload_package:list")
 
-    get_object_or_404(get_scoped_package_queryset(request.user), pk=package_id)
+    get_object_or_404(
+        get_scoped_package_queryset(request.user, ASSIGN_PACKAGE), pk=package_id
+    )
 
-    return redirect(f"/admin/snippets/upload/qapackage/edit/{package_id}/")
+    return redirect("wagtailsnippets_upload_qapackage:edit", pk=package_id)
 
 
 def archive_package(request):
@@ -317,12 +403,12 @@ def archive_package(request):
 
     if not user.has_perm("upload.change_package"):
         messages.error(request, _("You do not have permission to archive packages."))
-        return redirect("/admin/snippets/upload/package/")
+        return redirect("wagtailsnippets_upload_package:list")
 
     package_id = request.POST.get("package_id") or request.GET.get("package_id")
     if not package_id:
         messages.error(request, _("Package not informed"))
-        return redirect("/admin/snippets/upload/package/")
+        return redirect("wagtailsnippets_upload_package:list")
 
     package = get_object_or_404(
         get_scoped_package_queryset(request.user),
@@ -338,7 +424,7 @@ def archive_package(request):
                 "message": _("Confirm archiving package '{}'?").format(package),
                 "submit_label": _("Archive"),
                 "package": package,
-                "cancel_url": "/admin/snippets/upload/package/",
+                "cancel_url": reverse("wagtailsnippets_upload_package:list"),
             },
         )
 
@@ -352,7 +438,7 @@ def archive_package(request):
             _("Unable to archive package which status = {}.").format(package.status),
         )
 
-    return redirect("/admin/snippets/upload/package/")
+    return redirect("wagtailsnippets_upload_package:list")
 
 
 def republish_selected(request):
@@ -363,7 +449,7 @@ def republish_selected(request):
     """
     if not request.user.has_perm(f"upload.{REPUBLISH_PACKAGE}"):
         messages.error(request, _("Operation not available"))
-        return redirect("/admin/snippets/upload/readytopublishpackage/")
+        return redirect("wagtailsnippets_upload_package:list")
 
     if request.method == "POST":
         website_kind = request.POST.get("website_kind") or None
@@ -374,16 +460,16 @@ def republish_selected(request):
 
         if not package_ids:
             messages.error(request, _("No packages selected."))
-            return redirect("/admin/snippets/upload/readytopublishpackage/")
+            return redirect("wagtailsnippets_upload_package:list")
 
         scoped_ids = set(
-            get_scoped_package_queryset(request.user)
+            get_scoped_package_queryset(request.user, REPUBLISH_PACKAGE)
             .filter(pk__in=package_ids)
             .values_list("pk", flat=True)
         )
         if scoped_ids != set(package_ids):
             messages.error(request, _("One or more packages are outside your scope."))
-            return redirect("/admin/snippets/upload/readytopublishpackage/")
+            return redirect("wagtailsnippets_upload_package:list")
 
         task_republish_articles.delay(
             username=request.user.username,
@@ -398,23 +484,23 @@ def republish_selected(request):
             )
             % {"count": len(package_ids), "website": website_kind or _("all")},
         )
-        return redirect("/admin/snippets/upload/readytopublishpackage/")
+        return redirect("wagtailsnippets_upload_package:list")
 
     package_ids_raw = request.GET.get("package_ids", "")
     package_ids = [pk for pk in package_ids_raw.split(",") if pk.strip().isdigit()]
 
     if not package_ids:
         messages.error(request, _("No packages selected."))
-        return redirect("/admin/snippets/upload/readytopublishpackage/")
+        return redirect("wagtailsnippets_upload_package:list")
 
     scoped_ids = set(
-        get_scoped_package_queryset(request.user)
+        get_scoped_package_queryset(request.user, REPUBLISH_PACKAGE)
         .filter(pk__in=package_ids)
         .values_list("pk", flat=True)
     )
     if scoped_ids != {int(pk) for pk in package_ids}:
         messages.error(request, _("One or more packages are outside your scope."))
-        return redirect("/admin/snippets/upload/readytopublishpackage/")
+        return redirect("wagtailsnippets_upload_package:list")
 
     return render(
         request,
@@ -425,3 +511,12 @@ def republish_selected(request):
             "package_count": len(package_ids),
         },
     )
+
+
+def redirect_upload_url(request, model_name, subpath):
+    url = reverse(f"wagtailsnippets_upload_{model_name}:list") + subpath
+    query = request.META.get("QUERY_STRING")
+    if query:
+        url += "?" + query
+
+    return redirect(url, preserve_request=request.method not in ("GET", "HEAD"))

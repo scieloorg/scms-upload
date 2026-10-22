@@ -1,18 +1,20 @@
 from django.urls import path
 
-from .views import (
+from upload.views import (
+    archive_package,
     assign,
-    download_errors,
     display_xml,
+    download_errors,
     finish_deposit,
     preview_document,
-    archive_package,
     republish_selected,
+    retry_publication,
 )
 
 app_name = "upload"
 
 urlpatterns = [
+    path("retry-publication", view=retry_publication, name="retry_publication"),
     path("assign", view=assign, name="assign"),
     path("preview-document", view=preview_document, name="preview_document"),
     path("finish", view=finish_deposit, name="finish_deposit"),

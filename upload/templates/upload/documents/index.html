@@ -1,0 +1,25 @@
+{% extends "wagtailsnippets/snippets/index.html" %}
+
+{% load i18n static %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'upload/css/documents.css' %}">
+{% endblock %}
+
+{% block listing %}
+    <nav class="nice-padding" aria-label="{% trans 'Document queues' %}">
+        <ul class="document-queues">
+            {% for queue in document_queues %}
+                <li>
+                    <a href="{{ queue.url }}"
+                       class="button button-small{% if not queue.selected %} button-secondary{% endif %}"
+                       {% if queue.selected %}aria-current="page"{% endif %}>
+                        {{ queue.label }} ({{ queue.count }})
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {{ block.super }}
+{% endblock %}

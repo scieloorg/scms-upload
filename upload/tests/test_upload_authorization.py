@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser, Permission
 from django.test import RequestFactory, TestCase
+from django.utils.translation import gettext
 
 from collection.models import Collection
 from journal.models import Journal, JournalCollection, OfficialJournal
@@ -163,7 +164,9 @@ class UploadJournalAuthorizationTest(TestCase):
         mock_journal_checker_cls,
     ):
         mock_checker = MagicMock()
-        mock_checker.check.side_effect = lambda resp: resp.update({"journal": self.journal_mr})
+        mock_checker.check.side_effect = lambda resp: resp.update(
+            {"journal": self.journal_mr}
+        )
         mock_journal_checker_cls.from_xmltree.return_value = mock_checker
 
         mock_xml_with_pre = self._make_xml_with_pre_mock(self.journal_mr)
@@ -176,8 +179,12 @@ class UploadJournalAuthorizationTest(TestCase):
         # Comportamento observável
         self.assertEqual(response.get("package_status"), choices.PS_UNEXPECTED)
         self.assertEqual(response.get("error_level"), choices.VALIDATION_RESULT_BLOCKING)
-        self.assertIn("Materials Research", response.get("error_message"))
-        self.assertIn("not authorized", response.get("error_message").lower())
+        self.assertEqual(
+            response.get("error_message"),
+            gettext("User is not authorized to submit packages for journal '{}'.").format(
+                "Materials Research"
+            ),
+        )
 
         # Garantia de não execução das etapas posteriores
         mock_is_registered_xml.assert_not_called()
@@ -384,7 +391,7 @@ class RejectedPackageVisibilityTest(TestCase):
 
     def test_viewset_queryset_filters_correctly_for_sender(self):
         viewset = PackageViewSet()
-        request = self.factory.get("/admin/snippets/upload/package/")
+        request = self.factory.get("/admin/upload/documents/")
         request.user = self.bn_editor
 
         qs = viewset.get_queryset(request)

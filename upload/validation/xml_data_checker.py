@@ -1,15 +1,10 @@
-import sys
 import logging
+import sys
 
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from packtools.sps.validation import xml_validator as packtools_xml_data_checker
-from upload.models import (
-    XMLError,
-    XMLInfo,
-    XMLErrorReport,
-    XMLInfoReport,
-    choices,
-)
+
+from upload.models import XMLError, XMLErrorReport, XMLInfo, XMLInfoReport, choices
 
 
 class XMLDataChecker:
@@ -27,23 +22,32 @@ class XMLDataChecker:
 
     def get_journal_params(self):
         try:
-            return {
-                # "get_doi_data": callable_get_doi_data,
-                "doi_required": self.journal.doi_prefix,
-                "expected_toc_sections": self.journal.toc_sections,
-                "journal_acron": self.journal.journal_acron,
+            journal_data = {
+                "abbrev_journal_title": self.journal.short_title,
                 "publisher_name_list": self.journal.publisher_names,
-                "nlm_ta": self.journal.nlm_title,
-                "journal_license_code": self.journal.license_code,
+                "toc_sections": self.journal.toc_sections,
+                "issues": list(
+                    self.journal.issue_set.values("volume", "number", "supplement")
+                ),
             }
-        except Exception as e:
+            if self.journal.nlm_title:
+                journal_data["nlm_journal_title"] = self.journal.nlm_title
+            if self.journal.license_code:
+                journal_data["license_code"] = self.journal.license_code.lower()
+
+            return {
+                "doi_required": self.journal.doi_prefix,
+                "journal_acron": self.journal.journal_acron,
+                "journal_data": journal_data,
+            }
+        except Exception:
             return {}
 
     def create_info_report(self):
         self.info_report = XMLInfoReport.create_or_update(
             self.user,
             self.package,
-            _("XML Info Report"),
+            gettext_noop("XML Info Report"),
             choices.VAL_CAT_XML_CONTENT,
             reset_validations=False,
         )
@@ -52,7 +56,7 @@ class XMLDataChecker:
         return XMLErrorReport.create_or_update(
             self.user,
             self.package,
-            _("XML Error Report") + f': {report_name}',
+            f"{gettext_noop('XML Error Report')}: {report_name}",
             choices.VAL_CAT_XML_CONTENT,
             reset_validations=False,
         )

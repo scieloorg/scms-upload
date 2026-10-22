@@ -1,0 +1,17 @@
+.sidebar-sub-menu-panel .upload-menu-section {
+    position: relative;
+    margin-block-start: 2.25rem;
+}
+
+.sidebar-sub-menu-panel .upload-menu-section::before {
+    content: attr(data-upload-section);
+    position: absolute;
+    inset-block-start: -1.5rem;
+    inset-inline: 1rem;
+    color: var(--w-color-text-label-menus-default);
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: normal;
+    pointer-events: none;
+}

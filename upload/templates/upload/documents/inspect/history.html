@@ -1,0 +1,41 @@
+{% load i18n wagtailadmin_tags %}
+
+<section class="document-section">
+    <h2>{% trans "Decision history" %}</h2>
+
+    {% for decision in decision_history %}
+        <article class="document-event">
+            <div class="document-event-heading">
+                <time>{{ decision.created }}</time>
+                <strong>{{ decision.decision_display }}</strong>
+            </div>
+            <p>
+                {{ decision.creator }} · {% trans "Assignee" %}:
+                {{ decision.detail.assignee|default:"—" }}
+            </p>
+            <p>{{ decision.detail.comment|default:"—"|linebreaksbr }}</p>
+        </article>
+    {% empty %}
+        <p class="document-empty">{% trans "No decisions recorded." %}</p>
+    {% endfor %}
+</section>
+
+<section class="document-section">
+    <h2>{% trans "Processing events" %}</h2>
+
+    {% for event in processing_events %}
+        <details class="document-event">
+            <summary class="document-event-heading">
+                {% icon name="arrow-right" classname="document-event-toggle" %}
+                <time>{{ event.created }}</time>
+                <span>{{ event.name }}</span>
+                <span class="document-status">
+                    {% trans "Completed" %}: {{ event.completed|yesno }}
+                </span>
+            </summary>
+            <pre>{{ event.detail|pprint }}</pre>
+        </details>
+    {% empty %}
+        <p class="document-empty">{% trans "No processing events recorded." %}</p>
+    {% endfor %}
+</section>

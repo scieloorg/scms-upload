@@ -174,7 +174,8 @@ def publish_article_on_collection_websites(
         }
         resp.update(response)
         responses.append(resp)
-        return responses
+        if not qa_published:
+            return responses
         
     if PUBLIC in website_kinds:
         if not qa_published:

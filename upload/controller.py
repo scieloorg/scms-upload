@@ -1,8 +1,9 @@
-import os
 import logging
+import os
 
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from packtools.sps.pid_provider.xml_sps_lib import GetXMLItemsError, XMLWithPre
 
 from article import choices as article_choices
@@ -11,25 +12,20 @@ from issue.models import Issue
 from journal.models import Journal
 from package.models import update_zip_file
 from pid_provider.requester import PidRequester
-from proc.controller import (
-    JournalDataChecker,
-    IssueDataChecker,
-)
+from proc.controller import IssueDataChecker, JournalDataChecker
 from team.models import get_user_membership_ids
-from upload.models import (
-    Package,
-    ValidationReport,
-    choices,
-)
+from upload.models import Package, ValidationReport, choices
 from upload.utils import file_utils, xml_utils
 
 pp = PidRequester()
 
 
-class UnexpectedPackageError(Exception): ...
+class UnexpectedPackageError(Exception):
+    ...
 
 
-class PackageDataError(Exception): ...
+class PackageDataError(Exception):
+    ...
 
 
 class UploadJournalDataChecker(JournalDataChecker):
@@ -214,7 +210,7 @@ def receive_package(user, package):
                 report = ValidationReport.create_or_update(
                     user=user,
                     package=package,
-                    title=_("Package file"),
+                    title=gettext_noop("Package file"),
                     category=choices.VAL_CAT_PACKAGE_FILE,
                     reset_validations=True,
                 )
@@ -234,7 +230,7 @@ def receive_package(user, package):
             if package.article:
                 package.article.update_status()
             return response
-    except GetXMLItemsError as exc:
+    except GetXMLItemsError:
         # identifica os erros do arquivo Zip / XML
         # TODO levar este código para o packtools / XMLWithPre
         return _identify_file_error(package)
@@ -266,11 +262,11 @@ def _identify_file_error(package):
     report = ValidationReport.create_or_update(
         package.creator,
         package,
-        _("File Report"),
+        gettext_noop("File Report"),
         choices.VAL_CAT_PACKAGE_FILE,
         reset_validations=True,
     )
-    validation_result = report.add_validation_result(
+    report.add_validation_result(
         status=choices.VALIDATION_RESULT_FAILURE,
         message=message,
         data=data,
@@ -328,7 +324,7 @@ def _check_article_and_journal(package, xml_with_pre, user):
         logging.info(f"_check_xml_and_registered_data_compatibility: {response}")
         response["package_status"] = choices.PS_ENQUEUED_FOR_VALIDATION
 
-        _archive_pending_correction_package(response, name)
+        _archive_pending_correction_package(response)
         return response
     except UnexpectedPackageError as e:
         response["package_status"] = choices.PS_UNEXPECTED
@@ -354,14 +350,16 @@ def _check_package_is_expected(response, package, sps_pkg_name):
     except (Article.DoesNotExist, KeyError):
         # artigo novo, inédito no sistema
         article = None
-        params = {"name": sps_pkg_name}
+        params = {"name": sps_pkg_name, "journal": response.get("journal")}
 
     logging.info(f"_check_package_is_expected: {params}")
-    try:
-        # se o pacote anterior está pendente de correção, então é aceitável
-        previous_package = Package.objects.filter(**params).order_by("-created")[1]
-    except IndexError:
-        previous_package = None
+    previous_package = (
+        Package.objects.filter(**params)
+        .exclude(pk=package.pk)
+        .order_by("-created", "-pk")
+        .first()
+    )
+    response["previous_package_id"] = previous_package.pk if previous_package else None
 
     response["article"] = article
 
@@ -390,15 +388,11 @@ def _check_package_is_expected(response, package, sps_pkg_name):
         return
 
 
-def _archive_pending_correction_package(response, name):
-    params = {}
-    if response.get("article"):
-        params["article"] = response.get("article")
-    else:
-        params["name"] = name
-    Package.objects.filter(**params, status=choices.PS_PENDING_CORRECTION).update(
-        status=choices.PS_ARCHIVED
-    )
+def _archive_pending_correction_package(response):
+    Package.objects.filter(
+        pk=response.get("previous_package_id"),
+        status=choices.PS_PENDING_CORRECTION,
+    ).update(status=choices.PS_ARCHIVED)
 
 
 def _check_xml_and_registered_data_compatibility(

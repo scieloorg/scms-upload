@@ -1,0 +1,229 @@
+{% load i18n wagtailadmin_tags %}
+
+{% if summary.total_xml_errors or summary.total_xml_warnings or summary.critical_errors %}
+    <div class="document-actions-bar">
+        <a class="button button-small document-action"
+           href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
+            {% icon name="download" %}
+            {% trans "Download XML errors report" %}
+        </a>
+    </div>
+{% endif %}
+
+<div class="document-section">
+    <h2>{% trans "Package validations" %}</h2>
+
+    <table class="listing upload-report-table">
+        <thead>
+            <tr>
+                <th>{% trans "Name" %}</th>
+                <th>{% trans "Date" %}</th>
+                <th>{% trans "Findings" %}</th>
+                <th>{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for report in reports %}
+                <tr>
+                    <td class="title report-name"
+                        data-label="{% trans 'Name' %}">
+                        {{ report.title }}
+                    </td>
+                    <td class="report-date" data-label="{% trans 'Date' %}">
+                        <time datetime="{{ report.updated }}">
+                            <span>{{ report.updated|slice:":10" }}</span>
+                            <span>{{ report.updated|slice:"11:" }}</span>
+                        </time>
+                    </td>
+                    <td data-label="{% trans 'Findings' %}">
+                        <dl class="report-counts">
+                            <div>
+                                <dt>{% trans "Blocking issues" %}</dt>
+                                <dd>{{ report.total_blocking }}</dd>
+                            </div>
+                            <div>
+                                <dt>{% trans "Critical issues" %}</dt>
+                                <dd>{{ report.total_critical }}</dd>
+                            </div>
+                            <div>
+                                <dt>{% trans "Errors" %}</dt>
+                                <dd>{{ report.total_error }}</dd>
+                            </div>
+                            <div>
+                                <dt>{% trans "Warnings" %}</dt>
+                                <dd>{{ report.total_warning }}</dd>
+                            </div>
+                        </dl>
+                    </td>
+                    <td class="report-actions" data-label="{% trans 'Actions' %}">
+                        <span id="vr{{ report.id }}"></span>
+                        {% if report.creation == "doing" %}
+                            <a class="button button-small document-action"
+                               href="?tab=validations">
+                                {% icon name='rotate' %}
+                                {% trans "Refresh" %}
+                            </a>
+                        {% else %}
+                            <a class="button button-small document-action"
+                               href="{% url 'wagtailsnippets_upload_validationreport:edit' report.id %}">
+                                {% icon name='doc-full' %}
+                                {% trans "Open report" %}
+                            </a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="document-section">
+    <h2>{% trans "XML Validations" %}</h2>
+
+    {% if not validation_in_progress and summary.conclusion %}
+        <p class="document-review-guidance">{{ summary.conclusion }}</p>
+    {% endif %}
+    <div>
+        <div class="help-block help-warning" id="help-to-fix">
+            <svg class="icon icon-warning icon" aria-hidden="true">
+                <use href="#icon-warning"></use>
+            </svg>
+            {% trans "By default, XML errors are marked for correction. Review the report and change the response for any finding you disagree with or cannot correct. The system does not correct the XML; correct the files and resubmit the package." %}
+        </div>
+    </div>
+
+    <table class="listing upload-report-table">
+        <thead>
+            <tr>
+                <th>{% trans "Name" %}</th>
+                <th>{% trans "Date" %}</th>
+                <th>{% trans "Findings" %}</th>
+                <th>{% trans "Responses" %}</th>
+                <th>{% trans "Review" %}</th>
+                <th>{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for report in xml_error_reports %}
+                <tr>
+                    <td class="title report-name"
+                        data-label="{% trans 'Name' %}">
+                        {{ report.title }}
+                    </td>
+                    <td class="report-date" data-label="{% trans 'Date' %}">
+                        <time datetime="{{ report.updated }}">
+                            <span>{{ report.updated|slice:":10" }}</span>
+                            <span>{{ report.updated|slice:"11:" }}</span>
+                        </time>
+                    </td>
+                    <td data-label="{% trans 'Findings' %}">
+                        <dl class="report-counts">
+                            <div>
+                                <dt>{% trans "Critical issues" %}</dt>
+                                <dd>{{ report.total_critical }}</dd>
+                            </div>
+                            <div>
+                                <dt>{% trans "Errors" %}</dt>
+                                <dd>{{ report.total_error }}</dd>
+                            </div>
+                            <div>
+                                <dt>{% trans "Warnings" %}</dt>
+                                <dd>{{ report.total_warning }}</dd>
+                            </div>
+                        </dl>
+                    </td>
+                    <td data-label="{% trans 'Responses' %}">
+                        <dl class="report-counts">
+                            <div>
+                                <dt>{% trans "To correct" %}</dt>
+                                <dd>{{ report.reaction_to_fix }}</dd>
+                            </div>
+                            <div>
+                                <dt>{% trans "Contested" %}</dt>
+                                <dd>{{ report.reaction_not_to_fix }}</dd>
+                            </div>
+                            <div>
+                                <dt>{% trans "Cannot correct" %}</dt>
+                                <dd>{{ report.reaction_impossible_to_fix }}</dd>
+                            </div>
+                        </dl>
+                    </td>
+                    <td data-label="{% trans 'Review' %}">
+                        {% if report.xml_producer_ack %}
+                            {% trans "Completed" %}
+                        {% else %}
+                            {% trans "Pending" %}
+                        {% endif %}
+                    </td>
+                    <td class="report-actions" data-label="{% trans 'Actions' %}">
+                        <span id="xer{{ report.id }}"></span>
+                        {% if report.creation == "doing" %}
+                            <a class="button button-small document-action"
+                               href="?tab=validations">
+                                {% icon name='rotate' %}
+                                {% trans "Refresh" %}
+                            </a>
+                        {% else %}
+                            <a class="button button-small document-action"
+                               href="{% url 'wagtailsnippets_upload_xmlerrorreport:edit' report.id %}">
+                                {% icon name='doc-full' %}
+                                {% trans "Open report" %}
+                            </a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="document-section">
+    <h2>{% trans "XML information" %}</h2>
+
+    <table class="listing upload-report-table">
+        <thead>
+            <tr>
+                <th>{% trans "Name" %}</th>
+                <th>{% trans "Date" %}</th>
+                <th>{% trans "Validations" %}</th>
+                <th>{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for report in xml_info_reports %}
+                <tr>
+                    <td class="title report-name"
+                        data-label="{% trans 'Name' %}">
+                        {{ report.title }}
+                    </td>
+                    <td class="report-date" data-label="{% trans 'Date' %}">
+                        <time datetime="{{ report.updated }}">
+                            <span>{{ report.updated|slice:":10" }}</span>
+                            <span>{{ report.updated|slice:"11:" }}</span>
+                        </time>
+                    </td>
+                    <td data-label="{% trans 'Validations' %}">{{ report.total }}</td>
+                    <td class="report-actions" data-label="{% trans 'Actions' %}">
+                        <span id="xi"></span>
+                        <a class="button button-small document-action"
+                           href="{% url 'wagtailsnippets_upload_xmlinforeport:edit' report.id %}">
+                            {% icon name='doc-full' %}
+                            {% trans "Open report" %}
+                        </a>
+                        {% if report.file_url %}
+                            <a class="button button-small document-action"
+                               href="{{ report.file_url }}"
+                               download>
+                                {% icon name="download" %}
+                                {% trans "Download CSV" %}
+                            </a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

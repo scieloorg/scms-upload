@@ -5,6 +5,7 @@ from upload.permissions import (
     FINISH_DEPOSIT,
     PUBLISH_PACKAGE,
     REPUBLISH_PACKAGE,
+    REQUEST_CORRECTION,
 )
 
 MANAGE_ACTIONS = ("add", "change", "view")
@@ -172,6 +173,7 @@ APP_ACCESS = {
             "custom": (
                 ACCESS_PACKAGES,
                 ASSIGN_PACKAGE,
+                REQUEST_CORRECTION,
                 FINISH_DEPOSIT,
                 PUBLISH_PACKAGE,
                 REPUBLISH_PACKAGE,
@@ -192,6 +194,7 @@ APP_ACCESS = {
             "custom": (
                 ACCESS_PACKAGES,
                 ASSIGN_PACKAGE,
+                REQUEST_CORRECTION,
                 FINISH_DEPOSIT,
                 PUBLISH_PACKAGE,
                 REPUBLISH_PACKAGE,
@@ -203,11 +206,13 @@ APP_ACCESS = {
                 "*": VIEW_ACTIONS,
                 "package": ("add", "view"),
                 "packagezip": ("add", "view"),
+                "qapackage": ("change", "view"),
+                "readytopublishpackage": ("change", "view"),
                 "validationreport": ("change", "view"),
                 "xmlerrorreport": ("change", "view"),
                 "xmlinforeport": ("change", "view"),
             },
-            "custom": (ACCESS_PACKAGES, FINISH_DEPOSIT),
+            "custom": (ACCESS_PACKAGES, FINISH_DEPOSIT, REQUEST_CORRECTION, ASSIGN_PACKAGE),
         },
         TeamGroups.JOURNAL_MEMBER: {
             "access": FULL_ACCESS,
@@ -215,11 +220,13 @@ APP_ACCESS = {
                 "*": VIEW_ACTIONS,
                 "package": ("add", "view"),
                 "packagezip": ("add", "view"),
+                "qapackage": ("change", "view"),
+                "readytopublishpackage": ("change", "view"),
                 "validationreport": ("change", "view"),
                 "xmlerrorreport": ("change", "view"),
                 "xmlinforeport": ("change", "view"),
             },
-            "custom": (ACCESS_PACKAGES, FINISH_DEPOSIT),
+            "custom": (ACCESS_PACKAGES, FINISH_DEPOSIT, REQUEST_CORRECTION, ASSIGN_PACKAGE),
         },
         TeamGroups.COMPANY_ADMIN: {
             "access": FULL_ACCESS,
@@ -227,11 +234,13 @@ APP_ACCESS = {
                 "*": VIEW_ACTIONS,
                 "package": ("add", "view"),
                 "packagezip": ("add", "view"),
+                "qapackage": ("change", "view"),
+                "readytopublishpackage": ("change", "view"),
                 "validationreport": ("change", "view"),
                 "xmlerrorreport": ("change", "view"),
                 "xmlinforeport": ("change", "view"),
             },
-            "custom": (FINISH_DEPOSIT,),
+            "custom": (FINISH_DEPOSIT, REQUEST_CORRECTION, ASSIGN_PACKAGE),
         },
         TeamGroups.COMPANY_MEMBER: {
             "access": FULL_ACCESS,
@@ -239,11 +248,13 @@ APP_ACCESS = {
                 "*": VIEW_ACTIONS,
                 "package": ("add", "view"),
                 "packagezip": ("add", "view"),
+                "qapackage": ("change", "view"),
+                "readytopublishpackage": ("change", "view"),
                 "validationreport": ("change", "view"),
                 "xmlerrorreport": ("change", "view"),
                 "xmlinforeport": ("change", "view"),
             },
-            "custom": (FINISH_DEPOSIT,),
+            "custom": (FINISH_DEPOSIT, REQUEST_CORRECTION, ASSIGN_PACKAGE),
         },
     },
     "wagtailadmin": {

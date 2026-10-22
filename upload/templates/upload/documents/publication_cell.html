@@ -1,0 +1,6 @@
+{% load i18n %}
+
+<td class="document-publication">
+    <div>QA: {{ qa_publication.label|default:"—" }}</div>
+    <div>{% trans "Public" %}: {{ public_publication.label|default:"—" }}</div>
+</td>

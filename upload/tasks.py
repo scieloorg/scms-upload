@@ -1,21 +1,17 @@
-import json
 import logging
-import os
 import sys
 import traceback
 
-from celery.result import AsyncResult
-from django.db.models import Q
+from celery import chord
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from packtools.sps.validation.xml_structure import StructureValidator
-from packtools.utils import SPPackage
 
-from article import choices as article_choices
 from article.models import Article
-from collection import choices as collection_choices
-from collection.models import WebSiteConfiguration
+from collection.models import Collection, WebSiteConfiguration
 from config import celery_app
 from issue.models import Issue
 from journal.models import Journal
@@ -25,16 +21,25 @@ from proc.models import JournalProc, IssueProc
 from proc.tasks import TaskExecution
 from publication.api.issue import sync_issue
 from tracker.models import UnexpectedEvent
-from upload import choices
+from upload import choices, publication
 from upload.controller import receive_package
-from upload import publication
-from upload.models import Package, ValidationReport, PackageZip, UploadValidator
-from upload.validation.rendition_validation import validate_rendition
+from upload.models import (
+    Package,
+    PackageZip,
+    UploadProcResult,
+    UploadValidator,
+    ValidationReport,
+)
+from upload.publication_status import (
+    PUBLICATION_ATTEMPT_PREFIX,
+    PUBLICATION_FAILED,
+    PUBLICATION_PUBLISHED,
+    PUBLICATION_RUNNING,
+)
+from upload.utils import file_utils, package_utils
 from upload.validation.html_validation import validate_webpage
+from upload.validation.rendition_validation import validate_rendition
 from upload.validation.xml_data_checker import XMLDataChecker
-from upload import choices, controller, exceptions
-from upload.utils import file_utils, package_utils, xml_utils
-
 
 User = get_user_model()
 
@@ -169,12 +174,15 @@ def task_optimise_package(file_path):
 
 @celery_app.task(priority=0)
 def task_validate_assets(package_id, xml_path, package_files, xml_assets):
-
     has_errors = False
     package = Package.objects.get(pk=package_id)
 
     report = ValidationReport.create_or_update(
-        package.creator, package, _("Assets Report"), choices.VAL_CAT_ASSET, True
+        package.creator,
+        package,
+        gettext_noop("Assets Report"),
+        choices.VAL_CAT_ASSET,
+        True,
     )
 
     for asset in xml_assets:
@@ -183,7 +191,7 @@ def task_validate_assets(package_id, xml_path, package_files, xml_assets):
 
         if not is_present:
             has_errors = True
-            validation_result = report.add_validation_result(
+            report.add_validation_result(
                 status=choices.VALIDATION_RESULT_CRITICAL,
                 message=f'{asset["name"]} {_("file is mentioned in the XML but not present in the package.")}',
                 data=asset,
@@ -191,7 +199,7 @@ def task_validate_assets(package_id, xml_path, package_files, xml_assets):
             )
 
     if not has_errors:
-        validation_result = report.add_validation_result(
+        report.add_validation_result(
             status=choices.VALIDATION_RESULT_SUCCESS,
             message=_("Package has all the expected asset files"),
             data=list(xml_assets),
@@ -199,26 +207,17 @@ def task_validate_assets(package_id, xml_path, package_files, xml_assets):
         )
 
     report.finish_validations()
-    # devido às tarefas serem executadas concorrentemente,
-    # necessário verificar se todas tarefas finalizaram e
-    # então finalizar o pacote
-    package.finish_reception(task_upload_workflow_publish_article)
-    # if package.is_approved:
-    #     task_process_approved_package.apply_async(
-    #         kwargs=dict(package_id=package.id, package_status=package.status)
-    #     )
 
 
 @celery_app.task(priority=0)
 def task_validate_renditions(package_id, xml_path, package_files, xml_renditions):
-
     has_errors = False
     package = Package.objects.get(pk=package_id)
 
     report = ValidationReport.create_or_update(
         package.creator,
         package,
-        _("Renditions Report"),
+        gettext_noop("Renditions Report"),
         choices.VAL_CAT_RENDITION,
         True,
     )
@@ -227,7 +226,7 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
         is_present = xml_rendition["name"] in package_files
         if not is_present:
             has_errors = True
-            validation_result = report.add_validation_result(
+            report.add_validation_result(
                 status=choices.VALIDATION_RESULT_FAILURE,
                 message=f'{xml_rendition["lang"]} {_("language is mentioned in the XML but its PDF file not present in the package.")}',
                 data=xml_rendition,
@@ -235,7 +234,7 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
             )
 
     if not has_errors:
-        validation_result = report.add_validation_result(
+        report.add_validation_result(
             status=choices.VALIDATION_RESULT_SUCCESS,
             message=_("Package has all the expected rendition files"),
             data=list(xml_renditions),
@@ -243,33 +242,23 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
         )
 
     report.finish_validations()
-    package.finish_reception(task_upload_workflow_publish_article)
-    # devido às tarefas serem executadas concorrentemente,
-    # necessário verificar se todas tarefas finalizaram e
-    # então finalizar o pacote
-    # if package.is_approved:
-    #     task_process_approved_package.apply_async(
-    #         kwargs=dict(package_id=package.id, package_status=package.status)
-    #     )
 
 
 @celery_app.task(priority=0)
 def task_validate_renditions_content(package_id, xml_path):
-
     package = Package.objects.get(pk=package_id)
 
     report = ValidationReport.create_or_update(
         package.creator,
         package,
-        _("Renditions content report"),
+        gettext_noop("Renditions content report"),
         choices.VAL_CAT_RENDITION_CONTENT,
         True,
     )
     try:
-
         for rendition in package.renditions:
             for result in validate_rendition(rendition, package.xml_with_pre):
-                validation_result = report.add_validation_result(
+                report.add_validation_result(
                     status=choices.VALIDATION_RESULT_FAILURE,
                     message=result["message"],
                     data={"filename": rendition["name"], "lang": rendition["lang"]},
@@ -287,7 +276,6 @@ def task_validate_renditions_content(package_id, xml_path):
             },
         )
     report.finish_validations()
-    package.finish_reception(task_upload_workflow_publish_article)
 
 
 @celery_app.task(bind=True, priority=0)
@@ -322,7 +310,6 @@ def task_receive_package(self, user_id, pkg_id):
 
     logging.info(response)
     if response.get("error_level") != choices.VALIDATION_RESULT_BLOCKING:
-
         file_path = package.file.path
         journal_id = response["journal"].id
         issue_id = response["issue"].id
@@ -330,66 +317,55 @@ def task_receive_package(self, user_id, pkg_id):
 
         xml_with_pre = package.xml_with_pre
         xml_path = xml_with_pre.filename
-        name, ext = os.path.splitext(xml_path)
 
         # FIXME para nao usar o otimizado
         optimised_filepath = task_optimise_package(file_path)
         logging.info(optimised_filepath)
 
         for optimised_xml_with_pre in XMLWithPre.create(path=optimised_filepath):
-
             package_files = optimised_xml_with_pre.filenames
 
-            # Aciona validação de Assets
-            task_validate_assets.apply_async(
-                kwargs={
-                    "package_id": pkg_id,
-                    "xml_path": xml_path,
-                    "package_files": package_files,
-                    "xml_assets": list(optimised_xml_with_pre.assets),
-                },
-            )
+            validations = [
+                task_validate_assets.s(
+                    package_id=pkg_id,
+                    xml_path=xml_path,
+                    package_files=package_files,
+                    xml_assets=list(optimised_xml_with_pre.assets),
+                ),
+                task_validate_renditions.s(
+                    package_id=pkg_id,
+                    xml_path=xml_path,
+                    package_files=package_files,
+                    xml_renditions=list(optimised_xml_with_pre.renditions),
+                ),
+                task_validate_xml_structure.s(
+                    file_path=file_path,
+                    xml_path=xml_path,
+                    package_id=pkg_id,
+                    journal_id=journal_id,
+                    issue_id=issue_id,
+                    article_id=article_id,
+                ),
+                task_validate_xml_content.s(
+                    file_path=file_path,
+                    xml_path=xml_path,
+                    package_id=pkg_id,
+                    journal_id=journal_id,
+                    issue_id=issue_id,
+                    article_id=article_id,
+                ),
+                task_validate_renditions_content.s(
+                    package_id=pkg_id,
+                    xml_path=xml_path,
+                ),
+            ]
+            chord(validations)(task_finish_package_reception.si(pkg_id))
 
-            # Aciona validação de Renditions
-            task_validate_renditions.apply_async(
-                kwargs={
-                    "package_id": pkg_id,
-                    "xml_path": xml_path,
-                    "package_files": package_files,
-                    "xml_renditions": list(optimised_xml_with_pre.renditions),
-                },
-            )
 
-            task_validate_xml_structure.apply_async(
-                kwargs={
-                    "file_path": file_path,
-                    "xml_path": xml_path,
-                    "package_id": pkg_id,
-                    "journal_id": journal_id,
-                    "issue_id": issue_id,
-                    "article_id": article_id,
-                },
-            )
-
-            # Aciona validacao do conteudo do XML
-            task_validate_xml_content.apply_async(
-                kwargs={
-                    "file_path": file_path,
-                    "xml_path": xml_path,
-                    "package_id": pkg_id,
-                    "journal_id": journal_id,
-                    "issue_id": issue_id,
-                    "article_id": article_id,
-                },
-            )
-
-            # Aciona validação do conteúdo de Renditions
-            task_validate_renditions_content.apply_async(
-                kwargs={
-                    "package_id": pkg_id,
-                    "xml_path": xml_path,
-                },
-            )
+@celery_app.task(priority=0)
+def task_finish_package_reception(package_id):
+    package = Package.objects.get(pk=package_id)
+    package.finish_reception(task_upload_workflow_publish_article)
 
 
 @celery_app.task(bind=True, priority=0)
@@ -416,11 +392,15 @@ def task_validate_xml_structure(
             return
 
         report = ValidationReport.create_or_update(
-            package.creator, package, _("DTD Report"), choices.VAL_CAT_XML_FORMAT, True
+            package.creator,
+            package,
+            gettext_noop("DTD Report"),
+            choices.VAL_CAT_XML_FORMAT,
+            True,
         )
         try:
             for item in summary["dtd_errors"]:
-                validation_result = report.add_validation_result(
+                report.add_validation_result(
                     status=choices.VALIDATION_RESULT_CRITICAL,
                     message=item.message,
                     data={
@@ -430,7 +410,7 @@ def task_validate_xml_structure(
                     subject=_("XML Structure"),
                 )
             if summary["dtd_is_valid"]:
-                validation_result = report.add_validation_result(
+                report.add_validation_result(
                     status=choices.VALIDATION_RESULT_SUCCESS,
                     message=_("No error found"),
                     data=str(summary),
@@ -438,7 +418,7 @@ def task_validate_xml_structure(
                 )
         except Exception as exc:
             logging.exception(f"{exc}: {summary}")
-            validation_result = report.add_validation_result(
+            report.add_validation_result(
                 status=choices.VALIDATION_RESULT_CRITICAL,
                 message=str(exc),
                 data=str(summary),
@@ -450,14 +430,14 @@ def task_validate_xml_structure(
         report = ValidationReport.create_or_update(
             package.creator,
             package,
-            _("Style checker Report"),
+            gettext_noop("Style checker Report"),
             choices.VAL_CAT_STYLE,
             True,
         )
 
         try:
             for item in summary["style_errors"]:
-                validation_result = report.add_validation_result(
+                report.add_validation_result(
                     status=choices.VALIDATION_RESULT_FAILURE,
                     message=item.message,
                     data={
@@ -468,7 +448,7 @@ def task_validate_xml_structure(
                     subject=_("XML Style"),
                 )
             if summary["style_is_valid"]:
-                validation_result = report.add_validation_result(
+                report.add_validation_result(
                     status=choices.VALIDATION_RESULT_SUCCESS,
                     message=_("No error found"),
                     data=str(summary),
@@ -476,7 +456,7 @@ def task_validate_xml_structure(
                 )
         except Exception as exc:
             logging.exception(f"{exc}: {summary}")
-            validation_result = report.add_validation_result(
+            report.add_validation_result(
                 status=choices.VALIDATION_RESULT_CRITICAL,
                 message=str(exc),
                 data=str(summary),
@@ -484,15 +464,6 @@ def task_validate_xml_structure(
             )
 
         report.finish_validations()
-
-        # devido às tarefas serem executadas concorrentemente,
-        # necessário verificar se todas tarefas finalizaram e
-        # então finalizar o pacote
-        package.finish_reception(task_upload_workflow_publish_article)
-        # if package.is_approved:
-        #     task_process_approved_package.apply_async(
-        #         kwargs=dict(package_id=package.id)
-        #     )
 
 
 @celery_app.task(bind=True, priority=0)
@@ -517,16 +488,12 @@ def task_validate_xml_content(
         else:
             issue = None
 
-        try:
-            params = UploadValidator.get().validation_params
-        except Exception as e:
-            params = {}
+        params = UploadValidator.for_journal(journal).validation_params or {}
 
         logging.info((issue, journal))
 
         xml_data_checker = XMLDataChecker(package, journal, issue, params)
         xml_data_checker.validate()
-        package.finish_reception(task_upload_workflow_publish_article)
         operation.finish(package.creator, completed=True)
     except Exception as e:
         logging.exception(e)
@@ -552,21 +519,19 @@ def task_validate_xml_content(
 
 @celery_app.task(priority=0)
 def task_validate_webpages_content(package_id):
-
     package = Package.objects.get(pk=package_id)
 
     report = ValidationReport.create_or_update(
         package.creator,
         package,
-        _("Web page Report"),
+        gettext_noop("Web page Report"),
         choices.VAL_CAT_WEB_PAGE_CONTENT,
         True,
     )
     try:
-
         for webpage in package.htmls:
             for result in validate_webpage(webpage, package.xml_with_pre):
-                validation_result = report.add_validation_result(
+                report.add_validation_result(
                     status=choices.VALIDATION_RESULT_FAILURE,
                     message=result["message"],
                     data={"filename": webpage["name"], "lang": webpage["lang"]},
@@ -603,10 +568,11 @@ def task_upload_workflow_publish_article(
     Tarefa que publica artigos ingressados pelo Upload
     """
     try:
-
         manager = None
         if not upload_package_id:
-            raise ValueError("task_upload_workflow_publish_article requires Upload Package ID")
+            raise ValueError(
+                "task_upload_workflow_publish_article requires Upload Package ID"
+            )
 
         user = _get_user(user_id, username)
 
@@ -638,6 +604,21 @@ def task_upload_workflow_publish_article(
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
+        if manager:
+            attempt = UploadProcResult.create(
+                user,
+                manager,
+                f"{PUBLICATION_ATTEMPT_PREFIX} {websites}",
+            )
+            attempt.finish(
+                user,
+                completed=False,
+                exception=e,
+                detail={
+                    "state": PUBLICATION_FAILED,
+                    "websites": websites,
+                },
+            )
         UnexpectedEvent.create(
             item=str(manager),
             action="task_upload_workflow_publish_article",
@@ -667,25 +648,39 @@ def task_publish_article(
     Tarefa que publica artigos ingressados pelo Upload
     """
     try:
-
         article = None
         op_main = None
         responses = []
         data = {}
 
         if not upload_package_id:
-            raise ValueError("task_upload_workflow_publish_article requires Upload Package ID")
+            raise ValueError(
+                "task_upload_workflow_publish_article requires Upload Package ID"
+            )
 
         user = _get_user(user_id, username)
 
         # Obter gerenciador e informações do artigo
         manager = Package.objects.get(pk=upload_package_id)
 
+        op_main = UploadProcResult.create(
+            user,
+            manager,
+            f"{PUBLICATION_ATTEMPT_PREFIX} {websites}",
+        )
+        op_main.detail = {
+            "state": PUBLICATION_RUNNING,
+            "websites": websites,
+            "collection_id": collection_id,
+        }
+        op_main.save(update_fields=["detail"])
+
         article = manager.article
-        collection = article.article_collections.filter(collection_id=collection_id).first().collection
-    
-        # Iniciar operação principal
-        op_main = manager.start(user, f"Publish article and check availability {collection} {websites}")
+        collection = (
+            article.article_collections.filter(collection_id=collection_id)
+            .first()
+            .collection
+        )
 
         responses = publication.publish_article_on_collection_websites(
             user,
@@ -696,12 +691,20 @@ def task_publish_article(
             force_issue_publication,
         )
 
+        published = {
+            response.get("website")
+            for response in responses
+            if response.get("published")
+        }
+        completed = bool(websites) and set(websites).issubset(published)
+        data["state"] = PUBLICATION_PUBLISHED if completed else PUBLICATION_FAILED
+        data["websites"] = websites
         data["publication"] = responses
         data["availability"] = article.is_available_on_website(collection)
         logging.info(data)
         op_main.finish(
             user,
-            completed=data["availability"]["valid"],
+            completed=completed,
             exception=None,
             message_type=None,
             message=None,
@@ -716,7 +719,7 @@ def task_publish_article(
                 completed=False,
                 exception=e,
                 exc_traceback=exc_traceback,
-                detail=None,
+                detail={"state": PUBLICATION_FAILED, "websites": websites},
             )
         else:
             UnexpectedEvent.create(
@@ -832,7 +835,7 @@ def task_check_articles_availability(
         Se True, re-verifica mesmo páginas já válidas.
     """
     try:
-        user = _get_user(user_id, username)
+        _get_user(user_id, username)
         article_params = {}
         j_query = Q()
 
@@ -921,7 +924,7 @@ def task_republish_articles(
     3. Agenda task_sync_issue por IssueProc, despublicando artigos removidos.
     """
     try:
-        user = _get_user(user_id, username)
+        _get_user(user_id, username)
 
         statuses = [
             choices.PS_PREVIEW,
@@ -1144,7 +1147,7 @@ def task_exclude_invalid_articles(
         Timeout passado para cada tarefa filha.
     """
     try:
-        user = _get_user(user_id, username)
+        _get_user(user_id, username)
         issue_params = {}
 
         if publication_year:

@@ -1,16 +1,8 @@
-{% extends "modeladmin/inspect.html" %}
-{% load i18n modeladmin_tags wagtailadmin_tags wagtailcore_tags %}
+{% extends "wagtailadmin/base.html" %}
 
 {% block content %}
-<textarea>
-    
-    textarea
-    {{ xml }}
-</textarea>
-code 
-<code>
-    code
-    <article/>
-    {{ xml }}
-</code>
+    <div class="nice-padding">
+        <h1>XML</h1>
+        <textarea rows="25" readonly aria-label="XML">{{ xml }}</textarea>
+    </div>
 {% endblock %}
