@@ -62,7 +62,7 @@ def test_complete_long_text_is_saved_and_displayed(
     assert str(escape(message)) in html
     assert "<details" in html
     assert "ref-1" in html
-    assert "Approximate line: 0" in html
+    assert gettext("Approximate line: %(line)s") % {"line": 0} in html
     if result_model is XMLError:
         assert str(escape(advice)) in html
         assert "a  b" in html and "a b" in html and "aff1" in html
