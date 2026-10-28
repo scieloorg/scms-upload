@@ -1,5 +1,7 @@
 import os
+from collections import Counter
 
+from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.widgets import Button
 
@@ -7,7 +9,16 @@ from core.users.permission_policies import TeamScopedInspectView
 from upload.admin_buttons import get_package_action_buttons, get_package_website_links
 from upload.delegation import DELEGATION_EVENT
 from upload.document_workflow import work_situation
-from upload.models import Package, PkgValidationResult, choices
+from upload.models import (
+    BaseValidationReport,
+    Package,
+    PkgValidationResult,
+    XMLError,
+    XMLErrorReport,
+    XMLInfo,
+    choices,
+)
+from upload.permission_policies import UploadModelPermissionPolicy
 from upload.publication_status import publication_situation
 
 DOCUMENT_SECTIONS = (
@@ -61,10 +72,16 @@ class PackageAdminInspectView(TeamScopedInspectView):
         )
 
         summary = self.object.summary
-        validation_in_progress = (
-            self.object.status
-            in (choices.PS_SUBMITTED, choices.PS_ENQUEUED_FOR_VALIDATION)
-            or not summary["is_validation_finished"]
+        validation_in_progress = self.object.status in (
+            choices.PS_SUBMITTED,
+            choices.PS_ENQUEUED_FOR_VALIDATION,
+        ) or any(
+            reports.filter(creation=choices.REPORT_CREATION_WIP).exists()
+            for reports in (
+                self.object.validation_report,
+                self.object.xml_error_report,
+                self.object.xml_info_report,
+            )
         )
 
         data = {
@@ -99,17 +116,39 @@ class PackageAdminInspectView(TeamScopedInspectView):
             ),
         }
 
+        if active_tab in ("overview", "validations"):
+            counts = Counter()
+            for model in (PkgValidationResult, XMLError, XMLInfo):
+                for result in (
+                    model.objects.filter(report__package=self.object)
+                    .order_by()
+                    .values("status")
+                    .annotate(total=Count("pk"))
+                ):
+                    counts[result["status"]] += result["total"]
+            data["validation_total"] = sum(counts.values())
+            data["validation_counts"] = [
+                {"status": status.lower(), "label": label, "total": counts[status]}
+                for status, label in choices.VALIDATION_RESULT
+                if counts[status]
+            ]
+            data["validation_outcome"] = BaseValidationReport.validation_state(
+                counts,
+                (
+                    choices.REPORT_CREATION_WIP
+                    if validation_in_progress
+                    else choices.REPORT_CREATION_DONE
+                ),
+            )
+
         if active_tab == "validations":
             data.update(
-                reports=list(self.object.reports),
-                xml_error_reports=list(self.object.xml_error_reports),
-                xml_info_reports=[
-                    {
-                        **report.data,
-                        "file_url": report.file.url if report.file else None,
-                    }
-                    for report in self.object.xml_info_report.all()
-                ],
+                reports=self.object.validation_report.order_by("created", "pk"),
+                xml_error_reports=self.object.xml_error_report.order_by("created", "pk"),
+                xml_info_reports=self.object.xml_info_report.order_by("created", "pk"),
+                can_review_reports=UploadModelPermissionPolicy(
+                    XMLErrorReport
+                ).user_has_permission(self.request.user, "change"),
             )
 
         if active_tab == "files":
