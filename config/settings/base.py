@@ -5,7 +5,6 @@ Base settings to build other settings files upon.
 from pathlib import Path
 
 import environ
-from django.utils.translation import gettext_lazy as _
 
 WAGTAILADMIN_SHOW_COUNT = True
 
@@ -306,6 +305,11 @@ logs_path.mkdir(parents=True, exist_ok=True)
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "reference_index_routine": {
+            "()": "config.logging_filters.ReferenceIndexRoutineFilter",
+        },
+    },
     "formatters": {
         "verbose": {
             "format": "%(levelname)s %(asctime)s %(module)s "
@@ -331,6 +335,11 @@ LOGGING = {
         },
     },
     "loggers": {
+        "django_tasks": {
+            "level": "INFO",
+            "filters": ["reference_index_routine"],
+            "propagate": True,
+        },
         "profiling": {  # <-- Logger usado pelo decorador
             "handlers": ["profiling_file"],
             "level": "DEBUG",
