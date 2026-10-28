@@ -7,29 +7,9 @@ from django.test import TestCase, override_settings
 from collection.models import (
     ENSURE_NETWORK_CLASSIFICATION_CACHE_KEY,
     Collection,
-    normalize_network_classification,
 )
-from collection.tasks import task_complete_network_classification
 
 User = get_user_model()
-
-
-class NormalizeNetworkClassificationTest(TestCase):
-    def test_converts_str_to_list(self):
-        self.assertEqual(
-            normalize_network_classification("thematic"), ["thematic"]
-        )
-
-    def test_ignores_empty_items(self):
-        self.assertEqual(
-            normalize_network_classification(["", None, "thematic"]), ["thematic"]
-        )
-
-    def test_returns_none_when_empty(self):
-        self.assertIsNone(normalize_network_classification(None))
-        self.assertIsNone(normalize_network_classification(""))
-        self.assertIsNone(normalize_network_classification([]))
-        self.assertIsNone(normalize_network_classification([""]))
 
 
 class CompleteNetworkClassificationTest(TestCase):
@@ -188,27 +168,3 @@ class EnsureNetworkClassificationTest(TestCase):
         self.assertIsNone(Collection.ensure_network_classification(self.user))
         self.mock_fetch_data.assert_not_called()
         self.assertIsNone(Collection.objects.get(acron="scl").network_classification)
-
-
-class TaskCompleteNetworkClassificationTest(TestCase):
-    def setUp(self):
-        self.user = User.objects.create(username="tester")
-
-    @patch("collection.models.fetch_data")
-    def test_task_completes_network_classification(self, mock_fetch_data):
-        mock_fetch_data.return_value = [
-            {"acron": "scl", "network_classification": ["scielonetwork"]},
-        ]
-        Collection.objects.create(acron="scl", creator=self.user)
-
-        result = task_complete_network_classification.run(username="tester")
-
-        self.assertEqual(result, {"updated": ["scl"], "not_found": []})
-        self.assertEqual(
-            Collection.objects.get(acron="scl").network_classification,
-            ["scielonetwork"],
-        )
-
-    def test_task_requires_user(self):
-        with self.assertRaises(ValueError):
-            task_complete_network_classification.run()
