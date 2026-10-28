@@ -1890,6 +1890,57 @@ class BaseValidationReport(CommonControlField):
 
         return self.display_title()
 
+    @staticmethod
+    def validation_state(counts, creation):
+        if creation == choices.REPORT_CREATION_WIP:
+            return "processing"
+
+        if any(
+            counts.get(status)
+            for status in (
+                choices.VALIDATION_RESULT_BLOCKING,
+                choices.VALIDATION_RESULT_CRITICAL,
+                choices.VALIDATION_RESULT_FAILURE,
+            )
+        ):
+            return "error"
+
+        if counts.get(choices.VALIDATION_RESULT_WARNING):
+            return "warning"
+
+        if any(
+            total > 0
+            for status, total in counts.items()
+            if status != choices.VALIDATION_RESULT_SUCCESS
+        ):
+            return "review"
+
+        if creation == choices.REPORT_CREATION_DONE and counts.get(
+            choices.VALIDATION_RESULT_SUCCESS
+        ):
+            return "success"
+
+        return "empty"
+
+    @property
+    def validation_summary(self):
+        counts = {
+            item["status"]: item["total"]
+            for item in self.validation_results.order_by()
+            .values("status")
+            .annotate(total=Count("pk"))
+        }
+
+        return {
+            "state": self.validation_state(counts, self.creation),
+            "success_total": counts.get(choices.VALIDATION_RESULT_SUCCESS, 0),
+            "counts": [
+                {"status": status.lower(), "label": label, "total": counts[status]}
+                for status, label in choices.VALIDATION_RESULT
+                if counts.get(status)
+            ],
+        }
+
     @classmethod
     def get(cls, package=None, title=None, category=None):
         return cls.objects.get(package=package, title=title, category=category)
