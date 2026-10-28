@@ -445,6 +445,7 @@ class CreateOrUpdateArticleTests(unittest.TestCase):
             article_proc.sps_pkg,
             issue=article_proc.issue_proc.issue,
             journal=article_proc.issue_proc.journal_proc.journal,
+            collection=article_proc.collection,
         )
         self.assertEqual(article_proc.migrated_data.migration_status, "done")
         self.assertEqual(article_proc.migration_status, "done")
