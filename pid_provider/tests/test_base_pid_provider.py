@@ -140,10 +140,10 @@ class ProvidePidForXMLURIIntegrationTests(TestCase):
         )
         updated_xml = self.xml_with_pre(updated_content)
 
-        with patch(
-            "pid_provider.base_pid_provider.XMLWithPre.create",
-            side_effect=([first_xml], [updated_xml]),
-        ):
+        # substitui XMLWithPre somente em base_pid_provider, preservando a
+        # leitura dos arquivos das versões (XMLVersion.xml_with_pre)
+        with patch("pid_provider.base_pid_provider.XMLWithPre") as mock_xml_with_pre:
+            mock_xml_with_pre.create.side_effect = ([first_xml], [updated_xml])
             created = self.provider.provide_pid_for_xml_uri(
                 xml_uri="https://www.scielo.br/article.xml",
                 name="adendo_01",
