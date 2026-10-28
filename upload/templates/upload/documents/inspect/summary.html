@@ -3,22 +3,10 @@
 <section class="document-section">
     <h2>{% trans "Validation summary" %}</h2>
 
-    <dl class="document-metrics">
-        <div>
-            <dt>{% trans "Validations" %}</dt>
-            <dd>{{ summary.total_validations }}</dd>
-        </div>
-        <div>
-            <dt>{% trans "Critical issues" %}</dt>
-            <dd>{{ summary.critical_errors }}</dd>
-        </div>
-        <div>
-            <dt>{% trans "XML errors" %}</dt>
-            <dd>{{ summary.total_xml_errors }}</dd>
-        </div>
-        <div>
-            <dt>{% trans "XML warnings" %}</dt>
-            <dd>{{ summary.total_xml_warnings }}</dd>
-        </div>
-    </dl>
+    {% include "upload/reports/state.html" with state=validation_outcome only %}
+
+    <div class="document-validation-totals">
+        <p class="document-validation-total">{% trans "Validations" %}: {{ validation_total }}</p>
+        {% include "upload/reports/counts.html" with counts=validation_counts only %}
+    </div>
 </section>
