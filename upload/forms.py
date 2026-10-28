@@ -34,6 +34,25 @@ class UploadPackageForm(CoreAdminModelForm):
     pass
 
 
+class DelegateReviewForm(forms.Form):
+    reviewer = forms.ModelChoiceField(
+        queryset=None,
+        label=_("Reviewer"),
+        help_text=_("Choose who will review this document."),
+    )
+    instructions = forms.CharField(
+        label=_("Instructions"),
+        widget=forms.Textarea(attrs={"rows": 4}),
+        required=False,
+    )
+
+    def __init__(self, *args, package, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["reviewer"].queryset = review_assignee_queryset(package)
+        self.initial["reviewer"] = package.assignee_id
+
+
 class PackageDecisionForm(CoreAdminModelForm):
     reviewer = forms.ModelChoiceField(
         queryset=get_user_model().objects.none(),
