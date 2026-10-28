@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
 from django.db.models import Count, Q
+from django.utils.html import strip_tags
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
@@ -342,7 +343,7 @@ class Package(CommonControlField, ClusterableModel):
     panels = [
         # FieldPanel("file"),
         FieldPanel("status", read_only=True),
-        FieldPanel("numbers", widget=ReadOnlyPrettyJSONWidget()),
+        FieldPanel("numbers", read_only=True),
         FieldPanel("qa_ws_status", read_only=True),
         FieldPanel("public_ws_status", read_only=True),
     ]
@@ -426,6 +427,33 @@ class Package(CommonControlField, ClusterableModel):
             | Q(name__icontains=search_term)
             | Q(file__icontains=search_term)
         )
+
+    @property
+    def document_identity(self):
+        article = self.article if self.article_id else None
+        title = article.title_with_lang.order_by("pk").first() if article else None
+        issue = self.issue or (article.issue if article else None)
+        journal = (
+            self.journal
+            or (issue.journal if issue else None)
+            or (article.journal if article else None)
+        )
+        official = journal.official_journal if journal else None
+
+        return {
+            "journal": str(journal) if journal else None,
+            "issn_print": official.issn_print if official else None,
+            "issn_electronic": official.issn_electronic if official else None,
+            "issue": (
+                " · ".join(filter(None, [issue.publication_year, issue.issue_folder]))
+                if issue
+                else None
+            ),
+            "document_type": article.get_article_type_display() if article else None,
+            "title": strip_tags(title.text) if title and title.text else self.name,
+            "identifier": self.name,
+            "batch": self.pkg_zip.name if self.pkg_zip_id else None,
+        }
 
     def autocomplete_label(self):
         return f"{self.package_name} {self.status}"
@@ -1421,25 +1449,8 @@ class QAPackage(Package):
 
     """
 
-    panel_id = [
-        FieldPanel("article", read_only=True),
-    ]
-    panel_numbers = [
-        FieldPanel("critical_errors", read_only=True),
-        FieldPanel("xml_errors_percentage", read_only=True),
-        FieldPanel("xml_warnings_percentage", read_only=True),
-        FieldPanel("contested_xml_errors_percentage", read_only=True),
-        FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
-        FieldPanel("status", read_only=True),
-    ]
-    panel_decision = decision_panels()
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(panel_decision, heading=_("Decision")),
-            ObjectList(panel_id, heading=_("Article")),
-            ObjectList(panel_numbers, heading=_("Status")),
-        ]
-    )
+    panels = decision_panels()
+    edit_handler = ObjectList(panels)
     base_form_class = QAPackageForm
 
     class Meta:
@@ -1453,32 +1464,8 @@ class ReadyToPublishPackage(Package):
     Package ready to publish
     """
 
-    panel_id = [
-        FieldPanel("article", read_only=True),
-    ]
-    panel_numbers = [
-        FieldPanel("critical_errors", read_only=True),
-        FieldPanel("xml_errors_percentage", read_only=True),
-        FieldPanel("xml_warnings_percentage", read_only=True),
-        FieldPanel("contested_xml_errors_percentage", read_only=True),
-        FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
-        FieldPanel("status", read_only=True),
-    ]
-    panel_decision = decision_panels()
-    panel_publication_status = [
-        FieldPanel("qa_ws_status", read_only=True),
-        FieldPanel("qa_ws_pubdate", read_only=True),
-        FieldPanel("public_ws_status", read_only=True),
-        FieldPanel("public_ws_pubdate", read_only=True),
-    ]
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(panel_decision, heading=_("Decision")),
-            ObjectList(panel_id, heading=_("Article")),
-            ObjectList(panel_publication_status, heading=_("Publication Status")),
-            ObjectList(panel_numbers, heading=_("Status")),
-        ]
-    )
+    panels = decision_panels()
+    edit_handler = ObjectList(panels)
 
     base_form_class = ReadyToPublishPackageForm
 

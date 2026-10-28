@@ -1,10 +1,17 @@
 {% extends "wagtailadmin/generic/form.html" %}
-{% load i18n wagtailadmin_tags %}
+{% load i18n static wagtailadmin_tags %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'upload/css/document-inspect.css' %}">
+{% endblock %}
 
 {% block before_form %}
-    {% include "upload/documents/identity.html" %}
-    <p>{% trans "Assigning a reviewer does not change the document decision or publication status." %}</p>
-    {{ form.non_field_errors }}
+    <div class="document-inspect">
+        {% include "upload/documents/identity.html" %}
+        <p class="document-review-guidance">{% trans "Assigning a reviewer does not change the document decision or publication status." %}</p>
+        {{ form.non_field_errors }}
+    </div>
 {% endblock %}
 
 {% block actions %}

@@ -7,7 +7,7 @@ from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils.html import format_html, strip_tags
+from django.utils.html import format_html
 from django.utils.http import content_disposition_header
 from django.utils.translation import gettext_lazy as _
 from django.views.generic.edit import FormView
@@ -67,32 +67,9 @@ class DelegateReviewView(WagtailAdminTemplateMixin, FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        package = self.package
-        article = package.article if package.article_id else None
-        title = article.title_with_lang.order_by("pk").first() if article else None
-
-        issue = package.issue or (article.issue if article else None)
-        journal = (
-            package.journal
-            or (issue.journal if issue else None)
-            or (article.journal if article else None)
-        )
 
         context.update(
-            document_identity={
-                "title": (
-                    strip_tags(title.text) if title and title.text else package.name
-                ),
-                "identifier": package.name,
-                "journal": str(journal) if journal else None,
-                "issue": (
-                    " · ".join(
-                        filter(None, [issue.publication_year, issue.issue_folder])
-                    )
-                    if issue
-                    else None
-                ),
-            },
+            document_identity=self.package.document_identity,
             document_url=self.get_success_url(),
             submit_button_label=_("Save assignment"),
             submit_button_active_label=_("Saving…"),
@@ -206,6 +183,17 @@ class PackageDecisionMixin:
     success_message = _("Decision recorded successfully")
     error_message = _("Unable to complete the operation. Check the form and try again.")
     permission_error_message = _("Operation not available")
+
+    page_subtitle = _("Record decision")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            document_identity=self.object.document_identity,
+            document_url=self.get_success_url(),
+        )
+
+        return context
 
     def get_success_url(self):
         return reverse("wagtailsnippets_upload_package:inspect", args=[self.object.pk])

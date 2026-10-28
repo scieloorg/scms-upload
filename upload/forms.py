@@ -36,10 +36,14 @@ class DelegateReviewForm(forms.Form):
     reviewer = forms.ModelChoiceField(
         queryset=None,
         label=_("Reviewer"),
-        help_text=_("Choose who will review this document."),
+        help_text=_(
+            "Choose who will review this document. "
+            "This does not change its decision or publication status."
+        ),
     )
     instructions = forms.CharField(
         label=_("Instructions"),
+        help_text=_("Describe what the reviewer should check in this document."),
         widget=forms.Textarea(attrs={"rows": 4}),
         required=False,
     )

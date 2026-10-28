@@ -291,8 +291,23 @@ def test_old_decision_post_rejects_delegation(client, quality_review_context, mo
     package.save(update_fields=["status"])
     client.force_login(ctx["ana"])
 
+    edit_url = reverse(f"wagtailsnippets_upload_{model}:edit", args=[package.pk])
+    response = client.get(edit_url)
+
+    assert response.status_code == 200
+    assert response.context["document_identity"] == package.document_identity
+    document_url = reverse("wagtailsnippets_upload_package:inspect", args=[package.pk])
+    assert response.context["document_url"] == document_url
+    assert f'href="{document_url}"'.encode() in response.content
+    assert b"document-actions-bar" in response.content
+    assert b"controls.css" not in response.content
+    assert b'role="tablist"' not in response.content
+    assert b"onchange=" not in response.content
+    assert "article" not in response.context["form"].fields
+    assert not response.context["form"].formsets
+
     response = client.post(
-        reverse(f"wagtailsnippets_upload_{model}:edit", args=[package.pk]),
+        edit_url,
         {
             "qa_decision": choices.PS_PENDING_QA_DECISION,
             "reviewer": ctx["bruno"].pk,
@@ -319,7 +334,11 @@ def test_url_identity_assignment_and_history(client, quality_review_context):
     document_url = reverse("wagtailsnippets_upload_package:inspect", args=[package.pk])
     identity = response.context["document_identity"]
     assert identity["title"] == identity["identifier"] == package.name
+    assert identity == package.document_identity
     assert identity["journal"] == str(package.journal)
+    assert identity["issn_print"] == package.journal.official_journal.issn_print
+    assert identity["issn_electronic"] == package.journal.official_journal.issn_electronic
+    assert identity["document_type"] is None and identity["batch"] is None
     assert f'href="{document_url}"'.encode() in response.content
 
     response = client.post(url, {"reviewer": package.creator_id})
