@@ -1485,7 +1485,7 @@ class BaseValidationResult(CommonControlField):
         help_text=_("Item being analyzed"),
     )
     data = models.JSONField(_("Data"), default=dict, null=True, blank=True)
-    message = models.CharField(_("Message"), null=True, blank=True, max_length=500)
+    message = models.TextField(_("Message"), null=True, blank=True)
     status = models.CharField(
         _("Result"),
         max_length=8,
@@ -1533,10 +1533,6 @@ class BaseValidationResult(CommonControlField):
                 ]
             ),
         ]
-
-    def save(self):
-        self.message = self.message and self.message[:500]
-        return super().save()
 
     @classmethod
     def create(cls, subject=None, status=None, message=None, data=None, creator=None):
@@ -1697,7 +1693,7 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
         blank=True,
     )
     got_value = models.JSONField(_("Got value"), null=True, blank=True)
-    advice = models.CharField(_("Advice"), null=True, blank=True, max_length=500)
+    advice = models.TextField(_("Advice"), null=True, blank=True)
     reaction = models.CharField(
         _("Reaction"),
         max_length=16,
@@ -1738,10 +1734,6 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
                 ]
             ),
         ]
-
-    def save(self):
-        self.advice = self.advice and self.advice[:500]
-        return super().save()
 
     @classmethod
     def get_numbers(cls, package, report=None):
