@@ -1,7 +1,7 @@
 from io import StringIO
 
 import pytest
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
@@ -199,6 +199,32 @@ def test_service_enforces_scope_permission_status(quality_review_context, restri
 
     assert package.assignee == previous_assignee
     assert not package.upload_proc_result.exists()
+
+
+@pytest.mark.parametrize(
+    "restriction", ["inactive_user", "inactive_member", "unrelated"]
+)
+def test_reviewer_must_be_active_and_eligible(quality_review_context, restriction):
+    ctx = quality_review_context
+    reviewer = ctx["bruno"]
+
+    if restriction == "inactive_user":
+        reviewer.is_active = False
+        reviewer.save(update_fields=["is_active"])
+    elif restriction == "inactive_member":
+        member = ctx["bruno_membership"]
+        member.is_active_member = False
+        member.save(update_fields=["is_active_member"])
+    else:
+        ctx["bruno_membership"].delete()
+    package = ctx["package"]
+
+    with pytest.raises(ValidationError):
+        delegate_review(ctx["ana"], package.pk, reviewer.pk, "")
+
+    package.refresh_from_db()
+
+    assert package.assignee == ctx["ana"] and not package.upload_proc_result.exists()
 
 
 def test_assignment_rolls_back_with_event_failure(quality_review_context, monkeypatch):
