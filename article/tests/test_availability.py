@@ -148,6 +148,8 @@ class ArticleCreateOrUpdateArticleCollectionsTestCase(unittest.TestCase):
 
     def _make_article(self, has_none_url_pages=False):
         article = Mock(spec=Article)
+        # artigo anterior à separação por coleção: coleções do periódico
+        article.collection = None
         article.pages.filter.return_value.exists.return_value = has_none_url_pages
         journal_proc = Mock()
         journal_proc.collection = Mock(name="collection")
@@ -208,6 +210,30 @@ class ArticleCreateOrUpdateArticleCollectionsTestCase(unittest.TestCase):
         Article.create_or_update_article_collections(article, "USER")
 
         art_col.create_or_update_pages.assert_called_once_with("USER")
+
+    @patch("article.models.ArticleCollection")
+    def test_article_with_collection_uses_only_its_collection(
+        self, mock_article_collection_cls
+    ):
+        """Um Article por coleção: somente a coleção do Article."""
+        article, journal_proc = self._make_article()
+        article.collection = Mock(name="article_collection")
+        art_col = Mock()
+        art_col.is_stale.return_value = False
+        mock_article_collection_cls.get_or_create.return_value = art_col
+
+        items = Article.create_or_update_article_collections(article, "USER")
+
+        mock_article_collection_cls.get_or_create.assert_called_once_with(
+            "USER", article, article.collection
+        )
+        # remove o que era de outras coleções
+        article.article_collections.exclude.assert_called_once_with(
+            collection=article.collection
+        )
+        article.pages.exclude.assert_called_once_with(collection=article.collection)
+        article.journal.journalproc_set.all.assert_not_called()
+        self.assertEqual(items, [art_col])
 
     @patch("article.models.logging")
     @patch("article.models.ArticleCollection")
