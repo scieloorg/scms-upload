@@ -1,0 +1,13 @@
+{% extends "wagtailadmin/generic/form.html" %}
+{% load i18n wagtailadmin_tags %}
+
+{% block before_form %}
+    {% include "upload/documents/identity.html" %}
+    <p>{% trans "Assigning a reviewer does not change the document decision or publication status." %}</p>
+    {{ form.non_field_errors }}
+{% endblock %}
+
+{% block actions %}
+    {{ block.super }}
+    <a class="button button-secondary" href="{{ document_url }}">{% trans "Cancel" %}</a>
+{% endblock %}
