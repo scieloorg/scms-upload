@@ -3,6 +3,7 @@ from functools import partial
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
@@ -10,6 +11,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.http import content_disposition_header
 from django.utils.translation import gettext_lazy as _
+from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 from wagtail.admin.views.generic.base import WagtailAdminTemplateMixin
 from wagtail.snippets.views.snippets import CreateView
@@ -19,7 +21,16 @@ from core.users.permission_policies import TeamScopedEditView
 from upload.authorization import user_can_act_on_package
 from upload.delegation import can_delegate_review, delegate_review
 from upload.forms import DelegateReviewForm
-from upload.models import Package, UploadProcResult, choices
+from upload.models import (
+    BaseXMLValidationResult,
+    Package,
+    UploadProcResult,
+    XMLError,
+    XMLErrorReport,
+    XMLInfoReport,
+    choices,
+)
+from upload.permission_policies import UploadModelPermissionPolicy
 from upload.permissions import (
     ASSIGN_PACKAGE,
     FINISH_DEPOSIT,
@@ -40,6 +51,155 @@ from upload.tasks import (
     task_upload_workflow_publish_article,
 )
 from upload.utils.package_utils import render_html
+
+
+class ValidationReportView(WagtailAdminTemplateMixin, TemplateView):
+    page_title = _("Document")
+    header_icon = "doc-full"
+    template_name = "upload/reports/detail.html"
+    http_method_names = ["get", "head", "options"]
+    model = None
+    report_kind = None
+    results_per_page = 20
+    pagination_neighbors = 1
+    pagination_end_pages = 1
+
+    def dispatch(self, request, *args, **kwargs):
+        self.policy = UploadModelPermissionPolicy(self.model)
+
+        if not self.policy.user_has_any_permission(request.user, ("view", "change")):
+            raise PermissionDenied
+
+        self.report = get_object_or_404(
+            self.model.objects.select_related("package"),
+            pk=kwargs["pk"],
+            package__in=get_scoped_package_queryset(request.user),
+        )
+        self.page_subtitle = str(self.report.package)
+
+        self.results = self.report.validation_results.order_by("pk")
+        self.filtered_results = self.results
+
+        self.status_filter = (
+            ""
+            if isinstance(self.report, XMLInfoReport)
+            else request.GET.get("status", "")
+        )
+
+        if self.status_filter in dict(choices.VALIDATION_RESULT):
+            self.filtered_results = self.filtered_results.filter(
+                status=self.status_filter
+            )
+
+        self.page = Paginator(self.filtered_results, self.results_per_page).get_page(
+            request.GET.get("p", request.GET.get("page"))
+        )
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_breadcrumbs_items(self):
+        return [
+            *super().get_breadcrumbs_items(),
+            {
+                "url": reverse("wagtailsnippets_upload_package:list"),
+                "label": _("Documents"),
+            },
+            {"url": "", "label": self.page_title, "sublabel": self.get_page_subtitle()},
+        ]
+
+    def get_package_url(self):
+        anchor = {"xml-errors": "xer", "package-checks": "vr", "xml-information": "xi"}
+        suffix = "" if self.report_kind == "xml-information" else self.report.pk
+
+        return (
+            reverse(
+                "wagtailsnippets_upload_package:inspect", args=[self.report.package_id]
+            )
+            + f"?tab=validations#{anchor[self.report_kind]}{suffix}"
+        )
+
+    def get_document_identity(self):
+        package = self.report.package
+        article = package.article if package.article_id else None
+        title = article.title_with_lang.order_by("pk").first() if article else None
+
+        issue = package.issue or (article.issue if article else None)
+        journal = (
+            package.journal
+            or (issue.journal if issue else None)
+            or (article.journal if article else None)
+        )
+
+        return {
+            "title": strip_tags(title.text) if title and title.text else package.name,
+            "identifier": package.name,
+            "journal": str(journal) if journal else None,
+            "issue": (
+                " · ".join(filter(None, [issue.publication_year, issue.issue_folder]))
+                if issue
+                else None
+            ),
+        }
+
+    def get_results_context(self):
+        results = []
+        for result in self.page.object_list:
+            data = result.data if isinstance(result.data, dict) else {}
+            details = data.get("data")
+            details = details if isinstance(details, dict) else {}
+            location = [details.get("contrib_full_name"), data.get("parent_lang")]
+            if isinstance(result, BaseXMLValidationResult):
+                location.extend((result.parent_id, result.attribute))
+
+            assets = result.data if isinstance(result.data, list) else []
+            results.append(
+                {
+                    "result": result,
+                    "reference": details.get("ref_id"),
+                    "location": " · ".join(str(value) for value in location if value),
+                    "line": data.get("apparent_line"),
+                    "asset": data if data.get("component_type") == "asset" else {},
+                    "assets": [
+                        asset
+                        for asset in assets
+                        if isinstance(asset, dict) and asset.get("component_type") == "asset"
+                    ],
+                    "message": data.get("message") or result.message,
+                    "advice": data.get("advice") or (result.advice if isinstance(result, XMLError) else None),
+                }
+            )
+
+        return results
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        summary = self.report.validation_summary
+
+        context.update(
+            report=self.report,
+            is_xml_info=isinstance(self.report, XMLInfoReport),
+            success_total=summary["success_total"],
+            document_identity=self.get_document_identity(),
+            report_title=self.report.display_heading,
+            package_url=self.get_package_url(),
+            results=self.get_results_context(),
+            page_obj=self.page,
+            pagination_pages=list(
+                self.page.paginator.get_elided_page_range(
+                    self.page.number,
+                    on_each_side=self.pagination_neighbors,
+                    on_ends=self.pagination_end_pages,
+                )
+            ),
+            status_filter=self.status_filter,
+            status_choices=choices.VALIDATION_RESULT,
+            report_in_progress=self.report.creation == choices.REPORT_CREATION_WIP,
+            is_xml_errors=isinstance(self.report, XMLErrorReport),
+            counts=summary["counts"],
+            report_outcome=summary["state"],
+        )
+
+        return context
 
 
 class DelegateReviewView(WagtailAdminTemplateMixin, FormView):
