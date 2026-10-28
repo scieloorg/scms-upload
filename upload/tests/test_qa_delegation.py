@@ -8,7 +8,8 @@ from journal.models import Journal, JournalCollection, OfficialJournal
 from team.management.commands.create_user_groups import Command
 from team.models import CollectionTeamMember, TeamRole
 from upload import choices
-from upload.models import Package
+from upload.delegation import DELEGATION_EVENT, can_delegate_review, delegate_review
+from upload.models import Package, UploadProcResult
 from upload.wagtail_hooks import (
     QualityAnalysisPackageViewSet,
     ReadyToPublishPackageViewSet,
@@ -18,32 +19,26 @@ from upload.wagtail_hooks import (
 @pytest.fixture
 def quality_review_context(django_user_model):
     Command().handle(stdout=StringIO(), sync_users=False)
+
     admin = django_user_model.objects.create_superuser(
-        username="admin",
-        email="admin@example.com",
-        password="password",
+        username="admin", email="admin@example.com", password="password"
     )
     ana = django_user_model.objects.create_user(username="ana")
     bruno = django_user_model.objects.create_user(username="bruno")
+
     collection = Collection.objects.create(
-        acron="scl",
-        name="SciELO Brazil",
-        creator=admin,
+        acron="scl", name="SciELO Brazil", creator=admin
     )
-    ana_membership = CollectionTeamMember.objects.create(
-        user=ana,
-        collection=collection,
-        role=TeamRole.MEMBER,
-        is_active_member=True,
-        creator=admin,
-    )
-    bruno_membership = CollectionTeamMember.objects.create(
-        user=bruno,
-        collection=collection,
-        role=TeamRole.MEMBER,
-        is_active_member=True,
-        creator=admin,
-    )
+    memberships = {}
+    for user in (ana, bruno):
+        memberships[user.pk] = CollectionTeamMember.objects.create(
+            user=user,
+            collection=collection,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=admin,
+        )
+
     official = OfficialJournal.objects.create(title="Journal", creator=admin)
     journal = Journal.objects.create(
         official_journal=official, journal_acron="test", creator=admin
@@ -51,12 +46,13 @@ def quality_review_context(django_user_model):
     JournalCollection.objects.create(
         journal=journal, collection=collection, creator=admin
     )
+
     package = Package.objects.create(
         journal=journal,
         name="package",
         status=choices.PS_PREVIEW,
         creator=admin,
-        analyst=ana_membership,
+        analyst=memberships[ana.pk],
         assignee=ana,
         file=SimpleUploadedFile("package.zip", b"PK\x05\x06" + b"\x00" * 18),
     )
@@ -64,9 +60,85 @@ def quality_review_context(django_user_model):
     return {
         "ana": ana,
         "bruno": bruno,
-        "bruno_membership": bruno_membership,
+        "bruno_membership": memberships[bruno.pk],
         "package": package,
     }
+
+
+pytestmark = pytest.mark.django_db
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        choices.PS_PREVIEW,
+        choices.PS_PENDING_QA_DECISION,
+        choices.PS_VALIDATED_WITH_ERRORS,
+    ],
+)
+def test_assignment_preserves_workflow_and_history(quality_review_context, status):
+    ctx = quality_review_context
+    package = ctx["package"]
+
+    package.status = status
+    package.qa_decision = choices.PS_PENDING_CORRECTION
+    package.qa_comment = "Existing correction instructions"
+    package.qa_ws_status = package.public_ws_status = choices.PUBLISHED
+    package.save()
+
+    preserved = (
+        "status",
+        "qa_decision",
+        "qa_comment",
+        "analyst_id",
+        "article_id",
+        "qa_ws_status",
+        "public_ws_status",
+        "qa_ws_pubdate",
+        "public_ws_pubdate",
+    )
+    before = [getattr(package, field) for field in preserved]
+    original = UploadProcResult.objects.create(
+        proc=package,
+        name="process_qa_decision",
+        creator=ctx["ana"],
+        detail={"original": True},
+    )
+
+    assert can_delegate_review(ctx["ana"], package)
+
+    delegate_review(ctx["ana"], package.pk, ctx["bruno"].pk, "Check references")
+    package.refresh_from_db()
+
+    assert [getattr(package, field) for field in preserved] == before
+    assert package.assignee == ctx["bruno"]
+
+    event = package.upload_proc_result.get(name=DELEGATION_EVENT)
+    assert event.creator == ctx["ana"] and event.completed
+    assert event.detail["previous_assignee_id"] == ctx["ana"].pk
+    assert event.detail["assignee_id"] == ctx["bruno"].pk
+    assert event.detail["comment"] == "Check references"
+
+    original.refresh_from_db()
+
+    assert original.detail == {"original": True}
+    assert package.upload_proc_result.count() == 2
+
+
+def test_assignment_rolls_back_with_event_failure(quality_review_context, monkeypatch):
+    def fail(*args, **kwargs):
+        raise RuntimeError("Event storage unavailable")
+
+    ctx = quality_review_context
+    package = ctx["package"]
+    monkeypatch.setattr(UploadProcResult, "finish", fail)
+
+    with pytest.raises(RuntimeError):
+        delegate_review(ctx["ana"], package.pk, ctx["bruno"].pk, "")
+
+    package.refresh_from_db()
+
+    assert package.assignee == ctx["ana"] and not package.upload_proc_result.exists()
 
 
 @pytest.mark.parametrize(
