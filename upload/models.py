@@ -329,7 +329,7 @@ class Package(CommonControlField, ClusterableModel):
         verbose_name=_("QA publication date"), null=True, blank=True
     )
     public_ws_status = models.CharField(
-        verbose_name=_("Public publication status"),
+        verbose_name=_("Production publication status"),
         max_length=15,
         choices=choices.WEBSITE_STATUS,
         null=True,
@@ -337,7 +337,7 @@ class Package(CommonControlField, ClusterableModel):
         default=choices.UNRELEASED,
     )
     public_ws_pubdate = models.DateTimeField(
-        verbose_name=_("Public publication date"), null=True, blank=True
+        verbose_name=_("Production publication date"), null=True, blank=True
     )
 
     panels = [
