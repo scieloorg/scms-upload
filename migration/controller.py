@@ -393,6 +393,7 @@ def create_or_update_article(
         article_proc.sps_pkg,
         issue=article_proc.issue_proc.issue,
         journal=article_proc.issue_proc.journal_proc.journal,
+        collection=article_proc.collection,
     )
     article_proc.migrated_data.migration_status = tracker_choices.PROGRESS_STATUS_DONE
     article_proc.migration_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -485,16 +486,16 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                 if not file:
                     continue
 
-                original_path = file["relative_path"]
-                if original_path in processed_paths:
-                    continue
-                processed_paths.add(original_path)
-
                 exception["file"] = file.get("path")
                 if file.get("error"):
                     exception["error"] = file["error"]
                     exceptions.append(exception)
                     continue
+
+                original_path = file["relative_path"]
+                if original_path in processed_paths:
+                    continue
+                processed_paths.add(original_path)
 
                 component_type = check_component_type(file)
                 part = file.get("part")
