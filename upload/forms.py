@@ -119,10 +119,12 @@ class PackageDecisionForm(CoreAdminModelForm):
         self.fields["qa_decision"].choices = [
             (
                 value,
-                _("Republish on QA website")
-                if value == choices.PS_READY_TO_PREVIEW
-                and self.instance.qa_ws_status == choices.PUBLISHED
-                else label,
+                (
+                    _("Republish on QA website")
+                    if value == choices.PS_READY_TO_PREVIEW
+                    and self.instance.qa_ws_status == choices.PUBLISHED
+                    else label
+                ),
             )
             for value, label in self.fields["qa_decision"].choices
             if not value or value in allowed_decisions
@@ -299,16 +301,20 @@ class UploadValidatorForm(CoreAdminModelForm):
             "Maximum share of XML warnings among all validation results. Enter 0 to 100; 0 allows no warnings."
         )
         self.fields["max_xml_errors_percentage"].help_text = _(
-            "Maximum share of XML errors among all validation results. Enter 0 to 100. Critical issues are handled separately."
+            "Maximum share of XML errors among all validation results. "
+            "Enter 0 to 100. Critical issues are handled separately."
         )
         self.fields["max_impossible_to_fix_percentage"].help_text = _(
-            "After report review is complete, maximum share of XML findings declared impossible to correct, among all XML findings. Enter 0 to 100."
+            "After report review is complete, maximum share of XML findings declared "
+            "impossible to correct, among all XML findings. Enter 0 to 100."
         )
         self.fields["decision_for_critical_errors"].help_text = _(
-            "Choose whether critical issues require corrections or remain available for analysis. The strict publication policy always requires corrections."
+            "Choose whether critical issues require corrections or remain available "
+            "for analysis. The strict publication policy always requires corrections."
         )
         self.fields["validation_params"].help_text = _(
-            "Technical parameters sent to Packtools to check XML content. Journal data is added automatically. This field is read-only."
+            "Technical parameters sent to Packtools to check XML content. "
+            "Journal data is added automatically. This field is read-only."
         )
 
     def clean(self):

@@ -226,7 +226,8 @@ def retry_publication(request):
             {
                 "title": _("Retry publication"),
                 "message": _(
-                    "Retry the failed publication using the existing authorization. The document and its validation results will be preserved."
+                    "Retry the failed publication using the existing authorization. "
+                    "The document and its validation results will be preserved."
                 ),
                 "submit_label": _("Retry publication"),
                 "package": package,
@@ -278,7 +279,9 @@ def finish_deposit(request):
             {
                 "title": _("Submit validation responses"),
                 "message": _(
-                    "The ZIP has already been received. Submit the validation responses to determine whether the document needs corrections or can proceed with processing."
+                    "The ZIP has already been received. Submit the validation responses "
+                    "to determine whether the document needs corrections or can proceed "
+                    "with processing."
                 ),
                 "submit_label": _("Submit validation responses"),
                 "package": package,
