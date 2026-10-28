@@ -113,7 +113,9 @@ class InspectFirstPackageIndexView(PackageActionIndexView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         base = scope_package_queryset(Package.objects.all(), self.request.user)
-        base = DocumentFilterSet(self.request.GET, queryset=base, request=self.request).qs
+        base = DocumentFilterSet(
+            self.request.GET, queryset=base, request=self.request
+        ).qs
         package_id = self.request.GET.get("pkg_zip_id", "")
         if package_id.isdecimal():
             base = base.filter(pkg_zip_id=package_id)
@@ -132,7 +134,9 @@ class InspectFirstPackageIndexView(PackageActionIndexView):
                     or (key == "all" and selected not in dict(QUEUE_LABELS)),
                     "count": base.filter(
                         document_queue_filter(
-                            key, self.request.user, status=self.request.GET.get("status")
+                            key,
+                            self.request.user,
+                            status=self.request.GET.get("status"),
                         )
                     ).count(),
                 }
@@ -250,7 +254,9 @@ class PackageZipViewSet(BaseUploadViewSet):
     )
 
     def get_index_view_kwargs(self, **kwargs):
-        return super().get_index_view_kwargs(add_item_label=_("Upload package"), **kwargs)
+        return super().get_index_view_kwargs(
+            add_item_label=_("Upload package"), **kwargs
+        )
 
     def get_add_view_kwargs(self, **kwargs):
         return super().get_add_view_kwargs(page_title=_("Upload package"), **kwargs)
@@ -289,7 +295,8 @@ class PackageViewSet(BaseUploadViewSet):
 
     list_display = (
         DocumentTitleColumn(
-            "__str__", label=_("Document"),
+            "__str__",
+            label=_("Document"),
             url_name="wagtailsnippets_upload_package:inspect",
             get_title_id=lambda instance: f"snippet_{instance.pk}_title",
             classname="document-title",
@@ -776,7 +783,11 @@ class UploadViewSetGroup(SnippetViewSetGroup):
 
 
 register_snippet(UploadViewSetGroup)
-for document_viewset in (QualityAnalysisPackageViewSet, ReadyToPublishPackageViewSet, ArchivedPackageViewSet):
+for document_viewset in (
+    QualityAnalysisPackageViewSet,
+    ReadyToPublishPackageViewSet,
+    ArchivedPackageViewSet,
+):
     document_viewset.add_to_admin_menu = False
     register_snippet(document_viewset)
 
