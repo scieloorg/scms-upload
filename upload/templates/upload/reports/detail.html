@@ -1,0 +1,78 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load i18n static wagtailadmin_tags %}
+
+{% block titletag %}{{ report_title }} — {{ report.package }}{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'upload/css/reports.css' %}">
+    <link rel="stylesheet" href="{% static 'upload/css/document-inspect.css' %}">
+    <link rel="stylesheet" href="{% static 'upload/css/validation-detail.css' %}">
+{% endblock %}
+
+{% block main_content %}
+    <div class="document-inspect validation-detail">
+        {% include "upload/documents/identity.html" %}
+
+        <header class="report-header">
+            <div class="report-heading">
+                <h2>{{ report_title }}</h2>
+
+                {% if report_outcome != "error" and report_outcome != "warning" %}
+                    {% if not is_xml_info or report_outcome != "success" %}
+                        {% include "upload/reports/state.html" with state=report_outcome only %}
+                    {% endif %}
+                {% endif %}
+            </div>
+
+            <div class="report-tools">
+                <a class="button button-secondary button--icon" href="{{ package_url }}">
+                    {% icon name="arrow-left" classname="w-mr-1" %} {% trans "All validation reports" %}
+                </a>
+            </div>
+        </header>
+
+        {% if is_xml_info %}
+            <p>{% blocktrans count total=success_total with display_total=success_total|floatformat:"0g" %}{{ display_total }} check with result OK{% plural %}{{ display_total }} checks with result OK{% endblocktrans %}</p>
+            <p class="document-summary-note">{% trans "This report lists successful checks. Warnings and issues appear in the other reports." %}</p>
+        {% endif %}
+
+        {% if not is_xml_info %}
+            <form method="get" class="report-filters">
+                <label for="report-status">{% trans "Result" %}
+                    <select id="report-status" name="status">
+                        <option value="">{% trans "All" %}</option>
+
+                        {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <button class="button button-secondary button--icon" type="submit">{% icon name="sliders" classname="w-mr-1" %} {% trans "Filter" %}</button>
+            </form>
+        {% endif %}
+
+        {% if page_obj.paginator.count or counts %}
+            <div class="report-results-summary">
+                <p class="report-range">{% blocktrans with first=page_obj.start_index last=page_obj.end_index total=page_obj.paginator.count %}Showing {{ first }}–{{ last }} of {{ total }} results{% endblocktrans %}</p>
+
+                {% if not is_xml_info or report_outcome != "success" %}
+                    {% include "upload/reports/counts.html" %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% for finding in results %}
+            {% include "upload/reports/result.html" with result=finding.result %}
+        {% empty %}
+            {% if counts %}
+                <p>{% trans "No results match these filters." %}</p>
+            {% else %}
+                <p>{% trans "No results are available yet." %}</p>
+            {% endif %}
+        {% endfor %}
+
+        {% include "upload/documents/pagination.html" %}
+    </div>
+{% endblock %}
