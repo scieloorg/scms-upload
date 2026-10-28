@@ -1,29 +1,15 @@
-{% load i18n %}
+{% load i18n wagtailadmin_tags %}
+{% trans "Open document" as open_document_label %}
 
 <td class="document-actions-cell">
     <div class="document-actions">
-        <a href="{{ report_url }}"
-           class="button button-small button-secondary">
-            {% trans "Reports" %}
+        <a href="{% url 'wagtailsnippets_upload_package:inspect' instance.pk %}" class="button button-secondary button--icon" title="{{ open_document_label }}" aria-label="{{ open_document_label }}">
+            {% icon name="doc-full" %} {% trans "Open" %}
         </a>
 
         {% for action in actions %}
-            <a href="{{ action.url }}"
-               class="button button-small button-secondary">
-                {{ action.label }}
-            </a>
-        {% endfor %}
-
-        {% for website in websites %}
-            <a href="{{ website.url }}"
-               class="button button-small button-secondary"
-               target="_blank"
-               rel="noopener noreferrer">
-                {% if website.label == "PUBLIC" %}
-                    {% trans "Public" %}
-                {% else %}
-                    QA
-                {% endif %}
+            <a href="{{ action.url }}" class="button button-secondary button--icon" title="{{ action.label }}" aria-label="{{ action.label }}">
+                {% icon name=action.icon_name %} {% include "upload/documents/action_label.html" %}
             </a>
         {% endfor %}
     </div>

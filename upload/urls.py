@@ -1,5 +1,6 @@
 from django.urls import path
 
+from upload.document_views import download_document_events
 from upload.models import ValidationReport, XMLErrorReport, XMLInfoReport
 from upload.views import (
     DelegateReviewView,
@@ -17,6 +18,11 @@ from upload.views import (
 app_name = "upload"
 
 urlpatterns = [
+    path(
+        "documents/<int:pk>/events/",
+        download_document_events,
+        name="download_document_events",
+    ),
     path(
         "documents/<int:pk>/delegate/",
         DelegateReviewView.as_view(),

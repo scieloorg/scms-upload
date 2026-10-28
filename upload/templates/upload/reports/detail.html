@@ -5,6 +5,7 @@
 
 {% block extra_css %}
     {{ block.super }}
+    <link rel="stylesheet" href="{% static 'upload/css/controls.css' %}">
     <link rel="stylesheet" href="{% static 'upload/css/reports.css' %}">
     <link rel="stylesheet" href="{% static 'upload/css/document-inspect.css' %}">
     <link rel="stylesheet" href="{% static 'upload/css/validation-detail.css' %}">
@@ -13,6 +14,8 @@
 {% block main_content %}
     <div class="document-inspect validation-detail">
         {% include "upload/documents/identity.html" %}
+        {% include "upload/documents/sections.html" %}
+        {% include "upload/documents/toolbar.html" %}
 
         <header class="report-header">
             <div class="report-heading">
@@ -49,6 +52,17 @@
                     </select>
                 </label>
 
+                {% if is_xml_errors %}
+                    <label for="report-reaction">{% trans "Response" %}
+                        <select id="report-reaction" name="reaction">
+                            <option value="">{% trans "All" %}</option>
+                            {% for value, label in reaction_choices %}
+                                <option value="{{ value }}" {% if reaction_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                {% endif %}
+
                 <button class="button button-secondary button--icon" type="submit">{% icon name="sliders" classname="w-mr-1" %} {% trans "Filter" %}</button>
             </form>
         {% endif %}
@@ -63,6 +77,12 @@
             </div>
         {% endif %}
 
+        {% if can_respond %}
+            <form method="post" id="report-responses">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+        {% endif %}
+
         {% for finding in results %}
             {% include "upload/reports/result.html" with result=finding.result %}
         {% empty %}
@@ -72,6 +92,11 @@
                 <p>{% trans "No results are available yet." %}</p>
             {% endif %}
         {% endfor %}
+
+        {% if can_respond %}
+                <button class="button report-save" type="submit" name="action" value="save_responses">{% trans "Save responses" %}</button>
+            </form>
+        {% endif %}
 
         {% include "upload/documents/pagination.html" %}
     </div>

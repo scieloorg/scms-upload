@@ -16,13 +16,15 @@
     margin-block: 1rem;
 }
 
-.report-filters label {
+.report-filters label,
+.report-response label {
     display: block;
     min-width: 0;
     max-width: 100%;
 }
 
-.report-filters select {
+.report-filters select,
+.report-response select {
     display: block;
     width: 21rem;
     max-width: 100%;
@@ -243,89 +245,6 @@
     --report-value-background: var(--w-color-positive-50);
 }
 
-/* Report-local identity and detail controls; no shared toolbar dependency. */
-.validation-detail .document-identity {
-    margin-block: 1rem 1.25rem;
-    overflow-wrap: anywhere;
-}
-
-.validation-detail .document-identity h2 {
-    margin: 0 0 0.5rem;
-}
-
-.validation-detail .document-identity p {
-    margin: 0;
-    color: var(--w-color-text-context);
-}
-
-.validation-detail .document-summary-note {
-    color: var(--w-color-text-context);
-    font-size: 0.875rem;
-}
-
-.report-file-context > div {
-    display: grid;
-    grid-template-columns: 9rem minmax(0, 1fr);
-    align-items: baseline;
-    gap: 0.25rem 1rem;
-    margin-block: 0.75rem;
-}
-
-.report-file-context dt,
-.validation-detail .upload-field-label,
-.report-filters label,
-.report-value > strong,
-.report-value > dt {
-    color: var(--w-color-text-context);
-    font-size: 0.875rem;
-    font-weight: 600;
-    line-height: 1.5;
-}
-
-.report-file-context dd {
-    min-width: 0;
-    margin: 0;
-    overflow-wrap: anywhere;
-}
-
-.report-technical > summary {
-    display: inline-block;
-    padding: 0.5rem 0.75rem;
-    margin-block: 0.375rem;
-    border: 1px solid var(--w-color-border-button-outline-default);
-    border-radius: 0.25rem;
-    color: var(--w-color-text-link-default);
-    font-size: 0.875rem;
-    font-weight: 600;
-    list-style: none;
-    cursor: pointer;
-}
-
-.report-technical > summary::before {
-    content: "›";
-    display: inline-block;
-    margin-inline-end: 0.375rem;
-}
-
-.report-technical[open] > summary::before {
-    transform: rotate(90deg);
-}
-
-.report-technical > summary::-webkit-details-marker {
-    display: none;
-}
-
-.report-technical > summary:hover {
-    background: var(--w-color-surface-header);
-}
-
-.report-technical > summary:focus-visible {
-    outline: 2px solid var(--w-color-text-link-default);
-    outline-offset: 2px;
-}
-
-@media (max-width: 40rem) {
-    .report-file-context > div {
-        grid-template-columns: minmax(0, 1fr);
-    }
+.report-save {
+    margin-block: 1rem 1.5rem;
 }

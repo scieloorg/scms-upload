@@ -1,12 +1,11 @@
 {% load i18n %}
-
 <section class="document-section">
     <h2>{% trans "Validation summary" %}</h2>
-
-    {% include "upload/reports/state.html" with state=validation_outcome only %}
-
+    {% if validation_outcome != "error" and validation_outcome != "warning" %}
+        {% include "upload/reports/state.html" with state=validation_outcome only %}
+    {% endif %}
     <div class="document-validation-totals">
-        <p class="document-validation-total">{% trans "Validations" %}: {{ validation_total }}</p>
+        <p class="document-validation-total">{% blocktrans with total=validation_total %}{{ total }} results{% endblocktrans %}</p>
         {% include "upload/reports/counts.html" with counts=validation_counts only %}
     </div>
 </section>

@@ -1,43 +1,46 @@
 {% load i18n l10n wagtailadmin_tags %}
 
-<div class="document-actions-bar">
-    <a class="button button-small document-action" href="?tab=files&show_xml=1">
-        {% icon name="code" %}
-        {% trans "View XML" %}
-    </a>
-
-    {% if object.pkg_zip.file %}
-        <a class="button button-small document-action"
-           href="{{ object.pkg_zip.file.url }}"
-           download>
-            {% icon name="download" %}
-            {% trans "Download submitted ZIP" %}
-        </a>
-    {% endif %}
-
-    {% if object.file %}
-        <a class="button button-small document-action" href="{{ object.file.url }}" download>
-            {% icon name="download" %}
-            {% trans "Download document ZIP" %}
-        </a>
-    {% endif %}
-
-    <a class="button button-small document-action"
-       href="{% url 'upload:display_xml' %}?package_id={{ package_id }}&download=1">
-        {% icon name="download" %}
-        {% trans "Download XML" %}
-    </a>
-</div>
-
 <section class="document-section">
+    {% if not document_file_available %}
+        {% help_block status="warning" %}
+            <p>{% trans "The document ZIP is unavailable." %}</p>
+        {% endhelp_block %}
+    {% endif %}
+
     {% if show_xml %}
         <textarea class="document-xml" rows="15" readonly aria-label="XML">{{ xml }}</textarea>
     {% endif %}
 
     {% if fields %}
-        <h2>{% trans "Details" %}</h2>
+        <div class="upload-section-heading">
+            <h2>{% trans "Details" %}</h2>
+            {% if document_file_available %}
+                <a class="upload-link" href="?tab=files&show_xml=1">{% trans "View XML" %}</a>
+            {% endif %}
+        </div>
 
-        <dl class="document-details">
+        <dl class="document-details upload-fields">
+            {% if document_identity.document_type %}
+                <div>
+                    <dt>{% trans "Document type" %}</dt>
+                    <dd>{{ document_identity.document_type }}</dd>
+                </div>
+            {% endif %}
+
+            {% if document_identity.issn_electronic %}
+                <div>
+                    <dt>{% trans "Electronic ISSN" %}</dt>
+                    <dd>{{ document_identity.issn_electronic }}</dd>
+                </div>
+            {% endif %}
+
+            {% if document_identity.issn_print %}
+                <div>
+                    <dt>{% trans "Print ISSN" %}</dt>
+                    <dd>{{ document_identity.issn_print }}</dd>
+                </div>
+            {% endif %}
+
             {% if submitted_package_filename %}
                 <div>
                     <dt>{% trans "Submitted package" %}</dt>

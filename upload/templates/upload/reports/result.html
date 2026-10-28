@@ -96,7 +96,13 @@
 
     {% if is_xml_errors and not report_in_progress %}
         <div class="report-response">
-            <span class="upload-field-label">{% trans "Response" %}:</span> {{ result.get_reaction_display|default:"—" }}
+            {% if finding.response_field %}
+                <label for="{{ finding.response_field.id_for_label }}">{{ finding.response_field.label }}</label>
+                {{ finding.response_field.errors }}
+                {{ finding.response_field }}
+            {% else %}
+                <span class="upload-field-label">{% trans "Response" %}:</span> {{ result.get_reaction_display|default:"—" }}
+            {% endif %}
         </div>
     {% endif %}
 </article>

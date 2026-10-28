@@ -1,15 +1,7 @@
 {% load i18n wagtailadmin_tags %}
 
-{% include "upload/documents/inspect/summary.html" %}
-
-{% if summary.total_xml_errors or summary.total_xml_warnings or summary.critical_errors %}
-    <div class="document-actions-bar">
-        <a class="button button-small document-action"
-           href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
-            {% icon name="download" %}
-            {% trans "Download XML errors report" %}
-        </a>
-    </div>
+{% if not validation_in_progress %}
+    {% include "upload/documents/inspect/summary.html" %}
 {% endif %}
 
 <section class="document-section">
@@ -47,6 +39,7 @@
 
 <section class="document-section">
     <h2>{% trans "XML Validations" %}</h2>
+    <p class="document-review-guidance">{% trans "Review the findings and record your responses. Saving responses does not correct the XML or approve publication." %}</p>
 
     <table class="listing upload-report-table report-review-table">
         <thead>
@@ -73,12 +66,12 @@
                             {% include "upload/reports/findings.html" %}
                         </td>
                         <td data-label="{% trans 'Review' %}">
-                            {% if report.creation != "done" or not can_review_reports %}
+                            {% if report.creation == "doing" %}
                                 <span class="document-summary-note">—</span>
                             {% else %}
                                 <a class="button button-secondary button--icon upload-review-control {% if report.xml_producer_ack %}report-review-completed{% else %}report-review-pending{% endif %}"
-                                   href="{% url 'wagtailsnippets_upload_xmlerrorreport:edit' report.id %}"
-                                   title="{% trans 'Review report' %}">
+                                   href="{% url 'upload:xml_error_report' report.id %}{% if can_review_reports %}#report-responses{% endif %}"
+                                   title="{% if can_review_reports and not report.xml_producer_ack %}{% trans 'Review report' %}{% else %}{% trans 'View review' %}{% endif %}">
                                     {% if report.xml_producer_ack %}
                                         {% icon name="check" classname="w-mr-1" %} {% translate "Completed" context "report review" %}
                                     {% else %}
@@ -111,11 +104,6 @@
                         {% include "upload/reports/state.html" with state=report_summary.state only %}
                     {% endif %}
 
-                    {% if report.file %}
-                        <a class="button button-small document-action" href="{{ report.file.url }}" download>
-                            {% icon name="download" %} {% trans "Download CSV" %}
-                        </a>
-                    {% endif %}
                 </div>
             </div>
         {% endwith %}
