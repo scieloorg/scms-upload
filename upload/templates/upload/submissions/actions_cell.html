@@ -1,17 +1,11 @@
-{% load i18n %}
-
+{% load i18n wagtailadmin_tags %}
+{% trans "View documents" as view_documents_label %}
+{% trans "Download ZIP" as download_zip_label %}
 <td class="document-actions-cell">
     <div class="document-actions">
-        <a href="{{ documents_url }}"
-           class="button button-small button-secondary">
-            {% trans "Documents" %}
-        </a>
+        <a href="{% url 'wagtailsnippets_upload_package:list' %}?pkg_zip_id={{ instance.pk }}" class="button button-secondary button--icon" title="{{ view_documents_label }}" aria-label="{{ view_documents_label }}">{% icon name="list-ul" %} {% trans "Documents" %}</a>
         {% if instance.file %}
-            <a href="{{ instance.file.url }}"
-               class="button button-small button-secondary"
-               download>
-                {% trans "Download ZIP" %}
-            </a>
+            <a href="{{ instance.file.url }}" class="button button-secondary button--icon" title="{{ download_zip_label }}" aria-label="{{ download_zip_label }}" download>{% icon name="download" %} {% trans "Download" %}</a>
         {% endif %}
     </div>
 </td>

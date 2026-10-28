@@ -1,0 +1,29 @@
+{% load i18n wagtailadmin_tags %}
+
+<div class="document-toolbar document-actions-bar" role="group" aria-label="{% trans 'Document actions' %}">
+    {% for action in document_actions %}
+        <a class="button button-secondary button--icon" href="{{ action.url }}" title="{{ action.label }}" aria-label="{{ action.label }}">
+            {% icon name=action.icon_name %} {% include "upload/documents/action_label.html" %}
+        </a>
+    {% endfor %}
+
+    {% if validation_in_progress or report_in_progress %}
+        <a class="button button-secondary button--icon" href="{{ request.get_full_path }}">
+            {% icon name="rotate" %} {% trans "Refresh" %}
+        </a>
+    {% endif %}
+
+    {% if document_downloads %}
+        {% fragment as download_label %}
+            {% icon name="download" %}<span>{% trans "Download" %}</span>
+        {% endfragment %}
+
+        {% dropdown toggle_label=download_label toggle_icon="arrow-down" toggle_classname="button button-secondary upload-download-toggle" %}
+            {% for item in document_downloads %}
+                <a href="{{ item.url }}" download>
+                    {% icon name="download" %} {{ item.label }}
+                </a>
+            {% endfor %}
+        {% enddropdown %}
+    {% endif %}
+</div>

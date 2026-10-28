@@ -1,229 +1,115 @@
 {% load i18n wagtailadmin_tags %}
 
-{% if summary.total_xml_errors or summary.total_xml_warnings or summary.critical_errors %}
-    <div class="document-actions-bar">
-        <a class="button button-small document-action"
-           href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
-            {% icon name="download" %}
-            {% trans "Download XML errors report" %}
-        </a>
-    </div>
+{% if not validation_in_progress %}
+    {% include "upload/documents/inspect/summary.html" %}
 {% endif %}
 
-<div class="document-section">
+<section class="document-section">
     <h2>{% trans "Package validations" %}</h2>
 
-    <table class="listing upload-report-table">
+    <table class="listing upload-report-table report-links-table">
         <thead>
             <tr>
-                <th>{% trans "Name" %}</th>
-                <th>{% trans "Date" %}</th>
-                <th>{% trans "Findings" %}</th>
-                <th>{% trans "Actions" %}</th>
+                <th>{% trans "Report" %}</th>
+                <th>{% trans "Result" %}</th>
             </tr>
         </thead>
-
         <tbody>
             {% for report in reports %}
-                <tr>
-                    <td class="title report-name"
-                        data-label="{% trans 'Name' %}">
-                        {{ report.title }}
-                    </td>
-                    <td class="report-date" data-label="{% trans 'Date' %}">
-                        <time datetime="{{ report.updated }}">
-                            <span>{{ report.updated|slice:":10" }}</span>
-                            <span>{{ report.updated|slice:"11:" }}</span>
-                        </time>
-                    </td>
-                    <td data-label="{% trans 'Findings' %}">
-                        <dl class="report-counts">
-                            <div>
-                                <dt>{% trans "Blocking issues" %}</dt>
-                                <dd>{{ report.total_blocking }}</dd>
-                            </div>
-                            <div>
-                                <dt>{% trans "Critical issues" %}</dt>
-                                <dd>{{ report.total_critical }}</dd>
-                            </div>
-                            <div>
-                                <dt>{% trans "Errors" %}</dt>
-                                <dd>{{ report.total_error }}</dd>
-                            </div>
-                            <div>
-                                <dt>{% trans "Warnings" %}</dt>
-                                <dd>{{ report.total_warning }}</dd>
-                            </div>
-                        </dl>
-                    </td>
-                    <td class="report-actions" data-label="{% trans 'Actions' %}">
-                        <span id="vr{{ report.id }}"></span>
-                        {% if report.creation == "doing" %}
-                            <a class="button button-small document-action"
-                               href="?tab=validations">
-                                {% icon name='rotate' %}
-                                {% trans "Refresh" %}
-                            </a>
-                        {% else %}
-                            <a class="button button-small document-action"
-                               href="{% url 'wagtailsnippets_upload_validationreport:edit' report.id %}">
-                                {% icon name='doc-full' %}
-                                {% trans "Open report" %}
-                            </a>
-                        {% endif %}
-                    </td>
-                </tr>
+                {% with report_summary=report.validation_summary %}
+                    <tr id="vr{{ report.id }}">
+                        <td class="report-name" data-label="{% trans 'Report' %}">
+                            <a class="upload-link report-title-link" href="{% url 'upload:package_validation_report' report.id %}">{{ report.display_heading }}</a>
+
+                            {% if report_summary.state == "processing" %}
+                                {% include "upload/reports/state.html" with state=report_summary.state only %}
+                            {% endif %}
+
+                            <time class="report-updated" datetime="{{ report.updated|date:'c' }}">{{ report.updated }}</time>
+                        </td>
+                        <td data-label="{% trans 'Result' %}">
+                            {% include "upload/reports/findings.html" %}
+                        </td>
+                    </tr>
+                {% endwith %}
             {% endfor %}
         </tbody>
     </table>
-</div>
+</section>
 
-<div class="document-section">
+<section class="document-section">
     <h2>{% trans "XML Validations" %}</h2>
+    <p class="document-review-guidance">{% trans "Review the findings and record your responses. Saving responses does not correct the XML or approve publication." %}</p>
 
-    {% if not validation_in_progress and summary.conclusion %}
-        <p class="document-review-guidance">{{ summary.conclusion }}</p>
-    {% endif %}
-    <div>
-        <div class="help-block help-warning" id="help-to-fix">
-            <svg class="icon icon-warning icon" aria-hidden="true">
-                <use href="#icon-warning"></use>
-            </svg>
-            {% trans "By default, XML errors are marked for correction. Review the report and change the response for any finding you disagree with or cannot correct. The system does not correct the XML; correct the files and resubmit the package." %}
-        </div>
-    </div>
-
-    <table class="listing upload-report-table">
+    <table class="listing upload-report-table report-review-table">
         <thead>
             <tr>
-                <th>{% trans "Name" %}</th>
-                <th>{% trans "Date" %}</th>
-                <th>{% trans "Findings" %}</th>
-                <th>{% trans "Responses" %}</th>
+                <th>{% trans "Report" %}</th>
+                <th>{% trans "Result" %}</th>
                 <th>{% trans "Review" %}</th>
-                <th>{% trans "Actions" %}</th>
             </tr>
         </thead>
-
         <tbody>
             {% for report in xml_error_reports %}
-                <tr>
-                    <td class="title report-name"
-                        data-label="{% trans 'Name' %}">
-                        {{ report.title }}
-                    </td>
-                    <td class="report-date" data-label="{% trans 'Date' %}">
-                        <time datetime="{{ report.updated }}">
-                            <span>{{ report.updated|slice:":10" }}</span>
-                            <span>{{ report.updated|slice:"11:" }}</span>
-                        </time>
-                    </td>
-                    <td data-label="{% trans 'Findings' %}">
-                        <dl class="report-counts">
-                            <div>
-                                <dt>{% trans "Critical issues" %}</dt>
-                                <dd>{{ report.total_critical }}</dd>
-                            </div>
-                            <div>
-                                <dt>{% trans "Errors" %}</dt>
-                                <dd>{{ report.total_error }}</dd>
-                            </div>
-                            <div>
-                                <dt>{% trans "Warnings" %}</dt>
-                                <dd>{{ report.total_warning }}</dd>
-                            </div>
-                        </dl>
-                    </td>
-                    <td data-label="{% trans 'Responses' %}">
-                        <dl class="report-counts">
-                            <div>
-                                <dt>{% trans "To correct" %}</dt>
-                                <dd>{{ report.reaction_to_fix }}</dd>
-                            </div>
-                            <div>
-                                <dt>{% trans "Contested" %}</dt>
-                                <dd>{{ report.reaction_not_to_fix }}</dd>
-                            </div>
-                            <div>
-                                <dt>{% trans "Cannot correct" %}</dt>
-                                <dd>{{ report.reaction_impossible_to_fix }}</dd>
-                            </div>
-                        </dl>
-                    </td>
-                    <td data-label="{% trans 'Review' %}">
-                        {% if report.xml_producer_ack %}
-                            {% trans "Completed" %}
-                        {% else %}
-                            {% trans "Pending" %}
-                        {% endif %}
-                    </td>
-                    <td class="report-actions" data-label="{% trans 'Actions' %}">
-                        <span id="xer{{ report.id }}"></span>
-                        {% if report.creation == "doing" %}
-                            <a class="button button-small document-action"
-                               href="?tab=validations">
-                                {% icon name='rotate' %}
-                                {% trans "Refresh" %}
-                            </a>
-                        {% else %}
-                            <a class="button button-small document-action"
-                               href="{% url 'wagtailsnippets_upload_xmlerrorreport:edit' report.id %}">
-                                {% icon name='doc-full' %}
-                                {% trans "Open report" %}
-                            </a>
-                        {% endif %}
-                    </td>
-                </tr>
+                {% with report_summary=report.validation_summary %}
+                    <tr id="xer{{ report.id }}">
+                        <td class="report-name" data-label="{% trans 'Report' %}">
+                            <a class="upload-link report-title-link" href="{% url 'upload:xml_error_report' report.id %}">{{ report.display_heading }}</a>
+
+                            {% if report_summary.state == "processing" %}
+                                {% include "upload/reports/state.html" with state=report_summary.state only %}
+                            {% endif %}
+
+                            <time class="report-updated" datetime="{{ report.updated|date:'c' }}">{{ report.updated }}</time>
+                        </td>
+                        <td data-label="{% trans 'Result' %}">
+                            {% include "upload/reports/findings.html" %}
+                        </td>
+                        <td data-label="{% trans 'Review' %}">
+                            {% if report.creation == "doing" %}
+                                <span class="document-summary-note">—</span>
+                            {% else %}
+                                <a class="button button-secondary button--icon upload-review-control {% if report.xml_producer_ack %}report-review-completed{% else %}report-review-pending{% endif %}"
+                                   href="{% url 'upload:xml_error_report' report.id %}{% if can_review_reports %}#report-responses{% endif %}"
+                                   title="{% if can_review_reports and not report.xml_producer_ack %}{% trans 'Review report' %}{% else %}{% trans 'View review' %}{% endif %}">
+                                    {% if report.xml_producer_ack %}
+                                        {% icon name="check" classname="w-mr-1" %} {% translate "Completed" context "report review" %}
+                                    {% else %}
+                                        {% icon name="edit" classname="w-mr-1" %} {% translate "Pending" context "report review" %}
+                                    {% endif %}
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endwith %}
             {% endfor %}
         </tbody>
     </table>
-</div>
+</section>
 
-<div class="document-section">
-    <h2>{% trans "XML information" %}</h2>
+<section class="document-section">
+    {% for report in xml_info_reports %}
+        {% with report_summary=report.validation_summary %}
+            <div class="report-information" id="{% if forloop.first %}xi{% else %}xi{{ report.id }}{% endif %}">
+                <div>
+                    <h2><a class="upload-link report-title-link" href="{% url 'upload:xml_info_report' report.id %}">{{ report.display_heading }}</a></h2>
 
-    <table class="listing upload-report-table">
-        <thead>
-            <tr>
-                <th>{% trans "Name" %}</th>
-                <th>{% trans "Date" %}</th>
-                <th>{% trans "Validations" %}</th>
-                <th>{% trans "Actions" %}</th>
-            </tr>
-        </thead>
+                    {% if report_summary.state == "processing" %}
+                        {% include "upload/reports/state.html" with state=report_summary.state only %}
+                    {% endif %}
 
-        <tbody>
-            {% for report in xml_info_reports %}
-                <tr>
-                    <td class="title report-name"
-                        data-label="{% trans 'Name' %}">
-                        {{ report.title }}
-                    </td>
-                    <td class="report-date" data-label="{% trans 'Date' %}">
-                        <time datetime="{{ report.updated }}">
-                            <span>{{ report.updated|slice:":10" }}</span>
-                            <span>{{ report.updated|slice:"11:" }}</span>
-                        </time>
-                    </td>
-                    <td data-label="{% trans 'Validations' %}">{{ report.total }}</td>
-                    <td class="report-actions" data-label="{% trans 'Actions' %}">
-                        <span id="xi"></span>
-                        <a class="button button-small document-action"
-                           href="{% url 'wagtailsnippets_upload_xmlinforeport:edit' report.id %}">
-                            {% icon name='doc-full' %}
-                            {% trans "Open report" %}
-                        </a>
-                        {% if report.file_url %}
-                            <a class="button button-small document-action"
-                               href="{{ report.file_url }}"
-                               download>
-                                {% icon name="download" %}
-                                {% trans "Download CSV" %}
-                            </a>
-                        {% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+                    <p class="report-updated">{% blocktrans count total=report_summary.success_total with display_total=report_summary.success_total|floatformat:"0g" %}{{ display_total }} check with result OK{% plural %}{{ display_total }} checks with result OK{% endblocktrans %}</p>
+
+                    {% if report_summary.state != "success" and report_summary.state != "processing" %}
+                        {% include "upload/reports/state.html" with state=report_summary.state only %}
+                    {% endif %}
+
+                </div>
+            </div>
+        {% endwith %}
+    {% empty %}
+        <h2>{% trans "Successful XML checks" %}</h2>
+    {% endfor %}
+
+    <p class="document-summary-note">{% trans "This report lists successful checks. Warnings and issues appear in the other reports." %}</p>
+</section>

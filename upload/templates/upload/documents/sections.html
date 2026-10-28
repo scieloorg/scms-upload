@@ -1,0 +1,14 @@
+{% load i18n %}
+<nav class="document-section-navigation" aria-label="{% trans 'Document sections' %}">
+    <ul class="w-tabs__list document-sections">
+        {% for section in document_sections %}
+            <li>
+                <a class="w-tabs__tab"
+                   href="{{ section.url }}"
+                   {% if section.selected %}aria-current="page"{% endif %}>
+                    {{ section.label }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+</nav>

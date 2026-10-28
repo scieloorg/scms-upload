@@ -1,6 +1,25 @@
-{% load i18n %}
+{% load i18n wagtailadmin_tags %}
 
 <td class="document-publication">
-    <div>QA: {{ qa_publication.label|default:"—" }}</div>
-    <div>{% trans "Public" %}: {{ public_publication.label|default:"—" }}</div>
+    <div class="document-publication-destination">
+        <span>QA:</span>
+        {% if website_urls.QA %}
+            <a class="upload-link" href="{{ website_urls.QA }}" target="_blank" rel="noopener noreferrer" title="{% trans 'Open QA' %}" aria-label="{% trans 'Open QA' %}: {{ qa_publication.label }}">
+                {{ qa_publication.label|default:"—" }} {% icon name="link-external" %}
+            </a>
+        {% else %}
+            {{ qa_publication.label|default:"—" }}
+        {% endif %}
+    </div>
+
+    <div class="document-publication-destination">
+        <span>{% trans "Production" %}:</span>
+        {% if website_urls.PUBLIC %}
+            <a class="upload-link" href="{{ website_urls.PUBLIC }}" target="_blank" rel="noopener noreferrer" title="{% trans 'Open in Production' %}" aria-label="{% trans 'Open in Production' %}: {{ public_publication.label }}">
+                {{ public_publication.label|default:"—" }} {% icon name="link-external" %}
+            </a>
+        {% else %}
+            {{ public_publication.label|default:"—" }}
+        {% endif %}
+    </div>
 </td>

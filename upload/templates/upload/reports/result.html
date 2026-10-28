@@ -1,0 +1,108 @@
+{% load i18n upload_tags %}
+{% trans "Result" as default_title %}
+
+<article class="document-section report-finding report-severity-{{ result.status|lower }}" id="result-{{ result.id }}">
+    <div class="report-finding-heading">
+        <span class="report-result report-result-{{ result.status|lower }}">{{ result.get_status_display }}</span>
+        <h2>{{ result.focus|default:result.subject|default:default_title }}</h2>
+    </div>
+
+    <div class="report-finding-context">
+        {% if finding.reference %}
+            <span><span class="upload-field-label">{% trans "Reference" %}:</span> {{ finding.reference }}</span>
+        {% endif %}
+
+        {% if finding.location %}
+            <span>{{ finding.location }}</span>
+        {% endif %}
+
+        {% if finding.line != None %}
+            <span>{% blocktrans with line=finding.line %}Approximate line: {{ line }}{% endblocktrans %}</span>
+        {% endif %}
+    </div>
+
+    {% if finding.asset.name %}
+        <dl class="report-file-context upload-metadata">
+            <div>
+                <dt>{% trans "File" %}</dt>
+                <dd>{{ finding.asset.name }}</dd>
+            </div>
+
+            {% if finding.asset.xml_elem_id %}
+                <div>
+                    <dt>{% trans "XML element identifier" %}</dt>
+                    <dd>{{ finding.asset.xml_elem_id }}</dd>
+                </div>
+            {% endif %}
+
+            {% if finding.asset.xml_path %}
+                <div>
+                    <dt>{% trans "XML file" %}</dt>
+                    <dd>{{ finding.asset.xml_path }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endif %}
+
+    {% if finding.message %}
+        <div class="report-value report-message">
+            <strong>{% trans "Validation message" %}</strong>
+            <pre>{{ finding.message }}</pre>
+        </div>
+    {% endif %}
+
+    {% if finding.advice and finding.advice != finding.message %}
+        <div class="report-value report-advice">
+            <strong>{% trans "Advice" %}</strong>
+            <pre>{{ finding.advice }}</pre>
+        </div>
+    {% endif %}
+
+    {% if is_xml_errors %}
+        {% trans "Found value" as found_label %}
+        {% trans "Expected value" as expected_label %}
+
+        <dl class="report-comparison">
+            {% include "upload/reports/value.html" with label=found_label variant="found" value=result.got_value|validation_value only %}
+            {% include "upload/reports/value.html" with label=expected_label variant="expected" value=result.expected_value|validation_value only %}
+        </dl>
+    {% endif %}
+
+    {% if finding.assets %}
+        <table class="listing report-assets">
+            <thead>
+                <tr>
+                    <th>{% trans "File" %}</th>
+                    <th>{% trans "XML element identifier" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asset in finding.assets %}
+                    <tr>
+                        <td>{{ asset.name }}</td>
+                        <td>{{ asset.xml_elem_id|default:"—" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    <div class="report-supplement">
+        <details class="report-technical upload-details">
+            <summary>{% trans "Technical details" %}</summary>
+            <pre>{{ result.data|pretty_json }}</pre>
+        </details>
+    </div>
+
+    {% if is_xml_errors and not report_in_progress %}
+        <div class="report-response">
+            {% if finding.response_field %}
+                <label for="{{ finding.response_field.id_for_label }}">{{ finding.response_field.label }}</label>
+                {{ finding.response_field.errors }}
+                {{ finding.response_field }}
+            {% else %}
+                <span class="upload-field-label">{% trans "Response" %}:</span> {{ result.get_reaction_display|default:"—" }}
+            {% endif %}
+        </div>
+    {% endif %}
+</article>

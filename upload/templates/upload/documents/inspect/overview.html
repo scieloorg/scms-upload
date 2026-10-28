@@ -1,56 +1,16 @@
 {% load i18n wagtailadmin_tags %}
 
-<div class="document-actions-bar">
-    <a class="button button-small document-action" href="?tab=validations">
-        {% icon name="view" %}
-        {% trans "View results" %}
-    </a>
-
-    {% for action in document_actions %}
-        <a class="button button-small document-action" href="{{ action.url }}">
-            {% icon name=action.icon_name %}
-            {{ action.label }}
-        </a>
-    {% endfor %}
-
-    {% if validation_in_progress %}
-        <a class="button button-small document-action" href="?tab=overview">
-            {% icon name="rotate" %}
-            {% trans "Refresh" %}
-        </a>
-    {% elif summary.total_xml_errors or summary.total_xml_warnings or summary.critical_errors %}
-        <a class="button button-small document-action"
-           href="{% url 'upload:download_errors' %}?package_id={{ package_id }}">
-            {% icon name="download" %}
-            {% trans "Download CSV" %}
-        </a>
-    {% endif %}
-
-    {% for website in website_links %}
-        <a class="button button-small document-action"
-           href="{{ website.url }}"
-           target="_blank"
-           rel="noopener noreferrer">
-            {% if website.label == "PUBLIC" %}
-                {% icon name="globe" %}
-                {% trans "Public" %}
-            {% else %}
-                {% icon name="view" %}
-                QA
-            {% endif %}
-        </a>
-    {% endfor %}
-</div>
-
 <section class="document-section">
-    <h2>{% trans "Current situation" %}</h2>
+    <div class="upload-section-heading">
+        <h2>{% trans "Current situation" %}</h2>
+    </div>
 
-    <dl class="document-situation">
+    <dl class="document-situation upload-fields">
         <div>
             <dt>{% trans "Work status" %}</dt>
             <dd>
                 {% if validation_in_progress %}
-                    <span class="document-processing-status" role="status">
+                    <span class="processing-status" role="status">
                         {% trans "Processing" %}
                     </span>
                 {% else %}
@@ -64,11 +24,27 @@
         </div>
         <div>
             <dt>QA</dt>
-            <dd>{{ qa_publication.label|default:"—" }}</dd>
+            <dd>
+                {% if website_urls.QA %}
+                    <a class="upload-link" href="{{ website_urls.QA }}" target="_blank" rel="noopener noreferrer" aria-label="{% trans 'Open QA' %}: {{ qa_publication.label }}">
+                        {{ qa_publication.label|default:"—" }} {% icon name="link-external" %}
+                    </a>
+                {% else %}
+                    {{ qa_publication.label|default:"—" }}
+                {% endif %}
+            </dd>
         </div>
         <div>
-            <dt>{% trans "Public" %}</dt>
-            <dd>{{ public_publication.label|default:"—" }}</dd>
+            <dt>{% trans "Production" %}</dt>
+            <dd>
+                {% if website_urls.PUBLIC %}
+                    <a class="upload-link" href="{{ website_urls.PUBLIC }}" target="_blank" rel="noopener noreferrer" aria-label="{% trans 'Open in Production' %}: {{ public_publication.label }}">
+                        {{ public_publication.label|default:"—" }} {% icon name="link-external" %}
+                    </a>
+                {% else %}
+                    {{ public_publication.label|default:"—" }}
+                {% endif %}
+            </dd>
         </div>
     </dl>
 
@@ -77,8 +53,8 @@
             <h3 id="correction-request-heading">{% trans "Correction request" %}</h3>
 
             <p class="document-correction-assignee">
-                {% trans "Responsible for corrections" %}:
-                <strong>{{ object.assignee|default:"—" }}</strong>
+                <span class="upload-field-label">{% trans "Responsible for corrections" %}:</span>
+                <span>{{ object.assignee|default:"—" }}</span>
             </p>
 
             {% if latest_decision %}
@@ -95,12 +71,89 @@
     {% endif %}
 
     {% for error in blocking_errors %}
-        <div class="help-block help-critical">
+        {% help_block status="critical" %}
             <p>{{ error }}</p>
-        </div>
+        {% endhelp_block %}
     {% endfor %}
 </section>
 
 {% if not validation_in_progress %}
     {% include "upload/documents/inspect/summary.html" %}
 {% endif %}
+
+<div class="document-overview-grid">
+    <section class="document-section">
+        <div class="upload-section-heading">
+            <h2>{% trans "Report review" %}</h2>
+            <a class="upload-link" href="?tab=validations">
+                {% trans "View reports" %} {% icon name="arrow-right" %}
+            </a>
+        </div>
+
+        {% if validation_in_progress %}
+            <p class="document-summary-note">{% trans "Review will be available after report generation finishes." %}</p>
+        {% else %}
+            <dl class="overview-review-counts upload-fields upload-statistics">
+                <div>
+                    <dt>{% trans "Review pending" %}</dt>
+                    <dd class="{% if pending_review_count %}overview-pending{% endif %}">{{ pending_review_count }}</dd>
+                </div>
+                <div>
+                    <dt>{% trans "Review completed" %}</dt>
+                    <dd>{{ completed_review_count }}</dd>
+                </div>
+            </dl>
+
+            {% if pending_review_count %}
+                <p class="document-summary-note">{% trans "Open the validation reports to review the findings and record your responses." %}</p>
+            {% endif %}
+        {% endif %}
+    </section>
+
+    <section class="document-section">
+        <div class="upload-section-heading">
+            <h2>{% trans "Submitted package" %}</h2>
+            <a class="upload-link" href="?tab=files">
+                {% trans "Files and data" %} {% icon name="arrow-right" %}
+            </a>
+        </div>
+
+        <dl class="overview-metadata upload-metadata">
+            {% if submitted_package_filename %}
+                <div>
+                    <dt>{% trans "File" %}</dt>
+                    <dd>{{ submitted_package_filename }}</dd>
+                </div>
+            {% endif %}
+
+            <div>
+                <dt>{% trans "Date" %}</dt>
+                <dd>{{ object.pkg_zip.created|default:object.created }}</dd>
+            </div>
+            <div>
+                <dt>{% trans "Creator" %}</dt>
+                <dd>{{ object.pkg_zip.creator|default:object.creator }}</dd>
+            </div>
+        </dl>
+    </section>
+</div>
+
+<section class="document-section">
+    <div class="upload-section-heading">
+        <h2>{% trans "Latest decision" %}</h2>
+        <a class="upload-link" href="?tab=history">
+            {% trans "View history" %} {% icon name="arrow-right" %}
+        </a>
+    </div>
+
+    {% if latest_activity %}
+        <p>{{ latest_activity.decision_display }}</p>
+        <p class="document-summary-note">{{ latest_activity.created }} · {{ latest_activity.creator }}</p>
+
+        {% if latest_activity.detail.comment and object.status != "pending-correction" %}
+            <p>{{ latest_activity.detail.comment|linebreaksbr }}</p>
+        {% endif %}
+    {% else %}
+        <p class="document-empty">{% trans "No decisions recorded." %}</p>
+    {% endif %}
+</section>

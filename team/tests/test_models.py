@@ -3,6 +3,7 @@ from datetime import date
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
+from django.utils.translation import override
 
 from collection.models import Collection
 from journal.models import Journal
@@ -68,6 +69,7 @@ class CollectionTeamMemberModelTest(TestCase):
         )
         self.assertEqual(member.role, TeamRole.MEMBER)
 
+    @override("en")
     def test_autocomplete_label_includes_role(self):
         member = CollectionTeamMember.objects.create(
             user=self.user,
@@ -80,6 +82,7 @@ class CollectionTeamMemberModelTest(TestCase):
         self.assertIn(str(self.user), label)
         self.assertIn(str(self.collection), label)
 
+    @override("en")
     def test_str_includes_role(self):
         manager = CollectionTeamMember.objects.create(
             user=self.manager_user,
