@@ -223,7 +223,7 @@ class PackageDecisionMixin:
         if decision == choices.PS_PENDING_CORRECTION:
             permission = REQUEST_CORRECTION
         elif decision == choices.PS_PENDING_QA_DECISION:
-            permission = ASSIGN_PACKAGE
+            raise PermissionDenied
         else:
             permission = PUBLISH_PACKAGE
         if not user_can_act_on_package(self.request.user, permission, form.instance):

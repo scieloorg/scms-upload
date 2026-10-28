@@ -9,7 +9,7 @@ from core.forms import CoreAdminModelForm
 from team.models import CollectionTeamMember, TeamRole
 from upload import choices
 from upload.authorization import user_can_act_on_package
-from upload.permissions import ASSIGN_PACKAGE, PUBLISH_PACKAGE, REQUEST_CORRECTION
+from upload.permissions import PUBLISH_PACKAGE, REQUEST_CORRECTION
 from upload.querysets import (
     correction_assignee_queryset,
     review_assignee_queryset,
@@ -52,13 +52,6 @@ class DelegateReviewForm(forms.Form):
 
 
 class PackageDecisionForm(CoreAdminModelForm):
-    reviewer = forms.ModelChoiceField(
-        queryset=get_user_model().objects.none(),
-        label=_("Reviewer"),
-        help_text=_("Choose who will review this document."),
-        required=False,
-    )
-
     correction_assignee = forms.ModelChoiceField(
         queryset=get_user_model().objects.none(),
         label=_("Responsible for corrections"),
@@ -99,7 +92,7 @@ class PackageDecisionForm(CoreAdminModelForm):
         )
         self.fields["qa_comment"].label = _("Justification / instructions")
         self.fields["qa_comment"].help_text = _(
-            "Describe the corrections needed or provide instructions for the reviewer."
+            "Describe the corrections needed or justify the publication decision."
         )
 
         linked_queryset = self.fields["linked"].queryset
@@ -116,8 +109,6 @@ class PackageDecisionForm(CoreAdminModelForm):
         allowed_decisions = set()
         if user_can_act_on_package(self.for_user, REQUEST_CORRECTION, self.instance):
             allowed_decisions.add(choices.PS_PENDING_CORRECTION)
-        if user_can_act_on_package(self.for_user, ASSIGN_PACKAGE, self.instance):
-            allowed_decisions.add(choices.PS_PENDING_QA_DECISION)
         if user_can_act_on_package(self.for_user, PUBLISH_PACKAGE, self.instance):
             allowed_decisions.update(
                 (
@@ -141,20 +132,11 @@ class PackageDecisionForm(CoreAdminModelForm):
             if not value or value in allowed_decisions
         ]
 
-        reviewers = review_assignee_queryset(self.instance)
-        self.fields["reviewer"].queryset = reviewers
-        if self.instance.qa_decision == choices.PS_PENDING_QA_DECISION:
-            self.initial["reviewer"] = self.instance.assignee_id
-        elif self.instance.analyst_id:
-            self.initial["reviewer"] = self.instance.analyst.user_id
-
         decision = (
             self.data.get(self.add_prefix("qa_decision"))
             if self.is_bound
             else self.initial.get("qa_decision")
         )
-        if decision != choices.PS_PENDING_QA_DECISION:
-            self.initial["reviewer"] = None
 
         if not self.for_user.is_superuser and decision in (
             choices.PS_READY_TO_PREVIEW,
@@ -164,10 +146,6 @@ class PackageDecisionForm(CoreAdminModelForm):
                 linked_queryset, self.for_user, permission=PUBLISH_PACKAGE
             )
 
-        if decision != choices.PS_PENDING_QA_DECISION or not user_can_act_on_package(
-            self.for_user, ASSIGN_PACKAGE, self.instance
-        ):
-            self.fields["reviewer"].disabled = True
         if decision != choices.PS_PENDING_CORRECTION:
             self.fields["correction_assignee"].disabled = True
         if decision not in (
@@ -207,10 +185,11 @@ class PackageDecisionForm(CoreAdminModelForm):
         if not decision:
             self.add_error("qa_decision", _("Choose an action for this document"))
 
-        if decision == choices.PS_PENDING_QA_DECISION and not cleaned_data.get(
-            "reviewer"
+        if (
+            self.data.get(self.add_prefix("qa_decision"))
+            == choices.PS_PENDING_QA_DECISION
         ):
-            self.add_error("reviewer", _("Choose who will review this document."))
+            self.add_error(None, _("Use Delegate review to assign a reviewer."))
 
         if decision == choices.PS_PENDING_CORRECTION:
             if not (cleaned_data.get("qa_comment") or "").strip():
@@ -225,9 +204,6 @@ class PackageDecisionForm(CoreAdminModelForm):
         return cleaned_data
 
     def _set_current_user_as_analyst(self, package, user):
-        if package.qa_decision == choices.PS_PENDING_QA_DECISION:
-            return
-
         package.analyst = CollectionTeamMember.objects.filter(
             user=user,
             is_active_member=True,
@@ -237,13 +213,6 @@ class PackageDecisionForm(CoreAdminModelForm):
     def _set_assignee(self, package):
         if package.qa_decision == choices.PS_PENDING_CORRECTION:
             package.assignee = self.cleaned_data["correction_assignee"]
-        elif package.qa_decision == choices.PS_PENDING_QA_DECISION:
-            package.assignee = self.cleaned_data["reviewer"]
-            package.analyst = CollectionTeamMember.objects.filter(
-                user=package.assignee,
-                is_active_member=True,
-                collection__journalcollection__journal=package.journal,
-            ).first()
         else:
             package.assignee = None
 

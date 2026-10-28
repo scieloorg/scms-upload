@@ -32,9 +32,6 @@ def decision_panels():
             [
                 FieldPanel("qa_decision"),
                 FieldPanel(
-                    "reviewer", attrs={"data-upload-decision-target": "reviewer"}
-                ),
-                FieldPanel(
                     "correction_assignee",
                     attrs={"data-upload-decision-target": "corrections"},
                 ),
