@@ -592,15 +592,16 @@ class PkgZipBuilder:
             try:
                 if rendition.lang:
                     sps_filename = f"{self.sps_pkg_name}-{rendition.lang}.pdf"
-                    pdf_langs.add(rendition.lang)
+                    pdf_lang = rendition.lang
                 else:
                     sps_filename = f"{self.sps_pkg_name}.pdf"
-                    pdf_langs.add(xml_langs[0])
+                    pdf_lang = xml_langs[0]
+                pdf_langs.add(pdf_lang)
 
                 zf.write(rendition.file.path, arcname=sps_filename)
 
                 self.components[sps_filename] = {
-                    "lang": rendition.lang,
+                    "lang": pdf_lang,
                     "legacy_uri": rendition.original_href,
                     "component_type": "rendition",
                 }
