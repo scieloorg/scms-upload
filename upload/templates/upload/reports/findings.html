@@ -1,0 +1,19 @@
+{% load i18n %}
+
+<div class="report-outcome">
+    {% if report_summary.state != "error" and report_summary.state != "warning" and report_summary.state != "processing" %}
+        {% include "upload/reports/state.html" with state=report_summary.state only %}
+    {% endif %}
+
+    {% if report_summary.state != "success" %}
+        <ul class="validation-counts">
+            {% for finding in report_summary.counts %}
+                {% if finding.status != "ok" %}
+                    <li class="validation-count validation-count-{{ finding.status }}">
+                        <span>{{ finding.label }}</span><strong>{{ finding.total }}</strong>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    {% endif %}
+</div>
