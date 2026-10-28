@@ -17,9 +17,11 @@ ArticleProc) e não têm pid v3 (como os XML gerados a partir do site clássico)
 - o pid v2 e a versão do XML de cada coleção ficam em CollectionPidV2
 """
 
+from importlib import import_module
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase, override_settings
@@ -27,6 +29,7 @@ from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from collection.models import ENSURE_NETWORK_CLASSIFICATION_CACHE_KEY, Collection
 from journal.models import Journal, OfficialJournal
+from package.models import SPSPkg
 from pid_provider import exceptions
 from pid_provider.models import (
     CollectionPidV2,
@@ -34,6 +37,7 @@ from pid_provider.models import (
     PidProviderXML,
     XMLVersion,
 )
+from pid_provider.tasks import task_complete_collection_pid_v2_sps_pkg_name
 from proc.models import JournalProc
 
 User = get_user_model()
@@ -528,6 +532,85 @@ class XMLVersionByCollectionTest(RegisterSameArticleInDifferentCollectionsTestBa
         self.assertEqual(psi_version.xml_with_pre.v2, PSI_V2)
         self.assertEqual(scl_version.xml_with_pre.collection, "scl")
         self.assertEqual(psi_version.xml_with_pre.collection, "psi")
+
+    def test_each_collection_has_sps_pkg_name_of_its_current_version(self):
+        self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+
+        for item in CollectionPidV2.objects.all():
+            with self.subTest(collection=item.collection.acron):
+                self.assertIsNotNone(item.sps_pkg_name)
+                self.assertEqual(
+                    item.sps_pkg_name, item.current_version.xml_with_pre.sps_pkg_name
+                )
+
+    def test_complete_sps_pkg_name(self):
+        self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+        expected = dict(
+            CollectionPidV2.objects.values_list("id", "sps_pkg_name")
+        )
+        CollectionPidV2.objects.update(sps_pkg_name=None)
+
+        ids = CollectionPidV2.get_ids_to_complete_sps_pkg_name()
+        result = CollectionPidV2.complete_sps_pkg_name(self.user, list(ids))
+
+        self.assertEqual(result, {"updated": 2, "failed": 0})
+        self.assertEqual(
+            dict(CollectionPidV2.objects.values_list("id", "sps_pkg_name")),
+            expected,
+        )
+
+    def test_get_ids_to_complete_sps_pkg_name(self):
+        self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+        all_ids = list(CollectionPidV2.objects.order_by("id").values_list("id", flat=True))
+
+        self.assertEqual(list(CollectionPidV2.get_ids_to_complete_sps_pkg_name()), [])
+        self.assertEqual(
+            list(CollectionPidV2.get_ids_to_complete_sps_pkg_name(force_update=True)),
+            all_ids,
+        )
+
+    def test_task_complete_sps_pkg_name_dispatches_batches(self):
+        self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+        CollectionPidV2.objects.update(sps_pkg_name=None)
+        ids = list(CollectionPidV2.objects.order_by("id").values_list("id", flat=True))
+
+        with patch(
+            "pid_provider.tasks.subtask_complete_collection_pid_v2_sps_pkg_name.apply_async"
+        ) as mock_apply_async:
+            result = task_complete_collection_pid_v2_sps_pkg_name(
+                user_id=self.user.id, batch_size=1
+            )
+
+        self.assertEqual(result, {"total": 2, "batch_size": 1})
+        self.assertEqual(
+            [call.kwargs["kwargs"]["ids"] for call in mock_apply_async.call_args_list],
+            [[ids[0]], [ids[1]]],
+        )
+
+    def test_migration_copies_sps_pkg_name_from_sps_pkg(self):
+        self.register(scl_xml(), "scl")
+        self.register(psi_xml(), "psi")
+        scl_item = CollectionPidV2.objects.get(collection=self.scl)
+        psi_item = CollectionPidV2.objects.get(collection=self.psi)
+        CollectionPidV2.objects.update(sps_pkg_name=None)
+        SPSPkg.objects.create(
+            creator=self.user, sps_pkg_name="pkg-scl", collection_pid_v2=scl_item
+        )
+
+        migration = import_module(
+            "pid_provider.migrations.0019_collectionpidv2_sps_pkg_name"
+        )
+        migration.copy_sps_pkg_name_from_sps_pkg(django_apps, None)
+
+        scl_item.refresh_from_db()
+        psi_item.refresh_from_db()
+        self.assertEqual(scl_item.sps_pkg_name, "pkg-scl")
+        # sem pacote: completado pelo script, a partir de current_version
+        self.assertIsNone(psi_item.sps_pkg_name)
 
     def test_current_version_is_the_main_collection_version(self):
         self.register(scl_xml(), "scl")
