@@ -11,6 +11,7 @@ from team.models import CollectionTeamMember, TeamRole
 from upload import choices
 from upload.delegation import DELEGATION_EVENT, can_delegate_review, delegate_review
 from upload.models import Package, UploadProcResult, ValidationReport
+from upload.wagtail_hooks import QualityAnalysisPackageViewSet
 
 
 @pytest.fixture
@@ -136,6 +137,46 @@ def test_assignment_rolls_back_with_event_failure(quality_review_context, monkey
     package.refresh_from_db()
 
     assert package.assignee == ctx["ana"] and not package.upload_proc_result.exists()
+
+
+@pytest.mark.parametrize("forgery", ["article", "event"])
+def test_decision_form_protects_article_and_events(quality_review_context, forgery):
+    ctx = quality_review_context
+    package = ctx["package"]
+
+    event = UploadProcResult.objects.create(
+        proc=package, creator=ctx["ana"], name="original"
+    )
+
+    data = {
+        "qa_decision": choices.PS_READY_TO_PREVIEW,
+        "order": package.order,
+        "reviewer": ctx["bruno"].pk,
+        "upload_proc_result-TOTAL_FORMS": "1",
+        "upload_proc_result-INITIAL_FORMS": "1",
+        "upload_proc_result-0-id": event.pk,
+        "upload_proc_result-0-name": "forged",
+        "upload_proc_result-0-DELETE": "on",
+    }
+
+    if forgery == "article":
+        data["article"] = "999999"
+
+    form = QualityAnalysisPackageViewSet().get_form_class()(
+        data=data, instance=package, for_user=ctx["ana"]
+    )
+
+    assert "reviewer" not in form.fields and "article" not in form.fields
+    assert "upload_proc_result" not in form.formsets
+    assert form.is_valid() == (forgery == "event"), form.errors
+
+    if forgery == "event":
+        form.save_all(ctx["ana"])
+
+    event.refresh_from_db()
+    package.refresh_from_db()
+
+    assert event.name == "original" and package.article_id is None
 
 
 @pytest.mark.parametrize("model", ["qapackage", "readytopublishpackage"])
