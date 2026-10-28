@@ -1,6 +1,7 @@
 from django.urls import path
 
 from upload.views import (
+    DelegateReviewView,
     archive_package,
     assign,
     display_xml,
@@ -14,6 +15,11 @@ from upload.views import (
 app_name = "upload"
 
 urlpatterns = [
+    path(
+        "documents/<int:pk>/delegate/",
+        DelegateReviewView.as_view(),
+        name="delegate_review",
+    ),
     path("retry-publication", view=retry_publication, name="retry_publication"),
     path("assign", view=assign, name="assign"),
     path("preview-document", view=preview_document, name="preview_document"),

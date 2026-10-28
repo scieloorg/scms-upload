@@ -477,7 +477,7 @@ def assign(request):
         get_scoped_package_queryset(request.user, ASSIGN_PACKAGE), pk=package_id
     )
 
-    return redirect("wagtailsnippets_upload_qapackage:edit", pk=package_id)
+    return redirect("upload:delegate_review", pk=package_id)
 
 
 def archive_package(request):

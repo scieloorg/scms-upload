@@ -2,6 +2,7 @@ from io import StringIO
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.urls import reverse
 
 from collection.models import Collection
 from journal.models import Journal, JournalCollection, OfficialJournal
@@ -9,7 +10,7 @@ from team.management.commands.create_user_groups import Command
 from team.models import CollectionTeamMember, TeamRole
 from upload import choices
 from upload.delegation import DELEGATION_EVENT, can_delegate_review, delegate_review
-from upload.models import Package, UploadProcResult
+from upload.models import Package, UploadProcResult, ValidationReport
 from upload.wagtail_hooks import (
     QualityAnalysisPackageViewSet,
     ReadyToPublishPackageViewSet,
@@ -138,6 +139,38 @@ def test_assignment_rolls_back_with_event_failure(quality_review_context, monkey
 
     package.refresh_from_db()
 
+    assert package.assignee == ctx["ana"] and not package.upload_proc_result.exists()
+
+
+@pytest.mark.parametrize("restriction", ["revoked", "validation_pending"])
+def test_post_revalidates_availability_after_opening_form(
+    client, quality_review_context, restriction
+):
+    ctx = quality_review_context
+    package = ctx["package"]
+    client.force_login(ctx["ana"])
+    url = reverse("upload:delegate_review", args=[package.pk])
+
+    assert client.get(url).status_code == 200
+    if restriction == "revoked":
+        CollectionTeamMember.objects.filter(user=ctx["ana"]).update(
+            is_active_member=False
+        )
+    else:
+        ValidationReport.objects.create(
+            package=package,
+            creator=ctx["ana"],
+            creation=choices.REPORT_CREATION_WIP,
+        )
+
+    response = client.post(url, {"reviewer": ctx["bruno"].pk}, follow=True)
+    package.refresh_from_db()
+
+    assert response.status_code == (404 if restriction == "revoked" else 200)
+    if restriction == "validation_pending":
+        assert response.redirect_chain[-1] == (reverse("wagtailadmin_home"), 302)
+
+    assert client.get(url, follow=True).status_code == response.status_code
     assert package.assignee == ctx["ana"] and not package.upload_proc_result.exists()
 
 
