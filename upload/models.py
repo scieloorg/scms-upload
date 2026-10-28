@@ -1773,6 +1773,43 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
 
 
 class BaseValidationReport(CommonControlField):
+    REPORT_GROUP_LABELS = {
+        "journal-meta": _("Journal metadata"),
+        "subject": _("Subjects"),
+        "table-wrap": _("Tables"),
+        "list": _("Lists"),
+        "article-id": _("Document identifiers"),
+        "article dates": _("Document dates"),
+        "history": _("Editorial dates"),
+        "article-type": _("Document type"),
+        "contrib": _("Contributors"),
+        "aff": _("Affiliations"),
+        "author-notes": _("Author notes"),
+        "id and rid": _("Identifiers and cross-references"),
+        "fig": _("Figures"),
+        "disp-formula": _("Display formulas"),
+        "inline-formula": _("Inline formulas"),
+        "reference": _("References"),
+        "accessibility": _("Accessibility"),
+        "app": _("Appendices"),
+        "ext-link": _("External links"),
+        "graphic": _("Images"),
+        "sec": _("Sections"),
+    }
+
+    REPORT_NAMES = (
+        gettext_noop("XML Error Report"),
+        gettext_noop("XML Info Report"),
+        gettext_noop("Assets Report"),
+        gettext_noop("Renditions Report"),
+        gettext_noop("Renditions content report"),
+        gettext_noop("DTD Report"),
+        gettext_noop("Style checker Report"),
+        gettext_noop("Web page Report"),
+        gettext_noop("Package file"),
+        gettext_noop("File Report"),
+    )
+
     title = models.CharField(_("Title"), null=True, blank=True, max_length=128)
     category = models.CharField(
         _("Validation category"),
@@ -1831,14 +1868,27 @@ class BaseValidationReport(CommonControlField):
 
     @display(description=_("Title"), ordering="title")
     def display_title(self):
+        """Traduz o título para exibição sem alterar o valor armazenado."""
         if not self.title:
             return self.title
 
-        title, separator, group = self.title.partition(": ")
-        if title == "XML Error Report" and separator:
-            return f"{gettext(title)}: {group}"
+        name, separator, group = self.title.partition(": ")
+        if name not in self.REPORT_NAMES:
+            return gettext(self.title)
 
-        return gettext(self.title)
+        translated = gettext(
+            "Successful XML checks" if name == "XML Info Report" else name
+        )
+        return f"{translated}: {group}" if separator else translated
+
+    @property
+    def display_heading(self):
+        title, separator, group = (self.title or "").partition(": ")
+
+        if title == "XML Error Report" and separator:
+            return self.REPORT_GROUP_LABELS.get(group, group)
+
+        return self.display_title()
 
     @classmethod
     def get(cls, package=None, title=None, category=None):
