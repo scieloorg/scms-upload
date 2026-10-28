@@ -51,11 +51,13 @@ class ValidationReportFilterSet(WagtailFilterSet):
 class XMLErrorReportFilterSet(ValidationReportFilterSet):
     class Meta(ValidationReportFilterSet.Meta):
         model = XMLErrorReport
+        fields = ("creation",)
 
 
 class XMLInfoReportFilterSet(ValidationReportFilterSet):
     class Meta(ValidationReportFilterSet.Meta):
         model = XMLInfoReport
+        fields = ("creation",)
 
 
 class PackageValidationReportFilterSet(ValidationReportFilterSet):
@@ -66,7 +68,6 @@ class PackageValidationReportFilterSet(ValidationReportFilterSet):
 def scoped_validation_reports(request):
     if request is None:
         return ValidationReport.objects.none()
-
     return ValidationReport.objects.filter(
         package__in=get_scoped_package_queryset(request.user)
     ).select_related("package")
@@ -78,7 +79,6 @@ class PackageValidationResultFilterSet(WagtailFilterSet):
         lookup_expr="icontains",
         label=_("Document"),
     )
-
     report = ModelChoiceFilter(
         label=_("Report"),
         queryset=scoped_validation_reports,
@@ -111,7 +111,7 @@ class DocumentFilterSet(WagtailFilterSet):
         empty_label=_("All"),
     )
     public_ws_status = ChoiceFilter(
-        label=_("Public"),
+        label=_("Production"),
         choices=[
             (value, PUBLICATION_STATE_LABELS.get(value, label))
             for value, label in choices.WEBSITE_STATUS
