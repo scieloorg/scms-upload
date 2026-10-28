@@ -142,6 +142,53 @@ def test_assignment_rolls_back_with_event_failure(quality_review_context, monkey
     assert package.assignee == ctx["ana"] and not package.upload_proc_result.exists()
 
 
+def test_url_identity_assignment_and_history(client, quality_review_context):
+    ctx = quality_review_context
+    package = ctx["package"]
+    client.force_login(ctx["ana"])
+    url = reverse("upload:delegate_review", args=[package.pk])
+
+    response = client.get(url)
+
+    assert response.status_code == 200
+    document_url = reverse("wagtailsnippets_upload_package:inspect", args=[package.pk])
+    identity = response.context["document_identity"]
+    assert identity["title"] == identity["identifier"] == package.name
+    assert identity["journal"] == str(package.journal)
+    assert f'href="{document_url}"'.encode() in response.content
+
+    response = client.post(url, {"reviewer": package.creator_id})
+
+    assert response.status_code == 200 and "reviewer" in response.context["form"].errors
+    assert not package.upload_proc_result.exists()
+
+    other = Package.objects.create(
+        name="other", creator=package.creator, assignee=ctx["ana"]
+    )
+
+    response = client.post(
+        url,
+        {
+            "package_id": other.pk,
+            "reviewer": ctx["bruno"].pk,
+            "instructions": "Check references",
+        },
+    )
+
+    assert response.status_code == 302 and response.url == document_url
+
+    history = client.get(response.url, {"tab": "history"})
+
+    assert history.status_code == 200 and b"Check references" in history.content
+
+    package.refresh_from_db()
+    other.refresh_from_db()
+
+    assert package.assignee == ctx["bruno"]
+    assert other.assignee == ctx["ana"] and not other.upload_proc_result.exists()
+    assert package.upload_proc_result.filter(name=DELEGATION_EVENT).count() == 1
+
+
 @pytest.mark.parametrize("restriction", ["revoked", "validation_pending"])
 def test_post_revalidates_availability_after_opening_form(
     client, quality_review_context, restriction
