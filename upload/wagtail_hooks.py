@@ -38,6 +38,7 @@ from upload.document_workflow import QUEUE_LABELS, document_queue_filter
 from upload.filters import (
     DocumentFilterSet,
     PackageValidationReportFilterSet,
+    PackageValidationResultFilterSet,
     SubmissionFilterSet,
     XMLErrorReportFilterSet,
     XMLInfoReportFilterSet,
@@ -496,7 +497,7 @@ class XMLErrorReportViewSet(BaseUploadViewSet):
     menu_icon = "clipboard-list"
     add_to_settings_menu = False
     list_display = (
-        "package",
+        TitleColumn("package", label=_("Document"), url_name="upload:xml_error_report"),
         "category",
         "display_title",
         "creation",
@@ -510,6 +511,7 @@ class XMLErrorReportViewSet(BaseUploadViewSet):
 
 
 class XMLErrorViewSet(BaseUploadViewSet):
+    inspect_view_enabled = True
     model = XMLError
     package_scope_field = "report__package"
     menu_label = _("XML errors")
@@ -524,6 +526,7 @@ class XMLErrorViewSet(BaseUploadViewSet):
         "report",
     )
     list_filter = (
+        "status",
         "validation_type",
         "parent",
         "parent_id",
@@ -534,8 +537,8 @@ class XMLErrorViewSet(BaseUploadViewSet):
         "focus",
         "message",
         "advice",
-        "package__name",
-        "package__file",
+        "report__package__name",
+        "report__package__file",
     )
 
 
@@ -548,7 +551,7 @@ class XMLInfoReportViewSet(BaseUploadViewSet):
     menu_icon = "info-circle"
     add_to_settings_menu = False
     list_display = (
-        "package",
+        TitleColumn("package", label=_("Document"), url_name="upload:xml_info_report"),
         "category",
         "display_title",
         "creation",
@@ -585,8 +588,8 @@ class XMLInfoViewSet(BaseUploadViewSet):
     search_fields = (
         "focus",
         "message",
-        "package__name",
-        "package__file",
+        "report__package__name",
+        "report__package__file",
     )
 
 
@@ -599,7 +602,9 @@ class ValidationReportViewSet(BaseUploadViewSet):
     menu_icon = "clipboard-list"
     add_to_settings_menu = False
     list_display = (
-        "package",
+        TitleColumn(
+            "package", label=_("Document"), url_name="upload:package_validation_report"
+        ),
         "category",
         "display_title",
         "creation",
@@ -613,6 +618,7 @@ class ValidationReportViewSet(BaseUploadViewSet):
 
 
 class ValidationViewSet(BaseUploadViewSet):
+    inspect_view_enabled = True
     model = PkgValidationResult
     package_scope_field = "report__package"
     menu_label = _("Package checks")
@@ -625,11 +631,13 @@ class ValidationViewSet(BaseUploadViewSet):
         "message",
         "created",
     )
-    list_filter = ("status",)
+    filterset_class = PackageValidationResultFilterSet
     search_fields = (
         "subject",
         "status",
         "message",
+        "report__package__name",
+        "report__package__file",
     )
 
 
