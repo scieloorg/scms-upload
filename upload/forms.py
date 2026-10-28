@@ -6,8 +6,6 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import CoreAdminModelForm
-from core.users.scoped_queryset import scope_by_membership
-from team.authorization import get_user_permission_journal_ids
 from team.models import CollectionTeamMember, TeamRole
 from upload import choices
 from upload.authorization import user_can_act_on_package
@@ -104,15 +102,9 @@ class PackageDecisionForm(CoreAdminModelForm):
             "Describe the corrections needed or provide instructions for the reviewer."
         )
 
-        article_queryset = self.fields["article"].queryset
         linked_queryset = self.fields["linked"].queryset
 
         if not self.for_user.is_superuser:
-            article_queryset = scope_by_membership(
-                self.for_user,
-                article_queryset,
-                journal_field="journal",
-            )
             linked_queryset = scope_package_queryset(
                 linked_queryset,
                 self.for_user,
@@ -168,10 +160,6 @@ class PackageDecisionForm(CoreAdminModelForm):
             choices.PS_READY_TO_PREVIEW,
             choices.PS_READY_TO_PUBLISH,
         ):
-            journal_ids = get_user_permission_journal_ids(
-                self.for_user, "upload", PUBLISH_PACKAGE
-            )
-            article_queryset = article_queryset.filter(journal_id__in=journal_ids)
             linked_queryset = scope_package_queryset(
                 linked_queryset, self.for_user, permission=PUBLISH_PACKAGE
             )
@@ -187,7 +175,6 @@ class PackageDecisionForm(CoreAdminModelForm):
             choices.PS_READY_TO_PUBLISH,
         ) or not user_can_act_on_package(self.for_user, PUBLISH_PACKAGE, self.instance):
             for field in (
-                "article",
                 "linked",
                 "order",
                 "force_journal_publication",
@@ -195,7 +182,6 @@ class PackageDecisionForm(CoreAdminModelForm):
             ):
                 self.fields[field].disabled = True
 
-        self.fields["article"].queryset = article_queryset.distinct()
         self.fields["linked"].queryset = linked_queryset.distinct()
 
         candidates = correction_assignee_queryset(self.instance)
@@ -211,6 +197,13 @@ class PackageDecisionForm(CoreAdminModelForm):
     def clean(self):
         cleaned_data = super().clean()
         decision = cleaned_data.get("qa_decision")
+
+        if self.data.get(self.add_prefix("article")) not in (None, "", "null"):
+            self.add_error(
+                None,
+                _("The document article cannot be changed when recording a decision."),
+            )
+
         if not decision:
             self.add_error("qa_decision", _("Choose an action for this document"))
 

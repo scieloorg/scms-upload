@@ -346,13 +346,9 @@ class Package(CommonControlField, ClusterableModel):
         FieldPanel("qa_ws_status", read_only=True),
         FieldPanel("public_ws_status", read_only=True),
     ]
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
-    ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panels, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
         ]
     )
     base_form_class = UploadPackageForm
@@ -1426,7 +1422,7 @@ class QAPackage(Package):
     """
 
     panel_id = [
-        AutocompletePanel("article", read_only=False),
+        FieldPanel("article", read_only=True),
     ]
     panel_numbers = [
         FieldPanel("critical_errors", read_only=True),
@@ -1437,15 +1433,11 @@ class QAPackage(Package):
         FieldPanel("status", read_only=True),
     ]
     panel_decision = decision_panels()
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
-    ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panel_decision, heading=_("Decision")),
             ObjectList(panel_id, heading=_("Article")),
             ObjectList(panel_numbers, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
         ]
     )
     base_form_class = QAPackageForm
@@ -1462,7 +1454,7 @@ class ReadyToPublishPackage(Package):
     """
 
     panel_id = [
-        AutocompletePanel("article", read_only=False),
+        FieldPanel("article", read_only=True),
     ]
     panel_numbers = [
         FieldPanel("critical_errors", read_only=True),
@@ -1473,10 +1465,6 @@ class ReadyToPublishPackage(Package):
         FieldPanel("status", read_only=True),
     ]
     panel_decision = decision_panels()
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
-    ]
-
     panel_publication_status = [
         FieldPanel("qa_ws_status", read_only=True),
         FieldPanel("qa_ws_pubdate", read_only=True),
@@ -1489,7 +1477,6 @@ class ReadyToPublishPackage(Package):
             ObjectList(panel_id, heading=_("Article")),
             ObjectList(panel_publication_status, heading=_("Publication Status")),
             ObjectList(panel_numbers, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
         ]
     )
 

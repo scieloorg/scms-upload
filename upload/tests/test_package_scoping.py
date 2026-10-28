@@ -640,8 +640,13 @@ class PackageScopingTest(TestCase):
                     self.analyst_user, self.analyst_user, choices.PS_READY_TO_PUBLISH
                 )
                 form.data[field] = value
+
                 self.assertFalse(form.is_valid())
-                self.assertIn(field, form.errors)
+                if field == "article":
+                    self.assertNotIn("article", form.fields)
+                    self.assertTrue(form.non_field_errors())
+                else:
+                    self.assertIn(field, form.errors)
 
     def test_publication_permission_does_not_follow_a_journal_membership(self):
         JournalTeamMember.objects.create(
