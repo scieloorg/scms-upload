@@ -2,19 +2,45 @@ import logging
 from functools import partial
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.db import transaction
-from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseNotAllowed,
+    HttpResponseRedirect,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.http import content_disposition_header
 from django.utils.translation import gettext_lazy as _
+from django.views.generic import TemplateView
+from django.views.generic.edit import FormView
+from wagtail.admin.views.generic.base import WagtailAdminTemplateMixin
+from wagtail.admin.widgets import Button
 from wagtail.snippets.views.snippets import CreateView
 
-from collection.choices import WEBSITE_KIND
 from core.users.permission_policies import TeamScopedEditView
+from upload.admin_buttons import (
+    get_document_downloads,
+    get_document_sections,
+    get_package_action_buttons,
+)
 from upload.authorization import user_can_act_on_package
-from upload.models import Package, UploadProcResult, choices
+from upload.delegation import can_delegate_review, delegate_review
+from upload.forms import DelegateReviewForm, ReportResponsesForm
+from upload.models import (
+    BaseXMLValidationResult,
+    Package,
+    UploadProcResult,
+    XMLError,
+    XMLErrorReport,
+    XMLInfoReport,
+    choices,
+)
+from upload.permission_policies import UploadModelPermissionPolicy
 from upload.permissions import (
     ASSIGN_PACKAGE,
     FINISH_DEPOSIT,
@@ -35,6 +61,239 @@ from upload.tasks import (
     task_upload_workflow_publish_article,
 )
 from upload.utils.package_utils import render_html
+
+
+class ValidationReportView(WagtailAdminTemplateMixin, TemplateView):
+    page_title = _("Document")
+    header_icon = "doc-full"
+    template_name = "upload/reports/detail.html"
+    http_method_names = ["get", "post", "head", "options"]
+    model = None
+    report_kind = None
+    results_per_page = 20
+    pagination_neighbors = 1
+    pagination_end_pages = 1
+
+    def dispatch(self, request, *args, **kwargs):
+        self.policy = UploadModelPermissionPolicy(self.model)
+
+        if not self.policy.user_has_any_permission(request.user, ("view", "change")):
+            raise PermissionDenied
+
+        self.report = get_object_or_404(
+            self.model.objects.select_related("package"),
+            pk=kwargs["pk"],
+            package__in=get_scoped_package_queryset(request.user),
+        )
+        self.page_subtitle = str(self.report.package)
+        self.can_respond = (
+            isinstance(self.report, XMLErrorReport)
+            and self.policy.user_has_permission(request.user, "change")
+            and self.report.creation == choices.REPORT_CREATION_DONE
+        )
+
+        self.results = self.report.validation_results.order_by("pk")
+        self.filtered_results = self.results
+
+        self.status_filter = (
+            ""
+            if isinstance(self.report, XMLInfoReport)
+            else request.GET.get("status", "")
+        )
+
+        if self.status_filter in dict(choices.VALIDATION_RESULT):
+            self.filtered_results = self.filtered_results.filter(
+                status=self.status_filter
+            )
+
+        self.reaction_filter = request.GET.get("reaction", "")
+        if isinstance(self.report, XMLErrorReport) and self.reaction_filter in dict(
+            choices.ERROR_REACTION
+        ):
+            self.filtered_results = self.filtered_results.filter(
+                reaction=self.reaction_filter
+            )
+
+        self.page = Paginator(self.filtered_results, self.results_per_page).get_page(
+            request.GET.get("p", request.GET.get("page"))
+        )
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_breadcrumbs_items(self):
+        return [
+            *super().get_breadcrumbs_items(),
+            {
+                "url": reverse("wagtailsnippets_upload_package:list"),
+                "label": _("Documents"),
+            },
+            {"url": "", "label": self.page_title, "sublabel": self.get_page_subtitle()},
+        ]
+
+    def get_package_url(self):
+        anchor = {"xml-errors": "xer", "package-checks": "vr", "xml-information": "xi"}
+        suffix = "" if self.report_kind == "xml-information" else self.report.pk
+
+        return (
+            reverse(
+                "wagtailsnippets_upload_package:inspect", args=[self.report.package_id]
+            )
+            + f"?tab=validations#{anchor[self.report_kind]}{suffix}"
+        )
+
+    def get_form(self, data=None):
+        return ReportResponsesForm(data=data, results=self.page.object_list)
+
+    def get_results_context(self, form=None):
+        results = []
+        for result in self.page.object_list:
+            data = result.data if isinstance(result.data, dict) else {}
+            details = data.get("data")
+            details = details if isinstance(details, dict) else {}
+            location = [details.get("contrib_full_name"), data.get("parent_lang")]
+            if isinstance(result, BaseXMLValidationResult):
+                location.extend((result.parent_id, result.attribute))
+
+            assets = result.data if isinstance(result.data, list) else []
+            results.append(
+                {
+                    "result": result,
+                    "response_field": form[f"reaction_{result.pk}"] if form else None,
+                    "reference": details.get("ref_id"),
+                    "location": " · ".join(str(value) for value in location if value),
+                    "line": data.get("apparent_line"),
+                    "asset": data if data.get("component_type") == "asset" else {},
+                    "assets": [
+                        asset
+                        for asset in assets
+                        if isinstance(asset, dict) and asset.get("component_type") == "asset"
+                    ],
+                    "message": data.get("message") or result.message,
+                    "advice": data.get("advice") or (result.advice if isinstance(result, XMLError) else None),
+                }
+            )
+
+        return results
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        summary = self.report.validation_summary
+        form = kwargs.get("form")
+        if form is None and self.can_respond:
+            form = self.get_form()
+
+        context.update(
+            report=self.report,
+            is_xml_info=isinstance(self.report, XMLInfoReport),
+            success_total=summary["success_total"],
+            document_identity=self.report.package.document_identity,
+            report_title=self.report.display_heading,
+            package_url=self.get_package_url(),
+            results=self.get_results_context(form),
+            page_obj=self.page,
+            pagination_pages=list(
+                self.page.paginator.get_elided_page_range(
+                    self.page.number,
+                    on_each_side=self.pagination_neighbors,
+                    on_ends=self.pagination_end_pages,
+                )
+            ),
+            status_filter=self.status_filter,
+            status_choices=choices.VALIDATION_RESULT,
+            reaction_filter=self.reaction_filter,
+            reaction_choices=choices.ERROR_REACTION,
+            can_respond=self.can_respond,
+            form=form,
+            report_in_progress=self.report.creation == choices.REPORT_CREATION_WIP,
+            is_xml_errors=isinstance(self.report, XMLErrorReport),
+            counts=summary["counts"],
+            report_outcome=summary["state"],
+            document_sections=get_document_sections(self.report.package_id, "validations"),
+            document_actions=get_package_action_buttons(
+                self.request.user, self.report.package, Button, include_finish_deposit=True
+            ),
+        )
+        context.update(get_document_downloads(self.report.package))
+        return context
+
+    def post(self, request, *args, **kwargs):
+        if not isinstance(self.report, XMLErrorReport):
+            return HttpResponseNotAllowed(["GET"])
+        if not self.can_respond:
+            raise PermissionDenied
+        if request.POST.get("action", "save_responses") != "save_responses":
+            return self.render_to_response(self.get_context_data(), status=400)
+
+        form = self.get_form(request.POST)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form), status=400)
+        responses = {
+            result.pk: form.cleaned_data[f"reaction_{result.pk}"]
+            for result in self.page.object_list
+        }
+        try:
+            self.report.save_responses(responses, request.user)
+        except ValidationError as error:
+            if error.code != "report_changed":
+                raise
+            form.add_error(None, error)
+            return self.render_to_response(self.get_context_data(form=form), status=409)
+
+        messages.success(
+            request, _("Responses saved. The validation results have not been changed.")
+        )
+        return redirect(request.get_full_path())
+
+
+class DelegateReviewView(WagtailAdminTemplateMixin, FormView):
+    page_title = _("Delegate review")
+    header_icon = ""
+    template_name = "upload/decisions/delegate.html"
+    form_class = DelegateReviewForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.package = get_object_or_404(
+            get_scoped_package_queryset(request.user, ASSIGN_PACKAGE),
+            pk=kwargs["pk"],
+        )
+
+        if not can_delegate_review(request.user, self.package):
+            raise PermissionDenied
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "package": self.package}
+
+    def get_success_url(self):
+        return reverse("wagtailsnippets_upload_package:inspect", args=[self.package.pk])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        context.update(
+            document_identity=self.package.document_identity,
+            document_url=self.get_success_url(),
+            submit_button_label=_("Save assignment"),
+            submit_button_active_label=_("Saving…"),
+        )
+
+        return context
+
+    def form_valid(self, form):
+        try:
+            delegate_review(
+                self.request.user,
+                self.package.pk,
+                form.cleaned_data["reviewer"].pk,
+                form.cleaned_data["instructions"],
+            )
+        except ValidationError as error:
+            form.add_error("reviewer", error)
+            return self.form_invalid(form)
+
+        messages.success(self.request, _("Review assignment saved."))
+        return redirect(self.get_success_url())
 
 
 class PackageZipCreateView(CreateView):
@@ -128,6 +387,17 @@ class PackageDecisionMixin:
     error_message = _("Unable to complete the operation. Check the form and try again.")
     permission_error_message = _("Operation not available")
 
+    page_subtitle = _("Record decision")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            document_identity=self.object.document_identity,
+            document_url=self.get_success_url(),
+        )
+
+        return context
+
     def get_success_url(self):
         return reverse("wagtailsnippets_upload_package:inspect", args=[self.object.pk])
 
@@ -144,7 +414,7 @@ class PackageDecisionMixin:
         if decision == choices.PS_PENDING_CORRECTION:
             permission = REQUEST_CORRECTION
         elif decision == choices.PS_PENDING_QA_DECISION:
-            permission = ASSIGN_PACKAGE
+            raise PermissionDenied
         else:
             permission = PUBLISH_PACKAGE
         if not user_can_act_on_package(self.request.user, permission, form.instance):
@@ -226,7 +496,8 @@ def retry_publication(request):
             {
                 "title": _("Retry publication"),
                 "message": _(
-                    "Retry the failed publication using the existing authorization. The document and its validation results will be preserved."
+                    "Retry the failed publication using the existing authorization. "
+                    "The document and its validation results will be preserved."
                 ),
                 "submit_label": _("Retry publication"),
                 "package": package,
@@ -278,7 +549,9 @@ def finish_deposit(request):
             {
                 "title": _("Submit validation responses"),
                 "message": _(
-                    "The ZIP has already been received. Submit the validation responses to determine whether the document needs corrections or can proceed with processing."
+                    "The ZIP has already been received. Submit the validation responses "
+                    "to determine whether the document needs corrections or can proceed "
+                    "with processing."
                 ),
                 "submit_label": _("Submit validation responses"),
                 "package": package,
@@ -395,7 +668,7 @@ def assign(request):
         get_scoped_package_queryset(request.user, ASSIGN_PACKAGE), pk=package_id
     )
 
-    return redirect("wagtailsnippets_upload_qapackage:edit", pk=package_id)
+    return redirect("upload:delegate_review", pk=package_id)
 
 
 def archive_package(request):
@@ -482,7 +755,10 @@ def republish_selected(request):
             _(
                 "Batch republication of %(count)d package(s) scheduled for %(website)s website."
             )
-            % {"count": len(package_ids), "website": website_kind or _("all")},
+            % {
+                "count": len(package_ids),
+                "website": choices.WEBSITE_ENVIRONMENT_LABELS.get(website_kind, _("all")),
+            },
         )
         return redirect("wagtailsnippets_upload_package:list")
 
@@ -506,7 +782,7 @@ def republish_selected(request):
         request,
         "upload/admin/package/republish_selected.html",
         {
-            "website_kinds": WEBSITE_KIND,
+            "website_kinds": choices.WEBSITE_ENVIRONMENTS,
             "package_ids": ",".join(package_ids),
             "package_count": len(package_ids),
         },

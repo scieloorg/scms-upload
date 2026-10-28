@@ -1,9 +1,10 @@
 {% extends "wagtailsnippets/snippets/index.html" %}
 
-{% load i18n static %}
+{% load i18n static wagtailadmin_tags %}
 
 {% block extra_css %}
     {{ block.super }}
+    <link rel="stylesheet" href="{% static 'upload/css/controls.css' %}">
     <link rel="stylesheet" href="{% static 'upload/css/documents.css' %}">
 {% endblock %}
 
@@ -13,9 +14,9 @@
             {% for queue in document_queues %}
                 <li>
                     <a href="{{ queue.url }}"
-                       class="button button-small{% if not queue.selected %} button-secondary{% endif %}"
+                       class="button button--icon{% if not queue.selected %} button-secondary{% endif %}"
                        {% if queue.selected %}aria-current="page"{% endif %}>
-                        {{ queue.label }} ({{ queue.count }})
+                        {% icon name=queue.icon classname="w-mr-1" %} {{ queue.label }} ({{ queue.count }})
                     </a>
                 </li>
             {% endfor %}

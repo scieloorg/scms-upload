@@ -6,12 +6,10 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import CoreAdminModelForm
-from core.users.scoped_queryset import scope_by_membership
-from team.authorization import get_user_permission_journal_ids
 from team.models import CollectionTeamMember, TeamRole
 from upload import choices
 from upload.authorization import user_can_act_on_package
-from upload.permissions import ASSIGN_PACKAGE, PUBLISH_PACKAGE, REQUEST_CORRECTION
+from upload.permissions import PUBLISH_PACKAGE, REQUEST_CORRECTION
 from upload.querysets import (
     correction_assignee_queryset,
     review_assignee_queryset,
@@ -20,6 +18,14 @@ from upload.querysets import (
 
 
 class PackageZipForm(CoreAdminModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["file"].label = _("ZIP file")
+        self.fields["file"].help_text = _(
+            "Select the ZIP package containing the XML and its associated files. "
+            "Processing starts in the background after submission."
+        )
+
     def save_all(self, user):
         pkg_zip = super().save_all(user)
 
@@ -34,14 +40,54 @@ class UploadPackageForm(CoreAdminModelForm):
     pass
 
 
-class PackageDecisionForm(CoreAdminModelForm):
+class ReportResponsesForm(forms.Form):
+    def __init__(self, *args, results, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        for result in results:
+            self.fields[f"reaction_{result.pk}"] = forms.ChoiceField(
+                label=_("Your response"),
+                choices=choices.ERROR_REACTION,
+                initial=result.reaction or choices.ER_REACTION_FIX,
+            )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if any(
+            key.startswith("reaction_") and key not in self.fields
+            for key in self.data
+        ):
+            raise forms.ValidationError(
+                _("The report has changed. Reload it before saving your responses."),
+                code="report_changed",
+            )
+        return cleaned_data
+
+
+class DelegateReviewForm(forms.Form):
     reviewer = forms.ModelChoiceField(
-        queryset=get_user_model().objects.none(),
+        queryset=None,
         label=_("Reviewer"),
-        help_text=_("Choose who will review this document."),
+        help_text=_(
+            "Choose who will review this document. "
+            "This does not change its decision or publication status."
+        ),
+    )
+    instructions = forms.CharField(
+        label=_("Instructions"),
+        help_text=_("Describe what the reviewer should check in this document."),
+        widget=forms.Textarea(attrs={"rows": 4}),
         required=False,
     )
 
+    def __init__(self, *args, package, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["reviewer"].queryset = review_assignee_queryset(package)
+        self.initial["reviewer"] = package.assignee_id
+
+
+class PackageDecisionForm(CoreAdminModelForm):
     correction_assignee = forms.ModelChoiceField(
         queryset=get_user_model().objects.none(),
         label=_("Responsible for corrections"),
@@ -82,18 +128,12 @@ class PackageDecisionForm(CoreAdminModelForm):
         )
         self.fields["qa_comment"].label = _("Justification / instructions")
         self.fields["qa_comment"].help_text = _(
-            "Describe the corrections needed or provide instructions for the reviewer."
+            "Describe the corrections needed or justify the publication decision."
         )
 
-        article_queryset = self.fields["article"].queryset
         linked_queryset = self.fields["linked"].queryset
 
         if not self.for_user.is_superuser:
-            article_queryset = scope_by_membership(
-                self.for_user,
-                article_queryset,
-                journal_field="journal",
-            )
             linked_queryset = scope_package_queryset(
                 linked_queryset,
                 self.for_user,
@@ -105,8 +145,6 @@ class PackageDecisionForm(CoreAdminModelForm):
         allowed_decisions = set()
         if user_can_act_on_package(self.for_user, REQUEST_CORRECTION, self.instance):
             allowed_decisions.add(choices.PS_PENDING_CORRECTION)
-        if user_can_act_on_package(self.for_user, ASSIGN_PACKAGE, self.instance):
-            allowed_decisions.add(choices.PS_PENDING_QA_DECISION)
         if user_can_act_on_package(self.for_user, PUBLISH_PACKAGE, self.instance):
             allowed_decisions.update(
                 (
@@ -119,46 +157,31 @@ class PackageDecisionForm(CoreAdminModelForm):
         self.fields["qa_decision"].choices = [
             (
                 value,
-                _("Republish on QA website")
-                if value == choices.PS_READY_TO_PREVIEW
-                and self.instance.qa_ws_status == choices.PUBLISHED
-                else label,
+                (
+                    _("Republish on QA website")
+                    if value == choices.PS_READY_TO_PREVIEW
+                    and self.instance.qa_ws_status == choices.PUBLISHED
+                    else label
+                ),
             )
             for value, label in self.fields["qa_decision"].choices
             if not value or value in allowed_decisions
         ]
-
-        reviewers = review_assignee_queryset(self.instance)
-        self.fields["reviewer"].queryset = reviewers
-        if self.instance.qa_decision == choices.PS_PENDING_QA_DECISION:
-            self.initial["reviewer"] = self.instance.assignee_id
-        elif self.instance.analyst_id:
-            self.initial["reviewer"] = self.instance.analyst.user_id
 
         decision = (
             self.data.get(self.add_prefix("qa_decision"))
             if self.is_bound
             else self.initial.get("qa_decision")
         )
-        if decision != choices.PS_PENDING_QA_DECISION:
-            self.initial["reviewer"] = None
 
         if not self.for_user.is_superuser and decision in (
             choices.PS_READY_TO_PREVIEW,
             choices.PS_READY_TO_PUBLISH,
         ):
-            journal_ids = get_user_permission_journal_ids(
-                self.for_user, "upload", PUBLISH_PACKAGE
-            )
-            article_queryset = article_queryset.filter(journal_id__in=journal_ids)
             linked_queryset = scope_package_queryset(
                 linked_queryset, self.for_user, permission=PUBLISH_PACKAGE
             )
 
-        if decision != choices.PS_PENDING_QA_DECISION or not user_can_act_on_package(
-            self.for_user, ASSIGN_PACKAGE, self.instance
-        ):
-            self.fields["reviewer"].disabled = True
         if decision != choices.PS_PENDING_CORRECTION:
             self.fields["correction_assignee"].disabled = True
         if decision not in (
@@ -166,7 +189,6 @@ class PackageDecisionForm(CoreAdminModelForm):
             choices.PS_READY_TO_PUBLISH,
         ) or not user_can_act_on_package(self.for_user, PUBLISH_PACKAGE, self.instance):
             for field in (
-                "article",
                 "linked",
                 "order",
                 "force_journal_publication",
@@ -174,7 +196,6 @@ class PackageDecisionForm(CoreAdminModelForm):
             ):
                 self.fields[field].disabled = True
 
-        self.fields["article"].queryset = article_queryset.distinct()
         self.fields["linked"].queryset = linked_queryset.distinct()
 
         candidates = correction_assignee_queryset(self.instance)
@@ -190,13 +211,21 @@ class PackageDecisionForm(CoreAdminModelForm):
     def clean(self):
         cleaned_data = super().clean()
         decision = cleaned_data.get("qa_decision")
+
+        if self.data.get(self.add_prefix("article")) not in (None, "", "null"):
+            self.add_error(
+                None,
+                _("The document article cannot be changed when recording a decision."),
+            )
+
         if not decision:
             self.add_error("qa_decision", _("Choose an action for this document"))
 
-        if decision == choices.PS_PENDING_QA_DECISION and not cleaned_data.get(
-            "reviewer"
+        if (
+            self.data.get(self.add_prefix("qa_decision"))
+            == choices.PS_PENDING_QA_DECISION
         ):
-            self.add_error("reviewer", _("Choose who will review this document."))
+            self.add_error(None, _("Use Delegate review to assign a reviewer."))
 
         if decision == choices.PS_PENDING_CORRECTION:
             if not (cleaned_data.get("qa_comment") or "").strip():
@@ -211,9 +240,6 @@ class PackageDecisionForm(CoreAdminModelForm):
         return cleaned_data
 
     def _set_current_user_as_analyst(self, package, user):
-        if package.qa_decision == choices.PS_PENDING_QA_DECISION:
-            return
-
         package.analyst = CollectionTeamMember.objects.filter(
             user=user,
             is_active_member=True,
@@ -223,13 +249,6 @@ class PackageDecisionForm(CoreAdminModelForm):
     def _set_assignee(self, package):
         if package.qa_decision == choices.PS_PENDING_CORRECTION:
             package.assignee = self.cleaned_data["correction_assignee"]
-        elif package.qa_decision == choices.PS_PENDING_QA_DECISION:
-            package.assignee = self.cleaned_data["reviewer"]
-            package.analyst = CollectionTeamMember.objects.filter(
-                user=package.assignee,
-                is_active_member=True,
-                collection__journalcollection__journal=package.journal,
-            ).first()
         else:
             package.assignee = None
 
@@ -299,16 +318,20 @@ class UploadValidatorForm(CoreAdminModelForm):
             "Maximum share of XML warnings among all validation results. Enter 0 to 100; 0 allows no warnings."
         )
         self.fields["max_xml_errors_percentage"].help_text = _(
-            "Maximum share of XML errors among all validation results. Enter 0 to 100. Critical issues are handled separately."
+            "Maximum share of XML errors among all validation results. "
+            "Enter 0 to 100. Critical issues are handled separately."
         )
         self.fields["max_impossible_to_fix_percentage"].help_text = _(
-            "After report review is complete, maximum share of XML findings declared impossible to correct, among all XML findings. Enter 0 to 100."
+            "After report review is complete, maximum share of XML findings declared "
+            "impossible to correct, among all XML findings. Enter 0 to 100."
         )
         self.fields["decision_for_critical_errors"].help_text = _(
-            "Choose whether critical issues require corrections or remain available for analysis. The strict publication policy always requires corrections."
+            "Choose whether critical issues require corrections or remain available "
+            "for analysis. The strict publication policy always requires corrections."
         )
         self.fields["validation_params"].help_text = _(
-            "Technical parameters sent to Packtools to check XML content. Journal data is added automatically. This field is read-only."
+            "Technical parameters sent to Packtools to check XML content. "
+            "Journal data is added automatically. This field is read-only."
         )
 
     def clean(self):
