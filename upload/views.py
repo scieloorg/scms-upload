@@ -5,7 +5,12 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseNotAllowed,
+    HttpResponseRedirect,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import format_html
@@ -14,13 +19,18 @@ from django.utils.translation import gettext_lazy as _
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 from wagtail.admin.views.generic.base import WagtailAdminTemplateMixin
+from wagtail.admin.widgets import Button
 from wagtail.snippets.views.snippets import CreateView
 
-from collection.choices import WEBSITE_KIND
 from core.users.permission_policies import TeamScopedEditView
+from upload.admin_buttons import (
+    get_document_downloads,
+    get_document_sections,
+    get_package_action_buttons,
+)
 from upload.authorization import user_can_act_on_package
 from upload.delegation import can_delegate_review, delegate_review
-from upload.forms import DelegateReviewForm
+from upload.forms import DelegateReviewForm, ReportResponsesForm
 from upload.models import (
     BaseXMLValidationResult,
     Package,
@@ -57,7 +67,7 @@ class ValidationReportView(WagtailAdminTemplateMixin, TemplateView):
     page_title = _("Document")
     header_icon = "doc-full"
     template_name = "upload/reports/detail.html"
-    http_method_names = ["get", "head", "options"]
+    http_method_names = ["get", "post", "head", "options"]
     model = None
     report_kind = None
     results_per_page = 20
@@ -76,6 +86,11 @@ class ValidationReportView(WagtailAdminTemplateMixin, TemplateView):
             package__in=get_scoped_package_queryset(request.user),
         )
         self.page_subtitle = str(self.report.package)
+        self.can_respond = (
+            isinstance(self.report, XMLErrorReport)
+            and self.policy.user_has_permission(request.user, "change")
+            and self.report.creation == choices.REPORT_CREATION_DONE
+        )
 
         self.results = self.report.validation_results.order_by("pk")
         self.filtered_results = self.results
@@ -89,6 +104,14 @@ class ValidationReportView(WagtailAdminTemplateMixin, TemplateView):
         if self.status_filter in dict(choices.VALIDATION_RESULT):
             self.filtered_results = self.filtered_results.filter(
                 status=self.status_filter
+            )
+
+        self.reaction_filter = request.GET.get("reaction", "")
+        if isinstance(self.report, XMLErrorReport) and self.reaction_filter in dict(
+            choices.ERROR_REACTION
+        ):
+            self.filtered_results = self.filtered_results.filter(
+                reaction=self.reaction_filter
             )
 
         self.page = Paginator(self.filtered_results, self.results_per_page).get_page(
@@ -118,30 +141,10 @@ class ValidationReportView(WagtailAdminTemplateMixin, TemplateView):
             + f"?tab=validations#{anchor[self.report_kind]}{suffix}"
         )
 
-    def get_document_identity(self):
-        package = self.report.package
-        article = package.article if package.article_id else None
-        title = article.title_with_lang.order_by("pk").first() if article else None
+    def get_form(self, data=None):
+        return ReportResponsesForm(data=data, results=self.page.object_list)
 
-        issue = package.issue or (article.issue if article else None)
-        journal = (
-            package.journal
-            or (issue.journal if issue else None)
-            or (article.journal if article else None)
-        )
-
-        return {
-            "title": strip_tags(title.text) if title and title.text else package.name,
-            "identifier": package.name,
-            "journal": str(journal) if journal else None,
-            "issue": (
-                " · ".join(filter(None, [issue.publication_year, issue.issue_folder]))
-                if issue
-                else None
-            ),
-        }
-
-    def get_results_context(self):
+    def get_results_context(self, form=None):
         results = []
         for result in self.page.object_list:
             data = result.data if isinstance(result.data, dict) else {}
@@ -155,6 +158,7 @@ class ValidationReportView(WagtailAdminTemplateMixin, TemplateView):
             results.append(
                 {
                     "result": result,
+                    "response_field": form[f"reaction_{result.pk}"] if form else None,
                     "reference": details.get("ref_id"),
                     "location": " · ".join(str(value) for value in location if value),
                     "line": data.get("apparent_line"),
@@ -174,15 +178,18 @@ class ValidationReportView(WagtailAdminTemplateMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         summary = self.report.validation_summary
+        form = kwargs.get("form")
+        if form is None and self.can_respond:
+            form = self.get_form()
 
         context.update(
             report=self.report,
             is_xml_info=isinstance(self.report, XMLInfoReport),
             success_total=summary["success_total"],
-            document_identity=self.get_document_identity(),
+            document_identity=self.report.package.document_identity,
             report_title=self.report.display_heading,
             package_url=self.get_package_url(),
-            results=self.get_results_context(),
+            results=self.get_results_context(form),
             page_obj=self.page,
             pagination_pages=list(
                 self.page.paginator.get_elided_page_range(
@@ -193,13 +200,49 @@ class ValidationReportView(WagtailAdminTemplateMixin, TemplateView):
             ),
             status_filter=self.status_filter,
             status_choices=choices.VALIDATION_RESULT,
+            reaction_filter=self.reaction_filter,
+            reaction_choices=choices.ERROR_REACTION,
+            can_respond=self.can_respond,
+            form=form,
             report_in_progress=self.report.creation == choices.REPORT_CREATION_WIP,
             is_xml_errors=isinstance(self.report, XMLErrorReport),
             counts=summary["counts"],
             report_outcome=summary["state"],
+            document_sections=get_document_sections(self.report.package_id, "validations"),
+            document_actions=get_package_action_buttons(
+                self.request.user, self.report.package, Button, include_finish_deposit=True
+            ),
         )
-
+        context.update(get_document_downloads(self.report.package))
         return context
+
+    def post(self, request, *args, **kwargs):
+        if not isinstance(self.report, XMLErrorReport):
+            return HttpResponseNotAllowed(["GET"])
+        if not self.can_respond:
+            raise PermissionDenied
+        if request.POST.get("action", "save_responses") != "save_responses":
+            return self.render_to_response(self.get_context_data(), status=400)
+
+        form = self.get_form(request.POST)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form), status=400)
+        responses = {
+            result.pk: form.cleaned_data[f"reaction_{result.pk}"]
+            for result in self.page.object_list
+        }
+        try:
+            self.report.save_responses(responses, request.user)
+        except ValidationError as error:
+            if error.code != "report_changed":
+                raise
+            form.add_error(None, error)
+            return self.render_to_response(self.get_context_data(form=form), status=409)
+
+        messages.success(
+            request, _("Responses saved. The validation results have not been changed.")
+        )
+        return redirect(request.get_full_path())
 
 
 class DelegateReviewView(WagtailAdminTemplateMixin, FormView):
@@ -712,7 +755,10 @@ def republish_selected(request):
             _(
                 "Batch republication of %(count)d package(s) scheduled for %(website)s website."
             )
-            % {"count": len(package_ids), "website": website_kind or _("all")},
+            % {
+                "count": len(package_ids),
+                "website": choices.WEBSITE_ENVIRONMENT_LABELS.get(website_kind, _("all")),
+            },
         )
         return redirect("wagtailsnippets_upload_package:list")
 
@@ -736,7 +782,7 @@ def republish_selected(request):
         request,
         "upload/admin/package/republish_selected.html",
         {
-            "website_kinds": WEBSITE_KIND,
+            "website_kinds": choices.WEBSITE_ENVIRONMENTS,
             "package_ids": ",".join(package_ids),
             "package_count": len(package_ids),
         },

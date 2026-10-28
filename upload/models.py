@@ -13,8 +13,9 @@ from django.contrib.admin import display
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import IntegrityError, models
+from django.db import IntegrityError, models, transaction
 from django.db.models import Count, Q
+from django.utils import timezone
 from django.utils.html import strip_tags
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
@@ -2135,6 +2136,41 @@ class XMLErrorReport(BaseValidationReport, ClusterableModel):
 
     base_form_class = XMLErrorReportForm
     ValidationResultClass = XMLError
+
+    @transaction.atomic
+    def save_responses(self, responses, user):
+        report = type(self).objects.select_for_update().filter(pk=self.pk).first()
+        if report is None or report.creation != choices.REPORT_CREATION_DONE:
+            raise ValidationError(
+                _("The report has changed. Reload it before saving your responses."),
+                code="report_changed",
+            )
+
+        results = list(
+            report.validation_results.select_for_update().filter(pk__in=responses)
+        )
+        if {result.pk for result in results} != set(responses):
+            raise ValidationError(
+                _("The report has changed. Reload it before saving your responses."),
+                code="report_changed",
+            )
+
+        if any(
+            reaction not in dict(choices.ERROR_REACTION)
+            for reaction in responses.values()
+        ):
+            raise ValidationError(_("Select a valid response."), code="invalid_choice")
+
+        now = timezone.now()
+        for result in results:
+            report.validation_results.filter(pk=result.pk).update(
+                reaction=responses[result.pk], updated_by=user, updated=now
+            )
+
+        report.updated_by = user
+        report.updated = now
+        report.save(update_fields=["updated_by", "updated"])
+        report.package.calculate_validation_numbers()
 
     class Meta:
         verbose_name = _("XML Error Report")

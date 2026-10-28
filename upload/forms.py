@@ -18,6 +18,14 @@ from upload.querysets import (
 
 
 class PackageZipForm(CoreAdminModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["file"].label = _("ZIP file")
+        self.fields["file"].help_text = _(
+            "Select the ZIP package containing the XML and its associated files. "
+            "Processing starts in the background after submission."
+        )
+
     def save_all(self, user):
         pkg_zip = super().save_all(user)
 
@@ -30,6 +38,30 @@ class PackageZipForm(CoreAdminModelForm):
 
 class UploadPackageForm(CoreAdminModelForm):
     pass
+
+
+class ReportResponsesForm(forms.Form):
+    def __init__(self, *args, results, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        for result in results:
+            self.fields[f"reaction_{result.pk}"] = forms.ChoiceField(
+                label=_("Your response"),
+                choices=choices.ERROR_REACTION,
+                initial=result.reaction or choices.ER_REACTION_FIX,
+            )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if any(
+            key.startswith("reaction_") and key not in self.fields
+            for key in self.data
+        ):
+            raise forms.ValidationError(
+                _("The report has changed. Reload it before saving your responses."),
+                code="report_changed",
+            )
+        return cleaned_data
 
 
 class DelegateReviewForm(forms.Form):
