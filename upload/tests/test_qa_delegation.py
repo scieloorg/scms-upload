@@ -1,16 +1,25 @@
 from io import StringIO
 
 import pytest
+from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
 from collection.models import Collection
 from journal.models import Journal, JournalCollection, OfficialJournal
 from team.management.commands.create_user_groups import Command
-from team.models import CollectionTeamMember, TeamRole
+from team.models import (
+    CollectionTeamMember,
+    Company,
+    CompanyTeamMember,
+    JournalCompanyContract,
+    TeamRole,
+)
 from upload import choices
+from upload.authorization import user_can_act_on_package
 from upload.delegation import DELEGATION_EVENT, can_delegate_review, delegate_review
 from upload.models import Package, UploadProcResult, ValidationReport
+from upload.permissions import ASSIGN_PACKAGE
 from upload.wagtail_hooks import QualityAnalysisPackageViewSet
 
 
@@ -121,6 +130,75 @@ def test_assignment_preserves_workflow_and_history(quality_review_context, statu
 
     assert original.detail == {"original": True}
     assert package.upload_proc_result.count() == 2
+
+
+@pytest.mark.parametrize(
+    "restriction",
+    [
+        "scope",
+        "visibility",
+        "validation_pending",
+        "revoked",
+        "inactive",
+        choices.PS_PENDING_CORRECTION,
+        choices.PS_READY_TO_PREVIEW,
+        choices.PS_READY_TO_PUBLISH,
+        choices.PS_PUBLISHED,
+        choices.PS_ARCHIVED,
+        choices.PS_SUBMITTED,
+    ],
+)
+def test_service_enforces_scope_permission_status(quality_review_context, restriction):
+    ctx = quality_review_context
+    user, package = ctx["ana"], ctx["package"]
+
+    if restriction == "scope":
+        package.journal = Journal.objects.create(journal_acron="outside", creator=user)
+    elif restriction == "visibility":
+        CollectionTeamMember.objects.filter(user=user).update(is_active_member=False)
+        company = Company.objects.create(name="XML company", creator=package.creator)
+        CompanyTeamMember.objects.create(
+            user=user,
+            company=company,
+            role=TeamRole.MEMBER,
+            is_active_member=True,
+            creator=package.creator,
+        )
+        JournalCompanyContract.objects.create(
+            journal=package.journal,
+            company=company,
+            is_active=True,
+            creator=package.creator,
+        )
+        package.assignee = ctx["bruno"]
+
+        assert user_can_act_on_package(user, ASSIGN_PACKAGE, package)
+    elif restriction == "validation_pending":
+        ValidationReport.objects.create(
+            package=package,
+            creator=user,
+            creation=choices.REPORT_CREATION_WIP,
+        )
+    elif restriction == "revoked":
+        CollectionTeamMember.objects.filter(user=user).update(is_active_member=False)
+    elif restriction == "inactive":
+        user.is_active = False
+        user.save(update_fields=["is_active"])
+    else:
+        package.status = restriction
+    package.save()
+
+    previous_assignee = package.assignee
+
+    assert not can_delegate_review(user, package)
+
+    with pytest.raises(PermissionDenied):
+        delegate_review(user, package.pk, ctx["bruno"].pk, "")
+
+    package.refresh_from_db()
+
+    assert package.assignee == previous_assignee
+    assert not package.upload_proc_result.exists()
 
 
 def test_assignment_rolls_back_with_event_failure(quality_review_context, monkeypatch):
