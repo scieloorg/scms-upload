@@ -7,7 +7,7 @@
 # # from sentry_sdk.integrations.redis import RedisIntegration
 
 from .base import *  # noqa
-from .base import env
+from .base import APPS_DIR, DATABASES, env
 
 # GENERAL
 # ------------------------------------------------------------------------------
@@ -151,6 +151,11 @@ COMPRESS_FILTERS = {
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "reference_index_routine": {
+            "()": "config.logging_filters.ReferenceIndexRoutineFilter",
+        },
+    },
     "formatters": {
         "verbose": {
             "format": "%(levelname)s %(asctime)s %(module)s "
@@ -176,6 +181,11 @@ LOGGING = {
         },
     },
     "loggers": {
+        "django_tasks": {
+            "level": "INFO",
+            "filters": ["reference_index_routine"],
+            "propagate": True,
+        },
         "profiling": {  # <-- Logger usado pelo decorador
             "handlers": ["profiling_file"],
             "level": "DEBUG",
