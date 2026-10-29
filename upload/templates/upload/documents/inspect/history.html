@@ -44,7 +44,7 @@
                     {% endif %}
                 </div>
 
-                {% if event.is_decision or event.is_delegation %}
+                {% if event.is_decision or event.is_delegation or event.is_change_request %}
                     {% if event.is_delegation and event.previous_assignee %}
                         <p>{% trans "Previous assignee" %}: {{ event.previous_assignee }}</p>
                     {% endif %}

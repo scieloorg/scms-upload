@@ -1,11 +1,17 @@
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
+from article.authorization import can_request_article_change
+from article.choices import RCS_PENDING, RCS_RECEIVED
+from article.models import RequestArticleChange
 from upload import choices
 from upload.authorization import user_can_act_on_package
 from upload.delegation import can_delegate_review
+from upload.models import Package
+from upload.permission_policies import UploadModelPermissionPolicy
 from upload.permissions import FINISH_DEPOSIT, PUBLISH_PACKAGE, REQUEST_CORRECTION
 from upload.publication_status import PUBLICATION_FAILED, publication_situation
+from upload.querysets import get_scoped_package_queryset
 
 DOCUMENT_SECTIONS = (
     ("overview", _("Overview")),
@@ -84,10 +90,30 @@ def get_package_action_buttons(
     button_class,
     include_finish_deposit=False,
 ):
-    if not package.is_validation_finished:
-        return []
-
     buttons = []
+    if (
+        UploadModelPermissionPolicy(Package).user_has_any_permission(
+            user, ("view", "change")
+        )
+        and can_request_article_change(user, package.article)
+        and get_scoped_package_queryset(user).filter(pk=package.pk).exists()
+        and not RequestArticleChange.objects.filter(
+            article_id=package.article_id,
+            status__in=(RCS_PENDING, RCS_RECEIVED),
+        ).exists()
+    ):
+        buttons.append(
+            button_class(
+                _("Request document change"),
+                icon_name="edit",
+                url=reverse("upload:request_article_change", args=[package.pk]),
+                priority=20,
+            )
+        )
+
+    if not package.is_validation_finished:
+        return buttons
+
     if can_delegate_review(user, package):
         buttons.append(
             button_class(

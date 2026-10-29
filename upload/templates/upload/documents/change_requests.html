@@ -1,0 +1,29 @@
+{% load i18n %}
+{% if article_change_requests %}
+    <section class="document-section" aria-label="{% trans 'Document change requests' %}">
+        <h2>{% trans "Document change requests" %}</h2>
+        {% for change_request in article_change_requests %}
+            {% if forloop.first or change_request.status == "pending" or change_request.status == "received" %}
+                <article>
+                    <h3>{{ change_request.get_change_type_display }} · {{ change_request.get_status_display }}</h3>
+                    <p>{{ change_request.comment|linebreaksbr }}</p>
+                    <p>{{ change_request.creator }} · {{ change_request.created }}</p>
+                </article>
+            {% endif %}
+        {% endfor %}
+        {% if article_change_requests|length > 1 %}
+            <details>
+                <summary>{% trans "Change request history" %}</summary>
+                {% for change_request in article_change_requests %}
+                    {% if not forloop.first and change_request.status != "pending" and change_request.status != "received" %}
+                        <article>
+                            <h3>{{ change_request.get_change_type_display }} · {{ change_request.get_status_display }}</h3>
+                            <p>{{ change_request.comment|linebreaksbr }}</p>
+                            <p>{{ change_request.creator }} · {{ change_request.created }}</p>
+                        </article>
+                    {% endif %}
+                {% endfor %}
+            </details>
+        {% endif %}
+    </section>
+{% endif %}

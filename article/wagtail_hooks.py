@@ -103,6 +103,7 @@ class RequestArticleChangeSnippetViewSet(TeamScopedSnippetViewSetMixin, SnippetV
     journal_field = "article__journal"
     menu_label = _("Changes request")
     add_view_class = RequestArticleChangeCreateView
+    inspect_view_fields_exclude = ("original_xml", "was_public")
     menu_icon = "doc-full"
     menu_order = 200
     add_to_settings_menu = False
@@ -112,8 +113,9 @@ class RequestArticleChangeSnippetViewSet(TeamScopedSnippetViewSetMixin, SnippetV
         "created",
         "article",
         "change_type",
+        "status",
     )
-    list_filter = ("change_type",)
+    list_filter = ("change_type", "status")
     search_fields = (
         "article__pid_v2",
         "article__pid_v3",

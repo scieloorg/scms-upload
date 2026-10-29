@@ -1,5 +1,6 @@
 from django.urls import path
 
+from upload.change_views import RequestArticleChangeView
 from upload.document_views import download_document_events
 from upload.models import ValidationReport, XMLErrorReport, XMLInfoReport
 from upload.views import (
@@ -18,6 +19,11 @@ from upload.views import (
 app_name = "upload"
 
 urlpatterns = [
+    path(
+        "documents/<int:pk>/request-change/",
+        RequestArticleChangeView.as_view(),
+        name="request_article_change",
+    ),
     path(
         "documents/<int:pk>/events/",
         download_document_events,

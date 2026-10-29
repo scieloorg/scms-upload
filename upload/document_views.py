@@ -37,6 +37,7 @@ from upload.querysets import get_scoped_package_queryset
 HISTORY_PER_PAGE = 20
 HISTORY_FILTERS = {"all", "decisions", "delegations", "processing"}
 EVENT_LABELS = {
+    "request_article_change": _("Request document change"),
     "Package.publish on QA": _("Publication task for QA"),
     "Package.publish on PUBLIC": _("Publication task for Production"),
     "upload_article_page_to_the_cloud": _("Send article page to storage"),
@@ -122,6 +123,7 @@ class PackageAdminInspectView(TeamScopedInspectView):
         return {
             "state": state,
             "is_decision": is_decision,
+            "is_change_request": event.name == "request_article_change",
             "is_delegation": is_delegation,
             "previous_assignee": detail.get("previous_assignee"),
             "comment": detail.get("comment"),
@@ -219,6 +221,7 @@ class PackageAdminInspectView(TeamScopedInspectView):
         )
         data = {
             "document_identity": self.object.document_identity,
+            "article_change_requests": self.object.article_change_requests,
             "validation_in_progress": validation_in_progress,
             "active_tab": active_tab,
             "document_sections": get_document_sections(self.object.pk, active_tab),
