@@ -370,6 +370,7 @@ class QualityAnalysisPackageViewSet(BaseUploadViewSet):
     menu_icon = "search"
     menu_order = 200
     edit_view_class = QAPackageEditView
+    edit_template_name = "upload/decisions/edit.html"
     inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
@@ -429,6 +430,7 @@ class ReadyToPublishPackageViewSet(BaseUploadViewSet):
     menu_icon = "tasks"
     menu_order = 200
     edit_view_class = ReadyToPublishPackageEditView
+    edit_template_name = "upload/decisions/edit.html"
     inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
@@ -766,7 +768,6 @@ class UploadViewSetGroup(SnippetViewSetGroup):
         UploadSettingsViewSetGroup,
     ]
     menu_order = get_menu_order("upload")
-
 
     def get_menu_item(self, order=None):
         item = super().get_menu_item(order=order)

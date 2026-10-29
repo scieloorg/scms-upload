@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 
 from upload import choices
 from upload.authorization import user_can_act_on_package
+from upload.delegation import can_delegate_review
 from upload.permissions import FINISH_DEPOSIT, PUBLISH_PACKAGE, REQUEST_CORRECTION
 from upload.publication_status import PUBLICATION_FAILED, publication_situation
 
@@ -17,6 +18,16 @@ def get_package_action_buttons(
         return []
 
     buttons = []
+    if can_delegate_review(user, package):
+        buttons.append(
+            button_class(
+                _("Delegate review"),
+                icon_name="user",
+                url=reverse("upload:delegate_review", args=[package.pk]),
+                priority=25,
+            )
+        )
+
     query = f"?package_id={package.pk}"
     if package.status in (
         choices.PS_PENDING_CORRECTION,

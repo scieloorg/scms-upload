@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
 from django.db.models import Count, Q
+from django.utils.html import strip_tags
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
@@ -342,17 +343,13 @@ class Package(CommonControlField, ClusterableModel):
     panels = [
         # FieldPanel("file"),
         FieldPanel("status", read_only=True),
-        FieldPanel("numbers", widget=ReadOnlyPrettyJSONWidget()),
+        FieldPanel("numbers", read_only=True),
         FieldPanel("qa_ws_status", read_only=True),
         FieldPanel("public_ws_status", read_only=True),
-    ]
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
     ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panels, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
         ]
     )
     base_form_class = UploadPackageForm
@@ -430,6 +427,33 @@ class Package(CommonControlField, ClusterableModel):
             | Q(name__icontains=search_term)
             | Q(file__icontains=search_term)
         )
+
+    @property
+    def document_identity(self):
+        article = self.article if self.article_id else None
+        title = article.title_with_lang.order_by("pk").first() if article else None
+        issue = self.issue or (article.issue if article else None)
+        journal = (
+            self.journal
+            or (issue.journal if issue else None)
+            or (article.journal if article else None)
+        )
+        official = journal.official_journal if journal else None
+
+        return {
+            "journal": str(journal) if journal else None,
+            "issn_print": official.issn_print if official else None,
+            "issn_electronic": official.issn_electronic if official else None,
+            "issue": (
+                " · ".join(filter(None, [issue.publication_year, issue.issue_folder]))
+                if issue
+                else None
+            ),
+            "document_type": article.get_article_type_display() if article else None,
+            "title": strip_tags(title.text) if title and title.text else self.name,
+            "identifier": self.name,
+            "batch": self.pkg_zip.name if self.pkg_zip_id else None,
+        }
 
     def autocomplete_label(self):
         return f"{self.package_name} {self.status}"
@@ -581,7 +605,9 @@ class Package(CommonControlField, ClusterableModel):
             return False
         return True
 
-    def finish_reception(self, task_upload_workflow_publish_article=None, blocking_error_status=None):
+    def finish_reception(
+        self, task_upload_workflow_publish_article=None, blocking_error_status=None
+    ):
         """
         1. Verifica se as validações que executaram em paralelo, finalizaram
         2. Calcula os números de problemas do pacote
@@ -622,8 +648,10 @@ class Package(CommonControlField, ClusterableModel):
                 detail = {"is_ready_to_publish": is_ready_to_publish}
 
                 response = self.prepare_to_publish(
-                    user, qa=is_ready_to_preview, public=is_ready_to_publish,
-                    force_update=None
+                    user,
+                    qa=is_ready_to_preview,
+                    public=is_ready_to_publish,
+                    force_update=None,
                 )
                 detail.update(response or {})
 
@@ -676,7 +704,9 @@ class Package(CommonControlField, ClusterableModel):
             + xml_numbers["total"]
             + pkg_numbers["total"]
         )
-        self.critical_errors = pkg_numbers["total_critical"] + xml_numbers["total_critical"]
+        self.critical_errors = (
+            pkg_numbers["total_critical"] + xml_numbers["total_critical"]
+        )
         self.xml_errors_percentage = calculate_percentage(
             xml_numbers["total_error"], total_validations
         )
@@ -741,7 +771,9 @@ class Package(CommonControlField, ClusterableModel):
             or "total_declared_impossible_to_fix" not in metrics
         ):
             reactions = XMLError.get_numbers(package=self)
-            metrics.setdefault("total_contested_xml_errors", reactions["total_not-to-fix"])
+            metrics.setdefault(
+                "total_contested_xml_errors", reactions["total_not-to-fix"]
+            )
             metrics.setdefault(
                 "total_declared_impossible_to_fix", reactions["total_unable-to-fix"]
             )
@@ -1101,7 +1133,9 @@ class Package(CommonControlField, ClusterableModel):
             )
             raise
 
-    def prepare_sps_package(self, user, xml_with_pre, xml_file_changed, force_update=None):
+    def prepare_sps_package(
+        self, user, xml_with_pre, xml_file_changed, force_update=None
+    ):
         # Aplica-se também para um pacote de atualização de um conteúdo anteriormente migrado
         # TODO components, texts
         if xml_file_changed:
@@ -1119,8 +1153,7 @@ class Package(CommonControlField, ClusterableModel):
             texts = {
                 "xml_langs": list(xml_with_pre.langs),
                 "pdf_langs": [
-                    rendition["lang"]
-                    for rendition in xml_with_pre.renditions
+                    rendition["lang"] for rendition in xml_with_pre.renditions
                 ],
             }
             self.sps_pkg = SPSPkg.create_or_update(
@@ -1416,29 +1449,8 @@ class QAPackage(Package):
 
     """
 
-    panel_id = [
-        AutocompletePanel("article", read_only=False),
-    ]
-    panel_numbers = [
-        FieldPanel("critical_errors", read_only=True),
-        FieldPanel("xml_errors_percentage", read_only=True),
-        FieldPanel("xml_warnings_percentage", read_only=True),
-        FieldPanel("contested_xml_errors_percentage", read_only=True),
-        FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
-        FieldPanel("status", read_only=True),
-    ]
-    panel_decision = decision_panels()
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
-    ]
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(panel_decision, heading=_("Decision")),
-            ObjectList(panel_id, heading=_("Article")),
-            ObjectList(panel_numbers, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
-        ]
-    )
+    panels = decision_panels()
+    edit_handler = ObjectList(panels)
     base_form_class = QAPackageForm
 
     class Meta:
@@ -1452,37 +1464,8 @@ class ReadyToPublishPackage(Package):
     Package ready to publish
     """
 
-    panel_id = [
-        AutocompletePanel("article", read_only=False),
-    ]
-    panel_numbers = [
-        FieldPanel("critical_errors", read_only=True),
-        FieldPanel("xml_errors_percentage", read_only=True),
-        FieldPanel("xml_warnings_percentage", read_only=True),
-        FieldPanel("contested_xml_errors_percentage", read_only=True),
-        FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
-        FieldPanel("status", read_only=True),
-    ]
-    panel_decision = decision_panels()
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
-    ]
-
-    panel_publication_status = [
-        FieldPanel("qa_ws_status", read_only=True),
-        FieldPanel("qa_ws_pubdate", read_only=True),
-        FieldPanel("public_ws_status", read_only=True),
-        FieldPanel("public_ws_pubdate", read_only=True),
-    ]
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(panel_decision, heading=_("Decision")),
-            ObjectList(panel_id, heading=_("Article")),
-            ObjectList(panel_publication_status, heading=_("Publication Status")),
-            ObjectList(panel_numbers, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
-        ]
-    )
+    panels = decision_panels()
+    edit_handler = ObjectList(panels)
 
     base_form_class = ReadyToPublishPackageForm
 
@@ -1637,9 +1620,7 @@ class BaseXMLValidationResult(BaseValidationResult):
         blank=False,
     )
     # geralemente article / sub-article e id
-    parent = models.CharField(
-        _("XML element"), null=True, blank=True, max_length=11
-    )
+    parent = models.CharField(_("XML element"), null=True, blank=True, max_length=11)
     parent_id = models.CharField(
         _("XML element identifier"), null=True, blank=True, max_length=13
     )
@@ -2172,7 +2153,9 @@ class UploadValidator(CommonControlField):
     base_form_class = UploadValidatorForm
 
     def __str__(self):
-        return str(self.collection) if self.collection_id else str(_("Validation rules"))
+        return (
+            str(self.collection) if self.collection_id else str(_("Validation rules"))
+        )
 
     class Meta:
         verbose_name = _("Validation rules")
@@ -2199,7 +2182,9 @@ class UploadValidator(CommonControlField):
             return cls.get()
 
         collection_ids = list(
-            journal.journal_collections.values_list("collection_id", flat=True).distinct()
+            journal.journal_collections.values_list(
+                "collection_id", flat=True
+            ).distinct()
         )
         if len(collection_ids) != 1:
             raise ValidationError(

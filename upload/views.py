@@ -2,6 +2,7 @@ import logging
 from functools import partial
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
@@ -9,11 +10,15 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.http import content_disposition_header
 from django.utils.translation import gettext_lazy as _
+from django.views.generic.edit import FormView
+from wagtail.admin.views.generic.base import WagtailAdminTemplateMixin
 from wagtail.snippets.views.snippets import CreateView
 
 from collection.choices import WEBSITE_KIND
 from core.users.permission_policies import TeamScopedEditView
 from upload.authorization import user_can_act_on_package
+from upload.delegation import can_delegate_review, delegate_review
+from upload.forms import DelegateReviewForm
 from upload.models import Package, UploadProcResult, choices
 from upload.permissions import (
     ASSIGN_PACKAGE,
@@ -35,6 +40,57 @@ from upload.tasks import (
     task_upload_workflow_publish_article,
 )
 from upload.utils.package_utils import render_html
+
+
+class DelegateReviewView(WagtailAdminTemplateMixin, FormView):
+    page_title = _("Delegate review")
+    header_icon = ""
+    template_name = "upload/decisions/delegate.html"
+    form_class = DelegateReviewForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.package = get_object_or_404(
+            get_scoped_package_queryset(request.user, ASSIGN_PACKAGE),
+            pk=kwargs["pk"],
+        )
+
+        if not can_delegate_review(request.user, self.package):
+            raise PermissionDenied
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "package": self.package}
+
+    def get_success_url(self):
+        return reverse("wagtailsnippets_upload_package:inspect", args=[self.package.pk])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        context.update(
+            document_identity=self.package.document_identity,
+            document_url=self.get_success_url(),
+            submit_button_label=_("Save assignment"),
+            submit_button_active_label=_("Saving…"),
+        )
+
+        return context
+
+    def form_valid(self, form):
+        try:
+            delegate_review(
+                self.request.user,
+                self.package.pk,
+                form.cleaned_data["reviewer"].pk,
+                form.cleaned_data["instructions"],
+            )
+        except ValidationError as error:
+            form.add_error("reviewer", error)
+            return self.form_invalid(form)
+
+        messages.success(self.request, _("Review assignment saved."))
+        return redirect(self.get_success_url())
 
 
 class PackageZipCreateView(CreateView):
@@ -128,6 +184,17 @@ class PackageDecisionMixin:
     error_message = _("Unable to complete the operation. Check the form and try again.")
     permission_error_message = _("Operation not available")
 
+    page_subtitle = _("Record decision")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            document_identity=self.object.document_identity,
+            document_url=self.get_success_url(),
+        )
+
+        return context
+
     def get_success_url(self):
         return reverse("wagtailsnippets_upload_package:inspect", args=[self.object.pk])
 
@@ -144,7 +211,7 @@ class PackageDecisionMixin:
         if decision == choices.PS_PENDING_CORRECTION:
             permission = REQUEST_CORRECTION
         elif decision == choices.PS_PENDING_QA_DECISION:
-            permission = ASSIGN_PACKAGE
+            raise PermissionDenied
         else:
             permission = PUBLISH_PACKAGE
         if not user_can_act_on_package(self.request.user, permission, form.instance):
@@ -226,7 +293,8 @@ def retry_publication(request):
             {
                 "title": _("Retry publication"),
                 "message": _(
-                    "Retry the failed publication using the existing authorization. The document and its validation results will be preserved."
+                    "Retry the failed publication using the existing authorization. "
+                    "The document and its validation results will be preserved."
                 ),
                 "submit_label": _("Retry publication"),
                 "package": package,
@@ -278,7 +346,9 @@ def finish_deposit(request):
             {
                 "title": _("Submit validation responses"),
                 "message": _(
-                    "The ZIP has already been received. Submit the validation responses to determine whether the document needs corrections or can proceed with processing."
+                    "The ZIP has already been received. Submit the validation responses "
+                    "to determine whether the document needs corrections or can proceed "
+                    "with processing."
                 ),
                 "submit_label": _("Submit validation responses"),
                 "package": package,
@@ -395,7 +465,7 @@ def assign(request):
         get_scoped_package_queryset(request.user, ASSIGN_PACKAGE), pk=package_id
     )
 
-    return redirect("wagtailsnippets_upload_qapackage:edit", pk=package_id)
+    return redirect("upload:delegate_review", pk=package_id)
 
 
 def archive_package(request):
