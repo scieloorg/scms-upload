@@ -107,13 +107,26 @@ QA_DECISION = (
 # Model Package, Field category
 PC_ERRATUM = "erratum"
 PC_UPDATE = "update"
+PC_ADDENDUM = "addendum"
+PC_RETRACTION = "retraction"
+PC_PARTIAL_RETRACTION = "partial-retraction"
 PC_NEW_DOCUMENT = "new-document"
 PC_SYSTEM_GENERATED = "generated-by-the-system"
 
 PACKAGE_CATEGORY = (
     (PC_UPDATE, _("Update")),
     (PC_ERRATUM, _("Erratum")),
+    (PC_ADDENDUM, _("Addendum")),
+    (PC_RETRACTION, _("Retraction")),
+    (PC_PARTIAL_RETRACTION, _("Partial retraction")),
     (PC_NEW_DOCUMENT, _("New document")),
+)
+
+CPR_ORIGINAL = "original"
+CPR_NOTICE = "notice"
+CHANGE_PACKAGE_ROLE = (
+    (CPR_ORIGINAL, _("Updated original")),
+    (CPR_NOTICE, _("Change notice")),
 )
 
 # Model ValidationResult, campo que agrupo tipos de erro de validação, VR = Validation Report

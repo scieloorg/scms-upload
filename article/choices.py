@@ -3,10 +3,28 @@ from django.utils.translation import gettext_lazy as _
 # Model RequestArticleChange, Field change_type
 RCT_UPDATE = "update"
 RCT_ERRATUM = "erratum"
+RCT_ADDENDUM = "addendum"
+RCT_RETRACTION = "retraction"
+RCT_PARTIAL_RETRACTION = "partial-retraction"
 
 REQUEST_CHANGE_TYPE = (
     (RCT_UPDATE, _("Update")),
     (RCT_ERRATUM, _("Erratum")),
+    (RCT_ADDENDUM, _("Addendum")),
+    (RCT_RETRACTION, _("Retraction")),
+    (RCT_PARTIAL_RETRACTION, _("Partial retraction")),
+)
+
+RCS_PENDING = "pending"
+RCS_RECEIVED = "received"
+RCS_COMPLETED = "completed"
+RCS_CANCELLED = "cancelled"
+
+REQUEST_CHANGE_STATUS = (
+    (RCS_PENDING, _("Pending")),
+    (RCS_RECEIVED, _("Received")),
+    (RCS_COMPLETED, _("Completed")),
+    (RCS_CANCELLED, _("Cancelled")),
 )
 
 

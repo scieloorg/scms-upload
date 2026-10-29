@@ -35,10 +35,22 @@ def build_group_access(app_access):
 
 APP_ACCESS = {
     "article": {
-        TeamGroups.COLLECTION_ADMIN: {"access": FULL_ACCESS},
-        TeamGroups.COLLECTION_MEMBER: {"access": FULL_ACCESS},
-        TeamGroups.JOURNAL_ADMIN: {"access": READ_ACCESS},
-        TeamGroups.JOURNAL_MEMBER: {"access": READ_ACCESS},
+        TeamGroups.COLLECTION_ADMIN: {
+            "access": FULL_ACCESS,
+            "custom": ("request_article_change",),
+        },
+        TeamGroups.COLLECTION_MEMBER: {
+            "access": FULL_ACCESS,
+            "custom": ("request_article_change",),
+        },
+        TeamGroups.JOURNAL_ADMIN: {
+            "access": READ_ACCESS,
+            "custom": ("request_article_change",),
+        },
+        TeamGroups.JOURNAL_MEMBER: {
+            "access": READ_ACCESS,
+            "custom": ("request_article_change",),
+        },
     },
     "collection": {
         TeamGroups.COLLECTION_ADMIN: {"access": FULL_ACCESS},
