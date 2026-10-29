@@ -4771,3 +4771,201 @@ msgstr "Technical lookup"
 #: upload/wagtail_hooks.py:798
 msgid "Settings"
 msgstr "Settings"
+
+#: article/choices.py:25
+msgid "Received"
+msgstr "Received"
+
+#: article/choices.py:27
+msgid "Cancelled"
+msgstr "Cancelled"
+
+#: article/forms.py:73
+msgid "Change requests must be saved through the request workflow"
+msgstr "Change requests must be saved through the request workflow"
+
+#: article/models.py:1250
+msgid "Published original XML"
+msgstr "Published original XML"
+
+#: article/models.py:1283
+msgid "Inform the article to change"
+msgstr "Inform the article to change"
+
+#: article/models.py:1299
+msgid "This article already has an active change request"
+msgstr "This article already has an active change request"
+
+#: article/models.py:1309
+msgid "Only pending requests can be cancelled"
+msgstr "Only pending requests can be cancelled"
+
+#: upload/admin_buttons.py:107 upload/change_views.py:19
+#: upload/change_views.py:52 upload/document_views.py:44
+msgid "Request document change"
+msgstr "Request document change"
+
+#: upload/article_changes.py:71 upload/article_changes.py:74
+msgid "The submitted XML identifies more than one article."
+msgstr "The submitted XML identifies more than one article."
+
+#: upload/article_changes.py:88
+msgid ""
+"The original article needs an active, compatible change request before "
+"reception."
+msgstr ""
+"The original article needs an active, compatible change request before "
+"reception."
+
+#: upload/article_changes.py:97
+msgid "This change request already has a submission in progress."
+msgstr "This change request already has a submission in progress."
+
+#: upload/article_changes.py:135
+msgid ""
+"The published XML could not be verified. The previous submission was "
+"preserved."
+msgstr ""
+"The published XML could not be verified. The previous submission was "
+"preserved."
+
+#: upload/article_changes.py:143
+msgid "The original journal must have registered ISSNs."
+msgstr "The original journal must have registered ISSNs."
+
+#: upload/article_changes.py:156
+msgid "The notice and updated original must belong to the authorized journal."
+msgstr ""
+"The notice and updated original must belong to the authorized journal."
+
+#: upload/article_changes.py:175
+msgid "Change documents must be received in one submitted package."
+msgstr "Change documents must be received in one submitted package."
+
+#: upload/article_changes.py:186 upload/article_changes.py:197
+msgid "This submission no longer belongs to an active change request."
+msgstr "This submission no longer belongs to an active change request."
+
+#: upload/article_changes.py:228
+msgid "An authorized depositor is required."
+msgstr "An authorized depositor is required."
+
+#: upload/article_changes.py:236
+msgid "The depositor is not authorized for the original article."
+msgstr "The depositor is not authorized for the original article."
+
+#: upload/article_changes.py:267
+msgid "A change notice must identify its original article by DOI."
+msgstr "A change notice must identify its original article by DOI."
+
+#: upload/article_changes.py:274
+msgid "Submit the updated original XML together with its change notice."
+msgstr "Submit the updated original XML together with its change notice."
+
+#: upload/article_changes.py:282
+msgid "The notice must refer to an already public original article."
+msgstr "The notice must refer to an already public original article."
+
+#: upload/article_changes.py:288
+msgid ""
+"The notice type does not match the active request on the original article."
+msgstr ""
+"The notice type does not match the active request on the original article."
+
+#: upload/article_changes.py:297
+msgid "Keep the previously published original filename in the change package."
+msgstr ""
+"Keep the previously published original filename in the change package."
+
+#: upload/article_changes.py:317
+msgid "A submitted document has conflicting change roles."
+msgstr "A submitted document has conflicting change roles."
+
+#: upload/article_changes.py:329
+msgid ""
+"This request requires both a change notice and the updated original, in XML "
+"and PDF."
+msgstr ""
+"This request requires both a change notice and the updated original, in XML "
+"and PDF."
+
+#: upload/choices.py:128
+msgid "Updated original"
+msgstr "Updated original"
+
+#: upload/choices.py:129
+msgid "Change notice"
+msgstr "Change notice"
+
+#: upload/controller.py:181 upload/controller.py:188
+msgid "Article change package"
+msgstr "Article change package"
+
+#: upload/controller.py:392
+msgid "The depositor is not authorized for the registered article."
+msgstr "The depositor is not authorized for the registered article."
+
+#: upload/controller.py:419
+msgid "The received original differs from the authorized article."
+msgstr "The received original differs from the authorized article."
+
+#: upload/controller.py:428
+msgid ""
+"The public article needs an active, compatible change request before "
+"reception."
+msgstr ""
+"The public article needs an active, compatible change request before "
+"reception."
+
+#: upload/forms.py:98
+msgid ""
+"Describe the requested change. Errata, addenda and retractions require a "
+"notice and the updated original document (XML/PDF)."
+msgstr ""
+"Describe the requested change. Errata, addenda and retractions require a "
+"notice and the updated original document (XML/PDF)."
+
+#: upload/models.py:323
+msgid "Article change requests"
+msgstr "Article change requests"
+
+#: upload/models.py:328
+msgid "Change package role"
+msgstr "Change package role"
+
+#: upload/models.py:741
+msgid "Republish the latest public submission, not a previous version."
+msgstr "Republish the latest public submission, not a previous version."
+
+#: upload/models.py:747
+msgid "Publication requires the current, received article change request."
+msgstr "Publication requires the current, received article change request."
+
+#: upload/models.py:754
+msgid ""
+"Approve the notice and all updated originals before publication in "
+"Production."
+msgstr ""
+"Approve the notice and all updated originals before publication in "
+"Production."
+
+#: upload/templates/upload/changes/request.html:12
+msgid ""
+"This request does not change the published document or its publication "
+"status. Submit the corrected content separately for review."
+msgstr ""
+"This request does not change the published document or its publication "
+"status. Submit the corrected content separately for review."
+
+#: upload/templates/upload/documents/change_requests.html:3
+#: upload/templates/upload/documents/change_requests.html:4
+msgid "Document change requests"
+msgstr "Document change requests"
+
+#: upload/templates/upload/documents/change_requests.html:16
+msgid "Change request history"
+msgstr "Change request history"
+
+#: upload/change_views.py:83
+msgid "Document change requested."
+msgstr "Document change requested."

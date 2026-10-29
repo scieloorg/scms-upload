@@ -4812,3 +4812,205 @@ msgstr "Consulta técnica"
 #: upload/wagtail_hooks.py:798
 msgid "Settings"
 msgstr "Configuración"
+
+#: article/choices.py:25
+msgid "Received"
+msgstr "Recibido"
+
+#: article/choices.py:27
+msgid "Cancelled"
+msgstr "Cancelado"
+
+#: article/forms.py:73
+msgid "Change requests must be saved through the request workflow"
+msgstr ""
+"Las solicitudes de cambios deben guardarse mediante el flujo de solicitudes"
+
+#: article/models.py:1250
+msgid "Published original XML"
+msgstr "XML original publicado"
+
+#: article/models.py:1283
+msgid "Inform the article to change"
+msgstr "Indique el artículo que se debe modificar"
+
+#: article/models.py:1299
+msgid "This article already has an active change request"
+msgstr "Este artículo ya tiene una solicitud de cambios activa"
+
+#: article/models.py:1309
+msgid "Only pending requests can be cancelled"
+msgstr "Solo se pueden cancelar las solicitudes pendientes"
+
+#: upload/admin_buttons.py:107 upload/change_views.py:19
+#: upload/change_views.py:52 upload/document_views.py:44
+msgid "Request document change"
+msgstr "Solicitar cambios del documento"
+
+#: upload/article_changes.py:71 upload/article_changes.py:74
+msgid "The submitted XML identifies more than one article."
+msgstr "El XML enviado identifica más de un artículo."
+
+#: upload/article_changes.py:88
+msgid ""
+"The original article needs an active, compatible change request before "
+"reception."
+msgstr ""
+"El artículo original necesita una solicitud de cambios activa y compatible "
+"antes de la recepción."
+
+#: upload/article_changes.py:97
+msgid "This change request already has a submission in progress."
+msgstr "Esta solicitud de cambios ya tiene un envío en curso."
+
+#: upload/article_changes.py:135
+msgid ""
+"The published XML could not be verified. The previous submission was "
+"preserved."
+msgstr "No se pudo verificar el XML publicado. Se conservó el envío anterior."
+
+#: upload/article_changes.py:143
+msgid "The original journal must have registered ISSNs."
+msgstr "La revista del artículo original debe tener ISSN registrados."
+
+#: upload/article_changes.py:156
+msgid "The notice and updated original must belong to the authorized journal."
+msgstr ""
+"El aviso y el original actualizado deben pertenecer a la revista autorizada."
+
+#: upload/article_changes.py:175
+msgid "Change documents must be received in one submitted package."
+msgstr ""
+"Los documentos de cambios deben recibirse en un único paquete enviado."
+
+#: upload/article_changes.py:186 upload/article_changes.py:197
+msgid "This submission no longer belongs to an active change request."
+msgstr "Este envío ya no pertenece a una solicitud de cambios activa."
+
+#: upload/article_changes.py:228
+msgid "An authorized depositor is required."
+msgstr "Se requiere un depositante autorizado."
+
+#: upload/article_changes.py:236
+msgid "The depositor is not authorized for the original article."
+msgstr "El depositante no está autorizado para el artículo original."
+
+#: upload/article_changes.py:267
+msgid "A change notice must identify its original article by DOI."
+msgstr ""
+"Un aviso de cambios debe identificar su artículo original mediante el DOI."
+
+#: upload/article_changes.py:274
+msgid "Submit the updated original XML together with its change notice."
+msgstr "Envíe el XML original actualizado junto con su aviso de cambios."
+
+#: upload/article_changes.py:282
+msgid "The notice must refer to an already public original article."
+msgstr "El aviso debe referirse a un artículo original que ya sea público."
+
+#: upload/article_changes.py:288
+msgid ""
+"The notice type does not match the active request on the original article."
+msgstr ""
+"El tipo de aviso no coincide con la solicitud activa del artículo original."
+
+#: upload/article_changes.py:297
+msgid "Keep the previously published original filename in the change package."
+msgstr ""
+"Conserve el nombre del archivo original publicado anteriormente en el "
+"paquete de cambios."
+
+#: upload/article_changes.py:317
+msgid "A submitted document has conflicting change roles."
+msgstr "Un documento enviado tiene funciones de cambio incompatibles."
+
+#: upload/article_changes.py:329
+msgid ""
+"This request requires both a change notice and the updated original, in XML "
+"and PDF."
+msgstr ""
+"Esta solicitud requiere tanto un aviso de cambios como el original "
+"actualizado, en XML y PDF."
+
+#: upload/choices.py:128
+msgid "Updated original"
+msgstr "Original actualizado"
+
+#: upload/choices.py:129
+msgid "Change notice"
+msgstr "Aviso de cambios"
+
+#: upload/controller.py:181 upload/controller.py:188
+msgid "Article change package"
+msgstr "Paquete de cambios del artículo"
+
+#: upload/controller.py:392
+msgid "The depositor is not authorized for the registered article."
+msgstr "El depositante no está autorizado para el artículo registrado."
+
+#: upload/controller.py:419
+msgid "The received original differs from the authorized article."
+msgstr "El original recibido difiere del artículo autorizado."
+
+#: upload/controller.py:428
+msgid ""
+"The public article needs an active, compatible change request before "
+"reception."
+msgstr ""
+"El artículo público necesita una solicitud de cambios activa y compatible "
+"antes de la recepción."
+
+#: upload/forms.py:98
+msgid ""
+"Describe the requested change. Errata, addenda and retractions require a "
+"notice and the updated original document (XML/PDF)."
+msgstr ""
+"Describa el cambio solicitado. Las erratas, adendas y retractaciones "
+"requieren un aviso y el documento original actualizado (XML/PDF)."
+
+#: upload/models.py:323
+msgid "Article change requests"
+msgstr "Solicitudes de cambios del artículo"
+
+#: upload/models.py:328
+msgid "Change package role"
+msgstr "Función en el paquete de cambios"
+
+#: upload/models.py:741
+msgid "Republish the latest public submission, not a previous version."
+msgstr "Vuelva a publicar el último envío público, no una versión anterior."
+
+#: upload/models.py:747
+msgid "Publication requires the current, received article change request."
+msgstr ""
+"La publicación requiere la solicitud de cambios del artículo actual y "
+"recibida."
+
+#: upload/models.py:754
+msgid ""
+"Approve the notice and all updated originals before publication in "
+"Production."
+msgstr ""
+"Apruebe el aviso y todos los originales actualizados antes de la publicación"
+" en Producción."
+
+#: upload/templates/upload/changes/request.html:12
+msgid ""
+"This request does not change the published document or its publication "
+"status. Submit the corrected content separately for review."
+msgstr ""
+"Esta solicitud no modifica el documento publicado ni su estado de "
+"publicación. Envíe el contenido corregido por separado para su revisión."
+
+#: upload/templates/upload/documents/change_requests.html:3
+#: upload/templates/upload/documents/change_requests.html:4
+msgid "Document change requests"
+msgstr "Solicitudes de cambios del documento"
+
+#: upload/templates/upload/documents/change_requests.html:16
+msgid "Change request history"
+msgstr "Historial de solicitudes de cambios"
+
+#: upload/change_views.py:83
+msgid "Document change requested."
+msgstr "Se solicitaron cambios del documento."
