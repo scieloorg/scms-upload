@@ -19,9 +19,9 @@ class ArticleAvailabilitySiteViewSet(SnippetViewSet):
         "publication_rule",
     )
     search_fields = (
-        "article__sps_pkg__sps_pkg_name",
+        "article__collection_pid_v2__sps_pkg_name",
         "article__pid_v3",
-        "article__pid_v2",
+        "article__collection_pid_v2__pid_v2",
     )
     list_filter = (
         "completed",

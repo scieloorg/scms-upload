@@ -85,7 +85,6 @@ class ArticleAvailabilityTest(TestCase):
             journal=self.journal,
             issue=self.issue,
             pid_v3="test_pid_v3",
-            pid_v2="test_pid_v2",
             creator=self.user,
         )
         lang = Language.get_or_create(creator=self.user, code2="en")

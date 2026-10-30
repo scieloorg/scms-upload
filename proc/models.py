@@ -6,6 +6,7 @@ import traceback
 from datetime import datetime
 from tempfile import TemporaryDirectory
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
 from django.db.models import Count, Q, F
@@ -39,6 +40,7 @@ from migration.controller import (
     PkgZipBuilder,
     XMLVersionXmlWithPreError,
     create_or_update_article,
+    get_classic_website,
 )
 from migration.models import (
     IdFileRecord,
@@ -616,11 +618,20 @@ class BaseProc(CommonControlField):
             if (
                 obj.migration_status != tracker_choices.PROGRESS_STATUS_TODO
                 and not force_update
+                # procs criados a partir do core (ex.: JournalProc com
+                # migration_status=DONE) não têm migrated_data
+                and obj.migrated_data
             ):
                 return obj
 
             operation = obj.start(user, f"get data from classic website {pid}")
 
+            # proc já migrado a partir do core: apenas completa migrated_data,
+            # sem voltar o status (evita remigrar a partir do site clássico)
+            keep_status = (
+                not obj.migrated_data
+                and obj.migration_status == tracker_choices.PROGRESS_STATUS_DONE
+            )
             if data:
                 obj.migrated_data = cls.MigratedDataClass.register_classic_website_data(
                     user,
@@ -630,7 +641,8 @@ class BaseProc(CommonControlField):
                     content_type,
                     force_update,
                 )
-                obj.migration_status = obj.migrated_data.migration_status
+                if not keep_status:
+                    obj.migration_status = obj.migrated_data.migration_status
                 detail = obj.migrated_data.data
             obj.save()
             operation.finish(
@@ -656,6 +668,48 @@ class BaseProc(CommonControlField):
                         "collection": collection.acron,
                     },
                 )
+
+    def _get_classic_website_records(self, classic_website):
+        """
+        Retorna os pares (pid, records) da base do site clássico
+        correspondente ao tipo de processo (title, issue).
+        """
+        raise NotImplementedError
+
+    def get_migrated_data(self, user):
+        """
+        Retorna os dados migrados (migrated_data.data).
+
+        Caso ainda não exista migrated_data (registro não foi obtido da
+        base do site clássico), tenta obtê-lo novamente da base do site
+        clássico. Se não encontrar, lança ValueError.
+        """
+        if self.migrated_data and self.migrated_data.data:
+            return self.migrated_data.data
+
+        classic_website = get_classic_website(self.collection.acron)
+        if classic_website:
+            for pid, records in self._get_classic_website_records(classic_website):
+                if pid != self.pid:
+                    continue
+                obj = self.register_classic_website_data(
+                    user,
+                    self.collection,
+                    self.pid,
+                    records[0],
+                    self.CLASSIC_WEBSITE_CONTENT_TYPE,
+                    force_update=True,
+                )
+                if obj:
+                    self.refresh_from_db()
+                break
+
+        if self.migrated_data and self.migrated_data.data:
+            return self.migrated_data.data
+        raise ValueError(
+            f"{type(self).__name__} {self} ({self.collection.acron} {self.pid}) "
+            "has no migrated data. Check if the record exists in the classic website database."
+        )
 
     @classmethod
     def register_pid(
@@ -756,7 +810,7 @@ class BaseProc(CommonControlField):
             migrated_data__content_type=content_type,
         )
         if content_type == "article":
-            params["sps_pkg__pid_v3__isnull"] = False
+            params["sps_pkg__collection_pid_v2__pid_provider_xml__v3__isnull"] = False
         q = Q(migration_status=tracker_choices.PROGRESS_STATUS_REPROC)
         if force_update:
             q |= (
@@ -843,7 +897,7 @@ class BaseProc(CommonControlField):
         params["migrated_data__content_type"] = content_type
         params["migration_status"] = tracker_choices.PROGRESS_STATUS_DONE
         if content_type == "article":
-            params["sps_pkg__pid_v3__isnull"] = False
+            params["sps_pkg__collection_pid_v2__pid_provider_xml__v3__isnull"] = False
         params["collection__websiteconfiguration__purpose"] = "QA"
         params["collection__websiteconfiguration__enabled"] = True
 
@@ -1033,7 +1087,7 @@ class BaseProc(CommonControlField):
         params["qa_ws_status"] = tracker_choices.PROGRESS_STATUS_DONE
         if content_type == "article":
             params["sps_pkg_status__isnull"] = False
-            params["sps_pkg__pid_v3__isnull"] = False
+            params["sps_pkg__collection_pid_v2__pid_provider_xml__v3__isnull"] = False
             params["sps_pkg__registered_in_core"] = True
         params["collection__websiteconfiguration__purpose"] = "PUBLIC"
         params["collection__websiteconfiguration__enabled"] = True
@@ -1112,6 +1166,10 @@ class JournalProc(BaseProc, ClusterableModel):
         InlinePanel("journal_proc_result", label=_("Event newest to oldest")),
     ]
     MigratedDataClass = MigratedJournal
+    CLASSIC_WEBSITE_CONTENT_TYPE = "journal"
+
+    def _get_classic_website_records(self, classic_website):
+        return classic_website.get_journals_pids_and_records()
 
     edit_handler = TabbedInterface(
         [
@@ -1166,6 +1224,9 @@ class JournalProc(BaseProc, ClusterableModel):
             self.migration_status = migration_status or self.migration_status
             self.set_qa_ws_status(tracker_choices.PROGRESS_STATUS_TODO)
             self.save()
+            if self.journal:
+                # Journal.journal_acron fica vazio se o acrônimo varia por coleção
+                self.journal.update_journal_acron()
         except Exception as e:
             raise exceptions.JournalProcUpdateError(
                 _("Unable to update journal {} {} {} {}").format(
@@ -1344,6 +1405,11 @@ class IssueProc(BaseProc, ClusterableModel):
         default=tracker_choices.PROGRESS_STATUS_TODO,
     )
     MigratedDataClass = MigratedIssue
+    CLASSIC_WEBSITE_CONTENT_TYPE = "issue"
+
+    def _get_classic_website_records(self, classic_website):
+        return classic_website.get_issues_pids_and_records()
+
     base_form_class = IssueProcAdminModelForm
     ProcResult = IssueProcResult
 
@@ -1857,8 +1923,8 @@ class IssueProc(BaseProc, ClusterableModel):
                 id_file_records = id_file_records.filter(todo=True)
             input_data["total_id_file_records_to_migrate"] = id_file_records.count()
 
-            journal_data = self.journal_proc.migrated_data.data
-            issue_data = self.migrated_data.data
+            journal_data = self.journal_proc.get_migrated_data(user)
+            issue_data = self.get_migrated_data(user)
             exceptions = {}
             for record in id_file_records:
                 try:
@@ -2372,11 +2438,32 @@ class ArticleProc(BaseProc, ClusterableModel):
                     or xml_with_pre.get_complete_publication_date()
                 )
 
+            # identifica a coleção de origem do XML (custom-meta)
+            collection_acron = self.collection.acron
+            if collection_acron != xml_with_pre.collection:
+                xml_with_pre.collection = collection_acron
+
+            # o acrônimo do periódico depende da coleção (JournalProc.acron);
+            # o do XML / registro title pode ser o de outra coleção
+            journal_acron = self.journal_proc.acron
+            if journal_acron and journal_acron != xml_with_pre.journal_acron:
+                xml_with_pre.journal_acron = journal_acron
+
+            # se o artigo já tem pid v3, mantém no XML processado
+            # (o pid v3 só era inserido no XML do pacote sps)
+            pid_v3 = self.sps_pkg and self.sps_pkg.pid_v3
+            if pid_v3 and xml_with_pre.v3 != pid_v3:
+                xml_with_pre.v3 = pid_v3
+
             # padroniza o nome do pacote
-            xml_with_pre.built_sps_pkg_name = xml_with_pre.build_sps_pkg_name()
+            # (xml_with_pre.sps_pkg_name prioriza o nome do arquivo de origem,
+            # que não reflete o acrônimo do periódico na coleção)
+            sps_pkg_name = xml_with_pre.build_sps_pkg_name()
+            xml_with_pre.built_sps_pkg_name = sps_pkg_name
 
             # atualiza detalhe da operação
             detail.update(xml_with_pre.data)
+            detail["sps_pkg_name"] = sps_pkg_name
 
             try:
                 # apagar arquivo atual para poupar espaço
@@ -2384,9 +2471,10 @@ class ArticleProc(BaseProc, ClusterableModel):
             except Exception:
                 pass
 
-            # o arquivo será gravado com o nome xml_with_pre.built_sps_pkg_name 
+            # o nome do arquivo será o sps_pkg_name das próximas leituras
+            # de self.xml_with_pre (provided_sps_pkg_name)
             self.processed_xml.save(
-                xml_with_pre.sps_pkg_name + ".xml",
+                sps_pkg_name + ".xml",
                 ContentFile(xml_with_pre.tostring()),
                 save=False,
             )
@@ -2636,9 +2724,12 @@ class ArticleProc(BaseProc, ClusterableModel):
             if not os.path.isfile(item.file.path):
                 continue
             return item
+        filenames = list(self.issue_proc.issue_files.filter(
+            pkg_name=self.pkg_name,
+        ).values("pkg_name", "component_type", "original_name"))
         raise MigratedFile.DoesNotExist(
-            _("No migrated XML file found for {} ({})").format(
-                self.pkg_name, self.issue_proc
+            _("No migrated XML file found for {} ({}): {}").format(
+                self.pkg_name, self.issue_proc, filenames
             )
         )
 
@@ -2735,7 +2826,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             migrated_data_id__isnull=False,
             sps_pkg_id__isnull=False,
             **params,
-        ).exclude(migrated_data__pid=F("sps_pkg__pid_v2"))
+        ).exclude(migrated_data__pid=F("sps_pkg__collection_pid_v2__pid_v2"))
 
         marked_to_reproc = []
         failures = {}
@@ -2760,7 +2851,7 @@ class ArticleProc(BaseProc, ClusterableModel):
         cls, user, journal_proc=None, issue_proc_id_list=None
     ):
         """
-        Completa sps_pkg.ppx (campo novo)
+        Vincula sps_pkg ao documento na coleção (collection_pid_v2)
         """
         params = {}
         if issue_proc_id_list:
@@ -2769,7 +2860,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             params["issue_proc__journal_proc"] = journal_proc
 
         sps_pkg_id_list = cls.objects.filter(
-            sps_pkg__ppx_id__isnull=True,
+            sps_pkg__collection_pid_v2__isnull=True,
             **params,
         ).values_list("sps_pkg_id", flat=True)
         if not sps_pkg_id_list:
@@ -2886,9 +2977,9 @@ class ArticleProc(BaseProc, ClusterableModel):
             duplicated_items = article_procs.filter(sps_pkg_id=value)
             data["total"] = duplicated_items.count()
 
-            article_id = duplicated_items.values_list(
-                "sps_pkg__article_id", flat=True
-            ).distinct()
+            article_id = duplicated_items.filter(
+                sps_pkg__collection_pid_v2__article__isnull=False
+            ).values_list("sps_pkg__collection_pid_v2__article", flat=True)
 
             if article_id:
                 keep = duplicated_items.order_by("-updated").first()
@@ -2930,7 +3021,11 @@ class ArticleProc(BaseProc, ClusterableModel):
     def article(self):
         if not self.sps_pkg:
             return None
-        return self.sps_pkg.article_set.all().order_by("-updated").first()
+        # um Article por documento na coleção (collection_pid_v2)
+        try:
+            return self.sps_pkg.collection_pid_v2.article
+        except (AttributeError, ObjectDoesNotExist):
+            return None
 
     # ── migration flow ──
 

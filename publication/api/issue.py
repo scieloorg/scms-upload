@@ -41,7 +41,7 @@ def sync_issue(issue_proc, api_data):
         api.post_data_url = url
         issue_sync_payload = {
             "issue_id": issue_proc.bundle_id,
-            "articles_id": issue.article_ids,
+            "articles_id": issue.get_article_ids(issue_proc.collection),
         }
         response["issue_sync"] = api.post_data(issue_sync_payload)
     except Exception as e:

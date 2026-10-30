@@ -1,0 +1,222 @@
+!ID 0000001
+!v991!1
+!v700!0
+!v706!i
+!v701!1
+!v091!20090901
+!v130!Psicologia USP
+!v421!Psicol USP
+!v151!Psicol. USP
+!v230!Psychology USP
+!v035!1678-5177
+!v480!Instituto de Psicologia da Universidade de São Paulo
+!v030!Psicol. USP
+!v930!PSICOUSP
+!v117!apa
+!v435!0103-6564^tPRINT
+!v435!1678-5177^tONLIN
+!v935!1678-5177
+!v031!20
+!v032!3
+!v036!20093
+!v042!1
+!v200!0
+!v065!20090900
+!v122!1
+!v048!^lpt^hSumário
+!v048!^len^hTable of Contents
+!v049!^lpt^cPSICOUSP010^tArtigos
+!v049!^len^cPSICOUSP010^tArticles
+!v043!^lpt^tPsicol. USP^vvol.20^nno.3^cSão Paulo^mset.^a2009
+!v043!^len^tPsicol. USP^vvol.20^nno.3^cSão Paulo^mSept.^a2009
+!v541!BY-NC
+!ID 0000002
+!v002!1678-5177-psicousp-20-3-333.xml
+!v004!v20n3
+!v091!20090901
+!v092!1000
+!v093!20090901
+!v700!1
+!v701!1
+!v702!psicousp/v20n3/1678-5177-psicousp-20-3-333.xml
+!v880!S1678-51772009000300003
+!v703!6
+!v705!S
+!v706!o
+!v708!1
+!ID 0000003
+!v002!1678-5177-psicousp-20-3-333.xml
+!v004!v20n3
+!v010!^1aff1^nMaria^rND^sSilva
+!v010!^1aff1^nJoão^rND^sSouza
+!v012!A constituição do sujeito e o laço social^lpt
+!v012!The constitution of the subject and the social bond^len
+!v014!^f333^l350
+!v030!Psicol. USP
+!v031!20
+!v032!3
+!v035!1678-5177
+!v040!pt
+!v042!1
+!v049!PSICOUSP010
+!v062!Instituto de Psicologia da Universidade de São Paulo
+!v065!20090900
+!v070!Universidade de São Paulo^1Instituto de Psicologia^cSão Paulo^iaff1^pBrasil^sSP
+!v071!oa
+!v072!2
+!v083!^aEste artigo discute a constituição do sujeito a partir do laço social, considerando as contribuições da psicanálise para a compreensão das relações entre o indivíduo e a cultura contemporânea.^lpt
+!v083!^aThis article discusses the constitution of the subject based on the social bond, considering the contributions of psychoanalysis to the understanding of the relationship between the individual and contemporary culture.^len
+!v085!^kPsicanálise^lpt
+!v085!^kLaço social^lpt
+!v085!^kSubjetividade^lpt
+!v085!^kPsychoanalysis^len
+!v085!^kSocial bond^len
+!v085!^kSubjectivity^len
+!v100!Psicologia USP
+!v120!XML_1.1
+!v121!00003
+!v223!20090901
+!v240!Universidade de São Paulo^cSão Paulo^iaff1^pBR^sSP
+!v265!^kreal^sxml^v20090901
+!v421!Psicol USP
+!v435!0103-6564^tppub
+!v435!1678-5177^tepub
+!v601!en
+!v700!2
+!v701!1
+!v702!psicousp/v20n3/1678-5177-psicousp-20-3-333.xml
+!v880!S1678-51772009000300003
+!v705!S
+!v706!h
+!v708!1
+!v709!article
+!ID 0000004
+!v002!1678-5177-psicousp-20-3-333.xml
+!v004!v20n3
+!v010!^1aff1^nMaria^rND^sSilva
+!v010!^1aff1^nJoão^rND^sSouza
+!v012!A constituição do sujeito e o laço social^lpt
+!v012!The constitution of the subject and the social bond^len
+!v014!^f333^l350
+!v030!Psicol. USP
+!v031!20
+!v032!3
+!v035!1678-5177
+!v040!pt
+!v042!1
+!v049!PSICOUSP010
+!v062!Instituto de Psicologia da Universidade de São Paulo
+!v065!20090900
+!v070!Universidade de São Paulo^1Instituto de Psicologia^cSão Paulo^iaff1^pBrasil^sSP
+!v071!oa
+!v072!2
+!v083!^a<p>Este artigo discute a constituição do sujeito a partir do laço social, considerando as contribuições da psicanálise para a compreensão das relações entre o indivíduo e a cultura contemporânea.</p>^lpt
+!v083!^a<p>This article discusses the constitution of the subject based on the social bond, considering the contributions of psychoanalysis to the understanding of the relationship between the individual and contemporary culture.</p>^len
+!v085!^kPsicanálise^lpt
+!v085!^kLaço social^lpt
+!v085!^kSubjetividade^lpt
+!v085!^kPsychoanalysis^len
+!v085!^kSocial bond^len
+!v085!^kSubjectivity^len
+!v100!Psicologia USP
+!v120!XML_1.1
+!v121!00003
+!v223!20090901
+!v240!Universidade de São Paulo^cSão Paulo^iaff1^pBR^sSP
+!v265!^kreal^sxml^v20090901
+!v421!Psicol USP
+!v435!0103-6564^tppub
+!v435!1678-5177^tepub
+!v601!en
+!v700!3
+!v701!1
+!v702!psicousp/v20n3/1678-5177-psicousp-20-3-333.xml
+!v880!S1678-51772009000300003
+!v705!S
+!v706!f
+!v708!1
+!v709!article
+!ID 0000005
+!v002!1678-5177-psicousp-20-3-333.xml
+!v004!v20n3
+!v010!^1aff1^nMaria^rND^sSilva
+!v010!^1aff1^nJoão^rND^sSouza
+!v012!A constituição do sujeito e o laço social^lpt
+!v012!The constitution of the subject and the social bond^len
+!v014!^f333^l350
+!v030!Psicol. USP
+!v031!20
+!v032!3
+!v035!1678-5177
+!v040!pt
+!v042!1
+!v049!PSICOUSP010
+!v062!Instituto de Psicologia da Universidade de São Paulo
+!v065!20090900
+!v070!Universidade de São Paulo^1Instituto de Psicologia^cSão Paulo^iaff1^pBrasil^sSP
+!v071!oa
+!v072!2
+!v083!^a<p>Este artigo discute a constituição do sujeito a partir do laço social, considerando as contribuições da psicanálise para a compreensão das relações entre o indivíduo e a cultura contemporânea.</p>^lpt
+!v083!^a<p>This article discusses the constitution of the subject based on the social bond, considering the contributions of psychoanalysis to the understanding of the relationship between the individual and contemporary culture.</p>^len
+!v085!^kPsicanálise^lpt
+!v085!^kLaço social^lpt
+!v085!^kSubjetividade^lpt
+!v085!^kPsychoanalysis^len
+!v085!^kSocial bond^len
+!v085!^kSubjectivity^len
+!v100!Psicologia USP
+!v120!XML_1.1
+!v121!00003
+!v223!20090901
+!v240!Universidade de São Paulo^cSão Paulo^iaff1^pBR^sSP
+!v265!^kreal^sxml^v20090901
+!v421!Psicol USP
+!v435!0103-6564^tppub
+!v435!1678-5177^tepub
+!v601!en
+!v700!4
+!v701!1
+!v702!psicousp/v20n3/1678-5177-psicousp-20-3-333.xml
+!v880!S1678-51772009000300003
+!v705!S
+!v706!l
+!v708!1
+!v709!article
+!ID 0000006
+!v002!1678-5177-psicousp-20-3-333.xml
+!v004!v20n3
+!v010!^nS^rND^sFreud
+!v018!O mal-estar na civilização
+!v062!Imago
+!v066!Rio de Janeiro
+!v064!1930
+!v065!19300000
+!v071!book
+!v118!1
+!v700!5
+!v701!1
+!v702!psicousp/v20n3/1678-5177-psicousp-20-3-333.xml
+!v880!S1678-51772009000300003
+!v705!S
+!v706!c
+!v708!1
+!v865!20090900
+!ID 0000007
+!v002!1678-5177-psicousp-20-3-333.xml
+!v004!v20n3
+!v010!^nJ^rND^sLacan
+!v018!Écrits
+!v062!Seuil
+!v066!Paris
+!v064!1966
+!v065!19660000
+!v071!book
+!v118!2
+!v700!6
+!v701!1
+!v702!psicousp/v20n3/1678-5177-psicousp-20-3-333.xml
+!v880!S1678-51772009000300003
+!v705!S
+!v706!c
+!v708!2
+!v865!20090900

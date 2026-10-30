@@ -153,3 +153,7 @@ class LoadRecordFromXMLURLTaskTests(SimpleTestCase):
             provider.provide_pid_for_xml_uri.call_args.kwargs["expected_pid_v3"],
             "expected-pid",
         )
+        self.assertEqual(
+            provider.provide_pid_for_xml_uri.call_args.kwargs["collection_acron"],
+            "scl",
+        )

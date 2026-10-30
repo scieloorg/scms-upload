@@ -26,7 +26,7 @@ from packtools.utils import SPPackage
 from wagtail.admin.panels import FieldPanel, InlinePanel, ObjectList, TabbedInterface
 from wagtail.models import Orderable
 
-from collection.models import Language
+from collection.models import Collection, Language
 from core.widgets import ReadOnlyPrettyJSONWidget
 from core.models import CommonControlField
 from core.utils.requester import fetch_data
@@ -34,7 +34,7 @@ from core.utils.file_utils import delete_files
 from files_storage.models import FileLocation, MinioConfiguration
 from package import choices
 from pid_provider.requester import PidRequester
-from pid_provider.models import PidProviderXML
+from pid_provider.models import CollectionPidV2
 
 
 pid_provider_app = PidRequester()
@@ -293,20 +293,32 @@ class SPSPkgComponent(FileLocation, Orderable):
 
 
 class SPSPkg(CommonControlField, ClusterableModel):
-    pid_v3 = models.CharField(max_length=23, null=True, blank=True)
-    pid_v2 = models.CharField(max_length=23, null=True, blank=True)
-    
+    """
+    Pacote SPS de um artigo em uma coleção
+
+    Artigo presente em mais de uma coleção tem um SPSPkg por coleção,
+    com o mesmo pid_v3, pois o XML difere por coleção (pid v2, acrônimo
+    do periódico, coleção, data de publicação)
+
+    O documento (pid v3) e a coleção (pid v2) são obtidos de
+    collection_pid_v2 (PidProviderXML / CollectionPidV2)
+    """
+
+    # documento na coleção; vazio para pacotes não registrados no pid
+    # provider ou sem coleção (ex.: ingresso)
+    collection_pid_v2 = models.OneToOneField(
+        "pid_provider.CollectionPidV2",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sps_pkg",
+    )
+
     sps_pkg_name = models.CharField(_("SPS Name"), max_length=100, null=True, blank=True)
 
     # zip
     file = models.FileField(upload_to=pkg_directory_path, null=True, blank=True, max_length=150)
 
-    ppx = models.ForeignKey(
-        PidProviderXML,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-    )
     # XML URI
     xml_uri = models.URLField(null=True, blank=True)
 
@@ -342,6 +354,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
     ]
 
     panel_status = [
+        FieldPanel("collection_pid_v2", read_only=True),
         FieldPanel("origin", read_only=True),
         FieldPanel("is_public", read_only=True),
         FieldPanel("registered_in_core", read_only=True),
@@ -361,7 +374,6 @@ class SPSPkg(CommonControlField, ClusterableModel):
         ordering = ["-updated"]
 
         indexes = [
-            models.Index(fields=["pid_v3"]),
             models.Index(fields=["sps_pkg_name"]),
             models.Index(fields=["valid_texts"]),
             models.Index(fields=["valid_components"]),
@@ -372,6 +384,40 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
     def autocomplete_label(self):
         return f"{self.sps_pkg_name} {self.pid_v3}"
+
+    # ── dados do documento na coleção (collection_pid_v2) ──
+
+    @property
+    def ppx(self):
+        return self.collection_pid_v2 and self.collection_pid_v2.pid_provider_xml
+
+    @property
+    def ppx_id(self):
+        return self.collection_pid_v2 and self.collection_pid_v2.pid_provider_xml_id
+
+    @property
+    def collection(self):
+        return self.collection_pid_v2 and self.collection_pid_v2.collection
+
+    @property
+    def pid_v2(self):
+        return self.collection_pid_v2 and self.collection_pid_v2.pid_v2
+
+    @property
+    def pid_v3(self):
+        ppx = self.ppx
+        return ppx and ppx.v3
+
+    @staticmethod
+    def get_collection_pid_v2(user, ppx_id, collection, pid_v2=None, journal_acron=None):
+        """
+        Registro do documento (ppx) na coleção, ao qual o pacote é vinculado
+        """
+        if not ppx_id or not collection:
+            return None
+        return CollectionPidV2.get_or_create(
+            user, ppx_id, collection, pid_v2=pid_v2, journal_acron=journal_acron
+        )
 
     def fix_sps_pkg_name(self, save=False):
         try:
@@ -390,8 +436,11 @@ class SPSPkg(CommonControlField, ClusterableModel):
         to_update = []
         for item in cls.objects.filter(
             Q(sps_pkg_name__in=pkg_name_list) |
-            Q(pid_v2=pid_v2, sps_pkg_name__isnull=True) |
-            Q(pid_v3=pid_v3, sps_pkg_name__isnull=True)
+            Q(collection_pid_v2__pid_v2=pid_v2, sps_pkg_name__isnull=True) |
+            Q(
+                collection_pid_v2__pid_provider_xml__v3=pid_v3,
+                sps_pkg_name__isnull=True,
+            )
         ):
             if item.fix_sps_pkg_name():  # calcula mas não salva
                 to_update.append(item)
@@ -409,10 +458,24 @@ class SPSPkg(CommonControlField, ClusterableModel):
         return self.origin == choices.PKG_ORIGIN_MIGRATION
 
     @property
+    def main_lang(self):
+        try:
+            return self.texts["xml_langs"][0]
+        except (TypeError, KeyError, IndexError):
+            return None
+
+    @property
     def pdfs(self):
+        main_lang = None
         for item in self.components.filter(component_type="rendition"):
+            if item.lang:
+                lang = item.lang.code2
+            else:
+                # PDF do idioma principal pode não ter idioma registrado
+                main_lang = main_lang or self.main_lang
+                lang = main_lang
             yield {
-                "lang": item.lang and item.lang.code2,
+                "lang": lang,
                 "url": item.uri,
                 "basename": item.basename,
                 "legacy_uri": item.legacy_uri,
@@ -443,34 +506,25 @@ class SPSPkg(CommonControlField, ClusterableModel):
         PidRequester.set_registered_in_core(self.pid_v3, value)
 
     @classmethod
-    def search_by_ppx_id(cls, ppx_id):
-        try:
-            return cls.objects.get(ppx_id=ppx_id)
-        except cls.MultipleObjectsReturned:
-            return (
-                cls.objects
-                .filter(ppx_id=ppx_id)
-                .order_by("-updated")
-                .first()
-            )
+    def search_by_ppx_id(cls, ppx_id, collection=None):
+        # o mesmo ppx (pid_v3) tem um SPSPkg por coleção
+        qs = cls.objects.filter(collection_pid_v2__pid_provider_xml_id=ppx_id)
+        if collection:
+            qs = qs.filter(collection_pid_v2__collection=collection)
+        obj = qs.order_by("-updated").first()
+        if not obj:
+            raise cls.DoesNotExist
+        return obj
 
     @classmethod
     def search_by_identifiers(
         cls,
-        pid_v3=None,
         sps_pkg_name=None,
         pkg_name_list=None,
-        pid_v2=None,
         queryset=None,
     ):
         qs = Q()
         params = {}
-        if pid_v3:
-            params["pid_v3"] = pid_v3
-            qs |= Q(pid_v3=pid_v3)
-        if pid_v2:
-            params["pid_v2"] = pid_v2
-            qs |= Q(pid_v2=pid_v2)
         if sps_pkg_name:
             params["sps_pkg_name"] = sps_pkg_name
             qs |= Q(sps_pkg_name=sps_pkg_name)
@@ -480,8 +534,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
         if not params:
             raise ValueError(
-                "SPSPkg.get requires at least one of "
-                "pid_v3, sps_pkg_name, pkg_name_list, pid_v2"
+                "SPSPkg.get requires at least one of sps_pkg_name, pkg_name_list"
             )
 
         if queryset is None:
@@ -510,41 +563,67 @@ class SPSPkg(CommonControlField, ClusterableModel):
     @classmethod
     def get(
         cls,
-        ppx_id,
-        pid_v3=None,
+        collection_pid_v2,
         sps_pkg_name=None,
         pkg_name_list=None,
-        pid_v2=None,
     ):
-        if not ppx_id:
-            raise ValueError("SPSPkg.get requires ppx_id")
+        """
+        Obtém o pacote do documento na coleção ou, na falta, o pacote ainda
+        não vinculado (sem collection_pid_v2) de mesmo nome
+        """
+        if collection_pid_v2:
+            try:
+                return cls.objects.get(collection_pid_v2=collection_pid_v2)
+            except cls.DoesNotExist:
+                pass
+        return cls.search_by_identifiers(
+            sps_pkg_name=sps_pkg_name,
+            pkg_name_list=None,
+            queryset=cls.objects.filter(collection_pid_v2__isnull=True),
+        )
 
-        try:
-            return cls.search_by_ppx_id(ppx_id)
-        except cls.DoesNotExist:
-            return cls.search_by_identifiers(
-                pid_v3=pid_v3,
-                sps_pkg_name=sps_pkg_name,
-                pkg_name_list=None,
-                pid_v2=pid_v2,
-                queryset=cls.objects.filter(ppx_id__isnull=True),
-            )
+    @staticmethod
+    def is_reusable(sps_pkg, collection_pid_v2):
+        """
+        Indica se o SPSPkg atual do processo (ex.: ArticleProc.sps_pkg) pode
+        ser reaproveitado para o documento na coleção: pacotes sem
+        collection_pid_v2 (ex.: migrados antes da separação por coleção)
+        podem estar compartilhados pelos ArticleProc de mais de uma coleção;
+        neste caso, não é reaproveitado, senão passaria a ser o pacote desta
+        coleção também para as outras
+        """
+        if not (sps_pkg and sps_pkg.pk and collection_pid_v2):
+            return False
+        if sps_pkg.collection_pid_v2_id is not None:
+            return sps_pkg.collection_pid_v2_id == collection_pid_v2.id
+        return not sps_pkg.articleproc_set.exclude(
+            collection=collection_pid_v2.collection
+        ).exists()
 
     @classmethod
-    def _create_or_update(cls, user, pid_v3, sps_pkg_name, registered_in_core, pid_v2, pkg_name_list, ppx_id):
+    def _create_or_update(
+        cls,
+        user,
+        sps_pkg_name,
+        registered_in_core,
+        pkg_name_list,
+        collection_pid_v2=None,
+        current_sps_pkg=None,
+    ):
         try:
-            obj = cls.get(ppx_id, pid_v3, sps_pkg_name, pkg_name_list, pid_v2)
+            obj = cls.get(collection_pid_v2, sps_pkg_name, pkg_name_list)
         except cls.DoesNotExist:
-            obj = cls()
-            obj.creator = user
+            if cls.is_reusable(current_sps_pkg, collection_pid_v2):
+                obj = current_sps_pkg
+            else:
+                obj = cls()
+                obj.creator = user
 
         # update
+        obj.collection_pid_v2 = collection_pid_v2 or obj.collection_pid_v2
         obj.sps_pkg_name = sps_pkg_name
-        obj.pid_v3 = pid_v3
-        obj.pid_v2 = pid_v2
         obj.registered_in_core = registered_in_core
         obj.updated_by = user
-        obj.ppx_id = ppx_id
         obj.save()
         return obj
 
@@ -612,6 +691,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
     @property
     def data(self):
         return dict(
+            collection=self.collection and self.collection.acron,
             sps_pkg_name=self.sps_pkg_name,
             pid_v3=self.pid_v3,
             pid_v2=self.pid_v2,
@@ -667,14 +747,21 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 pkg_name_list = xml_with_pre.pkg_name_variations
                 cls.fix_sps_pkg_names(response["v3"], response["v2"], pkg_name_list)
 
+                # ArticleProc é por coleção; Package (upload) não tem coleção
+                collection_pid_v2 = cls.get_collection_pid_v2(
+                    user,
+                    response.get("ppx_id"),
+                    getattr(article_proc, "collection", None),
+                    pid_v2=response["v2"],
+                    journal_acron=xml_with_pre.journal_acron,
+                )
                 obj = cls._create_or_update(
                     user=user,
-                    pid_v3=response["v3"],
                     sps_pkg_name=xml_with_pre.sps_pkg_name,
                     registered_in_core=response.get("registered_in_core"),
-                    pid_v2=response["v2"],
                     pkg_name_list=pkg_name_list,
-                    ppx_id=response.get("ppx_id")
+                    collection_pid_v2=collection_pid_v2,
+                    current_sps_pkg=getattr(article_proc, "sps_pkg", None),
                 )
 
                 if response.get("changed"):
@@ -1016,22 +1103,48 @@ class SPSPkg(CommonControlField, ClusterableModel):
         # em caso de data incompleta, tenta retornar a data completa, completando com 06 o mes ausente e com 15 o dia ausente
         return xml_with_pre.get_complete_publication_date()
 
+    def get_article_proc_collection(self):
+        """Coleção dos ArticleProc do pacote, se única"""
+        collections = set(
+            self.articleproc_set.values_list("collection_id", flat=True)
+        )
+        if len(collections) == 1:
+            return Collection.objects.filter(id=collections.pop()).first()
+
     def add_ppx(self, user, save=False):
+        """
+        Vincula o pacote ao registro do documento (ppx) na coleção
+        (collection_pid_v2), consultando o pid provider
+        """
         for registered in pid_provider_app.is_registered_xml_zip(self.file.path):
             try:
-                self.ppx_id = registered["ppx_id"]
-                self.updated_by = user
-                if save:
-                    self.save()
+                ppx_id = registered["ppx_id"]
             except KeyError:
-                return registered 
+                return registered
+            collection = self.get_article_proc_collection()
+            if not collection:
+                return {
+                    **registered,
+                    "error_msg": "Unable to identify the collection of the package",
+                }
+            xml_with_pre = registered.get("xml_with_pre")
+            self.collection_pid_v2 = self.get_collection_pid_v2(
+                user,
+                ppx_id,
+                collection,
+                pid_v2=registered.get("v2"),
+                journal_acron=xml_with_pre and xml_with_pre.journal_acron,
+            )
+            self.updated_by = user
+            if save:
+                self.save()
 
     @classmethod
     def complete_ppx(cls, user, sps_pkg_id_list=None, pkg_name_substr=None, pid_v2_subst=None):
         if not sps_pkg_id_list and not pkg_name_substr and not pid_v2_subst:
             raise ValueError("SPSPkg.complete_ppx requires sps_pkg_id_list or pkg_name_substr or pid_v2_subst")
         filters = {
-            "ppx_id__isnull": True,
+            "collection_pid_v2__isnull": True,
         }
         qs = Q()
         if sps_pkg_id_list:
@@ -1039,16 +1152,17 @@ class SPSPkg(CommonControlField, ClusterableModel):
         if pkg_name_substr:
             qs |= Q(sps_pkg_name__contains=pkg_name_substr)
         if pid_v2_subst:
-            qs |= Q(pid_v2__contains=pid_v2_subst)
+            # sem collection_pid_v2, o pid v2 é o do ArticleProc
+            qs |= Q(articleproc__pid__contains=pid_v2_subst)
 
         failures = []
         success = []
         items_to_update = []
-        for sps_pkg in cls.objects.filter(qs, **filters).iterator():
+        for sps_pkg in cls.objects.filter(qs, **filters).distinct().iterator():
             try:
                 name = sps_pkg.sps_pkg_name
                 response = sps_pkg.add_ppx(user)
-                if sps_pkg.ppx_id:
+                if sps_pkg.collection_pid_v2_id:
                     success.append(name)
                     items_to_update.append(sps_pkg)
                     continue
@@ -1061,11 +1175,23 @@ class SPSPkg(CommonControlField, ClusterableModel):
                 })
         if items_to_update:
             cls.objects.bulk_update(
-                items_to_update, ["ppx", "updated_by"], batch_size=100)
+                items_to_update, ["collection_pid_v2", "updated_by"], batch_size=100)
         return {
             "failures": failures,
             "success": success,
         }
+
+    @classmethod
+    def select_by_pid_v2_prefix(cls, prefix):
+        """
+        Pacotes cujo pid v2 (do documento na coleção ou, na falta do vínculo,
+        do ArticleProc) começa com prefix
+        """
+        ids = cls.objects.filter(
+            Q(collection_pid_v2__pid_v2__startswith=prefix)
+            | Q(articleproc__pid__startswith=prefix)
+        ).values("id")
+        return cls.objects.filter(id__in=ids)
 
     @classmethod
     def exclude_invalid_records(
@@ -1097,7 +1223,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
         response = {}
         exceptions = []
         prefix_article_pid = f"S{issue_pid}"
-        sps_pkgs = cls.objects.filter(pid_v2__startswith=prefix_article_pid)
+        sps_pkgs = cls.select_by_pid_v2_prefix(prefix_article_pid)
         response["total_sps_pkgs"]= sps_pkgs.count()
         response["params"] = {
             "delete_sps_pkg_which_ppx_is_missing": delete_sps_pkg_which_ppx_is_missing,
@@ -1106,14 +1232,14 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
         if delete_sps_pkg_which_ppx_is_missing:
             # 1. Remoção por falta de ppx
-            to_delete = sps_pkgs.filter(ppx_id__isnull=True)
+            to_delete = sps_pkgs.filter(collection_pid_v2__isnull=True)
             if to_delete:
                 try:
                     qtd_deleted, _ignored = cls.delete_related_items(to_delete)
                     response["total_delete_sps_pkg_which_ppx_is_missing"] = qtd_deleted
                     total_deletado += qtd_deleted
                     # consulta novamente
-                    sps_pkgs = cls.objects.filter(pid_v2__startswith=prefix_article_pid)
+                    sps_pkgs = cls.select_by_pid_v2_prefix(prefix_article_pid)
                 except Exception as e:
                     exceptions.append({
                         "action": "deleting due to missing ppx",
@@ -1122,17 +1248,26 @@ class SPSPkg(CommonControlField, ClusterableModel):
         if delete_sps_pkg_which_is_duplicated:
             # 2. Remoção por duplicidade
             duplicated_items = []
+            # o mesmo ppx tem um SPSPkg por coleção: duplicado é o que repete
+            # o par (ppx, coleção)
+            ppx_field = "collection_pid_v2__pid_provider_xml_id"
+            collection_field = "collection_pid_v2__collection_id"
             multiple_values = (
-                sps_pkgs.values("ppx_id")
+                sps_pkgs.filter(collection_pid_v2__isnull=False)
+                .values(ppx_field, collection_field)
                 .annotate(total=Count("id"))
                 .filter(total__gt=1)
-                .values_list("ppx_id", flat=True)
+                .values_list(ppx_field, collection_field)
             )
             total_delete_sps_pkg_which_is_duplicated = 0
             for value in list(multiple_values or []):
                 try:
                     # Filtra os registros que possuem este valor específico duplicado
-                    sps_pkgs_which_same_ppx = sps_pkgs.filter(ppx_id=value).order_by("-updated")
+                    ppx_id, collection_id = value
+                    sps_pkgs_which_same_ppx = sps_pkgs.filter(
+                        collection_pid_v2__pid_provider_xml_id=ppx_id,
+                        collection_pid_v2__collection_id=collection_id,
+                    ).order_by("-updated")
                     data = {"value": value, "total": sps_pkgs_which_same_ppx.count()}
 
                     keep = sps_pkgs_which_same_ppx.first()

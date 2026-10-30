@@ -20,7 +20,7 @@ Organização hierárquica das tasks de migração e publicação:
       └─ task_migrate_and_publish_articles_by_journal (por periódico)
           ├─ task_fix_issue_articles (síncrono, por fascículo selecionado,
           │   antes de agendar a migração; corrige/exclui registros
-          │   duplicados ou com sps_pkg.ppx ausente)
+          │   duplicados ou com sps_pkg.collection_pid_v2 ausente)
           └─ task_migrate_and_publish_articles_by_issue (por fascículo)
               └─ task_publish_issue_articles (publica artigos + sincroniza issue)
                   ├─ task_publish_article (por artigo, síncrono)
@@ -1117,7 +1117,7 @@ def task_migrate_and_publish_articles(
     delete_article_which_sps_pkg_is_missing : bool, default False
         Repassado até ``task_fix_issue_articles``: controla se a exclusão
         de registros inválidos deve ser executada mesmo quando a
-        reconciliação de ``sps_pkg.ppx`` reportar falhas (ver docstring
+        reconciliação de ``sps_pkg.collection_pid_v2`` reportar falhas (ver docstring
         de ``task_fix_issue_articles``).
     delete_sps_pkg_which_is_duplicated / delete_sps_pkg_which_ppx_is_missing : bool, default False
         Repassados até ``task_fix_issue_articles`` / ``SPSPkg.exclude_invalid_records``:
@@ -1614,7 +1614,7 @@ def task_publish_issue_articles(
                 "issue_proc", "sps_pkg"
             ).filter(
                 id__in=articleprocs_id_list,
-                sps_pkg__pid_v3__isnull=False,
+                sps_pkg__collection_pid_v2__pid_provider_xml__v3__isnull=False,
             )
 
         if articles.exists():
@@ -2033,7 +2033,7 @@ def task_fix_issue_articles(
 
     Executa, para o fascículo associado ao ``IssueProc`` informado:
     1. ``ArticleProc.complete_sps_pkg_ppx``, que completa o vínculo
-       ``sps_pkg.ppx`` dos ArticleProc do fascículo ainda sem PidProviderXML
+       ``sps_pkg.collection_pid_v2`` dos ArticleProc do fascículo ainda sem PidProviderXML
        associado.
     2. ``Article.exclude_invalid_records``, que remove registros de Article
        inválidos ou duplicados.
@@ -2094,15 +2094,9 @@ def task_fix_issue_articles(
             }
         })
         issue = issue_proc.issue
-        # Filtra Article por issue e 
-        # completa Article.sps_pkg.ppx com Article.pp_xml
-        response = Article.complete_sps_pkg_ppx(user, issue)
-        detail.append({
-            "operation": "Article.complete_sps_pkg_ppx",
-            "response": response,
-        })
-        # Filtra ArticleProc por issue_proc_id e 
-        # completa ArticleProc.sps_pkg.ppx requisitando novamente pid v3 usando sps_pkg.file
+        # Filtra ArticleProc por issue_proc_id e vincula ArticleProc.sps_pkg
+        # ao documento na coleção (collection_pid_v2), consultando o pid
+        # provider com sps_pkg.file
         response = ArticleProc.complete_sps_pkg_ppx(
             user, issue_proc_id_list=[issue_proc_id])
         detail.append({
@@ -2591,7 +2585,7 @@ def task_check_articles_availability(
         q = Q()
 
         if article_pid_v3:
-            article_params["sps_pkg__pid_v3"] = article_pid_v3
+            article_params["sps_pkg__collection_pid_v2__pid_provider_xml__v3"] = article_pid_v3
         if publication_year:
             article_params["issue_proc__issue__publication_year"] = publication_year
         if issue_folder:

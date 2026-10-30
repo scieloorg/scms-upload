@@ -34,14 +34,15 @@ class ArticleFilterSet(django_filters.FilterSet):
         choices=choices.ARTICLE_STATUS,  # ajuste para o nome real das choices
     )
     collection = django_filters.ModelChoiceFilter(
-        field_name="article_collections__collection",
+        # um Article por coleção
+        field_name="collection_pid_v2__collection",
         label=_("Collection"),
         queryset=Collection.objects.filter(
-            articlecollection__article__isnull=False
+            collectionpidv2__article__isnull=False
         ).distinct(),
     )
     absent_sps_pkg = django_filters.BooleanFilter(
-        field_name="sps_pkg_id",
+        field_name="collection_pid_v2__sps_pkg",
         lookup_expr="isnull",
         label=_("Missing SPSPkg"),
     )
@@ -65,27 +66,27 @@ class ArticleSnippetViewSet(SnippetViewSet):
     # exclude_from_explorer = False  # Não aplicável a SnippetViewSet
     list_per_page = 20
     list_display = (
-        "sps_pkg__sps_pkg_name",
+        "__str__",
         "pid_v3",
         "pid_v2",
         "status",
-        "display_collections",
+        "collection",
         "first_pubdate_iso",
         "updated",
         # "updated_by",
     )
     filterset_class = ArticleFilterSet
     search_fields = (
-        "sps_pkg__sps_pkg_name",
-        "pid_v2",
+        "collection_pid_v2__sps_pkg_name",
+        "collection_pid_v2__pid_v2",
         "pid_v3",
         "issue__publication_year",
         "journal__official_journal__title",
         "journal__official_journal__issn_print",
         "journal__official_journal__issn_electronic",
         "title_with_lang__text",
-        "article_collections__collection__acron",
-        "article_collections__collection__name",
+        "collection_pid_v2__collection__acron",
+        "collection_pid_v2__collection__name",
     )
     # inspect_view_fields não é usado em SnippetViewSet, use inspect_view_class customizada
 
@@ -142,7 +143,7 @@ class RequestArticleChangeSnippetViewSet(SnippetViewSet):
     )
     list_filter = ("change_type",)
     search_fields = (
-        "article__pid_v2",
+        "article__collection_pid_v2__pid_v2",
         "article__pid_v3",
         "article__doi_with_lang__doi",
     )
@@ -210,8 +211,8 @@ class ArticleWebPageSnippetViewSet(SnippetViewSet):
     search_fields = (
         "url",
         "article__pid_v3",
-        "article__pid_v2",
-        "article__sps_pkg__sps_pkg_name",
+        "article__collection_pid_v2__pid_v2",
+        "article__collection_pid_v2__sps_pkg_name",
     )
     ordering = ["-updated"]
 
