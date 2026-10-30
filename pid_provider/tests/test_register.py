@@ -163,6 +163,26 @@ class RegisterTestBase(TestCase):
         self.m_record = self.p_record.start()
         self.addCleanup(self.p_record.stop)
 
+        # register() exige que a coleção do XML seja identificável
+        # (RequiredCollectionErrorToGetPidProviderXMLError) e que seja uma
+        # das coleções do periódico
+        # (XMLCollectionNotFoundErrorToGetPidProviderXMLError); _save está
+        # mockado nos testes, então o conteúdo da lista não é consumido.
+        self.xml.collection = "scl"
+        collection = MagicMock(name="collection")
+        collection.acron = "scl"
+        self.p_xml_collections = patch(f"{PATCH_BASE}.get_xml_collections")
+        self.m_xml_collections = self.p_xml_collections.start()
+        self.m_xml_collections.return_value = [
+            {
+                "is_main": True,
+                "collection": collection,
+                "journal_acron": "acron",
+                "journal_pid": "0000-0000",
+            }
+        ]
+        self.addCleanup(self.p_xml_collections.stop)
+
         # Mantém os testes independentes da configuração persistida.
         self.p_setting = patch(f"{PATCH_BASE}.PidProviderSetting.load")
         self.m_setting_load = self.p_setting.start()
@@ -475,6 +495,41 @@ class BadRequestPathTest(RegisterTestBase):
         self.assert_recorded_status("bad_request")
 
 
+class RequiredCollectionPathTest(RegisterTestBase):
+    """
+    Sem coleção identificável para o XML, register() não seleciona nem
+    grava o registro: a exceção vira resposta de erro
+    """
+
+    def test_unidentified_collection_becomes_error_response(self):
+        self.m_xml_collections.return_value = []
+        with patch(f"{PATCH_BASE}.select_record") as m_select, \
+             patch(f"{PATCH_BASE}.PidProviderXML._save") as m_save:
+            response = PidProviderXML.register(self.xml, "file.xml", self.user)
+
+        m_select.assert_not_called()
+        m_save.assert_not_called()
+        self.assertEqual(
+            response["error_type"],
+            str(exceptions.RequiredCollectionErrorToGetPidProviderXMLError),
+        )
+        self.assert_recorded_status("error")
+
+    def test_journal_not_found_in_the_xml_collection_becomes_error_response(self):
+        self.xml.collection = "psi"
+        with patch(f"{PATCH_BASE}.select_record") as m_select, \
+             patch(f"{PATCH_BASE}.PidProviderXML._save") as m_save:
+            response = PidProviderXML.register(self.xml, "file.xml", self.user)
+
+        m_select.assert_not_called()
+        m_save.assert_not_called()
+        self.assertEqual(
+            response["error_type"],
+            str(exceptions.XMLCollectionNotFoundErrorToGetPidProviderXMLError),
+        )
+        self.assert_recorded_status("error")
+
+
 class UnexpectedErrorPathTest(RegisterTestBase):
     """
     ATENÇÃO — MUDANÇA DE CONTRATO:
@@ -664,6 +719,7 @@ class RegisterResponseSchemaTest(RegisterTestBase):
             "xml_adapter_data",
             "xml_changed",
             "v3",
+            "v2",
             "record_status",
             "created",
             "event_status",
@@ -747,6 +803,7 @@ class RegisterResponseSchemaTest(RegisterTestBase):
         expected_keys = {
             "input_data",
             "xml_adapter_data",
+            "v2",
             "v3",
             "record_status",
             "skipped",
