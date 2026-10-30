@@ -15,7 +15,7 @@ def _filter_articles(
     publication_year=None,
     force_update=False,
 ):
-    qs = Article.objects.filter(sps_pkg__isnull=False)
+    qs = Article.objects.filter(collection_pid_v2__sps_pkg__isnull=False)
     if collection_acron:
         qs = qs.filter(
             pk__in=Article.objects.filter(
