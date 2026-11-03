@@ -5,6 +5,8 @@ from django.test import SimpleTestCase
 from pid_provider.tasks import (
     task_load_record_from_xml_url,
     task_load_records_from_counter_dict,
+    task_process_article_source,
+    task_process_article_sources,
 )
 
 
@@ -203,3 +205,61 @@ class LoadRecordFromXMLURLTaskTests(SimpleTestCase):
 
         create_event.assert_called_once()
         self.assertEqual(create_event.call_args.kwargs["item"], "pid")
+
+
+class ProcessArticleSourcesTaskTests(SimpleTestCase):
+    @patch("pid_provider.tasks.task_process_article_source.delay")
+    @patch("pid_provider.tasks.ArticleSource")
+    def test_marks_processing_and_dispatches_each_stored_xml(
+        self, article_source_class, process_one
+    ):
+        ids = Mock()
+        ids.iterator.return_value = iter([1, 2])
+        queryset = article_source_class.get_with_stored_xml.return_value
+        queryset.values_list.return_value = ids
+
+        task_process_article_sources.run(
+            username="operator",
+            collection_acron="scl",
+            force_update=True,
+        )
+
+        article_source_class.get_with_stored_xml.assert_called_once_with(
+            status_list=None,
+            collection_acron="scl",
+            from_date=None,
+            until_date=None,
+        )
+        self.assertEqual(article_source_class.objects.filter.call_count, 2)
+        self.assertEqual(
+            [c.kwargs["article_source_id"] for c in process_one.call_args_list],
+            [1, 2],
+        )
+        self.assertTrue(process_one.call_args.kwargs["force_update"])
+
+    @patch("pid_provider.tasks.task_process_article_source.delay")
+    @patch("pid_provider.tasks.ArticleSource")
+    def test_stop_limits_selected_ids(self, article_source_class, process_one):
+        ids = article_source_class.get_with_stored_xml.return_value.values_list.return_value
+        ids.__getitem__.return_value.iterator.return_value = iter([1])
+
+        task_process_article_sources.run(username="operator", stop=1)
+
+        ids.__getitem__.assert_called_once_with(slice(None, 1))
+        process_one.assert_called_once()
+
+    @patch("pid_provider.tasks.ArticleSource")
+    @patch("pid_provider.tasks._get_user")
+    def test_process_one_uses_stored_xml(self, get_user, article_source_class):
+        article_source = article_source_class.objects.get.return_value
+
+        task_process_article_source.run(
+            username="operator", article_source_id=7, force_update=True
+        )
+
+        article_source_class.objects.get.assert_called_once_with(pk=7)
+        article_source.process_stored_xml.assert_called_once_with(
+            get_user.return_value,
+            force_update=True,
+            auto_solve_pid_conflict=False,
+        )
