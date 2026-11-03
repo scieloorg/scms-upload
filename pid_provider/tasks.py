@@ -280,3 +280,139 @@ def task_load_record_from_xml_url(
                 "force_update": force_update,
             },
         )
+
+
+@celery_app.task(bind=True)
+def task_process_article_sources(
+    self,
+    username=None,
+    user_id=None,
+    collection_acron=None,
+    status_list=None,
+    from_date=None,
+    until_date=None,
+    force_update=None,
+    auto_solve_pid_conflict=None,
+    stop=None,
+):
+    """
+    Seleciona ArticleSource com XML já guardado e enfileira
+    task_process_article_source para cada um, sem consultar a fonte
+    (OPAC) novamente.
+
+    Args:
+        self: Instância da tarefa Celery.
+        username (str, optional): Nome do usuário executando a tarefa.
+        user_id (int, optional): ID do usuário executando a tarefa.
+        collection_acron (str, optional): Acrônimo da coleção.
+        status_list (list, optional): Status a processar. Padrão:
+            ArticleSource.STATUS_TO_PROCESS_STORED_XML (pending, reprocess,
+            error, xml_error).
+        from_date (str, optional): Data inicial (ISO) de atualização do
+            ArticleSource.
+        until_date (str, optional): Data final (ISO) de atualização do
+            ArticleSource.
+        force_update (bool, optional): Força o registro em PidProviderXML
+            mesmo sem mudanças. Não faz novo download.
+        auto_solve_pid_conflict (bool, optional): Resolve conflitos de PID
+            automaticamente.
+        stop (int, optional): Quantidade máxima de subtarefas disparadas.
+
+    Side Effects:
+        - Marca cada ArticleSource selecionado como PROCESSING.
+        - Dispara task_process_article_source para cada um.
+        - Registra UnexpectedEvent em caso de erro.
+    """
+    try:
+        queryset = ArticleSource.get_with_stored_xml(
+            status_list=status_list,
+            collection_acron=collection_acron,
+            from_date=from_date,
+            until_date=until_date,
+        )
+        ids = queryset.values_list("id", flat=True)
+        if stop:
+            ids = ids[:stop]
+
+        for article_source_id in ids.iterator():
+            # evita que outra execução selecione o mesmo registro
+            ArticleSource.objects.filter(pk=article_source_id).update(
+                status=ArticleSource.StatusChoices.PROCESSING
+            )
+            task_process_article_source.delay(
+                username=username,
+                user_id=user_id,
+                article_source_id=article_source_id,
+                force_update=force_update,
+                auto_solve_pid_conflict=auto_solve_pid_conflict,
+            )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            exception=e,
+            exc_traceback=exc_traceback,
+            action="task_process_article_sources",
+            detail={
+                "task": "task_process_article_sources",
+                "collection_acron": collection_acron,
+                "status_list": status_list,
+                "from_date": from_date,
+                "until_date": until_date,
+                "force_update": force_update,
+                "stop": stop,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_process_article_source(
+    self,
+    username=None,
+    user_id=None,
+    article_source_id=None,
+    force_update=None,
+    auto_solve_pid_conflict=None,
+):
+    """
+    Registra em PidProviderXML o XML guardado em um ArticleSource, sem
+    consultar a fonte (OPAC) novamente.
+
+    O resultado fica no próprio ArticleSource: status COMPLETED ou de
+    erro, com a mensagem em detail.
+
+    Args:
+        self: Instância da tarefa Celery.
+        username (str, optional): Nome do usuário executando a tarefa.
+        user_id (int, optional): ID do usuário executando a tarefa.
+        article_source_id (int): ID do ArticleSource.
+        force_update (bool, optional): Força o registro em PidProviderXML
+            mesmo sem mudanças.
+        auto_solve_pid_conflict (bool, optional): Resolve conflitos de PID
+            automaticamente.
+
+    Side Effects:
+        - Cria ou atualiza um registro em PidProviderXML.
+        - Atualiza status e detail do ArticleSource.
+        - Registra UnexpectedEvent em caso de erro inesperado.
+    """
+    try:
+        user = _get_user(self.request, username=username, user_id=user_id)
+        article_source = ArticleSource.objects.get(pk=article_source_id)
+        article_source.process_stored_xml(
+            user,
+            force_update=force_update,
+            auto_solve_pid_conflict=bool(auto_solve_pid_conflict),
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            exception=e,
+            exc_traceback=exc_traceback,
+            item=article_source_id,
+            action="task_process_article_source",
+            detail={
+                "task": "task_process_article_source",
+                "article_source_id": article_source_id,
+                "force_update": force_update,
+            },
+        )
