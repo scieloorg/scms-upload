@@ -3,6 +3,8 @@ import sys
 
 from django.contrib.auth import get_user_model
 
+from article.models import ArticleSource
+from collection.models import Collection
 from config import celery_app
 from core.utils.harvesters import OPACHarvester
 from pid_provider.provider import PidProvider
@@ -151,6 +153,7 @@ def task_load_records_from_counter_dict(
                     origin_date=origin_date,
                     force_update=force_update,
                     document_item=document_item,
+                    source_date=document.get("source_date"),
                 )
                 count += 1
                 if stop and count >= stop:
@@ -199,13 +202,15 @@ def task_load_record_from_xml_url(
     origin_date=None,
     force_update=None,
     document_item=None,
+    source_date=None,
 ):
     """
     Carrega um registro individual em PidProviderXML a partir de uma URL de XML.
 
-    Esta tarefa baixa o XML do site SciELO e cria/atualiza registros apenas em
-    PidProviderXML via PidProvider.provide_pid_for_xml_uri. Não cria registros
-    de Article.
+    O XML coletado é guardado em ArticleSource e só é baixado novamente
+    quando source_date muda (documento atualizado na fonte) ou quando
+    force_update=True. Em seguida o XML é registrado em PidProviderXML.
+    Não cria registros de Article.
 
     Args:
         self: Instância da tarefa Celery.
@@ -215,46 +220,47 @@ def task_load_record_from_xml_url(
         pid_v3 (str): Identificador PID v3 do documento.
         xml_url (str): URL do XML do documento.
             Ex: "https://www.scielo.br/j/{journal}/a/{pid_v3}/?format=xml"
-        origin_date (str, optional): Data de última atualização na fonte (formato ISO).
-        force_update (bool, optional): Força reprocessamento mesmo se o registro
-            já existe.
+        origin_date (str, optional): Data de última atualização na fonte
+            (YYYY-MM-DD). Usada quando source_date não é informado.
+        force_update (bool, optional): Força novo download e reprocessamento
+            mesmo se o registro já existe.
         document_item (dict, optional): Dados complementares do documento
             provenientes do OPAC (ex: metadados retornados pelo harvester).
-            Usado como contexto de observabilidade em caso de falha.
+            Guardado em ArticleSource.detail.
+        source_date (str, optional): Data e hora de última atualização na
+            fonte (ISO 8601), guardada em ArticleSource.source_date.
 
     Side Effects:
+        - Cria ou atualiza ArticleSource (XML, status e detalhes de erro).
         - Cria ou atualiza um registro em PidProviderXML.
-        - Registra UnexpectedEvent em caso de erro.
+        - Registra UnexpectedEvent em caso de erro inesperado.
     """
     try:
-        pid_provider = None
         user = _get_user(self.request, username=username, user_id=user_id)
+        document_item = document_item or {}
 
-        # Usa PidProvider para processar XML e criar registro em PidProviderXML
-        pid_provider = PidProvider()
-        
-        # provide_pid_for_xml_uri cria/atualiza PidProviderXML mas não cria Article
-        result = pid_provider.provide_pid_for_xml_uri(
-            xml_uri=xml_url,
-            name=f"{collection_acron}_{pid_v3}",
-            user=user,
-            origin_date=origin_date,
+        article_source = ArticleSource.create_or_update(
+            user,
+            url=xml_url,
+            source_date=source_date or origin_date,
+            collection=Collection.get(collection_acron),
+            pid=document_item.get("pid_v2"),
             force_update=force_update,
-            is_published=None,
-            registered_in_core=False,
             auto_solve_pid_conflict=False,
-            document_item=document_item,
+            is_public=True,
+            detail=document_item,
             expected_pid_v3=pid_v3,
         )
 
-        if result.get("error_msg"):
-            logging.error(
-                f"Error loading record {pid_v3}: {result.get('error_msg')}"
-            )
-        else:
+        if article_source.status == ArticleSource.StatusChoices.COMPLETED:
             logging.info(
                 f"Successfully loaded record {pid_v3} - "
-                f"v3={result.get('v3')}, created={result.get('created')}"
+                f"pid_provider_xml={article_source.get_pid_provider_xml_id()}"
+            )
+        else:
+            logging.error(
+                f"Error loading record {pid_v3}: {article_source.status} "
+                f"{(article_source.detail or {}).get('error_msg')}"
             )
 
     except Exception as e:
@@ -262,12 +268,151 @@ def task_load_record_from_xml_url(
         UnexpectedEvent.create(
             exception=e,
             exc_traceback=exc_traceback,
+            item=pid_v3,
+            action="task_load_record_from_xml_url",
             detail={
                 "task": "task_load_record_from_xml_url",
                 "collection_acron": collection_acron,
                 "pid_v3": pid_v3,
                 "xml_url": xml_url,
                 "origin_date": origin_date,
+                "source_date": source_date,
+                "force_update": force_update,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_process_article_sources(
+    self,
+    username=None,
+    user_id=None,
+    collection_acron=None,
+    status_list=None,
+    from_date=None,
+    until_date=None,
+    force_update=None,
+    auto_solve_pid_conflict=None,
+    stop=None,
+):
+    """
+    Seleciona ArticleSource com XML já guardado e enfileira
+    task_process_article_source para cada um, sem consultar a fonte
+    (OPAC) novamente.
+
+    Args:
+        self: Instância da tarefa Celery.
+        username (str, optional): Nome do usuário executando a tarefa.
+        user_id (int, optional): ID do usuário executando a tarefa.
+        collection_acron (str, optional): Acrônimo da coleção.
+        status_list (list, optional): Status a processar. Padrão:
+            ArticleSource.STATUS_TO_PROCESS_STORED_XML (pending, reprocess,
+            error, xml_error).
+        from_date (str, optional): Data inicial (ISO) de atualização do
+            ArticleSource.
+        until_date (str, optional): Data final (ISO) de atualização do
+            ArticleSource.
+        force_update (bool, optional): Força o registro em PidProviderXML
+            mesmo sem mudanças. Não faz novo download.
+        auto_solve_pid_conflict (bool, optional): Resolve conflitos de PID
+            automaticamente.
+        stop (int, optional): Quantidade máxima de subtarefas disparadas.
+
+    Side Effects:
+        - Marca cada ArticleSource selecionado como PROCESSING.
+        - Dispara task_process_article_source para cada um.
+        - Registra UnexpectedEvent em caso de erro.
+    """
+    try:
+        queryset = ArticleSource.get_with_stored_xml(
+            status_list=status_list,
+            collection_acron=collection_acron,
+            from_date=from_date,
+            until_date=until_date,
+        )
+        ids = queryset.values_list("id", flat=True)
+        if stop:
+            ids = ids[:stop]
+
+        for article_source_id in ids.iterator():
+            # evita que outra execução selecione o mesmo registro
+            ArticleSource.objects.filter(pk=article_source_id).update(
+                status=ArticleSource.StatusChoices.PROCESSING
+            )
+            task_process_article_source.delay(
+                username=username,
+                user_id=user_id,
+                article_source_id=article_source_id,
+                force_update=force_update,
+                auto_solve_pid_conflict=auto_solve_pid_conflict,
+            )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            exception=e,
+            exc_traceback=exc_traceback,
+            action="task_process_article_sources",
+            detail={
+                "task": "task_process_article_sources",
+                "collection_acron": collection_acron,
+                "status_list": status_list,
+                "from_date": from_date,
+                "until_date": until_date,
+                "force_update": force_update,
+                "stop": stop,
+            },
+        )
+
+
+@celery_app.task(bind=True)
+def task_process_article_source(
+    self,
+    username=None,
+    user_id=None,
+    article_source_id=None,
+    force_update=None,
+    auto_solve_pid_conflict=None,
+):
+    """
+    Registra em PidProviderXML o XML guardado em um ArticleSource, sem
+    consultar a fonte (OPAC) novamente.
+
+    O resultado fica no próprio ArticleSource: status COMPLETED ou de
+    erro, com a mensagem em detail.
+
+    Args:
+        self: Instância da tarefa Celery.
+        username (str, optional): Nome do usuário executando a tarefa.
+        user_id (int, optional): ID do usuário executando a tarefa.
+        article_source_id (int): ID do ArticleSource.
+        force_update (bool, optional): Força o registro em PidProviderXML
+            mesmo sem mudanças.
+        auto_solve_pid_conflict (bool, optional): Resolve conflitos de PID
+            automaticamente.
+
+    Side Effects:
+        - Cria ou atualiza um registro em PidProviderXML.
+        - Atualiza status e detail do ArticleSource.
+        - Registra UnexpectedEvent em caso de erro inesperado.
+    """
+    try:
+        user = _get_user(self.request, username=username, user_id=user_id)
+        article_source = ArticleSource.objects.get(pk=article_source_id)
+        article_source.process_stored_xml(
+            user,
+            force_update=force_update,
+            auto_solve_pid_conflict=bool(auto_solve_pid_conflict),
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            exception=e,
+            exc_traceback=exc_traceback,
+            item=article_source_id,
+            action="task_process_article_source",
+            detail={
+                "task": "task_process_article_source",
+                "article_source_id": article_source_id,
                 "force_update": force_update,
             },
         )
