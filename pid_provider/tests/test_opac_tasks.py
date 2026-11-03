@@ -132,28 +132,81 @@ class LoadRecordsFromCounterDictTests(SimpleTestCase):
 
 
 class LoadRecordFromXMLURLTaskTests(SimpleTestCase):
-    @patch("pid_provider.tasks.PidProvider")
+    @patch("pid_provider.tasks.Collection")
+    @patch("pid_provider.tasks.ArticleSource")
     @patch("pid_provider.tasks._get_user")
-    def test_passes_opac_pid_as_expected_pid(self, get_user, provider_class):
-        get_user.return_value = Mock()
-        provider = provider_class.return_value
-        provider.provide_pid_for_xml_uri.return_value = {
-            "v3": "expected-pid",
-            "created": True,
-        }
+    def test_stores_xml_in_article_source_with_expected_pid(
+        self, get_user, article_source_class, collection_class
+    ):
+        user = get_user.return_value
+        collection = collection_class.get.return_value
+        document_item = {"aid": "expected-pid", "pid_v2": "S0001"}
 
         task_load_record_from_xml_url.run(
             username="operator",
             collection_acron="scl",
             pid_v3="expected-pid",
             xml_url="https://www.scielo.br/j/rsp/a/expected-pid/?format=xml",
+            origin_date="2024-01-31",
+            source_date="2024-01-31T10:01:00",
+            document_item=document_item,
+        )
+
+        collection_class.get.assert_called_once_with("scl")
+        article_source_class.create_or_update.assert_called_once_with(
+            user,
+            url="https://www.scielo.br/j/rsp/a/expected-pid/?format=xml",
+            source_date="2024-01-31T10:01:00",
+            collection=collection,
+            pid="S0001",
+            force_update=None,
+            auto_solve_pid_conflict=False,
+            is_public=True,
+            detail=document_item,
+            expected_pid_v3="expected-pid",
+        )
+
+    @patch("pid_provider.tasks.Collection")
+    @patch("pid_provider.tasks.ArticleSource")
+    @patch("pid_provider.tasks._get_user")
+    def test_uses_origin_date_when_source_date_is_missing(
+        self, get_user, article_source_class, collection_class
+    ):
+        task_load_record_from_xml_url.run(
+            username="operator",
+            collection_acron="scl",
+            pid_v3="pid",
+            xml_url="https://www.scielo.br/j/rsp/a/pid/?format=xml",
+            origin_date="2024-01-31",
         )
 
         self.assertEqual(
-            provider.provide_pid_for_xml_uri.call_args.kwargs["expected_pid_v3"],
-            "expected-pid",
+            article_source_class.create_or_update.call_args.kwargs["source_date"],
+            "2024-01-31",
         )
+<<<<<<< HEAD
         self.assertEqual(
             provider.provide_pid_for_xml_uri.call_args.kwargs["collection_acron"],
             "scl",
         )
+=======
+
+    @patch("pid_provider.tasks.UnexpectedEvent.create")
+    @patch("pid_provider.tasks.Collection")
+    @patch("pid_provider.tasks.ArticleSource")
+    @patch("pid_provider.tasks._get_user")
+    def test_records_unexpected_event_when_article_source_fails(
+        self, get_user, article_source_class, collection_class, create_event
+    ):
+        article_source_class.create_or_update.side_effect = ValueError("boom")
+
+        task_load_record_from_xml_url.run(
+            username="operator",
+            collection_acron="scl",
+            pid_v3="pid",
+            xml_url="https://www.scielo.br/j/rsp/a/pid/?format=xml",
+        )
+
+        create_event.assert_called_once()
+        self.assertEqual(create_event.call_args.kwargs["item"], "pid")
+>>>>>>> ab811768 (Atualiza testes da carga de registros a partir de URL de XML)
