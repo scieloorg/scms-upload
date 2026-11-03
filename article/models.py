@@ -1738,6 +1738,14 @@ class ArticleSource(CommonControlField):
         XML_ERROR = "xml_error", _("XML Error")
         NOT_PUBLIC = "not_public", _("Not public")
 
+    # status cujo XML guardado pode ser (re)registrado sem novo download
+    STATUS_TO_PROCESS_STORED_XML = [
+        StatusChoices.PENDING,
+        StatusChoices.REPROCESS,
+        StatusChoices.ERROR,
+        StatusChoices.XML_ERROR,
+    ]
+
     url = models.URLField(
         verbose_name=_("Article URL"),
         max_length=200,
@@ -2084,6 +2092,31 @@ class ArticleSource(CommonControlField):
             status__in=[cls.StatusChoices.PENDING, cls.StatusChoices.REPROCESS]
         )
 
+    @classmethod
+    def get_with_stored_xml(
+        cls,
+        status_list=None,
+        collection_acron=None,
+        from_date=None,
+        until_date=None,
+    ):
+        """
+        Retorna fontes com XML guardado em arquivo, filtradas por status
+        (padrão: STATUS_TO_PROCESS_STORED_XML), coleção e data de
+        atualização do registro.
+        """
+        params = {"status__in": status_list or cls.STATUS_TO_PROCESS_STORED_XML}
+        if collection_acron:
+            params["collection__acron"] = collection_acron
+        if from_date:
+            params["updated__gte"] = from_date
+        if until_date:
+            params["updated__lte"] = until_date
+        return (
+            cls.objects.filter(file__isnull=False, **params)
+            .exclude(file="")
+        )
+
     def add_pid_provider(
         self,
         user,
@@ -2129,27 +2162,70 @@ class ArticleSource(CommonControlField):
                 changed = True
 
             if changed:
-                self.mark_as_completed()
-                if self.detail:
-                    for key in ("error_type", "error_msg", "traceback"):
-                        self.detail.pop(key, None)
+                self._mark_success()
         except Exception as e:
-            if isinstance(e, XMLException):
-                self.mark_as_xml_error()
-            elif isinstance(e, RequestXMLException):
-                self.mark_as_url_error()
-            else:
-                self.mark_as_error()
-            self.detail = self.detail or {}
-            self.detail.update(
-                {
-                    "error_type": str(type(e)),
-                    "error_msg": str(e),
-                    "traceback": traceback.format_exc(),
-                }
-            )
+            self._mark_failure(e)
             changed = True
         return changed
+
+    @property
+    def expected_pid_v3(self):
+        # identificador do documento na fonte (OPAC: aid)
+        detail = self.detail or {}
+        return detail.get("aid") or detail.get("pid_v3")
+
+    def process_stored_xml(
+        self, user, force_update=False, auto_solve_pid_conflict=False
+    ):
+        """
+        Registra em PidProviderXML o XML já guardado em ``self.file``,
+        sem consultar a fonte (``self.url``) novamente.
+
+        Se o arquivo não existe, marca XML_ERROR; o novo download fica a
+        cargo da coleta (``create_or_update``).
+        """
+        try:
+            if not self.has_file:
+                raise XMLException(f"Stored XML file not found for {self}")
+            try:
+                xml_with_pre = list(XMLWithPre.create(path=self.file.path))[0]
+            except Exception as e:
+                raise XMLException(f"Unable to read stored XML: {e}") from e
+            # garante que request_pid use o arquivo e não a URL
+            self.__dict__["xml_with_pre"] = xml_with_pre
+            self.request_pid(
+                user,
+                force_update,
+                auto_solve_pid_conflict,
+                self.expected_pid_v3,
+            )
+            self._mark_success()
+        except Exception as e:
+            self._mark_failure(e)
+        self.updated_by = user
+        self.save()
+
+    def _mark_success(self):
+        self.mark_as_completed()
+        if self.detail:
+            for key in ("error_type", "error_msg", "traceback"):
+                self.detail.pop(key, None)
+
+    def _mark_failure(self, e):
+        if isinstance(e, XMLException):
+            self.mark_as_xml_error()
+        elif isinstance(e, RequestXMLException):
+            self.mark_as_url_error()
+        else:
+            self.mark_as_error()
+        self.detail = self.detail or {}
+        self.detail.update(
+            {
+                "error_type": str(type(e)),
+                "error_msg": str(e),
+                "traceback": traceback.format_exc(),
+            }
+        )
 
     def request_pid(
         self, user, force_update, auto_solve_pid_conflict, expected_pid_v3=None
