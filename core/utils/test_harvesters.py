@@ -6,25 +6,27 @@ from core.utils.requester import NonRetryableError
 
 
 ITEM_JTEST = {
+    "aid": "abc123",
     "journal_acronym": "jtest",
     "pid_v1": "v1",
     "pid_v2": "S0001-00002024000100001",
     "publication_date": "2024-01-15",
     "default_language": "en",
     "aop_pid": None,
-    "create": "Mon, 15 Jan 2024 10:00:00 GMT",
-    "update": "Tue, 16 Jan 2024 12:00:00 GMT",
+    "created": "2024-01-15T10:00:00",
+    "updated": "2024-01-16T12:00:00",
 }
 
 ITEM_JOTHER = {
+    "aid": "def456",
     "journal_acronym": "jother",
     "pid_v1": "v1b",
     "pid_v2": "S0002-00002024000200001",
     "publication_date": "2024-06-01",
     "default_language": "pt",
     "aop_pid": None,
-    "create": "Sat, 01 Jun 2024 08:00:00 GMT",
-    "update": None,
+    "created": "2024-06-01T08:00:00",
+    "updated": None,
 }
 
 
@@ -53,7 +55,7 @@ class HarvestDocumentsTest(TestCase):
         """harvest_documents deve retornar tuplas (pid_v3, item) sem formatação."""
         mock_fetch.return_value = {
             "pages": 1,
-            "documents": {"abc123": ITEM_JTEST},
+            "documents": [ITEM_JTEST],
         }
         harvester = _make_harvester()
         results = list(harvester.harvest_documents())
@@ -67,21 +69,21 @@ class HarvestDocumentsTest(TestCase):
     def test_yields_all_documents_across_pages(self, mock_fetch):
         """Documentos de múltiplas páginas devem ser retornados em sequência."""
         mock_fetch.side_effect = [
-            {"pages": 2, "documents": {"pid1": ITEM_JTEST}},
-            {"pages": 2, "documents": {"pid2": ITEM_JOTHER}},
+            {"pages": 2, "documents": [ITEM_JTEST]},
+            {"pages": 2, "documents": [ITEM_JOTHER]},
         ]
         harvester = _make_harvester()
         results = list(harvester.harvest_documents())
 
         self.assertEqual(len(results), 2)
-        self.assertEqual(results[0][0], "pid1")
-        self.assertEqual(results[1][0], "pid2")
+        self.assertEqual(results[0][0], "abc123")
+        self.assertEqual(results[1][0], "def456")
         self.assertEqual(mock_fetch.call_count, 2)
 
     @patch("core.utils.harvesters.fetch_data")
     def test_stops_when_total_pages_is_zero(self, mock_fetch):
         """Deve parar sem erros quando pages=0 ou ausente."""
-        mock_fetch.return_value = {"pages": 0, "documents": {}}
+        mock_fetch.return_value = {"pages": 0, "documents": []}
         harvester = _make_harvester()
         results = list(harvester.harvest_documents())
 
@@ -91,7 +93,7 @@ class HarvestDocumentsTest(TestCase):
     @patch("core.utils.harvesters.fetch_data")
     def test_stops_when_documents_is_empty(self, mock_fetch):
         """Deve parar quando documents={}, mesmo que pages > 0."""
-        mock_fetch.return_value = {"pages": 3, "documents": {}}
+        mock_fetch.return_value = {"pages": 3, "documents": []}
         harvester = _make_harvester()
         results = list(harvester.harvest_documents())
 
@@ -113,7 +115,7 @@ class HarvestDocumentsTest(TestCase):
     def test_stops_when_fetch_raises_on_middle_page(self, mock_fetch):
         """Quando uma página intermediária falha, a exceção deve propagar."""
         mock_fetch.side_effect = [
-            {"pages": 3, "documents": {"pid1": ITEM_JTEST}},
+            {"pages": 3, "documents": [ITEM_JTEST]},
             NonRetryableError("page 2 error"),
         ]
         harvester = _make_harvester()
@@ -126,7 +128,7 @@ class HarvestDocumentsTest(TestCase):
         """Não deve requisitar páginas além de total_pages."""
         mock_fetch.return_value = {
             "pages": 1,
-            "documents": {"pid1": ITEM_JTEST},
+            "documents": [ITEM_JTEST],
         }
         harvester = _make_harvester()
         list(harvester.harvest_documents())
@@ -136,7 +138,7 @@ class HarvestDocumentsTest(TestCase):
     @patch("core.utils.harvesters.fetch_data")
     def test_base_url_built_correctly_in_init(self, mock_fetch):
         """base_url deve ser construída no __init__ e reusada nas páginas."""
-        mock_fetch.return_value = {"pages": 1, "documents": {"p1": ITEM_JTEST}}
+        mock_fetch.return_value = {"pages": 1, "documents": [ITEM_JTEST]}
         harvester = _make_harvester(
             domain="www.scielo.br",
             from_date="2024-01-01",
@@ -150,6 +152,30 @@ class HarvestDocumentsTest(TestCase):
         self.assertIn("end_date=2024-12-31", called_url)
         self.assertIn("limit=50", called_url)
         self.assertIn("page=1", called_url)
+        self.assertIn("/api/v2/counter_dict?", called_url)
+
+    @patch("core.utils.harvesters.fetch_data")
+    def test_datetime_with_timezone_is_url_encoded(self, mock_fetch):
+        mock_fetch.return_value = {"pages": 0, "documents": []}
+        harvester = _make_harvester(
+            from_date="2024-01-31T10:30:15-03:00",
+            until_date="2024-02-01T00:00:00+00:00",
+        )
+        list(harvester.harvest_documents())
+
+        called_url = mock_fetch.call_args[0][0]
+        self.assertIn("begin_date=2024-01-31T10%3A30%3A15-03%3A00", called_url)
+        self.assertIn("end_date=2024-02-01T00%3A00%3A00%2B00%3A00", called_url)
+
+    @patch("core.utils.harvesters.fetch_data")
+    def test_falls_back_to_pid_v3_when_aid_missing(self, mock_fetch):
+        item = {**ITEM_JTEST, "aid": None, "pid_v3": "xyz789"}
+        mock_fetch.return_value = {"pages": 1, "documents": [item]}
+        harvester = _make_harvester()
+
+        results = list(harvester.harvest_documents())
+
+        self.assertEqual(results, [("xyz789", item)])
 
     def test_uses_https_when_domain_has_no_protocol(self):
         harvester = _make_harvester(domain="www.scielo.br")
@@ -158,7 +184,7 @@ class HarvestDocumentsTest(TestCase):
 
     @patch("core.utils.harvesters.fetch_data")
     def test_filters_counter_dict_by_journal(self, mock_fetch):
-        mock_fetch.return_value = {"pages": 0, "documents": {}}
+        mock_fetch.return_value = {"pages": 0, "documents": []}
         harvester = _make_harvester(journal_acron="rsp")
 
         list(harvester.harvest_documents())
@@ -222,17 +248,17 @@ class FormatNormalizedTest(TestCase):
 
     def test_origin_date_uses_update_when_present(self):
         doc = self.harvester.format_normalized("abc123", ITEM_JTEST)
-        # update="Tue, 16 Jan 2024 12:00:00 GMT" → "2024-01-16"
+        # updated="2024-01-16T12:00:00" → "2024-01-16"
         self.assertEqual(doc["origin_date"], "2024-01-16")
 
     def test_origin_date_falls_back_to_create(self):
-        item = {**ITEM_JTEST, "update": None}
+        item = {**ITEM_JTEST, "updated": None}
         doc = self.harvester.format_normalized("abc123", item)
-        # create="Mon, 15 Jan 2024 10:00:00 GMT" → "2024-01-15"
+        # created="2024-01-15T10:00:00" → "2024-01-15"
         self.assertEqual(doc["origin_date"], "2024-01-15")
 
     def test_origin_date_none_when_both_missing(self):
-        item = {**ITEM_JTEST, "update": None, "create": None}
+        item = {**ITEM_JTEST, "updated": None, "created": None}
         doc = self.harvester.format_normalized("abc123", item)
         self.assertIsNone(doc["origin_date"])
 
@@ -300,6 +326,31 @@ class FormatRawTest(TestCase):
             self.harvester.format_raw("abc123", string_item)["is_public"]
         )
 
+    def test_v2_is_public_field_has_priority_over_status(self):
+        item = {**ITEM_JTEST, "is_public": False, "status": True}
+
+        raw = self.harvester.format_raw("abc123", item)
+
+        self.assertFalse(raw["is_public"])
+
+    def test_v2_is_public_true(self):
+        item = {**ITEM_JTEST, "is_public": True}
+
+        self.assertTrue(self.harvester.format_raw("abc123", item)["is_public"])
+
+    def test_source_date_keeps_full_updated_datetime(self):
+        raw = self.harvester.format_raw("abc123", ITEM_JTEST)
+
+        self.assertEqual(raw["source_date"], "2024-01-16T12:00:00")
+        self.assertEqual(raw["origin_date"], "2024-01-16")
+
+    def test_source_date_falls_back_to_created(self):
+        item = {**ITEM_JTEST, "updated": None}
+
+        raw = self.harvester.format_raw("abc123", item)
+
+        self.assertEqual(raw["source_date"], "2024-01-15T10:00:00")
+
     def test_missing_status_is_not_public(self):
         raw = self.harvester.format_raw("abc123", ITEM_JTEST)
 
@@ -307,23 +358,29 @@ class FormatRawTest(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# _parse_gmt_date
+# _parse_iso_date
 # ---------------------------------------------------------------------------
 
-class ParseGmtDateTest(TestCase):
+class ParseIsoDateTest(TestCase):
 
     def setUp(self):
         self.harvester = _make_harvester()
 
-    def test_valid_gmt_date(self):
-        result = self.harvester._parse_gmt_date("Mon, 15 Jan 2024 10:00:00 GMT")
+    def test_valid_iso_datetime(self):
+        result = self.harvester._parse_iso_date("2024-01-15T10:00:00")
+        self.assertEqual(result, "2024-01-15")
+
+    def test_valid_iso_date(self):
+        result = self.harvester._parse_iso_date("2024-01-15")
         self.assertEqual(result, "2024-01-15")
 
     def test_returns_none_for_none_input(self):
-        self.assertIsNone(self.harvester._parse_gmt_date(None))
+        self.assertIsNone(self.harvester._parse_iso_date(None))
 
     def test_returns_none_for_empty_string(self):
-        self.assertIsNone(self.harvester._parse_gmt_date(""))
+        self.assertIsNone(self.harvester._parse_iso_date(""))
 
     def test_returns_none_for_invalid_format(self):
-        self.assertIsNone(self.harvester._parse_gmt_date("2024-01-15"))
+        self.assertIsNone(
+            self.harvester._parse_iso_date("Mon, 15 Jan 2024 10:00:00 GMT")
+        )
