@@ -1,0 +1,16 @@
+{% extends "wagtailadmin/generic/inspect.html" %}
+{% load i18n static wagtailadmin_tags %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'upload/css/controls.css' %}">
+{% endblock %}
+
+{% block content %}
+    <div class="nice-padding document-toolbar">
+        <a class="button button-secondary button--icon" href="{% url 'wagtailsnippets_upload_package:inspect' object.report.package_id %}?tab=validations">
+            {% icon name="arrow-left" %} {% trans "Back to document" %}
+        </a>
+    </div>
+    {{ block.super }}
+{% endblock %}

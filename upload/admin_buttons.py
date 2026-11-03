@@ -3,8 +3,79 @@ from django.utils.translation import gettext_lazy as _
 
 from upload import choices
 from upload.authorization import user_can_act_on_package
+from upload.delegation import can_delegate_review
 from upload.permissions import FINISH_DEPOSIT, PUBLISH_PACKAGE, REQUEST_CORRECTION
 from upload.publication_status import PUBLICATION_FAILED, publication_situation
+
+DOCUMENT_SECTIONS = (
+    ("overview", _("Overview")),
+    ("validations", _("Validations")),
+    ("files", _("Files and data")),
+    ("history", _("History")),
+)
+
+
+def get_document_sections(package_id, active_tab):
+    document_url = reverse("wagtailsnippets_upload_package:inspect", args=[package_id])
+    return [
+        {
+            "key": key,
+            "label": label,
+            "url": f"{document_url}?tab={key}",
+            "selected": key == active_tab,
+        }
+        for key, label in DOCUMENT_SECTIONS
+    ]
+
+
+def get_document_downloads(package):
+    downloads = []
+    if any(
+        package.metrics.get(key)
+        for key in ("total_xml_errors", "total_xml_warnings", "critical_errors")
+    ):
+        downloads.append(
+            {
+                "label": _("XML errors (CSV)"),
+                "url": reverse("upload:download_errors") + f"?package_id={package.pk}",
+            }
+        )
+    for report in package.xml_info_report.exclude(file="").order_by("pk"):
+        if report.file:
+            downloads.append(
+                {"label": _("XML information (CSV)"), "url": report.file.url}
+            )
+    if package.pkg_zip_id and package.pkg_zip.file:
+        downloads.append(
+            {"label": _("Submitted package (ZIP)"), "url": package.pkg_zip.file.url}
+        )
+    try:
+        document_file_available = bool(
+            package.file and package.file.storage.exists(package.file.name)
+        )
+    except OSError:
+        document_file_available = False
+    if document_file_available:
+        downloads.extend(
+            [
+                {"label": _("Document package (ZIP)"), "url": package.file.url},
+                {
+                    "label": _("Document XML"),
+                    "url": reverse("upload:display_xml")
+                    + f"?package_id={package.pk}&download=1",
+                },
+            ]
+        )
+    downloads.append(
+        {
+            "label": _("History (JSON)"),
+            "url": reverse("upload:download_document_events", args=[package.pk]),
+        }
+    )
+    return {
+        "document_downloads": downloads,
+        "document_file_available": document_file_available,
+    }
 
 
 def get_package_action_buttons(
@@ -17,6 +88,16 @@ def get_package_action_buttons(
         return []
 
     buttons = []
+    if can_delegate_review(user, package):
+        buttons.append(
+            button_class(
+                _("Delegate review"),
+                icon_name="user",
+                url=reverse("upload:delegate_review", args=[package.pk]),
+                priority=25,
+            )
+        )
+
     query = f"?package_id={package.pk}"
     if package.status in (
         choices.PS_PENDING_CORRECTION,
@@ -26,10 +107,13 @@ def get_package_action_buttons(
         choices.PS_READY_TO_PREVIEW,
         choices.PS_READY_TO_PUBLISH,
         choices.PS_PUBLISHED,
-    ) and user_can_act_on_package(user, REQUEST_CORRECTION, package):
+    ) and (
+        user_can_act_on_package(user, REQUEST_CORRECTION, package)
+        or user_can_act_on_package(user, PUBLISH_PACKAGE, package)
+    ):
         buttons.append(
             button_class(
-                _("Decisions"),
+                _("Record decision"),
                 icon_name="tasks",
                 url=reverse(
                     "wagtailsnippets_upload_readytopublishpackage:edit",

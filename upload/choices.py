@@ -1,5 +1,8 @@
 from django.utils.translation import gettext_lazy as _
 
+WEBSITE_ENVIRONMENTS = (("QA", _("QA")), ("PUBLIC", _("Production")))
+WEBSITE_ENVIRONMENT_LABELS = dict(WEBSITE_ENVIRONMENTS)
+
 # Model Package, Field status
 
 """
@@ -83,8 +86,8 @@ PACKAGE_STATUS = (
     (PS_UNEXPECTED, _("Unexpected submission")),
     (PS_READY_TO_PREVIEW, _("Publication on QA website authorized")),
     (PS_PREVIEW, _("Published in QA")),
-    (PS_READY_TO_PUBLISH, _("Publication on public website authorized")),
-    (PS_PUBLISHED, _("Published on public site")),
+    (PS_READY_TO_PUBLISH, _("Publication in Production authorized")),
+    (PS_PUBLISHED, _("Published in Production")),
     (PS_ARCHIVED, _("Archived")),
 )
 
@@ -98,7 +101,7 @@ QA_DECISION = (
     (PS_PENDING_CORRECTION, _("Request correction")),
     (PS_PENDING_QA_DECISION, _("Assign quality review")),
     (PS_READY_TO_PREVIEW, _("Publish on QA website")),
-    (PS_READY_TO_PUBLISH, _("Publish on public website")),
+    (PS_READY_TO_PUBLISH, _("Publish in Production")),
 )
 
 # Model Package, Field category

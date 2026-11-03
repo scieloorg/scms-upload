@@ -1,0 +1,18 @@
+{% extends "wagtailsnippets/snippets/edit.html" %}
+{% load i18n static wagtailadmin_tags %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'upload/css/document-inspect.css' %}">
+{% endblock %}
+
+{% block before_form %}
+    <div class="document-inspect">
+        {% include "upload/documents/identity.html" %}
+        <div class="document-actions-bar">
+            <a class="button button-secondary button--icon" href="{{ document_url }}">
+                {% icon name="arrow-left" classname="w-mr-1" %} {% trans "Back to document" %}
+            </a>
+        </div>
+    </div>
+{% endblock %}
