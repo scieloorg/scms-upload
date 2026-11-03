@@ -1,21 +1,27 @@
 import logging
+import os
 import traceback
 from datetime import datetime, timezone
+from functools import cached_property
 
 from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, models, transaction
+from django.core.files.base import ContentFile
 from django.db.models import Count, Max, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.models.article_titles import ArticleTitles
 from packtools.sps.models.article_toc_sections import ArticleTocSections
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel, TabbedInterface, ObjectList
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
+from core.forms import CoreAdminModelForm
+from core.utils.requester import NonRetryableError
 from core.widgets import ReadOnlyPrettyJSONWidget
 from migration import choices as migration_choices
 from migration.models import ClassicWebsiteConfiguration
@@ -33,6 +39,12 @@ from pid_provider.choices import PPXML_STATUS_INVALID
 from . import choices
 from package import collection_pid_v2_completion as completion
 
+from .exceptions import (
+    ArticleSourcePidV3MismatchError,
+    RequestXMLException,
+    UnableToRegisterPIDError,
+    XMLException,
+)
 from .permission_helper import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
 
 User = get_user_model()
@@ -2010,3 +2022,491 @@ class ArticleWebPage(CommonControlField):
         if not created:
             page.update_url_if_changed(item["url"], user)
         return page
+
+
+def article_source_path(instance, filename):
+    """Define o caminho para upload de arquivos de fonte de artigos"""
+    # filename é "{sps_pkg_name}.xml"; não usa instance.sps_pkg_name para
+    # não baixar o XML novamente antes de salvar o arquivo
+    subdir = "/".join(os.path.splitext(filename)[0].split("-"))
+    return f"article_sources/{subdir}/{filename}"
+
+
+class ArticleSource(CommonControlField):
+    """
+    Represent article sources with URL or file
+
+    Guarda o XML coletado (ex.: do OPAC via counter_dict) para não repetir
+    o download enquanto a data de atualização na fonte (source_date)
+    não mudar.
+
+    Fields:
+        created
+        updated
+        url
+        file
+        source_date
+        status
+    """
+
+    class StatusChoices(models.TextChoices):
+        PENDING = "pending", _("Pending")
+        PROCESSING = "processing", _("Processing")
+        COMPLETED = "completed", _("Completed")
+        ERROR = "error", _("Error")
+        REPROCESS = "reprocess", _("Reprocess")
+        URL_ERROR = "url_error", _("URL Error")
+        XML_ERROR = "xml_error", _("XML Error")
+        NOT_PUBLIC = "not_public", _("Not public")
+
+    url = models.URLField(
+        verbose_name=_("Article URL"),
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text=_("Article URL"),
+    )
+    file = models.FileField(
+        verbose_name=_("Article file"),
+        upload_to=article_source_path,
+        null=True,
+        blank=True,
+        help_text=_("Upload article file"),
+    )
+    source_date = models.CharField(
+        verbose_name=_("Source date"),
+        # data (YYYY-MM-DD) ou data e hora completas (ISO 8601),
+        # ex.: updated do OPAC "2026-10-28T02:42:17"
+        max_length=32,
+        null=True,
+        blank=True,
+        help_text=_("Date of data collection or original data date"),
+    )
+    status = models.CharField(
+        verbose_name=_("Status"),
+        max_length=20,
+        choices=StatusChoices.choices,
+        default=StatusChoices.PENDING,
+        help_text=_("Processing status of the article source"),
+    )
+    pid_provider_xml = models.ForeignKey(
+        PidProviderXML,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        verbose_name=_("PID Provider XML"),
+        help_text=_("Related PID Provider XML instance"),
+    )
+    detail = models.JSONField(null=True, blank=True, default=None)
+    pid = models.CharField(max_length=24, null=True, blank=True)
+    collection = models.ForeignKey(
+        Collection,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        verbose_name=_("Collection"),
+        help_text=_("Related Collection instance"),
+    )
+
+    base_form_class = CoreAdminModelForm
+
+    panels = [
+        FieldPanel("url", read_only=True),
+        FieldPanel("file", read_only=True),
+        FieldPanel("source_date", read_only=True),
+        FieldPanel("status"),
+        FieldPanel("collection", read_only=True),
+        FieldPanel("pid", read_only=True),
+        FieldPanel("pid_provider_xml", read_only=True),
+        FieldPanel("detail", read_only=True),
+    ]
+
+    @staticmethod
+    def autocomplete_custom_queryset_filter(search_term):
+        return ArticleSource.objects.filter(
+            Q(url__icontains=search_term) | Q(file__icontains=search_term)
+        )
+
+    def autocomplete_label(self):
+        return str(self)
+
+    class Meta:
+        verbose_name = _("Article Source")
+        verbose_name_plural = _("Article Sources")
+        indexes = [
+            models.Index(fields=["url"]),
+            models.Index(fields=["source_date"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["status", "updated"]),
+            models.Index(fields=["pid_provider_xml"]),
+        ]
+
+    def __str__(self):
+        if self.url:
+            return f"{self.url}"
+        elif self.file:
+            return f"{self.file.name}"
+        return f"ArticleSource #{self.pk}"
+
+    @classmethod
+    def get(cls, url):
+        if url:
+            try:
+                return cls.objects.get(url__iexact=url)
+            except cls.MultipleObjectsReturned:
+                return cls.objects.filter(url__iexact=url).first()
+
+        raise ValueError("ArticleSource.get requires url")
+
+    @classmethod
+    def create(
+        cls,
+        user,
+        url=None,
+        source_date=None,
+        collection=None,
+        pid=None,
+        is_public=None,
+        detail=None,
+    ):
+        if not url:
+            raise ValueError("ArticleSource.create requires url")
+
+        try:
+            obj = cls()
+            obj.creator = user
+            obj.url = url
+            obj.source_date = source_date
+            obj.collection = collection
+            obj.pid = pid
+            obj.detail = detail
+            if is_public is False:
+                obj.status = cls.StatusChoices.NOT_PUBLIC
+            else:
+                obj.status = cls.StatusChoices.PENDING
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(url=url)
+
+    @classmethod
+    def create_or_update(
+        cls,
+        user,
+        url=None,
+        source_date=None,
+        collection=None,
+        pid=None,
+        force_update=None,
+        auto_solve_pid_conflict=False,
+        is_public=None,
+        detail=None,
+        expected_pid_v3=None,
+    ):
+        """
+        Cria ou atualiza o ArticleSource e garante XML e PidProviderXML.
+
+        O XML só é baixado novamente se ainda não existe em disco, se
+        source_date mudou (o documento foi atualizado na fonte) ou se
+        force_update=True.
+        """
+        try:
+            obj = cls.get(url=url)
+            source_changed = bool(source_date) and obj.source_date != source_date
+            changed = obj.update(
+                source_date,
+                collection,
+                pid,
+                is_public,
+                detail,
+            )
+        except cls.DoesNotExist:
+            obj = cls.create(
+                user,
+                url=url,
+                source_date=source_date,
+                collection=collection,
+                pid=pid,
+                is_public=is_public,
+                detail=detail,
+            )
+            source_changed = False
+            changed = True
+        add_pid_provider_changed = obj.add_pid_provider(
+            user,
+            force_update,
+            auto_solve_pid_conflict,
+            expected_pid_v3=expected_pid_v3,
+            source_changed=source_changed,
+        )
+        if changed or add_pid_provider_changed:
+            obj.updated_by = user
+            obj.save()
+        return obj
+
+    def update(
+        self,
+        source_date,
+        collection,
+        pid,
+        is_public,
+        detail=None,
+    ):
+        changed = False
+        if self.source_date != source_date:
+            self.source_date = source_date
+            changed = True
+        if self.collection != collection:
+            self.collection = collection
+            changed = True
+        if self.pid != pid:
+            self.pid = pid
+            changed = True
+        if detail is not None and self.detail != detail:
+            self.detail = detail
+            changed = True
+        if is_public is False and self.status != ArticleSource.StatusChoices.NOT_PUBLIC:
+            self.status = ArticleSource.StatusChoices.NOT_PUBLIC
+            changed = True
+        elif (
+            is_public is True
+            and self.status == ArticleSource.StatusChoices.NOT_PUBLIC
+        ):
+            self.status = ArticleSource.StatusChoices.PENDING
+            changed = True
+        return changed
+
+    def get_pid_provider_xml_id(self):
+        try:
+            return self.pid_provider_xml.id
+        except AttributeError:
+            pass
+
+    @property
+    def has_file(self):
+        return bool(self.file) and os.path.isfile(self.file.path)
+
+    @cached_property
+    def xml_with_pre(self):
+        if self.has_file:
+            try:
+                return list(XMLWithPre.create(path=self.file.path))[0]
+            except Exception:
+                pass
+        if self.pid_provider_xml:
+            try:
+                return self.pid_provider_xml.xml_with_pre
+            except AttributeError:
+                pass
+        if self.url:
+            try:
+                return list(XMLWithPre.create(uri=self.url))[0]
+            except Exception:
+                pass
+
+    @cached_property
+    def sps_pkg_name(self):
+        try:
+            return self.xml_with_pre.sps_pkg_name
+        except Exception:
+            pass
+
+    def request_xml(self):
+        if not self.url:
+            raise ValueError("URL is required")
+
+        try:
+            xml_with_pre = list(XMLWithPre.create(uri=self.url))[0]
+        except NonRetryableError as e:
+            raise RequestXMLException(
+                f"Non-retryable error while requesting XML: {e}"
+            ) from e
+        except Exception as e:
+            raise XMLException(f"Error while requesting XML: {e}") from e
+
+        self.save_file(
+            f"{xml_with_pre.sps_pkg_name}.xml",
+            xml_with_pre.tostring(pretty_print=True),
+        )
+        # evita nova leitura do XML recém-baixado
+        self.__dict__["xml_with_pre"] = xml_with_pre
+        self.__dict__.pop("sps_pkg_name", None)
+
+    def save_file(self, filename, content):
+        try:
+            self.file.delete(save=False)
+        except Exception:
+            pass
+        self.file.save(filename, ContentFile(content), save=False)
+
+    # Métodos para controle de status
+    def mark_as_processing(self):
+        """Marca como processando"""
+        self.status = self.StatusChoices.PROCESSING
+        self.save()
+
+    def mark_as_completed(self):
+        """Marca como concluído"""
+        self.status = self.StatusChoices.COMPLETED
+
+    def mark_as_error(self):
+        """Marca como erro"""
+        self.status = self.StatusChoices.ERROR
+
+    def mark_as_url_error(self):
+        """Marca como erro de URL"""
+        self.status = self.StatusChoices.URL_ERROR
+
+    def mark_as_xml_error(self):
+        """Marca como erro de XML"""
+        self.status = self.StatusChoices.XML_ERROR
+
+    def mark_for_reprocess(self):
+        """Marca para reprocessamento"""
+        self.status = self.StatusChoices.REPROCESS
+        self.save()
+
+    # Métodos de consulta por status
+    @classmethod
+    def get_pending(cls):
+        """Retorna fontes pendentes"""
+        return cls.objects.filter(status=cls.StatusChoices.PENDING)
+
+    @classmethod
+    def get_for_reprocess(cls):
+        """Retorna fontes marcadas para reprocessamento"""
+        return cls.objects.filter(status=cls.StatusChoices.REPROCESS)
+
+    @classmethod
+    def get_processing(cls):
+        """Retorna fontes em processamento"""
+        return cls.objects.filter(status=cls.StatusChoices.PROCESSING)
+
+    @classmethod
+    def get_completed(cls):
+        """Retorna fontes concluídas"""
+        return cls.objects.filter(status=cls.StatusChoices.COMPLETED)
+
+    @classmethod
+    def get_with_errors(cls):
+        """Retorna fontes com erro"""
+        return cls.objects.filter(
+            status__in=[
+                cls.StatusChoices.ERROR,
+                cls.StatusChoices.URL_ERROR,
+                cls.StatusChoices.XML_ERROR,
+            ]
+        )
+
+    @classmethod
+    def get_needs_processing(cls):
+        """Retorna fontes que precisam ser processadas (pending + reprocess)"""
+        return cls.objects.filter(
+            status__in=[cls.StatusChoices.PENDING, cls.StatusChoices.REPROCESS]
+        )
+
+    def add_pid_provider(
+        self,
+        user,
+        force_update=False,
+        auto_solve_pid_conflict=False,
+        expected_pid_v3=None,
+        source_changed=False,
+    ):
+        """
+        Executa o pipeline de obtenção de XML e registro de PID para este
+        ArticleSource. Evita refazer etapas já concluídas, a menos que
+        ``force_update=True``.
+
+        Etapas:
+            1. request_xml  — baixa o XML da URL e salva em ``self.file``
+               • Pula se ``self.file`` já existe em disco, ``source_changed``
+                 é False e ``force_update`` é False
+            2. request_pid  — registra o XML no PidProvider e associa ``self.pid_provider_xml``
+               • Pula se ``self.pid_provider_xml`` já está associado, o XML
+                 não foi baixado novamente e ``force_update`` é False
+
+        Se uma etapa anterior falhou (ex: tem arquivo mas não tem
+        pid_provider_xml), somente a etapa faltante é executada.
+        """
+        changed = False
+        try:
+            if self.status == ArticleSource.StatusChoices.NOT_PUBLIC:
+                if not force_update:
+                    return changed
+
+            xml_requested = False
+            if force_update or source_changed or not self.has_file:
+                # faz download do xml
+                self.request_xml()
+                xml_requested = True
+                changed = True
+
+            if force_update or xml_requested or not self.pid_provider_xml:
+                # atribui pid_provider_xml
+                self.request_pid(
+                    user, force_update, auto_solve_pid_conflict, expected_pid_v3
+                )
+                changed = True
+
+            if changed:
+                self.mark_as_completed()
+                if self.detail:
+                    for key in ("error_type", "error_msg", "traceback"):
+                        self.detail.pop(key, None)
+        except Exception as e:
+            if isinstance(e, XMLException):
+                self.mark_as_xml_error()
+            elif isinstance(e, RequestXMLException):
+                self.mark_as_url_error()
+            else:
+                self.mark_as_error()
+            self.detail = self.detail or {}
+            self.detail.update(
+                {
+                    "error_type": str(type(e)),
+                    "error_msg": str(e),
+                    "traceback": traceback.format_exc(),
+                }
+            )
+            changed = True
+        return changed
+
+    def request_pid(
+        self, user, force_update, auto_solve_pid_conflict, expected_pid_v3=None
+    ):
+        # import local: pid_provider.provider depende de tracker e profiling
+        from pid_provider.provider import PidProvider
+
+        xml_with_pre = self.xml_with_pre
+        if not xml_with_pre:
+            raise XMLException(f"Unable to read XML of {self}")
+
+        if expected_pid_v3 and xml_with_pre.v3 != expected_pid_v3:
+            raise ArticleSourcePidV3MismatchError(
+                f"PID v3 mismatch: source={expected_pid_v3}, xml={xml_with_pre.v3}"
+            )
+
+        collection_acron = self.collection and self.collection.acron
+        response = PidProvider().provide_pid_for_xml_with_pre(
+            xml_with_pre,
+            f"{collection_acron}_{xml_with_pre.v3}",
+            user,
+            # PidProviderXML.origin_date guarda somente a data (YYYY-MM-DD)
+            origin_date=self.source_date and self.source_date[:10],
+            force_update=force_update,
+            is_published=None,
+            origin=self.url,
+            registered_in_core=False,
+            auto_solve_pid_conflict=auto_solve_pid_conflict,
+        )
+        error_msg = response.get("error_msg") or response.get("error_message")
+        v3 = response.get("v3")
+        if error_msg or not v3:
+            raise UnableToRegisterPIDError(error_msg or response)
+
+        # Associa o PidProviderXML ao ArticleSource
+        try:
+            self.pid_provider_xml = PidProviderXML.get_by_pid_v3(v3)
+        except PidProviderXML.DoesNotExist:
+            raise UnableToRegisterPIDError(f"Unable to get by pid v3: {v3}")
