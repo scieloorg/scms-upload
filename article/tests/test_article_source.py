@@ -143,3 +143,110 @@ class ArticleSourceCreateOrUpdateTest(TestCase):
 
         xml_create.assert_not_called()
         self.assertEqual(obj.status, ArticleSource.StatusChoices.NOT_PUBLIC)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+@patch("pid_provider.models.PidProviderXML.get_by_pid_v3")
+@patch("pid_provider.provider.PidProvider.provide_pid_for_xml_with_pre")
+@patch("article.models.XMLWithPre.create")
+class ArticleSourceProcessStoredXMLTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create(username="operator")
+        self.collection = Collection.objects.create(acron="scl", creator=self.user)
+
+    def _stored(self, status=ArticleSource.StatusChoices.ERROR, aid="abc123"):
+        obj = ArticleSource.objects.create(
+            url=URL,
+            source_date="2024-01-31T10:01:00",
+            collection=self.collection,
+            status=status,
+            detail={"aid": aid, "error_msg": "old error"},
+            creator=self.user,
+        )
+        obj.save_file("0034-8910-rsp-58-01.xml", "<article/>")
+        obj.save()
+        return ArticleSource.objects.get(pk=obj.pk)
+
+    def test_registers_stored_xml_without_requesting_url(
+        self, xml_create, provide_pid, get_by_pid_v3
+    ):
+        obj = self._stored()
+        xml_create.side_effect = lambda **kwargs: iter([_xml_with_pre()])
+        provide_pid.return_value = {"v3": "abc123"}
+        get_by_pid_v3.return_value = PidProviderXML.objects.create(
+            v3="abc123", creator=self.user
+        )
+
+        obj.process_stored_xml(self.user)
+
+        self.assertEqual(xml_create.call_count, 1)
+        self.assertIn("path", xml_create.call_args.kwargs)
+        self.assertNotIn("uri", xml_create.call_args.kwargs)
+        obj.refresh_from_db()
+        self.assertEqual(obj.status, ArticleSource.StatusChoices.COMPLETED)
+        self.assertEqual(obj.pid_provider_xml, get_by_pid_v3.return_value)
+        self.assertNotIn("error_msg", obj.detail)
+        self.assertEqual(
+            provide_pid.call_args.kwargs["origin_date"], "2024-01-31"
+        )
+
+    def test_unreadable_stored_xml_is_not_requested_from_url(
+        self, xml_create, provide_pid, get_by_pid_v3
+    ):
+        obj = self._stored()
+        xml_create.side_effect = ValueError("invalid xml")
+
+        obj.process_stored_xml(self.user)
+
+        self.assertNotIn("uri", xml_create.call_args.kwargs)
+        provide_pid.assert_not_called()
+        obj.refresh_from_db()
+        self.assertEqual(obj.status, ArticleSource.StatusChoices.XML_ERROR)
+
+    def test_missing_file_marks_xml_error(
+        self, xml_create, provide_pid, get_by_pid_v3
+    ):
+        obj = ArticleSource.objects.create(
+            url=URL, collection=self.collection, creator=self.user
+        )
+
+        obj.process_stored_xml(self.user)
+
+        xml_create.assert_not_called()
+        obj.refresh_from_db()
+        self.assertEqual(obj.status, ArticleSource.StatusChoices.XML_ERROR)
+        self.assertIn("not found", obj.detail["error_msg"])
+
+    def test_checks_pid_v3_from_detail(
+        self, xml_create, provide_pid, get_by_pid_v3
+    ):
+        obj = self._stored(aid="expected")
+        xml_create.side_effect = lambda **kwargs: iter([_xml_with_pre(v3="other")])
+
+        obj.process_stored_xml(self.user)
+
+        provide_pid.assert_not_called()
+        obj.refresh_from_db()
+        self.assertEqual(obj.status, ArticleSource.StatusChoices.ERROR)
+        self.assertIn("PID v3 mismatch", obj.detail["error_msg"])
+
+    def test_get_with_stored_xml_filters_status_file_and_collection(
+        self, xml_create, provide_pid, get_by_pid_v3
+    ):
+        with_error = self._stored()
+        self._stored(status=ArticleSource.StatusChoices.COMPLETED)
+        ArticleSource.objects.create(
+            url=URL + "&no-file",
+            collection=self.collection,
+            status=ArticleSource.StatusChoices.ERROR,
+            creator=self.user,
+        )
+        other = Collection.objects.create(acron="arg", creator=self.user)
+
+        self.assertEqual(
+            list(ArticleSource.get_with_stored_xml().values_list("id", flat=True)),
+            [with_error.id],
+        )
+        self.assertFalse(
+            ArticleSource.get_with_stored_xml(collection_acron=other.acron).exists()
+        )
