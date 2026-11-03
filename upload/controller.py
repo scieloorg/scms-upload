@@ -1,12 +1,14 @@
 import logging
 import os
 
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
 from packtools.sps.pid_provider.xml_sps_lib import GetXMLItemsError, XMLWithPre
 
 from article import choices as article_choices
+from article.authorization import is_public_article
 from article.models import Article
 from issue.models import Issue
 from journal.models import Journal
@@ -14,6 +16,7 @@ from package.models import update_zip_file
 from pid_provider.requester import PidRequester
 from proc.controller import IssueDataChecker, JournalDataChecker
 from team.models import get_user_membership_ids
+from upload.article_changes import prepare_change_requests
 from upload.models import Package, ValidationReport, choices
 from upload.utils import file_utils, xml_utils
 
@@ -169,18 +172,45 @@ def get_last_package(article_id, **kwargs):
         return
 
 
+def reject_change_packages(user, packages, error):
+    message = "; ".join(error.messages)
+    for package in packages:
+        report = ValidationReport.create_or_update(
+            user,
+            package,
+            gettext_noop("Article change package"),
+            choices.VAL_CAT_GROUP_DATA,
+            reset_validations=True,
+        )
+        report.add_validation_result(
+            status=choices.VALIDATION_RESULT_BLOCKING,
+            message=message,
+            subject=gettext_noop("Article change package"),
+        )
+        report.finish_validations()
+        package.status = choices.PS_UNEXPECTED
+        package.calculate_validation_numbers()
+    return {
+        "error_message": message,
+        "error_level": choices.VALIDATION_RESULT_BLOCKING,
+        "package_status": choices.PS_UNEXPECTED,
+    }
+
+
 def receive_package(user, package):
+    if package.pkg_zip_id:
+        siblings = list(package.pkg_zip.packages.all())
+        try:
+            prepare_change_requests(user, siblings)
+            package.refresh_from_db(fields=["change_role", "category"])
+        except ValidationError as error:
+            return reject_change_packages(user, siblings, error)
+
     try:
         zip_xml_file_path = package.file.path
         response = {}
         for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
 
-            # atualiza package name e linked
-            # TODO melhorar a forma de fazer link entre os artigos do pacote
-            if xml_with_pre.xmltree.find(".//related-article"):
-                for item in package.pkg_zip.packages.all():
-                    if item is not package:
-                        package.linked.add(item)
             package.main_doi = xml_with_pre.main_doi
             package.add_order(xml_with_pre.order, xml_with_pre.fpage)
             package.save()
@@ -227,7 +257,7 @@ def receive_package(user, package):
                 )
                 return response
 
-            if package.article:
+            if package.article and not package.change_role:
                 package.article.update_status()
             return response
     except GetXMLItemsError:
@@ -309,7 +339,7 @@ def _check_article_and_journal(package, xml_with_pre, user):
         logging.info(f"is_registered_xml_with_pre: {response}")
 
         name, ext = os.path.splitext(xml_with_pre.filename)
-        _check_package_is_expected(response, package, name)
+        _check_package_is_expected(response, package, name, user=user)
         logging.info(f"_check_package_is_expected: {response}")
 
         issue_checker = UploadIssueDataChecker.from_xmltree(
@@ -343,7 +373,8 @@ def _check_article_and_journal(package, xml_with_pre, user):
         return response
 
 
-def _check_package_is_expected(response, package, sps_pkg_name):
+def _check_package_is_expected(response, package, sps_pkg_name, user=None):
+    response["article"] = None
     try:
         article = Article.objects.get(pid_v3=response["v3"])
         params = {"article": article}
@@ -351,6 +382,14 @@ def _check_package_is_expected(response, package, sps_pkg_name):
         # artigo novo, inédito no sistema
         article = None
         params = {"name": sps_pkg_name, "journal": response.get("journal")}
+
+    if article is not None:
+        actor = user or package.creator
+        if not actor or not actor.is_active or (
+            not actor.is_superuser
+            and article.journal_id not in get_user_membership_ids(actor).get("journal_list_ids", [])
+        ):
+            raise UnexpectedPackageError(_("The depositor is not authorized for the registered article."))
 
     logging.info(f"_check_package_is_expected: {params}")
     previous_package = (
@@ -370,7 +409,27 @@ def _check_package_is_expected(response, package, sps_pkg_name):
             ).format(previous_package.status, choices.PS_PENDING_CORRECTION)
         )
 
+    change_request = package.change_requests.filter(
+        submission_id=package.pkg_zip_id,
+        status=article_choices.RCS_RECEIVED,
+    ).first()
+    if change_request:
+        if package.change_role == choices.CPR_ORIGINAL:
+            if article is not None and article.pk != change_request.article_id:
+                raise UnexpectedPackageError(_("The received original differs from the authorized article."))
+            response["article"] = change_request.article
+        response["package_category"] = change_request.change_type
+        response["preserve_previous_package"] = True
+        return
+
     if article:
+        if is_public_article(article):
+            raise UnexpectedPackageError(
+                _("The public article needs an active, compatible change request before reception.")
+            )
+        if previous_package and previous_package.qa_ws_status == choices.PUBLISHED:
+            response["package_category"] = choices.PC_UPDATE
+            return
         if article.status == article_choices.AS_REQUIRE_UPDATE:
             response["package_category"] = choices.PC_UPDATE
         elif article.status == article_choices.AS_REQUIRE_ERRATUM:
@@ -389,6 +448,8 @@ def _check_package_is_expected(response, package, sps_pkg_name):
 
 
 def _archive_pending_correction_package(response):
+    if response.get("preserve_previous_package"):
+        return
     Package.objects.filter(
         pk=response.get("previous_package_id"),
         status=choices.PS_PENDING_CORRECTION,

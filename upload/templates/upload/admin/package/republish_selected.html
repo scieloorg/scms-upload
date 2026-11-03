@@ -1,9 +1,14 @@
 {% extends "wagtailadmin/base.html" %}
 
-{% load i18n wagtailadmin_tags %}
+{% load i18n static wagtailadmin_tags %}
 
 {% block titletag %}
     {% trans "Republish Selected Packages" %}
+{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'upload/css/controls.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -39,16 +44,14 @@
             </div>
 
             <div class="w-field__wrapper" style="margin-top: 1.5rem;">
-                <button type="submit" class="button button-longrunning">
-                    <svg class="icon icon-tick" aria-hidden="true">
-                        <use href="#icon-tick"></use>
-                    </svg>
+                <button type="submit" class="button button-longrunning button--icon">
+                    {% icon name="check" classname="w-mr-1" %}
                     {% trans "Schedule republication" %}
                 </button>
                 <a href="{% url 'wagtailsnippets_upload_package:list' %}"
-                   class="button button-secondary"
+                   class="button button-secondary button--icon"
                    style="margin-left: 0.5rem">
-                    {% trans "Cancel" %}
+                    {% icon name="arrow-left" classname="w-mr-1" %} {% trans "Cancel" %}
                 </a>
             </div>
         </form>

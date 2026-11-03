@@ -13,8 +13,10 @@ from django.contrib.admin import display
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import IntegrityError, models
+from django.db import IntegrityError, models, transaction
 from django.db.models import Count, Q
+from django.utils import timezone
+from django.utils.html import strip_tags
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
@@ -26,7 +28,7 @@ from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article import choices as article_choices
-from article.models import Article
+from article.models import Article, RequestArticleChange
 from collection import choices as collection_choices
 from collection.models import Collection
 from core.models import CommonControlField
@@ -316,6 +318,20 @@ class Package(CommonControlField, ClusterableModel):
         blank=True,
     )
 
+    change_requests = models.ManyToManyField(
+        RequestArticleChange,
+        verbose_name=_("Article change requests"),
+        related_name="packages",
+        blank=True,
+    )
+    change_role = models.CharField(
+        _("Change package role"),
+        max_length=8,
+        choices=choices.CHANGE_PACKAGE_ROLE,
+        blank=True,
+        default="",
+    )
+
     qa_ws_status = models.CharField(
         verbose_name=_("QA publication status"),
         max_length=15,
@@ -328,7 +344,7 @@ class Package(CommonControlField, ClusterableModel):
         verbose_name=_("QA publication date"), null=True, blank=True
     )
     public_ws_status = models.CharField(
-        verbose_name=_("Public publication status"),
+        verbose_name=_("Production publication status"),
         max_length=15,
         choices=choices.WEBSITE_STATUS,
         null=True,
@@ -336,23 +352,19 @@ class Package(CommonControlField, ClusterableModel):
         default=choices.UNRELEASED,
     )
     public_ws_pubdate = models.DateTimeField(
-        verbose_name=_("Public publication date"), null=True, blank=True
+        verbose_name=_("Production publication date"), null=True, blank=True
     )
 
     panels = [
         # FieldPanel("file"),
         FieldPanel("status", read_only=True),
-        FieldPanel("numbers", widget=ReadOnlyPrettyJSONWidget()),
+        FieldPanel("numbers", read_only=True),
         FieldPanel("qa_ws_status", read_only=True),
         FieldPanel("public_ws_status", read_only=True),
-    ]
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
     ]
     edit_handler = TabbedInterface(
         [
             ObjectList(panels, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
         ]
     )
     base_form_class = UploadPackageForm
@@ -431,6 +443,46 @@ class Package(CommonControlField, ClusterableModel):
             | Q(file__icontains=search_term)
         )
 
+    @property
+    def document_identity(self):
+        article = self.article if self.article_id else None
+        title = article.title_with_lang.order_by("pk").first() if article else None
+        issue = self.issue or (article.issue if article else None)
+        journal = (
+            self.journal
+            or (issue.journal if issue else None)
+            or (article.journal if article else None)
+        )
+        official = journal.official_journal if journal else None
+
+        return {
+            "journal": str(journal) if journal else None,
+            "issn_print": official.issn_print if official else None,
+            "issn_electronic": official.issn_electronic if official else None,
+            "issue": (
+                " · ".join(filter(None, [issue.publication_year, issue.issue_folder]))
+                if issue
+                else None
+            ),
+            "document_type": article.get_article_type_display() if article else None,
+            "title": strip_tags(title.text) if title and title.text else self.name,
+            "identifier": self.name,
+            "batch": self.pkg_zip.name if self.pkg_zip_id else None,
+        }
+
+    @property
+    def article_change_requests(self):
+        query = Q(packages=self)
+        if self.article_id:
+            query |= Q(article_id=self.article_id)
+        return (
+            RequestArticleChange.objects.filter(query)
+            .select_related("creator", "article", "submission")
+            .defer("original_xml")
+            .order_by("-created", "-pk")
+            .distinct()
+        )
+
     def autocomplete_label(self):
         return f"{self.package_name} {self.status}"
 
@@ -443,7 +495,11 @@ class Package(CommonControlField, ClusterableModel):
         if not self.expiration_date:
             self.expiration_date = date.today() + timedelta(days=30)
 
-        if self.status == choices.PS_PENDING_CORRECTION and self.article:
+        if (
+            self.status == choices.PS_PENDING_CORRECTION
+            and self.article
+            and not self.change_role
+        ):
             # volta article.status para o status antes da submissão do pacote
             self.article.update_status(rollback=True)
 
@@ -581,7 +637,9 @@ class Package(CommonControlField, ClusterableModel):
             return False
         return True
 
-    def finish_reception(self, task_upload_workflow_publish_article=None, blocking_error_status=None):
+    def finish_reception(
+        self, task_upload_workflow_publish_article=None, blocking_error_status=None
+    ):
         """
         1. Verifica se as validações que executaram em paralelo, finalizaram
         2. Calcula os números de problemas do pacote
@@ -622,8 +680,10 @@ class Package(CommonControlField, ClusterableModel):
                 detail = {"is_ready_to_publish": is_ready_to_publish}
 
                 response = self.prepare_to_publish(
-                    user, qa=is_ready_to_preview, public=is_ready_to_publish,
-                    force_update=None
+                    user,
+                    qa=is_ready_to_preview,
+                    public=is_ready_to_publish,
+                    force_update=None,
                 )
                 detail.update(response or {})
 
@@ -652,7 +712,56 @@ class Package(CommonControlField, ClusterableModel):
                     )
 
     @property
+    def change_publication_packages(self):
+        members = {self.pk}
+        while True:
+            request_ids = RequestArticleChange.objects.filter(
+                packages__pk__in=members,
+                submission_id=self.pkg_zip_id,
+            ).values_list("pk", flat=True)
+            related = set(Package.objects.filter(
+                change_requests__pk__in=request_ids,
+                pkg_zip_id=self.pkg_zip_id,
+            ).values_list("pk", flat=True))
+            if related <= members:
+                return Package.objects.filter(pk__in=members).order_by("pk")
+            members.update(related)
+
+    def validate_change_publication(self, require_group_approval=True):
+        if not self.change_role:
+            return
+        requests = self.change_requests.all()
+        states = [article_choices.RCS_RECEIVED]
+        if self.public_ws_status == choices.PUBLISHED:
+            if Package.objects.filter(
+                article_id=self.article_id,
+                public_ws_status=choices.PUBLISHED,
+                pk__gt=self.pk,
+            ).exists():
+                raise ValidationError(_("Republish the latest public submission, not a previous version."))
+            states.append(article_choices.RCS_COMPLETED)
+        if not requests.exists() or requests.exclude(
+            submission_id=self.pkg_zip_id,
+            status__in=states,
+        ).exists():
+            raise ValidationError(_("Publication requires the current, received article change request."))
+        if require_group_approval and requests.exclude(change_type=article_choices.RCT_UPDATE).exists():
+            members = self.change_publication_packages
+            if members.exclude(qa_decision=choices.PS_READY_TO_PUBLISH).exists() or members.exclude(
+                status__in=(choices.PS_READY_TO_PUBLISH, choices.PS_PUBLISHED)
+            ).exists():
+                raise ValidationError(
+                    _("Approve the notice and all updated originals before publication in Production.")
+                )
+
+    @property
     def is_ready_to_publish(self):
+        if self.change_requests.exclude(change_type=article_choices.RCT_UPDATE).exists():
+            members = self.change_publication_packages
+            return not (
+                members.exclude(qa_decision=choices.PS_READY_TO_PUBLISH).exists()
+                or members.exclude(status__in=(choices.PS_READY_TO_PUBLISH, choices.PS_PUBLISHED)).exists()
+            )
         if (
             self.linked
             and self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists()
@@ -676,7 +785,9 @@ class Package(CommonControlField, ClusterableModel):
             + xml_numbers["total"]
             + pkg_numbers["total"]
         )
-        self.critical_errors = pkg_numbers["total_critical"] + xml_numbers["total_critical"]
+        self.critical_errors = (
+            pkg_numbers["total_critical"] + xml_numbers["total_critical"]
+        )
         self.xml_errors_percentage = calculate_percentage(
             xml_numbers["total_error"], total_validations
         )
@@ -741,7 +852,9 @@ class Package(CommonControlField, ClusterableModel):
             or "total_declared_impossible_to_fix" not in metrics
         ):
             reactions = XMLError.get_numbers(package=self)
-            metrics.setdefault("total_contested_xml_errors", reactions["total_not-to-fix"])
+            metrics.setdefault(
+                "total_contested_xml_errors", reactions["total_not-to-fix"]
+            )
             metrics.setdefault(
                 "total_declared_impossible_to_fix", reactions["total_unable-to-fix"]
             )
@@ -927,6 +1040,17 @@ class Package(CommonControlField, ClusterableModel):
                 choices.PS_READY_TO_PUBLISH,
             ):
                 qa = self.qa_decision == choices.PS_READY_TO_PREVIEW
+                editorial_change = self.change_requests.exclude(
+                    change_type=article_choices.RCT_UPDATE
+                ).exists()
+                if editorial_change and self.qa_decision == choices.PS_READY_TO_PUBLISH:
+                    self.validate_change_publication(require_group_approval=False)
+                    self.status = choices.PS_READY_TO_PUBLISH
+                    self.save(update_fields=["status", "updated"])
+                    if not self.is_ready_to_publish:
+                        detail["waiting_for_related_packages"] = True
+                        operation.finish(user, completed=True, detail=detail)
+                        return True
                 public = self.is_ready_to_publish
 
                 # é desejável que qa e public sejam publicados simultaneamente
@@ -962,6 +1086,7 @@ class Package(CommonControlField, ClusterableModel):
                 exc_traceback=exc_traceback,
                 detail=detail,
             )
+            return False
         if qa_decision == self.qa_decision:
             return True
         return False
@@ -1101,7 +1226,9 @@ class Package(CommonControlField, ClusterableModel):
             )
             raise
 
-    def prepare_sps_package(self, user, xml_with_pre, xml_file_changed, force_update=None):
+    def prepare_sps_package(
+        self, user, xml_with_pre, xml_file_changed, force_update=None
+    ):
         # Aplica-se também para um pacote de atualização de um conteúdo anteriormente migrado
         # TODO components, texts
         if xml_file_changed:
@@ -1119,8 +1246,7 @@ class Package(CommonControlField, ClusterableModel):
             texts = {
                 "xml_langs": list(xml_with_pre.langs),
                 "pdf_langs": [
-                    rendition["lang"]
-                    for rendition in xml_with_pre.renditions
+                    rendition["lang"] for rendition in xml_with_pre.renditions
                 ],
             }
             self.sps_pkg = SPSPkg.create_or_update(
@@ -1191,8 +1317,13 @@ class Package(CommonControlField, ClusterableModel):
         bundle_id=None,
     ):
         # manter a compatibilidade com ArticleProc
+        operation = None
+        response = {}
+        detail = {}
         try:
             website_kind = website_kind or collection_choices.QA
+            if website_kind == collection_choices.PUBLIC:
+                self.validate_change_publication()
             detail = {
                 "website_kind": website_kind,
                 "force_update": force_update,
@@ -1249,15 +1380,18 @@ class Package(CommonControlField, ClusterableModel):
                 self.qa_ws_pubdate = datetime.utcnow()
                 self.status = choices.PS_PREVIEW
                 self.save()
-                self.article.update_status(
-                    new_status=article_choices.AS_PREPARE_TO_PUBLISH
-                )
+                if self.change_role != choices.CPR_ORIGINAL:
+                    self.article.update_status(
+                        new_status=article_choices.AS_PREPARE_TO_PUBLISH
+                    )
             elif website_kind == collection_choices.PUBLIC:
                 self.public_ws_status = status
                 self.public_ws_pubdate = datetime.utcnow()
                 self.status = choices.PS_PUBLISHED
                 self.save()
                 self.article.update_status(new_status=article_choices.AS_PUBLISHED)
+                for change_request in self.change_requests.all():
+                    change_request.complete_if_published(self.updated_by or self.creator)
 
     @property
     @display(description=_("Table of contents sections"))
@@ -1301,6 +1435,8 @@ class Package(CommonControlField, ClusterableModel):
         detail = {"qa": qa, "public": public}
         if not qa and not public:
             return detail
+        if public:
+            self.validate_change_publication()
 
         try:
             event = None
@@ -1396,7 +1532,11 @@ class Package(CommonControlField, ClusterableModel):
             )
         )
         if "PUBLIC" in websites:
-            for item in self.linked.all():
+            members = (
+                self.change_publication_packages.exclude(pk=self.pk)
+                if self.change_role else self.linked.all()
+            )
+            for item in members:
                 task_upload_workflow_publish_article.apply_async(
                     kwargs=dict(
                         user_id=user.id,
@@ -1416,29 +1556,8 @@ class QAPackage(Package):
 
     """
 
-    panel_id = [
-        AutocompletePanel("article", read_only=False),
-    ]
-    panel_numbers = [
-        FieldPanel("critical_errors", read_only=True),
-        FieldPanel("xml_errors_percentage", read_only=True),
-        FieldPanel("xml_warnings_percentage", read_only=True),
-        FieldPanel("contested_xml_errors_percentage", read_only=True),
-        FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
-        FieldPanel("status", read_only=True),
-    ]
-    panel_decision = decision_panels()
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
-    ]
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(panel_decision, heading=_("Decision")),
-            ObjectList(panel_id, heading=_("Article")),
-            ObjectList(panel_numbers, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
-        ]
-    )
+    panels = decision_panels()
+    edit_handler = ObjectList(panels)
     base_form_class = QAPackageForm
 
     class Meta:
@@ -1452,37 +1571,8 @@ class ReadyToPublishPackage(Package):
     Package ready to publish
     """
 
-    panel_id = [
-        AutocompletePanel("article", read_only=False),
-    ]
-    panel_numbers = [
-        FieldPanel("critical_errors", read_only=True),
-        FieldPanel("xml_errors_percentage", read_only=True),
-        FieldPanel("xml_warnings_percentage", read_only=True),
-        FieldPanel("contested_xml_errors_percentage", read_only=True),
-        FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
-        FieldPanel("status", read_only=True),
-    ]
-    panel_decision = decision_panels()
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
-    ]
-
-    panel_publication_status = [
-        FieldPanel("qa_ws_status", read_only=True),
-        FieldPanel("qa_ws_pubdate", read_only=True),
-        FieldPanel("public_ws_status", read_only=True),
-        FieldPanel("public_ws_pubdate", read_only=True),
-    ]
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(panel_decision, heading=_("Decision")),
-            ObjectList(panel_id, heading=_("Article")),
-            ObjectList(panel_publication_status, heading=_("Publication Status")),
-            ObjectList(panel_numbers, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
-        ]
-    )
+    panels = decision_panels()
+    edit_handler = ObjectList(panels)
 
     base_form_class = ReadyToPublishPackageForm
 
@@ -1502,7 +1592,7 @@ class BaseValidationResult(CommonControlField):
         help_text=_("Item being analyzed"),
     )
     data = models.JSONField(_("Data"), default=dict, null=True, blank=True)
-    message = models.CharField(_("Message"), null=True, blank=True, max_length=500)
+    message = models.TextField(_("Message"), null=True, blank=True)
     status = models.CharField(
         _("Result"),
         max_length=8,
@@ -1550,10 +1640,6 @@ class BaseValidationResult(CommonControlField):
                 ]
             ),
         ]
-
-    def save(self):
-        self.message = self.message and self.message[:500]
-        return super().save()
 
     @classmethod
     def create(cls, subject=None, status=None, message=None, data=None, creator=None):
@@ -1637,9 +1723,7 @@ class BaseXMLValidationResult(BaseValidationResult):
         blank=False,
     )
     # geralemente article / sub-article e id
-    parent = models.CharField(
-        _("XML element"), null=True, blank=True, max_length=11
-    )
+    parent = models.CharField(_("XML element"), null=True, blank=True, max_length=11)
     parent_id = models.CharField(
         _("XML element identifier"), null=True, blank=True, max_length=13
     )
@@ -1716,7 +1800,7 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
         blank=True,
     )
     got_value = models.JSONField(_("Got value"), null=True, blank=True)
-    advice = models.CharField(_("Advice"), null=True, blank=True, max_length=500)
+    advice = models.TextField(_("Advice"), null=True, blank=True)
     reaction = models.CharField(
         _("Reaction"),
         max_length=16,
@@ -1758,10 +1842,6 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
             ),
         ]
 
-    def save(self):
-        self.advice = self.advice and self.advice[:500]
-        return super().save()
-
     @classmethod
     def get_numbers(cls, package, report=None):
         # ER_REACTION_FIX = "to-fix"
@@ -1800,6 +1880,43 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
 
 
 class BaseValidationReport(CommonControlField):
+    REPORT_GROUP_LABELS = {
+        "journal-meta": _("Journal metadata"),
+        "subject": _("Subjects"),
+        "table-wrap": _("Tables"),
+        "list": _("Lists"),
+        "article-id": _("Document identifiers"),
+        "article dates": _("Document dates"),
+        "history": _("Editorial dates"),
+        "article-type": _("Document type"),
+        "contrib": _("Contributors"),
+        "aff": _("Affiliations"),
+        "author-notes": _("Author notes"),
+        "id and rid": _("Identifiers and cross-references"),
+        "fig": _("Figures"),
+        "disp-formula": _("Display formulas"),
+        "inline-formula": _("Inline formulas"),
+        "reference": _("References"),
+        "accessibility": _("Accessibility"),
+        "app": _("Appendices"),
+        "ext-link": _("External links"),
+        "graphic": _("Images"),
+        "sec": _("Sections"),
+    }
+
+    REPORT_NAMES = (
+        gettext_noop("XML Error Report"),
+        gettext_noop("XML Info Report"),
+        gettext_noop("Assets Report"),
+        gettext_noop("Renditions Report"),
+        gettext_noop("Renditions content report"),
+        gettext_noop("DTD Report"),
+        gettext_noop("Style checker Report"),
+        gettext_noop("Web page Report"),
+        gettext_noop("Package file"),
+        gettext_noop("File Report"),
+    )
+
     title = models.CharField(_("Title"), null=True, blank=True, max_length=128)
     category = models.CharField(
         _("Validation category"),
@@ -1858,14 +1975,78 @@ class BaseValidationReport(CommonControlField):
 
     @display(description=_("Title"), ordering="title")
     def display_title(self):
+        """Traduz o título para exibição sem alterar o valor armazenado."""
         if not self.title:
             return self.title
 
-        title, separator, group = self.title.partition(": ")
-        if title == "XML Error Report" and separator:
-            return f"{gettext(title)}: {group}"
+        name, separator, group = self.title.partition(": ")
+        if name not in self.REPORT_NAMES:
+            return gettext(self.title)
 
-        return gettext(self.title)
+        translated = gettext(
+            "Successful XML checks" if name == "XML Info Report" else name
+        )
+        return f"{translated}: {group}" if separator else translated
+
+    @property
+    def display_heading(self):
+        title, separator, group = (self.title or "").partition(": ")
+
+        if title == "XML Error Report" and separator:
+            return self.REPORT_GROUP_LABELS.get(group, group)
+
+        return self.display_title()
+
+    @staticmethod
+    def validation_state(counts, creation):
+        if creation == choices.REPORT_CREATION_WIP:
+            return "processing"
+
+        if any(
+            counts.get(status)
+            for status in (
+                choices.VALIDATION_RESULT_BLOCKING,
+                choices.VALIDATION_RESULT_CRITICAL,
+                choices.VALIDATION_RESULT_FAILURE,
+            )
+        ):
+            return "error"
+
+        if counts.get(choices.VALIDATION_RESULT_WARNING):
+            return "warning"
+
+        if any(
+            total > 0
+            for status, total in counts.items()
+            if status != choices.VALIDATION_RESULT_SUCCESS
+        ):
+            return "review"
+
+        if creation == choices.REPORT_CREATION_DONE and counts.get(
+            choices.VALIDATION_RESULT_SUCCESS
+        ):
+            return "success"
+
+        return "empty"
+
+    @property
+    def validation_summary(self):
+        counts = {
+            item["status"]: item["total"]
+            for item in self.validation_results.order_by()
+            .values("status")
+            .annotate(total=Count("pk"))
+        }
+
+        return {
+            "state": self.validation_state(counts, self.creation),
+            "success_total": counts.get(choices.VALIDATION_RESULT_SUCCESS, 0),
+            "counts": [
+                {"status": status.lower(), "label": label, "total": counts[status]}
+                for status, label in choices.VALIDATION_RESULT
+                if counts.get(status)
+            ],
+        }
 
     @classmethod
     def get(cls, package=None, title=None, category=None):
@@ -2062,6 +2243,41 @@ class XMLErrorReport(BaseValidationReport, ClusterableModel):
     base_form_class = XMLErrorReportForm
     ValidationResultClass = XMLError
 
+    @transaction.atomic
+    def save_responses(self, responses, user):
+        report = type(self).objects.select_for_update().filter(pk=self.pk).first()
+        if report is None or report.creation != choices.REPORT_CREATION_DONE:
+            raise ValidationError(
+                _("The report has changed. Reload it before saving your responses."),
+                code="report_changed",
+            )
+
+        results = list(
+            report.validation_results.select_for_update().filter(pk__in=responses)
+        )
+        if {result.pk for result in results} != set(responses):
+            raise ValidationError(
+                _("The report has changed. Reload it before saving your responses."),
+                code="report_changed",
+            )
+
+        if any(
+            reaction not in dict(choices.ERROR_REACTION)
+            for reaction in responses.values()
+        ):
+            raise ValidationError(_("Select a valid response."), code="invalid_choice")
+
+        now = timezone.now()
+        for result in results:
+            report.validation_results.filter(pk=result.pk).update(
+                reaction=responses[result.pk], updated_by=user, updated=now
+            )
+
+        report.updated_by = user
+        report.updated = now
+        report.save(update_fields=["updated_by", "updated"])
+        report.package.calculate_validation_numbers()
+
     class Meta:
         verbose_name = _("XML Error Report")
         verbose_name_plural = _("XML Error Reports")
@@ -2172,7 +2388,9 @@ class UploadValidator(CommonControlField):
     base_form_class = UploadValidatorForm
 
     def __str__(self):
-        return str(self.collection) if self.collection_id else str(_("Validation rules"))
+        return (
+            str(self.collection) if self.collection_id else str(_("Validation rules"))
+        )
 
     class Meta:
         verbose_name = _("Validation rules")
@@ -2199,7 +2417,9 @@ class UploadValidator(CommonControlField):
             return cls.get()
 
         collection_ids = list(
-            journal.journal_collections.values_list("collection_id", flat=True).distinct()
+            journal.journal_collections.values_list(
+                "collection_id", flat=True
+            ).distinct()
         )
         if len(collection_ids) != 1:
             raise ValidationError(

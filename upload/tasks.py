@@ -4,6 +4,7 @@ import traceback
 
 from celery import chord
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
@@ -16,13 +17,14 @@ from config import celery_app
 from issue.models import Issue
 from journal.models import Journal
 from package.models import SPSPkg
-from proc.controller import ensure_journal_data_is_updated, ensure_issue_data_is_updated
-from proc.models import JournalProc, IssueProc
+from proc.controller import ensure_issue_data_is_updated, ensure_journal_data_is_updated
+from proc.models import JournalProc
 from proc.tasks import TaskExecution
 from publication.api.issue import sync_issue
 from tracker.models import UnexpectedEvent
 from upload import choices, publication
-from upload.controller import receive_package
+from upload.article_changes import prepare_change_requests
+from upload.controller import receive_package, reject_change_packages
 from upload.models import (
     Package,
     PackageZip,
@@ -285,7 +287,15 @@ def task_receive_packages(self, user_id, pkg_zip_id):
     user = User.objects.get(pk=user_id)
     pkg_zip = PackageZip.objects.get(pk=pkg_zip_id)
 
-    for item in pkg_zip.split(user):
+    items = list(pkg_zip.split(user))
+    packages = [item["package"] for item in items if item.get("package")]
+    try:
+        prepare_change_requests(user, packages)
+    except ValidationError as error:
+        reject_change_packages(user, packages, error)
+        return
+
+    for item in items:
         try:
             logging.info(str(item))
             task_receive_package.apply_async(

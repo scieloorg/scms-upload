@@ -1,5 +1,8 @@
 from django.utils.translation import gettext_lazy as _
 
+WEBSITE_ENVIRONMENTS = (("QA", _("QA")), ("PUBLIC", _("Production")))
+WEBSITE_ENVIRONMENT_LABELS = dict(WEBSITE_ENVIRONMENTS)
+
 # Model Package, Field status
 
 """
@@ -83,8 +86,8 @@ PACKAGE_STATUS = (
     (PS_UNEXPECTED, _("Unexpected submission")),
     (PS_READY_TO_PREVIEW, _("Publication on QA website authorized")),
     (PS_PREVIEW, _("Published in QA")),
-    (PS_READY_TO_PUBLISH, _("Publication on public website authorized")),
-    (PS_PUBLISHED, _("Published on public site")),
+    (PS_READY_TO_PUBLISH, _("Publication in Production authorized")),
+    (PS_PUBLISHED, _("Published in Production")),
     (PS_ARCHIVED, _("Archived")),
 )
 
@@ -98,19 +101,32 @@ QA_DECISION = (
     (PS_PENDING_CORRECTION, _("Request correction")),
     (PS_PENDING_QA_DECISION, _("Assign quality review")),
     (PS_READY_TO_PREVIEW, _("Publish on QA website")),
-    (PS_READY_TO_PUBLISH, _("Publish on public website")),
+    (PS_READY_TO_PUBLISH, _("Publish in Production")),
 )
 
 # Model Package, Field category
 PC_ERRATUM = "erratum"
 PC_UPDATE = "update"
+PC_ADDENDUM = "addendum"
+PC_RETRACTION = "retraction"
+PC_PARTIAL_RETRACTION = "partial-retraction"
 PC_NEW_DOCUMENT = "new-document"
 PC_SYSTEM_GENERATED = "generated-by-the-system"
 
 PACKAGE_CATEGORY = (
     (PC_UPDATE, _("Update")),
     (PC_ERRATUM, _("Erratum")),
+    (PC_ADDENDUM, _("Addendum")),
+    (PC_RETRACTION, _("Retraction")),
+    (PC_PARTIAL_RETRACTION, _("Partial retraction")),
     (PC_NEW_DOCUMENT, _("New document")),
+)
+
+CPR_ORIGINAL = "original"
+CPR_NOTICE = "notice"
+CHANGE_PACKAGE_ROLE = (
+    (CPR_ORIGINAL, _("Updated original")),
+    (CPR_NOTICE, _("Change notice")),
 )
 
 # Model ValidationResult, campo que agrupo tipos de erro de validação, VR = Validation Report
