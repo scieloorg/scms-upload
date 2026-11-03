@@ -3,6 +3,7 @@
 
 {% block extra_css %}
     {{ block.super }}
+    <link rel="stylesheet" href="{% static 'upload/css/controls.css' %}">
     <link rel="stylesheet" href="{% static 'upload/css/reports.css' %}">
     <link rel="stylesheet" href="{% static 'upload/css/document-inspect.css' %}">
 {% endblock %}
@@ -13,19 +14,9 @@
     {{ block.super }}
 
     <div class="nice-padding document-inspect">
-        <nav aria-label="{% trans 'Document sections' %}">
-            <ul class="document-sections">
-                {% for section in document_sections %}
-                    <li>
-                        <a class="document-section-link"
-                           href="?tab={{ section.key }}"
-                           {% if section.selected %}aria-current="page"{% endif %}>
-                            {{ section.label }}
-                        </a>
-                    </li>
-                {% endfor %}
-            </ul>
-        </nav>
+        {% include "upload/documents/identity.html" %}
+        {% include "upload/documents/sections.html" %}
+        {% include "upload/documents/toolbar.html" %}
 
         {% if active_tab == "overview" %}
             {% include "upload/documents/inspect/overview.html" %}

@@ -5,7 +5,11 @@ from unittest.mock import PropertyMock, patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ImproperlyConfigured, PermissionDenied
+from django.core.exceptions import (
+    ImproperlyConfigured,
+    PermissionDenied,
+    ValidationError,
+)
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import Http404
 from django.test import RequestFactory, TestCase
@@ -29,6 +33,7 @@ from team.models import (
 )
 from upload.authorization import user_can_act_on_package
 from upload.bulk_actions.republish import RepublishPublicBulkAction
+from upload.delegation import delegate_review
 from upload.filters import DocumentFilterSet
 from upload.models import (
     Package,
@@ -640,8 +645,13 @@ class PackageScopingTest(TestCase):
                     self.analyst_user, self.analyst_user, choices.PS_READY_TO_PUBLISH
                 )
                 form.data[field] = value
+
                 self.assertFalse(form.is_valid())
-                self.assertIn(field, form.errors)
+                if field == "article":
+                    self.assertNotIn("article", form.fields)
+                    self.assertTrue(form.non_field_errors())
+                else:
+                    self.assertIn(field, form.errors)
 
     def test_publication_permission_does_not_follow_a_journal_membership(self):
         JournalTeamMember.objects.create(
@@ -887,24 +897,22 @@ class PackageScopingTest(TestCase):
             creator=self.superuser,
             is_active_member=True,
         )
-        form = self.correction_form(
-            self.company_user, self.company_user, choices.PS_PENDING_QA_DECISION
-        )
-        form.data["reviewer"] = reviewer.pk
-        self.assertTrue(form.is_valid(), form.errors)
-        saved = form.save_all(self.company_user)
-        saved.process_qa_decision(self.company_user)
+
+        self.package_1.status = choices.PS_PENDING_QA_DECISION
+        self.package_1.save(update_fields=["status"])
+
+        saved = delegate_review(self.company_user, self.package_1.pk, reviewer.pk, "")
         saved.refresh_from_db()
+
         self.assertEqual(saved.assignee, reviewer)
         self.assertEqual(saved.status, choices.PS_PENDING_QA_DECISION)
         self.assertFalse(reviewer.has_perm("upload.publish_package"))
         self.assertIn(saved, get_scoped_package_queryset(reviewer))
-        form = self.correction_form(
-            self.company_user, self.company_user, choices.PS_PENDING_QA_DECISION
-        )
-        form.data["reviewer"] = self.unrelated_user.pk
-        self.assertFalse(form.is_valid())
-        self.assertIn("reviewer", form.errors)
+
+        with self.assertRaises(ValidationError):
+            delegate_review(
+                self.company_user, self.package_1.pk, self.unrelated_user.pk, ""
+            )
 
     def test_document_status_filter_matches_display_and_includes_archived(self):
         self.client.force_login(self.company_user)

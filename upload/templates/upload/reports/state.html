@@ -1,0 +1,24 @@
+{% load i18n wagtailadmin_tags %}
+
+{% if state == "processing" %}
+    <span class="processing-status" role="status">{% trans "Processing" %}</span>
+{% else %}
+    <span class="validation-state validation-state-{% if state == 'review' or state == 'empty' %}neutral{% else %}{{ state }}{% endif %}">
+        {% if state == "error" %}
+            {% icon name="warning" %}
+            {% trans "Issues found" %}
+        {% elif state == "warning" %}
+            {% icon name="warning" %}
+            {% trans "Warnings found" %}
+        {% elif state == "success" %}
+            {% icon name="check" %}
+            {% trans "No issues found" %}
+        {% elif state == "review" %}
+            {% icon name="help" %}
+            {% trans "Needs review" %}
+        {% else %}
+            {% icon name="info-circle" %}
+            {% trans "No results yet" %}
+        {% endif %}
+    </span>
+{% endif %}

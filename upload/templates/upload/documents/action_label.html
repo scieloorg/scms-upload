@@ -1,0 +1,11 @@
+{% load i18n %}
+{% trans "Record decision" as record_decision_label %}
+{% trans "Delegate review" as delegate_review_label %}
+
+{% if action.label == record_decision_label %}
+    {% trans "Decide" %}
+{% elif action.label == delegate_review_label %}
+    {% trans "Delegate" %}
+{% else %}
+    {{ action.label }}
+{% endif %}
