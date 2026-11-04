@@ -235,7 +235,7 @@ class SPSPkgTestCase(TestCase):
             SPSPkg.get(sps_pkg_name="sps-12345-v1")
 
     def test_get_method_single_object(self):
-        found = SPSPkg.get(None, sps_pkg_name="sps-12345-v1")
+        found = SPSPkg.get_unlinked_by_sps_pkg_name("sps-12345-v1")
         self.assertEqual(found, self.pkg)
 
     def test_validate(self):
@@ -312,25 +312,26 @@ class SPSPkgTestCase(TestCase):
         self.assertEqual(self.pkg.collection.acron, "psi")
         self.assertEqual(self.pkg.data["collection"], "psi")
 
-    def test_get_method_single_object_via_name_fallback(self):
-        # collection_pid_v2 sem pacote; o pacote ainda não vinculado de
-        # mesmo nome é encontrado
+    def test_get_does_not_fall_back_to_the_package_name(self):
+        # collection_pid_v2 sem pacote; a busca pelo nome é explícita
         other = make_collection_pid_v2(self.user)
-        found = SPSPkg.get(other, sps_pkg_name="sps-12345-v1")
-        self.assertEqual(found, self.pkg)
+        with self.assertRaises(SPSPkg.DoesNotExist):
+            SPSPkg.get(other)
+        self.assertEqual(
+            SPSPkg.get_unlinked_by_sps_pkg_name("sps-12345-v1"), self.pkg
+        )
 
     def test_get_method_does_not_exist(self):
         # pacote já vinculado a outro documento na coleção não é encontrado
         # pelo nome
         self.pkg.collection_pid_v2 = make_collection_pid_v2(self.user)
         self.pkg.save()
-        other = make_collection_pid_v2(self.user)
         with self.assertRaises(SPSPkg.DoesNotExist):
-            SPSPkg.get(other, sps_pkg_name="sps-12345-v1")
+            SPSPkg.get_unlinked_by_sps_pkg_name("sps-12345-v1")
 
     def test_get_method_multiple_objects_returns_most_recent(self):
         second = SPSPkg.objects.create(creator=self.user, sps_pkg_name="sps-12345-v1")
-        found = SPSPkg.get(None, sps_pkg_name="sps-12345-v1")
+        found = SPSPkg.get_unlinked_by_sps_pkg_name("sps-12345-v1")
         self.assertEqual(found, second)
 
 
@@ -410,8 +411,8 @@ class SPSPkgGetTestCase(TestCase):
         )
         self.collection_pid_v2 = make_collection_pid_v2(self.user)
 
-    def test_get_raises_value_error_without_any_identifier(self):
-        with self.assertRaises(ValueError):
+    def test_get_raises_does_not_exist_without_collection_pid_v2(self):
+        with self.assertRaises(SPSPkg.DoesNotExist):
             SPSPkg.get(None)
 
     def test_get_finds_by_collection_pid_v2_first(self):
@@ -420,13 +421,17 @@ class SPSPkgGetTestCase(TestCase):
             sps_pkg_name="pkg-a",
             collection_pid_v2=self.collection_pid_v2,
         )
-        found = SPSPkg.get(self.collection_pid_v2, sps_pkg_name="does-not-matter")
+        found = SPSPkg.get(self.collection_pid_v2)
         self.assertEqual(found, pkg)
 
-    def test_get_falls_back_to_unlinked_package_with_the_same_name(self):
+    def test_get_unlinked_by_sps_pkg_name(self):
         pkg = SPSPkg.objects.create(creator=self.user, sps_pkg_name="pkg-b")
-        found = SPSPkg.get(self.collection_pid_v2, sps_pkg_name="pkg-b")
+        found = SPSPkg.get_unlinked_by_sps_pkg_name("pkg-b")
         self.assertEqual(found, pkg)
+
+    def test_get_unlinked_by_sps_pkg_name_requires_sps_pkg_name(self):
+        with self.assertRaises(SPSPkg.DoesNotExist):
+            SPSPkg.get_unlinked_by_sps_pkg_name(None)
 
 
 class SPSPkgAddPpxTestCase(TestCase):
