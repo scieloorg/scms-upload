@@ -6,7 +6,8 @@ import logging
 import sys
 
 from migration import controller
-from proc.models import ArticleProc, IssueProc, JournalProc
+from migration.models import MigratedFile, modified_date
+from proc.models import IssueProc, JournalProc
 from tracker.models import UnexpectedEvent
 
 
@@ -17,42 +18,17 @@ def create_or_update_migrated_journal(
     force_update,
 ):
     """
-    Cria ou atualiza journals migrados do site clássico.
+    Cria ou atualiza journals migrados do site clássico (base title).
     """
-    has_changes = controller.id_file_has_changes(
+    register_id_file_records(
         user,
         collection,
         classic_website.classic_website_paths.title_path,
+        classic_website.get_journals_pids_and_records,
+        JournalProc,
+        "journal",
         force_update,
     )
-    if not has_changes:
-        logging.info(f"skip reading {classic_website.classic_website_paths.title_path}")
-        return
-
-    for (
-        scielo_issn,
-        journal_data,
-    ) in classic_website.get_journals_pids_and_records():
-        # para cada registro da base de dados "title",
-        # cria um registro MigratedData (source="journal")
-        try:
-            JournalProc.register_classic_website_data(
-                user,
-                collection,
-                scielo_issn,
-                journal_data[0],
-                "journal",
-                force_update,
-            )
-
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            UnexpectedEvent.create(
-                action="proc.sources.classic_website.create_or_update_migrated_journal",
-                item=scielo_issn,
-                e=e,
-                exc_traceback=exc_traceback,
-            )
 
 
 def create_or_update_migrated_issue(
@@ -62,47 +38,84 @@ def create_or_update_migrated_issue(
     force_update,
 ):
     """
-    Cria ou atualiza issues migrados do site clássico.
+    Cria ou atualiza issues migrados do site clássico (base issue).
     """
-    has_changes = controller.id_file_has_changes(
+    register_id_file_records(
         user,
         collection,
         classic_website.classic_website_paths.issue_path,
+        classic_website.get_issues_pids_and_records,
+        IssueProc,
+        "issue",
         force_update,
     )
 
+
+def register_id_file_records(
+    user, collection, id_file_path, get_records, proc_class, content_type, force_update
+):
+    """
+    Registra (proc_class.register_classic_website_data) os registros do
+    arquivo .id somente se o arquivo mudou desde a última leitura completa
+    (ou se force_update).
+
+    O arquivo só é marcado como lido se for lido completamente; assim, uma
+    leitura interrompida é refeita na próxima execução. Falhas em registros
+    individuais não impedem a marcação: ficam registradas pelo próprio
+    proc (BLOCKED) ou em UnexpectedEvent.
+    """
+    file_datetime_iso = modified_date(id_file_path)
+    has_changes = MigratedFile.has_changes(
+        collection, id_file_path, force_update
+    )
     if not has_changes:
-        logging.info(f"skip reading {classic_website.classic_website_paths.issue_path}")
+        logging.info(f"skip reading {id_file_path}: records already read")
         return
 
-    for (
-        pid,
-        issue_data,
-    ) in classic_website.get_issues_pids_and_records():
-        # para cada registro da base de dados "issue",
-        # cria um registro MigratedData (source="issue")
-        try:
-            IssueProc.register_classic_website_data(
-                user,
-                collection,
-                pid,
-                issue_data[0],
-                "issue",
-                force_update,
-            )
+    try:
+        for pid, records in get_records():
+            try:
+                proc_class.register_classic_website_data(
+                    user, collection, pid, records[0], content_type, force_update
+                )
+            except Exception as e:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                UnexpectedEvent.create(
+                    action="proc.source_classic_website.register_id_file_records",
+                    item=pid,
+                    e=e,
+                    exc_traceback=exc_traceback,
+                    detail={
+                        "collection": collection.acron,
+                        "id_file_path": id_file_path,
+                        "force_update": force_update,
+                    },
+                )
+    except Exception as e:
+        # leitura incompleta do arquivo .id: não marca como lido
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            action="proc.source_classic_website.register_id_file_records",
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={
+                "collection": collection.acron,
+                "id_file_path": id_file_path,
+                "force_update": force_update,
+                "message": "incomplete reading; the file will be read again in the next execution",
+            },
+        )
+        return
 
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            UnexpectedEvent.create(
-                action="proc.sources.classic_website.create_or_update_migrated_issue",
-                item=pid,
-                e=e,
-                exc_traceback=exc_traceback,
-                detail={
-                    "collection": collection.acron,
-                    "force_update": force_update,
-                },
-            )
+    MigratedFile.create_or_update(
+        user=user,
+        collection=collection,
+        original_path=id_file_path,
+        source_path=id_file_path,
+        component_type="id_file",
+        force_update=force_update,
+        file_datetime_iso=file_datetime_iso,
+    )
 
 
 def migrate_journal(
