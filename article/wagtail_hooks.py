@@ -24,9 +24,9 @@ from article import choices
 
 class ArticleFilterSet(django_filters.FilterSet):
     journal__journal_acron = django_filters.CharFilter(
-        field_name="journal__journal_acron",
+        # acrônimo do periódico na coleção do artigo (JournalProc)
         label=_("Journal Acronym"),
-        lookup_expr="exact",
+        method="filter_journal_acron",
     )
     status = django_filters.ChoiceFilter(
         field_name="status",
@@ -50,6 +50,11 @@ class ArticleFilterSet(django_filters.FilterSet):
     class Meta:
         model = Article
         fields = []
+
+    def filter_journal_acron(self, queryset, name, value):
+        if not value:
+            return queryset
+        return Article.filter_by_journal_acron(queryset, value)
 
 
 class ArticleSnippetViewSet(SnippetViewSet):
