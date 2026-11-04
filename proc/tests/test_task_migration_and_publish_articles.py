@@ -118,7 +118,7 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
     @patch("proc.tasks.task_fix_issue_articles")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.migration_controller")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.JournalProc")
     @patch("proc.tasks.TaskTracker")
     def test_happy_path(
@@ -182,7 +182,7 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
     @patch("proc.tasks.task_migrate_and_publish_articles_by_issue")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.migration_controller")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.JournalProc")
     @patch("proc.tasks.TaskTracker")
     def test_exception_during_import_calls_finish_with_exception(
@@ -216,7 +216,7 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
     @patch("proc.tasks.task_fix_issue_articles")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.migration_controller")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.JournalProc")
     @patch("proc.tasks.TaskTracker")
     def test_exclude_invalid_articles_response_flows_into_delay_kwargs_per_issue(
@@ -424,7 +424,6 @@ class TaskPublishIssueArticlesTest(TestCase):
     @patch("proc.tasks.task_sync_issue")
     @patch("proc.tasks.task_publish_article")
     @patch("proc.tasks.WebSiteConfiguration")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.ArticleProc")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.TaskTracker")
@@ -433,12 +432,12 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_task_tracker,
         mock_issue_proc,
         mock_article_proc,
-        mock_fix_pub_status,
         mock_website_config,
         mock_publish_article,
         mock_task_sync_issue,
         mock_get_total_status_data,
     ):
+        mock_fix_pub_status = mock_article_proc.fix_publication_status
         mock_tracker_instance = MagicMock()
         mock_task_tracker.create.return_value = mock_tracker_instance
         mock_get_total_status_data.return_value = {}
@@ -499,7 +498,6 @@ class TaskPublishIssueArticlesTest(TestCase):
     @patch("proc.tasks.task_sync_issue")
     @patch("proc.tasks.task_publish_article")
     @patch("proc.tasks.WebSiteConfiguration")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.ArticleProc")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.TaskTracker")
@@ -508,12 +506,12 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_task_tracker,
         mock_issue_proc,
         mock_article_proc,
-        mock_fix_pub_status,
         mock_website_config,
         mock_publish_article,
         mock_task_sync_issue,
         mock_get_total_status_data,
     ):
+        mock_fix_pub_status = mock_article_proc.fix_publication_status
         mock_get_total_status_data.return_value = {}
         mock_issue_proc.objects.select_related.return_value.get.return_value = (
             MagicMock()
@@ -529,7 +527,6 @@ class TaskPublishIssueArticlesTest(TestCase):
     @patch("proc.tasks.task_sync_issue")
     @patch("proc.tasks.task_publish_article")
     @patch("proc.tasks.WebSiteConfiguration")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.ArticleProc")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.TaskTracker")
@@ -538,12 +535,12 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_task_tracker,
         mock_issue_proc,
         mock_article_proc,
-        mock_fix_pub_status,
         mock_website_config,
         mock_publish_article,
         mock_task_sync_issue,
         mock_get_total_status_data,
     ):
+        mock_fix_pub_status = mock_article_proc.fix_publication_status
         mock_get_total_status_data.return_value = {}
         mock_issue_proc.objects.select_related.return_value.get.return_value = (
             MagicMock()
@@ -574,7 +571,6 @@ class TaskPublishIssueArticlesTest(TestCase):
     @patch("proc.tasks.task_sync_issue")
     @patch("proc.tasks.task_publish_article")
     @patch("proc.tasks.WebSiteConfiguration")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.ArticleProc")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.TaskTracker")
@@ -583,12 +579,12 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_task_tracker,
         mock_issue_proc,
         mock_article_proc,
-        mock_fix_pub_status,
         mock_website_config,
         mock_publish_article,
         mock_task_sync_issue,
         mock_get_total_status_data,
     ):
+        mock_fix_pub_status = mock_article_proc.fix_publication_status
         mock_get_total_status_data.return_value = {}
         mock_issue_proc.objects.select_related.return_value.get.return_value = (
             MagicMock()
@@ -730,7 +726,7 @@ class TaskPublishArticlesTest(TestCase):
 
     @patch("proc.tasks.task_publish_issue_articles")
     @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.Collection")
     def test_happy_path_schedules_publish_per_issue(
         self, mock_collection, mock_fix_pub_status, mock_issue_proc, mock_publish_issue_articles
@@ -768,7 +764,7 @@ class TaskPublishArticlesTest(TestCase):
 
     @patch("proc.tasks.task_publish_issue_articles")
     @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.Collection")
     def test_fix_publication_status_called_per_collection_but_select_items_called_once(
         self, mock_collection, mock_fix_pub_status, mock_issue_proc, mock_publish_issue_articles
@@ -787,7 +783,7 @@ class TaskPublishArticlesTest(TestCase):
     @patch("proc.tasks.UnexpectedEvent")
     @patch("proc.tasks.task_publish_issue_articles")
     @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.Collection")
     def test_exception_path_calls_unexpected_event_create(
         self,
