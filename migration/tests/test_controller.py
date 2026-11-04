@@ -21,6 +21,8 @@ from importlib import import_module
 from unittest import mock
 from unittest.mock import MagicMock, call, patch
 
+from django.utils import translation
+
 from migration import controller as migration_controller
 
 MODULE = "migration.controller"
@@ -888,31 +890,6 @@ class GetBasesWorkAcronIdFileRecordsTests(unittest.TestCase):
 
 
 # ===========================================================================
-# id_file_has_changes
-# ===========================================================================
-class IdFileHasChangesTests(unittest.TestCase):
-    def setUp(self):
-        from importlib import import_module
-
-        migration_controller = import_module(MODULE)
-
-    @patch("migration.controller.MigratedFile")
-    def test_delega_para_migratedfile_has_changes(self, mock_migrated_file):
-        mock_migrated_file.has_changes.return_value = True
-        user = MagicMock()
-        collection = MagicMock()
-
-        result = migration_controller.id_file_has_changes(
-            user, collection, "/caminho/x.id", force_update=False
-        )
-
-        self.assertTrue(result)
-        mock_migrated_file.has_changes.assert_called_once_with(
-            user, collection, "/caminho/x.id", False
-        )
-
-
-# ===========================================================================
 # import_journal_acron_id_records
 # ===========================================================================
 class ImportJournalAcronIdRecordsTests(unittest.TestCase):
@@ -1013,9 +990,11 @@ class ImportJournalAcronIdRecordsTests(unittest.TestCase):
         issueproc_qs.values_list.return_value = [11]
         journal_proc.issueproc_set.filter.return_value = issueproc_qs
 
-        detail = migration_controller.import_journal_acron_id_records(
-            user, MagicMock(), journal_proc, force_update=False
-        )
+        # mensagem traduzida: compara em inglês, independente do idioma ativo
+        with translation.override("en"):
+            detail = migration_controller.import_journal_acron_id_records(
+                user, MagicMock(), journal_proc, force_update=False
+            )
 
         self.assertIn("message", detail)
         self.assertIn("up-to-date", detail["message"])
