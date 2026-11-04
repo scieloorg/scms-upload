@@ -8,7 +8,7 @@ from zlib import crc32
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models, transaction
-from django.db.models import Prefetch, Q, Count
+from django.db.models import Count, F, Prefetch, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -421,19 +421,29 @@ class CollectionPidV2(CommonControlField):
 
     def set_sps_pkg_name(self, raise_error=True):
         """
-        Obtém sps_pkg_name de current_version.xml_with_pre, que é a versão
-        do XML de pid_provider_xml na coleção
+        Obtém sps_pkg_name, para identificação humana, construído a partir
+        de current_version.xml_with_pre, que é a versão do XML de
+        pid_provider_xml na coleção.
+
+        Não usa xml_with_pre.sps_pkg_name, que prioriza o nome do arquivo,
+        que, em XMLVersion, é o pid v3 (chave determinística).
+
+        build_sps_pkg_name depende de vários dados do XML e levanta
+        ValueError na falta deles; neste caso mantém o nome atual
+        (ex.: copiado de SPSPkg), exceto se for o pid v3.
         """
+        if not self.current_version:
+            return
         try:
             self.sps_pkg_name = (
-                self.current_version
-                and self.current_version.xml_with_pre.sps_pkg_name
-            ) or None
+                self.current_version.xml_with_pre.build_sps_pkg_name() or None
+            )
         except Exception as e:
+            if self.sps_pkg_name and self.sps_pkg_name == self.pid_provider_xml.v3:
+                self.sps_pkg_name = None
             if raise_error:
                 raise
             logging.exception(e)
-            self.sps_pkg_name = None
 
     @classmethod
     def get_ids_to_complete_sps_pkg_name(cls, force_update=False):
@@ -442,14 +452,18 @@ class CollectionPidV2(CommonControlField):
         """
         items = cls.objects.filter(current_version__isnull=False)
         if not force_update:
-            items = items.filter(sps_pkg_name__isnull=True)
+            # sem nome ou com o pid v3 no lugar do nome do pacote
+            items = items.filter(
+                Q(sps_pkg_name__isnull=True)
+                | Q(sps_pkg_name=F("pid_provider_xml__v3"))
+            )
         return items.order_by("id").values_list("id", flat=True)
 
     @classmethod
     def complete_sps_pkg_name(cls, user, ids):
         """
         Preenche sps_pkg_name dos registros (ids) a partir de
-        current_version.xml_with_pre.sps_pkg_name
+        current_version.xml_with_pre.build_sps_pkg_name()
 
         A leitura do XML é lenta, por isso é feita por lotes de ids
         (ver task_complete_collection_pid_v2_sps_pkg_name)
