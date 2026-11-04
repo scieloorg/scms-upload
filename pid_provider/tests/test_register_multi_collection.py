@@ -540,8 +540,15 @@ class XMLVersionByCollectionTest(RegisterSameArticleInDifferentCollectionsTestBa
         for item in CollectionPidV2.objects.all():
             with self.subTest(collection=item.collection.acron):
                 self.assertIsNotNone(item.sps_pkg_name)
+                # nome do pacote construído a partir dos dados do XML;
+                # xml_with_pre.sps_pkg_name prioriza o nome do arquivo, que,
+                # em XMLVersion, é o pid v3
                 self.assertEqual(
-                    item.sps_pkg_name, item.current_version.xml_with_pre.sps_pkg_name
+                    item.sps_pkg_name,
+                    item.current_version.xml_with_pre.build_sps_pkg_name(),
+                )
+                self.assertNotEqual(
+                    item.sps_pkg_name, item.pid_provider_xml.v3
                 )
 
     def test_complete_sps_pkg_name(self):
