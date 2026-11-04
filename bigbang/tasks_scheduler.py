@@ -211,6 +211,8 @@ def _schedule_migrate_and_publish_journals(username, enabled):
             journal_acron=None,
             force_update=False,
             status=[],
+            # valid_status não tem efeito: é apenas um lembrete dos valores
+            # aceitos em status (ex.: status=["BLOCKED"] reprocessa os bloqueados)
             valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_import_acron_id_file=False,
             force_core_sync=False,
@@ -240,6 +242,8 @@ def _schedule_migrate_and_publish_issues(username, enabled):
             publication_year=None,
             issue_folder=None,
             status=[],
+            # valid_status não tem efeito: é apenas um lembrete dos valores
+            # aceitos em status (ex.: status=["BLOCKED"] reprocessa os bloqueados)
             valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
         ),
@@ -264,6 +268,8 @@ def _schedule_migrate_and_publish_articles(username, enabled):
             publication_year=None,
             issue_folder=None,
             status=[],
+            # valid_status não tem efeito: é apenas um lembrete dos valores
+            # aceitos em status (ex.: status=["BLOCKED"] reprocessa os bloqueados)
             valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
             force_import_acron_id_file=False,
