@@ -52,8 +52,12 @@ def create_or_update_journal(
     try:
         journal_proc_event = journal_proc.start(user, "create_or_update_journal")
         collection = journal_proc.collection
-        journal_data = journal_proc.migrated_data.data
 
+        migrated_data = journal_proc.migrated_data
+        if not migrated_data:
+            raise ValueError(f"Missing migrated_data for {journal_proc}")
+
+        journal_data = migrated_data.data
         # obtém classic website journal
         classic_website_journal = classic_ws.Journal(journal_data)
 
@@ -860,7 +864,3 @@ def get_bases_work_acron_id_file_records(
                 item_pid=doc_id or issue_id,
                 exception=str(e)
             )
-
-
-def id_file_has_changes(user, collection, id_path, force_update):
-    return MigratedFile.has_changes(user, collection, id_path, force_update)
