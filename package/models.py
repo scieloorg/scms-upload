@@ -561,24 +561,29 @@ class SPSPkg(CommonControlField, ClusterableModel):
         raise SPSPkgMultipleObjectReturnedException(data)
 
     @classmethod
-    def get(
-        cls,
-        collection_pid_v2,
-        sps_pkg_name=None,
-        pkg_name_list=None,
-    ):
+    def get(cls, collection_pid_v2):
         """
-        Obtém o pacote do documento na coleção ou, na falta, o pacote ainda
-        não vinculado (sem collection_pid_v2) de mesmo nome
+        Obtém o pacote do documento na coleção (chave determinística)
+
+        Para busca pelo nome do pacote, que serve à identificação humana,
+        usar get_unlinked_by_sps_pkg_name.
         """
-        if collection_pid_v2:
-            try:
-                return cls.objects.get(collection_pid_v2=collection_pid_v2)
-            except cls.DoesNotExist:
-                pass
+        if not collection_pid_v2:
+            raise cls.DoesNotExist("SPSPkg.get requires collection_pid_v2")
+        return cls.objects.get(collection_pid_v2=collection_pid_v2)
+
+    @classmethod
+    def get_unlinked_by_sps_pkg_name(cls, sps_pkg_name):
+        """
+        Obtém, pelo nome, o pacote ainda não vinculado a um documento na
+        coleção (sem collection_pid_v2), ex.: pacotes legados
+        """
+        if not sps_pkg_name:
+            raise cls.DoesNotExist(
+                "SPSPkg.get_unlinked_by_sps_pkg_name requires sps_pkg_name"
+            )
         return cls.search_by_identifiers(
             sps_pkg_name=sps_pkg_name,
-            pkg_name_list=None,
             queryset=cls.objects.filter(collection_pid_v2__isnull=True),
         )
 
@@ -611,13 +616,17 @@ class SPSPkg(CommonControlField, ClusterableModel):
         current_sps_pkg=None,
     ):
         try:
-            obj = cls.get(collection_pid_v2, sps_pkg_name, pkg_name_list)
+            obj = cls.get(collection_pid_v2)
         except cls.DoesNotExist:
-            if cls.is_reusable(current_sps_pkg, collection_pid_v2):
-                obj = current_sps_pkg
-            else:
-                obj = cls()
-                obj.creator = user
+            try:
+                # pacote legado, ainda não vinculado ao documento na coleção
+                obj = cls.get_unlinked_by_sps_pkg_name(sps_pkg_name)
+            except cls.DoesNotExist:
+                if cls.is_reusable(current_sps_pkg, collection_pid_v2):
+                    obj = current_sps_pkg
+                else:
+                    obj = cls()
+                    obj.creator = user
 
         # update
         obj.collection_pid_v2 = collection_pid_v2 or obj.collection_pid_v2
@@ -625,6 +634,15 @@ class SPSPkg(CommonControlField, ClusterableModel):
         obj.registered_in_core = registered_in_core
         obj.updated_by = user
         obj.save()
+
+        # mantém o nome (identificação humana) igual ao do pacote
+        if (
+            obj.collection_pid_v2
+            and sps_pkg_name
+            and obj.collection_pid_v2.sps_pkg_name != sps_pkg_name
+        ):
+            obj.collection_pid_v2.sps_pkg_name = sps_pkg_name
+            obj.collection_pid_v2.save(update_fields=["sps_pkg_name"])
         return obj
 
     @classmethod
