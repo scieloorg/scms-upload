@@ -6,7 +6,7 @@ task_migrate_and_publish_journals_by_collection, task_migrate_and_publish_journa
 task_publish_journals e task_publish_journal.
 
 Toda a camada de persistência (TaskTracker, Collection, JournalProc,
-UnexpectedEvent, migration_controller, get_api_data, fix_publication_status)
+UnexpectedEvent, migration_controller, get_api_data, JournalProc.fix_publication_status)
 é mockada, já que o objetivo é validar a lógica de orquestração das tasks
 (o que é agendado, com quais kwargs, e como exceções são capturadas) e não
 o comportamento real dos modelos. Chamadas ``.delay``/``.apply_async`` para
@@ -19,6 +19,7 @@ from unittest.mock import DEFAULT, MagicMock, patch
 from django.test import TestCase
 
 import proc.tasks as tasks
+from proc.models import BaseProc
 
 
 def _queryset(items):
@@ -119,21 +120,19 @@ class TaskMigrateAndPublishJournalsTest(TestCase):
 
 
 class TaskMigrateAndPublishJournalsByCollectionTest(TestCase):
-    """Testa task_migrate_and_publish_journals_by_collection: migração de periódicos
-    de uma coleção a partir do site clássico (ou da core, se force_core_sync) e o
-    agendamento de task_publish_journal para QA e/ou PUBLIC."""
+    """Testa task_migrate_and_publish_journals_by_collection: registra os dados
+    do site clássico, seleciona separadamente os JournalProc a migrar e a
+    publicar e agenda task_migrate_and_publish_journal para cada um."""
 
     def setUp(self):
         patcher = patch.multiple(
             "proc.tasks",
             TaskTracker=DEFAULT,
             Collection=DEFAULT,
-            JournalProc=DEFAULT,
             get_api_data=DEFAULT,
-            fix_publication_status=DEFAULT,
             migration_controller=DEFAULT,
             create_or_update_migrated_journal=DEFAULT,
-            fetch_and_create_journal=DEFAULT,
+            JournalProc=DEFAULT,
             UnexpectedEvent=DEFAULT,
         )
         self.mocks = patcher.start()
@@ -148,10 +147,9 @@ class TaskMigrateAndPublishJournalsByCollectionTest(TestCase):
         self.mock_collection = MagicMock(acron="scl")
         self.mocks["Collection"].objects.get.return_value = self.mock_collection
         self.mocks["migration_controller"].get_classic_website.return_value = MagicMock()
+        self.mocks["JournalProc"].select_items_to_process.return_value = set()
 
     def test_nothing_to_process_finishes_early_without_scheduling(self):
-        self.mocks["JournalProc"].objects.filter.return_value = _queryset([])
-
         tasks.task_migrate_and_publish_journals_by_collection(collection_acron="scl")
 
         self.mock_apply_async.assert_not_called()
@@ -161,120 +159,96 @@ class TaskMigrateAndPublishJournalsByCollectionTest(TestCase):
         self.assertEqual(task_tracker_mock.total_to_process, 0)
         task_tracker_mock.finish.assert_called_once()
 
-    def test_journal_acron_filter_is_applied_to_journalproc_query(self):
-        self.mocks["JournalProc"].objects.filter.return_value = _queryset([])
-
+    def test_journal_acron_filter_and_status_are_used_in_selection(self):
         tasks.task_migrate_and_publish_journals_by_collection(
             collection_acron="scl", journal_acron="rbt"
         )
 
-        _, kwargs = self.mocks["JournalProc"].objects.filter.call_args
-        self.assertEqual(kwargs.get("acron"), "rbt")
-        self.assertEqual(kwargs.get("collection"), self.mock_collection)
-
-    def test_happy_path_schedules_migrate_and_publish_journal_for_each_item(self):
-        journal_proc = MagicMock(id=42)
-        self.mocks["JournalProc"].objects.filter.return_value = _queryset(
-            [journal_proc]
+        self.mocks["JournalProc"].select_items_to_process.assert_called_once_with(
+            self.mock_collection,
+            ["REPROC", "TODO"],
+            params={"acron": "rbt"},
+            include_core_sync_demand=True,
         )
-        self.mocks["get_api_data"].side_effect = [
-            {"url": "qa"},
-            {"url": "public"},
-        ]
 
+    def test_explicit_status_is_used_in_selection(self):
         tasks.task_migrate_and_publish_journals_by_collection(
-            user_id=None,
-            username=None,
-            collection_acron="scl",
-            force_update=False,
+            collection_acron="scl", status=["BLOCKED"]
         )
 
-        self.mock_apply_async.assert_called_once_with(
-            kwargs=dict(
+        # com status explícito, a demanda de sincronização não é incluída
+        self.mocks["JournalProc"].select_items_to_process.assert_called_once_with(
+            self.mock_collection,
+            ["BLOCKED"],
+            params={},
+            include_core_sync_demand=False,
+        )
+
+    def test_collection_without_classic_website_skips_classic_reading(self):
+        self.mocks["migration_controller"].get_classic_website.return_value = None
+
+        tasks.task_migrate_and_publish_journals_by_collection(collection_acron="scl")
+
+        self.mocks["create_or_update_migrated_journal"].assert_not_called()
+        self.mocks["JournalProc"].select_items_to_process.assert_called_once()
+
+    def test_force_update_forces_reading_title_records(self):
+        tasks.task_migrate_and_publish_journals_by_collection(
+            collection_acron="scl", force_update=True
+        )
+        args, _ = self.mocks["create_or_update_migrated_journal"].call_args
+        self.assertTrue(args[3])
+
+    def test_schedules_each_selected_item(self):
+        self.mocks["JournalProc"].select_items_to_process.return_value = {3, 1, 2}
+        self.mocks["get_api_data"].side_effect = [{"url": "qa"}, {"url": "public"}]
+
+        tasks.task_migrate_and_publish_journals_by_collection(collection_acron="scl")
+
+        self.assertEqual(self.mock_apply_async.call_count, 3)
+        scheduled = [
+            c.kwargs["kwargs"] for c in self.mock_apply_async.call_args_list
+        ]
+        self.assertEqual([k["journal_proc_id"] for k in scheduled], [1, 2, 3])
+        # a decisão de migrar/publicar é tomada por item, na execução
+        self.assertEqual(
+            scheduled[2],
+            dict(
                 user_id=None,
                 username=None,
-                journal_proc_id=42,
+                journal_proc_id=3,
                 force_update=False,
                 force_core_sync=False,
                 collection_acron="scl",
                 qa_api_data={"url": "qa"},
                 public_api_data={"url": "public"},
-            )
+                status=["REPROC", "TODO"],
+            ),
         )
         task_tracker_mock = self.mocks["TaskTracker"].create.return_value
-        self.assertEqual(task_tracker_mock.total_processed, 1)
-        task_tracker_mock.finish.assert_called_once()
+        self.assertEqual(task_tracker_mock.total_processed, 3)
 
-    def test_api_data_is_forwarded_to_child_task_without_filtering(self):
-        # a filtragem por "error"/valores falsy passou a ser responsabilidade de
-        # task_migrate_and_publish_journal; by_collection apenas repassa o que
-        # get_api_data devolveu.
-        journal_proc = MagicMock(id=1)
-        self.mocks["JournalProc"].objects.filter.return_value = _queryset(
-            [journal_proc]
-        )
-        self.mocks["get_api_data"].side_effect = [{"error": "unreachable"}, {}]
-
-        tasks.task_migrate_and_publish_journals_by_collection(collection_acron="scl")
-
-        self.mock_apply_async.assert_called_once_with(
-            kwargs=dict(
-                user_id=None,
-                username=None,
-                journal_proc_id=1,
-                force_update=False,
-                force_core_sync=False,
-                collection_acron="scl",
-                qa_api_data={"error": "unreachable"},
-                public_api_data={},
-            )
-        )
-
-    def test_force_core_sync_flag_is_forwarded_to_child_task(self):
-        journal_proc = MagicMock(id=7)
-        self.mocks["JournalProc"].objects.filter.return_value = _queryset(
-            [journal_proc]
-        )
-        self.mocks["get_api_data"].side_effect = [None, None]
+    def test_force_core_sync_schedules_all_journals(self):
+        self.mocks["JournalProc"].objects.filter.return_value.values_list.return_value = [5, 4]
 
         tasks.task_migrate_and_publish_journals_by_collection(
-            user_id=None,
-            username=None,
-            collection_acron="scl",
-            force_core_sync=True,
+            collection_acron="scl", force_core_sync=True
         )
 
-        # fetch_and_create_journal só é chamado dentro de
-        # task_migrate_and_publish_journal (aqui mockada via apply_async).
-        self.mocks["fetch_and_create_journal"].assert_not_called()
-        self.mock_apply_async.assert_called_once_with(
-            kwargs=dict(
-                user_id=None,
-                username=None,
-                journal_proc_id=7,
-                force_update=False,
-                force_core_sync=True,
-                collection_acron="scl",
-                qa_api_data=None,
-                public_api_data=None,
-            )
-        )
+        self.mocks["JournalProc"].select_items_to_process.assert_not_called()
+        ids = [
+            c.kwargs["kwargs"]["journal_proc_id"]
+            for c in self.mock_apply_async.call_args_list
+        ]
+        self.assertEqual(ids, [4, 5])
 
     def test_apply_async_exception_aborts_processing_and_records_exception(self):
-        item1 = MagicMock(id=1)
-        item2 = MagicMock(id=2)
-        self.mocks["JournalProc"].objects.filter.return_value = _queryset(
-            [item1, item2]
-        )
-        self.mocks["get_api_data"].side_effect = [None, None]
+        self.mocks["JournalProc"].select_items_to_process.return_value = {1, 2}
         self.mock_apply_async.side_effect = Exception("broker down")
 
         tasks.task_migrate_and_publish_journals_by_collection(collection_acron="scl")
 
-        # a exceção ao agendar o primeiro item propaga para o try/except externo
-        # da função, então o segundo item nunca chega a ser agendado.
         self.assertEqual(self.mock_apply_async.call_count, 1)
-
         task_tracker_mock = self.mocks["TaskTracker"].create.return_value
         task_tracker_mock.finish.assert_called_once()
         _, kwargs = task_tracker_mock.finish.call_args
@@ -295,85 +269,163 @@ class TaskMigrateAndPublishJournalsByCollectionTest(TestCase):
         self.assertIsInstance(kwargs["exception"], Exception)
 
 
+def _journal_proc_mock(
+    migration_status="DONE", qa_ws_status="TODO", public_ws_status="TODO", **kwargs
+):
+    kwargs.setdefault("needs_core_sync", False)
+    journal_proc = MagicMock(
+        migration_status=migration_status,
+        qa_ws_status=qa_ws_status,
+        public_ws_status=public_ws_status,
+        **kwargs,
+    )
+
+    def publish(user, api_publish_callable, website_kind=None, **kw):
+        # simula publicação bem-sucedida, como BaseProc.publish
+        if website_kind == "QA":
+            journal_proc.qa_ws_status = "DONE"
+        else:
+            journal_proc.public_ws_status = "DONE"
+        return {"completed": True}
+
+    journal_proc.publish.side_effect = publish
+
+    def migrate(*args, **kw):
+        # simula migração bem-sucedida
+        journal_proc.migration_status = "DONE"
+
+    journal_proc.create_or_update_item.side_effect = migrate
+    # usa a lógica real de publicação em sequência (QA, depois PUBLIC)
+    journal_proc.publish_on_websites.side_effect = (
+        lambda *args, **kw: BaseProc.publish_on_websites(journal_proc, *args, **kw)
+    )
+    return journal_proc
+
+
 class TaskMigrateAndPublishJournalTest(TestCase):
-    """Testa task_migrate_and_publish_journal: migra um único JournalProc (a partir
-    do site clássico, ou da core se force_core_sync) e agenda task_publish_journal
-    para QA e/ou PUBLIC conforme os dados de API recebidos de by_collection."""
+    """Testa task_migrate_and_publish_journal: migra um único JournalProc (site
+    clássico ou core) e publica em sequência no QA e no PUBLIC."""
 
-    @patch("proc.tasks.task_publish_journal.apply_async")
-    @patch("proc.tasks.migration_controller")
-    @patch("proc.tasks.JournalProc")
-    def test_happy_path_schedules_qa_and_public_publish(
-        self, mock_journal_proc_cls, mock_migration_controller, mock_apply_async
-    ):
-        journal_proc = MagicMock(id=42)
-        mock_journal_proc_cls.objects.get.return_value = journal_proc
+    def setUp(self):
+        patcher = patch.multiple(
+            "proc.tasks",
+            JournalProc=DEFAULT,
+            migration_controller=DEFAULT,
+            fetch_and_create_journal=DEFAULT,
+            UnexpectedEvent=DEFAULT,
+        )
+        self.mocks = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.mocks["JournalProc"].get_status_to_publish.side_effect = (
+            BaseProc.get_status_to_publish
+        )
 
-        tasks.task_migrate_and_publish_journal(
-            user_id=None,
-            username=None,
-            journal_proc_id=42,
-            force_update=False,
-            force_core_sync=False,
+    def _run(self, journal_proc, **kwargs):
+        self.mocks["JournalProc"].objects.get.return_value = journal_proc
+        params = dict(
+            journal_proc_id=1,
             collection_acron="scl",
             qa_api_data={"url": "qa"},
             public_api_data={"url": "public"},
         )
+        params.update(kwargs)
+        return tasks.task_migrate_and_publish_journal(**params)
 
+    def test_migrates_from_classic_website_and_publishes_qa_then_public(self):
+        journal_proc = _journal_proc_mock(migration_status="TODO")
+
+        result = self._run(journal_proc)
+
+        self.assertTrue(result)
         journal_proc.create_or_update_item.assert_called_once_with(
-            None, False, mock_migration_controller.create_or_update_journal
+            None, False, self.mocks["migration_controller"].create_or_update_journal
         )
-        self.assertEqual(mock_apply_async.call_count, 2)
-        mock_apply_async.assert_any_call(
-            kwargs=dict(
-                user_id=None,
-                username=None,
-                website_kind="QA",
-                journal_proc_id=42,
-                api_data={"url": "qa"},
-                force_update=False,
-            )
-        )
-        mock_apply_async.assert_any_call(
-            kwargs=dict(
-                user_id=None,
-                username=None,
-                website_kind="PUBLIC",
-                journal_proc_id=42,
-                api_data={"url": "public"},
-                force_update=False,
-            )
-        )
-        journal_proc.start.return_value.finish.assert_called_once_with(
-            None,
-            completed=True,
-            detail={
-                "journal_data_source": "classic website data",
-                "task_publish_journal_on_qa_website": "scheduled",
-                "task_publish_journal_on_public_website": "scheduled",
-            },
+        self.mocks["fetch_and_create_journal"].assert_not_called()
+        kinds = [c.kwargs["website_kind"] for c in journal_proc.publish.call_args_list]
+        self.assertEqual(kinds, ["QA", "PUBLIC"])
+        _, kwargs = journal_proc.start.return_value.finish.call_args
+        self.assertTrue(kwargs["completed"])
+        self.assertEqual(
+            kwargs["detail"]["journal_data_source"], "classic website data"
         )
 
-    @patch("proc.tasks.task_publish_journal.apply_async")
-    @patch("proc.tasks.fetch_and_create_journal")
-    @patch("proc.tasks.JournalProc")
-    def test_force_core_sync_uses_fetch_and_create_journal(
-        self, mock_journal_proc_cls, mock_fetch, mock_apply_async
-    ):
-        journal_proc = MagicMock(
-            id=7, issn_electronic="1111-2222", issn_print="3333-4444"
-        )
-        mock_journal_proc_cls.objects.get.return_value = journal_proc
+    def test_migrated_journal_is_only_published(self):
+        journal_proc = _journal_proc_mock(qa_ws_status="REPROC", public_ws_status="DONE")
 
-        tasks.task_migrate_and_publish_journal(
-            user_id=None,
-            username=None,
-            journal_proc_id=7,
-            force_core_sync=True,
-            collection_acron="scl",
+        result = self._run(journal_proc)
+
+        self.assertTrue(result)
+        journal_proc.create_or_update_item.assert_not_called()
+        self.mocks["fetch_and_create_journal"].assert_not_called()
+        kinds = [c.kwargs["website_kind"] for c in journal_proc.publish.call_args_list]
+        # PUBLIC já está DONE e QA não altera public_ws_status neste mock
+        self.assertEqual(kinds, ["QA"])
+
+    def test_public_is_not_published_if_qa_fails(self):
+        journal_proc = _journal_proc_mock()
+        journal_proc.publish.side_effect = lambda *a, **kw: {"completed": False}
+
+        result = self._run(journal_proc)
+
+        self.assertFalse(result)
+        kinds = [c.kwargs["website_kind"] for c in journal_proc.publish.call_args_list]
+        self.assertEqual(kinds, ["QA"])
+        _, kwargs = journal_proc.start.return_value.finish.call_args
+        self.assertFalse(kwargs["completed"])
+        self.assertEqual(
+            kwargs["detail"]["publication"]["PUBLIC"], {"skipped": "qa_ws_status=TODO"}
         )
 
-        mock_fetch.assert_called_once_with(
+    def test_public_is_published_if_qa_is_ignored(self):
+        journal_proc = _journal_proc_mock(qa_ws_status="IGNORED")
+
+        self._run(journal_proc)
+
+        kinds = [c.kwargs["website_kind"] for c in journal_proc.publish.call_args_list]
+        self.assertEqual(kinds, ["PUBLIC"])
+
+    def test_does_not_publish_when_status_does_not_require(self):
+        journal_proc = _journal_proc_mock(qa_ws_status="DONE", public_ws_status="DONE")
+
+        result = self._run(journal_proc)
+
+        self.assertTrue(result)
+        journal_proc.publish.assert_not_called()
+
+    def test_force_update_republishes_done(self):
+        journal_proc = _journal_proc_mock(qa_ws_status="DONE", public_ws_status="DONE")
+
+        self._run(journal_proc, force_update=True)
+
+        kinds = [c.kwargs["website_kind"] for c in journal_proc.publish.call_args_list]
+        self.assertEqual(kinds, ["QA", "PUBLIC"])
+
+    def test_does_not_publish_when_migration_is_not_done(self):
+        journal_proc = _journal_proc_mock(migration_status="BLOCKED")
+
+        result = self._run(journal_proc)
+
+        self.assertFalse(result)
+        journal_proc.publish.assert_not_called()
+        _, kwargs = journal_proc.start.return_value.finish.call_args
+        self.assertFalse(kwargs["completed"])
+        self.assertEqual(kwargs["detail"]["migration_status"], "BLOCKED")
+
+    def test_missing_api_data_skips_website(self):
+        journal_proc = _journal_proc_mock()
+
+        self._run(journal_proc, qa_api_data={"error": "unreachable"}, public_api_data=None)
+
+        journal_proc.publish.assert_not_called()
+
+    def test_force_core_sync_uses_fetch_and_create_journal(self):
+        journal_proc = _journal_proc_mock(
+            issn_electronic="1111-2222", issn_print="3333-4444"
+        )
+
+        self._run(journal_proc, force_core_sync=True)
+
+        self.mocks["fetch_and_create_journal"].assert_called_once_with(
             None,
             collection_acron="scl",
             issn_electronic="1111-2222",
@@ -381,56 +433,139 @@ class TaskMigrateAndPublishJournalTest(TestCase):
             force_update=True,
         )
         journal_proc.create_or_update_item.assert_not_called()
-        journal_proc.start.return_value.finish.assert_called_once_with(
-            None,
-            completed=True,
-            detail={"journal_data_source": "core data"},
+        _, kwargs = journal_proc.start.return_value.finish.call_args
+        self.assertEqual(kwargs["detail"]["journal_data_source"], "core data")
+
+    def test_status_blocked_migrates_and_publishes_in_same_execution(self):
+        # migração bem-sucedida deixa qa_ws_status=TODO, que não está em
+        # status=["BLOCKED"], mas deve ser publicado na mesma execução
+        journal_proc = _journal_proc_mock(
+            migration_status="BLOCKED", qa_ws_status="DONE", public_ws_status="DONE"
         )
 
-    @patch("proc.tasks.task_publish_journal.apply_async")
-    @patch("proc.tasks.migration_controller")
-    @patch("proc.tasks.JournalProc")
-    def test_qa_api_data_with_error_skips_qa_but_schedules_public(
-        self, mock_journal_proc_cls, mock_migration_controller, mock_apply_async
-    ):
-        journal_proc = MagicMock(id=1)
-        mock_journal_proc_cls.objects.get.return_value = journal_proc
+        def migrate(*args, **kwargs):
+            journal_proc.migration_status = "DONE"
+            journal_proc.qa_ws_status = "TODO"
+            journal_proc.public_ws_status = "TODO"
 
-        tasks.task_migrate_and_publish_journal(
-            journal_proc_id=1,
-            qa_api_data={"error": "unreachable"},
-            public_api_data={"url": "public"},
+        journal_proc.create_or_update_item.side_effect = migrate
+
+        result = self._run(journal_proc, status=["BLOCKED"])
+
+        self.assertTrue(result)
+        kinds = [c.kwargs["website_kind"] for c in journal_proc.publish.call_args_list]
+        self.assertEqual(kinds, ["QA", "PUBLIC"])
+
+    def test_status_blocked_does_not_republish_done(self):
+        journal_proc = _journal_proc_mock(
+            migration_status="DONE", qa_ws_status="BLOCKED", public_ws_status="DONE"
         )
 
-        self.assertEqual(mock_apply_async.call_count, 1)
-        called_kwargs = mock_apply_async.call_args.kwargs["kwargs"]
-        self.assertEqual(called_kwargs["website_kind"], "PUBLIC")
+        self._run(journal_proc, status=["BLOCKED"])
 
-    @patch("proc.tasks.task_publish_journal.apply_async")
-    @patch("proc.tasks.migration_controller")
-    @patch("proc.tasks.JournalProc")
-    def test_falsy_api_data_skips_both_websites(
-        self, mock_journal_proc_cls, mock_migration_controller, mock_apply_async
-    ):
-        journal_proc = MagicMock(id=1)
-        mock_journal_proc_cls.objects.get.return_value = journal_proc
+        kinds = [c.kwargs["website_kind"] for c in journal_proc.publish.call_args_list]
+        # QA bloqueado é republicado; PUBLIC (DONE) só porque QA o marca TODO
+        # em BaseProc.publish, o que este mock não simula
+        self.assertEqual(kinds, ["QA"])
 
-        tasks.task_migrate_and_publish_journal(
-            journal_proc_id=1, qa_api_data=None, public_api_data={}
+    def test_journal_whose_status_changed_after_selection_is_not_migrated(self):
+        # selecionado como TODO, mas já migrado (DONE) quando a tarefa executa
+        journal_proc = _journal_proc_mock(qa_ws_status="DONE", public_ws_status="DONE")
+
+        result = self._run(journal_proc)
+
+        self.assertTrue(result)
+        journal_proc.create_or_update_item.assert_not_called()
+        journal_proc.publish.assert_not_called()
+
+    def test_core_sync_demand_with_classic_data_migrates_from_classic(self):
+        # por ora os dados do site clássico são os mais atuais
+        journal_proc = _journal_proc_mock(
+            needs_core_sync=True, issn_electronic="1111-2222", issn_print=None
         )
 
-        mock_apply_async.assert_not_called()
+        self._run(journal_proc)
 
-    @patch("proc.tasks.migration_controller")
-    @patch("proc.tasks.JournalProc")
-    def test_exception_during_migration_is_captured_via_event_finish(
-        self, mock_journal_proc_cls, mock_migration_controller
-    ):
-        journal_proc = MagicMock(id=5)
+        journal_proc.create_or_update_item.assert_called_once()
+        self.mocks["fetch_and_create_journal"].assert_not_called()
+
+    def test_core_sync_demand_without_classic_data_fetches_core(self):
+        journal_proc = _journal_proc_mock(
+            needs_core_sync=True,
+            migrated_data=None,
+            issn_electronic="1111-2222",
+            issn_print=None,
+        )
+
+        def fetched(*args, **kwargs):
+            journal_proc.needs_core_sync = False
+
+        self.mocks["fetch_and_create_journal"].side_effect = fetched
+
+        result = self._run(journal_proc)
+
+        self.assertTrue(result)
+        self.mocks["fetch_and_create_journal"].assert_called_once()
+        self.assertEqual(journal_proc.migration_status, "DONE")
+
+    def test_journal_still_not_synchronized_after_core_fetch_becomes_blocked(self):
+        journal_proc = _journal_proc_mock(
+            needs_core_sync=True,
+            migrated_data=None,
+            issn_electronic="1111-2222",
+            issn_print=None,
+        )
+
+        result = self._run(journal_proc)
+
+        self.assertFalse(result)
+        self.assertEqual(journal_proc.migration_status, "BLOCKED")
+        journal_proc.publish.assert_not_called()
+
+    def test_without_classic_website_data_and_issn_does_not_fetch_core(self):
+        # sem ISSN, fetch_and_create_journal buscaria todos os periódicos da coleção
+        journal_proc = _journal_proc_mock(
+            migration_status="TODO",
+            migrated_data=None,
+            issn_electronic=None,
+            issn_print=None,
+        )
+
+        result = self._run(journal_proc)
+
+        self.assertFalse(result)
+        self.mocks["fetch_and_create_journal"].assert_not_called()
+        journal_proc.create_or_update_item.assert_not_called()
+        self.assertEqual(journal_proc.migration_status, "PENDING")
+        journal_proc.save.assert_called_once()
+        journal_proc.publish.assert_not_called()
+
+    def test_force_core_sync_without_issn_migrates_from_classic_website(self):
+        journal_proc = _journal_proc_mock(issn_electronic=None, issn_print=None)
+
+        self._run(journal_proc, force_core_sync=True)
+
+        self.mocks["fetch_and_create_journal"].assert_not_called()
+        journal_proc.create_or_update_item.assert_called_once()
+
+    def test_journal_without_classic_website_data_is_migrated_from_core(self):
+        journal_proc = _journal_proc_mock(
+            migration_status="TODO",
+            migrated_data=None,
+            issn_electronic="1111-2222",
+            issn_print=None,
+        )
+
+        self._run(journal_proc)
+
+        self.mocks["fetch_and_create_journal"].assert_called_once()
+        journal_proc.create_or_update_item.assert_not_called()
+
+    def test_exception_during_migration_is_captured_via_event_finish(self):
+        journal_proc = _journal_proc_mock(migration_status="TODO")
         journal_proc.create_or_update_item.side_effect = Exception("boom")
-        mock_journal_proc_cls.objects.get.return_value = journal_proc
 
-        result = tasks.task_migrate_and_publish_journal(journal_proc_id=5)
+        result = self._run(journal_proc)
 
         self.assertFalse(result)
         finish_mock = journal_proc.start.return_value.finish
@@ -440,20 +575,14 @@ class TaskMigrateAndPublishJournalTest(TestCase):
         self.assertFalse(kwargs["completed"])
         self.assertIsInstance(kwargs["exception"], Exception)
 
-    @patch("proc.tasks.UnexpectedEvent")
-    @patch("proc.tasks.JournalProc")
-    def test_exception_before_event_exists_falls_back_to_unexpected_event(
-        self, mock_journal_proc_cls, mock_unexpected_event
-    ):
-        # JournalProc.objects.get falha ANTES de "event" ser atribuído: cai no
-        # branch de UnexpectedEvent.create em vez de event.finish(...).
-        mock_journal_proc_cls.objects.get.side_effect = Exception("db down")
+    def test_exception_before_event_exists_falls_back_to_unexpected_event(self):
+        self.mocks["JournalProc"].objects.get.side_effect = Exception("db down")
 
         result = tasks.task_migrate_and_publish_journal(journal_proc_id=99)
 
         self.assertFalse(result)
-        mock_unexpected_event.create.assert_called_once()
-        _, kwargs = mock_unexpected_event.create.call_args
+        self.mocks["UnexpectedEvent"].create.assert_called_once()
+        _, kwargs = self.mocks["UnexpectedEvent"].create.call_args
         self.assertEqual(kwargs["item"], "99")
         self.assertEqual(
             kwargs["action"], "proc.tasks.task_migrate_and_publish_journal"
@@ -471,7 +600,6 @@ class TaskPublishJournalsTest(TestCase):
             TaskTracker=DEFAULT,
             JournalProc=DEFAULT,
             get_api_data=DEFAULT,
-            fix_publication_status=DEFAULT,
             UnexpectedEvent=DEFAULT,
             _get_collections=DEFAULT,
         )
