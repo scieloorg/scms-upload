@@ -15,7 +15,7 @@ def _filter_articles(
     publication_year=None,
     force_update=False,
 ):
-    qs = Article.objects.filter(sps_pkg__isnull=False)
+    qs = Article.objects.filter(collection_pid_v2__sps_pkg__isnull=False)
     if collection_acron:
         qs = qs.filter(
             pk__in=Article.objects.filter(
@@ -23,7 +23,7 @@ def _filter_articles(
             ).values("pk")
         )
     if journal_acron:
-        qs = qs.filter(journal__journal_acron=journal_acron)
+        qs = Article.filter_by_journal_acron(qs, journal_acron)
     if publication_year:
         qs = qs.filter(issue__publication_year=publication_year)
     if not force_update:

@@ -5,7 +5,12 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from collection.models import Collection
-from migration.models import IdFileRecord, JournalAcronIdFile, MigratedData
+from migration.models import (
+    IdFileRecord,
+    JournalAcronIdFile,
+    MigratedArticle,
+    MigratedData,
+)
 
 
 class MigratedDataCreateOrUpdateTestCase(unittest.TestCase):
@@ -125,3 +130,41 @@ class JournalAcronIdFileDataTests(TestCase):
         self.assertEqual(data["stats"]["total_id_file_records"], 2)
         self.assertEqual(data["stats"]["total_id_file_records_to_migrate"], 1)
         self.assertEqual(data["stats"]["total_issues"], 2)
+
+
+class MigratedArticleValidPidTestCase(unittest.TestCase):
+    """Test cases for MigratedArticle.valid_pid() class method.
+
+    A PID é válido se, e somente se, tem exatamente 23 caracteres e existe
+    um registro MigratedArticle correspondente no banco de dados.
+    """
+
+    PID_23 = "S0034-77442021000600036"  # exatamente 23 caracteres
+
+    @patch("migration.models.MigratedArticle.objects")
+    def test_valid_pid_length_23_exists_in_db(self, mock_objects):
+        """Returns True when pid has 23 chars and exists in DB."""
+        mock_objects.filter.return_value.exists.return_value = True
+        self.assertTrue(MigratedArticle.valid_pid(self.PID_23))
+
+    @patch("migration.models.MigratedArticle.objects")
+    def test_invalid_pid_not_in_db(self, mock_objects):
+        """Returns False when pid has 23 chars but does not exist in DB."""
+        mock_objects.filter.return_value.exists.return_value = False
+        self.assertFalse(MigratedArticle.valid_pid(self.PID_23))
+
+    def test_invalid_when_pid_is_none(self):
+        """Returns False when pid is None (falsy)."""
+        self.assertFalse(MigratedArticle.valid_pid(None))
+
+    def test_invalid_when_pid_is_empty(self):
+        """Returns False when pid is empty string (falsy)."""
+        self.assertFalse(MigratedArticle.valid_pid(""))
+
+    def test_invalid_when_pid_too_short(self):
+        """Returns False when pid has fewer than 23 chars."""
+        self.assertFalse(MigratedArticle.valid_pid(self.PID_23[:-1]))  # 22 chars
+
+    def test_invalid_when_pid_too_long(self):
+        """Returns False when pid has more than 23 chars."""
+        self.assertFalse(MigratedArticle.valid_pid(self.PID_23 + "0"))  # 24 chars

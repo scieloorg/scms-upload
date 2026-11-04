@@ -5,6 +5,7 @@ from django.test import TestCase
 from article import choices, tasks
 from article.models import Article
 from article.tests.data_availability_fixtures import ReportDataMixin, make_xmltree
+from article.tests.utils import link_sps_pkg
 from package.models import SPSPkg
 
 
@@ -14,10 +15,7 @@ class TaskUpdateDataAvailabilityStatusTest(ReportDataMixin, TestCase):
         super().setUpTestData()
         # tarefa só considera artigos com sps_pkg
         for i, article in enumerate(cls.articles):
-            article.sps_pkg = SPSPkg.objects.create(
-                creator=cls.user, sps_pkg_name=f"pkg-{i}"
-            )
-            article.save()
+            link_sps_pkg(cls.user, article, f"pkg-{i}")
         cls.not_processed = cls.articles[3]
 
     def _ids(self, mock_subtask):
@@ -64,7 +62,9 @@ class TaskUpdateDataAvailabilityStatusTest(ReportDataMixin, TestCase):
 
     @patch("article.tasks.task_update_data_availability_status_for_articles")
     def test_ignores_article_without_sps_pkg(self, mock_subtask):
-        Article.objects.filter(pk=self.not_processed.pk).update(sps_pkg=None)
+        SPSPkg.objects.filter(
+            collection_pid_v2__article=self.not_processed
+        ).update(collection_pid_v2=None)
         self.assertEqual(0, tasks.task_update_data_availability_status())
         mock_subtask.apply_async.assert_not_called()
 
@@ -79,8 +79,7 @@ class TaskUpdateDataAvailabilityStatusForArticlesTest(ReportDataMixin, TestCase)
     @patch.object(SPSPkg, "xml_with_pre", create=True)
     def test_updates_given_articles(self, mock_xml_with_pre):
         article = self.articles[3]
-        article.sps_pkg = SPSPkg.objects.create(creator=self.user, sps_pkg_name="pkg")
-        article.save()
+        link_sps_pkg(self.user, article, "pkg")
         mock_xml_with_pre.xmltree = make_xmltree(
             '<sec sec-type="data-availability" specific-use="data-not-available"/>'
         )

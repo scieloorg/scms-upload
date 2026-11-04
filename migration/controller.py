@@ -393,6 +393,7 @@ def create_or_update_article(
         article_proc.sps_pkg,
         issue=article_proc.issue_proc.issue,
         journal=article_proc.issue_proc.journal_proc.journal,
+        collection=article_proc.collection,
     )
     article_proc.migrated_data.migration_status = tracker_choices.PROGRESS_STATUS_DONE
     article_proc.migration_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -474,8 +475,13 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
             journal_acron,
             issue_folder,
         )
+        # o mesmo arquivo pode ser retornado mais de uma vez
+        # (ex.: arquivos de bases também encontrados como "asset");
+        # mantém o primeiro, que tem o tipo mais específico
+        processed_paths = set()
         for file in files_and_exceptions:
             exception = {}
+            original_path = None
             try:
                 if not file:
                     continue
@@ -486,6 +492,11 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                     exceptions.append(exception)
                     continue
 
+                original_path = file["relative_path"]
+                if original_path in processed_paths:
+                    continue
+                processed_paths.add(original_path)
+
                 component_type = check_component_type(file)
                 part = file.get("part")
 
@@ -493,7 +504,7 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                     MigratedFile.create_or_update(
                         user=user,
                         collection=collection,
-                        original_path=file["relative_path"],
+                        original_path=original_path,
                         source_path=file["path"],
                         component_type=component_type,
                         lang=file.get("lang"),
@@ -507,6 +518,7 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                 )
 
             except Exception as e:
+                exception["original_path"] = original_path
                 exception["error"] = str(e)
                 exception["type"] = str(type(e))
                 exceptions.append(exception)
@@ -581,15 +593,16 @@ class PkgZipBuilder:
             try:
                 if rendition.lang:
                     sps_filename = f"{self.sps_pkg_name}-{rendition.lang}.pdf"
-                    pdf_langs.add(rendition.lang)
+                    pdf_lang = rendition.lang
                 else:
                     sps_filename = f"{self.sps_pkg_name}.pdf"
-                    pdf_langs.add(xml_langs[0])
+                    pdf_lang = xml_langs[0]
+                pdf_langs.add(pdf_lang)
 
                 zf.write(rendition.file.path, arcname=sps_filename)
 
                 self.components[sps_filename] = {
-                    "lang": rendition.lang,
+                    "lang": pdf_lang,
                     "legacy_uri": rendition.original_href,
                     "component_type": "rendition",
                 }
