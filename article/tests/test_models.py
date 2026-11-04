@@ -1,5 +1,6 @@
 """
-- Article.get(pid_v2=None, sps_pkg_name=None, pid_v3=None, sps_pkg=None)
+- Article.get(pid_v2=None, sps_pkg_name=None, pid_v3=None, sps_pkg=None, collection=None)
+  (pid_v3, pid_v2 e sps_pkg_name somente com collection)
 - Article.delete_related_items(qs)
 - Article.create_or_update(user, sps_pkg, issue=None, journal=None, position=None, collection=None)
 - Article.get_repeated_values(field_name, queryset=None, issue=None, other_field_names=None)
@@ -51,48 +52,101 @@ def _mock_model_instance(model_cls, **attrs):
 class ArticleGetTestCase(unittest.TestCase):
     """Testes para Article.get().
 
-    get() delega para cls.objects.get(**params) e NÃO trata duplicidade —
-    esse tratamento (MultipleObjectsReturned) é responsabilidade de quem
-    chama, como create_or_update().
+    pid_v3, pid_v2 e sps_pkg_name são usados somente com collection, pois
+    há um Article por documento na coleção; sps_pkg dispensa collection.
+
+    get() NÃO trata duplicidade — esse tratamento (MultipleObjectsReturned)
+    é responsabilidade de quem chama, como create_or_update().
     """
+
+    def setUp(self):
+        self.collection = Mock()
 
     def test_raises_value_error_without_any_param(self):
         with self.assertRaises(ValueError):
             Article.get()
 
+    def test_raises_value_error_without_collection(self):
+        for kwargs in (
+            {"pid_v3": "pid123"},
+            {"pid_v2": "pid_v2_value"},
+            {"sps_pkg_name": "pkg-v01"},
+            {"pid_v3": "pid123", "pid_v2": "pid_v2_value"},
+        ):
+            with self.subTest(**kwargs):
+                with self.assertRaises(ValueError):
+                    Article.get(**kwargs)
+
+    def test_raises_value_error_with_collection_only(self):
+        with self.assertRaises(ValueError):
+            Article.get(collection=self.collection)
+
     @patch("article.models.Article.objects")
-    def test_get_by_pid_v3(self, mock_objects):
+    def test_get_by_pid_v3_and_collection(self, mock_objects):
         mock_article = Mock(spec=Article)
         mock_objects.get.return_value = mock_article
 
-        result = Article.get(pid_v3="pid123")
-
-        self.assertEqual(result, mock_article)
-        mock_objects.get.assert_called_once_with(pid_v3="pid123")
-
-    @patch("article.models.Article.objects")
-    def test_get_by_pid_v2(self, mock_objects):
-        mock_article = Mock(spec=Article)
-        mock_objects.get.return_value = mock_article
-
-        result = Article.get(pid_v2="pid_v2_value")
-
-        self.assertEqual(result, mock_article)
-        mock_objects.get.assert_called_once_with(
-            collection_pid_v2__pid_v2="pid_v2_value"
-        )
-
-    @patch("article.models.Article.objects")
-    def test_get_by_sps_pkg_name(self, mock_objects):
-        mock_article = Mock(spec=Article)
-        mock_objects.get.return_value = mock_article
-
-        result = Article.get(sps_pkg_name="pkg-v01")
+        result = Article.get(pid_v3="pid123", collection=self.collection)
 
         self.assertEqual(result, mock_article)
         mock_objects.get.assert_called_once_with(
-            collection_pid_v2__sps_pkg_name="pkg-v01"
+            collection_pid_v2__collection=self.collection, pid_v3="pid123"
         )
+
+    @patch("article.models.Article.objects")
+    def test_get_by_pid_v2_and_collection(self, mock_objects):
+        mock_article = Mock(spec=Article)
+        mock_objects.get.return_value = mock_article
+
+        result = Article.get(pid_v2="pid_v2_value", collection=self.collection)
+
+        self.assertEqual(result, mock_article)
+        mock_objects.get.assert_called_once_with(
+            collection_pid_v2__collection=self.collection,
+            collection_pid_v2__pid_v2="pid_v2_value",
+        )
+
+    @patch("article.models.Article.filter_by_sps_pkg_name")
+    @patch("article.models.Article.objects")
+    def test_get_by_sps_pkg_name_and_collection(
+        self, mock_objects, mock_filter_by_sps_pkg_name
+    ):
+        mock_article = Mock(spec=Article)
+        mock_filter_by_sps_pkg_name.return_value.get.return_value = mock_article
+
+        result = Article.get(sps_pkg_name="pkg-v01", collection=self.collection)
+
+        self.assertEqual(result, mock_article)
+        mock_objects.get.assert_not_called()
+        mock_objects.filter.assert_called_once_with(
+            collection_pid_v2__collection=self.collection
+        )
+        mock_filter_by_sps_pkg_name.assert_called_once_with(
+            mock_objects.filter.return_value, "pkg-v01"
+        )
+
+    @patch("article.models.Article.filter_by_sps_pkg_name")
+    @patch("article.models.Article.objects")
+    def test_get_prioritizes_deterministic_keys(
+        self, mock_objects, mock_filter_by_sps_pkg_name
+    ):
+        mock_article = Mock(spec=Article)
+        mock_objects.get.return_value = mock_article
+
+        result = Article.get(
+            pid_v3="pid123",
+            pid_v2="pid_v2_value",
+            sps_pkg_name="pkg-v01",
+            collection=self.collection,
+        )
+
+        self.assertEqual(result, mock_article)
+        mock_objects.get.assert_called_once_with(
+            collection_pid_v2__collection=self.collection,
+            collection_pid_v2__pid_v2="pid_v2_value",
+            pid_v3="pid123",
+        )
+        mock_filter_by_sps_pkg_name.assert_not_called()
 
     @patch("article.models.Article.objects")
     def test_get_by_sps_pkg(self, mock_objects):
@@ -106,22 +160,11 @@ class ArticleGetTestCase(unittest.TestCase):
         mock_objects.get.assert_called_once_with(collection_pid_v2__sps_pkg=mock_sps_pkg)
 
     @patch("article.models.Article.objects")
-    def test_get_combines_multiple_params(self, mock_objects):
-        mock_article = Mock(spec=Article)
-        mock_objects.get.return_value = mock_article
-
-        Article.get(pid_v2="v2", pid_v3="v3")
-
-        mock_objects.get.assert_called_once_with(
-            collection_pid_v2__pid_v2="v2", pid_v3="v3"
-        )
-
-    @patch("article.models.Article.objects")
     def test_get_raises_does_not_exist(self, mock_objects):
         mock_objects.get.side_effect = Article.DoesNotExist()
 
         with self.assertRaises(Article.DoesNotExist):
-            Article.get(pid_v3="pid123")
+            Article.get(pid_v3="pid123", collection=self.collection)
 
     @patch("article.models.Article.objects")
     def test_get_propagates_multiple_objects_returned(self, mock_objects):
@@ -129,7 +172,7 @@ class ArticleGetTestCase(unittest.TestCase):
         mock_objects.get.side_effect = Article.MultipleObjectsReturned()
 
         with self.assertRaises(Article.MultipleObjectsReturned):
-            Article.get(pid_v3="pid123")
+            Article.get(pid_v3="pid123", collection=self.collection)
 
 
 # ============================================================
