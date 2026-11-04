@@ -143,8 +143,45 @@ class ArticleUniqueByCollectionTest(ArticleByCollectionTestBase):
         psi = self.create_article(self.psi, PSI_V2, "psi")
         self.create_article(self.scl, SCL_V2, "scl")
         self.assertEqual(Article.get(pid_v3=PID_V3, collection=self.psi), psi)
-        self.assertEqual(Article.get(pid_v2=PSI_V2), psi)
-        self.assertEqual(Article.get(sps_pkg_name="psi"), psi)
+        self.assertEqual(Article.get(pid_v2=PSI_V2, collection=self.psi), psi)
+        with self.assertRaises(Article.DoesNotExist):
+            Article.get(pid_v2=PSI_V2, collection=self.scl)
+        self.assertEqual(Article.get(sps_pkg_name="psi", collection=self.psi), psi)
+        self.assertEqual(Article.get_by_sps_pkg_name("psi"), psi)
+        # sem a coleção
+        with self.assertRaises(ValueError):
+            Article.get(pid_v3=PID_V3)
+
+    def test_get_by_sps_pkg_name_uses_the_name_of_the_package(self):
+        # CollectionPidV2.sps_pkg_name com o pid v3 (dado legado)
+        scl = self.create_article(self.scl, SCL_V2, "0103-6564-pusp-20-03-00003")
+        psi = self.create_article(self.psi, PSI_V2, "1678-5177-psicousp-20-03-00003")
+        from pid_provider.models import CollectionPidV2
+
+        CollectionPidV2.objects.filter(pid_provider_xml__v3=PID_V3).update(
+            sps_pkg_name=PID_V3
+        )
+        self.assertEqual(
+            Article.get(sps_pkg_name="0103-6564-pusp-20-03-00003", collection=self.scl),
+            scl,
+        )
+        self.assertEqual(
+            Article.get_by_sps_pkg_name("1678-5177-psicousp-20-03-00003"), psi
+        )
+        with self.assertRaises(Article.DoesNotExist):
+            Article.get_by_sps_pkg_name(PID_V3)
+
+    def test_filter_by_journal_acron_of_the_collection(self):
+        scl = self.create_article(self.scl, SCL_V2, "scl")
+        psi = self.create_article(self.psi, PSI_V2, "psi")
+        Article.objects.filter(pk__in=[scl.pk, psi.pk]).update(journal=self.journal)
+        # acrônimos diferentes nas coleções: journal_acron vazio
+        self.assertIsNone(self.journal.update_journal_acron())
+
+        qs = Article.objects.all()
+        self.assertEqual(list(Article.filter_by_journal_acron(qs, "pusp")), [scl])
+        self.assertEqual(list(Article.filter_by_journal_acron(qs, "psicousp")), [psi])
+        self.assertEqual(list(Article.filter_by_journal_acron(qs, "other")), [])
 
 
 class ArticleCreateOrUpdateByCollectionTest(ArticleByCollectionTestBase):
