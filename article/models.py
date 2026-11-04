@@ -396,23 +396,96 @@ class Article(ClusterableModel, CommonControlField):
     def get(
         cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, sps_pkg=None, collection=None
     ):
-        params = {}
-        if collection:
-            # pid_v3 é único por coleção
-            params["collection_pid_v2__collection"] = collection
-        if sps_pkg:
-            params["collection_pid_v2__sps_pkg"] = sps_pkg
-        if pid_v2:
-            params["collection_pid_v2__pid_v2"] = pid_v2
-        if pid_v3:
-            params["pid_v3"] = pid_v3
-        if sps_pkg_name:
-            params["collection_pid_v2__sps_pkg_name"] = sps_pkg_name
+        """
+        Obtém o Article do documento na coleção.
 
-        if not params:
-            raise ValueError("Article.get requires sps_pkg or spid_v3 or pid_v2 or sps_pkg_name")
-        
-        return cls.objects.get(**params)
+        Há um Article por documento na coleção (mesmo pid_v3 em coleções
+        diferentes; pid_v2 e sps_pkg_name dependem da coleção), então
+        pid_v3, pid_v2 e sps_pkg_name devem ser combinados com collection.
+        sps_pkg dispensa collection, pois é único por documento na coleção.
+
+        Prioriza as chaves determinísticas (pid_v3, pid_v2); sps_pkg_name
+        (identificação humana, depende de vários dados do XML) é usado
+        somente na falta delas.
+        """
+        if sps_pkg:
+            params = {"collection_pid_v2__sps_pkg": sps_pkg}
+            if collection:
+                params["collection_pid_v2__collection"] = collection
+            return cls.objects.get(**params)
+
+        if not collection:
+            raise ValueError(
+                "Article.get requires collection with pid_v3 or pid_v2 or sps_pkg_name, or sps_pkg"
+            )
+        if not (pid_v3 or pid_v2 or sps_pkg_name):
+            raise ValueError(
+                "Article.get requires pid_v3 or pid_v2 or sps_pkg_name with collection, or sps_pkg"
+            )
+
+        params = {"collection_pid_v2__collection": collection}
+        if pid_v3 or pid_v2:
+            if pid_v2:
+                params["collection_pid_v2__pid_v2"] = pid_v2
+            if pid_v3:
+                params["pid_v3"] = pid_v3
+            return cls.objects.get(**params)
+
+        return cls.filter_by_sps_pkg_name(
+            cls.objects.filter(**params), sps_pkg_name
+        ).get()
+
+    @classmethod
+    def filter_by_sps_pkg_name(cls, qs, sps_pkg_name):
+        """
+        Filtra pelo nome do pacote SPS (identificação humana).
+
+        O nome do pacote é o de SPSPkg; CollectionPidV2.sps_pkg_name é
+        usado somente para os documentos sem pacote.
+        """
+        return qs.filter(
+            Q(collection_pid_v2__sps_pkg__sps_pkg_name=sps_pkg_name)
+            | Q(
+                collection_pid_v2__sps_pkg__isnull=True,
+                collection_pid_v2__sps_pkg_name=sps_pkg_name,
+            )
+        )
+
+    @classmethod
+    def get_by_sps_pkg_name(cls, sps_pkg_name, collection=None):
+        """
+        Obtém o Article pelo nome do pacote SPS (identificação humana)
+        """
+        if not sps_pkg_name:
+            raise ValueError("Article.get_by_sps_pkg_name requires sps_pkg_name")
+        qs = cls.objects.all()
+        if collection:
+            qs = qs.filter(collection_pid_v2__collection=collection)
+        return cls.filter_by_sps_pkg_name(qs, sps_pkg_name).get()
+
+    @classmethod
+    def filter_by_journal_acron(cls, qs, journal_acron):
+        """
+        Filtra os artigos pelo acrônimo do periódico na coleção do artigo.
+
+        Journal.journal_acron fica vazio quando o periódico tem acrônimos
+        diferentes nas coleções; o acrônimo na coleção está em
+        JournalProc (journal, collection, acron).
+        """
+        from proc.models import JournalProc
+
+        return qs.filter(
+            Q(journal__journal_acron=journal_acron)
+            | Q(
+                models.Exists(
+                    JournalProc.objects.filter(
+                        journal=models.OuterRef("journal"),
+                        collection=models.OuterRef("collection_pid_v2__collection"),
+                        acron=journal_acron,
+                    )
+                )
+            )
+        )
 
     @classmethod
     def get_by_pid_v3(cls, pid_v3):
