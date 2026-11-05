@@ -31,7 +31,13 @@ from journal.models import (
     Subject,
 )
 from location.models import Location
-from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile, ClassicWebsiteConfiguration
+from migration.models import (
+    ClassicWebsiteConfiguration,
+    IdFileRecord,
+    JournalAcronIdFile,
+    MigratedFile,
+    modified_date,
+)
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 
@@ -764,6 +770,10 @@ def import_journal_acron_id_records(
             journal_acron + ".id",
         )
 
+        # data do arquivo antes da leitura: se o arquivo mudar durante a
+        # leitura, será lido novamente na próxima execução
+        file_datetime_iso = modified_date(source_path)
+
         journal_id_file = JournalAcronIdFile.create_or_update(
             user=user,
             collection=collection,
@@ -772,22 +782,46 @@ def import_journal_acron_id_records(
             force_update=force_update,
         )
 
-        if force_update or journal_id_file.data.get(
-            "id_file_record_need_to_be_updated"
-        ):
-            for item in get_bases_work_acron_id_file_records(
-                source_path,
-                classic_website,
-            ):
-                if item.get("exception"):
-                    exceptions.append(item.get("exception"))
-                    continue
+        # o arquivo só é marcado como lido (MigratedFile) se for lido
+        # completamente; assim, uma leitura interrompida é refeita na
+        # próxima execução
+        has_changes = MigratedFile.has_changes(
+            collection, source_path, force_update
+        )
+        if has_changes:
+            try:
+                for item in get_bases_work_acron_id_file_records(
+                    source_path,
+                    classic_website,
+                ):
+                    if item.get("exception"):
+                        # falha em registro individual: não impede a
+                        # marcação do arquivo como lido
+                        exceptions.append(item.get("exception"))
+                        continue
 
-                item["force_update"] = force_update
-                IdFileRecord.create_or_update(
-                    user,
-                    journal_id_file,
-                    **item,
+                    item["force_update"] = force_update
+                    IdFileRecord.create_or_update(
+                        user,
+                        journal_id_file,
+                        **item,
+                    )
+            except Exception:
+                # leitura incompleta: não marca como lido; os registros já
+                # carregados (todo=True) podem ser processados
+                tb = traceback.format_exc()
+                message = str(
+                    _("Incomplete reading of acron.id; it will be read again in the next execution")
+                )
+            else:
+                MigratedFile.create_or_update(
+                    user=user,
+                    collection=collection,
+                    original_path=source_path,
+                    source_path=source_path,
+                    component_type="id_file",
+                    force_update=force_update,
+                    file_datetime_iso=file_datetime_iso,
                 )
         else:
             message = str(_("IdFileRecord is already up-to-date with acron.id"))
