@@ -904,107 +904,139 @@ class ImportJournalAcronIdRecordsTests(unittest.TestCase):
         journal_proc.collection.acron = "scl"
         return journal_proc
 
-    @patch("migration.controller.IdFileRecord")
-    @patch("migration.controller.get_bases_work_acron_id_file_records")
-    @patch("migration.controller.JournalAcronIdFile")
-    @patch("migration.controller.get_classic_website")
-    def test_atualizacao_necessaria_processa_registros(
+    def _import(
         self,
-        mock_get_cw,
-        mock_journal_acron_id_file,
-        mock_get_records,
-        mock_id_file_record,
+        has_changes,
+        records=None,
+        force_update=False,
+        pending_issue_pids=("0000-000020000001",),
     ):
-        user = MagicMock()
+        """
+        Executa import_journal_acron_id_records com dependências simuladas.
+
+        ``records``: lista de itens de get_bases_work_acron_id_file_records
+        ou exceção levantada durante a leitura do arquivo.
+        """
         journal_proc = self._make_journal_proc()
-
-        classic_website = MagicMock()
-        classic_website.classic_website_paths.bases_work_path = "/bases-work"
-        mock_get_cw.return_value = classic_website
-
-        journal_id_file = MagicMock()
-        journal_id_file.data = {
-            "id_file_record_need_to_be_updated": True,
-            "stats": {
-                "total_id_file_records": 1,
-                "total_id_file_records_to_migrate": 1,
-                "total_issues": 1,
-            },
-            "issue_pids": ["0000-000020000001", "0000-000020000002"],
-            "pending_issue_pids": ["0000-000020000001"],
-        }
-        mock_journal_acron_id_file.create_or_update.return_value = journal_id_file
-
-        mock_get_records.return_value = [
-            {"item_type": "article", "item_pid": "S0000-0000202000010001", "data": {}},
-        ]
-
-        issueproc_qs = MagicMock()
-        issueproc_qs.values_list.return_value = [11, 12]
-        journal_proc.issueproc_set.filter.return_value = issueproc_qs
-
-        article_proc_model = MagicMock()
-
-        detail = migration_controller.import_journal_acron_id_records(
-            user, article_proc_model, journal_proc, force_update=False
-        )
-
-        self.assertEqual(detail["exceptions"], [])
-        mock_id_file_record.create_or_update.assert_called_once()
-        journal_proc.issueproc_set.filter.assert_called_once_with(
-            pid__in=["0000-000020000001"]
-        )
-        self.assertEqual(detail["issue_proc_id_list"], [11, 12])
-        self.assertEqual(detail["stats"], journal_id_file.data["stats"])
-
-    @patch("migration.controller.get_bases_work_acron_id_file_records")
-    @patch("migration.controller.JournalAcronIdFile")
-    @patch("migration.controller.get_classic_website")
-    def test_ja_atualizado_sem_force_update_retorna_mensagem(
-        self,
-        mock_get_cw,
-        mock_journal_acron_id_file,
-        mock_get_records,
-    ):
-        user = MagicMock()
-        journal_proc = self._make_journal_proc()
-
-        classic_website = MagicMock()
-        classic_website.classic_website_paths.bases_work_path = "/bases-work"
-        mock_get_cw.return_value = classic_website
-
-        journal_id_file = MagicMock()
-        journal_id_file.data = {
-            "id_file_record_need_to_be_updated": False,
-            "stats": {
-                "total_id_file_records": 1,
-                "total_id_file_records_to_migrate": 1,
-                "total_issues": 1,
-            },
-            "issue_pids": ["0034-891020040002"],
-            "pending_issue_pids": ["0034-891020040002"],
-        }
-        mock_journal_acron_id_file.create_or_update.return_value = journal_id_file
-
         issueproc_qs = MagicMock()
         issueproc_qs.values_list.return_value = [11]
         journal_proc.issueproc_set.filter.return_value = issueproc_qs
 
-        # mensagem traduzida: compara em inglês, independente do idioma ativo
-        with translation.override("en"):
-            detail = migration_controller.import_journal_acron_id_records(
-                user, MagicMock(), journal_proc, force_update=False
-            )
+        classic_website = MagicMock()
+        classic_website.classic_website_paths.bases_work_path = "/bases-work"
 
-        self.assertIn("message", detail)
-        self.assertIn("up-to-date", detail["message"])
-        mock_get_records.assert_not_called()
-        self.assertEqual(detail["journal_id_file_data"], journal_id_file.data)
-        self.assertEqual(detail["stats"], journal_id_file.data["stats"])
-        journal_proc.issueproc_set.filter.assert_called_once_with(
-            pid__in=["0034-891020040002"]
+        journal_id_file = MagicMock()
+        journal_id_file.data = {
+            "stats": {"total_id_file_records": 1},
+            "pending_issue_pids": list(pending_issue_pids),
+        }
+
+        def get_records(source_path, cw):
+            for item in records or []:
+                if isinstance(item, Exception):
+                    raise item
+                yield item
+
+        with patch(
+            "migration.controller.get_classic_website", return_value=classic_website
+        ), patch("migration.controller.JournalAcronIdFile") as mock_acron_id_file, patch(
+            "migration.controller.MigratedFile"
+        ) as mock_migrated_file, patch(
+            "migration.controller.modified_date", return_value="2026-01-01T00:00:00"
+        ), patch(
+            "migration.controller.get_bases_work_acron_id_file_records",
+            side_effect=get_records,
+        ) as mock_get_records, patch(
+            "migration.controller.IdFileRecord"
+        ) as mock_id_file_record, translation.override(
+            "en"
+        ):
+            mock_acron_id_file.create_or_update.return_value = journal_id_file
+            mock_migrated_file.has_changes.return_value = has_changes
+            detail = migration_controller.import_journal_acron_id_records(
+                MagicMock(), MagicMock(), journal_proc, force_update=force_update
+            )
+        return {
+            "detail": detail,
+            "journal_proc": journal_proc,
+            "journal_id_file": journal_id_file,
+            "migrated_file": mock_migrated_file,
+            "get_records": mock_get_records,
+            "id_file_record": mock_id_file_record,
+        }
+
+    def test_arquivo_alterado_le_registros_e_marca_como_lido(self):
+        r = self._import(
+            has_changes=True,
+            records=[
+                {"item_type": "article", "item_pid": "S0000-0000202000010001", "data": {}},
+            ],
+        )
+
+        detail = r["detail"]
+        self.assertEqual(detail["exceptions"], [])
+        self.assertNotIn("traceback", detail)
+        r["id_file_record"].create_or_update.assert_called_once()
+        r["migrated_file"].create_or_update.assert_called_once()
+        kwargs = r["migrated_file"].create_or_update.call_args.kwargs
+        self.assertEqual(kwargs["original_path"], "/bases-work/rt/rt.id")
+        self.assertEqual(kwargs["component_type"], "id_file")
+        # data obtida antes da leitura
+        self.assertEqual(kwargs["file_datetime_iso"], "2026-01-01T00:00:00")
+        r["journal_proc"].issueproc_set.filter.assert_called_once_with(
+            pid__in=["0000-000020000001"]
         )
         self.assertEqual(detail["issue_proc_id_list"], [11])
+        self.assertEqual(detail["stats"], r["journal_id_file"].data["stats"])
+
+    def test_force_update_e_repassado_a_has_changes(self):
+        r = self._import(has_changes=True, force_update=True)
+
+        r["migrated_file"].has_changes.assert_called_once_with(
+            r["journal_proc"].collection, "/bases-work/rt/rt.id", True
+        )
+
+    def test_arquivo_ja_lido_completamente_nao_e_relido(self):
+        r = self._import(has_changes=False)
+
+        detail = r["detail"]
+        self.assertIn("up-to-date", detail["message"])
+        r["get_records"].assert_not_called()
+        r["migrated_file"].create_or_update.assert_not_called()
+        # os fascículos pendentes continuam sendo informados
+        self.assertEqual(detail["issue_proc_id_list"], [11])
+
+    def test_leitura_incompleta_nao_marca_como_lido(self):
+        r = self._import(
+            has_changes=True,
+            records=[
+                {"item_type": "article", "item_pid": "S0000-0000202000010001", "data": {}},
+                OSError("interrompido"),
+            ],
+        )
+
+        detail = r["detail"]
+        self.assertIn("traceback", detail)
+        self.assertIn("Incomplete reading", detail["message"])
+        # será lido novamente na próxima execução
+        r["migrated_file"].create_or_update.assert_not_called()
+        # os registros já carregados ficam disponíveis para processar
+        r["id_file_record"].create_or_update.assert_called_once()
+        self.assertEqual(detail["issue_proc_id_list"], [11])
+
+    def test_falha_em_registro_individual_nao_impede_marcacao(self):
+        r = self._import(
+            has_changes=True,
+            records=[
+                {"item_pid": "S0000-0000202000010001", "exception": "erro"},
+                {"item_type": "article", "item_pid": "S0000-0000202000010002", "data": {}},
+            ],
+        )
+
+        detail = r["detail"]
+        self.assertEqual(detail["exceptions"], ["erro"])
+        r["id_file_record"].create_or_update.assert_called_once()
+        r["migrated_file"].create_or_update.assert_called_once()
 
     @patch("migration.controller.JournalAcronIdFile")
     @patch("migration.controller.get_classic_website")
