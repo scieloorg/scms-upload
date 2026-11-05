@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch
 from django.test import TestCase
 
 import proc.tasks as tasks
+from proc.models import BaseProc
 
 
 def _make_task_tracker_mock(mock_task_tracker_cls):
@@ -98,6 +99,26 @@ class TaskMigrateAndPublishIssuesTest(TestCase):
         self.assertIsInstance(call_kwargs["e"], RuntimeError)
 
 
+def _setup_issue_procs(mock_issue_proc_cls, items):
+    """Configura o IssueProc mockado: seleção e itens."""
+    mock_issue_proc_cls.select_items_to_process.return_value = {
+        item.id for item in items
+    }
+    mock_issue_proc_cls.get_status_to_publish.side_effect = (
+        BaseProc.get_status_to_publish
+    )
+    mock_issue_proc_cls.objects.filter.return_value = _make_queryset_mock(items)
+
+
+def _issue_proc_mock(id, migration_status="DONE", qa_ws_status="TODO", public_ws_status="TODO"):
+    return MagicMock(
+        id=id,
+        migration_status=migration_status,
+        qa_ws_status=qa_ws_status,
+        public_ws_status=public_ws_status,
+    )
+
+
 class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
     """Testes para task_migrate_and_publish_issues_by_collection (migração e agendamento de publicação por coleção)."""
 
@@ -105,7 +126,6 @@ class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
     @patch("proc.tasks.migrate_issue")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.create_or_update_migrated_issue")
     @patch("proc.tasks.Collection")
     @patch("proc.tasks.migration_controller")
@@ -116,12 +136,12 @@ class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
         mock_migration_controller,
         mock_collection_cls,
         mock_create_or_update_migrated_issue,
-        mock_fix_publication_status,
         mock_issue_proc_cls,
         mock_get_api_data,
         mock_migrate_issue,
         mock_apply_async,
     ):
+        mock_fix_publication_status = mock_issue_proc_cls.fix_publication_status
         _make_task_tracker_mock(mock_task_tracker_cls)
 
         mock_classic_website = MagicMock()
@@ -130,11 +150,9 @@ class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
         mock_collection = MagicMock()
         mock_collection_cls.objects.get.return_value = mock_collection
 
-        issue_proc_1 = MagicMock(id=1)
-        issue_proc_2 = MagicMock(id=2)
-        mock_issue_proc_cls.objects.filter.return_value = _make_queryset_mock(
-            [issue_proc_1, issue_proc_2]
-        )
+        issue_proc_1 = _issue_proc_mock(1)
+        issue_proc_2 = _issue_proc_mock(2)
+        _setup_issue_procs(mock_issue_proc_cls, [issue_proc_1, issue_proc_2])
 
         mock_get_api_data.side_effect = [
             {"qa": True},  # QA
@@ -176,7 +194,6 @@ class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
     @patch("proc.tasks.migrate_issue")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.create_or_update_migrated_issue")
     @patch("proc.tasks.Collection")
     @patch("proc.tasks.migration_controller")
@@ -187,15 +204,15 @@ class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
         mock_migration_controller,
         mock_collection_cls,
         mock_create_or_update_migrated_issue,
-        mock_fix_publication_status,
         mock_issue_proc_cls,
         mock_get_api_data,
         mock_migrate_issue,
         mock_apply_async,
     ):
+        mock_fix_publication_status = mock_issue_proc_cls.fix_publication_status
         mock_task_tracker = _make_task_tracker_mock(mock_task_tracker_cls)
         mock_collection_cls.objects.get.return_value = MagicMock()
-        mock_issue_proc_cls.objects.filter.return_value = _make_queryset_mock([])
+        _setup_issue_procs(mock_issue_proc_cls, [])
 
         tasks.task_migrate_and_publish_issues_by_collection(collection_acron="scl")
 
@@ -215,7 +232,6 @@ class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
     @patch("proc.tasks.migrate_issue")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.create_or_update_migrated_issue")
     @patch("proc.tasks.Collection")
     @patch("proc.tasks.migration_controller")
@@ -226,24 +242,27 @@ class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
         mock_migration_controller,
         mock_collection_cls,
         mock_create_or_update_migrated_issue,
-        mock_fix_publication_status,
         mock_issue_proc_cls,
         mock_get_api_data,
         mock_migrate_issue,
         mock_apply_async,
     ):
+        mock_fix_publication_status = mock_issue_proc_cls.fix_publication_status
         mock_task_tracker = _make_task_tracker_mock(mock_task_tracker_cls)
         mock_collection_cls.objects.get.return_value = MagicMock()
 
-        issue_proc_1 = MagicMock(id=1)
-        issue_proc_2 = MagicMock(id=2)
-        mock_issue_proc_cls.objects.filter.return_value = _make_queryset_mock(
-            [issue_proc_1, issue_proc_2]
-        )
+        issue_proc_1 = _issue_proc_mock(1, migration_status="TODO")
+        issue_proc_2 = _issue_proc_mock(2, migration_status="TODO")
+        _setup_issue_procs(mock_issue_proc_cls, [issue_proc_1, issue_proc_2])
 
         mock_get_api_data.side_effect = [{"qa": True}, {"public": True}]
         # falha ao migrar o primeiro issue_proc; o segundo é migrado normalmente
-        mock_migrate_issue.side_effect = [RuntimeError("fail issue 1"), None]
+        def migrate(user, issue_proc, force_update):
+            if issue_proc.id == 1:
+                raise RuntimeError("fail issue 1")
+            issue_proc.migration_status = "DONE"
+
+        mock_migrate_issue.side_effect = migrate
 
         tasks.task_migrate_and_publish_issues_by_collection(collection_acron="scl")
 
@@ -266,7 +285,6 @@ class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
     @patch("proc.tasks.migrate_issue")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.create_or_update_migrated_issue")
     @patch("proc.tasks.Collection")
     @patch("proc.tasks.migration_controller")
@@ -277,12 +295,12 @@ class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
         mock_migration_controller,
         mock_collection_cls,
         mock_create_or_update_migrated_issue,
-        mock_fix_publication_status,
         mock_issue_proc_cls,
         mock_get_api_data,
         mock_migrate_issue,
         mock_apply_async,
     ):
+        mock_fix_publication_status = mock_issue_proc_cls.fix_publication_status
         mock_task_tracker = _make_task_tracker_mock(mock_task_tracker_cls)
         mock_migration_controller.get_classic_website.side_effect = RuntimeError(
             "classic website unreachable"
@@ -299,6 +317,78 @@ class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
         self.assertFalse(finish_kwargs["completed"])
         self.assertIsInstance(finish_kwargs["exception"], RuntimeError)
 
+    def _run_with_status(self, items, **kwargs):
+        with patch("proc.tasks.TaskTracker") as mock_task_tracker_cls, patch(
+            "proc.tasks.migration_controller"
+        ), patch("proc.tasks.Collection"), patch(
+            "proc.tasks.create_or_update_migrated_issue"
+        ), patch(
+            "proc.tasks.IssueProc"
+        ) as mock_issue_proc_cls, patch(
+            "proc.tasks.get_api_data"
+        ) as mock_get_api_data, patch(
+            "proc.tasks.migrate_issue"
+        ) as mock_migrate_issue, patch.object(
+            tasks.task_publish_issue, "apply_async"
+        ) as mock_apply_async:
+            _make_task_tracker_mock(mock_task_tracker_cls)
+            _setup_issue_procs(mock_issue_proc_cls, items)
+
+            def migrate(user, issue_proc, force_update):
+                # simula migração bem-sucedida
+                issue_proc.migration_status = "DONE"
+                issue_proc.qa_ws_status = "TODO"
+                issue_proc.public_ws_status = "TODO"
+
+            mock_migrate_issue.side_effect = migrate
+            mock_get_api_data.side_effect = [{"qa": True}, {"public": True}]
+            tasks.task_migrate_and_publish_issues_by_collection(
+                collection_acron="scl", **kwargs
+            )
+        published = [
+            (c.kwargs["kwargs"]["issue_proc_id"], c.kwargs["kwargs"]["website_kind"])
+            for c in mock_apply_async.call_args_list
+        ]
+        return mock_issue_proc_cls, mock_migrate_issue, published
+
+    def test_status_is_used_in_selection(self):
+        mock_issue_proc_cls, _, _ = self._run_with_status(
+            [], status=["BLOCKED", "TODO"]
+        )
+        args, kwargs = mock_issue_proc_cls.select_items_to_process.call_args
+        self.assertEqual(set(args[1]), {"BLOCKED", "TODO"})
+
+    def test_migrates_by_current_migration_status_and_publishes_after(self):
+        to_migrate = _issue_proc_mock(
+            1, migration_status="BLOCKED", qa_ws_status="DONE", public_ws_status="DONE"
+        )
+        only_publish = _issue_proc_mock(2, qa_ws_status="BLOCKED", public_ws_status="DONE")
+        _, mock_migrate_issue, published = self._run_with_status(
+            [to_migrate, only_publish], status=["BLOCKED"]
+        )
+        mock_migrate_issue.assert_called_once_with(None, to_migrate, False)
+        # migrado nesta execução: publica com os status resultantes (TODO)
+        self.assertIn((1, "QA"), published)
+        self.assertIn((1, "PUBLIC"), published)
+        # apenas publicação: somente o website cujo status está em status
+        self.assertIn((2, "QA"), published)
+        self.assertNotIn((2, "PUBLIC"), published)
+
+    def test_publication_only_item_with_status_not_requested_is_not_published(self):
+        item = _issue_proc_mock(1, qa_ws_status="TODO", public_ws_status="BLOCKED")
+        _, mock_migrate_issue, published = self._run_with_status(
+            [item], status=["BLOCKED"]
+        )
+        mock_migrate_issue.assert_not_called()
+        self.assertEqual(published, [(1, "PUBLIC")])
+
+    def test_item_already_migrated_when_processed_is_not_migrated_again(self):
+        # selecionado como TODO, mas já DONE quando o loop o processa
+        item = _issue_proc_mock(1, qa_ws_status="DONE", public_ws_status="DONE")
+        _, mock_migrate_issue, published = self._run_with_status([item])
+        mock_migrate_issue.assert_not_called()
+        self.assertEqual(published, [])
+
 
 class TaskPublishIssuesTest(TestCase):
     """Testes para task_publish_issues (agendamento de publicação de fascículos pendentes nos sites QA/PUBLIC)."""
@@ -306,18 +396,17 @@ class TaskPublishIssuesTest(TestCase):
     @patch.object(tasks.task_publish_issue, "apply_async")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.get_api_data")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks._get_collections")
     @patch("proc.tasks.TaskTracker")
     def test_schedules_publish_issue_for_qa_and_public_per_collection(
         self,
         mock_task_tracker_cls,
         mock_get_collections,
-        mock_fix_publication_status,
         mock_get_api_data,
         mock_issue_proc_cls,
         mock_apply_async,
     ):
+        mock_fix_publication_status = mock_issue_proc_cls.fix_publication_status
         _make_task_tracker_mock(mock_task_tracker_cls)
         collection = MagicMock()
         mock_get_collections.return_value = [collection]
@@ -352,18 +441,17 @@ class TaskPublishIssuesTest(TestCase):
     @patch.object(tasks.task_publish_issue, "apply_async")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.get_api_data")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks._get_collections")
     @patch("proc.tasks.TaskTracker")
     def test_skips_website_kind_when_api_data_missing_or_has_error(
         self,
         mock_task_tracker_cls,
         mock_get_collections,
-        mock_fix_publication_status,
         mock_get_api_data,
         mock_issue_proc_cls,
         mock_apply_async,
     ):
+        mock_fix_publication_status = mock_issue_proc_cls.fix_publication_status
         collection = MagicMock()
         mock_get_collections.return_value = [collection]
         # QA sem dados (falsy), PUBLIC com erro reportado pela API
@@ -378,18 +466,17 @@ class TaskPublishIssuesTest(TestCase):
     @patch.object(tasks.task_publish_issue, "apply_async")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.get_api_data")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks._get_collections")
     @patch("proc.tasks.TaskTracker")
     def test_exception_scheduling_one_item_does_not_stop_others(
         self,
         mock_task_tracker_cls,
         mock_get_collections,
-        mock_fix_publication_status,
         mock_get_api_data,
         mock_issue_proc_cls,
         mock_apply_async,
     ):
+        mock_fix_publication_status = mock_issue_proc_cls.fix_publication_status
         mock_task_tracker = _make_task_tracker_mock(mock_task_tracker_cls)
         collection = MagicMock()
         mock_get_collections.return_value = [collection]
@@ -397,8 +484,8 @@ class TaskPublishIssuesTest(TestCase):
         # a um único par collection x website_kind)
         mock_get_api_data.side_effect = [{"qa": True}, None]
 
-        issue_proc_1 = MagicMock(id=1)
-        issue_proc_2 = MagicMock(id=2)
+        issue_proc_1 = MagicMock(id=1, migration_status="DONE")
+        issue_proc_2 = MagicMock(id=2, migration_status="DONE")
         mock_issue_proc_cls.items_to_publish.return_value = _make_queryset_mock(
             [issue_proc_1, issue_proc_2]
         )

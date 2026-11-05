@@ -118,7 +118,7 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
     @patch("proc.tasks.task_fix_issue_articles")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.migration_controller")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.JournalProc")
     @patch("proc.tasks.TaskTracker")
     def test_happy_path(
@@ -182,7 +182,7 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
     @patch("proc.tasks.task_migrate_and_publish_articles_by_issue")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.migration_controller")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.JournalProc")
     @patch("proc.tasks.TaskTracker")
     def test_exception_during_import_calls_finish_with_exception(
@@ -216,7 +216,7 @@ class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
     @patch("proc.tasks.task_fix_issue_articles")
     @patch("proc.tasks.get_api_data")
     @patch("proc.tasks.migration_controller")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.JournalProc")
     @patch("proc.tasks.TaskTracker")
     def test_exclude_invalid_articles_response_flows_into_delay_kwargs_per_issue(
@@ -304,7 +304,10 @@ class TaskMigrateAndPublishArticlesByIssueTest(TestCase):
 
         task_migrate_and_publish_articles_by_issue(issue_proc_id=5)
 
-        mock_issue.migrate_document_records.assert_called_once_with(None, False)
+        mock_issue.migrate_document_records.assert_called_once()
+        args, kwargs = mock_issue.migrate_document_records.call_args
+        self.assertEqual(args, (None, False))
+        self.assertCountEqual(kwargs["status"], ["TODO", "REPROC"])
         mock_issue.migrate_document_files.assert_called_once_with(
             None, False, mock_migration_controller.migrate_issue_files
         )
@@ -387,7 +390,7 @@ class TaskMigrateAndPublishArticlesByIssueTest(TestCase):
             "collection", "journal_proc"
         )
         mock_article_proc.select_items.assert_called_once_with(
-            issue_proc_id=5, status_list=None
+            issue_proc_id=5, status_list=None, include_id_list=[]
         )
         delay_kwargs = mock_publish_issue_articles.delay.call_args.kwargs
         self.assertEqual(delay_kwargs["user_id"], None)
@@ -399,6 +402,130 @@ class TaskMigrateAndPublishArticlesByIssueTest(TestCase):
         self.assertIn("REPROC", delay_kwargs["status"])
         self.assertIn("TODO", delay_kwargs["status"])
         self.assertIn("DONE", delay_kwargs["status"])
+
+    @patch("proc.tasks.get_total_status_data")
+    @patch("proc.tasks.task_publish_issue_articles")
+    @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.migration_controller")
+    @patch("proc.tasks.IssueProc")
+    @patch("proc.tasks.TaskTracker")
+    def test_migrates_only_articles_that_need_migration(
+        self,
+        mock_task_tracker,
+        mock_issue_proc,
+        mock_migration_controller,
+        mock_article_proc,
+        mock_publish_issue_articles,
+        mock_get_total_status_data,
+    ):
+        mock_get_total_status_data.return_value = {}
+        mock_issue_proc.objects.select_related.return_value.get.return_value = (
+            MagicMock()
+        )
+        to_migrate = MagicMock(id=1, pid="pid-1", migration_status="TODO")
+        to_migrate.needs_migration.return_value = True
+        # já migrado, com qa_ws_status/public_ws_status pendente
+        to_publish = MagicMock(id=2, pid="pid-2", migration_status="DONE")
+        to_publish.needs_migration.return_value = False
+        # aguarda ação do usuário: nem migra, nem publica
+        pending = MagicMock(id=3, pid="pid-3", migration_status="PENDING")
+        pending.needs_migration.return_value = False
+        mock_article_proc.select_items.return_value = make_id_queryset(
+            [to_migrate, to_publish, pending]
+        )
+
+        task_migrate_and_publish_articles_by_issue(
+            issue_proc_id=5, status=["TODO", "REPROC"]
+        )
+
+        to_migrate.migrate_article.assert_called_once_with(None, False)
+        to_publish.migrate_article.assert_not_called()
+        pending.migrate_article.assert_not_called()
+        to_migrate.needs_migration.assert_called_once()
+        self.assertCountEqual(
+            to_migrate.needs_migration.call_args.args[0], ["TODO", "REPROC"]
+        )
+        delay_kwargs = mock_publish_issue_articles.delay.call_args.kwargs
+        self.assertEqual(delay_kwargs["articleprocs_id_list"], [1, 2])
+        self.assertEqual(delay_kwargs["migrated_articleprocs_id_list"], [1])
+
+    @patch("proc.tasks.get_total_status_data")
+    @patch("proc.tasks.task_publish_issue_articles")
+    @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.migration_controller")
+    @patch("proc.tasks.IssueProc")
+    @patch("proc.tasks.TaskTracker")
+    def test_reset_article_is_migrated_even_if_status_is_blocked(
+        self,
+        mock_task_tracker,
+        mock_issue_proc,
+        mock_migration_controller,
+        mock_article_proc,
+        mock_publish_issue_articles,
+        mock_get_total_status_data,
+    ):
+        # retomada pedida com status=["BLOCKED"]: o registro foi relido e o
+        # processo do artigo resetado (TODO)
+        mock_get_total_status_data.return_value = {}
+        issue_proc = MagicMock()
+        issue_proc.migrate_document_records.return_value = {
+            "reset_article_proc_ids": [1]
+        }
+        mock_issue_proc.objects.select_related.return_value.get.return_value = (
+            issue_proc
+        )
+        reset = MagicMock(id=1, pid="pid-1", migration_status="TODO")
+        reset.needs_migration.return_value = False
+        blocked = MagicMock(id=2, pid="pid-2", migration_status="TODO")
+        blocked.needs_migration.return_value = True
+        mock_article_proc.select_items.return_value = make_id_queryset(
+            [reset, blocked]
+        )
+
+        task_migrate_and_publish_articles_by_issue(
+            issue_proc_id=5, status=["BLOCKED"]
+        )
+
+        issue_proc.migrate_document_records.assert_called_once_with(
+            None, False, status=["BLOCKED"]
+        )
+        mock_article_proc.select_items.assert_called_once_with(
+            issue_proc_id=5, status_list=["BLOCKED"], include_id_list=[1]
+        )
+        reset.migrate_article.assert_called_once_with(None, False)
+        blocked.migrate_article.assert_called_once_with(None, False)
+        delay_kwargs = mock_publish_issue_articles.delay.call_args.kwargs
+        self.assertEqual(delay_kwargs["migrated_articleprocs_id_list"], [1, 2])
+
+    @patch("proc.tasks.get_total_status_data")
+    @patch("proc.tasks.task_publish_issue_articles")
+    @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.migration_controller")
+    @patch("proc.tasks.IssueProc")
+    @patch("proc.tasks.TaskTracker")
+    def test_failed_migration_is_not_published(
+        self,
+        mock_task_tracker,
+        mock_issue_proc,
+        mock_migration_controller,
+        mock_article_proc,
+        mock_publish_issue_articles,
+        mock_get_total_status_data,
+    ):
+        mock_get_total_status_data.return_value = {}
+        mock_issue_proc.objects.select_related.return_value.get.return_value = (
+            MagicMock()
+        )
+        article = MagicMock(id=1, pid="pid-1", migration_status="TODO")
+        article.needs_migration.return_value = True
+        article.migrate_article.return_value = None
+        mock_article_proc.select_items.return_value = make_id_queryset([article])
+
+        task_migrate_and_publish_articles_by_issue(issue_proc_id=5)
+
+        delay_kwargs = mock_publish_issue_articles.delay.call_args.kwargs
+        self.assertEqual(delay_kwargs["articleprocs_id_list"], [])
+        self.assertEqual(delay_kwargs["migrated_articleprocs_id_list"], [])
 
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.TaskTracker")
@@ -424,7 +551,6 @@ class TaskPublishIssueArticlesTest(TestCase):
     @patch("proc.tasks.task_sync_issue")
     @patch("proc.tasks.task_publish_article")
     @patch("proc.tasks.WebSiteConfiguration")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.ArticleProc")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.TaskTracker")
@@ -433,12 +559,12 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_task_tracker,
         mock_issue_proc,
         mock_article_proc,
-        mock_fix_pub_status,
         mock_website_config,
         mock_publish_article,
         mock_task_sync_issue,
         mock_get_total_status_data,
     ):
+        mock_fix_pub_status = mock_article_proc.fix_publication_status
         mock_tracker_instance = MagicMock()
         mock_task_tracker.create.return_value = mock_tracker_instance
         mock_get_total_status_data.return_value = {}
@@ -449,16 +575,7 @@ class TaskPublishIssueArticlesTest(TestCase):
             mock_issue
         )
 
-        mock_articles = MagicMock()
-        mock_article_proc.objects.select_related.return_value.filter.return_value = (
-            mock_articles
-        )
-        mock_articles.exists.return_value = True
-        mock_articles.first.return_value.issue_proc = mock_issue
-        ids_qs = make_id_queryset([101, 102])
-        mock_filtered = MagicMock()
-        mock_filtered.values_list.return_value = ids_qs
-        mock_articles.filter.return_value = mock_filtered
+        mock_article_proc.select_items_to_publish.return_value = [101, 102]
 
         website = MagicMock()
         website.id = 7
@@ -499,7 +616,6 @@ class TaskPublishIssueArticlesTest(TestCase):
     @patch("proc.tasks.task_sync_issue")
     @patch("proc.tasks.task_publish_article")
     @patch("proc.tasks.WebSiteConfiguration")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.ArticleProc")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.TaskTracker")
@@ -508,12 +624,12 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_task_tracker,
         mock_issue_proc,
         mock_article_proc,
-        mock_fix_pub_status,
         mock_website_config,
         mock_publish_article,
         mock_task_sync_issue,
         mock_get_total_status_data,
     ):
+        mock_fix_pub_status = mock_article_proc.fix_publication_status
         mock_get_total_status_data.return_value = {}
         mock_issue_proc.objects.select_related.return_value.get.return_value = (
             MagicMock()
@@ -529,7 +645,6 @@ class TaskPublishIssueArticlesTest(TestCase):
     @patch("proc.tasks.task_sync_issue")
     @patch("proc.tasks.task_publish_article")
     @patch("proc.tasks.WebSiteConfiguration")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.ArticleProc")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.TaskTracker")
@@ -538,27 +653,18 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_task_tracker,
         mock_issue_proc,
         mock_article_proc,
-        mock_fix_pub_status,
         mock_website_config,
         mock_publish_article,
         mock_task_sync_issue,
         mock_get_total_status_data,
     ):
+        mock_fix_pub_status = mock_article_proc.fix_publication_status
         mock_get_total_status_data.return_value = {}
         mock_issue_proc.objects.select_related.return_value.get.return_value = (
             MagicMock()
         )
 
-        mock_articles = MagicMock()
-        mock_article_proc.objects.select_related.return_value.filter.return_value = (
-            mock_articles
-        )
-        mock_articles.exists.return_value = True
-        mock_articles.first.return_value.issue_proc = MagicMock()
-        ids_qs = make_id_queryset([101, 102])
-        mock_filtered = MagicMock()
-        mock_filtered.values_list.return_value = ids_qs
-        mock_articles.filter.return_value = mock_filtered
+        mock_article_proc.select_items_to_publish.return_value = [101, 102]
 
         website = MagicMock(id=7, purpose="QA")
         website.get_data.return_value = {}
@@ -574,7 +680,6 @@ class TaskPublishIssueArticlesTest(TestCase):
     @patch("proc.tasks.task_sync_issue")
     @patch("proc.tasks.task_publish_article")
     @patch("proc.tasks.WebSiteConfiguration")
-    @patch("proc.tasks.fix_publication_status")
     @patch("proc.tasks.ArticleProc")
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.TaskTracker")
@@ -583,35 +688,25 @@ class TaskPublishIssueArticlesTest(TestCase):
         mock_task_tracker,
         mock_issue_proc,
         mock_article_proc,
-        mock_fix_pub_status,
         mock_website_config,
         mock_publish_article,
         mock_task_sync_issue,
         mock_get_total_status_data,
     ):
+        mock_fix_pub_status = mock_article_proc.fix_publication_status
         mock_get_total_status_data.return_value = {}
         mock_issue_proc.objects.select_related.return_value.get.return_value = (
             MagicMock()
         )
 
-        mock_articles = MagicMock()
-        mock_article_proc.objects.select_related.return_value.filter.return_value = (
-            mock_articles
-        )
-        mock_articles.exists.return_value = True
-        mock_articles.first.return_value.issue_proc = MagicMock()
-        mock_filtered = MagicMock()
-        mock_filtered.values_list.side_effect = [
-            make_id_queryset([101]),
-            make_id_queryset([201]),
-        ]
-        mock_articles.filter.return_value = mock_filtered
+        mock_article_proc.select_items_to_publish.side_effect = [[101], [201]]
 
         qa_website = MagicMock(id=1, purpose="QA")
         qa_website.get_data.return_value = {"kind": "qa"}
         public_website = MagicMock(id=2, purpose="PUBLIC")
         public_website.get_data.return_value = {"kind": "public"}
-        mock_website_config.objects.filter.return_value = [qa_website, public_website]
+        # PUBLIC antes de QA na consulta: a tarefa publica primeiro no QA
+        mock_website_config.objects.filter.return_value = [public_website, qa_website]
 
         task_publish_issue_articles(issue_proc_id=5, articleprocs_id_list=[101, 201])
 
@@ -621,6 +716,82 @@ class TaskPublishIssueArticlesTest(TestCase):
         ]
         self.assertEqual(website_kinds, ["QA", "PUBLIC"])
         self.assertEqual(mock_publish_article.call_count, 2)
+        selected_kinds = [
+            c.args[1] for c in mock_article_proc.select_items_to_publish.call_args_list
+        ]
+        self.assertEqual(selected_kinds, ["QA", "PUBLIC"])
+
+    @patch("proc.tasks.get_total_status_data")
+    @patch("proc.tasks.task_sync_issue")
+    @patch("proc.tasks.task_publish_article")
+    @patch("proc.tasks.WebSiteConfiguration")
+    @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.IssueProc")
+    @patch("proc.tasks.TaskTracker")
+    def test_without_articleprocs_id_list_considers_all_issue_articles(
+        self,
+        mock_task_tracker,
+        mock_issue_proc,
+        mock_article_proc,
+        mock_website_config,
+        mock_publish_article,
+        mock_task_sync_issue,
+        mock_get_total_status_data,
+    ):
+        # publicação avulsa (task_publish_articles)
+        mock_get_total_status_data.return_value = {}
+        issue_proc = MagicMock()
+        mock_issue_proc.objects.select_related.return_value.get.return_value = (
+            issue_proc
+        )
+        mock_article_proc.select_items_to_publish.return_value = [101]
+        website = MagicMock(id=7, purpose="QA")
+        mock_website_config.objects.filter.return_value = [website]
+
+        task_publish_issue_articles(issue_proc_id=5, status=["TODO"])
+
+        mock_article_proc.objects.filter.assert_called_once_with(issue_proc=issue_proc)
+        args, kwargs = mock_article_proc.select_items_to_publish.call_args
+        self.assertEqual(args[0], mock_article_proc.objects.filter.return_value)
+        self.assertEqual(args[2], ["TODO"])
+        self.assertIsNone(kwargs["migrated_ids"])
+        self.assertEqual(mock_publish_article.call_count, 1)
+
+    @patch("proc.tasks.get_total_status_data")
+    @patch("proc.tasks.task_sync_issue")
+    @patch("proc.tasks.task_publish_article")
+    @patch("proc.tasks.WebSiteConfiguration")
+    @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.IssueProc")
+    @patch("proc.tasks.TaskTracker")
+    def test_migrated_ids_are_forwarded_to_selection(
+        self,
+        mock_task_tracker,
+        mock_issue_proc,
+        mock_article_proc,
+        mock_website_config,
+        mock_publish_article,
+        mock_task_sync_issue,
+        mock_get_total_status_data,
+    ):
+        mock_get_total_status_data.return_value = {}
+        mock_issue_proc.objects.select_related.return_value.get.return_value = (
+            MagicMock()
+        )
+        mock_article_proc.select_items_to_publish.return_value = []
+        mock_website_config.objects.filter.return_value = [
+            MagicMock(id=7, purpose="QA")
+        ]
+
+        task_publish_issue_articles(
+            issue_proc_id=5,
+            articleprocs_id_list=[101, 102],
+            migrated_articleprocs_id_list=[101],
+        )
+
+        mock_article_proc.objects.filter.assert_called_once_with(id__in=[101, 102])
+        _, kwargs = mock_article_proc.select_items_to_publish.call_args
+        self.assertEqual(kwargs["migrated_ids"], [101])
 
     @patch("proc.tasks.IssueProc")
     @patch("proc.tasks.TaskTracker")
@@ -730,7 +901,7 @@ class TaskPublishArticlesTest(TestCase):
 
     @patch("proc.tasks.task_publish_issue_articles")
     @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.Collection")
     def test_happy_path_schedules_publish_per_issue(
         self, mock_collection, mock_fix_pub_status, mock_issue_proc, mock_publish_issue_articles
@@ -768,7 +939,7 @@ class TaskPublishArticlesTest(TestCase):
 
     @patch("proc.tasks.task_publish_issue_articles")
     @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.Collection")
     def test_fix_publication_status_called_per_collection_but_select_items_called_once(
         self, mock_collection, mock_fix_pub_status, mock_issue_proc, mock_publish_issue_articles
@@ -787,7 +958,7 @@ class TaskPublishArticlesTest(TestCase):
     @patch("proc.tasks.UnexpectedEvent")
     @patch("proc.tasks.task_publish_issue_articles")
     @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.fix_publication_status")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
     @patch("proc.tasks.Collection")
     def test_exception_path_calls_unexpected_event_create(
         self,

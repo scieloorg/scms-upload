@@ -437,28 +437,15 @@ class MigratedFile(CommonControlField):
         ]
 
     @classmethod
-    def has_changes(cls, user, collection, file_path, force_update):
-        if not force_update:
-            try:
-                file_datetime_iso = modified_date(file_path)
-                if cls.objects.filter(
-                    collection=collection,
-                    original_path=file_path,
-                    file_datetime_iso=file_datetime_iso,
-                ).exists():
-                    return False
-            except cls.DoesNotExist:
-                pass
-
-        cls.create_or_update(
-            user=user,
+    def has_changes(cls, collection, file_path, force_update=False):
+        if force_update:
+            return True
+        file_datetime_iso = modified_date(file_path)
+        return not cls.objects.filter(
             collection=collection,
             original_path=file_path,
-            source_path=file_path,
-            component_type="id_file",
-            force_update=force_update,
-        )
-        return True
+            file_datetime_iso=file_datetime_iso,
+        ).exists()
 
     @classmethod
     def get(

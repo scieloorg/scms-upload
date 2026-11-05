@@ -31,7 +31,13 @@ from journal.models import (
     Subject,
 )
 from location.models import Location
-from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile, ClassicWebsiteConfiguration
+from migration.models import (
+    ClassicWebsiteConfiguration,
+    IdFileRecord,
+    JournalAcronIdFile,
+    MigratedFile,
+    modified_date,
+)
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 
@@ -52,8 +58,12 @@ def create_or_update_journal(
     try:
         journal_proc_event = journal_proc.start(user, "create_or_update_journal")
         collection = journal_proc.collection
-        journal_data = journal_proc.migrated_data.data
 
+        migrated_data = journal_proc.migrated_data
+        if not migrated_data:
+            raise ValueError(f"Missing migrated_data for {journal_proc}")
+
+        journal_data = migrated_data.data
         # obtém classic website journal
         classic_website_journal = classic_ws.Journal(journal_data)
 
@@ -393,6 +403,7 @@ def create_or_update_article(
         article_proc.sps_pkg,
         issue=article_proc.issue_proc.issue,
         journal=article_proc.issue_proc.journal_proc.journal,
+        collection=article_proc.collection,
     )
     article_proc.migrated_data.migration_status = tracker_choices.PROGRESS_STATUS_DONE
     article_proc.migration_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -474,8 +485,13 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
             journal_acron,
             issue_folder,
         )
+        # o mesmo arquivo pode ser retornado mais de uma vez
+        # (ex.: arquivos de bases também encontrados como "asset");
+        # mantém o primeiro, que tem o tipo mais específico
+        processed_paths = set()
         for file in files_and_exceptions:
             exception = {}
+            original_path = None
             try:
                 if not file:
                     continue
@@ -486,6 +502,11 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                     exceptions.append(exception)
                     continue
 
+                original_path = file["relative_path"]
+                if original_path in processed_paths:
+                    continue
+                processed_paths.add(original_path)
+
                 component_type = check_component_type(file)
                 part = file.get("part")
 
@@ -493,7 +514,7 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                     MigratedFile.create_or_update(
                         user=user,
                         collection=collection,
-                        original_path=file["relative_path"],
+                        original_path=original_path,
                         source_path=file["path"],
                         component_type=component_type,
                         lang=file.get("lang"),
@@ -507,6 +528,7 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                 )
 
             except Exception as e:
+                exception["original_path"] = original_path
                 exception["error"] = str(e)
                 exception["type"] = str(type(e))
                 exceptions.append(exception)
@@ -581,15 +603,16 @@ class PkgZipBuilder:
             try:
                 if rendition.lang:
                     sps_filename = f"{self.sps_pkg_name}-{rendition.lang}.pdf"
-                    pdf_langs.add(rendition.lang)
+                    pdf_lang = rendition.lang
                 else:
                     sps_filename = f"{self.sps_pkg_name}.pdf"
-                    pdf_langs.add(xml_langs[0])
+                    pdf_lang = xml_langs[0]
+                pdf_langs.add(pdf_lang)
 
                 zf.write(rendition.file.path, arcname=sps_filename)
 
                 self.components[sps_filename] = {
-                    "lang": rendition.lang,
+                    "lang": pdf_lang,
                     "legacy_uri": rendition.original_href,
                     "component_type": "rendition",
                 }
@@ -747,6 +770,10 @@ def import_journal_acron_id_records(
             journal_acron + ".id",
         )
 
+        # data do arquivo antes da leitura: se o arquivo mudar durante a
+        # leitura, será lido novamente na próxima execução
+        file_datetime_iso = modified_date(source_path)
+
         journal_id_file = JournalAcronIdFile.create_or_update(
             user=user,
             collection=collection,
@@ -755,22 +782,46 @@ def import_journal_acron_id_records(
             force_update=force_update,
         )
 
-        if force_update or journal_id_file.data.get(
-            "id_file_record_need_to_be_updated"
-        ):
-            for item in get_bases_work_acron_id_file_records(
-                source_path,
-                classic_website,
-            ):
-                if item.get("exception"):
-                    exceptions.append(item.get("exception"))
-                    continue
+        # o arquivo só é marcado como lido (MigratedFile) se for lido
+        # completamente; assim, uma leitura interrompida é refeita na
+        # próxima execução
+        has_changes = MigratedFile.has_changes(
+            collection, source_path, force_update
+        )
+        if has_changes:
+            try:
+                for item in get_bases_work_acron_id_file_records(
+                    source_path,
+                    classic_website,
+                ):
+                    if item.get("exception"):
+                        # falha em registro individual: não impede a
+                        # marcação do arquivo como lido
+                        exceptions.append(item.get("exception"))
+                        continue
 
-                item["force_update"] = force_update
-                IdFileRecord.create_or_update(
-                    user,
-                    journal_id_file,
-                    **item,
+                    item["force_update"] = force_update
+                    IdFileRecord.create_or_update(
+                        user,
+                        journal_id_file,
+                        **item,
+                    )
+            except Exception:
+                # leitura incompleta: não marca como lido; os registros já
+                # carregados (todo=True) podem ser processados
+                tb = traceback.format_exc()
+                message = str(
+                    _("Incomplete reading of acron.id; it will be read again in the next execution")
+                )
+            else:
+                MigratedFile.create_or_update(
+                    user=user,
+                    collection=collection,
+                    original_path=source_path,
+                    source_path=source_path,
+                    component_type="id_file",
+                    force_update=force_update,
+                    file_datetime_iso=file_datetime_iso,
                 )
         else:
             message = str(_("IdFileRecord is already up-to-date with acron.id"))
@@ -847,7 +898,3 @@ def get_bases_work_acron_id_file_records(
                 item_pid=doc_id or issue_id,
                 exception=str(e)
             )
-
-
-def id_file_has_changes(user, collection, id_path, force_update):
-    return MigratedFile.has_changes(user, collection, id_path, force_update)

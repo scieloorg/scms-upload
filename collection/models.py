@@ -1,7 +1,12 @@
 import logging
 
 from langdetect import detect
+from django import forms
+from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
+from django.core.cache import cache
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -13,9 +18,48 @@ from collection.utils import get_valid_language_code
 from core.choices import LANGUAGE
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
+from core.utils.requester import fetch_data
 
 
 class LanguageGetOrCreateError(Exception): ...
+
+
+class ChoiceArrayField(ArrayField):
+    """
+    ArrayField cujo formulário apresenta as opções do base_field
+    como múltipla escolha (checkboxes), em vez de texto separado por vírgula.
+    """
+
+    def formfield(self, **kwargs):
+        defaults = {
+            "form_class": forms.TypedMultipleChoiceField,
+            "choices": self.base_field.choices,
+            "coerce": self.base_field.to_python,
+            "widget": forms.CheckboxSelectMultiple,
+        }
+        defaults.update(kwargs)
+        # Ignora ArrayField.formfield (SimpleArrayField)
+        return super(ArrayField, self).formfield(**defaults)
+
+
+ARTICLEMETA_COLLECTIONS_URL = (
+    "https://articlemeta.scielo.org/api/v1/collection/identifiers/"
+)
+
+ENSURE_NETWORK_CLASSIFICATION_CACHE_KEY = "collection.ensure_network_classification"
+# intervalo mínimo (segundos) entre consultas ao articlemeta feitas por
+# Collection.ensure_network_classification
+ENSURE_NETWORK_CLASSIFICATION_INTERVAL = 600
+
+
+def normalize_network_classification(network_classification):
+    """
+    Retorna network_classification como lista ou None
+    Ex.: "scielonetwork" -> ["scielonetwork"]
+    """
+    if isinstance(network_classification, str):
+        network_classification = [network_classification]
+    return [item for item in network_classification or [] if item] or None
 
 
 class Collection(CommonControlField):
@@ -33,8 +77,31 @@ class Collection(CommonControlField):
         _("Collection Acronym"), max_length=16, null=True, blank=True
     )
     name = models.CharField(_("Collection Name"), max_length=64, null=True, blank=True)
+    platform_status = models.CharField(
+        _("Platform Status"),
+        choices=choices.PLATFORM_STATUS,
+        max_length=20,
+        null=True,
+        blank=True,
+    )
+    network_classification = ChoiceArrayField(
+        models.CharField(
+            max_length=20,
+            choices=choices.NETWORK_CLASSIFICATION,
+        ),
+        verbose_name=_("Network classification"),
+        null=True,
+        blank=True,
+    )
 
     base_form_class = CoreAdminModelForm
+
+    panels = [
+        FieldPanel("acron"),
+        FieldPanel("name"),
+        FieldPanel("platform_status"),
+        FieldPanel("network_classification", widget=forms.CheckboxSelectMultiple),
+    ]
 
     autocomplete_search_field = "name"
 
@@ -48,17 +115,139 @@ class Collection(CommonControlField):
         raise ValueError("Collection.get requires acron")
 
     @classmethod
-    def get_or_create(cls, acron, name=None, user=None):
+    def get_or_create(
+        cls,
+        acron,
+        name=None,
+        user=None,
+        platform_status=None,
+        network_classification=None,
+    ):
+        network_classification = normalize_network_classification(
+            network_classification
+        )
         try:
-            return Collection.get(acron=acron)
+            collection = Collection.get(acron=acron)
         except Collection.DoesNotExist:
             collection = Collection()
             collection.acron = acron
             collection.name = name
+            collection.platform_status = platform_status
+            collection.network_classification = network_classification
             collection.creator = user
             collection.save()
             return collection
-    
+
+        # completa / atualiza os dados informados
+        changed = False
+        if platform_status and collection.platform_status != platform_status:
+            collection.platform_status = platform_status
+            changed = True
+        if (
+            network_classification
+            and collection.network_classification != network_classification
+        ):
+            collection.network_classification = network_classification
+            changed = True
+        if changed:
+            collection.updated_by = user
+            collection.save()
+        return collection
+
+    @classmethod
+    def get_collections_without_network_classification(cls):
+        return cls.objects.filter(
+            models.Q(network_classification__isnull=True)
+            | models.Q(network_classification=[])
+        )
+
+    @classmethod
+    def ensure_network_classification(cls, user):
+        """
+        Garante network_classification das coleções antes de seu uso para
+        identificar a coleção principal (ex.: PidProviderXML.register de
+        artigos publicados em mais de uma coleção).
+
+        Consulta o articlemeta somente se há coleções sem esse dado e, no
+        máximo, uma vez a cada ENSURE_NETWORK_CLASSIFICATION_INTERVAL
+        segundos, evitando uma consulta por registro quando o articlemeta
+        está indisponível ou não tem a coleção.
+        Falhas são registradas no log e não interrompem quem chama.
+        """
+        if not getattr(settings, "COLLECTION_ENSURE_NETWORK_CLASSIFICATION", True):
+            return None
+        try:
+            if not cls.get_collections_without_network_classification().exists():
+                return None
+            # cache.add é atômico: somente um processo consulta o articlemeta
+            if not cache.add(
+                ENSURE_NETWORK_CLASSIFICATION_CACHE_KEY,
+                True,
+                ENSURE_NETWORK_CLASSIFICATION_INTERVAL,
+            ):
+                return None
+            return cls.complete_network_classification(user)
+        except Exception as e:
+            logging.exception(f"Collection.ensure_network_classification: {e}")
+            return None
+
+    @classmethod
+    def complete_network_classification(cls, user, collections_data=None, verify=False):
+        """
+        Preenche em lote network_classification das coleções que estão
+        sem esse dado, a partir dos dados do articlemeta.
+        Coleções já preenchidas não são alteradas.
+        """
+        queryset = cls.get_collections_without_network_classification()
+        result = {"updated": [], "not_found": []}
+        if not queryset.exists():
+            return result
+
+        if not collections_data:
+            collections_data = fetch_data(
+                ARTICLEMETA_COLLECTIONS_URL,
+                json=True,
+                verify=verify,
+            )
+        network_classification_by_acron = {
+            item.get("acron"): normalize_network_classification(
+                item.get("network_classification")
+            )
+            for item in collections_data
+        }
+
+        now = timezone.now()
+        items = []
+        for obj in queryset:
+            network_classification = network_classification_by_acron.get(obj.acron)
+            if not network_classification:
+                result["not_found"].append(obj.acron)
+                continue
+            obj.network_classification = network_classification
+            obj.updated_by = user
+            # bulk_update não aplica auto_now
+            obj.updated = now
+            items.append(obj)
+            result["updated"].append(obj.acron)
+
+        cls.objects.bulk_update(
+            items, ["network_classification", "updated_by", "updated"]
+        )
+        logging.info(f"Collection.complete_network_classification: {result}")
+        return result
+
+    @classmethod
+    def get_national_journal_collections(cls):
+        """
+        Retorna as coleções cuja classificação de rede
+        é exclusivamente scielonetwork
+        """
+        return cls.objects.filter(network_classification=["scielonetwork"])
+
+    @property
+    def is_national_journal_collection(self):
+        return self.network_classification == ["scielonetwork"]
+
     def get_website_config(self, purpose, content_type):
         ws = WebSiteConfiguration.get(collection=self, purpose=purpose)
         return ws.get_data(content_type=content_type)

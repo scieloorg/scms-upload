@@ -103,8 +103,12 @@ class ArticleAvailability(ClusterableModel, CommonControlField):
             )
 
     def create_or_update_urls(self, user, website_url, timeout=None):
-        webpage_items = self.article.get_webpage_items(
-            website_url, purpose="QA"
+        # acrônimo do periódico na coleção do artigo
+        article = self.article
+        webpage_items = article.get_webpage_items(
+            website_url,
+            purpose="QA",
+            journal_acron=article.journal.get_acron(article.collection),
         )
         for webpage_item in webpage_items:
             ScieloURLStatus.create_or_update(
