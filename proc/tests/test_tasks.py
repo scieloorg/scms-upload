@@ -8,6 +8,7 @@ from django.test import TestCase
 from migration import choices as migration_choices
 from tracker import choices as tracker_choices
 from proc import tasks
+from proc.models import ArticleProc, IssueProc, JournalProc
 
 User = get_user_model()
 
@@ -418,100 +419,83 @@ class GetCollectionsTest(TestCase):
 
 
 class FixPublicationStatusTest(TestCase):
-    """Testes para fix_publication_status: TODO <-> IGNORED conforme WebSiteConfiguration."""
+    """Testes para *Proc.fix_publication_status: TODO <-> IGNORED conforme
+    WebSiteConfiguration, somente nos itens da classe chamada."""
 
-    @patch("proc.tasks.ArticleProc")
-    @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.JournalProc")
-    @patch("proc.tasks.WebSiteConfiguration")
-    def test_qa_enabled_public_disabled(
-        self, mock_wsc, mock_journal_proc, mock_issue_proc, mock_article_proc
-    ):
-        mock_wsc.objects.filter.return_value.values_list.return_value = ["QA"]
+    PROC_CLASSES = (JournalProc, IssueProc, ArticleProc)
+
+    def _run(self, proc_class, enabled_purposes):
         collection = MagicMock()
+        with patch("proc.models.WebSiteConfiguration") as mock_wsc, patch.object(
+            JournalProc, "objects"
+        ) as journal_objects, patch.object(
+            IssueProc, "objects"
+        ) as issue_objects, patch.object(
+            ArticleProc, "objects"
+        ) as article_objects:
+            mock_wsc.objects.filter.return_value.values_list.return_value = (
+                enabled_purposes
+            )
+            proc_class.fix_publication_status(collection)
+            mock_wsc.objects.filter.assert_called_once_with(
+                collection=collection, enabled=True
+            )
+        objects = {
+            JournalProc: journal_objects,
+            IssueProc: issue_objects,
+            ArticleProc: article_objects,
+        }
+        for other_class, other_objects in objects.items():
+            if other_class is not proc_class:
+                other_objects.filter.assert_not_called()
+        return collection, objects[proc_class]
 
-        tasks.fix_publication_status(collection)
-
-        mock_wsc.objects.filter.assert_called_once_with(
-            collection=collection, enabled=True
+    def _assert_updates(self, collection, objects, qa_from, qa_to, public_from, public_to):
+        objects.filter.assert_any_call(collection=collection, qa_ws_status=qa_from)
+        objects.filter.assert_any_call(
+            collection=collection, public_ws_status=public_from
         )
-        mock_wsc.objects.filter.return_value.values_list.assert_called_once_with(
-            "purpose", flat=True
-        )
+        objects.filter.return_value.update.assert_any_call(qa_ws_status=qa_to)
+        objects.filter.return_value.update.assert_any_call(public_ws_status=public_to)
 
-        for mock_model in (mock_journal_proc, mock_issue_proc, mock_article_proc):
-            # QA habilitado: IGNORED -> TODO
-            mock_model.objects.filter.assert_any_call(
-                collection=collection,
-                qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED,
-            )
-            # PUBLIC desabilitado: TODO -> IGNORED
-            mock_model.objects.filter.assert_any_call(
-                collection=collection,
-                public_ws_status=tracker_choices.PROGRESS_STATUS_TODO,
-            )
-            mock_model.objects.filter.return_value.update.assert_any_call(
-                qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO
-            )
-            mock_model.objects.filter.return_value.update.assert_any_call(
-                public_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
-            )
+    def test_qa_enabled_public_disabled(self):
+        for proc_class in self.PROC_CLASSES:
+            with self.subTest(proc_class=proc_class.__name__):
+                collection, objects = self._run(proc_class, ["QA"])
+                self._assert_updates(
+                    collection,
+                    objects,
+                    tracker_choices.PROGRESS_STATUS_IGNORED,
+                    tracker_choices.PROGRESS_STATUS_TODO,
+                    tracker_choices.PROGRESS_STATUS_TODO,
+                    tracker_choices.PROGRESS_STATUS_IGNORED,
+                )
 
-    @patch("proc.tasks.ArticleProc")
-    @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.JournalProc")
-    @patch("proc.tasks.WebSiteConfiguration")
-    def test_both_disabled(
-        self, mock_wsc, mock_journal_proc, mock_issue_proc, mock_article_proc
-    ):
-        mock_wsc.objects.filter.return_value.values_list.return_value = []
-        collection = MagicMock()
+    def test_both_disabled(self):
+        for proc_class in self.PROC_CLASSES:
+            with self.subTest(proc_class=proc_class.__name__):
+                collection, objects = self._run(proc_class, [])
+                self._assert_updates(
+                    collection,
+                    objects,
+                    tracker_choices.PROGRESS_STATUS_TODO,
+                    tracker_choices.PROGRESS_STATUS_IGNORED,
+                    tracker_choices.PROGRESS_STATUS_TODO,
+                    tracker_choices.PROGRESS_STATUS_IGNORED,
+                )
 
-        tasks.fix_publication_status(collection)
-
-        for mock_model in (mock_journal_proc, mock_issue_proc, mock_article_proc):
-            mock_model.objects.filter.assert_any_call(
-                collection=collection,
-                qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO,
-            )
-            mock_model.objects.filter.assert_any_call(
-                collection=collection,
-                public_ws_status=tracker_choices.PROGRESS_STATUS_TODO,
-            )
-            mock_model.objects.filter.return_value.update.assert_any_call(
-                qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
-            )
-            mock_model.objects.filter.return_value.update.assert_any_call(
-                public_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED
-            )
-
-    @patch("proc.tasks.ArticleProc")
-    @patch("proc.tasks.IssueProc")
-    @patch("proc.tasks.JournalProc")
-    @patch("proc.tasks.WebSiteConfiguration")
-    def test_both_enabled(
-        self, mock_wsc, mock_journal_proc, mock_issue_proc, mock_article_proc
-    ):
-        mock_wsc.objects.filter.return_value.values_list.return_value = ["QA", "PUBLIC"]
-        collection = MagicMock()
-
-        tasks.fix_publication_status(collection)
-
-        for mock_model in (mock_journal_proc, mock_issue_proc, mock_article_proc):
-            mock_model.objects.filter.assert_any_call(
-                collection=collection,
-                qa_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED,
-            )
-            mock_model.objects.filter.assert_any_call(
-                collection=collection,
-                public_ws_status=tracker_choices.PROGRESS_STATUS_IGNORED,
-            )
-            mock_model.objects.filter.return_value.update.assert_any_call(
-                qa_ws_status=tracker_choices.PROGRESS_STATUS_TODO
-            )
-            mock_model.objects.filter.return_value.update.assert_any_call(
-                public_ws_status=tracker_choices.PROGRESS_STATUS_TODO
-            )
+    def test_both_enabled(self):
+        for proc_class in self.PROC_CLASSES:
+            with self.subTest(proc_class=proc_class.__name__):
+                collection, objects = self._run(proc_class, ["QA", "PUBLIC"])
+                self._assert_updates(
+                    collection,
+                    objects,
+                    tracker_choices.PROGRESS_STATUS_IGNORED,
+                    tracker_choices.PROGRESS_STATUS_TODO,
+                    tracker_choices.PROGRESS_STATUS_IGNORED,
+                    tracker_choices.PROGRESS_STATUS_TODO,
+                )
 
 
 class TaskFetchAndCreateJournalTest(TestCase):
@@ -568,8 +552,8 @@ class TaskFixIssueArticlesTest(TestCase):
     """Testes para task_fix_issue_articles (não usa TaskExecution).
 
     Renomeada de task_exclude_invalid_issue_articles (commit ba92d1335be2):
-    agora sempre reconcilia sps_pkg.ppx (Article.complete_sps_pkg_ppx e
-    ArticleProc.complete_sps_pkg_ppx) e só executa as exclusões destrutivas
+    agora sempre reconcilia sps_pkg.collection_pid_v2
+    (ArticleProc.complete_sps_pkg_ppx) e só executa as exclusões destrutivas
     (SPSPkg/Article/ArticleProc.exclude_invalid_records) quando as flags
     delete_* correspondentes são True.
     """
@@ -587,7 +571,6 @@ class TaskFixIssueArticlesTest(TestCase):
         mock_issue_proc.objects.select_related.return_value.get.return_value = (
             mock_issue_proc_instance
         )
-        mock_article.complete_sps_pkg_ppx.return_value = {"completed": 1}
         mock_article_proc.complete_sps_pkg_ppx.return_value = {"completed": 2}
 
         result = tasks.task_fix_issue_articles(
@@ -598,21 +581,19 @@ class TaskFixIssueArticlesTest(TestCase):
         mock_issue_proc.objects.select_related.return_value.get.assert_called_once_with(
             id=10
         )
-        mock_article.complete_sps_pkg_ppx.assert_called_once_with("USER", mock_issue)
         mock_article_proc.complete_sps_pkg_ppx.assert_called_once_with(
             "USER", issue_proc_id_list=[10]
         )
         mock_article.exclude_invalid_records.assert_not_called()
         mock_article_proc.exclude_invalid_records.assert_not_called()
 
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 2)
         self.assertEqual(result[0], {"params": {
             "delete_article_which_is_duplicated": False,
             "delete_article_which_sps_pkg_is_missing": False,
             "delete_sps_pkg_which_ppx_is_missing": False,
         }})
-        self.assertEqual(result[1]["operation"], "Article.complete_sps_pkg_ppx")
-        self.assertEqual(result[2]["operation"], "ArticleProc.complete_sps_pkg_ppx")
+        self.assertEqual(result[1]["operation"], "ArticleProc.complete_sps_pkg_ppx")
 
     @patch("proc.tasks.SPSPkg")
     @patch("proc.tasks.ArticleProc")
@@ -1299,7 +1280,7 @@ class TaskCheckArticlesAvailabilityTest(TestCase):
         self.assertEqual(
             kwargs,
             {
-                "sps_pkg__pid_v3": "pidv3",
+                "sps_pkg__collection_pid_v2__pid_provider_xml__v3": "pidv3",
                 "issue_proc__issue__publication_year": "2020",
                 "issue_proc__issue__issue_folder": "01",
                 "collection__acron": "scl",

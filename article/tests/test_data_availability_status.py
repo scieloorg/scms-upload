@@ -120,13 +120,13 @@ class UpdateDataAvailabilityStatusTest(TestCase):
     def test_filters_not_processed_by_default(self):
         qs = self._queryset([])
         Article.update_data_availability_status(queryset=qs)
-        qs.filter.assert_any_call(sps_pkg__isnull=False)
+        qs.filter.assert_any_call(collection_pid_v2__sps_pkg__isnull=False)
         qs.filter.assert_any_call(data_availability_status__isnull=True)
 
     def test_force_update_does_not_filter_status(self):
         qs = self._queryset([])
         Article.update_data_availability_status(queryset=qs, force_update=True)
-        qs.filter.assert_called_once_with(sps_pkg__isnull=False)
+        qs.filter.assert_called_once_with(collection_pid_v2__sps_pkg__isnull=False)
 
     def test_skips_article_without_xml(self):
         article = self._article(xmltree=None)

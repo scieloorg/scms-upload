@@ -72,6 +72,7 @@ class JournalViewSet(SnippetViewSet):
         "missing_fields",
         "updated",
     ]
+    ordering = ["-updated"]
     search_fields = [
         "official_journal__issn_electronic",
         "official_journal__issn_print",

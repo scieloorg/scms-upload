@@ -9,6 +9,14 @@ from publication.utils.issue import build_issue
 def publish_issue(issue_proc, api_data):
     issue = issue_proc.issue
     issue_id = issue_proc.pid
+    if not issue_proc.journal_proc:
+        raise ValueError(
+            f"IssueProc {issue_proc} has no journal_proc. Run the issue migration first"
+        )
+    if not issue:
+        raise ValueError(
+            f"IssueProc {issue_proc} has no issue. Run the issue migration first"
+        )
     journal_id = issue_proc.journal_proc.pid
 
     data = {}
@@ -41,7 +49,7 @@ def sync_issue(issue_proc, api_data):
         api.post_data_url = url
         issue_sync_payload = {
             "issue_id": issue_proc.bundle_id,
-            "articles_id": issue.article_ids,
+            "articles_id": issue.get_article_ids(issue_proc.collection),
         }
         response["issue_sync"] = api.post_data(issue_sync_payload)
     except Exception as e:

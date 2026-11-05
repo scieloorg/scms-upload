@@ -21,6 +21,8 @@ from importlib import import_module
 from unittest import mock
 from unittest.mock import MagicMock, call, patch
 
+from django.utils import translation
+
 from migration import controller as migration_controller
 
 MODULE = "migration.controller"
@@ -445,6 +447,7 @@ class CreateOrUpdateArticleTests(unittest.TestCase):
             article_proc.sps_pkg,
             issue=article_proc.issue_proc.issue,
             journal=article_proc.issue_proc.journal_proc.journal,
+            collection=article_proc.collection,
         )
         self.assertEqual(article_proc.migrated_data.migration_status, "done")
         self.assertEqual(article_proc.migration_status, "done")
@@ -596,6 +599,45 @@ class MigrateIssueFilesTests(unittest.TestCase):
         self.assertEqual(result["migrated"], [7])
         self.assertEqual(len(result["exceptions"]), 1)
         self.assertEqual(result["exceptions"][0]["error"], "falha ao salvar")
+
+    @patch("migration.controller.MigratedFile")
+    @patch("migration.controller.get_classic_website")
+    def test_arquivo_duplicado_como_asset_mantem_tipo_original(
+        self, mock_get_cw, mock_migrated_file
+    ):
+        user = MagicMock()
+        collection = MagicMock()
+        collection.acron = "scl"
+
+        classic_website = MagicMock()
+        classic_website.get_issue_folder_content.return_value = [
+            {
+                "path": "/x/bases/xml/revista/v10n1/a.xml",
+                "relative_path": "bases/xml/revista/v10n1/a.xml",
+                "name": "a.xml",
+                "type": "xml",
+            },
+            {
+                "path": "/x/bases/xml/revista/v10n1/a.xml",
+                "relative_path": "bases/xml/revista/v10n1/a.xml",
+                "name": "a.xml",
+                "type": "asset",
+            },
+        ]
+        mock_get_cw.return_value = classic_website
+
+        instance = MagicMock()
+        instance.id = 1
+        mock_migrated_file.create_or_update.return_value = instance
+
+        result = migration_controller.migrate_issue_files(
+            user, collection, "revista", "v10n1", force_update=True
+        )
+
+        self.assertEqual(result["migrated"], [1])
+        mock_migrated_file.create_or_update.assert_called_once()
+        _, kwargs = mock_migrated_file.create_or_update.call_args
+        self.assertEqual(kwargs["component_type"], "xml")
 
 
 # ===========================================================================
@@ -848,31 +890,6 @@ class GetBasesWorkAcronIdFileRecordsTests(unittest.TestCase):
 
 
 # ===========================================================================
-# id_file_has_changes
-# ===========================================================================
-class IdFileHasChangesTests(unittest.TestCase):
-    def setUp(self):
-        from importlib import import_module
-
-        migration_controller = import_module(MODULE)
-
-    @patch("migration.controller.MigratedFile")
-    def test_delega_para_migratedfile_has_changes(self, mock_migrated_file):
-        mock_migrated_file.has_changes.return_value = True
-        user = MagicMock()
-        collection = MagicMock()
-
-        result = migration_controller.id_file_has_changes(
-            user, collection, "/caminho/x.id", force_update=False
-        )
-
-        self.assertTrue(result)
-        mock_migrated_file.has_changes.assert_called_once_with(
-            user, collection, "/caminho/x.id", False
-        )
-
-
-# ===========================================================================
 # import_journal_acron_id_records
 # ===========================================================================
 class ImportJournalAcronIdRecordsTests(unittest.TestCase):
@@ -973,9 +990,11 @@ class ImportJournalAcronIdRecordsTests(unittest.TestCase):
         issueproc_qs.values_list.return_value = [11]
         journal_proc.issueproc_set.filter.return_value = issueproc_qs
 
-        detail = migration_controller.import_journal_acron_id_records(
-            user, MagicMock(), journal_proc, force_update=False
-        )
+        # mensagem traduzida: compara em inglês, independente do idioma ativo
+        with translation.override("en"):
+            detail = migration_controller.import_journal_acron_id_records(
+                user, MagicMock(), journal_proc, force_update=False
+            )
 
         self.assertIn("message", detail)
         self.assertIn("up-to-date", detail["message"])

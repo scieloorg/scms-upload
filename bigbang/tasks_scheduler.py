@@ -49,6 +49,8 @@ PRESS_RELEASE_PRIORITY = 1
 
 DATA_AVAILABILITY_STATUS_MINUTES = MINUTES[10]
 DATA_AVAILABILITY_STATUS_PRIORITY = 9
+COMPLETE_NETWORK_CLASSIFICATION_MINUTES = MINUTES[10]
+COMPLETE_NETWORK_CLASSIFICATION_PRIORITY = 1
 
 TITLE_DB_MIGRATION_PRIORITY = 0
 ISSUE_DB_MIGRATION_PRIORITY = 0
@@ -113,6 +115,7 @@ def schedule_subtasks(username):
     _schedule_fetch_and_create_journal(username, enabled)  # Nova tarefa adicionada
     _schedule_try_fetch_and_register_press_release(username, enabled)
     _schedule_update_data_availability_status(username, enabled)
+    _schedule_complete_network_classification(username, enabled)
 
 
 def _schedule_check_article_availability(username, enabled=False):
@@ -205,6 +208,8 @@ def _schedule_migrate_and_publish_journals(username, enabled):
             journal_acron=None,
             force_update=False,
             status=[],
+            # valid_status não tem efeito: é apenas um lembrete dos valores
+            # aceitos em status (ex.: status=["BLOCKED"] reprocessa os bloqueados)
             valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_import_acron_id_file=False,
             force_core_sync=False,
@@ -234,6 +239,8 @@ def _schedule_migrate_and_publish_issues(username, enabled):
             publication_year=None,
             issue_folder=None,
             status=[],
+            # valid_status não tem efeito: é apenas um lembrete dos valores
+            # aceitos em status (ex.: status=["BLOCKED"] reprocessa os bloqueados)
             valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
         ),
@@ -258,6 +265,8 @@ def _schedule_migrate_and_publish_articles(username, enabled):
             publication_year=None,
             issue_folder=None,
             status=[],
+            # valid_status não tem efeito: é apenas um lembrete dos valores
+            # aceitos em status (ex.: status=["BLOCKED"] reprocessa os bloqueados)
             valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
             force_import_acron_id_file=False,
@@ -399,6 +408,29 @@ def _schedule_fetch_and_create_journal(username, enabled=False):
         day_of_week="*",
         hour="*",
         minute=FETCH_AND_CREATE_JOURNAL_MINUTES,
+    )
+
+
+def _schedule_complete_network_classification(username, enabled=False):
+    """
+    Agenda a tarefa de preencher network_classification das coleções
+    que estão sem esse dado (necessário para identificar a coleção
+    principal de periódicos presentes em mais de uma coleção)
+    Deixa a tarefa desabilitada por padrão
+    """
+    schedule_task(
+        task="collection.tasks.task_complete_network_classification",
+        name="complete_network_classification",
+        kwargs=dict(
+            username=username,
+        ),
+        description=_("Completa a classificação de rede das coleções"),
+        priority=COMPLETE_NETWORK_CLASSIFICATION_PRIORITY,
+        enabled=enabled,
+        run_once=True,
+        day_of_week="*",
+        hour="*",
+        minute=COMPLETE_NETWORK_CLASSIFICATION_MINUTES,
     )
 
 

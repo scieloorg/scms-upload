@@ -228,7 +228,7 @@ class ArticleProcFilterSet(django_filters.FilterSet):
         label=_('Has SPS Package')
     )
     has_sps_pkg_article = django_filters.BooleanFilter(
-        field_name='sps_pkg__article',
+        field_name='sps_pkg__collection_pid_v2__article',
         lookup_expr='isnull',
         exclude=True,
         label=_('Has SPS Package Article')
@@ -259,6 +259,7 @@ class ArticleProcViewSet(CommonControlFieldViewSet):
     list_per_page = 10
     list_display = [
         "__str__",
+        "collection",
         "xml_status",
         "sps_pkg_status",
         "migration_status",
@@ -269,7 +270,7 @@ class ArticleProcViewSet(CommonControlFieldViewSet):
     ]
     filterset_class = ArticleProcFilterSet
     search_fields = [
-        "sps_pkg__pid_v3",
+        "sps_pkg__collection_pid_v2__pid_provider_xml__v3",
         "pid",
         "sps_pkg__sps_pkg_name",
         "pkg_name",
