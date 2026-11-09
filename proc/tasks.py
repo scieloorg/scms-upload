@@ -1614,7 +1614,7 @@ def task_publish_issue_articles(
                 "issue_proc", "sps_pkg"
             ).filter(
                 id__in=articleprocs_id_list,
-                sps_pkg__collection_pid_v2__pid_provider_xml__v3__isnull=False,
+                sps_pkg__pid_v3__isnull=False,
             )
 
         if articles.exists():
@@ -2585,7 +2585,7 @@ def task_check_articles_availability(
         q = Q()
 
         if article_pid_v3:
-            article_params["sps_pkg__collection_pid_v2__pid_provider_xml__v3"] = article_pid_v3
+            article_params["sps_pkg__pid_v3"] = article_pid_v3
         if publication_year:
             article_params["issue_proc__issue__publication_year"] = publication_year
         if issue_folder:
