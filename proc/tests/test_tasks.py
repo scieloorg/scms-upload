@@ -1296,7 +1296,7 @@ class TaskCheckArticlesAvailabilityTest(TestCase):
         self.assertEqual(
             kwargs,
             {
-                "sps_pkg__collection_pid_v2__pid_provider_xml__v3": "pidv3",
+                "sps_pkg__pid_v3": "pidv3",
                 "issue_proc__issue__publication_year": "2020",
                 "issue_proc__issue__issue_folder": "01",
                 "collection__acron": "scl",
