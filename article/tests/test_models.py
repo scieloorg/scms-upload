@@ -81,96 +81,100 @@ class ArticleGetTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             Article.get(collection=self.collection)
 
+    @patch.object(Article, "_get_in_collection")
     @patch("article.models.Article.objects")
-    def test_get_by_pid_v3_and_collection(self, mock_objects):
+    def test_get_by_pid_v3_and_collection(self, mock_objects, mock_get_in_collection):
         mock_article = Mock(spec=Article)
-        mock_objects.get.return_value = mock_article
+        mock_get_in_collection.return_value = mock_article
 
         result = Article.get(pid_v3="pid123", collection=self.collection)
 
         self.assertEqual(result, mock_article)
-        mock_objects.get.assert_called_once_with(
-            collection_pid_v2__collection=self.collection, pid_v3="pid123"
+        mock_objects.all.return_value.filter.assert_called_once_with(pid_v3="pid123")
+        mock_get_in_collection.assert_called_once_with(
+            mock_objects.all.return_value.filter.return_value, self.collection
         )
 
+    @patch.object(Article, "_get_in_collection")
     @patch("article.models.Article.objects")
-    def test_get_by_pid_v2_and_collection(self, mock_objects):
+    def test_get_by_pid_v2_and_collection(self, mock_objects, mock_get_in_collection):
         mock_article = Mock(spec=Article)
-        mock_objects.get.return_value = mock_article
+        mock_get_in_collection.return_value = mock_article
 
         result = Article.get(pid_v2="pid_v2_value", collection=self.collection)
 
         self.assertEqual(result, mock_article)
-        mock_objects.get.assert_called_once_with(
-            collection_pid_v2__collection=self.collection,
-            collection_pid_v2__pid_v2="pid_v2_value",
+        mock_objects.all.return_value.filter.assert_called_once_with(
+            pid_v2="pid_v2_value"
+        )
+        mock_get_in_collection.assert_called_once_with(
+            mock_objects.all.return_value.filter.return_value, self.collection
         )
 
+    @patch.object(Article, "_get_in_collection")
     @patch("article.models.Article.filter_by_sps_pkg_name")
     @patch("article.models.Article.objects")
     def test_get_by_sps_pkg_name_and_collection(
-        self, mock_objects, mock_filter_by_sps_pkg_name
+        self, mock_objects, mock_filter_by_sps_pkg_name, mock_get_in_collection
     ):
         mock_article = Mock(spec=Article)
-        mock_filter_by_sps_pkg_name.return_value.get.return_value = mock_article
+        mock_get_in_collection.return_value = mock_article
 
         result = Article.get(sps_pkg_name="pkg-v01", collection=self.collection)
 
         self.assertEqual(result, mock_article)
-        mock_objects.get.assert_not_called()
-        mock_objects.filter.assert_called_once_with(
-            collection_pid_v2__collection=self.collection
-        )
         mock_filter_by_sps_pkg_name.assert_called_once_with(
-            mock_objects.filter.return_value, "pkg-v01"
+            mock_objects.all.return_value, "pkg-v01"
+        )
+        mock_get_in_collection.assert_called_once_with(
+            mock_filter_by_sps_pkg_name.return_value, self.collection
         )
 
+    @patch.object(Article, "_get_in_collection")
     @patch("article.models.Article.filter_by_sps_pkg_name")
     @patch("article.models.Article.objects")
     def test_get_prioritizes_deterministic_keys(
-        self, mock_objects, mock_filter_by_sps_pkg_name
+        self, mock_objects, mock_filter_by_sps_pkg_name, mock_get_in_collection
     ):
-        mock_article = Mock(spec=Article)
-        mock_objects.get.return_value = mock_article
-
-        result = Article.get(
+        Article.get(
             pid_v3="pid123",
             pid_v2="pid_v2_value",
             sps_pkg_name="pkg-v01",
             collection=self.collection,
         )
 
-        self.assertEqual(result, mock_article)
-        mock_objects.get.assert_called_once_with(
-            collection_pid_v2__collection=self.collection,
-            collection_pid_v2__pid_v2="pid_v2_value",
-            pid_v3="pid123",
-        )
+        qs = mock_objects.all.return_value
+        qs.filter.assert_called_once_with(pid_v2="pid_v2_value")
+        qs.filter.return_value.filter.assert_called_once_with(pid_v3="pid123")
         mock_filter_by_sps_pkg_name.assert_not_called()
 
     @patch("article.models.Article.objects")
     def test_get_by_sps_pkg(self, mock_objects):
         mock_sps_pkg = Mock(spec=SPSPkg)
         mock_article = Mock(spec=Article)
-        mock_objects.get.return_value = mock_article
+        mock_objects.filter.return_value.get.return_value = mock_article
 
         result = Article.get(sps_pkg=mock_sps_pkg)
 
         self.assertEqual(result, mock_article)
-        mock_objects.get.assert_called_once_with(collection_pid_v2__sps_pkg=mock_sps_pkg)
+        mock_objects.filter.assert_called_once_with(sps_pkg=mock_sps_pkg)
+        # a consulta não completa o vínculo (feito pela migração / tarefa)
+        mock_article.complete_collection_pid_v2.assert_not_called()
 
+    @patch.object(Article, "_get_in_collection", side_effect=Article.DoesNotExist())
     @patch("article.models.Article.objects")
-    def test_get_raises_does_not_exist(self, mock_objects):
-        mock_objects.get.side_effect = Article.DoesNotExist()
-
+    def test_get_raises_does_not_exist(self, mock_objects, mock_get_in_collection):
         with self.assertRaises(Article.DoesNotExist):
             Article.get(pid_v3="pid123", collection=self.collection)
 
+    @patch.object(
+        Article, "_get_in_collection", side_effect=Article.MultipleObjectsReturned()
+    )
     @patch("article.models.Article.objects")
-    def test_get_propagates_multiple_objects_returned(self, mock_objects):
+    def test_get_propagates_multiple_objects_returned(
+        self, mock_objects, mock_get_in_collection
+    ):
         """get() não trata duplicidade — quem chama decide o que fazer."""
-        mock_objects.get.side_effect = Article.MultipleObjectsReturned()
-
         with self.assertRaises(Article.MultipleObjectsReturned):
             Article.get(pid_v3="pid123", collection=self.collection)
 
@@ -237,25 +241,39 @@ class ArticleCreateOrUpdateTestCase(unittest.TestCase):
 
         # obj.collection_pid_v2 = ... é OneToOneField — precisa de _state fake.
         collection_pid_v2 = _mock_model_instance(
-            CollectionPidV2, pid_v2=pid_v2, collection_id=collection_id
+            CollectionPidV2,
+            pid_v2=pid_v2,
+            collection_id=collection_id,
+            pid_provider_xml_id=10,
         )
         mock_sps_pkg = _mock_model_instance(
             SPSPkg,
             xml_with_pre=mock_xml_with_pre,
             pid_v3=pid_v3,
+            pid_v2=pid_v2,
+            ppx_id=10,
             collection_pid_v2=collection_pid_v2,
+            collection_pid_v2_id=1,
         )
+        collection_pid_v2.sps_pkg = mock_sps_pkg
         return mock_sps_pkg, mock_xml_with_pre
 
     def test_raises_value_error_without_sps_pkg(self):
         with self.assertRaises(ValueError):
             Article.create_or_update(_mock_model_instance(User), None)
 
-    def test_raises_value_error_without_collection_pid_v2(self):
-        mock_sps_pkg = _mock_model_instance(SPSPkg, collection_pid_v2=None)
+    def test_raises_value_error_without_collection_pid_v2_for_the_collection(self):
+        mock_sps_pkg = _mock_model_instance(
+            SPSPkg, collection_pid_v2=None, collection_pid_v2_id=None
+        )
+        collection = _mock_model_instance(Collection, id=1)
 
         with self.assertRaises(ValueError):
-            Article.create_or_update(_mock_model_instance(User), mock_sps_pkg)
+            Article.create_or_update(
+                _mock_model_instance(User), mock_sps_pkg, collection=collection
+            )
+        # tenta vincular o pacote antes de rejeitá-lo
+        mock_sps_pkg.complete_collection_pid_v2.assert_called_once()
 
     def test_raises_value_error_when_sps_pkg_is_of_other_collection(self):
         mock_sps_pkg, _ = self._make_sps_pkg(collection_id=1)
@@ -282,7 +300,7 @@ class ArticleCreateOrUpdateTestCase(unittest.TestCase):
         obj = Article.create_or_update(mock_user, mock_sps_pkg)
 
         mock_get.assert_called_once_with(
-            mock_sps_pkg.collection_pid_v2, mock_sps_pkg.pid_v3
+            mock_user, mock_sps_pkg, mock_sps_pkg.collection_pid_v2
         )
         self.assertEqual(obj.creator, mock_user)
         self.assertEqual(obj.collection_pid_v2, mock_sps_pkg.collection_pid_v2)
@@ -369,7 +387,7 @@ class ArticleGetRepeatedValuesTestCase(unittest.TestCase):
     """Testes para Article.get_repeated_values().
 
     Fluxo real: queryset.filter(**params) -> .values(field_name) ->
-    .filter(collection_pid_v2__sps_pkg__isnull=False) -> .annotate(total=Count("id")) ->
+    .filter(sps_pkg__isnull=False) -> .annotate(total=Count("id")) ->
     .filter(total__gt=1) -> .values_list(field_name, flat=True).
     """
 
@@ -388,7 +406,7 @@ class ArticleGetRepeatedValuesTestCase(unittest.TestCase):
         mock_objects.filter.assert_called_once_with()
         mock_filtered.values.assert_called_once_with("pid_v2")
         mock_filtered.values.return_value.filter.assert_called_once_with(
-            collection_pid_v2__sps_pkg__isnull=False
+            sps_pkg__isnull=False
         )
         self.assertEqual(result, ["v1", "v2"])
 
@@ -409,7 +427,7 @@ class ArticleGetRepeatedValuesTestCase(unittest.TestCase):
         mock_qs.filter.assert_called_once_with()
         mock_filtered.values.assert_called_once_with("sps_pkg__sps_pkg_name")
         mock_filtered.values.return_value.filter.assert_called_once_with(
-            collection_pid_v2__sps_pkg__isnull=False
+            sps_pkg__isnull=False
         )
         self.assertEqual(result, ["v1"])
 
@@ -483,7 +501,7 @@ class ArticleExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
     Fluxo atual (sem sps_pkg_id_list, sem verificação de pid_v2/pp_xml):
 
     1. `cls.objects.filter(issue=issue)` -> queryset base "articles".
-    2. `articles.filter(collection_pid_v2__sps_pkg__isnull=True)` -> Article sem sps_pkg,
+    2. `articles.filter(sps_pkg__isnull=True)` -> Article sem sps_pkg,
        removidos via delete_related_items; se algo foi deletado,
        "articles" é reconsultado.
     3. `cls.get_repeated_values("pid_v3", articles,
@@ -591,8 +609,11 @@ class ArticleExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         duplicados_qs.exclude.return_value = remover_qs
 
         def filter_side_effect(**kwargs):
-            if "collection_pid_v2__sps_pkg__isnull" in kwargs:
+            if "sps_pkg__isnull" in kwargs:
                 return no_missing_qs
+            if kwargs == {"collection_pid_v2__isnull": True}:
+                # nenhum artigo a vincular ao documento na coleção
+                return []
             if kwargs == {"pid_v3": "pid-v3-1", "collection_pid_v2__collection_id": 5}:
                 return duplicados_qs
             raise AssertionError(f"filter inesperado: {kwargs}")
@@ -640,8 +661,10 @@ class ArticleExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         no_missing_qs.__bool__.return_value = False
 
         def filter_side_effect(**kwargs):
-            if "collection_pid_v2__sps_pkg__isnull" in kwargs:
+            if "sps_pkg__isnull" in kwargs:
                 return no_missing_qs
+            if kwargs == {"collection_pid_v2__isnull": True}:
+                return []
             raise Exception("boom")
 
         articles_qs.filter.side_effect = filter_side_effect
