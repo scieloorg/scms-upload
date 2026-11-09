@@ -810,7 +810,7 @@ class BaseProc(CommonControlField):
             migrated_data__content_type=content_type,
         )
         if content_type == "article":
-            params["sps_pkg__collection_pid_v2__pid_provider_xml__v3__isnull"] = False
+            params["sps_pkg__pid_v3__isnull"] = False
         q = Q(migration_status=tracker_choices.PROGRESS_STATUS_REPROC)
         if force_update:
             q |= (
@@ -897,7 +897,7 @@ class BaseProc(CommonControlField):
         params["migrated_data__content_type"] = content_type
         params["migration_status"] = tracker_choices.PROGRESS_STATUS_DONE
         if content_type == "article":
-            params["sps_pkg__collection_pid_v2__pid_provider_xml__v3__isnull"] = False
+            params["sps_pkg__pid_v3__isnull"] = False
         params["collection__websiteconfiguration__purpose"] = "QA"
         params["collection__websiteconfiguration__enabled"] = True
 
@@ -1087,7 +1087,7 @@ class BaseProc(CommonControlField):
         params["qa_ws_status"] = tracker_choices.PROGRESS_STATUS_DONE
         if content_type == "article":
             params["sps_pkg_status__isnull"] = False
-            params["sps_pkg__collection_pid_v2__pid_provider_xml__v3__isnull"] = False
+            params["sps_pkg__pid_v3__isnull"] = False
             params["sps_pkg__registered_in_core"] = True
         params["collection__websiteconfiguration__purpose"] = "PUBLIC"
         params["collection__websiteconfiguration__enabled"] = True
@@ -2826,7 +2826,7 @@ class ArticleProc(BaseProc, ClusterableModel):
             migrated_data_id__isnull=False,
             sps_pkg_id__isnull=False,
             **params,
-        ).exclude(migrated_data__pid=F("sps_pkg__collection_pid_v2__pid_v2"))
+        ).exclude(migrated_data__pid=F("sps_pkg__pid_v2"))
 
         marked_to_reproc = []
         failures = {}
@@ -2978,8 +2978,8 @@ class ArticleProc(BaseProc, ClusterableModel):
             data["total"] = duplicated_items.count()
 
             article_id = duplicated_items.filter(
-                sps_pkg__collection_pid_v2__article__isnull=False
-            ).values_list("sps_pkg__collection_pid_v2__article", flat=True)
+                sps_pkg__article__isnull=False
+            ).values_list("sps_pkg__article", flat=True)
 
             if article_id:
                 keep = duplicated_items.order_by("-updated").first()
@@ -3021,11 +3021,12 @@ class ArticleProc(BaseProc, ClusterableModel):
     def article(self):
         if not self.sps_pkg:
             return None
-        # um Article por documento na coleção (collection_pid_v2)
+        # um Article por documento na coleção (collection_pid_v2); na falta
+        # do vínculo, o Article do pacote
         try:
             return self.sps_pkg.collection_pid_v2.article
         except (AttributeError, ObjectDoesNotExist):
-            return None
+            return self.sps_pkg.article_set.order_by("-updated").first()
 
     # ── migration flow ──
 
