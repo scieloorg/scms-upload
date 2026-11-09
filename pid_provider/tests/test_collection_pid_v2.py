@@ -73,8 +73,9 @@ class CollectionPidV2Test(CollectionPidV2TestBase):
         psi_version = self.create_version(registered, "psi")
         self.create_collection_pid_v2(registered, self.psi, PSI_V2, psi_version)
 
-        # sem versão da coleção principal
-        self.assertIsNone(CollectionPidV2.get_current_version(registered))
+        # sem versão da coleção principal: a mais recente das coleções
+        self.assertEqual(CollectionPidV2.get_current_version(registered), psi_version)
+        # documento com versão por coleção: sem a da coleção solicitada
         self.assertIsNone(CollectionPidV2.get_current_version(registered, self.scl))
         self.assertEqual(
             CollectionPidV2.get_current_version(registered, self.psi), psi_version
@@ -91,6 +92,23 @@ class CollectionPidV2Test(CollectionPidV2TestBase):
             registered.current_version,
         )
         self.assertIsNone(CollectionPidV2.get_current_version(None))
+
+    def test_get_current_version_of_document_registered_before_collection_pid_v2(self):
+        registered = self.create_pid_provider_xml()
+        registered.current_version = self.create_version(registered, "legacy")
+        registered.save()
+
+        # legado: nenhuma versão por coleção, usa PidProviderXML.current_version
+        for collection in (None, self.scl, self.psi):
+            with self.subTest(collection=collection):
+                self.assertEqual(
+                    CollectionPidV2.get_current_version(registered, collection),
+                    registered.current_version,
+                )
+        self.assertEqual(
+            CollectionPidV2.get_current_version(registered, collection_acron="psi"),
+            registered.current_version,
+        )
 
     def test_is_equal_to_compares_with_version_of_the_same_collection(self):
         registered = self.create_pid_provider_xml()
