@@ -173,6 +173,14 @@ class PidRequester(BasePidProvider):
             )
             # Upload segue a mesma regra do Core quando XMLs são iguais
             registered["do_local_registration"] = registered["do_remote_registration"]
+        elif registered.get("is_equal_xml"):
+            # XML recebido é igual ao registrado, mas os dados por coleção
+            # (CollectionPidV2) estão incompletos: registra no Upload para
+            # completá-los; no Core, somente se ainda não registrado
+            registered["do_remote_registration"] = not registered.get(
+                "registered_in_core"
+            )
+            registered["do_local_registration"] = True
         else:
             # XML recebido é diferente do registrado ou não está no Upload
             # Força registro em ambos os sistemas
