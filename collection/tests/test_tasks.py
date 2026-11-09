@@ -38,7 +38,7 @@ class TaskCompleteNetworkClassificationIntegrationTest(TestCase):
     def setUp(self):
         self.user = User.objects.create(username="tester")
 
-    @patch("collection.models.fetch_data")
+    @patch("collection.network_classification_completion.fetch_data")
     def test_task_completes_network_classification(self, mock_fetch_data):
         mock_fetch_data.return_value = [
             {"acron": "scl", "network_classification": ["scielonetwork"]},
@@ -47,7 +47,9 @@ class TaskCompleteNetworkClassificationIntegrationTest(TestCase):
 
         result = tasks.task_complete_network_classification(username="tester")
 
-        self.assertEqual(result, {"updated": ["scl"], "not_found": []})
+        self.assertEqual(
+            result, {"updated": ["scl"], "inferred": [], "not_found": []}
+        )
         self.assertEqual(
             Collection.objects.get(acron="scl").network_classification,
             ["scielonetwork"],
