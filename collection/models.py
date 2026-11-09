@@ -2,11 +2,9 @@ import logging
 
 from langdetect import detect
 from django import forms
-from django.conf import settings
+from django.apps import apps as django_apps
 from django.contrib.postgres.fields import ArrayField
-from django.core.cache import cache
 from django.db import models
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -14,11 +12,15 @@ from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from collection import choices
+from collection import network_classification_completion as completion
+from collection.network_classification_completion import (  # noqa: F401
+    ARTICLEMETA_COLLECTIONS_URL,
+    normalize_network_classification,
+)
 from collection.utils import get_valid_language_code
 from core.choices import LANGUAGE
 from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
-from core.utils.requester import fetch_data
 
 
 class LanguageGetOrCreateError(Exception): ...
@@ -40,26 +42,6 @@ class ChoiceArrayField(ArrayField):
         defaults.update(kwargs)
         # Ignora ArrayField.formfield (SimpleArrayField)
         return super(ArrayField, self).formfield(**defaults)
-
-
-ARTICLEMETA_COLLECTIONS_URL = (
-    "https://articlemeta.scielo.org/api/v1/collection/identifiers/"
-)
-
-ENSURE_NETWORK_CLASSIFICATION_CACHE_KEY = "collection.ensure_network_classification"
-# intervalo mínimo (segundos) entre consultas ao articlemeta feitas por
-# Collection.ensure_network_classification
-ENSURE_NETWORK_CLASSIFICATION_INTERVAL = 600
-
-
-def normalize_network_classification(network_classification):
-    """
-    Retorna network_classification como lista ou None
-    Ex.: "scielonetwork" -> ["scielonetwork"]
-    """
-    if isinstance(network_classification, str):
-        network_classification = [network_classification]
-    return [item for item in network_classification or [] if item] or None
 
 
 class Collection(CommonControlField):
@@ -156,40 +138,9 @@ class Collection(CommonControlField):
 
     @classmethod
     def get_collections_without_network_classification(cls):
-        return cls.objects.filter(
-            models.Q(network_classification__isnull=True)
-            | models.Q(network_classification=[])
+        return completion.get_collections_without_network_classification(
+            django_apps
         )
-
-    @classmethod
-    def ensure_network_classification(cls, user):
-        """
-        Garante network_classification das coleções antes de seu uso para
-        identificar a coleção principal (ex.: PidProviderXML.register de
-        artigos publicados em mais de uma coleção).
-
-        Consulta o articlemeta somente se há coleções sem esse dado e, no
-        máximo, uma vez a cada ENSURE_NETWORK_CLASSIFICATION_INTERVAL
-        segundos, evitando uma consulta por registro quando o articlemeta
-        está indisponível ou não tem a coleção.
-        Falhas são registradas no log e não interrompem quem chama.
-        """
-        if not getattr(settings, "COLLECTION_ENSURE_NETWORK_CLASSIFICATION", True):
-            return None
-        try:
-            if not cls.get_collections_without_network_classification().exists():
-                return None
-            # cache.add é atômico: somente um processo consulta o articlemeta
-            if not cache.add(
-                ENSURE_NETWORK_CLASSIFICATION_CACHE_KEY,
-                True,
-                ENSURE_NETWORK_CLASSIFICATION_INTERVAL,
-            ):
-                return None
-            return cls.complete_network_classification(user)
-        except Exception as e:
-            logging.exception(f"Collection.ensure_network_classification: {e}")
-            return None
 
     @classmethod
     def complete_network_classification(cls, user, collections_data=None, verify=False):
@@ -197,44 +148,11 @@ class Collection(CommonControlField):
         Preenche em lote network_classification das coleções que estão
         sem esse dado, a partir dos dados do articlemeta.
         Coleções já preenchidas não são alteradas.
+        (ver collection.network_classification_completion.complete)
         """
-        queryset = cls.get_collections_without_network_classification()
-        result = {"updated": [], "not_found": []}
-        if not queryset.exists():
-            return result
-
-        if not collections_data:
-            collections_data = fetch_data(
-                ARTICLEMETA_COLLECTIONS_URL,
-                json=True,
-                verify=verify,
-            )
-        network_classification_by_acron = {
-            item.get("acron"): normalize_network_classification(
-                item.get("network_classification")
-            )
-            for item in collections_data
-        }
-
-        now = timezone.now()
-        items = []
-        for obj in queryset:
-            network_classification = network_classification_by_acron.get(obj.acron)
-            if not network_classification:
-                result["not_found"].append(obj.acron)
-                continue
-            obj.network_classification = network_classification
-            obj.updated_by = user
-            # bulk_update não aplica auto_now
-            obj.updated = now
-            items.append(obj)
-            result["updated"].append(obj.acron)
-
-        cls.objects.bulk_update(
-            items, ["network_classification", "updated_by", "updated"]
+        return completion.complete(
+            django_apps, user and user.id, collections_data, verify
         )
-        logging.info(f"Collection.complete_network_classification: {result}")
-        return result
 
     @classmethod
     def get_national_journal_collections(cls):
