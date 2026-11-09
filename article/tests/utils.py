@@ -21,9 +21,10 @@ def create_sps_pkg(user, sps_pkg_name, pid_v3=None, collection=None, pid_v2=None
         pid_v2=pid_v2,
         sps_pkg_name=sps_pkg_name,
     )
-    return SPSPkg.objects.create(
-        creator=user, sps_pkg_name=sps_pkg_name, collection_pid_v2=collection_pid_v2
-    )
+    sps_pkg = SPSPkg(creator=user, sps_pkg_name=sps_pkg_name)
+    sps_pkg.set_collection_pid_v2(collection_pid_v2)
+    sps_pkg.save()
+    return sps_pkg
 
 
 def link_sps_pkg(user, article, sps_pkg_name, collection=None):
@@ -31,6 +32,6 @@ def link_sps_pkg(user, article, sps_pkg_name, collection=None):
     sps_pkg = create_sps_pkg(
         user, sps_pkg_name, pid_v3=article.pid_v3 or sps_pkg_name, collection=collection
     )
-    article.collection_pid_v2 = sps_pkg.collection_pid_v2
+    article.set_collection_pid_v2(sps_pkg.collection_pid_v2)
     article.save()
     return sps_pkg
