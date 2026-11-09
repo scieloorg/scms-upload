@@ -62,9 +62,7 @@ class TaskUpdateDataAvailabilityStatusTest(ReportDataMixin, TestCase):
 
     @patch("article.tasks.task_update_data_availability_status_for_articles")
     def test_ignores_article_without_sps_pkg(self, mock_subtask):
-        SPSPkg.objects.filter(
-            collection_pid_v2__article=self.not_processed
-        ).update(collection_pid_v2=None)
+        Article.objects.filter(pk=self.not_processed.pk).update(sps_pkg=None)
         self.assertEqual(0, tasks.task_update_data_availability_status())
         mock_subtask.apply_async.assert_not_called()
 
