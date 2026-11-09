@@ -42,7 +42,7 @@ class ArticleFilterSet(django_filters.FilterSet):
         ).distinct(),
     )
     absent_sps_pkg = django_filters.BooleanFilter(
-        field_name="collection_pid_v2__sps_pkg",
+        field_name="sps_pkg_id",
         lookup_expr="isnull",
         label=_("Missing SPSPkg"),
     )
@@ -82,8 +82,8 @@ class ArticleSnippetViewSet(SnippetViewSet):
     )
     filterset_class = ArticleFilterSet
     search_fields = (
-        "collection_pid_v2__sps_pkg_name",
-        "collection_pid_v2__pid_v2",
+        "sps_pkg__sps_pkg_name",
+        "pid_v2",
         "pid_v3",
         "issue__publication_year",
         "journal__official_journal__title",
@@ -148,7 +148,7 @@ class RequestArticleChangeSnippetViewSet(SnippetViewSet):
     )
     list_filter = ("change_type",)
     search_fields = (
-        "article__collection_pid_v2__pid_v2",
+        "article__pid_v2",
         "article__pid_v3",
         "article__doi_with_lang__doi",
     )
@@ -216,8 +216,8 @@ class ArticleWebPageSnippetViewSet(SnippetViewSet):
     search_fields = (
         "url",
         "article__pid_v3",
-        "article__collection_pid_v2__pid_v2",
-        "article__collection_pid_v2__sps_pkg_name",
+        "article__pid_v2",
+        "article__sps_pkg__sps_pkg_name",
     )
     ordering = ["-updated"]
 
