@@ -701,6 +701,19 @@ class Package(CommonControlField, ClusterableModel):
             | Q(file__icontains=search_term)
         )
 
+    @property
+    def has_interrupted_reception(self):
+        if self.status == choices.PS_UNEXPECTED:
+            return True
+        return (
+            self.status == choices.PS_PENDING_CORRECTION
+            and not self.sps_pkg_id
+            and not self.article_id
+            and self.blocking_errors > 0
+            and self.qa_ws_status != choices.PUBLISHED
+            and self.public_ws_status != choices.PUBLISHED
+        )
+
     def can_receive_package(self, user):
         if not user or not user.is_authenticated or not user.is_active:
             return False
@@ -715,6 +728,9 @@ class Package(CommonControlField, ClusterableModel):
         return journal_id is None or journal_id in get_user_membership_ids(user).get(
             "journal_list_ids", []
         )
+
+    def can_retry_processing(self, user):
+        return self.has_interrupted_reception and self.can_receive_package(user)
 
     def other_document_attempts(self, article=None, name=None, journal=None):
         article_id = article.pk if article else self.article_id
