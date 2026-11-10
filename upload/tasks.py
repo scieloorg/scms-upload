@@ -37,8 +37,6 @@ from upload.publication_status import (
     PUBLICATION_RUNNING,
 )
 from upload.utils import file_utils, package_utils
-from upload.validation.html_validation import validate_webpage
-from upload.validation.rendition_validation import validate_rendition
 from upload.validation.xml_data_checker import XMLDataChecker
 
 User = get_user_model()
@@ -167,7 +165,7 @@ def task_optimise_package(file_path):
     source = file_utils.get_file_absolute_path(file_path)
     target = file_utils.generate_filepath_with_new_extension(source, ".optz", True)
     package_utils.optimise_package(source, target)
-    package_utils.unzip(target)
+    file_utils.unzip(target)
 
     return target
 
@@ -241,40 +239,6 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
             subject=_("Renditions"),
         )
 
-    report.finish_validations()
-
-
-@celery_app.task(priority=0)
-def task_validate_renditions_content(package_id, xml_path):
-    package = Package.objects.get(pk=package_id)
-
-    report = ValidationReport.create_or_update(
-        package.creator,
-        package,
-        gettext_noop("Renditions content report"),
-        choices.VAL_CAT_RENDITION_CONTENT,
-        True,
-    )
-    try:
-        for rendition in package.renditions:
-            for result in validate_rendition(rendition, package.xml_with_pre):
-                report.add_validation_result(
-                    status=choices.VALIDATION_RESULT_FAILURE,
-                    message=result["message"],
-                    data={"filename": rendition["name"], "lang": rendition["lang"]},
-                    subject=rendition["name"],
-                )
-
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            exception=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "operation": "upload.tasks.task_validate_renditions_content",
-                "detail": dict(xml_path=xml_path),
-            },
-        )
     report.finish_validations()
 
 
@@ -353,10 +317,6 @@ def task_receive_package(self, user_id, pkg_id):
                     journal_id=journal_id,
                     issue_id=issue_id,
                     article_id=article_id,
-                ),
-                task_validate_renditions_content.s(
-                    package_id=pkg_id,
-                    xml_path=xml_path,
                 ),
             ]
             chord(validations)(task_finish_package_reception.si(pkg_id))
@@ -517,41 +477,6 @@ def task_validate_xml_content(
         )
 
 
-@celery_app.task(priority=0)
-def task_validate_webpages_content(package_id):
-    package = Package.objects.get(pk=package_id)
-
-    report = ValidationReport.create_or_update(
-        package.creator,
-        package,
-        gettext_noop("Web page Report"),
-        choices.VAL_CAT_WEB_PAGE_CONTENT,
-        True,
-    )
-    try:
-        for webpage in package.htmls:
-            for result in validate_webpage(webpage, package.xml_with_pre):
-                report.add_validation_result(
-                    status=choices.VALIDATION_RESULT_FAILURE,
-                    message=result["message"],
-                    data={"filename": webpage["name"], "lang": webpage["lang"]},
-                    subject=webpage["name"],
-                )
-
-    except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        UnexpectedEvent.create(
-            exception=e,
-            exc_traceback=exc_traceback,
-            detail={
-                "operation": "upload.tasks.task_validate_webpages_content",
-                "detail": dict(package=str(package)),
-            },
-        )
-    report.finish_validations()
-    package.finish_reception(task_upload_workflow_publish_article)
-
-
 @celery_app.task(bind=True)
 def task_upload_workflow_publish_article(
     self,
@@ -628,7 +553,6 @@ def task_upload_workflow_publish_article(
                 websites=websites,
             ),
         )
-
 
 
 @celery_app.task(bind=True)
