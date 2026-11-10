@@ -525,6 +525,14 @@ msgstr "Publish articles"
 msgid "Busca e cria periódicos"
 msgstr "Search and create journals"
 
+#: bigbang/tasks_scheduler.py:413
+msgid "Busca e registra press releases"
+msgstr "Search and register press releases"
+
+#: bigbang/tasks_scheduler.py:439
+msgid "Republica artigos em lote"
+msgstr "Republish articles in bulk"
+
 #: bigbang/utils/scheduler.py:55 core/utils/scheduler.py:51
 msgid "Scheduled task: {}"
 msgstr "Scheduled task: {}"
@@ -1138,10 +1146,66 @@ msgstr "Name"
 msgid "Host"
 msgstr "Host"
 
+#: files_storage/models.py:45
+msgid ""
+"Endpoint do object storage para gravação (sem https://). Ex.: "
+"s3.wasabisys.com."
+msgstr ""
+"Object storage endpoint for writing (without https://). E.g.: "
+"s3.wasabisys.com."
+
+#: files_storage/models.py:49
+msgid "Host root dir"
+msgstr "Host root directory"
+
+#: files_storage/models.py:50
+msgid "Diretório raíz no servidor que contém o bucket. Ex.: scielo"
+msgstr "Root directory on the server containing the bucket. E.g.: scielo"
+
+#: files_storage/models.py:55
+msgid "Bucket"
+msgstr "Bucket"
+
+#: files_storage/models.py:57
+msgid ""
+"Bucket no object storage (MinIO/S3/Wasabi) onde os arquivos são fisicamente "
+"gravados. Ex.: upload"
+msgstr ""
+"Object storage bucket (MinIO/S3/Wasabi) where files are physically stored. "
+"E.g.: upload"
+
+#: files_storage/models.py:62
+msgid "Public base URL"
+msgstr "Public base URL"
+
+#: files_storage/models.py:62
+msgid ""
+"URL pública base usada para montar a URI de leitura salva no banco. Deve já "
+"incluir o caminho público completo até os objetos (inclusive qualquer "
+"prefixo), pois o host_root_dir não é reaplicado aqui. Ex.: "
+"https://minio.scielo.br. Se vazia, a URI é gerada via presigned URL do "
+"próprio object storage. Leitura e gravação são independentes: garanta que "
+"esta URL sirva o mesmo conteúdo gravado sob host_root_dir"
+msgstr ""
+"Public base URL used to build the read URI saved in the database. It must "
+"include the full public path to the objects (including any prefix), as "
+"host_root_dir is not reapplied here. E.g.: https://minio.scielo.br. If "
+"empty, the URI is generated using the object storage's presigned URL. "
+"Reading and writing are independent: ensure this URL serves the same content"
+" stored under host_root_dir"
+
 #: files_storage/models.py:67 location/models.py:235
 #: location/wagtail_hooks.py:14
 msgid "Location"
 msgstr "Location"
+
+#: files_storage/models.py:73
+msgid ""
+"Região usada ao criar o bucket (ex.: us-east-1). Deixe vazio se o provedor "
+"não exigir."
+msgstr ""
+"Region used when creating the bucket (e.g.: us-east-1). Leave empty if the "
+"provider does not require it."
 
 #: files_storage/models.py:77
 msgid "Access key"
@@ -1154,6 +1218,12 @@ msgstr "Secret key"
 #: files_storage/models.py:81
 msgid "Secure"
 msgstr "Secure"
+
+#: files_storage/models.py:81
+msgid ""
+"Usar HTTPS na conexão com o object storage. Mantenha marcado em produção."
+msgstr ""
+"Use HTTPS when connecting to object storage. Keep enabled in production."
 
 #: files_storage/models.py:342
 msgid "Basename"
@@ -1276,6 +1346,22 @@ msgstr "HTML to XML Conversions"
 msgid "Quality"
 msgstr "Quality"
 
+#: htmlxml/models.py:611
+msgid "Initial HTML file"
+msgstr "Initial HTML file"
+
+#: htmlxml/models.py:612
+msgid "Initial HTML structured in body, back, ref-list"
+msgstr "Initial HTML structured into body, back, and ref-list"
+
+#: htmlxml/models.py:619
+msgid "Body and Back ZIP file"
+msgstr "Body and Back ZIP file"
+
+#: htmlxml/models.py:620
+msgid "ZIP file containing all body and back XML versions"
+msgstr "ZIP file containing all body and back XML versions"
+
 #: htmlxml/models.py:635
 msgid "Body and Back XML files"
 msgstr "Body and Back XML files"
@@ -1295,6 +1381,10 @@ msgid ""
 msgstr ""
 "Unable to create or update the record of the conversion of HTML to XML for "
 "{} {} {}"
+
+#: htmlxml/models.py:929
+msgid "Error generating HTML to XML report: {} {}"
+msgstr "Error generating HTML to XML report: {} {}"
 
 #: institution/choices.py:13
 msgid "agência de apoio à pesquisa"
@@ -1514,6 +1604,10 @@ msgstr "Owner"
 msgid "Publisher"
 msgstr "Publisher"
 
+#: journal/models.py:294
+msgid "Sponsor"
+msgstr "Sponsor"
+
 #: journal/models.py:298 journal/models.py:305
 msgid "Mission"
 msgstr "Mission"
@@ -1522,6 +1616,10 @@ msgstr "Mission"
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:23
 msgid "Identification"
 msgstr "Identification"
+
+#: journal/models.py:304
+msgid "Institutions"
+msgstr "Institutions"
 
 #: journal/models.py:642
 msgid "Journal Title"
@@ -1555,6 +1653,10 @@ msgstr "License Code"
 msgid "WoS Areas"
 msgstr "WoS Areas"
 
+#: journal/models.py:652
+msgid "Journal acronym"
+msgstr "Journal acronym"
+
 #: journal/models.py:663 journal/tests/test_core_metadata.py:65
 #: pid_provider/models.py:380
 #: upload/templates/upload/documents/inspect/files.html:32
@@ -1587,9 +1689,17 @@ msgstr "publisher"
 msgid "study area"
 msgstr "study area"
 
+#: journal/models.py:692
+msgid "history for {}"
+msgstr "history for {}"
+
 #: journal/models.py:695 journal/models.py:941
 msgid "Journal collection"
 msgstr "Journal collection"
+
+#: journal/models.py:937
+msgid "Journal history"
+msgstr "Journal history"
 
 #: journal/models.py:942
 msgid "Journal collections"
@@ -1627,6 +1737,10 @@ msgstr "Collection journal events"
 #: upload/models.py:254
 msgid "Journal"
 msgstr "Journal"
+
+#: journal/wagtail_hooks.py:67
+msgid "Journal Collection"
+msgstr "Journal Collection"
 
 #: journal/wagtail_hooks.py:93
 msgid "Journals"
@@ -1696,6 +1810,46 @@ msgstr "To ignore"
 msgid "Imported"
 msgstr "Imported"
 
+#: migration/choices.py:35
+msgid "Missing"
+msgstr "Missing"
+
+#: migration/choices.py:36
+msgid "Matched"
+msgstr "Matched"
+
+#: migration/choices.py:37
+msgid "Exceeding"
+msgstr "Exceeding"
+
+#: migration/choices.py:40
+msgid "Published but not found"
+msgstr "Published but not found"
+
+#: migration/choices.py:41
+msgid "Published and content valid"
+msgstr "Published and content valid"
+
+#: migration/choices.py:42
+msgid "Published and mismatched content"
+msgstr "Published and mismatched content"
+
+#: migration/choices.py:43
+msgid "Classic and matched content"
+msgstr "Classic and matched content"
+
+#: migration/choices.py:44
+msgid "Classic and mismatched content"
+msgstr "Classic and mismatched content"
+
+#: migration/choices.py:45
+msgid "Classic found"
+msgstr "Classic found"
+
+#: migration/choices.py:46
+msgid "Classic not found"
+msgstr "Classic not found"
+
 #: migration/controller.py:701
 msgid "Unable to get xml with pre from migrated article ({}) {}: {} {}"
 msgstr "Unable to get xml with pre from migrated article ({}) {}: {} {}"
@@ -1703,6 +1857,10 @@ msgstr "Unable to get xml with pre from migrated article ({}) {}: {} {}"
 #: migration/controller.py:767
 msgid "IdFileRecord is already up-to-date with acron.id"
 msgstr "IdFileRecord is already up-to-date with acron.id"
+
+#: migration/models.py:69
+msgid "Collection URL"
+msgstr "Collection URL"
 
 #: migration/models.py:72
 msgid "Title path"
@@ -1907,6 +2065,10 @@ msgstr "duplicated"
 msgid "deduplicated"
 msgstr "deduplicated"
 
+#: pid_provider/choices.py:24
+msgid "unmatched journal or issue"
+msgstr "unmatched journal or issue"
+
 #: pid_provider/client.py:145
 msgid "Unable to get api token {} {} {} {} {}"
 msgstr "Unable to get api token {} {} {} {} {}"
@@ -2028,6 +2190,10 @@ msgstr "Origin date"
 msgid "Available since"
 msgstr "Available since"
 
+#: pid_provider/models.py:439
+msgid "Readable data"
+msgstr "Readable data"
+
 #: pid_provider/models.py:463
 msgid "Other PID"
 msgstr "Other PID"
@@ -2053,6 +2219,10 @@ msgstr ""
 "The XML content is an ahead of print version but the document {} is already "
 "published in an issue"
 
+#: pid_provider/models.py:1146
+msgid "{} belongs to {}, not to {}"
+msgstr "{} belongs to {}, not to {}"
+
 #: pid_provider/models.py:1611
 msgid "Incorrect v2"
 msgstr "Incorrect v2"
@@ -2060,6 +2230,34 @@ msgstr "Incorrect v2"
 #: pid_provider/models.py:1614
 msgid "Correct v2"
 msgstr "Correct v2"
+
+#: pid_provider/models.py:1752
+msgid "Gravar todos os eventos de auditoria"
+msgstr "Record all audit events"
+
+#: pid_provider/models.py:1754
+msgid ""
+"Quando ativo, grava auditoria em PidProviderXMLRegistration mesmo para "
+"fluxos limpos (created, updated, skipped)."
+msgstr ""
+"When enabled, records audit events in PidProviderXMLRegistration even for "
+"clean flows (created, updated, skipped)."
+
+#: pid_provider/models.py:1764
+msgid "Configurações do PID Provider"
+msgstr "PID Provider settings"
+
+#: pid_provider/models.py:1808
+msgid "Event status"
+msgstr "Event status"
+
+#: pid_provider/models.py:1827
+msgid "PidProviderXML Registration"
+msgstr "PidProviderXML Registration"
+
+#: pid_provider/models.py:1828
+msgid "PidProviderXML Registrations"
+msgstr "PidProviderXML Registrations"
 
 #: pid_provider/query_params.py:185
 msgid "Required Print or Electronic ISSN to identify XML {}"
@@ -2085,6 +2283,10 @@ msgstr "Fix pid v2"
 msgid "XML Versions"
 msgstr "XML Versions"
 
+#: pid_provider/wagtail_hooks.py:202
+msgid "PID Registration Events"
+msgstr "PID Registration Events"
+
 #: pid_provider/wagtail_hooks.py:234
 msgid "Pid Provider"
 msgstr "Pid Provider"
@@ -2104,6 +2306,10 @@ msgstr "Processing report"
 #: proc/models.py:290
 msgid "Processing reports"
 msgstr "Processing reports"
+
+#: proc/models.py:450
+msgid "Registration Status"
+msgstr "Registration Status"
 
 #: proc/models.py:457
 msgid "QA Website Status"
@@ -2163,6 +2369,10 @@ msgstr "XML status"
 msgid "SPS Pkg status"
 msgstr "SPS Pkg status"
 
+#: proc/models.py:2040
+msgid "PID Status"
+msgstr "PID Status"
+
 #: proc/models.py:2048
 msgid "Processed XML"
 msgstr "Processed XML"
@@ -2175,6 +2385,10 @@ msgstr "Native XML + modifications or converted XML from HTML"
 msgid "Unable to update article_proc{} {} {} {}"
 msgstr "Unable to update article_proc{} {} {} {}"
 
+#: proc/models.py:2280
+msgid "Unable to get xml_with_pre from native for {}: {}"
+msgstr "Unable to get xml_with_pre from native for {}: {}"
+
 #: proc/models.py:2332
 msgid "Unable to get xml_with_pre for {}: {}"
 msgstr "Unable to get xml_with_pre for {}: {}"
@@ -2186,6 +2400,26 @@ msgstr "Unable to get xml with pre from migrated article {}: {} {}"
 #: proc/models.py:2633
 msgid "No migrated XML file found for {} ({})"
 msgstr "No migrated XML file found for {} ({})"
+
+#: proc/source_core_api.py:411
+msgid "Missing SciELO Journal {} registration at core.scielo.org"
+msgstr "Missing SciELO Journal {} registration at core.scielo.org"
+
+#: proc/source_core_api.py:458
+msgid "Unable to get journal collection data for {}"
+msgstr "Unable to get journal collection data for {}"
+
+#: proc/wagtail_hooks.py:24
+msgid "Has Images"
+msgstr "Has Images"
+
+#: proc/wagtail_hooks.py:31
+msgid "Has Tables"
+msgstr "Has Tables"
+
+#: proc/wagtail_hooks.py:38
+msgid "Has Attention Demands"
+msgstr "Has Attention Demands"
 
 #: proc/wagtail_hooks.py:81
 msgid "Journal Processing"
@@ -2554,6 +2788,41 @@ msgstr "Retry publication"
 
 msgid "Retry"
 msgstr "Retry"
+
+#, python-format
+msgid "Original updated via %(category)s"
+msgstr "Original updated via %(category)s"
+
+#, python-format
+msgid "Original amended via %(category)s"
+msgstr "Original amended via %(category)s"
+
+msgid "Type of change"
+msgstr "Type of change"
+
+msgid "Request status"
+msgstr "Request status"
+
+msgid "Requested by"
+msgstr "Requested by"
+
+msgid "Requested on"
+msgstr "Requested on"
+
+msgid "Reason for change"
+msgstr "Reason for change"
+
+msgid "Erratum notice"
+msgstr "Erratum notice"
+
+msgid "Addendum notice"
+msgstr "Addendum notice"
+
+msgid "Retraction notice"
+msgstr "Retraction notice"
+
+msgid "Partial retraction notice"
+msgstr "Partial retraction notice"
 
 #: upload/bulk_actions/republish.py:76
 #, python-format
@@ -3983,6 +4252,14 @@ msgstr "You don't have permission to republish some of the selected packages."
 msgid "Yes, republish"
 msgstr "Yes, republish"
 
+#: upload/templates/upload/decisions/delegate.html:12
+msgid ""
+"Assigning a reviewer does not change the document decision or publication "
+"status."
+msgstr ""
+"Assigning a reviewer does not change the document decision or publication "
+"status."
+
 #: upload/templates/upload/decisions/edit.html:14
 #: upload/templates/upload/validationresult/inspect.html:12
 msgid "Back to document"
@@ -4262,6 +4539,10 @@ msgstr "No results match these filters."
 msgid "No results are available yet."
 msgstr "No results are available yet."
 
+#: upload/templates/upload/reports/detail.html:97
+msgid "Save responses"
+msgstr "Save responses"
+
 #: upload/templates/upload/reports/result.html:12
 msgid "Reference"
 msgstr "Reference"
@@ -4504,6 +4785,13 @@ msgstr "Packages"
 msgid "Actions"
 msgstr "Actions"
 
+#: upload/wagtail_hooks.py:320
+msgid "Document versions"
+msgstr "Document versions"
+
+msgid "Published version preserved; change in progress"
+msgstr "Published version preserved; change in progress"
+
 msgid "Information"
 msgstr "Information"
 
@@ -4553,13 +4841,249 @@ msgstr "Technical lookup"
 msgid "Settings"
 msgstr "Settings"
 
+#: article/choices.py:25
+msgid "Received"
+msgstr "Received"
+
+#: article/choices.py:27
+msgid "Cancelled"
+msgstr "Cancelled"
+
+#: article/forms.py:73
+msgid "Change requests must be saved through the request workflow"
+msgstr "Change requests must be saved through the request workflow"
+
+#: article/models.py:1250
+msgid "Published original XML"
+msgstr "Published original XML"
+
+#: article/models.py:1283
+msgid "Inform the article to change"
+msgstr "Inform the article to change"
+
+#: article/models.py:1299
+msgid "This article already has an active change request"
+msgstr "This article already has an active change request"
+
+#: article/models.py:1309
+msgid "Only pending requests can be cancelled"
+msgstr "Only pending requests can be cancelled"
+
 #: upload/admin_buttons.py:107 upload/change_views.py:19
 #: upload/change_views.py:52 upload/document_views.py:44
 msgid "Request document change"
 msgstr "Request document change"
 
+#: upload/article_changes.py:71 upload/article_changes.py:74
+msgid "The submitted XML identifies more than one article."
+msgstr "The submitted XML identifies more than one article."
+
+#: upload/article_changes.py:88
+msgid ""
+"The original article needs an active, compatible change request before "
+"reception."
+msgstr ""
+"The original article needs an active, compatible change request before "
+"reception."
+
+#: upload/article_changes.py:97
+msgid "This change request already has a submission in progress."
+msgstr "This change request already has a submission in progress."
+
+#: upload/article_changes.py:135
+msgid ""
+"The published XML could not be verified. The previous submission was "
+"preserved."
+msgstr ""
+"The published XML could not be verified. The previous submission was "
+"preserved."
+
+#: upload/article_changes.py:143
+msgid "The original journal must have registered ISSNs."
+msgstr "The original journal must have registered ISSNs."
+
+#: upload/article_changes.py:156
+msgid "The notice and updated original must belong to the authorized journal."
+msgstr ""
+"The notice and updated original must belong to the authorized journal."
+
+#: upload/article_changes.py:175
+msgid "Change documents must be received in one submitted package."
+msgstr "Change documents must be received in one submitted package."
+
+#: upload/article_changes.py:186 upload/article_changes.py:197
+msgid "This submission no longer belongs to an active change request."
+msgstr "This submission no longer belongs to an active change request."
+
+#: upload/article_changes.py:228
+msgid "An authorized depositor is required."
+msgstr "An authorized depositor is required."
+
+#: upload/article_changes.py:236
+msgid "The depositor is not authorized for the original article."
+msgstr "The depositor is not authorized for the original article."
+
+#: upload/article_changes.py:267
+msgid "A change notice must identify its original article by DOI."
+msgstr "A change notice must identify its original article by DOI."
+
+#: upload/article_changes.py:274
+msgid "Submit the updated original XML together with its change notice."
+msgstr "Submit the updated original XML together with its change notice."
+
+#: upload/article_changes.py:282
+msgid "The notice must refer to an already public original article."
+msgstr "The notice must refer to an already public original article."
+
+#: upload/article_changes.py:288
+msgid ""
+"The notice type does not match the active request on the original article."
+msgstr ""
+"The notice type does not match the active request on the original article."
+
+#: upload/article_changes.py:297
+msgid "Keep the previously published original filename in the change package."
+msgstr ""
+"Keep the previously published original filename in the change package."
+
+#: upload/article_changes.py:317
+msgid "A submitted document has conflicting change roles."
+msgstr "A submitted document has conflicting change roles."
+
+#: upload/article_changes.py:329
+msgid ""
+"This request requires both a change notice and the updated original, in XML "
+"and PDF."
+msgstr ""
+"This request requires both a change notice and the updated original, in XML "
+"and PDF."
+
+#: upload/choices.py:128
+msgid "Updated original"
+msgstr "Updated original"
+
+#: upload/choices.py:129
+msgid "Change notice"
+msgstr "Change notice"
+
+#: upload/controller.py:181 upload/controller.py:188
+msgid "Article change package"
+msgstr "Article change package"
+
+#: upload/controller.py:392
+msgid "The depositor is not authorized for the registered article."
+msgstr "The depositor is not authorized for the registered article."
+
+#: upload/controller.py:419
+msgid "The received original differs from the authorized article."
+msgstr "The received original differs from the authorized article."
+
+#: upload/controller.py:428
+msgid ""
+"The public article needs an active, compatible change request before "
+"reception."
+msgstr ""
+"The public article needs an active, compatible change request before "
+"reception."
+
+#: upload/forms.py:98
+msgid ""
+"Describe the requested change. Errata, addenda and retractions require a "
+"notice and the updated original document (XML/PDF)."
+msgstr ""
+"Describe the requested change. Errata, addenda and retractions require a "
+"notice and the updated original document (XML/PDF)."
+
+#: upload/models.py:323
+msgid "Article change requests"
+msgstr "Article change requests"
+
+#: upload/models.py:328
+msgid "Change package role"
+msgstr "Change package role"
+
+#: upload/models.py:741
+msgid "Republish the latest public submission, not a previous version."
+msgstr "Republish the latest public submission, not a previous version."
+
+#: upload/models.py:747
+msgid "Publication requires the current, received article change request."
+msgstr "Publication requires the current, received article change request."
+
+#: upload/models.py:754
+msgid ""
+"Approve the notice and all updated originals before publication in "
+"Production."
+msgstr ""
+"Approve the notice and all updated originals before publication in "
+"Production."
+
+#: upload/templates/upload/changes/request.html:12
+msgid ""
+"This request does not change the published document or its publication "
+"status. Submit the corrected content separately for review."
+msgstr ""
+"This request does not change the published document or its publication "
+"status. Submit the corrected content separately for review."
+
+#: upload/templates/upload/documents/change_requests.html:3
+#: upload/templates/upload/documents/change_requests.html:4
+msgid "Document change requests"
+msgstr "Document change requests"
+
+#: upload/templates/upload/documents/change_requests.html:16
+msgid "Change request history"
+msgstr "Change request history"
+
+#: upload/change_views.py:83
+msgid "Document change requested."
+msgstr "Document change requested."
+
+msgid "Published, awaiting access verification"
+msgstr "Published, awaiting access verification"
+
 msgid "The previous request may have been received. Check the destination before confirming another publication."
 msgstr "The previous request may have been received. Check the destination before confirming another publication."
+
+msgid "Reprocess"
+msgstr "Reprocess"
+
+msgid "Try processing"
+msgstr "Try processing"
+
+msgid "Process the existing ZIP again without creating a new submission?"
+msgstr "Process the existing ZIP again without creating a new submission?"
+
+msgid "No interrupted processing is available to retry."
+msgstr "No interrupted processing is available to retry."
+
+msgid "The submitted ZIP is no longer available."
+msgstr "The submitted ZIP is no longer available."
+
+msgid "Processing retry scheduled."
+msgstr "Processing retry scheduled."
+
+msgid ""
+"A newer version of this document has already been accepted. Open the latest "
+"document instead."
+msgstr ""
+"A newer version of this document has already been accepted. Open the latest "
+"document instead."
+
+msgid ""
+"This document is already published in Production. Open the original document"
+" and choose \"Request document change\" before sending a compatible "
+"replacement."
+msgstr ""
+"This document is already published in Production. Open the original document"
+" and choose \"Request document change\" before sending a compatible "
+"replacement."
+
+msgid "Open related document"
+msgstr "Open related document"
+
+msgid "Open original document"
+msgstr "Open original document"
 
 msgid "No safe technical details were recorded."
 msgstr "No safe technical details were recorded."
@@ -4600,6 +5124,18 @@ msgstr "The destination refused authentication or permission."
 msgid "Ask an administrator to check the destination credentials and permissions before retrying."
 msgstr "Ask an administrator to check the destination credentials and permissions before retrying."
 
+msgid "Publication succeeded and availability was confirmed."
+msgstr "Publication succeeded and availability was confirmed."
+
+msgid "No further action is required."
+msgstr "No further action is required."
+
+msgid "Publication succeeded, but availability is not yet confirmed."
+msgstr "Publication succeeded, but availability is not yet confirmed."
+
+msgid "Wait a few minutes and check availability again."
+msgstr "Wait a few minutes and check availability again."
+
 msgid "The destination did not respond in time; publication could not be confirmed."
 msgstr "The destination did not respond in time; publication could not be confirmed."
 
@@ -4609,20 +5145,38 @@ msgstr "Check whether the document is available at the destination before retryi
 msgid "A connection to the destination could not be established."
 msgstr "A connection to the destination could not be established."
 
+msgid "Try again later. If this continues, ask an administrator to check connectivity and destination configuration."
+msgstr "Try again later. If this continues, ask an administrator to check connectivity and destination configuration."
+
 msgid "The destination rejected the publication data."
 msgstr "The destination rejected the publication data."
+
+msgid "Review the package validation results and publication metadata before trying again."
+msgstr "Review the package validation results and publication metadata before trying again."
 
 msgid "The publication conflicts with data already at the destination."
 msgstr "The publication conflicts with data already at the destination."
 
+msgid "Ask support to compare the existing destination record before retrying."
+msgstr "Ask support to compare the existing destination record before retrying."
+
 msgid "The destination service reported an internal failure."
 msgstr "The destination service reported an internal failure."
+
+msgid "Try again later. If the problem persists, contact the destination administrator."
+msgstr "Try again later. If the problem persists, contact the destination administrator."
 
 msgid "A required publication file was not found."
 msgstr "A required publication file was not found."
 
+msgid "Check that the package contains the required files before retrying."
+msgstr "Check that the package contains the required files before retrying."
+
 msgid "Publication not confirmed"
 msgstr "Publication not confirmed"
+
+msgid "Published, but access verification failed"
+msgstr "Published, but access verification failed"
 
 msgid "Publication not started"
 msgstr "Publication not started"
@@ -4633,8 +5187,58 @@ msgstr "Production publication was not started because QA publication was not co
 msgid "Review the QA result before trying to publish in Production."
 msgstr "Review the QA result before trying to publish in Production."
 
+msgid "No Production request was recorded in this attempt."
+msgstr "No Production request was recorded in this attempt."
+
 msgid "Publication details"
 msgstr "Publication details"
 
 msgid "View reason"
 msgstr "View reason"
+
+msgid "A document DOI is required."
+msgstr "A document DOI is required."
+
+msgid "A translation needs a language for its PDF."
+msgstr "A translation needs a language for its PDF."
+
+msgid "An article XML is required."
+msgstr "An article XML is required."
+
+msgid "Document authorship changed. Review the updated authors."
+msgstr "Document authorship changed. Review the updated authors."
+
+msgid "Document identity"
+msgstr "Document identity"
+
+msgid "Incorrect notice article-type."
+msgstr "Incorrect notice article-type."
+
+msgid "Missing article metadata."
+msgstr "Missing article metadata."
+
+#, python-format
+msgid "Missing direct DOI relationship: %s."
+msgstr "Missing direct DOI relationship: %s."
+
+#, python-format
+msgid "Missing document PDF: %s."
+msgstr "Missing document PDF: %s."
+
+msgid "Original and notice must have distinct DOIs."
+msgstr "Original and notice must have distinct DOIs."
+
+msgid "The notice must cover all original languages."
+msgstr "The notice must cover all original languages."
+
+msgid "The submitted collection does not match the registered document."
+msgstr "The submitted collection does not match the registered document."
+
+msgid "The submitted identifiers refer to different documents."
+msgstr "The submitted identifiers refer to different documents."
+
+msgid "Unsafe package path."
+msgstr "Unsafe package path."
+
+msgid "Unsupported change type."
+msgstr "Unsupported change type."
