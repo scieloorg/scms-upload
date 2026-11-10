@@ -1,0 +1,7 @@
+<ul class="validation-counts">
+    {% for count in counts %}
+        <li class="validation-count validation-count-{{ count.status }}">
+            <span>{{ count.label }}</span><strong>{{ count.total }}</strong>
+        </li>
+    {% endfor %}
+</ul>
