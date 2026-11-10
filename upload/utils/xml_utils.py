@@ -6,6 +6,18 @@ from lxml import etree
 
 from .file_utils import numbered_lines
 
+ASSET_TAGS = (
+    "graphic",
+    "media",
+    "inline-graphic",
+    "supplementary-material",
+    "inline-supplementary-material",
+)
+XPATH_FOR_IDENTIFYING_ASSETS = "|".join(
+    [".//" + at + "[@xlink:href]" for at in ASSET_TAGS]
+)
+
+
 PATTERN_START_END_LINE_NUMBERS = r".* line (?P<start>\d*) and .*, line (?P<end>\d*),"
 PATTERN_START_LINE_NUMBER = r".* line (?P<start>\d*),"
 
@@ -50,16 +62,6 @@ def get_etree_from_xml_content(xml_str):
 
 
 def get_xml_strio_for_preview(xmlstr, dirname):
-    ASSET_TAGS = (
-        "graphic",
-        "media",
-        "inline-graphic",
-        "supplementary-material",
-        "inline-supplementary-material",
-    )
-    XPATH_FOR_IDENTIFYING_ASSETS = "|".join(
-        [".//" + at + "[@xlink:href]" for at in ASSET_TAGS]
-    )
     xmltree = get_etree_from_xml_content(xmlstr)
 
     for node in xmltree.xpath(

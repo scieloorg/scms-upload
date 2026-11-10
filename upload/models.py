@@ -32,7 +32,7 @@ from collection.models import Collection
 from core.models import CommonControlField
 from core.widgets import ReadOnlyPrettyJSONWidget
 from package import choices as package_choices
-from package.models import SPSPkg
+from package.models import SPSPkg, update_zip_file
 from pid_provider.models import PidProviderXML
 from proc.models import IssueProc, Operation
 from proc.source_core_api import IssueDataChecker
@@ -58,8 +58,9 @@ from upload.permissions import (
     REQUEST_CORRECTION,
 )
 from upload.utils import file_utils
-from upload.utils.package_utils import update_zip_file
 from upload.utils.zip_pkg import PkgZip
+
+DELEGATION_EVENT = "delegate_review"
 
 User = get_user_model()
 
@@ -349,6 +350,7 @@ class Package(CommonControlField, ClusterableModel):
     panel_event = [
         InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
     ]
+
     edit_handler = TabbedInterface(
         [
             ObjectList(panels, heading=_("Status")),
@@ -1101,11 +1103,13 @@ class Package(CommonControlField, ClusterableModel):
             )
             raise
 
-    def prepare_sps_package(self, user, xml_with_pre, xml_file_changed, force_update=None):
+    def prepare_sps_package(
+        self, user, xml_with_pre, xml_file_changed, force_update=None
+    ):
         # Aplica-se também para um pacote de atualização de um conteúdo anteriormente migrado
         # TODO components, texts
         if xml_file_changed:
-            update_zip_file(self.file.path, xml_with_pre)
+            update_zip_file(self.file.path, xml_with_pre.filename, xml_with_pre)
 
         if (
             # self.xml_file_changed(xml_with_pre, set_pub_date)
@@ -1119,8 +1123,7 @@ class Package(CommonControlField, ClusterableModel):
             texts = {
                 "xml_langs": list(xml_with_pre.langs),
                 "pdf_langs": [
-                    rendition["lang"]
-                    for rendition in xml_with_pre.renditions
+                    rendition["lang"] for rendition in xml_with_pre.renditions
                 ],
             }
             self.sps_pkg = SPSPkg.create_or_update(
