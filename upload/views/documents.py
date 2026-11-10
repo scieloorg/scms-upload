@@ -10,8 +10,7 @@ from wagtail.admin.widgets import Button
 
 from core.users.permission_policies import TeamScopedInspectView
 from upload.admin_buttons import get_package_action_buttons, get_package_website_links
-from upload.document_workflow import work_situation
-from upload.models import Package, PkgValidationResult, choices
+from upload.models import DELEGATION_EVENT, Package, PkgValidationResult, choices
 from upload.publication_status import publication_situation
 from upload.querysets import get_scoped_package_queryset
 from upload.utils.package_utils import render_html
@@ -59,7 +58,7 @@ class PackageAdminInspectView(TeamScopedInspectView):
 
         history = (
             self.object.upload_proc_result.filter(
-                name="process_qa_decision",
+                name__in=("process_qa_decision", DELEGATION_EVENT),
                 completed=True,
             )
             .select_related("creator")
@@ -80,7 +79,7 @@ class PackageAdminInspectView(TeamScopedInspectView):
                 {"key": key, "label": label, "selected": key == active_tab}
                 for key, label in DOCUMENT_SECTIONS
             ],
-            "work_situation": work_situation(self.object),
+            "work_situation": self.object.work_situation(),
             "qa_publication": publication_situation(self.object, "QA"),
             "public_publication": publication_situation(self.object, "PUBLIC"),
             "decision_history": history,
@@ -88,7 +87,7 @@ class PackageAdminInspectView(TeamScopedInspectView):
                 detail__decision=choices.PS_PENDING_CORRECTION
             ).first(),
             "processing_events": self.object.upload_proc_result.exclude(
-                name="process_qa_decision",
+                name__in=("process_qa_decision", DELEGATION_EVENT),
             ).order_by("-created", "-pk"),
             "pkg_zip_name": self.object.pkg_zip.name if self.object.pkg_zip else "",
             "linked": self.object.linked.all(),

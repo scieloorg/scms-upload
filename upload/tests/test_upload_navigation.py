@@ -18,6 +18,13 @@ def admin_client(client, settings):
 
 
 @pytest.mark.django_db
+def test_snippet_navigation_uses_registered_document_listing(admin_client):
+    response = admin_client.get(reverse("wagtailsnippets:index"))
+    assert response.status_code == 200
+    assert reverse("wagtailsnippets_upload_package:list") in response.content.decode()
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     "model_name", ["xmlerrorreport", "xmlinforeport", "validationreport"]
 )
@@ -41,4 +48,5 @@ def test_report_generation_filter_handles_empty_status(admin_client, model_name)
         assert response.status_code == 200
         assert list(response.context["object_list"]) == [report]
     response = admin_client.get(url)
+
     assert set(response.context["object_list"]) == set(reports.values())

@@ -17,6 +17,16 @@ def get_package_action_buttons(
         return []
 
     buttons = []
+    if package.can_delegate_review(user):
+        buttons.append(
+            button_class(
+                _("Delegate review"),
+                icon_name="user",
+                url=reverse("upload:delegate_review", args=[package.pk]),
+                priority=25,
+            )
+        )
+
     query = f"?package_id={package.pk}"
     if package.status in (
         choices.PS_PENDING_CORRECTION,

@@ -9,7 +9,7 @@ from wagtail.admin.filters import DateRangePickerWidget, WagtailFilterSet
 from wagtail.admin.widgets import BooleanRadioSelect
 
 from upload import choices
-from upload.document_workflow import WORK_STATUS_CHOICES
+from upload.choices import WORK_STATUS_CHOICES
 from upload.models import (
     Package,
     PackageZip,
