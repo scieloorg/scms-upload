@@ -7,10 +7,15 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
-from packtools.sps.pid_provider.xml_sps_lib import GetXMLItemsError, XMLWithPre
+from packtools.sps.pid_provider.xml_sps_lib import (
+    GetXMLItemsError,
+    GetXmlWithPreError,
+    XMLWithPre,
+)
 
 from article import choices as article_choices
-from article.models import Article
+from article.authorization import is_public_article
+from article.models import CHANGE_REQUEST_REQUIRED, Article
 from issue.models import Issue
 from journal.models import Journal
 from package.models import update_zip_file
@@ -27,6 +32,7 @@ from upload.models import (
     choices,
 )
 from upload.utils import file_utils, xml_utils
+from upload.validation.article_changes import normalize_doi
 
 pp = PidRequester()
 
@@ -57,6 +63,7 @@ class UploadJournalDataChecker(JournalDataChecker):
             )
         if similar_journals:
             return _("Registered journals: {}. ").format(similar_journals)
+
         return _("Found no registered journal. ")
 
     def raise_error(self):
@@ -127,6 +134,7 @@ class UploadIssueDataChecker(IssueDataChecker):
             )
         if issues:
             return _("Registered issues: {}. ").format(issues)
+
         return _("{} has no registered issues").format(self._journal)
 
     def raise_error(self):
@@ -279,36 +287,19 @@ def prepare_package_reception(user, packages, task, retry_package_id=None):
         )
 
 
-def get_last_package(article_id, **kwargs):
-    try:
-        return (
-            Package.objects.filter(article=article_id, **kwargs)
-            .order_by("-created")
-            .first()
-        )
-    except Package.DoesNotExist:
-        return
-
-
+@transaction.atomic
 def receive_package(user, package):
     try:
         zip_xml_file_path = package.file.path
         response = {}
         for xml_with_pre in XMLWithPre.create(path=zip_xml_file_path):
 
-            # atualiza package name e linked
-            # TODO melhorar a forma de fazer link entre os artigos do pacote
-            if xml_with_pre.xmltree.find(".//related-article"):
-                for item in package.pkg_zip.packages.all():
-                    if item is not package:
-                        package.linked.add(item)
             package.main_doi = xml_with_pre.main_doi
             package.add_order(xml_with_pre.order, xml_with_pre.fpage)
             package.save()
 
             response = _check_article_and_journal(package, xml_with_pre, user=user)
             logging.info(response)
-            update_zip_file(zip_xml_file_path, response, xml_with_pre)
 
             package.article = response.get("article")
             package.issue = (
@@ -348,10 +339,28 @@ def receive_package(user, package):
                 )
                 return response
 
-            if package.article:
+            if response.get("v3") and not xml_with_pre.v3:
+                xml_with_pre.v3 = response["v3"]
+            if response.get("v2") and not xml_with_pre.v2:
+                xml_with_pre.v2 = response["v2"]
+            update_zip_file(zip_xml_file_path, xml_with_pre.filename, xml_with_pre)
+
+            if package.article and not package.change_role:
                 package.article.update_status()
+
+            # Old reception diagnostics have been preserved in the retry event.
+            PkgValidationResult.objects.filter(
+                report__package=package,
+                report__title__in=(
+                    "Package file",
+                    "Article change package",
+                    "File Report",
+                ),
+            ).delete()
+            package.accept_document_version(response.get("previous_package_id"))
+            _record_authorship_change(user, package, xml_with_pre)
             return response
-    except GetXMLItemsError:
+    except (GetXMLItemsError, GetXmlWithPreError):
         # identifica os erros do arquivo Zip / XML
         # TODO levar este código para o packtools / XMLWithPre
         return _identify_file_error(package)
@@ -409,6 +418,7 @@ def _check_article_and_journal(package, xml_with_pre, user):
         if (
             not user
             or not getattr(user, "is_authenticated", False)
+            or not user.is_active
             or (
                 not user.is_superuser
                 and (
@@ -424,13 +434,32 @@ def _check_article_and_journal(package, xml_with_pre, user):
                 )
             )
 
-        response.update(
-            pp.is_registered_xml_with_pre(xml_with_pre, xml_with_pre.filename)
+        # Serialize acceptance of versions of a document, including first deposits.
+        # The lock is retained through the successful package save in receive_package.
+        if transaction.get_connection().in_atomic_block:
+            Journal.objects.select_for_update().get(pk=journal.pk)
+
+        article = Article.identify(
+            pid_v3=xml_with_pre.v3,
+            pid_v2=xml_with_pre.v2,
+            doi=normalize_doi(xml_with_pre.main_doi),
+            collection_acron=xml_with_pre.collection,
         )
+        if article is not None:
+            response.update(v3=article.pid_v3, v2=article.pid_v2, registered=True)
+        else:
+            response.update(
+                pp.is_registered_xml_with_pre(xml_with_pre, xml_with_pre.filename)
+            )
+            if response.get("error_type"):
+                raise PackageDataError(response.get("error_msg"))
+            if response.get("v3"):
+                article = Article.objects.filter(pid_v3=response["v3"]).first()
+
         logging.info(f"is_registered_xml_with_pre: {response}")
 
         name, ext = os.path.splitext(xml_with_pre.filename)
-        _check_package_is_expected(response, package, name)
+        _check_package_is_expected(response, package, name, article, user=user)
         logging.info(f"_check_package_is_expected: {response}")
 
         issue_checker = UploadIssueDataChecker.from_xmltree(
@@ -445,38 +474,38 @@ def _check_article_and_journal(package, xml_with_pre, user):
         logging.info(f"_check_xml_and_registered_data_compatibility: {response}")
         response["package_status"] = choices.PS_ENQUEUED_FOR_VALIDATION
 
-        _archive_pending_correction_package(response)
         return response
-    except UnexpectedPackageError as e:
-        response["package_status"] = choices.PS_UNEXPECTED
-        response["error_message"] = str(e)
-        response["error_level"] = choices.VALIDATION_RESULT_BLOCKING
-        return response
-    except PackageDataError as e:
-        response["package_status"] = choices.PS_PENDING_CORRECTION
-        response["error_message"] = str(e)
-        response["error_level"] = choices.VALIDATION_RESULT_BLOCKING
-        return response
-    except Exception as e:
-        response["package_status"] = choices.PS_PENDING_CORRECTION
-        response["error_message"] = str(e)
-        response["error_level"] = choices.VALIDATION_RESULT_BLOCKING
+    except Exception as error:
+        response.update(
+            package_status=(
+                choices.PS_UNEXPECTED
+                if isinstance(error, (UnexpectedPackageError, ValidationError))
+                else choices.PS_PENDING_CORRECTION
+            ),
+            error_message=str(error),
+            error_level=choices.VALIDATION_RESULT_BLOCKING,
+        )
         return response
 
 
-def _check_package_is_expected(response, package, sps_pkg_name):
-    try:
-        article = Article.objects.get(pid_v3=response["v3"])
-        params = {"article": article}
-    except (Article.DoesNotExist, KeyError):
-        # artigo novo, inédito no sistema
-        article = None
-        params = {"name": sps_pkg_name, "journal": response.get("journal")}
+def _check_package_is_expected(response, package, sps_pkg_name, article, user=None):
+    if article is not None:
+        actor = user or package.creator
+        if not actor or not actor.is_active or (
+            not actor.is_superuser
+            and article.journal_id not in get_user_membership_ids(actor).get("journal_list_ids", [])
+        ):
+            raise UnexpectedPackageError(_("The depositor is not authorized for the registered article."))
 
-    logging.info(f"_check_package_is_expected: {params}")
+    if package.has_newer_accepted_attempt(
+        article=article, name=sps_pkg_name, journal=response.get("journal")
+    ):
+        raise UnexpectedPackageError(NEWER_DOCUMENT)
     previous_package = (
-        Package.objects.filter(**params)
-        .exclude(pk=package.pk)
+        package.other_document_attempts(
+            article=article, name=sps_pkg_name, journal=response.get("journal")
+        )
+        .exclude(status=choices.PS_ARCHIVED)
         .order_by("-created", "-pk")
         .first()
     )
@@ -484,36 +513,55 @@ def _check_package_is_expected(response, package, sps_pkg_name):
 
     response["article"] = article
 
-    if previous_package and previous_package.status in choices.PS_WIP:
-        raise UnexpectedPackageError(
-            _(
-                "Not allowed to accept new package. There is a previous package which status={}. Search it and change the status to '{}'"
-            ).format(previous_package.status, choices.PS_PENDING_CORRECTION)
-        )
+    change_request = package.change_requests.filter(
+        submission_id=package.pkg_zip_id,
+        status=article_choices.RCS_RECEIVED,
+    ).first()
+    if change_request:
+        if package.change_role == choices.CPR_ORIGINAL:
+            if article is not None and article.pk != change_request.article_id:
+                raise UnexpectedPackageError(_("The received original differs from the authorized article."))
+            response["article"] = change_request.article
+        response["package_category"] = change_request.change_type
+        return
+
+    if package.change_role:
+        raise UnexpectedPackageError(CHANGE_REQUEST_REQUIRED)
 
     if article:
-        if article.status == article_choices.AS_REQUIRE_UPDATE:
-            response["package_category"] = choices.PC_UPDATE
-        elif article.status == article_choices.AS_REQUIRE_ERRATUM:
-            response["package_category"] = choices.PC_ERRATUM
-        else:
-            response["package_category"] = choices.PC_UPDATE
-
-            raise UnexpectedPackageError(
-                _(
-                    "Not allowed to accept new package. There is a previous package which status={}. Search it and change the status to '{}'"
-                ).format(article.status, choices.PS_PENDING_CORRECTION)
-            )
+        if is_public_article(article):
+            raise UnexpectedPackageError(CHANGE_REQUEST_REQUIRED)
+        response["package_category"] = choices.PC_UPDATE
     else:
         response["package_category"] = choices.PC_NEW_DOCUMENT
         return
 
 
-def _archive_pending_correction_package(response):
-    Package.objects.filter(
-        pk=response.get("previous_package_id"),
-        status=choices.PS_PENDING_CORRECTION,
-    ).update(status=choices.PS_ARCHIVED)
+def _record_authorship_change(user, package, document):
+    previous = package.previous_package
+    if previous is None:
+        return
+    try:
+        previous_document = previous.xml_with_pre
+    except (OSError, ValueError, GetXMLItemsError, GetXmlWithPreError):
+        return
+    if previous_document is None or previous_document.authors == document.authors:
+        return
+
+    report = ValidationReport.create_or_update(
+        user,
+        package,
+        gettext_noop("Document identity"),
+        choices.VAL_CAT_GROUP_DATA,
+        reset_validations=True,
+    )
+    report.add_validation_result(
+        status=choices.VALIDATION_RESULT_INFO,
+        message=_("Document authorship changed. Review the updated authors."),
+        subject=gettext_noop("Document identity"),
+        data={"previous": previous_document.authors, "submitted": document.authors},
+    )
+    report.finish_validations()
 
 
 def _check_xml_and_registered_data_compatibility(

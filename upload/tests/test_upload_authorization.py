@@ -150,6 +150,11 @@ class UploadJournalAuthorizationTest(TestCase):
         mock_xml_with_pre = MagicMock()
         mock_xml_with_pre.filename = "1516-1439-mr-29-e20250709.xml"
         mock_xml_with_pre.xmltree = MagicMock()
+        mock_xml_with_pre.v3 = None
+        mock_xml_with_pre.v2 = None
+        mock_xml_with_pre.main_doi = None
+        mock_xml_with_pre.collection = None
+
         return mock_xml_with_pre
 
     @patch("upload.controller.UploadJournalDataChecker")
@@ -177,6 +182,7 @@ class UploadJournalAuthorizationTest(TestCase):
         )
 
         # Comportamento observável
+
         self.assertEqual(response.get("package_status"), choices.PS_UNEXPECTED)
         self.assertEqual(response.get("error_level"), choices.VALIDATION_RESULT_BLOCKING)
         self.assertEqual(
@@ -212,6 +218,7 @@ class UploadJournalAuthorizationTest(TestCase):
         resp_none = _check_article_and_journal(
             self.package, mock_xml_with_pre, None
         )
+
         self.assertEqual(resp_none.get("package_status"), choices.PS_UNEXPECTED)
         self.assertEqual(resp_none.get("error_level"), choices.VALIDATION_RESULT_BLOCKING)
 
@@ -219,6 +226,7 @@ class UploadJournalAuthorizationTest(TestCase):
         resp_anon = _check_article_and_journal(
             self.package, mock_xml_with_pre, AnonymousUser()
         )
+
         self.assertEqual(resp_anon.get("package_status"), choices.PS_UNEXPECTED)
         self.assertEqual(resp_anon.get("error_level"), choices.VALIDATION_RESULT_BLOCKING)
 
@@ -231,10 +239,8 @@ class UploadJournalAuthorizationTest(TestCase):
     @patch("upload.controller._check_package_is_expected")
     @patch("upload.controller.UploadIssueDataChecker")
     @patch("upload.controller._check_xml_and_registered_data_compatibility")
-    @patch("upload.controller._archive_pending_correction_package")
     def test_authorized_users_proceed_to_validations(
         self,
-        mock_archive,
         mock_compat,
         mock_issue_checker_cls,
         mock_check_package_is_expected,
@@ -257,18 +263,21 @@ class UploadJournalAuthorizationTest(TestCase):
         resp_mr = _check_article_and_journal(
             self.package, mock_xml_with_pre, self.mr_editor
         )
+
         self.assertEqual(resp_mr.get("package_status"), choices.PS_ENQUEUED_FOR_VALIDATION)
 
         # 2. qa_analyst submetendo mr -> Autorizado pela colecao
         resp_qa = _check_article_and_journal(
             self.package, mock_xml_with_pre, self.qa_analyst
         )
+
         self.assertEqual(resp_qa.get("package_status"), choices.PS_ENQUEUED_FOR_VALIDATION)
 
         # 3. superuser submetendo mr -> Autorizado
         resp_su = _check_article_and_journal(
             self.package, mock_xml_with_pre, self.superuser
         )
+
         self.assertEqual(resp_su.get("package_status"), choices.PS_ENQUEUED_FOR_VALIDATION)
 
     @patch("upload.controller.UploadJournalDataChecker")
@@ -276,10 +285,8 @@ class UploadJournalAuthorizationTest(TestCase):
     @patch("upload.controller._check_package_is_expected")
     @patch("upload.controller.UploadIssueDataChecker")
     @patch("upload.controller._check_xml_and_registered_data_compatibility")
-    @patch("upload.controller._archive_pending_correction_package")
     def test_company_contract_user_authorized_for_contracted_journal(
         self,
-        mock_archive,
         mock_compat,
         mock_issue_checker_cls,
         mock_check_package_is_expected,
@@ -302,6 +309,7 @@ class UploadJournalAuthorizationTest(TestCase):
         resp_comp = _check_article_and_journal(
             self.package, mock_xml_with_pre, self.company_user
         )
+
         self.assertEqual(resp_comp.get("package_status"), choices.PS_ENQUEUED_FOR_VALIDATION)
 
 
@@ -386,6 +394,7 @@ class RejectedPackageVisibilityTest(TestCase):
 
         # Mesmo com ACCESS_PACKAGES (que amplia acesso no escopo de suas revistas),
         # deve ver seu pacote rejeitado com status unexpected
+
         self.assertIn(self.bn_rejected_pkg, scoped)
         self.assertNotIn(self.mr_regular_pkg, scoped)
 

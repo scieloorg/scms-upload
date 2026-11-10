@@ -1,10 +1,17 @@
+from types import SimpleNamespace
+from unittest.mock import patch
+
 import pytest
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext
+from lxml import etree
 
 from article.models import Article, ArticleDOIWithLang
 from collection.models import Collection, Language
+from issue.models import Issue
 from journal.models import Journal, JournalCollection
+from upload import choices
+from upload.controller import _check_article_and_journal
 
 
 def test_identifiers_resolve_existing_article_and_reject_conflicts(report_scope):
@@ -30,6 +37,56 @@ def test_identifiers_resolve_existing_article_and_reject_conflicts(report_scope)
     assert error.value.messages == [
         gettext("The submitted identifiers refer to different documents.")
     ]
+
+
+@pytest.mark.parametrize("identity_source", ["xml", "pid_provider"])
+def test_reception_keeps_the_registered_article_for_both_identity_sources(
+    report_scope, identity_source
+):
+    scope = report_scope
+    issue = Issue.objects.create(creator=scope.superuser, journal=scope.journal_1)
+    article = Article.objects.create(
+        creator=scope.superuser,
+        journal=scope.journal_1,
+        issue=issue,
+        pid_v3="A" * 23,
+    )
+    document = SimpleNamespace(
+        xmltree=etree.fromstring(b"<article/>"),
+        v3=article.pid_v3 if identity_source == "xml" else None,
+        v2=None,
+        main_doi=None,
+        collection=None,
+        filename="original.xml",
+    )
+    journal_checker = SimpleNamespace(
+        check=lambda result: result.update(journal=scope.journal_1)
+    )
+    issue_checker = SimpleNamespace(check=lambda result: result.update(issue=issue))
+
+    with (
+        patch(
+            "upload.controller.UploadJournalDataChecker.from_xmltree",
+            return_value=journal_checker,
+        ),
+        patch(
+            "upload.controller.UploadIssueDataChecker.from_xmltree",
+            return_value=issue_checker,
+        ),
+        patch(
+            "upload.controller.pp.is_registered_xml_with_pre",
+            return_value={"v3": article.pid_v3},
+        ) as provider,
+    ):
+        response = _check_article_and_journal(
+            scope.package_1, document, scope.superuser
+        )
+
+    assert response["article"] == article
+    assert response["v3"] == article.pid_v3
+    assert response["package_category"] == choices.PC_UPDATE
+    assert response["package_status"] == choices.PS_ENQUEUED_FOR_VALIDATION
+    assert provider.call_count == (0 if identity_source == "xml" else 1)
 
 
 @pytest.fixture
