@@ -17,6 +17,14 @@ from upload.querysets import (
 )
 
 class PackageZipForm(CoreAdminModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["file"].label = _("ZIP file")
+        self.fields["file"].help_text = _(
+            "Select the ZIP package containing the XML and its associated files. "
+            "Processing starts in the background after submission."
+        )
+
     def save_all(self, user):
         pkg_zip = super().save_all(user)
 

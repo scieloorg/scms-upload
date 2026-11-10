@@ -1,0 +1,15 @@
+{% extends "wagtailsnippets/snippets/create.html" %}
+{% load i18n wagtailadmin_tags %}
+
+{% block actions %}
+    <button type="submit" class="button button-longrunning"
+            data-controller="w-progress w-kbd"
+            data-action="w-progress#activate"
+            data-w-kbd-key-value="mod+s"
+            data-w-kbd-scope-value="global"
+            data-w-progress-active-value="{% trans 'Uploading…' %}">
+        {% icon name="upload" classname="button-longrunning__icon w-mr-1" %}
+        {% icon name="spinner" %}
+        <em data-w-progress-target="label">{% trans "Upload package" %}</em>
+    </button>
+{% endblock %}

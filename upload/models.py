@@ -186,7 +186,7 @@ class PackageZip(CommonControlField):
             "Unchecked to be redirect to package upload. Checked to be redirect to package validation"
         ),
     )
-    name = models.CharField(_("Name"), max_length=40, null=True, blank=True)
+    name = models.CharField(_("Name"), max_length=255, null=True, blank=True)
 
     panels = [
         FieldPanel("file"),
@@ -740,6 +740,7 @@ class Package(CommonControlField, ClusterableModel):
             return False
         if self.validation_report.filter(creation=choices.REPORT_CREATION_WIP).exists():
             return False
+
         return True
 
     def calculate_validation_numbers(self):
@@ -1035,6 +1036,7 @@ class Package(CommonControlField, ClusterableModel):
         # revisão finalizada e a quantidade de erros não é tolerável
         self.status = choices.PS_PENDING_CORRECTION
         self.save()
+
         return True
 
     def process_system_decision(self, task_upload_workflow_publish_article):
@@ -1353,7 +1355,6 @@ class Package(CommonControlField, ClusterableModel):
             update_zip_file(self.file.path, xml_with_pre.filename, xml_with_pre)
 
         if (
-            # self.xml_file_changed(xml_with_pre, set_pub_date)
             xml_file_changed
             or not self.sps_pkg
             or not self.sps_pkg.registered_in_core
@@ -1426,6 +1427,7 @@ class Package(CommonControlField, ClusterableModel):
                 result["blocking_errors"].append(
                     _("SPS package requires PID provider registration")
                 )
+
         return {
             "websites": websites,
             "result": result,
@@ -2670,6 +2672,7 @@ class PidReservation(models.Model):
             params["pkg_name__in"] = name_list
         if not params:
             raise ValueError("PidReservation.is_reserved requires params")
+
         return cls.objects.get(**params)
 
     @classmethod

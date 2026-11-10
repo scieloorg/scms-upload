@@ -40,7 +40,7 @@ class PackageZipCreateView(CreateView):
                 '{} <a href="{}?pkg_zip_id={}">{}</a>',
                 _(
                     "Package received. Processing runs in the background. "
-                    "Follow its progress in Document tracking."
+                    "Follow its progress in Documents."
                 ),
                 documents_url,
                 pkg_zip.pk,
