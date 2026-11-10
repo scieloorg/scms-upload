@@ -3,6 +3,7 @@ import traceback
 from datetime import datetime, timezone
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models
 from django.db.models import Count, Max, Q
 from django.utils.translation import gettext_lazy as _
@@ -10,26 +11,42 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.models.article_titles import ArticleTitles
 from packtools.sps.models.article_toc_sections import ArticleTocSections
-from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel, TabbedInterface, ObjectList
+from wagtail.admin.panels import (
+    FieldPanel,
+    InlinePanel,
+    MultiFieldPanel,
+    ObjectList,
+    TabbedInterface,
+)
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
-from core.widgets import ReadOnlyPrettyJSONWidget
-from migration import choices as migration_choices
-from migration.models import ClassicWebsiteConfiguration
-from article.page_checker import check_url, check_content, format_url, format_classic_url
 from article.forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
-from collection.choices import PUBLIC
-from collection.models import Language, Collection, WebSiteConfiguration
+from article.page_checker import (
+    check_content,
+    check_url,
+    format_classic_url,
+    format_url,
+)
+from collection.models import Collection, Language, WebSiteConfiguration
 from core.models import CommonControlField, HTMLTextModel
+from core.widgets import ReadOnlyPrettyJSONWidget
 from doi.models import DOIWithLang
 from issue.models import TOC, Issue, TocSection
 from journal.models import Journal, JournalSection, OfficialJournal
+from migration import choices as migration_choices
+from migration.models import ClassicWebsiteConfiguration
 from package.models import SPSPkg
-from pid_provider.models import PidProviderXML
 from pid_provider.choices import PPXML_STATUS_INVALID
+from pid_provider.models import PidProviderXML
+
 from . import choices
 from .permissions import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
+
+CHANGE_REQUEST_REQUIRED = _(
+    "This document is already published in Production. Open the original document "
+    'and choose "Request document change" before sending a compatible replacement.'
+)
 
 User = get_user_model()
 
@@ -305,6 +322,43 @@ class Article(ClusterableModel, CommonControlField):
         return list(langs)
 
     # ── get / dedup ──
+
+    @classmethod
+    def identify(cls, pid_v3=None, pid_v2=None, doi=None, collection_acron=None):
+        """Resolve supplied identifiers without comparing the XML contents."""
+        identifiers = Q()
+        if pid_v3:
+            identifiers |= Q(pid_v3=pid_v3)
+        if pid_v2:
+            identifiers |= Q(pid_v2=pid_v2)
+        if doi:
+            identifiers |= Q(doi_with_lang__doi__iexact=doi)
+        if not identifiers:
+            return None
+
+        matches = list(cls.objects.filter(identifiers).distinct())
+        if len(matches) > 1:
+            raise ValidationError(
+                _("The submitted identifiers refer to different documents.")
+            )
+        if not matches:
+            return None
+
+        article = matches[0]
+        if pid_v3 and article.pid_v3 != pid_v3:
+            raise ValidationError(
+                _("The submitted identifiers refer to different documents.")
+            )
+        if (
+            collection_acron
+            and not article.journal.journal_collections.filter(
+                collection__acron=collection_acron
+            ).exists()
+        ):
+            raise ValidationError(
+                _("The submitted collection does not match the registered document.")
+            )
+        return article
 
     @classmethod
     def get(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, sps_pkg=None):
