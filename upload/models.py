@@ -1974,6 +1974,43 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
 
 
 class BaseValidationReport(CommonControlField):
+    REPORT_GROUP_LABELS = {
+        "journal-meta": _("Journal metadata"),
+        "subject": _("Subjects"),
+        "table-wrap": _("Tables"),
+        "list": _("Lists"),
+        "article-id": _("Document identifiers"),
+        "article dates": _("Document dates"),
+        "history": _("Editorial dates"),
+        "article-type": _("Document type"),
+        "contrib": _("Contributors"),
+        "aff": _("Affiliations"),
+        "author-notes": _("Author notes"),
+        "id and rid": _("Identifiers and cross-references"),
+        "fig": _("Figures"),
+        "disp-formula": _("Display formulas"),
+        "inline-formula": _("Inline formulas"),
+        "reference": _("References"),
+        "accessibility": _("Accessibility"),
+        "app": _("Appendices"),
+        "ext-link": _("External links"),
+        "graphic": _("Images"),
+        "sec": _("Sections"),
+    }
+
+    REPORT_NAMES = (
+        gettext_noop("XML Error Report"),
+        gettext_noop("XML Info Report"),
+        gettext_noop("Assets Report"),
+        gettext_noop("Renditions Report"),
+        gettext_noop("Renditions content report"),
+        gettext_noop("DTD Report"),
+        gettext_noop("Style checker Report"),
+        gettext_noop("Web page Report"),
+        gettext_noop("Package file"),
+        gettext_noop("File Report"),
+    )
+
     title = models.CharField(_("Title"), null=True, blank=True, max_length=128)
     category = models.CharField(
         _("Validation category"),
@@ -2032,14 +2069,86 @@ class BaseValidationReport(CommonControlField):
 
     @display(description=_("Title"), ordering="title")
     def display_title(self):
+        """Traduz o título para exibição sem alterar o valor armazenado."""
         if not self.title:
             return self.title
 
-        title, separator, group = self.title.partition(": ")
-        if title == "XML Error Report" and separator:
-            return f"{gettext(title)}: {group}"
+        name, separator, group = self.title.partition(": ")
+        if name not in self.REPORT_NAMES:
+            return gettext(self.title)
 
-        return gettext(self.title)
+        translated = gettext(
+            "Successful XML checks" if name == "XML Info Report" else name
+        )
+
+        return f"{translated}: {group}" if separator else translated
+
+    @property
+    def display_heading(self):
+        title, separator, group = (self.title or "").partition(": ")
+
+        if title == "XML Error Report" and separator:
+            return self.REPORT_GROUP_LABELS.get(group, group)
+
+        return self.display_title()
+
+    @staticmethod
+    def validation_state(counts, creation):
+        if creation == choices.REPORT_CREATION_WIP:
+            return "processing"
+
+        if any(
+            counts.get(status)
+            for status in (
+                choices.VALIDATION_RESULT_BLOCKING,
+                choices.VALIDATION_RESULT_CRITICAL,
+                choices.VALIDATION_RESULT_FAILURE,
+            )
+        ):
+            return "error"
+
+        if counts.get(choices.VALIDATION_RESULT_WARNING):
+            return "warning"
+
+        if any(
+            total > 0
+            for status, total in counts.items()
+            if status
+            not in (
+                choices.VALIDATION_RESULT_SUCCESS,
+                choices.VALIDATION_RESULT_INFO,
+            )
+        ):
+            return "review"
+
+        if counts.get(choices.VALIDATION_RESULT_INFO):
+            return "info"
+
+        if creation == choices.REPORT_CREATION_DONE and counts.get(
+            choices.VALIDATION_RESULT_SUCCESS
+        ):
+            return "success"
+
+        return "empty"
+
+    @property
+    def validation_summary(self):
+        counts = {
+            item["status"]: item["total"]
+            for item in self.validation_results.order_by()
+            .values("status")
+            .annotate(total=Count("pk"))
+        }
+
+        return {
+            "state": self.validation_state(counts, self.creation),
+            "success_total": counts.get(choices.VALIDATION_RESULT_SUCCESS, 0),
+            "counts": [
+                {"status": status.lower(), "label": label, "total": counts[status]}
+                for status, label in choices.VALIDATION_RESULT_DISPLAY
+                if counts.get(status)
+            ],
+        }
 
     @classmethod
     def get(cls, package=None, title=None, category=None):
@@ -2065,9 +2174,7 @@ class BaseValidationReport(CommonControlField):
         try:
             obj = cls.get(package, title, category)
             if reset_validations:
-                cls.ValidationResultClass.objects.filter(
-                    report__package=package
-                ).delete()
+                obj.validation_results.all().delete()
             return obj
         except cls.DoesNotExist:
             return cls.create(user, package, title, category)
@@ -2115,6 +2222,7 @@ class BaseValidationReport(CommonControlField):
             items["total_" + item["status"].lower()] = item["total"]
         items["total"] = sum(items.values())
         logging.info(f"BaseValidationReport.get_numbers: {items}")
+
         return items
 
 
