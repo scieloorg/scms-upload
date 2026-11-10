@@ -1,7 +1,9 @@
 import os
+from collections import Counter
 
 from django.contrib import messages
 from django.contrib.admin.utils import quote
+from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -20,9 +22,12 @@ from upload.admin_buttons import (
 from upload.filters import DocumentFilterSet
 from upload.models import (
     DELEGATION_EVENT,
+    BaseValidationReport,
     Package,
     PackageZip,
     PkgValidationResult,
+    XMLError,
+    XMLInfo,
     choices,
 )
 from upload.publication_status import publication_situation
@@ -155,6 +160,33 @@ class PackageAdminInspectView(TeamScopedInspectView):
         if self.request.GET.get("tab") != "files":
             return []
         return [field for field in super().get_fields() if field != "file"]
+
+    def get_validation_context(self, validation_in_progress):
+        counts = Counter()
+        for model in (PkgValidationResult, XMLError, XMLInfo):
+            for result in (
+                model.objects.filter(report__package=self.object)
+                .order_by()
+                .values("status")
+                .annotate(total=Count("pk"))
+            ):
+                counts[result["status"]] += result["total"]
+        return {
+            "validation_total": sum(counts.values()),
+            "validation_counts": [
+                {"status": status.lower(), "label": label, "total": counts[status]}
+                for status, label in choices.VALIDATION_RESULT_DISPLAY
+                if counts[status]
+            ],
+            "validation_outcome": BaseValidationReport.validation_state(
+                counts,
+                (
+                    choices.REPORT_CREATION_WIP
+                    if validation_in_progress
+                    else choices.REPORT_CREATION_DONE
+                ),
+            ),
+        }
 
     def get_header_more_buttons(self):
         buttons = super().get_header_more_buttons()
