@@ -16,6 +16,7 @@ from upload.querysets import (
     scope_package_queryset,
 )
 
+
 class PackageZipForm(CoreAdminModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -106,7 +107,7 @@ class PackageDecisionForm(CoreAdminModelForm):
     )
 
     force_journal_publication = forms.BooleanField(
-        label=_("Força a publicação de journal"),
+        label=_("Force journal publication"),
         required=False,
         help_text=_(
             "Refresh journal data from Core and resend it to the destination website, even if already available."
@@ -114,7 +115,7 @@ class PackageDecisionForm(CoreAdminModelForm):
     )
 
     force_issue_publication = forms.BooleanField(
-        label=_("Força a publicação de issue"),
+        label=_("Force issue publication"),
         required=False,
         help_text=_(
             "Refresh issue data from Core and resend it to the destination website, even if already available."

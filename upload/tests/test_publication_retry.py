@@ -12,7 +12,10 @@ from team.management.commands.create_user_groups import Command
 from team.models import CollectionTeamMember, JournalTeamMember, TeamRole
 from upload import choices
 from upload.models import Package, UploadProcResult
-from upload.publication_status import PUBLICATION_ATTEMPT_PREFIX, publication_situation
+from upload.publication_results import (
+    PUBLICATION_ATTEMPT_PREFIX,
+    record_publication_results,
+)
 from upload.views.publication import retry_publication
 
 
@@ -59,11 +62,17 @@ def test_publication_failure_and_retry_keep_authorization(
     attempt.finish(
         user,
         completed=False,
-        detail={"publication": [{"website": "QA", "published": False}]},
+        detail={
+            "websites": ["PUBLIC"],
+            "state": "failed",
+            "publication": record_publication_results(["PUBLIC"], []),
+        },
     )
-    assert publication_situation(package, "PUBLIC")["state"] == "failed"
+
+    assert package.publication_situation("PUBLIC")["state"] == "blocked"
     client.force_login(user)
     url = reverse("upload:retry_publication")
+
     with patch(
         "upload.views.publication.task_upload_workflow_publish_article.apply_async"
     ) as enqueue:
@@ -76,11 +85,13 @@ def test_publication_failure_and_retry_keep_authorization(
         client.post(url, {"package_id": package.pk})
         assert enqueue.call_count == 1
     package.refresh_from_db()
+
     assert package.qa_decision == choices.PS_READY_TO_PUBLISH
     assert package.public_ws_status == choices.UNRELEASED
-    assert publication_situation(package, "PUBLIC")["state"] == "queued"
+    assert package.publication_situation("PUBLIC")["state"] == "queued"
     membership.is_active_member = False
     membership.save()
+
     with patch(
         "upload.views.publication.task_upload_workflow_publish_article.apply_async"
     ) as enqueue:
