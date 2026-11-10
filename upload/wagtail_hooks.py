@@ -33,7 +33,6 @@ from upload.bulk_actions.republish import (
     RepublishPublicBulkAction,
     RepublishQABulkAction,
 )
-from upload.document_views import PackageAdminInspectView
 from upload.document_workflow import QUEUE_LABELS, document_queue_filter
 from upload.filters import (
     DocumentFilterSet,
@@ -73,15 +72,14 @@ from upload.tables import (
     PublicationColumn,
     SubmissionActionsColumn,
 )
-from upload.views import (
-    PackageZipCreateView,
-    QAPackageEditView,
-    ReadyToPublishPackageEditView,
+from upload.views.decisions import QAPackageEditView, ReadyToPublishPackageEditView
+from upload.views.documents import PackageAdminInspectView, redirect_upload_url
+from upload.views.reports import (
     ValidationReportEditView,
     XMLErrorReportEditView,
     XMLInfoReportEditView,
-    redirect_upload_url,
 )
+from upload.views.submissions import PackageZipCreateView
 
 MODEL_PERMISSION_ACTIONS = ("add", "change", "delete", "view")
 

@@ -1,15 +1,9 @@
 from django.urls import path
 
-from upload.views import (
-    archive_package,
-    assign,
-    display_xml,
-    download_errors,
-    finish_deposit,
-    preview_document,
-    republish_selected,
-    retry_publication,
-)
+from upload.views.decisions import assign
+from upload.views.documents import archive_package, display_xml, preview_document
+from upload.views.publication import republish_selected, retry_publication
+from upload.views.reports import download_errors, finish_deposit
 
 app_name = "upload"
 

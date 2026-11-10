@@ -368,7 +368,7 @@ class PackageScopingTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.package_1.status, choices.PS_ARCHIVED)
 
-    @patch("upload.views.task_republish_articles.delay")
+    @patch("upload.views.publication.task_republish_articles.delay")
     def test_republish_rejects_entire_selection_with_out_of_scope_package(self, delay):
         self.client.force_login(self.analyst_user)
 
@@ -393,7 +393,7 @@ class PackageScopingTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
-    @patch("upload.views.task_republish_articles.delay")
+    @patch("upload.views.publication.task_republish_articles.delay")
     def test_republish_schedules_only_authorized_selection(self, delay):
         self.analyst_user.refresh_from_db()
         self.assertTrue(self.analyst_user.has_perm("upload.republish_package"))
@@ -661,8 +661,8 @@ class PackageScopingTest(TestCase):
             )
         )
 
-    @patch("upload.views.task_upload_workflow_publish_article.apply_async")
-    @patch("upload.views.task_republish_articles.delay")
+    @patch("upload.views.publication.task_upload_workflow_publish_article.apply_async")
+    @patch("upload.views.publication.task_republish_articles.delay")
     def test_mixed_roles_reject_publication_retry_and_entire_republish_selection(
         self, republish, retry
     ):

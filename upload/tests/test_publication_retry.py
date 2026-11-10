@@ -13,7 +13,7 @@ from team.models import CollectionTeamMember, JournalTeamMember, TeamRole
 from upload import choices
 from upload.models import Package, UploadProcResult
 from upload.publication_status import PUBLICATION_ATTEMPT_PREFIX, publication_situation
-from upload.views import retry_publication
+from upload.views.publication import retry_publication
 
 
 @pytest.mark.django_db
@@ -65,7 +65,7 @@ def test_publication_failure_and_retry_keep_authorization(
     client.force_login(user)
     url = reverse("upload:retry_publication")
     with patch(
-        "upload.views.task_upload_workflow_publish_article.apply_async"
+        "upload.views.publication.task_upload_workflow_publish_article.apply_async"
     ) as enqueue:
         assert client.get(url, {"package_id": package.pk}).status_code == 200
         enqueue.assert_not_called()
@@ -82,7 +82,7 @@ def test_publication_failure_and_retry_keep_authorization(
     membership.is_active_member = False
     membership.save()
     with patch(
-        "upload.views.task_upload_workflow_publish_article.apply_async"
+        "upload.views.publication.task_upload_workflow_publish_article.apply_async"
     ) as enqueue:
         client.post(url, {"package_id": package.pk})
         enqueue.assert_not_called()

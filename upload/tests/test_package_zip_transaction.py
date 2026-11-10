@@ -8,7 +8,7 @@ from django.db import transaction
 from django.test import RequestFactory
 
 from upload.models import Package, PackageZip, choices
-from upload.views import PackageZipCreateView
+from upload.views.submissions import PackageZipCreateView
 
 
 @pytest.mark.django_db(transaction=True)
@@ -28,7 +28,7 @@ def test_package_processing_waits_for_deposit_commit(rollback):
         name="deposit", creator=user, show_package_validations=True
     )
 
-    with patch("upload.views.task_receive_packages.apply_async") as enqueue:
+    with patch("upload.views.submissions.task_receive_packages.apply_async") as enqueue:
         with transaction.atomic():
             response = view.form_valid(form)
             package = PackageZip.objects.get(name="deposit")
