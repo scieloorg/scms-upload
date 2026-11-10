@@ -9,12 +9,12 @@ from django.utils.translation import gettext_lazy as _
 from collection.choices import WEBSITE_KIND
 from upload.models import Package, UploadProcResult, choices
 from upload.permissions import PUBLISH_PACKAGE, REPUBLISH_PACKAGE
-from upload.publication_status import (
+from upload.publication_results import (
     PUBLICATION_ATTEMPT_PREFIX,
     PUBLICATION_FAILED,
     PUBLICATION_QUEUED,
-    publication_situation,
 )
+from upload.publication_status import publication_situation
 from upload.querysets import get_scoped_package_queryset
 from upload.tasks import task_republish_articles, task_upload_workflow_publish_article
 
