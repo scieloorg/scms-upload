@@ -3,12 +3,15 @@ from collections import Counter
 
 from django.contrib import messages
 from django.contrib.admin.utils import quote
+from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.db.models import Count
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import content_disposition_header
 from django.utils.translation import gettext_lazy as _
+from django.views.decorators.http import require_GET
 from wagtail.admin.ui.tables import TitleColumn
 from wagtail.admin.widgets import Button, ListingButton
 from wagtail.snippets.views.snippets import IndexView as SnippetIndexView
@@ -30,6 +33,8 @@ from upload.models import (
     XMLInfo,
     choices,
 )
+from upload.permission_policies import UploadModelPermissionPolicy
+from upload.publication_results import PUBLICATION_ATTEMPT_PREFIX
 from upload.publication_status import publication_situation
 from upload.querysets import (
     document_queue_filter,
@@ -161,6 +166,113 @@ class PackageAdminInspectView(TeamScopedInspectView):
             return []
         return [field for field in super().get_fields() if field != "file"]
 
+    def get_event_context(self, event, processing_in_progress=False):
+        is_decision = event.name == "process_qa_decision"
+        is_delegation = event.name == DELEGATION_EVENT
+        detail = event.detail if isinstance(event.detail, dict) else {}
+        label = (
+            event.decision_display
+            if is_decision
+            else EVENT_LABELS.get(event.name, event.name)
+        )
+        if is_delegation:
+            label = _("Delegate review")
+        if event.name.startswith(PUBLICATION_ATTEMPT_PREFIX):
+            environments = [
+                str(choices.WEBSITE_ENVIRONMENT_LABELS.get(kind, kind))
+                for kind in detail.get("websites", [])
+            ]
+            label = _("Publish and check availability")
+            if environments:
+                label = f"{label} · {', '.join(environments)}"
+
+        if event.completed is True:
+            state = {"kind": "success", "label": _("Task completed"), "icon": "check"}
+        elif event.completed is False and (
+            event.updated_by_id
+            or any(
+                detail.get(key)
+                for key in ("exception_message", "exception_type", "traceback")
+            )
+        ):
+            state = {
+                "kind": "error",
+                "label": _("Processing failed"),
+                "icon": "warning",
+            }
+        elif (
+            processing_in_progress and event.detail is None and not event.updated_by_id
+        ):
+            state = {"kind": "processing", "label": _("Processing"), "icon": "rotate"}
+        else:
+            state = {
+                "kind": "neutral",
+                "label": _("Status unavailable"),
+                "icon": "info-circle",
+            }
+
+        return {
+            "state": state,
+            "is_decision": is_decision,
+            "is_delegation": is_delegation,
+            "previous_assignee": detail.get("previous_assignee"),
+            "comment": detail.get("comment"),
+            "assignee": detail.get("assignee"),
+            "label": label,
+            "name": event.name,
+            "created": event.created,
+            "creator": event.creator,
+            "detail": event.detail,
+        }
+
+    def get_history_context(self, validation_in_progress):
+        events = self.object.upload_proc_result.select_related("creator").order_by(
+            "-created", "-pk"
+        )
+        latest_validation = events.filter(name="xml_data_checker").first()
+        # An old unfinished record is not evidence of a currently running task.
+        validation_started = (
+            latest_validation.created
+            if validation_in_progress
+            and latest_validation is not None
+            and latest_validation.completed is not True
+            and latest_validation.detail is None
+            and latest_validation.updated_by_id is None
+            else None
+        )
+        history_filter = self.request.GET.get("event_type", "all")
+        if history_filter not in HISTORY_FILTERS:
+            history_filter = "all"
+        if history_filter == "decisions":
+            events = events.filter(name="process_qa_decision")
+        elif history_filter == "delegations":
+            events = events.filter(name=DELEGATION_EVENT)
+        elif history_filter == "processing":
+            events = events.exclude(name__in=("process_qa_decision", DELEGATION_EVENT))
+        page = Paginator(events, HISTORY_PER_PAGE).get_page(
+            self.request.GET.get("p", self.request.GET.get("page"))
+        )
+
+        return {
+            "history_filter": history_filter,
+            "timeline_events": [
+                self.get_event_context(
+                    event,
+                    processing_in_progress=(
+                        validation_started is not None
+                        and event.created >= validation_started
+                    ),
+                )
+                for event in page
+            ],
+            "page_obj": page,
+            "pagination_pages": list(
+                page.paginator.get_elided_page_range(
+                    page.number, on_each_side=1, on_ends=1
+                )
+            ),
+        }
+
     def get_validation_context(self, validation_in_progress):
         counts = Counter()
         for model in (PkgValidationResult, XMLError, XMLInfo):
@@ -288,6 +400,41 @@ class PackageAdminInspectView(TeamScopedInspectView):
             data.update(show_xml=True, xml=self.object.xml)
 
         return super().get_context_data(**data)
+
+
+@require_GET
+def download_document_events(request, pk):
+    policy = UploadModelPermissionPolicy(Package)
+    if not policy.user_has_any_permission(request.user, ("view", "change")):
+        raise PermissionDenied
+    package = get_object_or_404(get_scoped_package_queryset(request.user), pk=pk)
+    events = package.upload_proc_result.select_related("creator").order_by(
+        "created", "pk"
+    )
+    response = JsonResponse(
+        {
+            "document_id": package.pk,
+            "document": str(package),
+            "events": [
+                {
+                    "id": event.pk,
+                    "created": event.created,
+                    "updated": event.updated,
+                    "author": event.creator.get_username() if event.creator else None,
+                    "name": event.name,
+                    "completed": event.completed,
+                    "detail": event.detail,
+                }
+                for event in events
+            ],
+        },
+        json_dumps_params={"ensure_ascii": False, "indent": 2},
+    )
+    response["Content-Disposition"] = content_disposition_header(
+        True, f"document-{package.pk}-events.json"
+    )
+
+    return response
 
 
 def display_xml(request):
