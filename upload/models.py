@@ -1683,7 +1683,7 @@ class BaseValidationResult(CommonControlField):
         help_text=_("Item being analyzed"),
     )
     data = models.JSONField(_("Data"), default=dict, null=True, blank=True)
-    message = models.CharField(_("Message"), null=True, blank=True, max_length=500)
+    message = models.TextField(_("Message"), null=True, blank=True)
     status = models.CharField(
         _("Result"),
         max_length=8,
@@ -1732,10 +1732,6 @@ class BaseValidationResult(CommonControlField):
             ),
         ]
 
-    def save(self):
-        self.message = self.message and self.message[:500]
-        return super().save()
-
     @classmethod
     def create(cls, subject=None, status=None, message=None, data=None, creator=None):
         val_res = cls()
@@ -1745,6 +1741,7 @@ class BaseValidationResult(CommonControlField):
         val_res.data = data
         val_res.creator = creator
         val_res.save()
+
         return val_res
 
     def update(self, status=None, message=None, data=None, updated_by=None):
@@ -1785,6 +1782,7 @@ class BaseValidationResult(CommonControlField):
             items["total_" + item["status"].lower()] = item["total"]
         items["total"] = sum(items.values())
         logging.info(f"BaseValidationResult.get_numbers : {items}")
+
         return items
 
     @classmethod
@@ -1895,7 +1893,7 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
         blank=True,
     )
     got_value = models.JSONField(_("Got value"), null=True, blank=True)
-    advice = models.CharField(_("Advice"), null=True, blank=True, max_length=500)
+    advice = models.TextField(_("Advice"), null=True, blank=True)
     reaction = models.CharField(
         _("Reaction"),
         max_length=16,
@@ -1937,10 +1935,6 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
             ),
         ]
 
-    def save(self):
-        self.advice = self.advice and self.advice[:500]
-        return super().save()
-
     @classmethod
     def get_numbers(cls, package, report=None):
         # ER_REACTION_FIX = "to-fix"
@@ -1975,6 +1969,7 @@ class XMLError(BaseXMLValidationResult, ClusterableModel):
 
         items["total"] = total
         logging.info(f"XMLError.get_numbers : {items}")
+
         return items
 
 
@@ -2393,16 +2388,6 @@ class UploadValidator(CommonControlField):
 
         return cls.get(collection=Collection.objects.get(pk=collection_ids[0]))
 
-    @staticmethod
-    def get_publication_rule(collection=None):
-        obj = UploadValidator.get(collection)
-        return obj.publication_rule
-
-    @staticmethod
-    def calculate_publication_date(qa_publication_date, collection=None):
-        obj = UploadValidator.get(collection)
-        return obj.get_publication_date(qa_publication_date)
-
     def check_xml_errors_percentage(self, value):
         return self.validate_number(value, self.max_xml_errors_percentage)
 
@@ -2417,8 +2402,6 @@ class UploadValidator(CommonControlField):
             return True
         if self.publication_rule == choices.STRICT_AUTO_PUBLICATION:
             return False
-        # if self.publication_rule == choices.MANUAL_PUBLICATION:
-        #     return True
         return value <= max_value
 
     def is_acceptable_package(self, package):
@@ -2457,6 +2440,7 @@ class UploadValidator(CommonControlField):
             return False
         if not self.check_xml_warnings_percentage(package.xml_warnings_percentage):
             return False
+
         return True
 
     def get_pos_validation_status(self, package, blocking_error_status=None):
@@ -2492,6 +2476,7 @@ class UploadValidator(CommonControlField):
             return self.decision_for_critical_errors
 
         # solicita revisão dos problemas
+
         return choices.PS_VALIDATED_WITH_ERRORS
 
 

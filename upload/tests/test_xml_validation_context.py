@@ -80,6 +80,7 @@ def test_packtools_checks_issue_and_section_against_registered_journal(registere
     assert checker.params["journal_data"]["abbrev_journal_title"] == journal.short_title
     assert ("nlm_journal_title" in checker.params["journal_data"]) == registered
     license_results = list(xml_validations.validate_open_science_actions(xml, params))
+
     assert any(
         item
         and item["title"] == "Article license code validation"
