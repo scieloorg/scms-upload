@@ -16,7 +16,6 @@ from upload.querysets import (
     scope_package_queryset,
 )
 
-
 class PackageZipForm(CoreAdminModelForm):
     def save_all(self, user):
         pkg_zip = super().save_all(user)
@@ -26,6 +25,43 @@ class PackageZipForm(CoreAdminModelForm):
         self.save()
 
         return pkg_zip
+
+
+class ReportResponsesForm(forms.Form):
+    def __init__(self, *args, results, allow_completion=False, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if allow_completion:
+            self.fields["complete_review"] = forms.BooleanField(
+                label=_("I have reviewed all findings in this report"),
+                help_text=_(
+                    "Confirm completion after reviewing all pages of this report."
+                ),
+                required=False,
+            )
+
+        for result in results:
+            self.fields[f"reaction_{result.pk}"] = forms.ChoiceField(
+                label=_("Your response"),
+                choices=choices.ERROR_REACTION,
+                initial=result.reaction or choices.ER_REACTION_FIX,
+            )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.data.get("complete_review") and "complete_review" not in self.fields:
+            raise forms.ValidationError(
+                _("Confirm completion after reviewing all pages of this report.")
+            )
+        if any(
+            key.startswith("reaction_") and key not in self.fields for key in self.data
+        ):
+            raise forms.ValidationError(
+                _("The report has changed. Reload it before saving your responses."),
+                code="report_changed",
+            )
+
+        return cleaned_data
 
 
 class DelegateReviewForm(forms.Form):
@@ -247,6 +283,7 @@ class XMLErrorReportForm(CoreAdminModelForm):
         self.save()
 
         obj.package.calculate_validation_numbers()
+
         return obj
 
 

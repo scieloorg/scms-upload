@@ -15,6 +15,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models, transaction
 from django.db.models import Count, Q
+from django.utils import timezone
 from django.utils.html import strip_tags
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
@@ -2344,6 +2345,45 @@ class XMLErrorReport(BaseValidationReport, ClusterableModel):
     base_form_class = XMLErrorReportForm
     ValidationResultClass = XMLError
 
+    @transaction.atomic
+    def save_responses(self, responses, user, complete_review=False):
+        report = type(self).objects.select_for_update().filter(pk=self.pk).first()
+        if report is None or report.creation != choices.REPORT_CREATION_DONE:
+            raise ValidationError(
+                _("The report has changed. Reload it before saving your responses."),
+                code="report_changed",
+            )
+
+        results = list(
+            report.validation_results.select_for_update().filter(pk__in=responses)
+        )
+        if {result.pk for result in results} != set(responses):
+            raise ValidationError(
+                _("The report has changed. Reload it before saving your responses."),
+                code="report_changed",
+            )
+
+        if any(
+            reaction not in dict(choices.ERROR_REACTION)
+            for reaction in responses.values()
+        ):
+            raise ValidationError(_("Select a valid response."), code="invalid_choice")
+
+        now = timezone.now()
+        for result in results:
+            report.validation_results.filter(pk=result.pk).update(
+                reaction=responses[result.pk], updated_by=user, updated=now
+            )
+
+        report.updated_by = user
+        report.updated = now
+        update_fields = ["updated_by", "updated"]
+        if complete_review:
+            report.xml_producer_ack = True
+            update_fields.append("xml_producer_ack")
+        report.save(update_fields=update_fields)
+        report.package.calculate_validation_numbers()
+
     class Meta:
         verbose_name = _("XML Error Report")
         verbose_name_plural = _("XML Error Reports")
@@ -2390,6 +2430,7 @@ class XMLErrorReport(BaseValidationReport, ClusterableModel):
             }
         )
         logging.info(f"XMLErrorReport.get_numbers: {numbers}")
+
         return numbers
 
 
