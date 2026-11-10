@@ -1,6 +1,9 @@
 import logging
 import os
+from functools import partial
 
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
@@ -14,7 +17,15 @@ from package.models import update_zip_file
 from pid_provider.requester import PidRequester
 from proc.controller import IssueDataChecker, JournalDataChecker
 from team.models import get_user_membership_ids
-from upload.models import Package, ValidationReport, choices
+from upload.article_changes import prepare_change_requests
+from upload.models import (
+    NEWER_DOCUMENT,
+    Package,
+    PkgValidationResult,
+    UploadProcResult,
+    ValidationReport,
+    choices,
+)
 from upload.utils import file_utils, xml_utils
 
 pp = PidRequester()
@@ -156,6 +167,116 @@ class UploadIssueDataChecker(IssueDataChecker):
         if self.core_communication_error:
             response["core_communication_error"] = True
         self.raise_error()
+
+
+def reject_change_packages(user, packages, error):
+    message = "; ".join(error.messages)
+    for package in packages:
+        if package.public_ws_status == choices.PUBLISHED:
+            continue
+        previous_results = list(
+            PkgValidationResult.objects.filter(report__package=package).values(
+                "report_id", "report__title", "status", "message", "data"
+            )
+        )
+        if previous_results:
+            event = UploadProcResult.create(
+                user, package, "Reception diagnostics preserved"
+            )
+            event.finish(
+                user, completed=True, detail={"validation_results": previous_results}
+            )
+        report = ValidationReport.create_or_update(
+            user,
+            package,
+            gettext_noop("Article change package"),
+            choices.VAL_CAT_GROUP_DATA,
+            reset_validations=True,
+        )
+        report.add_validation_result(
+            status=choices.VALIDATION_RESULT_BLOCKING,
+            message=message,
+            subject=gettext_noop("Article change package"),
+        )
+        report.finish_validations()
+        package.status = choices.PS_UNEXPECTED
+        package.calculate_validation_numbers()
+    return {
+        "error_message": message,
+        "error_level": choices.VALIDATION_RESULT_BLOCKING,
+        "package_status": choices.PS_UNEXPECTED,
+    }
+
+
+def record_reception_failure(user, packages, error):
+    for package in packages:
+        package.refresh_from_db()
+        event = UploadProcResult.create(user, package, "Package reception failed")
+        event.finish(user, completed=False, exception=error)
+        if package.public_ws_status != choices.PUBLISHED:
+            Package.objects.filter(pk=package.pk).update(status=choices.PS_UNEXPECTED)
+
+
+@transaction.atomic
+def prepare_package_reception(user, packages, task, retry_package_id=None):
+    """Prepare a submission once, then enqueue only the selected documents."""
+    packages = list(packages)
+    if not packages:
+        return
+    selected = packages
+    if retry_package_id:
+        target = next(package for package in packages if package.pk == retry_package_id)
+        if target.status != choices.PS_SUBMITTED:
+            return
+    if packages[0].pkg_zip_id:
+        prepare_change_requests(user, packages)
+    if retry_package_id:
+        request_ids = target.change_requests.values_list("pk", flat=True)
+        related_ids = set(
+            Package.objects.filter(
+                pkg_zip_id=target.pkg_zip_id, change_requests__pk__in=request_ids
+            ).values_list("pk", flat=True)
+        )
+        selected = [
+            package
+            for package in packages
+            if package.pk == target.pk
+            or (package.pk in related_ids and package.has_interrupted_reception)
+        ]
+
+    for package in selected:
+        if not package.can_receive_package(user):
+            raise ValidationError(
+                _("The depositor is not authorized for the original article.")
+            )
+        if package.has_newer_accepted_attempt():
+            raise ValidationError(NEWER_DOCUMENT)
+        if not package.file or not package.file.storage.exists(package.file.name):
+            raise ValidationError(_("The submitted ZIP is no longer available."))
+
+    for package in selected:
+        if retry_package_id and package.pk != retry_package_id:
+            attempt = UploadProcResult.create(user, package, "Try processing")
+            attempt.detail = {
+                "state": "queued",
+                "previous_status": package.status,
+                "validation_results": list(
+                    package.validation_report.values(
+                        "id",
+                        "title",
+                        "pkg_validation_result__status",
+                        "pkg_validation_result__message",
+                        "pkg_validation_result__data",
+                    )
+                ),
+            }
+            attempt.save(update_fields=["detail"])
+        package.status = choices.PS_ENQUEUED_FOR_VALIDATION
+        package.updated_by = user
+        package.save(update_fields=["status", "updated_by", "updated"])
+        transaction.on_commit(
+            partial(task.apply_async, kwargs={"user_id": user.pk, "pkg_id": package.pk})
+        )
 
 
 def get_last_package(article_id, **kwargs):
