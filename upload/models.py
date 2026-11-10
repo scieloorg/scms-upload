@@ -14,7 +14,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models, transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from django.utils.html import strip_tags
 from django.utils.translation import gettext
@@ -715,6 +715,65 @@ class Package(CommonControlField, ClusterableModel):
         return journal_id is None or journal_id in get_user_membership_ids(user).get(
             "journal_list_ids", []
         )
+
+    def other_document_attempts(self, article=None, name=None, journal=None):
+        article_id = article.pk if article else self.article_id
+        if self.document_root_id:
+            identity = Q(document_root_id=self.document_root_id)
+        elif article_id:
+            identity = Q(article_id=article_id)
+        elif self.main_doi and (journal or self.journal_id):
+            identity = Q(
+                main_doi__iexact=self.main_doi, journal=journal or self.journal
+            )
+        elif (name or self.name) and (journal or self.journal_id):
+            identity = Q(name=name or self.name, journal=journal or self.journal)
+        else:
+            return Package.objects.none()
+        return Package.objects.filter(identity).exclude(pk=self.pk)
+
+    def has_newer_accepted_attempt(self, article=None, name=None, journal=None):
+        return (
+            self.other_document_attempts(article, name, journal)
+            .filter(
+                Q(created__gt=self.created) | Q(created=self.created, pk__gt=self.pk)
+            )
+            .exclude(status__in=(choices.PS_UNEXPECTED, choices.PS_ARCHIVED))
+            .exists()
+        )
+
+    @classmethod
+    def active_document_attempts(cls, queryset):
+        """Keep the caller's scope when listing active submissions."""
+        published = queryset.filter(
+            document_root_id=OuterRef("document_root_id"),
+            public_ws_status=choices.PUBLISHED,
+        ).exclude(pk=OuterRef("pk"))
+        return queryset.exclude(status=choices.PS_ARCHIVED).annotate(
+            has_published_version=Exists(published)
+        )
+
+    @classmethod
+    def document_versions(cls, queryset, package):
+        if package.document_root_id:
+            return queryset.filter(document_root_id=package.document_root_id).order_by(
+                "-created", "-pk"
+            )
+        return queryset.filter(pk=package.pk)
+
+    @transaction.atomic
+    def accept_document_version(self, previous_package_id=None):
+        previous = Package.objects.filter(pk=previous_package_id).first()
+        self.previous_package = previous
+        self.document_root_id = (
+            previous.document_root_id or previous.pk if previous else self.pk
+        )
+        if previous and not previous.document_root_id:
+            Package.objects.filter(pk=previous.pk).update(document_root_id=previous.pk)
+        self.save(update_fields=["previous_package", "document_root"])
+
+        if previous:
+            Package.objects.filter(pk=previous.pk).update(status=choices.PS_ARCHIVED)
 
     def add_order(self, xml_order=None, xml_fpage=None):
         try:

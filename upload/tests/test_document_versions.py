@@ -31,3 +31,61 @@ def test_resubmission_selects_previous_record_and_archives_only_that_attempt(
     assert previous.status == choices.PS_ARCHIVED
     assert older.status == choices.PS_PENDING_CORRECTION
     assert current.status == choices.PS_ENQUEUED_FOR_VALIDATION
+
+
+
+@pytest.mark.django_db
+def test_accepted_versions_keep_the_first_submission_as_their_root(report_scope):
+    first = report_scope.package_1
+    first.accept_document_version()
+    second = Package.objects.create(creator=first.creator)
+    second.accept_document_version(first.pk)
+    third = Package.objects.create(creator=first.creator)
+    third.accept_document_version(second.pk)
+
+    first.refresh_from_db()
+    second.refresh_from_db()
+    third.refresh_from_db()
+
+    assert (
+        first.document_root_id
+        == second.document_root_id
+        == third.document_root_id
+        == first.pk
+    )
+    assert first.previous_package_id is None
+    assert second.previous_package_id == first.pk
+    assert third.previous_package_id == second.pk
+    assert first.status == second.status == choices.PS_ARCHIVED
+    assert third.status != choices.PS_ARCHIVED
+    assert first.has_newer_accepted_attempt()
+    assert not third.has_newer_accepted_attempt()
+
+
+
+@pytest.mark.django_db
+def test_failed_version_link_preserves_the_previous_submission(
+    report_scope, monkeypatch
+):
+    previous = report_scope.package_1
+    current = Package.objects.create(creator=previous.creator)
+    previous_status = previous.status
+    save = Package.save
+
+    def fail_current_save(package, *args, **kwargs):
+        if package.pk == current.pk:
+            raise RuntimeError("Version link unavailable")
+        return save(package, *args, **kwargs)
+
+    monkeypatch.setattr(Package, "save", fail_current_save)
+
+    with pytest.raises(RuntimeError, match="Version link unavailable"):
+        current.accept_document_version(previous.pk)
+
+    previous.refresh_from_db()
+    current.refresh_from_db()
+
+    assert previous.status == previous_status
+    assert previous.document_root_id is None
+    assert current.document_root_id is None
+    assert current.previous_package_id is None
