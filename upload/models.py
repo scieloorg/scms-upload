@@ -1022,7 +1022,80 @@ class Package(CommonControlField, ClusterableModel):
         return {"content": content, "filename": filename, "columns": fieldnames}
 
     @property
+    def article_change_requests(self):
+        query = Q(packages=self)
+        if self.article_id:
+            query |= Q(article_id=self.article_id)
+        return (
+            RequestArticleChange.objects.filter(query)
+            .select_related("creator", "article", "submission")
+            .order_by("-created", "-pk")
+            .distinct()
+        )
+
+    def bind_change_request(self, change_request, role):
+        self.change_requests.add(change_request)
+        self.change_role = role
+        self.category = change_request.change_type
+        fields = {"change_role": role, "category": self.category}
+        if role == choices.CPR_ORIGINAL:
+            self.article = change_request.article
+            fields["article_id"] = change_request.article_id
+
+        # Avoid save() rolling back the article status during editorial preparation.
+        type(self).objects.filter(pk=self.pk).update(**fields)
+
+    @property
+    def change_publication_packages(self):
+        members = {self.pk}
+        while True:
+            request_ids = RequestArticleChange.objects.filter(
+                packages__pk__in=members,
+                submission_id=self.pkg_zip_id,
+            ).values_list("pk", flat=True)
+            related = set(Package.objects.filter(
+                change_requests__pk__in=request_ids,
+                pkg_zip_id=self.pkg_zip_id,
+            ).values_list("pk", flat=True))
+            if related <= members:
+                return Package.objects.filter(pk__in=members).order_by("pk")
+            members.update(related)
+
+    @property
+    def is_change_group_approved(self):
+        return not self.change_publication_packages.exclude(
+            qa_decision=choices.PS_READY_TO_PUBLISH,
+            status__in=(choices.PS_READY_TO_PUBLISH, choices.PS_PUBLISHED),
+        ).exists()
+
+    def validate_change_publication(self, require_group_approval=True):
+        if not self.change_role:
+            return
+        requests = self.change_requests.all()
+        states = [article_choices.RCS_RECEIVED]
+        if self.public_ws_status == choices.PUBLISHED:
+            if Package.objects.filter(
+                article_id=self.article_id,
+                public_ws_status=choices.PUBLISHED,
+                pk__gt=self.pk,
+            ).exists():
+                raise ValidationError(_("Republish the latest public submission, not a previous version."))
+            states.append(article_choices.RCS_COMPLETED)
+        if not requests.exists() or requests.exclude(
+            submission_id=self.pkg_zip_id,
+            status__in=states,
+        ).exists():
+            raise ValidationError(_("Publication requires the current, received article change request."))
+        if require_group_approval and requests.exclude(change_type=article_choices.RCT_UPDATE).exists():
+            if not self.is_change_group_approved:
+                raise ValidationError(
+                    _("Approve the notice and all updated originals before publication in Production.")
+                )
+
+    @property
     def is_ready_to_publish(self):
+        if self.change_requests.exclude(change_type=article_choices.RCT_UPDATE).exists():
+            return self.is_change_group_approved
         if (
             self.linked
             and self.linked.filter(~Q(status=choices.PS_READY_TO_PUBLISH)).exists()
@@ -1032,6 +1105,7 @@ class Package(CommonControlField, ClusterableModel):
             return True
         if self.upload_validator.publication_rule == choices.FLEXIBLE_AUTO_PUBLICATION:
             return self.is_acceptable_package
+
         return False
 
     def can_delegate_review(self, user):
@@ -1230,6 +1304,17 @@ class Package(CommonControlField, ClusterableModel):
                 choices.PS_READY_TO_PUBLISH,
             ):
                 qa = self.qa_decision == choices.PS_READY_TO_PREVIEW
+                editorial_change = self.change_requests.exclude(
+                    change_type=article_choices.RCT_UPDATE
+                ).exists()
+                if editorial_change and self.qa_decision == choices.PS_READY_TO_PUBLISH:
+                    self.validate_change_publication(require_group_approval=False)
+                    self.status = choices.PS_READY_TO_PUBLISH
+                    self.save(update_fields=["status", "updated"])
+                    if not self.is_ready_to_publish:
+                        detail["waiting_for_related_packages"] = True
+                        operation.finish(user, completed=True, detail=detail)
+                        return True
                 public = self.is_ready_to_publish
 
                 # é desejável que qa e public sejam publicados simultaneamente
@@ -1535,6 +1620,8 @@ class Package(CommonControlField, ClusterableModel):
         detail = {"qa": qa, "public": public}
         if not qa and not public:
             return detail
+        if public:
+            self.validate_change_publication()
 
         try:
             event = None
@@ -1629,6 +1716,8 @@ class Package(CommonControlField, ClusterableModel):
         detail = {}
         try:
             website_kind = website_kind or collection_choices.QA
+            if website_kind == collection_choices.PUBLIC:
+                self.validate_change_publication()
             detail = {
                 "website_kind": website_kind,
                 "force_update": force_update,
@@ -1686,15 +1775,18 @@ class Package(CommonControlField, ClusterableModel):
                 self.qa_ws_pubdate = datetime.utcnow()
                 self.status = choices.PS_PREVIEW
                 self.save()
-                self.article.update_status(
-                    new_status=article_choices.AS_PREPARE_TO_PUBLISH
-                )
+                if self.change_role != choices.CPR_ORIGINAL:
+                    self.article.update_status(
+                        new_status=article_choices.AS_PREPARE_TO_PUBLISH
+                    )
             elif website_kind == collection_choices.PUBLIC:
                 self.public_ws_status = status
                 self.public_ws_pubdate = datetime.utcnow()
                 self.status = choices.PS_PUBLISHED
                 self.save()
                 self.article.update_status(new_status=article_choices.AS_PUBLISHED)
+                for change_request in self.change_requests.all():
+                    change_request.complete_if_published(self.updated_by or self.creator)
 
     def update_sps_pkg_status(self):
         # completou sps package
@@ -1726,7 +1818,11 @@ class Package(CommonControlField, ClusterableModel):
             )
         )
         if "PUBLIC" in websites:
-            for item in self.linked.all():
+            members = (
+                self.change_publication_packages.exclude(pk=self.pk)
+                if self.change_role else self.linked.all()
+            )
+            for item in members:
                 task_upload_workflow_publish_article.apply_async(
                     kwargs=dict(
                         user_id=user.id,
