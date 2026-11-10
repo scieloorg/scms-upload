@@ -1,26 +1,151 @@
 import os
 
 from django.contrib import messages
+from django.contrib.admin.utils import quote
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import content_disposition_header
 from django.utils.translation import gettext_lazy as _
-from wagtail.admin.widgets import Button
+from wagtail.admin.ui.tables import TitleColumn
+from wagtail.admin.widgets import Button, ListingButton
+from wagtail.snippets.views.snippets import IndexView as SnippetIndexView
 
 from core.users.permission_policies import TeamScopedInspectView
-from upload.admin_buttons import get_package_action_buttons, get_package_website_links
-from upload.models import DELEGATION_EVENT, Package, PkgValidationResult, choices
+from upload.admin_buttons import (
+    DOCUMENT_SECTIONS,
+    get_package_action_buttons,
+    get_package_website_links,
+)
+from upload.filters import DocumentFilterSet
+from upload.models import (
+    DELEGATION_EVENT,
+    Package,
+    PackageZip,
+    PkgValidationResult,
+    choices,
+)
 from upload.publication_status import publication_situation
-from upload.querysets import get_scoped_package_queryset
+from upload.querysets import (
+    document_queue_filter,
+    get_scoped_package_queryset,
+    scope_package_queryset,
+)
 from upload.utils.package_utils import render_html
 
-DOCUMENT_SECTIONS = (
-    ("overview", _("Overview")),
-    ("validations", _("Validations")),
-    ("files", _("Files and data")),
-    ("history", _("History")),
-)
+HISTORY_PER_PAGE = 20
+
+
+HISTORY_FILTERS = {"all", "decisions", "delegations", "processing"}
+
+
+EVENT_LABELS = {
+    "request_article_change": _("Request document change"),
+    "Package.publish on QA": _("Publication task for QA"),
+    "Package.publish on PUBLIC": _("Publication task for Production"),
+    "upload_article_page_to_the_cloud": _("Send article page to storage"),
+    "upload_xml_to_the_cloud": _("Send XML to storage"),
+    "upload_zip_content_to_the_cloud": _("Send package files to storage"),
+    "save_pkg_zip_file": _("Save package file"),
+    "request_pid_for_xml_zip": _("Request document identifiers"),
+    "prepare to publish": _("Prepare publication"),
+    "SPSPkg.create_or_update": _("Register or update SPS package"),
+    "check_xml_changed": _("Check XML changes"),
+    "process_system_decision": _("Record workflow decision"),
+    ">>> local registration": _("Register document in Upload"),
+    ">>> core registration": _("Register document in Core"),
+}
+
+
+QUEUE_ICONS = {
+    "all": "list-ul",
+    "mine": "tasks",
+    "review": "edit",
+    "corrections": "warning",
+    "archived": "history",
+}
+
+
+class PackageIndexView(SnippetIndexView):
+    def get_list_more_buttons(self, instance):
+        buttons = super().get_list_more_buttons(instance)
+        buttons.extend(
+            get_package_action_buttons(
+                self.request.user,
+                instance,
+                ListingButton,
+            )
+        )
+
+        return buttons
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base = scope_package_queryset(Package.objects.all(), self.request.user)
+        params = self.request.GET.copy()
+        params.pop("p", None)
+        params.pop("queue", None)
+        selected = self.request.GET.get("queue", "all")
+        context["document_queues"] = []
+        for key, label in choices.QUEUE_LABELS:
+            queue_base = base
+            queue_base = DocumentFilterSet(
+                self.request.GET, queryset=queue_base, request=self.request
+            ).qs
+            params["queue"] = key
+            context["document_queues"].append(
+                {
+                    "label": label,
+                    "icon": QUEUE_ICONS[key],
+                    "url": "?" + params.urlencode(),
+                    "selected": key == selected
+                    or (key == "all" and selected not in dict(choices.QUEUE_LABELS)),
+                    "count": queue_base.filter(
+                        document_queue_filter(
+                            key,
+                            self.request.user,
+                            status=self.request.GET.get("status"),
+                        )
+                    ).count(),
+                }
+            )
+
+        pkg_zip_id = self.request.GET.get("pkg_zip_id", "")
+        if pkg_zip_id.isdecimal():
+            pending_zip = PackageZip.objects.filter(
+                pk=pkg_zip_id,
+                creator=self.request.user,
+                packages__isnull=True,
+            ).exists()
+            if pending_zip:
+                context["no_results_message"] = _(
+                    "Documents from this ZIP are not available yet. "
+                    "Processing runs in the background. Refresh shortly."
+                )
+
+        return context
+
+    def _get_title_column(self, field_name, column_class=TitleColumn, **kwargs):
+        column_class = self._get_title_column_class(column_class)
+
+        def get_url(instance):
+            if inspect_url := self.get_inspect_url(instance):
+                return inspect_url
+            return self.get_edit_url(instance)
+
+        kwargs.setdefault(
+            "get_title_id",
+            lambda instance: f"snippet_{quote(instance.pk)}_title",
+        )
+
+        if not self.model:
+            return column_class(
+                "name", label="Name", accessor=str, get_url=get_url, **kwargs
+            )
+
+        return self._get_custom_column(
+            field_name, column_class, get_url=get_url, **kwargs
+        )
 
 
 class PackageAdminInspectView(TeamScopedInspectView):

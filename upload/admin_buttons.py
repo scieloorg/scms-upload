@@ -4,8 +4,11 @@ from django.utils.translation import gettext_lazy as _
 from upload import choices
 from upload.authorization import user_can_act_on_package
 from upload.permissions import FINISH_DEPOSIT, PUBLISH_PACKAGE, REQUEST_CORRECTION
-from upload.publication_results import PUBLICATION_FAILED
-from upload.publication_status import publication_situation
+from upload.publication_results import (
+    PUBLICATION_BLOCKED,
+    PUBLICATION_FAILED,
+    PUBLICATION_UNCONFIRMED,
+)
 
 DOCUMENT_SECTIONS = (
     ("overview", _("Overview")),
@@ -85,10 +88,11 @@ def get_package_action_buttons(
     button_class,
     include_finish_deposit=False,
 ):
-    if not package.is_validation_finished:
-        return []
-
     buttons = []
+
+    if not package.is_validation_finished:
+        return buttons
+
     if package.can_delegate_review(user):
         buttons.append(
             button_class(
@@ -108,10 +112,13 @@ def get_package_action_buttons(
         choices.PS_READY_TO_PREVIEW,
         choices.PS_READY_TO_PUBLISH,
         choices.PS_PUBLISHED,
-    ) and user_can_act_on_package(user, REQUEST_CORRECTION, package):
+    ) and (
+        user_can_act_on_package(user, REQUEST_CORRECTION, package)
+        or user_can_act_on_package(user, PUBLISH_PACKAGE, package)
+    ):
         buttons.append(
             button_class(
-                _("Decisions"),
+                _("Record decision"),
                 icon_name="tasks",
                 url=reverse(
                     "wagtailsnippets_upload_readytopublishpackage:edit",
@@ -149,13 +156,16 @@ def get_package_action_buttons(
 
     if package.status in (choices.PS_READY_TO_PREVIEW, choices.PS_READY_TO_PUBLISH):
         purpose = "PUBLIC" if package.status == choices.PS_READY_TO_PUBLISH else "QA"
-        if (
-            user_can_act_on_package(user, PUBLISH_PACKAGE, package)
-            and publication_situation(package, purpose)["state"] == PUBLICATION_FAILED
+        if user_can_act_on_package(
+            user, PUBLISH_PACKAGE, package
+        ) and package.publication_situation(purpose)["state"] in (
+            PUBLICATION_FAILED,
+            PUBLICATION_BLOCKED,
+            PUBLICATION_UNCONFIRMED,
         ):
             buttons.append(
                 button_class(
-                    _("Retry publication"),
+                    _("Retry"),
                     icon_name="rotate",
                     url=reverse("upload:retry_publication") + query,
                     priority=35,
