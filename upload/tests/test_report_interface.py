@@ -28,7 +28,8 @@ def test_generated_report_can_be_downloaded_but_not_changed(client, settings):
         response = client.get(url)
         assert response.status_code == 200
         with override(language):
-            assert gettext("XML Info Report") in response.content.decode()
+            assert gettext("Successful XML checks") in response.content.decode()
+
     assert 'name="file-clear"' not in response.content.decode()
     assert 'type="file"' not in response.content.decode()
     assert report.file.url in response.content.decode()
@@ -36,6 +37,7 @@ def test_generated_report_can_be_downloaded_but_not_changed(client, settings):
         reverse("wagtailsnippets_upload_package:inspect", args=[package.pk])
         + "?tab=validations#xi"
     )
+
     assert response.context["breadcrumbs_items"][-2]["url"] == document_url
     assert response.context["view"].get_success_url() == document_url
 
@@ -44,6 +46,8 @@ def test_generated_report_can_be_downloaded_but_not_changed(client, settings):
         "file": SimpleUploadedFile("replacement.csv", b"replacement"),
     }
     response = client.post(url, data)
+
     assert response.status_code == 302
     report.refresh_from_db()
+
     assert report.file.name == "reports/information.csv"

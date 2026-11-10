@@ -37,7 +37,7 @@ from upload.models import (
     choices,
 )
 from upload.permissions import PUBLISH_PACKAGE, REQUEST_CORRECTION
-from upload.publication_status import PUBLICATION_ATTEMPT_PREFIX
+from upload.publication_results import PUBLICATION_ATTEMPT_PREFIX
 from upload.querysets import get_scoped_package_queryset
 from upload.tests.factories import populate_package_scope
 from upload.wagtail_hooks import (
@@ -303,6 +303,7 @@ class PackageScopingTest(TestCase):
     @patch("upload.views.publication.task_republish_articles.delay")
     def test_republish_schedules_only_authorized_selection(self, delay):
         self.analyst_user.refresh_from_db()
+
         self.assertTrue(self.analyst_user.has_perm("upload.republish_package"))
         self.assertIn(
             self.package_1,
@@ -364,6 +365,7 @@ class PackageScopingTest(TestCase):
         request.user = self.superuser
 
         qs = viewset.get_queryset(request)
+
         self.assertGreaterEqual(qs.count(), 2)
 
     def test_object_level_enforcement_raises_404_for_out_of_scope_object(self):
@@ -380,6 +382,7 @@ class PackageScopingTest(TestCase):
         # Edit View
         request = self.factory.get(f"/admin/upload/documents/edit/{self.package_2.pk}/")
         request.user = self.company_user
+
         with self.assertRaises(Http404):
             viewset.edit_view(request, pk=str(self.package_2.pk))
 
@@ -388,6 +391,7 @@ class PackageScopingTest(TestCase):
             f"/admin/upload/documents/delete/{self.package_2.pk}/"
         )
         request.user = self.company_user
+
         with self.assertRaises(Http404):
             viewset.delete_view(request, pk=str(self.package_2.pk))
 
@@ -396,12 +400,14 @@ class PackageScopingTest(TestCase):
             f"/admin/upload/documents/inspect/{self.package_2.pk}/"
         )
         request.user = self.company_user
+
         with self.assertRaises(Http404):
             viewset.inspect_view(request, pk=str(self.package_2.pk))
 
         # Copy View
         request = self.factory.get(f"/admin/upload/documents/copy/{self.package_2.pk}/")
         request.user = self.company_user
+
         with self.assertRaises(Http404):
             viewset.copy_view(request, pk=str(self.package_2.pk))
 
@@ -422,6 +428,7 @@ class PackageScopingTest(TestCase):
         )
         request.user = self.company_user
         response = viewset.inspect_view(request, pk=str(self.package_1.pk))
+
         self.assertEqual(response.status_code, 200)
 
     def test_actual_upload_custom_views_reject_out_of_scope_object(self):
@@ -500,6 +507,7 @@ class PackageScopingTest(TestCase):
         )
 
         scoped = get_scoped_package_queryset(self.analyst_user)
+
         self.assertIn(self.package_1, scoped)
         self.assertIn(self.package_2, scoped)
         self.assertNotIn(other_company_package, scoped)
@@ -508,6 +516,7 @@ class PackageScopingTest(TestCase):
         self,
     ):
         colleague = self.add_company_scope_outside_collection()
+
         self.assertTrue(
             user_can_act_on_package(self.analyst_user, PUBLISH_PACKAGE, self.package_1)
         )
@@ -521,15 +530,19 @@ class PackageScopingTest(TestCase):
         ).data
 
         response = self.client.post(url, data)
+
         self.assertEqual(response.status_code, 200)
         self.assertIn("qa_decision", response.context["form"].errors)
         self.package_2.refresh_from_db()
+
         self.assertIsNone(self.package_2.qa_decision)
 
         data["qa_decision"] = choices.PS_PENDING_CORRECTION
         response = self.client.post(url, data)
+
         self.assertEqual(response.status_code, 302)
         self.package_2.refresh_from_db()
+
         self.assertEqual(self.package_2.status, choices.PS_PENDING_CORRECTION)
         self.assertEqual(self.package_2.assignee, colleague)
 
@@ -562,6 +575,7 @@ class PackageScopingTest(TestCase):
             role=TeamRole.MEMBER,
             creator=self.superuser,
         )
+
         self.assertIn(self.package_2, get_scoped_package_queryset(self.analyst_user))
         self.assertTrue(self.analyst_user.has_perm("upload.publish_package"))
         self.assertFalse(
@@ -608,11 +622,13 @@ class PackageScopingTest(TestCase):
                 },
             )
             self.assertEqual(response.status_code, 302)
+
         retry.assert_not_called()
         republish.assert_not_called()
 
         request = self.factory.post("/")
         request.user = self.analyst_user
+
         with patch(
             "upload.bulk_actions.republish.task_republish_articles.delay"
         ) as native_republish:
@@ -671,19 +687,24 @@ class PackageScopingTest(TestCase):
         form = self.correction_form(self.analyst_user, colleague)
         form.data["order"] = "999"
         form.data["force_journal_publication"] = "on"
+
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["order"], self.package_1.order)
         self.assertFalse(form.cleaned_data["force_journal_publication"])
         package = form.save_all(self.analyst_user)
+
         self.assertTrue(package.process_qa_decision(self.analyst_user))
         package.refresh_from_db()
+
         self.assertEqual(package.assignee, colleague)
         self.assertEqual(package.analyst.user, self.analyst_user)
         self.assertEqual(package.status, choices.PS_PENDING_CORRECTION)
         request = self.factory.get("/")
         request.user = colleague
+
         self.assertIn(package, PackageViewSet().get_queryset(request))
         request.user = self.analyst_user
+
         self.assertNotIn(package, QualityAnalysisPackageViewSet().get_queryset(request))
 
     def test_company_member_can_request_correction_but_cannot_publish(self):
@@ -692,12 +713,14 @@ class PackageScopingTest(TestCase):
         )
         self.package_1.save()
         form = self.correction_form(self.company_user, self.company_user)
+
         self.assertTrue(form.is_valid(), form.errors)
         form = self.correction_form(
             self.company_user,
             self.company_user,
             choices.PS_READY_TO_PUBLISH,
         )
+
         self.assertFalse(form.is_valid())
         self.assertIn("qa_decision", form.errors)
 
@@ -707,14 +730,18 @@ class PackageScopingTest(TestCase):
         self.client.force_login(self.company_user)
         url = f"/admin/upload/decisions/edit/{self.package_1.pk}/"
         response = self.client.post(url, form.data)
+
         self.assertEqual(response.status_code, 200)
         self.package_1.refresh_from_db()
+
         self.assertEqual(self.package_1.status, choices.PS_PREVIEW)
         self.assertIsNone(self.package_1.qa_decision)
         form = self.correction_form(self.company_user, self.company_user)
         response = self.client.post(url, form.data)
+
         self.assertEqual(response.status_code, 302)
         self.package_1.refresh_from_db()
+
         self.assertEqual(self.package_1.status, choices.PS_PENDING_CORRECTION)
         self.assertEqual(self.package_1.assignee, self.company_user)
         self.assertEqual(self.package_1.updated_by, self.company_user)
@@ -722,6 +749,7 @@ class PackageScopingTest(TestCase):
     def test_correction_rejects_recipient_outside_company_and_missing_reason(self):
         form = self.correction_form(self.analyst_user, self.unrelated_user)
         form.data["qa_comment"] = " "
+
         self.assertFalse(form.is_valid())
         self.assertIn("correction_assignee", form.errors)
         self.assertIn("qa_comment", form.errors)
@@ -742,13 +770,16 @@ class PackageScopingTest(TestCase):
         )
         self.package_2.journal = self.journal_1
         self.package_2.save()
+
         self.assertNotIn(self.package_2, get_scoped_package_queryset(self.company_user))
         form = self.correction_form(self.company_user, self.unrelated_user)
+
         self.assertFalse(form.is_valid())
         self.assertIn("correction_assignee", form.errors)
 
     def test_pending_correction_can_be_reassigned_with_decision_history(self):
         form = self.correction_form(self.company_user, self.company_user)
+
         self.assertTrue(form.is_valid(), form.errors)
         package = form.save_all(self.company_user)
         package.process_qa_decision(self.company_user)
@@ -756,10 +787,12 @@ class PackageScopingTest(TestCase):
         self.package_1.refresh_from_db()
         form = self.correction_form(self.analyst_user, self.company_user)
         form.data["qa_comment"] = "Conferir também as referências."
+
         self.assertTrue(form.is_valid(), form.errors)
         package = form.save_all(self.analyst_user)
         package.process_qa_decision(self.analyst_user)
         original.refresh_from_db()
+
         self.assertEqual(
             original.detail["comment"], "Corrigir a identificação da revista."
         )
@@ -768,6 +801,7 @@ class PackageScopingTest(TestCase):
         )
         self.client.force_login(self.company_user)
         response = self.client.get(f"/admin/upload/decisions/edit/{package.pk}/")
+
         self.assertEqual(response.status_code, 200)
 
     def test_document_queues_count_only_visible_documents(self):
@@ -776,18 +810,22 @@ class PackageScopingTest(TestCase):
         self.package_1.save()
         self.client.force_login(self.company_user)
         response = self.client.get("/admin/upload/documents/?queue=mine")
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(list(response.context["object_list"]), [self.package_1])
         counts = {
             str(item["label"]): item["count"]
             for item in response.context["document_queues"]
         }
+
         self.assertEqual(max(counts.values()), 1)
         self.package_1.status = choices.PS_ARCHIVED
         self.package_1.save()
         response = self.client.get("/admin/upload/documents/")
+
         self.assertEqual(list(response.context["object_list"]), [])
         response = self.client.get("/admin/upload/documents/?queue=archived")
+
         self.assertEqual(list(response.context["object_list"]), [self.package_1])
 
     def test_review_can_be_delegated_to_journal_member_without_publication_right(self):
@@ -802,7 +840,9 @@ class PackageScopingTest(TestCase):
         self.package_1.status = choices.PS_PENDING_QA_DECISION
         self.package_1.save(update_fields=["status"])
 
-        saved = Package.delegate_review(self.company_user, self.package_1.pk, reviewer.pk, "")
+        saved = Package.delegate_review(
+            self.company_user, self.package_1.pk, reviewer.pk, ""
+        )
         saved.refresh_from_db()
 
         self.assertEqual(saved.assignee, reviewer)
@@ -824,8 +864,10 @@ class PackageScopingTest(TestCase):
         url = reverse("wagtailsnippets_upload_package:list")
 
         response = self.client.get(url, {"status": choices.PS_PREVIEW})
+
         self.assertEqual(list(response.context["object_list"]), [self.package_1])
         status_field = DocumentFilterSet().form.fields["status"]
+
         self.assertEqual(
             str(dict(status_field.choices)[choices.PS_PREVIEW]),
             str(self.package_1.work_situation()),
@@ -841,16 +883,20 @@ class PackageScopingTest(TestCase):
                 "public_ws_status": choices.UNRELEASED,
             },
         )
+
         self.assertEqual(list(response.context["object_list"]), [self.package_1])
         response = self.client.get(url, {"public_ws_status": choices.PUBLISHED})
+
         self.assertEqual(list(response.context["object_list"]), [])
 
         self.package_1.status = choices.PS_ARCHIVED
         self.package_1.save()
         response = self.client.get(url, {"status": choices.PS_ARCHIVED})
+
         self.assertEqual(list(response.context["object_list"]), [self.package_1])
         self.assertNotIn(self.package_2, response.context["object_list"])
         response = self.client.get(url)
+
         self.assertEqual(list(response.context["object_list"]), [])
 
     def test_document_error_filters_select_presence_instead_of_exact_count(self):
@@ -872,9 +918,11 @@ class PackageScopingTest(TestCase):
     def test_package_name_filter_is_partial_and_respects_scope(self):
         self.client.force_login(self.company_user)
         response = self.client.get("/admin/upload/documents/", {"package": "pkg"})
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(list(response.context["object_list"]), [self.package_1])
         response = self.client.get("/admin/upload/documents/", {"package": "missing"})
+
         self.assertEqual(list(response.context["object_list"]), [])
 
     def test_submission_filters_use_dates_and_document_presence_within_scope(self):
@@ -882,9 +930,12 @@ class PackageScopingTest(TestCase):
         empty = PackageZip.objects.create(name="empty", creator=self.company_user)
         url = "/admin/upload/submissions/"
         response = self.client.get(url, {"has_documents": "true"})
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(list(response.context["object_list"]), [self.pkg_zip_1])
         response = self.client.get(url, {"has_documents": "false"})
+
         self.assertEqual(list(response.context["object_list"]), [empty])
         response = self.client.get(url, {"created_from": "2099-01-01"})
+
         self.assertEqual(list(response.context["object_list"]), [])
