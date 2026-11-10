@@ -28,7 +28,7 @@ from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from article import choices as article_choices
-from article.models import Article
+from article.models import Article, RequestArticleChange
 from collection import choices as collection_choices
 from collection.models import Collection
 from core.forms import CoreAdminModelForm
@@ -73,6 +73,9 @@ from upload.utils import file_utils
 from upload.utils.zip_pkg import PkgZip
 
 DELEGATION_EVENT = "delegate_review"
+NEWER_DOCUMENT = _(
+    "A newer version of this document has already been accepted. Open the latest document instead."
+)
 
 PUBLISHED_PUBLICATION_STATES = {
     PUBLICATION_PUBLISHED,
@@ -252,6 +255,22 @@ class Package(CommonControlField, ClusterableModel):
         null=False,
         blank=False,
     )
+    previous_package = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="replacements",
+    )
+    document_root = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="document_attempts",
+    )
     main_doi = models.CharField(_("DOI"), max_length=128, null=True, blank=True)
     name = models.CharField(_("SPS Package name"), max_length=40, null=True, blank=True)
     signature = models.CharField(_("Signature"), max_length=32, null=True, blank=True)
@@ -378,6 +397,20 @@ class Package(CommonControlField, ClusterableModel):
         blank=True,
     )
 
+    change_requests = models.ManyToManyField(
+        RequestArticleChange,
+        verbose_name=_("Article change requests"),
+        related_name="packages",
+        blank=True,
+    )
+    change_role = models.CharField(
+        _("Change package role"),
+        max_length=8,
+        choices=choices.CHANGE_PACKAGE_ROLE,
+        blank=True,
+        default="",
+    )
+
     qa_ws_status = models.CharField(
         verbose_name=_("QA publication status"),
         max_length=15,
@@ -490,7 +523,11 @@ class Package(CommonControlField, ClusterableModel):
         if not self.expiration_date:
             self.expiration_date = date.today() + timedelta(days=30)
 
-        if self.status == choices.PS_PENDING_CORRECTION and self.article:
+        if (
+            self.status == choices.PS_PENDING_CORRECTION
+            and self.article
+            and not self.change_role
+        ):
             # volta article.status para o status antes da submissão do pacote
             self.article.update_status(rollback=True)
 
