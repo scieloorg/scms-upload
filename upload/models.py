@@ -30,6 +30,7 @@ from article import choices as article_choices
 from article.models import Article
 from collection import choices as collection_choices
 from collection.models import Collection
+from core.forms import CoreAdminModelForm
 from core.models import CommonControlField
 from core.widgets import ReadOnlyPrettyJSONWidget
 from package import choices as package_choices
@@ -40,12 +41,9 @@ from proc.source_core_api import IssueDataChecker
 from team.models import CollectionTeamMember
 from upload import choices
 from upload.forms import (
+    PackageDecisionForm,
     PackageZipForm,
-    QAPackageForm,
-    ReadyToPublishPackageForm,
-    UploadPackageForm,
     UploadValidatorForm,
-    ValidationResultForm,
     XMLErrorReportForm,
 )
 from upload.panels import ReportFilePanel, ReportTitlePanel, decision_panels
@@ -344,21 +342,16 @@ class Package(CommonControlField, ClusterableModel):
     panels = [
         # FieldPanel("file"),
         FieldPanel("status", read_only=True),
-        FieldPanel("numbers", widget=ReadOnlyPrettyJSONWidget()),
+        FieldPanel("numbers", read_only=True),
         FieldPanel("qa_ws_status", read_only=True),
         FieldPanel("public_ws_status", read_only=True),
     ]
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
-    ]
-
     edit_handler = TabbedInterface(
         [
             ObjectList(panels, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
         ]
     )
-    base_form_class = UploadPackageForm
+    base_form_class = CoreAdminModelForm
 
     class Meta:
         verbose_name = _("Package admin")
@@ -611,7 +604,9 @@ class Package(CommonControlField, ClusterableModel):
             return False
         return True
 
-    def finish_reception(self, task_upload_workflow_publish_article=None, blocking_error_status=None):
+    def finish_reception(
+        self, task_upload_workflow_publish_article=None, blocking_error_status=None
+    ):
         """
         1. Verifica se as validações que executaram em paralelo, finalizaram
         2. Calcula os números de problemas do pacote
@@ -652,8 +647,10 @@ class Package(CommonControlField, ClusterableModel):
                 detail = {"is_ready_to_publish": is_ready_to_publish}
 
                 response = self.prepare_to_publish(
-                    user, qa=is_ready_to_preview, public=is_ready_to_publish,
-                    force_update=None
+                    user,
+                    qa=is_ready_to_preview,
+                    public=is_ready_to_publish,
+                    force_update=None,
                 )
                 detail.update(response or {})
 
@@ -706,7 +703,9 @@ class Package(CommonControlField, ClusterableModel):
             + xml_numbers["total"]
             + pkg_numbers["total"]
         )
-        self.critical_errors = pkg_numbers["total_critical"] + xml_numbers["total_critical"]
+        self.critical_errors = (
+            pkg_numbers["total_critical"] + xml_numbers["total_critical"]
+        )
         self.xml_errors_percentage = calculate_percentage(
             xml_numbers["total_error"], total_validations
         )
@@ -771,7 +770,9 @@ class Package(CommonControlField, ClusterableModel):
             or "total_declared_impossible_to_fix" not in metrics
         ):
             reactions = XMLError.get_numbers(package=self)
-            metrics.setdefault("total_contested_xml_errors", reactions["total_not-to-fix"])
+            metrics.setdefault(
+                "total_contested_xml_errors", reactions["total_not-to-fix"]
+            )
             metrics.setdefault(
                 "total_declared_impossible_to_fix", reactions["total_unable-to-fix"]
             )
@@ -1439,6 +1440,7 @@ class Package(CommonControlField, ClusterableModel):
                     )
                 )
 
+
     @property
     def effective_journal(self):
         journal = self.journal
@@ -1513,30 +1515,9 @@ class QAPackage(Package):
 
     """
 
-    panel_id = [
-        AutocompletePanel("article", read_only=False),
-    ]
-    panel_numbers = [
-        FieldPanel("critical_errors", read_only=True),
-        FieldPanel("xml_errors_percentage", read_only=True),
-        FieldPanel("xml_warnings_percentage", read_only=True),
-        FieldPanel("contested_xml_errors_percentage", read_only=True),
-        FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
-        FieldPanel("status", read_only=True),
-    ]
-    panel_decision = decision_panels()
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
-    ]
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(panel_decision, heading=_("Decision")),
-            ObjectList(panel_id, heading=_("Article")),
-            ObjectList(panel_numbers, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
-        ]
-    )
-    base_form_class = QAPackageForm
+    panels = decision_panels()
+    edit_handler = ObjectList(panels)
+    base_form_class = PackageDecisionForm
 
     class Meta:
         proxy = True
@@ -1549,39 +1530,10 @@ class ReadyToPublishPackage(Package):
     Package ready to publish
     """
 
-    panel_id = [
-        AutocompletePanel("article", read_only=False),
-    ]
-    panel_numbers = [
-        FieldPanel("critical_errors", read_only=True),
-        FieldPanel("xml_errors_percentage", read_only=True),
-        FieldPanel("xml_warnings_percentage", read_only=True),
-        FieldPanel("contested_xml_errors_percentage", read_only=True),
-        FieldPanel("declared_impossible_to_fix_percentage", read_only=True),
-        FieldPanel("status", read_only=True),
-    ]
-    panel_decision = decision_panels()
-    panel_event = [
-        InlinePanel("upload_proc_result", label=_("Event newest to oldest")),
-    ]
+    panels = decision_panels()
+    edit_handler = ObjectList(panels)
 
-    panel_publication_status = [
-        FieldPanel("qa_ws_status", read_only=True),
-        FieldPanel("qa_ws_pubdate", read_only=True),
-        FieldPanel("public_ws_status", read_only=True),
-        FieldPanel("public_ws_pubdate", read_only=True),
-    ]
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(panel_decision, heading=_("Decision")),
-            ObjectList(panel_id, heading=_("Article")),
-            ObjectList(panel_publication_status, heading=_("Publication Status")),
-            ObjectList(panel_numbers, heading=_("Status")),
-            ObjectList(panel_event, heading=_("Events")),
-        ]
-    )
-
-    base_form_class = ReadyToPublishPackageForm
+    base_form_class = PackageDecisionForm
 
     class Meta:
         proxy = True
@@ -1609,7 +1561,7 @@ class BaseValidationResult(CommonControlField):
         blank=True,
     )
 
-    base_form_class = ValidationResultForm
+    base_form_class = CoreAdminModelForm
     panels = [
         FieldPanel("subject", read_only=True),
         FieldPanel("status", read_only=True),
@@ -1734,9 +1686,7 @@ class BaseXMLValidationResult(BaseValidationResult):
         blank=False,
     )
     # geralemente article / sub-article e id
-    parent = models.CharField(
-        _("XML element"), null=True, blank=True, max_length=11
-    )
+    parent = models.CharField(_("XML element"), null=True, blank=True, max_length=11)
     parent_id = models.CharField(
         _("XML element identifier"), null=True, blank=True, max_length=13
     )
@@ -1914,7 +1864,7 @@ class BaseValidationReport(CommonControlField):
         blank=False,
     )
     ValidationResultClass = BaseValidationResult
-    base_form_class = ValidationResultForm
+    base_form_class = CoreAdminModelForm
 
     panels = [
         AutocompletePanel("package", read_only=True),
@@ -2269,7 +2219,9 @@ class UploadValidator(CommonControlField):
     base_form_class = UploadValidatorForm
 
     def __str__(self):
-        return str(self.collection) if self.collection_id else str(_("Validation rules"))
+        return (
+            str(self.collection) if self.collection_id else str(_("Validation rules"))
+        )
 
     class Meta:
         verbose_name = _("Validation rules")
@@ -2296,7 +2248,9 @@ class UploadValidator(CommonControlField):
             return cls.get()
 
         collection_ids = list(
-            journal.journal_collections.values_list("collection_id", flat=True).distinct()
+            journal.journal_collections.values_list(
+                "collection_id", flat=True
+            ).distinct()
         )
         if len(collection_ids) != 1:
             raise ValidationError(
