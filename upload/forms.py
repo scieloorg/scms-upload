@@ -18,7 +18,6 @@ from upload.querysets import (
     scope_package_queryset,
 )
 
-
 class PackageZipForm(CoreAdminModelForm):
     def save_all(self, user):
         pkg_zip = super().save_all(user)
@@ -28,6 +27,29 @@ class PackageZipForm(CoreAdminModelForm):
         self.save()
 
         return pkg_zip
+
+
+class DelegateReviewForm(forms.Form):
+    reviewer = forms.ModelChoiceField(
+        queryset=None,
+        label=_("Reviewer"),
+        help_text=_(
+            "Choose who will review this document. "
+            "This does not change its decision or publication status."
+        ),
+    )
+    instructions = forms.CharField(
+        label=_("Instructions"),
+        help_text=_("Describe what the reviewer should check in this document."),
+        widget=forms.Textarea(attrs={"rows": 4}),
+        required=False,
+    )
+
+    def __init__(self, *args, package, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["reviewer"].queryset = review_assignee_queryset(package)
+        self.initial["reviewer"] = package.assignee_id
 
 
 class UploadPackageForm(CoreAdminModelForm):
@@ -244,7 +266,7 @@ class PackageDecisionForm(CoreAdminModelForm):
         return package
 
 
-class QAPackageForm(PackageDecisionForm):
+class ValidationResultForm(CoreAdminModelForm):
     pass
 
 
@@ -252,7 +274,7 @@ class ReadyToPublishPackageForm(PackageDecisionForm):
     pass
 
 
-class ValidationResultForm(CoreAdminModelForm):
+class QAPackageForm(PackageDecisionForm):
     pass
 
 

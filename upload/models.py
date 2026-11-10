@@ -11,10 +11,11 @@ from zipfile import ZipFile
 
 from django.contrib.admin import display
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
-from django.db import IntegrityError, models
+from django.db import IntegrityError, models, transaction
 from django.db.models import Count, Q
+from django.utils.html import strip_tags
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
@@ -38,7 +39,6 @@ from proc.models import IssueProc, Operation
 from proc.source_core_api import IssueDataChecker
 from team.models import CollectionTeamMember
 from upload import choices
-from upload.document_workflow import work_situation
 from upload.forms import (
     PackageZipForm,
     QAPackageForm,
@@ -57,6 +57,7 @@ from upload.permissions import (
     REPUBLISH_PACKAGE,
     REQUEST_CORRECTION,
 )
+from upload.querysets import get_scoped_package_queryset, review_assignee_queryset
 from upload.utils import file_utils
 from upload.utils.zip_pkg import PkgZip
 
@@ -433,6 +434,33 @@ class Package(CommonControlField, ClusterableModel):
             | Q(file__icontains=search_term)
         )
 
+    @property
+    def document_identity(self):
+        article = self.article if self.article_id else None
+        title = article.title_with_lang.order_by("pk").first() if article else None
+        issue = self.issue or (article.issue if article else None)
+        journal = (
+            self.journal
+            or (issue.journal if issue else None)
+            or (article.journal if article else None)
+        )
+        official = journal.official_journal if journal else None
+
+        return {
+            "journal": str(journal) if journal else None,
+            "issn_print": official.issn_print if official else None,
+            "issn_electronic": official.issn_electronic if official else None,
+            "issue": (
+                " · ".join(filter(None, [issue.publication_year, issue.issue_folder]))
+                if issue
+                else None
+            ),
+            "document_type": article.get_article_type_display() if article else None,
+            "title": strip_tags(title.text) if title and title.text else self.name,
+            "identifier": self.name,
+            "batch": self.pkg_zip.name if self.pkg_zip_id else None,
+        }
+
     def autocomplete_label(self):
         return f"{self.package_name} {self.status}"
 
@@ -452,7 +480,7 @@ class Package(CommonControlField, ClusterableModel):
         super(Package, self).save(*args, **kwargs)
 
     def work_situation(self):
-        return work_situation(self)
+        return choices.WORK_STATUS_LABELS.get(self.status, self.get_status_display())
 
     work_situation.short_description = _("Work status")
 
@@ -1419,6 +1447,63 @@ class Package(CommonControlField, ClusterableModel):
         if journal is None and self.article_id:
             journal = self.article.journal
         return journal
+
+    def can_delegate_review(self, user):
+        return (
+            self.status in choices.REVIEW_STATUSES
+            and self.is_validation_finished
+            and get_scoped_package_queryset(user, ASSIGN_PACKAGE)
+            .filter(pk=self.pk)
+            .exists()
+        )
+
+    @classmethod
+    @transaction.atomic
+    def delegate_review(cls, user, package_id, reviewer_id, instructions):
+        package = (
+            cls.objects.select_for_update()
+            .filter(
+                pk__in=get_scoped_package_queryset(user, ASSIGN_PACKAGE).values("pk"),
+                pk=package_id,
+            )
+            .first()
+        )
+
+        if package is None:
+            raise PermissionDenied
+        if not package.can_delegate_review(user):
+            raise PermissionDenied
+
+        reviewer = review_assignee_queryset(package).filter(pk=reviewer_id).first()
+        if reviewer is None:
+            raise ValidationError(
+                _("Choose an active reviewer eligible for this document.")
+            )
+
+        previous_assignee = package.assignee
+
+        package.assignee = reviewer
+        package.updated_by = user
+        package.save(update_fields=["assignee", "updated_by", "updated"])
+
+        event = UploadProcResult.create(user, package, DELEGATION_EVENT)
+        event.finish(
+            user,
+            completed=True,
+            detail={
+                "previous_assignee_id": (
+                    previous_assignee.pk if previous_assignee else None
+                ),
+                "previous_assignee": (
+                    str(previous_assignee) if previous_assignee else None
+                ),
+                "assignee_id": reviewer.pk,
+                "assignee": str(reviewer),
+                "comment": instructions,
+            },
+        )
+
+        return package
 
 
 class QAPackage(Package):
