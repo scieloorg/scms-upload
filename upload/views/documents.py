@@ -221,12 +221,3 @@ def archive_package(request):
         )
 
     return redirect("wagtailsnippets_upload_package:list")
-
-
-def redirect_upload_url(request, model_name, subpath):
-    url = reverse(f"wagtailsnippets_upload_{model_name}:list") + subpath
-    query = request.META.get("QUERY_STRING")
-    if query:
-        url += "?" + query
-
-    return redirect(url, preserve_request=request.method not in ("GET", "HEAD"))

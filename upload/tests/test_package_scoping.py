@@ -1,24 +1,21 @@
 import json
-from io import StringIO
 from unittest.mock import PropertyMock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ImproperlyConfigured, PermissionDenied
-from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.exceptions import (
+    ImproperlyConfigured,
+    PermissionDenied,
+    ValidationError,
+)
 from django.http import Http404
-from django.test import RequestFactory, TestCase
+from django.test import TestCase
 from django.urls import reverse
 from wagtail.snippets.views.snippets import SnippetViewSet
 
 from article.models import Article
-from collection.models import Collection
 from core.users.permission_policies import TeamScopedSnippetViewSetMixin
-from journal.models import Journal, JournalCollection, OfficialJournal
-from team.management.commands.create_user_groups import (
-    Command as CreateUserGroupsCommand,
-)
 from team.models import (
     CollectionTeamMember,
     Company,
@@ -42,8 +39,8 @@ from upload.models import (
 from upload.permissions import PUBLISH_PACKAGE, REQUEST_CORRECTION
 from upload.publication_status import PUBLICATION_ATTEMPT_PREFIX
 from upload.querysets import get_scoped_package_queryset
+from upload.tests.factories import populate_package_scope
 from upload.wagtail_hooks import (
-    ArchivedPackageViewSet,
     PackageViewSet,
     PackageZipViewSet,
     QualityAnalysisPackageViewSet,
@@ -57,93 +54,7 @@ User = get_user_model()
 
 class PackageScopingTest(TestCase):
     def setUp(self):
-        CreateUserGroupsCommand().handle(stdout=StringIO(), sync_users=False)
-        self.factory = RequestFactory()
-
-        self.superuser = User.objects.create_superuser(
-            username="admin", email="admin@example.com", password="password"
-        )
-        self.analyst_user = User.objects.create_user(
-            username="analyst", email="analyst@example.com", password="password"
-        )
-        self.company_user = User.objects.create_user(
-            username="provider",
-            email="provider@example.com",
-            password="password",
-            is_staff=True,
-        )
-        self.unrelated_user = User.objects.create_user(
-            username="unrelated", email="unrelated@example.com", password="password"
-        )
-
-        self.collection = Collection.objects.create(
-            acron="scl", name="SciELO Brazil", creator=self.superuser
-        )
-        CollectionTeamMember.objects.create(
-            user=self.analyst_user,
-            collection=self.collection,
-            role=TeamRole.MEMBER,
-            is_active_member=True,
-            creator=self.superuser,
-        )
-
-        self.official_j1 = OfficialJournal.objects.create(
-            title="Journal One", issn_electronic="1111-1111", creator=self.superuser
-        )
-        self.journal_1 = Journal.objects.create(
-            official_journal=self.official_j1,
-            journal_acron="J1",
-            creator=self.superuser,
-        )
-        JournalCollection.objects.create(
-            journal=self.journal_1, collection=self.collection, creator=self.superuser
-        )
-
-        self.official_j2 = OfficialJournal.objects.create(
-            title="Journal Two", issn_electronic="2222-2222", creator=self.superuser
-        )
-        self.journal_2 = Journal.objects.create(
-            official_journal=self.official_j2,
-            journal_acron="J2",
-            creator=self.superuser,
-        )
-
-        self.company = Company.objects.create(name="Alpha XML", creator=self.superuser)
-        CompanyTeamMember.objects.create(
-            user=self.company_user,
-            company=self.company,
-            role=TeamRole.MEMBER,
-            is_active_member=True,
-            creator=self.superuser,
-        )
-        JournalCompanyContract.objects.create(
-            journal=self.journal_1,
-            company=self.company,
-            is_active=True,
-            creator=self.superuser,
-        )
-
-        fake_file = SimpleUploadedFile("sample.zip", b"PK\x05\x06" + b"\x00" * 18)
-        self.pkg_zip_1 = PackageZip.objects.create(
-            name="pkg1",
-            file=fake_file,
-            creator=self.company_user,
-        )
-
-        self.package_1 = Package.objects.create(
-            pkg_zip=self.pkg_zip_1,
-            journal=self.journal_1,
-            status=choices.PS_VALIDATED_WITH_ERRORS,
-            creator=self.company_user,
-            file=fake_file,
-        )
-
-        self.package_2 = Package.objects.create(
-            journal=self.journal_2,
-            status=choices.PS_VALIDATED_WITH_ERRORS,
-            creator=self.unrelated_user,
-            file=fake_file,
-        )
+        populate_package_scope(self)
 
     def test_analyst_sees_packages_in_collection(self):
         request = self.factory.get("/admin/upload/documents/")
@@ -290,16 +201,8 @@ class PackageScopingTest(TestCase):
 
     def test_decision_navigation_returns_to_documents(self):
         self.client.force_login(self.superuser)
-        documents_url = reverse("wagtailsnippets_upload_package:list")
-
         for model in ("qapackage", "readytopublishpackage"):
             with self.subTest(model=model):
-                response = self.client.get(
-                    reverse(f"wagtailsnippets_upload_{model}:list")
-                )
-                self.assertRedirects(
-                    response, documents_url, fetch_redirect_response=False
-                )
                 response = self.client.get(
                     reverse(
                         f"wagtailsnippets_upload_{model}:edit",
@@ -314,14 +217,18 @@ class PackageScopingTest(TestCase):
 
     def test_archive_navigation_opens_archived_document_queue(self):
         self.client.force_login(self.superuser)
+        self.package_1.status = choices.PS_ARCHIVED
+        self.package_1.save()
         response = self.client.get(
-            reverse("wagtailsnippets_upload_archivedpackage:list")
+            reverse("wagtailsnippets_upload_package:list"), {"queue": "archived"}
         )
-        self.assertRedirects(
-            response,
-            reverse("wagtailsnippets_upload_package:list") + "?queue=archived",
-            fetch_redirect_response=False,
-        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.package_1, response.context["object_list"])
+        selected = [q for q in response.context["document_queues"] if q["selected"]]
+
+        self.assertEqual(len(selected), 1)
+        self.assertIn("queue=archived", selected[0]["url"])
 
     def test_inactive_membership_denies_native_upload_policy(self):
         CollectionTeamMember.objects.filter(user=self.analyst_user).update(
@@ -640,8 +547,13 @@ class PackageScopingTest(TestCase):
                     self.analyst_user, self.analyst_user, choices.PS_READY_TO_PUBLISH
                 )
                 form.data[field] = value
+
                 self.assertFalse(form.is_valid())
-                self.assertIn(field, form.errors)
+                if field == "article":
+                    self.assertNotIn("article", form.fields)
+                    self.assertTrue(form.non_field_errors())
+                else:
+                    self.assertIn(field, form.errors)
 
     def test_publication_permission_does_not_follow_a_journal_membership(self):
         JournalTeamMember.objects.create(
@@ -773,7 +685,6 @@ class PackageScopingTest(TestCase):
         self.assertIn(package, PackageViewSet().get_queryset(request))
         request.user = self.analyst_user
         self.assertNotIn(package, QualityAnalysisPackageViewSet().get_queryset(request))
-        self.assertNotIn(package, ArchivedPackageViewSet().get_queryset(request))
 
     def test_company_member_can_request_correction_but_cannot_publish(self):
         self.package_1.analyst = CollectionTeamMember.objects.get(
@@ -887,24 +798,22 @@ class PackageScopingTest(TestCase):
             creator=self.superuser,
             is_active_member=True,
         )
-        form = self.correction_form(
-            self.company_user, self.company_user, choices.PS_PENDING_QA_DECISION
-        )
-        form.data["reviewer"] = reviewer.pk
-        self.assertTrue(form.is_valid(), form.errors)
-        saved = form.save_all(self.company_user)
-        saved.process_qa_decision(self.company_user)
+
+        self.package_1.status = choices.PS_PENDING_QA_DECISION
+        self.package_1.save(update_fields=["status"])
+
+        saved = Package.delegate_review(self.company_user, self.package_1.pk, reviewer.pk, "")
         saved.refresh_from_db()
+
         self.assertEqual(saved.assignee, reviewer)
         self.assertEqual(saved.status, choices.PS_PENDING_QA_DECISION)
         self.assertFalse(reviewer.has_perm("upload.publish_package"))
         self.assertIn(saved, get_scoped_package_queryset(reviewer))
-        form = self.correction_form(
-            self.company_user, self.company_user, choices.PS_PENDING_QA_DECISION
-        )
-        form.data["reviewer"] = self.unrelated_user.pk
-        self.assertFalse(form.is_valid())
-        self.assertIn("reviewer", form.errors)
+
+        with self.assertRaises(ValidationError):
+            Package.delegate_review(
+                self.company_user, self.package_1.pk, self.unrelated_user.pk, ""
+            )
 
     def test_document_status_filter_matches_display_and_includes_archived(self):
         self.client.force_login(self.company_user)

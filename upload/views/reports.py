@@ -80,7 +80,9 @@ def finish_deposit(request):
             {
                 "title": _("Submit validation responses"),
                 "message": _(
-                    "The ZIP has already been received. Submit the validation responses to determine whether the document needs corrections or can proceed with processing."
+                    "The ZIP has already been received. Submit the validation responses "
+                    "to determine whether the document needs corrections or can proceed "
+                    "with processing."
                 ),
                 "submit_label": _("Submit validation responses"),
                 "package": package,
