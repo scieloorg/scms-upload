@@ -683,6 +683,29 @@ class Package(CommonControlField, ClusterableModel):
     work_situation.short_description = _("Work status")
 
     @property
+    def editorial_label(self):
+        if self.change_role == choices.CPR_ORIGINAL:
+            return _("Original updated via %(category)s") % {
+                "category": self.get_category_display()
+            }
+        if self.change_role == choices.CPR_NOTICE:
+            return {
+                choices.PC_ERRATUM: _("Erratum notice"),
+                choices.PC_ADDENDUM: _("Addendum notice"),
+                choices.PC_RETRACTION: _("Retraction notice"),
+                choices.PC_PARTIAL_RETRACTION: _("Partial retraction notice"),
+            }.get(self.category, self.get_category_display())
+        return self.get_category_display()
+
+    @property
+    def editorial_history_label(self):
+        if self.change_role == choices.CPR_ORIGINAL:
+            return _("Original amended via %(category)s") % {
+                "category": self.get_category_display()
+            }
+        return self.editorial_label
+
+    @property
     @display(description=_("Table of contents sections"))
     def toc_sections(self):
         try:

@@ -16,7 +16,12 @@
     <div class="nice-padding document-inspect">
         {% include "upload/documents/identity.html" %}
         {% include "upload/documents/sections.html" %}
+
         {% include "upload/documents/toolbar.html" %}
+
+        {% if active_tab != "overview" %}
+            {% include "upload/documents/change_requests.html" %}
+        {% endif %}
 
         {% if active_tab == "overview" %}
             {% include "upload/documents/inspect/overview.html" %}

@@ -69,7 +69,11 @@ from upload.tables import (
     SubmissionTitleColumn,
 )
 from upload.views.decisions import PackageDecisionEditView
-from upload.views.documents import PackageAdminInspectView, PackageIndexView
+from upload.views.documents import (
+    PackageAdminInspectView,
+    PackageIndexView,
+    document_listing_attempts,
+)
 from upload.views.reports import (
     ValidationReportEditView,
     XMLErrorReportEditView,
@@ -273,9 +277,7 @@ class PackageViewSet(BaseUploadViewSet):
         qs = scope_package_queryset(qs, request.user)
         match = getattr(request, "resolver_match", None)
         if not match or match.url_name in ("list", "list_results"):
-            package_id = request.GET.get("pkg_zip_id", "")
-            if package_id.isdecimal():
-                qs = qs.filter(pkg_zip_id=package_id)
+            qs = document_listing_attempts(qs, request.GET)
             qs = qs.filter(
                 document_queue_filter(
                     request.GET.get("queue", "all"),

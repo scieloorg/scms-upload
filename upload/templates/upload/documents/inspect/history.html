@@ -1,5 +1,19 @@
 {% load i18n wagtailadmin_tags %}
 
+{% if document_versions|length > 1 %}
+<section class="document-section">
+    <div class="upload-section-heading"><h2>{% trans "Document versions" %}</h2></div>
+    <ul>
+        {% for version in document_versions %}
+        <li>
+            <a class="upload-link" href="{% url 'wagtailsnippets_upload_package:inspect' version.pk %}?tab=history">{{ version.created }} · {{ version.editorial_history_label }}</a>
+            — {{ version.work_situation }}
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
 <section class="document-section">
     <div class="upload-section-heading">
         <h2>{% trans "History" %}</h2>
@@ -44,7 +58,7 @@
                     {% endif %}
                 </div>
 
-                {% if event.is_decision or event.is_delegation %}
+                {% if event.is_decision or event.is_delegation or event.is_change_request %}
                     {% if event.is_delegation and event.previous_assignee %}
                         <p>{% trans "Previous assignee" %}: {{ event.previous_assignee }}</p>
                     {% endif %}

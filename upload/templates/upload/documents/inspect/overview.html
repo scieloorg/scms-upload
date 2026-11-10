@@ -90,6 +90,7 @@
 {% trans "Production" as production_label %}
 {% include "upload/documents/inspect/publication_diagnostic.html" with situation=public_publication purpose="PUBLIC" destination=production_label only %}
 
+{% include "upload/documents/change_requests.html" %}
 
 {% if not validation_in_progress %}
     {% include "upload/documents/inspect/summary.html" %}
