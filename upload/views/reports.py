@@ -1,9 +1,9 @@
 import logging
 
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -225,6 +225,57 @@ class ValidationReportView(WagtailAdminTemplateMixin, TemplateView):
 
         return context
 
+    def post(self, request, *args, **kwargs):
+        if not isinstance(self.report, XMLErrorReport):
+            return HttpResponseNotAllowed(["GET"])
+        if not self.can_respond:
+            raise PermissionDenied
+        action = request.POST.get("action", "save_responses")
+        if action not in ("save_responses", "save_and_next"):
+            return self.render_to_response(self.get_context_data(), status=400)
+
+        form = self.get_form(request.POST)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form), status=400)
+        responses = {
+            result.pk: form.cleaned_data[f"reaction_{result.pk}"]
+            for result in self.page.object_list
+        }
+        # Compute before saving: changing reactions can move pagination boundaries.
+        next_result_pk = None
+        if action == "save_and_next" and self.page.has_next():
+            next_result_pk = (
+                self.page.paginator.page(self.page.next_page_number()).object_list[0].pk
+            )
+        complete_review = form.cleaned_data.get("complete_review", False)
+        try:
+            if complete_review:
+                self.report.save_responses(
+                    responses, request.user, complete_review=True
+                )
+            else:
+                self.report.save_responses(responses, request.user)
+        except ValidationError as error:
+            if error.code != "report_changed":
+                raise
+            form.add_error(None, error)
+            return self.render_to_response(self.get_context_data(form=form), status=409)
+
+        next_url = (
+            self.get_next_review_url(next_result_pk)
+            if action == "save_and_next"
+            else None
+        )
+        messages.success(
+            request,
+            (
+                _("Review completed. The validation results have not been changed.")
+                if complete_review
+                else _("Responses saved. The validation results have not been changed.")
+            ),
+        )
+
+        return redirect(next_url or request.get_full_path())
 
 
 class XMLInfoReportEditView(TeamScopedEditView):
