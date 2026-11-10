@@ -1411,6 +1411,15 @@ class Package(CommonControlField, ClusterableModel):
                     )
                 )
 
+    @property
+    def effective_journal(self):
+        journal = self.journal
+        if journal is None and self.issue_id:
+            journal = self.issue.journal
+        if journal is None and self.article_id:
+            journal = self.article.journal
+        return journal
+
 
 class QAPackage(Package):
     """

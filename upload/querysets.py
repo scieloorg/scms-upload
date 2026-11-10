@@ -1,6 +1,7 @@
 from django.apps import apps
 from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
+from django.db.models.functions import Coalesce
 
 from team.authorization import get_user_permission_journal_ids
 from team.models import (
@@ -58,26 +59,23 @@ def scope_package_queryset(qs, user, permission=None):
     )
     responsible_q = own_q | (Q(assignee=user) & scope_q)
     if user.has_perm(f"upload.{REQUEST_CORRECTION}"):
-        for company_id in membership["company_list_ids"]:
-            colleague_ids = CompanyTeamMember.objects.filter(
-                company_id=company_id,
-                is_active_member=True,
-                user__is_active=True,
-            ).values_list("user_id", flat=True)
-            journal_ids = (
-                active_contract_queryset()
-                .filter(
-                    company_id=company_id,
-                )
-                .values_list("journal_id", flat=True)
-            )
-            company_scope = package_journal_filter(journal_ids)
-            responsible_q |= Q(creator_id__in=colleague_ids) & company_scope
+        colleague_contracts = active_contract_queryset().filter(
+            company_id__in=membership["company_list_ids"],
+            company__team_members__user_id=OuterRef("creator_id"),
+            company__team_members__is_active_member=True,
+            company__team_members__user__is_active=True,
+            journal_id=Coalesce(
+                OuterRef("journal_id"),
+                OuterRef("issue__journal_id"),
+                OuterRef("article__journal_id"),
+            ),
+        )
+        responsible_q |= Q(Exists(colleague_contracts))
 
     if access_journal_ids:
         responsible_q |= package_journal_filter(access_journal_ids)
 
-    return qs.filter(responsible_q | own_unexpected_q).distinct()
+    return qs.filter(responsible_q).distinct()
 
 
 def get_scoped_package_queryset(user, permission=None):
@@ -89,11 +87,8 @@ def get_scoped_package_queryset(user, permission=None):
 def correction_assignee_queryset(package):
     User = get_user_model()
     creator = package.creator
-    journal_id = package.journal_id
-    if not journal_id and package.issue_id:
-        journal_id = package.issue.journal_id
-    if not journal_id and package.article_id:
-        journal_id = package.article.journal_id
+    journal = package.effective_journal
+    journal_id = journal.pk if journal else None
     if not creator or not journal_id:
         return User.objects.none()
 
@@ -113,15 +108,14 @@ def correction_assignee_queryset(package):
     candidates = Q(pk__in=colleague_ids)
     if journal_id in creator_scope["journal_list_ids"]:
         candidates |= Q(pk=creator.pk)
+
     return User.objects.filter(candidates, is_active=True).distinct()
 
 
 def review_assignee_queryset(package):
     from_scope = correction_assignee_queryset(package)
     User = get_user_model()
-    journal = package.journal or (package.issue.journal if package.issue_id else None)
-    if not journal and package.article_id:
-        journal = package.article.journal
+    journal = package.effective_journal
     if not journal:
         return User.objects.none()
 
@@ -134,7 +128,29 @@ def review_assignee_queryset(package):
         journal=journal,
         is_active_member=True,
     ).values_list("user_id", flat=True)
+
     return User.objects.filter(
         Q(pk__in=collection_users) | Q(pk__in=journal_users) | Q(pk__in=from_scope),
         is_active=True,
     ).distinct()
+
+
+def document_queue_filter(queue, user, status=None):
+    if queue == "archived" or (queue == "all" and status in choices.ARCHIVED_STATUSES):
+        return Q(status__in=choices.ARCHIVED_STATUSES)
+
+    active = ~Q(status__in=choices.ARCHIVED_STATUSES)
+
+    if queue == "mine":
+        return active & Q(
+            assignee=user,
+            status__in=(*choices.REVIEW_STATUSES, choices.PS_PENDING_CORRECTION),
+        )
+
+    if queue == "review":
+        return active & Q(status__in=choices.REVIEW_STATUSES)
+
+    if queue == "corrections":
+        return active & Q(status=choices.PS_PENDING_CORRECTION)
+
+    return active
