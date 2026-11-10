@@ -38,7 +38,7 @@ from package.models import SPSPkg, update_zip_file
 from pid_provider.models import PidProviderXML
 from proc.models import IssueProc, Operation
 from proc.source_core_api import IssueDataChecker
-from team.models import CollectionTeamMember
+from team.models import CollectionTeamMember, get_user_membership_ids
 from upload import choices
 from upload.forms import (
     PackageDecisionForm,
@@ -55,11 +55,35 @@ from upload.permissions import (
     REPUBLISH_PACKAGE,
     REQUEST_CORRECTION,
 )
+from upload.publication_results import (
+    PUBLICATION_ATTEMPT_PREFIX,
+    PUBLICATION_BLOCKED,
+    PUBLICATION_FAILED,
+    PUBLICATION_PUBLISHED,
+    PUBLICATION_QUEUED,
+    PUBLICATION_UNAVAILABLE,
+    PUBLICATION_UNCONFIRMED,
+    PUBLICATION_UNRELEASED,
+    PUBLICATION_UNVERIFIED,
+    publication_error_metadata,
+)
 from upload.querysets import get_scoped_package_queryset, review_assignee_queryset
 from upload.utils import file_utils
 from upload.utils.zip_pkg import PkgZip
 
 DELEGATION_EVENT = "delegate_review"
+
+PUBLISHED_PUBLICATION_STATES = {
+    PUBLICATION_PUBLISHED,
+    PUBLICATION_UNAVAILABLE,
+    PUBLICATION_UNVERIFIED,
+}
+DIAGNOSTIC_PUBLICATION_STATES = {
+    PUBLICATION_FAILED,
+    PUBLICATION_BLOCKED,
+    PUBLICATION_UNCONFIRMED,
+    PUBLICATION_UNAVAILABLE,
+}
 
 User = get_user_model()
 
@@ -74,6 +98,43 @@ class UploadProcResult(Operation, Orderable):
         return dict(choices.QA_DECISION).get(
             decision, detail.get("decision_label") or decision
         )
+
+    def publication_diagnostic(self, result):
+        category = result.get("error_category", "unknown")
+        reason = choices.PUBLICATION_FAILURE_REASONS.get(
+            category,
+            _("The publication failed, but its cause could not be determined."),
+        )
+        guidance = choices.PUBLICATION_FAILURE_GUIDANCE.get(
+            category,
+            _(
+                "Check the destination and ask support to review this attempt before retrying."
+            ),
+        )
+        if result.get("state") == PUBLICATION_UNAVAILABLE:
+            reason = _("Publication succeeded, but the availability check failed.")
+            guidance = _(
+                "Wait a few minutes and check availability again. If the pages "
+                "remain unavailable, contact support."
+            )
+        status = result.get("status_code")
+        technical = (
+            f"HTTP {status}"
+            if isinstance(status, int)
+            and not isinstance(status, bool)
+            and 100 <= status <= 599
+            else _("No safe technical details were recorded.")
+        )
+
+        return {
+            "reason": reason,
+            "guidance": guidance,
+            "stage": choices.PUBLICATION_STAGE_LABELS.get(
+                result.get("stage"), _("Publication")
+            ),
+            "technical": technical,
+            "created": self.created,
+        }
 
 
 def calculate_percentage(value, total):
@@ -602,6 +663,21 @@ class Package(CommonControlField, ClusterableModel):
             | Q(file__icontains=search_term)
         )
 
+    def can_receive_package(self, user):
+        if not user or not user.is_authenticated or not user.is_active:
+            return False
+        if user.is_superuser:
+            return True
+        if self.creator_id != user.pk:
+            return False
+        journal = self.effective_journal
+        journal_id = journal.pk if journal else None
+        # Unknown journals are revalidated from the stored XML by the receiving path.
+
+        return journal_id is None or journal_id in get_user_membership_ids(user).get(
+            "journal_list_ids", []
+        )
+
     def add_order(self, xml_order=None, xml_fpage=None):
         try:
             self.order = int(xml_order or xml_fpage)
@@ -1090,6 +1166,7 @@ class Package(CommonControlField, ClusterableModel):
                 exc_traceback=exc_traceback,
                 detail=detail,
             )
+            return False
         if qa_decision == self.qa_decision:
             return True
         return False
@@ -1385,6 +1462,58 @@ class Package(CommonControlField, ClusterableModel):
                 )
             raise
 
+    def publication_situation(self, purpose):
+        events = getattr(self, "publication_attempts", None)
+        if events is None:
+            events = self.upload_proc_result.filter(
+                name__startswith=PUBLICATION_ATTEMPT_PREFIX,
+            ).order_by("-created", "-pk")
+
+        website_status = (
+            self.public_ws_status if purpose == "PUBLIC" else self.qa_ws_status
+        )
+        state = (
+            PUBLICATION_PUBLISHED
+            if website_status == choices.PUBLISHED
+            else PUBLICATION_UNRELEASED
+        )
+        attempt = None
+        result = None
+        for event in events:
+            detail = event.detail or {}
+            if purpose not in detail.get("websites", []):
+                continue
+            attempt = event
+            result = next(
+                (
+                    item
+                    for item in detail.get("publication", [])
+                    if item["website"] == purpose
+                ),
+                None,
+            )
+            state = (result or {}).get("state", detail.get("state", state))
+            break
+
+        if attempt is None and self.status == (
+            choices.PS_READY_TO_PUBLISH
+            if purpose == "PUBLIC"
+            else choices.PS_READY_TO_PREVIEW
+        ):
+            state = PUBLICATION_QUEUED
+
+        return {
+            "state": state,
+            "is_published": state in PUBLISHED_PUBLICATION_STATES,
+            "label": choices.PUBLICATION_STATE_LABELS[state],
+            "attempt": attempt,
+            "diagnostic": (
+                attempt.publication_diagnostic(result)
+                if result and state in DIAGNOSTIC_PUBLICATION_STATES
+                else None
+            ),
+        }
+
     def publish(
         self,
         user,
@@ -1396,6 +1525,9 @@ class Package(CommonControlField, ClusterableModel):
         bundle_id=None,
     ):
         # manter a compatibilidade com ArticleProc
+        operation = None
+        response = {}
+        detail = {}
         try:
             website_kind = website_kind or collection_choices.QA
             detail = {
@@ -1432,7 +1564,7 @@ class Package(CommonControlField, ClusterableModel):
                     exc_traceback=exc_traceback,
                     detail=response,
                 )
-            return {"error_type": str(type(e)), "error_message": str(e)}
+            return {"error_message": str(e), **publication_error_metadata(e)}
 
     # def update_status(self):
     #     if self.status == choices.PS_READY_TO_PREVIEW:

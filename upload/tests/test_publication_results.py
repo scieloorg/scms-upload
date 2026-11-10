@@ -90,6 +90,39 @@ def test_publication_result_is_not_overridden_by_unchecked_pages(
 
 
 @pytest.mark.parametrize(
+    "purpose,state,published",
+    [("QA", "published", True), ("PUBLIC", "failed", False)],
+)
+def test_document_listing_reads_state_from_previous_publication_records(
+    client, report_scope, purpose, state, published
+):
+    scope = report_scope
+    package = scope.package_1
+    attempt = UploadProcResult.create(
+        scope.superuser, package, f"{PUBLICATION_ATTEMPT_PREFIX} ['{purpose}']"
+    )
+    attempt.finish(
+        scope.superuser,
+        completed=published,
+        detail={
+            "websites": [purpose],
+            "state": state,
+            "publication": [
+                {"website": purpose, "published": published, "completed": published}
+            ],
+        },
+    )
+
+    client.force_login(scope.superuser)
+    response = client.get("/admin/upload/documents/")
+
+    assert response.status_code == 200
+    situation = package.publication_situation(purpose)
+    assert situation["state"] == state
+    assert situation["is_published"] is published
+
+
+@pytest.mark.parametrize(
     "page_status,expected",
     [
         ("not-checked", "unverified"),
