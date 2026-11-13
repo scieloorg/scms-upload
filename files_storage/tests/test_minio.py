@@ -17,6 +17,9 @@ from files_storage.minio import (
     MinioStorage,
     SHA1Error,
     MinioStorageGetUriError,
+    MinioStorageDeleteError,
+    MinioStorageMoveError,
+    MinioStorageCopyError,
 )
 
 
@@ -158,6 +161,77 @@ class TestMinioStorage(unittest.TestCase):
         mock_client.remove_object.assert_called_once_with(
             "test-bucket", "prefix/file.txt"
         )
+
+    def test_delete(self):
+        mock_client = MagicMock()
+        self.storage._client_instance = mock_client
+
+        self.storage.delete("a/file.txt")
+        mock_client.remove_object.assert_called_once_with(
+            "test-bucket", "prefix/a/file.txt"
+        )
+
+    def test_delete_error(self):
+        mock_client = MagicMock()
+        mock_client.remove_object.side_effect = Exception("boom")
+        self.storage._client_instance = mock_client
+
+        with self.assertRaises(MinioStorageDeleteError):
+            self.storage.delete("a/file.txt")
+
+    def test_move(self):
+        mock_client = MagicMock()
+        self.storage._client_instance = mock_client
+
+        uri = self.storage.move("a/file.txt", "b/file.txt")
+
+        mock_client.copy_object.assert_called_once()
+        bucket, target, source = mock_client.copy_object.call_args.args
+        self.assertEqual(bucket, "test-bucket")
+        self.assertEqual(target, "prefix/b/file.txt")
+        self.assertEqual(source.bucket_name, "test-bucket")
+        self.assertEqual(source.object_name, "prefix/a/file.txt")
+        mock_client.remove_object.assert_called_once_with(
+            "test-bucket", "prefix/a/file.txt"
+        )
+        self.assertEqual(uri, "http://localhost:9000/public/b/file.txt")
+
+    def test_move_copy_error_keeps_source(self):
+        mock_client = MagicMock()
+        mock_client.copy_object.side_effect = Exception("boom")
+        self.storage._client_instance = mock_client
+
+        with self.assertRaises(MinioStorageMoveError):
+            self.storage.move("a/file.txt", "b/file.txt")
+        mock_client.remove_object.assert_not_called()
+
+    def test_copy_keeps_source(self):
+        mock_client = MagicMock()
+        self.storage._client_instance = mock_client
+
+        uri = self.storage.copy("a/file.txt", "b/file.txt")
+
+        mock_client.copy_object.assert_called_once()
+        mock_client.remove_object.assert_not_called()
+        self.assertEqual(uri, "http://localhost:9000/public/b/file.txt")
+
+    def test_copy_error(self):
+        mock_client = MagicMock()
+        mock_client.copy_object.side_effect = Exception("boom")
+        self.storage._client_instance = mock_client
+
+        with self.assertRaises(MinioStorageCopyError):
+            self.storage.copy("a/file.txt", "b/file.txt")
+
+    def test_move_same_object_name_does_nothing(self):
+        mock_client = MagicMock()
+        self.storage._client_instance = mock_client
+
+        uri = self.storage.move("a/file.txt", "a/file.txt")
+
+        mock_client.copy_object.assert_not_called()
+        mock_client.remove_object.assert_not_called()
+        self.assertEqual(uri, "http://localhost:9000/public/a/file.txt")
 
     @patch("files_storage.minio.Minio")
     def test_fget_success(self, mock_minio_class):
