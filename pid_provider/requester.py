@@ -279,6 +279,7 @@ class PidRequester(BasePidProvider):
             op.finish(user, completed=False, exception=e, exc_traceback=exc_traceback)
             return {"error_msg": str(e), "error_type": str(type(e))}
 
+    # OBSOLETO: o pid v2 é corrigido por coleção em proc.models.ArticleProc.fix_pid_v2
     def fix_pid_v2(
         self,
         user,
