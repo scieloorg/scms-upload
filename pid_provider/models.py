@@ -1957,6 +1957,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         except cls.MultipleObjectsReturned as e:
             return cls.objects.filter(**params).order_by("-updated").first()
 
+    # OBSOLETO: o pid v2 é corrigido por coleção em proc.models.ArticleProc.fix_pid_v2
     @classmethod
     @profile_classmethod
     def fix_pid_v2(cls, user, pid_v3, correct_pid_v2):
