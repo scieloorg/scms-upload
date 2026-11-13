@@ -2,9 +2,8 @@ import logging
 
 from django.contrib.admin.utils import quote
 from django.db.models import Prefetch, Q
-from django.shortcuts import redirect
 from django.templatetags.static import static
-from django.urls import include, path, re_path
+from django.urls import include, path
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
@@ -33,8 +32,7 @@ from upload.bulk_actions.republish import (
     RepublishPublicBulkAction,
     RepublishQABulkAction,
 )
-from upload.document_views import PackageAdminInspectView
-from upload.document_workflow import QUEUE_LABELS, document_queue_filter
+from upload.choices import QUEUE_LABELS
 from upload.filters import (
     DocumentFilterSet,
     PackageValidationReportFilterSet,
@@ -44,7 +42,6 @@ from upload.filters import (
 )
 from upload.menu import UploadSectionMenu
 from upload.models import (
-    ArchivedPackage,
     Package,
     PackageZip,
     PkgValidationResult,
@@ -55,7 +52,6 @@ from upload.models import (
     ValidationReport,
     XMLError,
     XMLErrorReport,
-    XMLInfo,
     XMLInfoReport,
     choices,
 )
@@ -65,7 +61,11 @@ from upload.permission_policies import (
 )
 from upload.permissions import ACCESS_PACKAGES
 from upload.publication_status import PUBLICATION_ATTEMPT_PREFIX
-from upload.querysets import get_scoped_package_queryset, scope_package_queryset
+from upload.querysets import (
+    document_queue_filter,
+    get_scoped_package_queryset,
+    scope_package_queryset,
+)
 from upload.tables import (
     DocumentActionsColumn,
     DocumentTitleColumn,
@@ -73,15 +73,14 @@ from upload.tables import (
     PublicationColumn,
     SubmissionActionsColumn,
 )
-from upload.views import (
-    PackageZipCreateView,
-    QAPackageEditView,
-    ReadyToPublishPackageEditView,
+from upload.views.decisions import PackageDecisionEditView
+from upload.views.documents import PackageAdminInspectView
+from upload.views.reports import (
     ValidationReportEditView,
     XMLErrorReportEditView,
     XMLInfoReportEditView,
-    redirect_upload_url,
 )
+from upload.views.submissions import PackageZipCreateView
 
 MODEL_PERMISSION_ACTIONS = ("add", "change", "delete", "view")
 
@@ -98,15 +97,6 @@ class PackageActionIndexView(SnippetIndexView):
         )
 
         return buttons
-
-
-class DocumentWorkflowIndexView(SnippetIndexView):
-    def get(self, request, *args, **kwargs):
-        response = redirect("wagtailsnippets_upload_package:list")
-        if self.model is ArchivedPackage:
-            response["Location"] += "?queue=archived"
-
-        return response
 
 
 class InspectFirstPackageIndexView(PackageActionIndexView):
@@ -217,9 +207,25 @@ class BaseUploadViewSet(CommonControlFieldViewSet):
     def get_common_view_kwargs(self, **kwargs):
         view_kwargs = super().get_common_view_kwargs(**kwargs)
         view_kwargs["viewset"] = self
-        if self.model in (QAPackage, ReadyToPublishPackage):
-            view_kwargs["index_url_name"] = "wagtailsnippets_upload_package:list"
         return view_kwargs
+
+    def get_url_name(self, view_name):
+        if self.model in (QAPackage, ReadyToPublishPackage) and view_name in (
+            "list",
+            "list_results",
+        ):
+            return f"wagtailsnippets_upload_package:{view_name}"
+        return super().get_url_name(view_name)
+
+    def get_urlpatterns(self):
+        patterns = super().get_urlpatterns()
+        if self.model in (QAPackage, ReadyToPublishPackage):
+            patterns = [
+                pattern
+                for pattern in patterns
+                if pattern.name not in ("list", "list_results")
+            ]
+        return patterns
 
 
 class PackageZipViewSet(BaseUploadViewSet):
@@ -364,12 +370,12 @@ class QualityAnalysisPackageViewSet(BaseUploadViewSet):
     model = QAPackage
     url_prefix = "upload/quality-review"
     denied_permission_actions = ("delete",)
-    index_view_class = DocumentWorkflowIndexView
     menu_label = _("Quality review")
     menu_name = "quality-review"
     menu_icon = "search"
     menu_order = 200
-    edit_view_class = QAPackageEditView
+    edit_view_class = PackageDecisionEditView
+    edit_template_name = "upload/decisions/edit.html"
     inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
@@ -422,13 +428,13 @@ class QualityAnalysisPackageViewSet(BaseUploadViewSet):
 class ReadyToPublishPackageViewSet(BaseUploadViewSet):
     model = ReadyToPublishPackage
     url_prefix = "upload/decisions"
-    index_view_class = DocumentWorkflowIndexView
     denied_permission_actions = ("delete",)
     menu_label = _("Decisions")
     menu_name = "publication"
     menu_icon = "tasks"
     menu_order = 200
-    edit_view_class = ReadyToPublishPackageEditView
+    edit_view_class = PackageDecisionEditView
+    edit_template_name = "upload/decisions/edit.html"
     inspect_view_enabled = True
     inspect_view_class = PackageAdminInspectView
     inspect_template_name = "modeladmin/upload/package/inspect.html"
@@ -552,35 +558,6 @@ class XMLInfoReportViewSet(BaseUploadViewSet):
     )
 
 
-class XMLInfoViewSet(BaseUploadViewSet):
-    model = XMLInfo
-    package_scope_field = "report__package"
-    menu_label = _("XML info")
-    menu_icon = "error"
-    add_to_settings_menu = False
-    list_display = (
-        "subject",
-        "attribute",
-        "focus",
-        "message",
-        "report",
-    )
-    list_filter = (
-        "status",
-        "validation_type",
-        "parent",
-        "parent_id",
-        "subject",
-        "attribute",
-    )
-    search_fields = (
-        "focus",
-        "message",
-        "package__name",
-        "package__file",
-    )
-
-
 class ValidationReportViewSet(BaseUploadViewSet):
     model = ValidationReport
     package_scope_field = "package"
@@ -661,65 +638,6 @@ class UploadValidatorViewSet(BaseUploadViewSet):
         ).distinct()
 
 
-class ArchivedPackageViewSet(BaseUploadViewSet):
-    model = ArchivedPackage
-    url_prefix = "upload/archive"
-    index_view_class = DocumentWorkflowIndexView
-    denied_permission_actions = ("delete",)
-    inspect_view_class = PackageAdminInspectView
-    inspect_template_name = "modeladmin/upload/package/inspect.html"
-    menu_label = _("Archived")
-    menu_name = "archive"
-    menu_icon = "history"
-    menu_order = 200
-    add_to_settings_menu = False
-    list_per_page = 20
-
-    list_display = (
-        "__str__",
-        "critical_errors",
-        "xml_errors_percentage",
-        "category",
-        "status",
-        "creator",
-        "updated",
-        "expiration_date",
-    )
-    list_filter = (
-        "creator",
-        "category",
-        "status",
-    )
-    search_fields = (
-        "name",
-        "journal__official_journal__title",
-        "issue__journal__official_journal__title",
-        "article__pid_v3",
-        "creator__username",
-        "updated_by__username",
-        "pkg_zip__file",
-    )
-    inspect_view_fields = (
-        "article",
-        "issue",
-        "category",
-        "status",
-        "file",
-        "created",
-        "updated",
-        "expiration_date",
-    )
-
-    def get_queryset(self, request):
-        qs = (
-            super()
-            .get_queryset(request)
-            .exclude(status__in=(*choices.PS_WIP, choices.PS_PENDING_CORRECTION))
-        )
-
-        return scope_package_queryset(qs, request.user)
-
-
 class UploadTrackingViewSetGroup(SnippetViewSetGroup):
     menu_label = _("Workflow")
     menu_name = "upload-tracking"
@@ -767,7 +685,6 @@ class UploadViewSetGroup(SnippetViewSetGroup):
     ]
     menu_order = get_menu_order("upload")
 
-
     def get_menu_item(self, order=None):
         item = super().get_menu_item(order=order)
         item.menu = UploadSectionMenu(items=self.get_submenu_items())
@@ -775,23 +692,14 @@ class UploadViewSetGroup(SnippetViewSetGroup):
 
 
 register_snippet(UploadViewSetGroup)
-for document_viewset in (QualityAnalysisPackageViewSet, ReadyToPublishPackageViewSet, ArchivedPackageViewSet):
+for document_viewset in (QualityAnalysisPackageViewSet, ReadyToPublishPackageViewSet):
     document_viewset.add_to_admin_menu = False
     register_snippet(document_viewset)
 
 
 @hooks.register("register_admin_urls")
-def register_disclosure_url():
-    return [
-        re_path(
-            r"^snippets/upload/(?P<model_name>xmlerrorreport|xmlinforeport|"
-            r"validationreport|xmlerror|pkgvalidationresult|uploadvalidator|"
-            r"packagezip|package|qapackage|readytopublishpackage|archivedpackage)/"
-            r"(?P<subpath>.*)$",
-            redirect_upload_url,
-        ),
-        path("upload/", include("upload.urls", namespace="upload")),
-    ]
+def register_upload_urls():
+    return [path("upload/", include("upload.urls", namespace="upload"))]
 
 
 @hooks.register("insert_global_admin_css")

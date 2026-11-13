@@ -1,7 +1,7 @@
 import os
 import logging
-from tempfile import TemporaryDirectory, mkdtemp
-from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
+from tempfile import TemporaryDirectory
+from zipfile import ZIP_DEFLATED, ZipFile
 
 
 class PkgZip:
@@ -10,12 +10,10 @@ class PkgZip:
         self.file_path = file_path
 
     def split(self):
-        found = False
         with ZipFile(self.file_path) as zf:
             xml_and_related_items = self.get_zip_content(zf)
             pkgs = self.get_packages(
-                xml_and_related_items["xmls"],
-                xml_and_related_items["other_files"]
+                xml_and_related_items["xmls"], xml_and_related_items["other_files"]
             )
             for xml_name, items in pkgs.items():
                 yield self.zip_package(zf, xml_name, items)
@@ -39,6 +37,7 @@ class PkgZip:
             else:
                 other_files.setdefault(name, [])
                 other_files[name].append(data)
+
         return {"xmls": xmls, "other_files": other_files}
 
     def get_packages(self, xmls, other_files):
@@ -59,6 +58,7 @@ class PkgZip:
                     xmls[key].extend(other_files.pop(other_files_key))
                 else:
                     logging.info("c")
+
         return xmls
 
     def zip_package(self, zf, xml_name, files):
@@ -68,9 +68,7 @@ class PkgZip:
                 zfile = os.path.join(tmpdirname, f"{xml_name}.zip")
                 with ZipFile(zfile, "w", compression=ZIP_DEFLATED) as zfw:
                     for item in files:
-                        zfw.writestr(
-                            item["basename"], zf.read(item["file_path"])
-                        )
+                        zfw.writestr(item["basename"], zf.read(item["file_path"]))
                 with open(zfile, "rb") as zfw:
                     content = zfw.read()
             return {"xml_name": xml_name, "content": content}

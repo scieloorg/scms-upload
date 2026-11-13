@@ -7,13 +7,14 @@
         <article class="document-event">
             <div class="document-event-heading">
                 <time>{{ decision.created }}</time>
-                <strong>{{ decision.decision_display }}</strong>
+                <strong>{% if decision.name == "delegate_review" %}{% trans "Delegate review" %}{% else %}{{ decision.decision_display }}{% endif %}</strong>
             </div>
             <p>
                 {{ decision.creator }} · {% trans "Assignee" %}:
                 {{ decision.detail.assignee|default:"—" }}
             </p>
-            <p>{{ decision.detail.comment|default:"—"|linebreaksbr }}</p>
+            {% if decision.name == "delegate_review" %}<p>{% trans "Previous assignee" %}: {{ decision.detail.previous_assignee|default:"—" }}</p>{% endif %}
+            <p>{% if decision.name == "delegate_review" %}{% trans "Instructions" %}: {% endif %}{{ decision.detail.comment|default:"—"|linebreaksbr }}</p>
         </article>
     {% empty %}
         <p class="document-empty">{% trans "No decisions recorded." %}</p>

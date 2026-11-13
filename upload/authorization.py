@@ -7,10 +7,7 @@ def user_can_act_on_package(user, permission, package):
     if user.is_superuser:
         return True
 
-    journal_id = package.journal_id
-    if not journal_id and package.issue_id:
-        journal_id = package.issue.journal_id
-    if not journal_id and package.article_id:
-        journal_id = package.article.journal_id
+    journal = package.effective_journal
+    journal_id = journal.pk if journal else None
 
     return journal_id in get_user_permission_journal_ids(user, "upload", permission)

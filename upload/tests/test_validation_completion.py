@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from config import celery_app
-from upload import tasks
+from upload import choices, tasks
 
 
 @pytest.mark.django_db(transaction=True)
@@ -25,7 +25,6 @@ def test_reception_finishes_once_after_all_validation_tasks(monkeypatch, failure
         tasks.task_validate_renditions,
         tasks.task_validate_xml_structure,
         tasks.task_validate_xml_content,
-        tasks.task_validate_renditions_content,
     )
     completed = []
 
@@ -67,3 +66,25 @@ def test_reception_finishes_once_after_all_validation_tasks(monkeypatch, failure
             package.finish_reception.assert_called_once_with(
                 tasks.task_upload_workflow_publish_article
             )
+
+
+@pytest.mark.parametrize("pdf_present", [False, True])
+def test_reception_still_checks_the_pdf_declared_in_the_xml(report_scope, pdf_present):
+    package = report_scope.package_1
+    tasks.task_validate_renditions.run(
+        package_id=package.pk,
+        xml_path="article.xml",
+        package_files=["article.pdf"] if pdf_present else [],
+        xml_renditions=[{"name": "article.pdf", "lang": "pt"}],
+    )
+
+    report = package.validation_report.get(category=choices.VAL_CAT_RENDITION)
+
+    assert report.creation == choices.REPORT_CREATION_DONE
+    result = report.validation_results.get()
+
+    assert result.status == (
+        choices.VALIDATION_RESULT_SUCCESS
+        if pdf_present
+        else choices.VALIDATION_RESULT_FAILURE
+    )

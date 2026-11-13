@@ -235,3 +235,27 @@ WEBSITE_STATUS = (
     (PUBLISHED, _("published")),
     (DEPUBLISHED, _("depublished")),
 )
+
+
+REVIEW_STATUSES = (
+    PS_VALIDATED_WITH_ERRORS,
+    PS_PENDING_QA_DECISION,
+    PS_PREVIEW,
+)
+
+ARCHIVED_STATUSES = (PS_ARCHIVED, PS_DEPUBLISHED)
+
+QUEUE_LABELS = (
+    ("all", _("All")),
+    ("mine", _("My pending tasks")),
+    ("review", _("In review")),
+    ("corrections", _("In correction")),
+    ("archived", _("Archived")),
+)
+
+WORK_STATUS_CHOICES = tuple(
+    (value, _("Awaiting analysis") if value == PS_PREVIEW else label)
+    for value, label in PACKAGE_STATUS
+)
+
+WORK_STATUS_LABELS = dict(WORK_STATUS_CHOICES)

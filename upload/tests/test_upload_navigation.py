@@ -6,20 +6,6 @@ from django.urls import reverse
 from upload import choices
 from upload.models import Package
 
-UPLOAD_ROUTES = (
-    ("packagezip", "submissions"),
-    ("package", "documents"),
-    ("qapackage", "quality-review"),
-    ("readytopublishpackage", "decisions"),
-    ("archivedpackage", "archive"),
-    ("xmlerrorreport", "validation/reports/xml-errors"),
-    ("xmlinforeport", "validation/reports/xml-information"),
-    ("validationreport", "validation/reports/package-checks"),
-    ("xmlerror", "validation/results/xml-errors"),
-    ("pkgvalidationresult", "validation/results/package-checks"),
-    ("uploadvalidator", "validation/rules"),
-)
-
 
 @pytest.fixture
 def admin_client(client, settings):
@@ -32,17 +18,10 @@ def admin_client(client, settings):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("model_name, path", UPLOAD_ROUTES)
-def test_upload_urls_preserve_names_and_legacy_requests(admin_client, model_name, path):
-    url = reverse(f"wagtailsnippets_upload_{model_name}:edit", args=[1])
-    assert url == f"/admin/upload/{path}/edit/1/"
-    old_url = f"/admin/snippets/upload/{model_name}/edit/1/"
-    response = admin_client.get(old_url + "?q=journal&page=2")
-    assert response.status_code == 302
-    assert response.url == url + "?q=journal&page=2"
-    response = admin_client.post(old_url, {"title": "review"})
-    assert response.status_code == 307
-    assert response.url == url
+def test_snippet_navigation_uses_registered_document_listing(admin_client):
+    response = admin_client.get(reverse("wagtailsnippets:index"))
+    assert response.status_code == 200
+    assert reverse("wagtailsnippets_upload_package:list") in response.content.decode()
 
 
 @pytest.mark.django_db
@@ -69,4 +48,5 @@ def test_report_generation_filter_handles_empty_status(admin_client, model_name)
         assert response.status_code == 200
         assert list(response.context["object_list"]) == [report]
     response = admin_client.get(url)
+
     assert set(response.context["object_list"]) == set(reports.values())

@@ -1,0 +1,7 @@
+{% load i18n %}
+<section class="document-identity" aria-label="{% trans 'Document' %}">
+    <h2>{{ document_identity.title|default:document_identity.identifier }}</h2>
+    {% if document_identity.journal or document_identity.issue %}
+        <p>{{ document_identity.journal|default_if_none:"" }}{% if document_identity.journal and document_identity.issue %} · {% endif %}{{ document_identity.issue|default_if_none:"" }}</p>
+    {% endif %}
+</section>
