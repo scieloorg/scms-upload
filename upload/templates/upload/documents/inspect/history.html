@@ -1,42 +1,77 @@
 {% load i18n wagtailadmin_tags %}
 
 <section class="document-section">
-    <h2>{% trans "Decision history" %}</h2>
+    <div class="upload-section-heading">
+        <h2>{% trans "History" %}</h2>
+    </div>
 
-    {% for decision in decision_history %}
-        <article class="document-event">
-            <div class="document-event-heading">
-                <time>{{ decision.created }}</time>
-                <strong>{% if decision.name == "delegate_review" %}{% trans "Delegate review" %}{% else %}{{ decision.decision_display }}{% endif %}</strong>
-            </div>
-            <p>
-                {{ decision.creator }} · {% trans "Assignee" %}:
-                {{ decision.detail.assignee|default:"—" }}
-            </p>
-            {% if decision.name == "delegate_review" %}<p>{% trans "Previous assignee" %}: {{ decision.detail.previous_assignee|default:"—" }}</p>{% endif %}
-            <p>{% if decision.name == "delegate_review" %}{% trans "Instructions" %}: {% endif %}{{ decision.detail.comment|default:"—"|linebreaksbr }}</p>
-        </article>
-    {% empty %}
-        <p class="document-empty">{% trans "No decisions recorded." %}</p>
-    {% endfor %}
-</section>
+    <form method="get" class="history-filters">
+        <input type="hidden" name="tab" value="history">
+        <label for="history-type">{% trans "Events" %}</label>
+        <select id="history-type" name="event_type">
+            <option value="all" {% if history_filter == "all" %}selected{% endif %}>{% trans "All" %}</option>
+            <option value="decisions" {% if history_filter == "decisions" %}selected{% endif %}>{% trans "Decisions" %}</option>
+            <option value="delegations" {% if history_filter == "delegations" %}selected{% endif %}>{% trans "Review assignments" %}</option>
+            <option value="processing" {% if history_filter == "processing" %}selected{% endif %}>{% trans "Processing events" %}</option>
+        </select>
+        <button class="button button-secondary button--icon" type="submit">
+            {% icon name="sliders" classname="w-mr-1" %} {% trans "Filter" %}
+        </button>
+    </form>
 
-<section class="document-section">
-    <h2>{% trans "Processing events" %}</h2>
+    <p class="document-summary-note">{% trans "Completion refers to each task. Publication availability is shown separately in the overview." %}</p>
 
-    {% for event in processing_events %}
-        <details class="document-event">
-            <summary class="document-event-heading">
-                {% icon name="arrow-right" classname="document-event-toggle" %}
-                <time>{{ event.created }}</time>
-                <span>{{ event.name }}</span>
-                <span class="document-status">
-                    {% trans "Completed" %}: {{ event.completed|yesno }}
-                </span>
-            </summary>
-            <pre>{{ event.detail|pprint }}</pre>
-        </details>
-    {% empty %}
-        <p class="document-empty">{% trans "No processing events recorded." %}</p>
-    {% endfor %}
+    <ol class="document-timeline">
+        {% for event in timeline_events %}
+            <li class="timeline-item">
+                <div class="timeline-metadata">
+                    <time datetime="{{ event.created|date:'c' }}">{{ event.created }}</time>
+                    {% if event.creator %}
+                        · {{ event.creator }}
+                    {% endif %}
+                </div>
+
+                <div class="timeline-heading">
+                    <h3>{{ event.label }}</h3>
+                    {% if event.is_decision %}
+                        <span class="validation-state">{% trans "Decision" %}</span>
+                    {% elif event.is_delegation %}
+                        <span class="validation-state">{% trans "Review assignment" %}</span>
+                    {% else %}
+                        <span class="validation-state validation-state-{{ event.state.kind }}"{% if event.state.kind == "processing" %} role="status"{% endif %}>
+                            {% icon name=event.state.icon %} {{ event.state.label }}
+                        </span>
+                    {% endif %}
+                </div>
+
+                {% if event.is_decision or event.is_delegation %}
+                    {% if event.is_delegation and event.previous_assignee %}
+                        <p>{% trans "Previous assignee" %}: {{ event.previous_assignee }}</p>
+                    {% endif %}
+
+                    {% if event.assignee %}
+                        <p>{% trans "Assignee" %}: {{ event.assignee }}</p>
+                    {% endif %}
+
+                    {% if event.comment %}
+                        <div class="timeline-comment">{{ event.comment|linebreaksbr }}</div>
+                    {% endif %}
+                {% endif %}
+
+                <details class="timeline-details upload-details">
+                    <summary>{% trans "Technical details" %}</summary>
+
+                    <dl class="timeline-operation upload-fields">
+                        <dt>{% trans "Technical name" %}</dt>
+                        <dd>{{ event.name }}</dd>
+                    </dl>
+                    <pre>{{ event.detail|pprint }}</pre>
+                </details>
+            </li>
+        {% empty %}
+            <li class="document-empty">{% trans "No events match this filter." %}</li>
+        {% endfor %}
+    </ol>
+
+    {% include "upload/documents/pagination.html" %}
 </section>

@@ -1,0 +1,15 @@
+{% load i18n %}
+{% if situation.diagnostic %}
+<section id="publication-{{ purpose }}" class="document-section document-publication-diagnostic document-issue-card {% if situation.state == 'failed' or situation.state == 'unavailable' %}document-issue-card--danger{% else %}document-issue-card--warning{% endif %}" aria-labelledby="publication-{{ purpose }}-heading">
+    <div class="upload-section-heading">
+        <h2 id="publication-{{ purpose }}-heading">{{ destination }} — {% trans "Publication details" %}</h2>
+    </div>
+    <p class="document-summary-note">{{ situation.diagnostic.stage }}{% if situation.diagnostic.created %} · <time datetime="{{ situation.diagnostic.created|date:'c' }}">{{ situation.diagnostic.created }}</time>{% endif %}</p>
+    <p>{{ situation.diagnostic.reason }}</p>
+    <p class="document-summary-note">{{ situation.diagnostic.guidance }}</p>
+    <div class="document-publication-technical">
+        <h3>{% trans "Technical details" %}</h3>
+        <div class="document-publication-technical-content">{{ situation.diagnostic.technical }}</div>
+    </div>
+</section>
+{% endif %}

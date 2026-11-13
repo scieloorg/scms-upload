@@ -95,6 +95,7 @@ def test_completed_review_summary_preserves_reaction_totals(legacy_numbers):
     package.refresh_from_db()
 
     summary = package.summary
+
     assert summary["is_error_review_finished"] is True
     assert summary["total_contested_xml_errors"] == 2
     assert summary["total_declared_impossible_to_fix"] == 1
@@ -120,6 +121,7 @@ def test_validation_limits_accept_zero_and_reject_out_of_range(django_user_model
         "validation_params": "{}",
     }
     form = form_class(data=data, for_user=user)
+
     assert form.is_valid(), form.errors
     invalid = dict(
         data,
@@ -128,6 +130,7 @@ def test_validation_limits_accept_zero_and_reject_out_of_range(django_user_model
         max_impossible_to_fix_percentage=101,
     )
     form = form_class(data=invalid, for_user=user)
+
     assert set(form.errors) == {
         "max_xml_warnings_percentage",
         "max_xml_errors_percentage",

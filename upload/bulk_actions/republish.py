@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from wagtail.snippets.bulk_actions.snippet_bulk_action import SnippetBulkAction
 
+from upload import choices
 from upload.models import ReadyToPublishPackage
 from upload.permissions import REPUBLISH_PACKAGE
 from upload.querysets import get_scoped_package_queryset
@@ -34,6 +35,9 @@ class BaseRepublishBulkAction(SnippetBulkAction):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["website_kind"] = self.website_kind
+        context["website_kind_label"] = choices.WEBSITE_ENVIRONMENT_LABELS[
+            self.website_kind
+        ]
 
         return context
 
@@ -74,7 +78,7 @@ class BaseRepublishBulkAction(SnippetBulkAction):
             num_parent_objects,
         ) % {
             "count": num_parent_objects,
-            "website_kind": self.website_kind,
+            "website_kind": choices.WEBSITE_ENVIRONMENT_LABELS[self.website_kind],
         }
 
 
@@ -86,7 +90,7 @@ class RepublishQABulkAction(BaseRepublishBulkAction):
 
 
 class RepublishPublicBulkAction(BaseRepublishBulkAction):
-    display_name = _("Republish Public")
+    display_name = _("Republish in Production")
     action_type = "republish_public"
-    aria_label = _("Republish selected packages on Public")
+    aria_label = _("Republish selected packages in Production")
     website_kind = "PUBLIC"

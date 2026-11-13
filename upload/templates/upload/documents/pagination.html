@@ -1,0 +1,3 @@
+{% if page_obj.paginator.num_pages > 1 %}
+    {% include "wagtailadmin/shared/pagination_nav.html" with items=page_obj elided_page_range=pagination_pages %}
+{% endif %}

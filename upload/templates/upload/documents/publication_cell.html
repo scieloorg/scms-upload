@@ -1,6 +1,27 @@
-{% load i18n %}
+{% load i18n wagtailadmin_tags %}
 
 <td class="document-publication">
-    <div>QA: {{ qa_publication.label|default:"—" }}</div>
-    <div>{% trans "Public" %}: {{ public_publication.label|default:"—" }}</div>
+    {% if qa_publication.diagnostic %}
+        <div class="document-publication-destination">
+            <span>QA:</span>
+            <a class="upload-link" href="{{ publication_document_url }}#publication-QA" title="{% trans 'View reason' %}">{% trans "Failed" %}</a>
+        </div>
+    {% elif website_urls.QA %}
+        <div class="document-publication-destination">
+            <span>QA:</span>
+            <a class="upload-link" href="{{ website_urls.QA }}" target="_blank" rel="noopener noreferrer" title="{% trans 'Open QA' %}" aria-label="{% trans 'Open QA' %}">{% icon name="link-external" %}</a>
+        </div>
+    {% endif %}
+
+    {% if public_publication.diagnostic %}
+        <div class="document-publication-destination">
+            <span>{% trans "Production" %}:</span>
+            <a class="upload-link" href="{{ publication_document_url }}#publication-PUBLIC" title="{% trans 'View reason' %}">{% trans "Failed" %}</a>
+        </div>
+    {% elif website_urls.PUBLIC %}
+        <div class="document-publication-destination">
+            <span>{% trans "Production" %}:</span>
+            <a class="upload-link" href="{{ website_urls.PUBLIC }}" target="_blank" rel="noopener noreferrer" title="{% trans 'Open in Production' %}" aria-label="{% trans 'Open in Production' %}">{% icon name="link-external" %}</a>
+        </div>
+    {% endif %}
 </td>

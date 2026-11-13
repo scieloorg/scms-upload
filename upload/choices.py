@@ -1,48 +1,53 @@
 from django.utils.translation import gettext_lazy as _
 
-# Model Package, Field status
+WEBSITE_ENVIRONMENTS = (("QA", _("QA")), ("PUBLIC", _("Production")))
+WEBSITE_ENVIRONMENT_LABELS = dict(WEBSITE_ENVIRONMENTS)
 
-"""
-# SYSTEM
-1. PS_SUBMITTED --> primeira avaliação --> 2
+PUBLICATION_STATE_LABELS = {
+    "queued": _("Awaiting publication"),
+    "running": _("Publication in progress"),
+    "failed": _("Last publication attempt failed"),
+    "published": _("Published"),
+    "unreleased": _("Not published"),
+    "unconfirmed": _("Publication not confirmed"),
+    "unavailable": _("Published"),
+    "blocked": _("Publication not started"),
+    "unverified": _("Published"),
+}
 
-# SYSTEM
-2.1. PS_ENQUEUED_FOR_VALIDATION --> 3
-2.2. PS_UNEXPECTED --> 10
+PUBLICATION_STAGE_LABELS = {
+    "journal": _("Journal publication"),
+    "issue": _("Issue publication"),
+    "article": _("Article publication"),
+    "connection": _("Connection"),
+    "authentication": _("Authentication"),
+    "files": _("Publication files"),
+}
+PUBLICATION_FAILURE_REASONS = {
+    "authentication": _("The destination refused authentication or permission."),
+    "timeout": _(
+        "The destination did not respond in time; publication could not be confirmed."
+    ),
+    "connection": _("A connection to the destination could not be established."),
+    "data": _("The destination rejected the publication data."),
+    "conflict": _("The publication conflicts with data already at the destination."),
+    "service": _("The destination service reported an internal failure."),
+    "files": _("A required publication file was not found."),
+    "qa_required": _(
+        "Production publication was not started because QA publication was not confirmed."
+    ),
+}
+PUBLICATION_FAILURE_GUIDANCE = {
+    "authentication": _(
+        "Ask an administrator to check the destination credentials and permissions before retrying."
+    ),
+    "timeout": _(
+        "Check whether the document is available at the destination before retrying. "
+        "The request may have been received."
+    ),
+    "qa_required": _("Review the QA result before trying to publish in Production."),
+}
 
-# SYSTEM
-3.1. PS_READY_TO_PREVIEW --> 13
-3.2. PS_PENDING_CORRECTION --> 10
-3.3. PS_VALIDATED_WITH_ERRORS --> 7
-
-# QA USER
-4.1. PS_PUBLISHED --> 8
-
-# QA USER
-6.1. PS_PENDING_CORRECTION --> 10
-6.2. PS_READY_TO_PREVIEW --> 13
-
-# XML PRODUCTOR USER
-# SYSTEM / CONFIGURAÇÃO DO FLUXO
-7.1. PS_PENDING_CORRECTION --> 10
-7.2. PS_PENDING_QA_DECISION --> 6 (MAIS TOLERANTE - GARGALO NA UNIDADE SCIELO)
-
-# QA USER ON BEHALF ANY USER
-8.1. PS_REQUIRED_ERRATUM --> 11
-8.2. PS_REQUIRED_UPDATE --> 11
-
-10. produtor de XML terá que corrigir e re-submeter
-
-# EDITOR | ?
-11.1. ASSIGN XML PRODUCTOR --> 10
-
-# SYSTEM / QA USER
-13.1. PS_PREVIEW --> 14
-
-# QA USER
-14.1. PS_PENDING_CORRECTION --> 10
-14.2. PS_READY_TO_PUBLISH --> 4
-"""
 PS_SUBMITTED = "submitted"
 PS_ENQUEUED_FOR_VALIDATION = "enqueued-for-validation"
 PS_VALIDATED_WITH_ERRORS = "validated-with-errors"
@@ -63,13 +68,9 @@ PS_WIP = (
     PS_ENQUEUED_FOR_VALIDATION,
     PS_VALIDATED_WITH_ERRORS,
     PS_PENDING_QA_DECISION,
-    # PS_UNEXPECTED,
     PS_READY_TO_PREVIEW,
     PS_PREVIEW,
     PS_READY_TO_PUBLISH,
-    # PS_PUBLISHED,
-    # PS_DEPUBLISHED,
-    # PS_ARCHIVED,
 )
 
 PACKAGE_STATUS = (
@@ -83,10 +84,30 @@ PACKAGE_STATUS = (
     (PS_UNEXPECTED, _("Unexpected submission")),
     (PS_READY_TO_PREVIEW, _("Publication on QA website authorized")),
     (PS_PREVIEW, _("Published in QA")),
-    (PS_READY_TO_PUBLISH, _("Publication on public website authorized")),
-    (PS_PUBLISHED, _("Published on public site")),
+    (PS_READY_TO_PUBLISH, _("Publication in Production authorized")),
+    (PS_PUBLISHED, _("Published in Production")),
     (PS_ARCHIVED, _("Archived")),
 )
+
+REVIEW_STATUSES = (
+    PS_VALIDATED_WITH_ERRORS,
+    PS_PENDING_QA_DECISION,
+    PS_PREVIEW,
+)
+ARCHIVED_STATUSES = (PS_ARCHIVED, PS_DEPUBLISHED)
+QUEUE_LABELS = (
+    ("all", _("All")),
+    ("mine", _("My pending tasks")),
+    ("review", _("In review")),
+    ("corrections", _("In correction")),
+    ("archived", _("Archived")),
+)
+
+WORK_STATUS_CHOICES = tuple(
+    (value, _("Awaiting analysis") if value == PS_PREVIEW else label)
+    for value, label in PACKAGE_STATUS
+)
+WORK_STATUS_LABELS = dict(WORK_STATUS_CHOICES)
 
 CRITICAL_ERROR_DECISION = (
     (PS_PENDING_CORRECTION, _("Awaiting corrections")),
@@ -98,20 +119,27 @@ QA_DECISION = (
     (PS_PENDING_CORRECTION, _("Request correction")),
     (PS_PENDING_QA_DECISION, _("Assign quality review")),
     (PS_READY_TO_PREVIEW, _("Publish on QA website")),
-    (PS_READY_TO_PUBLISH, _("Publish on public website")),
+    (PS_READY_TO_PUBLISH, _("Publish in Production")),
 )
 
 # Model Package, Field category
 PC_ERRATUM = "erratum"
 PC_UPDATE = "update"
+PC_ADDENDUM = "addendum"
+PC_RETRACTION = "retraction"
+PC_PARTIAL_RETRACTION = "partial-retraction"
 PC_NEW_DOCUMENT = "new-document"
 PC_SYSTEM_GENERATED = "generated-by-the-system"
 
 PACKAGE_CATEGORY = (
     (PC_UPDATE, _("Update")),
     (PC_ERRATUM, _("Erratum")),
+    (PC_ADDENDUM, _("Addendum")),
+    (PC_RETRACTION, _("Retraction")),
+    (PC_PARTIAL_RETRACTION, _("Partial retraction")),
     (PC_NEW_DOCUMENT, _("New document")),
 )
+
 
 # Model ValidationResult, campo que agrupo tipos de erro de validação, VR = Validation Report
 VR_XML_OR_DTD = "xml_or_dtd"
@@ -135,8 +163,6 @@ VAL_CAT_DATA_CONSISTENCY = "data-consistency"
 VAL_CAT_CRITERIA_ISSUES = "criteria-issues"
 VAL_CAT_ASSET = "asset"
 VAL_CAT_RENDITION = "rendition"
-VAL_CAT_RENDITION_CONTENT = "rendition-content"
-VAL_CAT_WEB_PAGE_CONTENT = "web-page-content"
 VAL_CAT_GROUP_DATA = "group"
 VAL_CAT_QA_CONCLUSION = "qa-conclusion"
 
@@ -176,6 +202,7 @@ VALIDATION_RESULT_CRITICAL = "CRITICAL"
 VALIDATION_RESULT_BLOCKING = "BLOCKING"
 VALIDATION_RESULT_UNKNOWN = "UKN"
 VALIDATION_RESULT_WARNING = "WARNING"
+VALIDATION_RESULT_INFO = "INFO"
 
 VALIDATION_RESULT = (
     (VALIDATION_RESULT_BLOCKING, _("Blocking")),
@@ -184,6 +211,13 @@ VALIDATION_RESULT = (
     (VALIDATION_RESULT_UNKNOWN, _("Unknown")),
     (VALIDATION_RESULT_WARNING, _("Warning")),
     (VALIDATION_RESULT_SUCCESS, _("OK")),
+)
+
+# Include informational results in presentation/filtering without changing model choices.
+VALIDATION_RESULT_DISPLAY = (
+    *VALIDATION_RESULT[:-1],
+    (VALIDATION_RESULT_INFO, _("Information")),
+    VALIDATION_RESULT[-1],
 )
 
 # Model ErrorResolution, Field action
@@ -235,27 +269,3 @@ WEBSITE_STATUS = (
     (PUBLISHED, _("published")),
     (DEPUBLISHED, _("depublished")),
 )
-
-
-REVIEW_STATUSES = (
-    PS_VALIDATED_WITH_ERRORS,
-    PS_PENDING_QA_DECISION,
-    PS_PREVIEW,
-)
-
-ARCHIVED_STATUSES = (PS_ARCHIVED, PS_DEPUBLISHED)
-
-QUEUE_LABELS = (
-    ("all", _("All")),
-    ("mine", _("My pending tasks")),
-    ("review", _("In review")),
-    ("corrections", _("In correction")),
-    ("archived", _("Archived")),
-)
-
-WORK_STATUS_CHOICES = tuple(
-    (value, _("Awaiting analysis") if value == PS_PREVIEW else label)
-    for value, label in PACKAGE_STATUS
-)
-
-WORK_STATUS_LABELS = dict(WORK_STATUS_CHOICES)

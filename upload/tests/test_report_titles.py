@@ -32,6 +32,7 @@ def test_report_is_reused_across_worker_languages_and_translated_for_display(
             assert report.title == "Assets Report"
             assert report.data["title"] == expected
             assert expected in str(report)
+
     assert len(set(report_ids)) == 1
 
 
@@ -49,9 +50,11 @@ def test_xml_report_group_and_decision_snapshot_remain_unchanged():
             assert (
                 report.display_title() == f'{gettext("XML Error Report")}: journal-meta'
             )
+            assert report.display_heading == gettext("Journal metadata")
             assert str(event.decision_display) == gettext("Request correction")
             assert event.detail["decision_label"] == "Solicitar correção"
             assert event.detail["comment"] == "Texto original do editor"
+
     assert report.title == "XML Error Report: journal-meta"
     assert (
         ValidationReport(title="Título personalizado").display_title()

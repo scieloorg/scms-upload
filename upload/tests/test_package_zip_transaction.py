@@ -60,6 +60,7 @@ def test_document_tracking_explains_pending_zip_extraction(client, settings):
     url = f"/admin/upload/documents/?pkg_zip_id={pkg_zip.pk}"
     response = client.get(url)
     pending_message = response.context["no_results_message"]
+
     assert "Processing runs in the background" in str(pending_message)
     assert (
         "show_package_validations"
@@ -73,6 +74,7 @@ def test_document_tracking_explains_pending_zip_extraction(client, settings):
         status=choices.PS_ENQUEUED_FOR_VALIDATION,
     )
     response = client.get(url)
+
     assert list(response.context["object_list"].values_list("name", flat=True)) == [
         "document"
     ]

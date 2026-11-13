@@ -126,7 +126,7 @@ class XMLDataChecker:
 
             validation_result = report.add_validation_result(
                 status=status_,
-                message=result.get("advice"),
+                message=result.get("message") or result.get("advice"),
                 data=result,
                 subject=subject,
             )

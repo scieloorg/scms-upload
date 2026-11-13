@@ -137,6 +137,7 @@ class PackageDecisionEditView(TeamScopedEditView):
             messages.success(self.request, self.success_message)
             return HttpResponseRedirect(self.get_success_url())
         messages.error(self.request, self.error_message)
+
         return self.form_invalid(form)
 
 

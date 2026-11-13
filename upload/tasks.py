@@ -30,11 +30,14 @@ from upload.models import (
     UploadValidator,
     ValidationReport,
 )
-from upload.publication_status import (
+from upload.publication_results import (
     PUBLICATION_ATTEMPT_PREFIX,
     PUBLICATION_FAILED,
     PUBLICATION_PUBLISHED,
     PUBLICATION_RUNNING,
+    destination_result,
+    publication_error_metadata,
+    record_publication_results,
 )
 from upload.utils import file_utils, package_utils
 from upload.validation.xml_data_checker import XMLDataChecker
@@ -623,8 +626,10 @@ def task_publish_article(
         completed = bool(websites) and set(websites).issubset(published)
         data["state"] = PUBLICATION_PUBLISHED if completed else PUBLICATION_FAILED
         data["websites"] = websites
-        data["publication"] = responses
         data["availability"] = article.is_available_on_website(collection)
+        data["publication"] = record_publication_results(
+            websites, responses, data["availability"]
+        )
         logging.info(data)
         op_main.finish(
             user,
@@ -643,7 +648,19 @@ def task_publish_article(
                 completed=False,
                 exception=e,
                 exc_traceback=exc_traceback,
-                detail={"state": PUBLICATION_FAILED, "websites": websites},
+                detail={
+                    **data,
+                    "state": PUBLICATION_FAILED,
+                    "websites": websites,
+                    "publication": record_publication_results(
+                        websites,
+                        responses
+                        or [
+                            destination_result(purpose, publication_error_metadata(e))
+                            for purpose in websites
+                        ],
+                    ),
+                },
             )
         else:
             UnexpectedEvent.create(

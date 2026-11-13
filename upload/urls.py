@@ -1,17 +1,47 @@
 from django.urls import path
 
+from upload.models import ValidationReport, XMLErrorReport, XMLInfoReport
 from upload.views.decisions import DelegateReviewView, assign
-from upload.views.documents import archive_package, display_xml, preview_document
+from upload.views.documents import (
+    archive_package,
+    display_xml,
+    download_document_events,
+    preview_document,
+)
 from upload.views.publication import republish_selected, retry_publication
-from upload.views.reports import download_errors, finish_deposit
+from upload.views.reports import ValidationReportView, download_errors, finish_deposit
 
 app_name = "upload"
 
 urlpatterns = [
     path(
+        "documents/<int:pk>/events/",
+        download_document_events,
+        name="download_document_events",
+    ),
+    path(
         "documents/<int:pk>/delegate/",
         DelegateReviewView.as_view(),
         name="delegate_review",
+    ),
+    path(
+        "reports/xml-errors/<int:pk>/",
+        ValidationReportView.as_view(model=XMLErrorReport, report_kind="xml-errors"),
+        name="xml_error_report",
+    ),
+    path(
+        "reports/package-checks/<int:pk>/",
+        ValidationReportView.as_view(
+            model=ValidationReport, report_kind="package-checks"
+        ),
+        name="package_validation_report",
+    ),
+    path(
+        "reports/xml-information/<int:pk>/",
+        ValidationReportView.as_view(
+            model=XMLInfoReport, report_kind="xml-information"
+        ),
+        name="xml_info_report",
     ),
     path("retry-publication", view=retry_publication, name="retry_publication"),
     path("assign", view=assign, name="assign"),
