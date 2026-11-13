@@ -993,12 +993,45 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
     @property
     def subdir(self):
+        """
+        Rota do pacote no MinIO
+
+        Padrão: <issn>/<acron>/<vol>/<num>/<artigo>
+        Documento em mais de uma coleção (ppx.collections, que recebe no
+        registro todas as coleções do periódico), quando o pacote está
+        vinculado a uma coleção: <col_acron>/<issn>/<acron>/...
+        evitando que o mesmo sps_pkg_name em coleções diferentes grave nos
+        mesmos objetos. Sem coleção vinculada, mantém a rota sem coleção.
+
+        Objetos já gravados não são movidos: as URIs registradas
+        (SPSPkgComponent.uri, xml_uri) continuam válidas e a rota nova só
+        vale para novas cargas.
+        """
         if not hasattr(self, "_subdir") or not self._subdir:
             sps_pkg_name = self.sps_pkg_name
             subdir = sps_pkg_name[:9]
             suffix = sps_pkg_name[10:]
-            self._subdir = os.path.join(subdir, "/".join(suffix.split("-")))
+            subdir = os.path.join(subdir, "/".join(suffix.split("-")))
+            collection_subdir = self.get_collection_subdir()
+            if collection_subdir:
+                subdir = os.path.join(collection_subdir, subdir)
+            self._subdir = subdir
         return self._subdir
+
+    def get_collection_subdir(self):
+        """
+        Pasta da coleção na rota do pacote no MinIO: acrônimo da coleção
+        do pacote, se o documento está em mais de uma coleção; senão, None
+        """
+        collection = self.collection
+        if (
+            collection
+            and collection.acron
+            and self.ppx_id
+            and self.ppx.collections.count() > 1
+        ):
+            return collection.acron
+        return None
 
     def upload_package_to_the_cloud(self, user, original_pkg_components, article_proc):
         self.save()
