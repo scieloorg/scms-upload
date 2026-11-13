@@ -279,7 +279,7 @@ class TaskMigrateAndPublishIssuesByCollectionTest(TestCase):
         mock_task_tracker.finish.assert_called_once()
         finish_call_kwargs = mock_task_tracker.finish.call_args.kwargs
         self.assertFalse(finish_call_kwargs["completed"])
-        self.assertEqual(len(finish_call_kwargs["detail"]["exceptions"]), 1)
+        self.assertEqual(len(finish_call_kwargs["detail"]["4_errors"]), 1)
 
     @patch.object(tasks.task_publish_issue, "apply_async")
     @patch("proc.tasks.migrate_issue")
