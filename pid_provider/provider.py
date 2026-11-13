@@ -24,6 +24,7 @@ class PidProvider(BasePidProvider):
         except (PidProviderXML.DoesNotExist, AttributeError):
             return None
 
+    # OBSOLETO: o pid v2 é corrigido por coleção em proc.models.ArticleProc.fix_pid_v2
     @profile_method
     def fix_pid_v2(self, user, pid_v3, correct_pid_v2):
         return PidProviderXML.fix_pid_v2(user, pid_v3, correct_pid_v2)
