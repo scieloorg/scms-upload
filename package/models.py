@@ -873,6 +873,7 @@ class SPSPkg(CommonControlField, ClusterableModel):
             components=[item.data for item in self.components.all()],
         )
 
+    # OBSOLETO: o pid v2 é corrigido por coleção em proc.models.ArticleProc.fix_pid_v2
     def fix_pid_v2(self, user, correct_pid_v2):
         return pid_provider_app.fix_pid_v2(user, self.pid_v3, correct_pid_v2)
 
