@@ -17,7 +17,7 @@
     {{ block.super }}
     
     <div class="nice-padding">
-        {% if status == 'required-erratum' or status == 'required-update' %}
+        {% if requested_changes %}
             <h3>{% trans "Article change instructions" %}</h3>
             {% for rac in requested_changes %}
                 <dl class='help-block help-info'>
@@ -25,10 +25,10 @@
                     <dd>{{ rac.id }}</dd>
                     <dt>{% trans 'Type' %}</dt>
                     <dd>{{ rac.get_change_type_display }}</dd>
-                    <dt>{% trans 'Deadline' %}</dt>
-                    <dd>{{ rac.deadline }}</dd>
+                    <dt>{% trans 'Status' %}</dt>
+                    <dd>{{ rac.get_status_display }}</dd>
                     <dt>{% trans 'Instructions' %}</dt>
-                    <dd>{{ rac.comment|richtext }}</dd>
+                    <dd>{{ rac.comment|linebreaksbr }}</dd>
                 </dl>
             {% endfor %}
         {% endif %}

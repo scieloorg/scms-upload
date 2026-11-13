@@ -1,5 +1,10 @@
 {% extends "wagtailadmin/tables/title_cell.html" %}
+{% load i18n %}
 
 {% block extra %}
-    <div class="document-category">{{ instance.get_category_display }}</div>
+    <div class="document-category">{{ instance.editorial_label }}</div>
+    {% if instance.has_published_version and instance.public_ws_status != 'published' %}
+        <div class="document-summary-note">{% trans "Published version preserved; change in progress" %}</div>
+        <a class="upload-link" href="{% url 'wagtailsnippets_upload_package:inspect' instance.pk %}?tab=history">{% trans "Document versions" %}</a>
+    {% endif %}
 {% endblock %}

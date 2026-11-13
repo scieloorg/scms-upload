@@ -502,6 +502,10 @@ class SPSPkg(CommonControlField, ClusterableModel):
 
             obj.save_pkg_zip_file(user, sps_pkg_zip_path, article_proc)
 
+            if origin == choices.PKG_ORIGIN_UPLOAD:
+                # QA revisions must not overwrite objects referenced by Production.
+                obj._subdir = None
+                obj._subdir = f"{obj.subdir}/submissions/{article_proc.pk}"
             obj.upload_package_to_the_cloud(user, original_pkg_components, article_proc)
             obj.validate(True)
 

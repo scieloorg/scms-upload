@@ -1,14 +1,20 @@
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
+from article.authorization import can_request_article_change
+from article.choices import RCS_PENDING, RCS_RECEIVED
+from article.models import RequestArticleChange
 from upload import choices
 from upload.authorization import user_can_act_on_package
+from upload.models import Package
+from upload.permission_policies import UploadModelPermissionPolicy
 from upload.permissions import FINISH_DEPOSIT, PUBLISH_PACKAGE, REQUEST_CORRECTION
 from upload.publication_results import (
     PUBLICATION_BLOCKED,
     PUBLICATION_FAILED,
     PUBLICATION_UNCONFIRMED,
 )
+from upload.querysets import get_scoped_package_queryset
 
 DOCUMENT_SECTIONS = (
     ("overview", _("Overview")),
@@ -89,6 +95,57 @@ def get_package_action_buttons(
     include_finish_deposit=False,
 ):
     buttons = []
+    if (
+        UploadModelPermissionPolicy(Package).user_has_any_permission(
+            user, ("view", "change")
+        )
+        and can_request_article_change(user, package.article)
+        and get_scoped_package_queryset(user).filter(pk=package.pk).exists()
+        and not RequestArticleChange.objects.filter(
+            article_id=package.article_id,
+            status__in=(RCS_PENDING, RCS_RECEIVED),
+        ).exists()
+    ):
+        buttons.append(
+            button_class(
+                _("Request document change"),
+                icon_name="edit",
+                url=reverse("upload:request_article_change", args=[package.pk]),
+                priority=20,
+            )
+        )
+
+    if package.can_retry_processing(user):
+        originals = (
+            get_scoped_package_queryset(user)
+            .filter(name=package.name)
+            .exclude(pk=package.pk)
+            .exclude(status__in=(choices.PS_UNEXPECTED, choices.PS_ARCHIVED))
+        )
+        if package.article_id:
+            originals = originals.filter(article_id=package.article_id)
+        elif package.journal_id:
+            originals = originals.filter(journal_id=package.journal_id)
+        original = originals.order_by("-created", "-pk").first()
+        if original and originals.values("article_id").distinct().count() == 1:
+            buttons.append(
+                button_class(
+                    _("Open related document"),
+                    icon_name="doc-full",
+                    url=reverse(
+                        "wagtailsnippets_upload_package:inspect", args=[original.pk]
+                    ),
+                    priority=34,
+                )
+            )
+        buttons.append(
+            button_class(
+                _("Reprocess"),
+                icon_name="rotate",
+                url=reverse("upload:retry_processing") + f"?package_id={package.pk}",
+                priority=35,
+            )
+        )
 
     if not package.is_validation_finished:
         return buttons

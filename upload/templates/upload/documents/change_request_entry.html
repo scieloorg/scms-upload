@@ -1,0 +1,25 @@
+{% load i18n %}
+<article class="document-change-request">
+    <dl class="document-request-fields upload-fields">
+        <div>
+            <dt>{% trans "Type of change" %}</dt>
+            <dd>{{ change_request.get_change_type_display }}</dd>
+        </div>
+        <div>
+            <dt>{% trans "Request status" %}</dt>
+            <dd>{{ change_request.get_status_display }}</dd>
+        </div>
+        <div>
+            <dt>{% trans "Requested by" %}</dt>
+            <dd>{{ change_request.creator }}</dd>
+        </div>
+        <div>
+            <dt>{% trans "Requested on" %}</dt>
+            <dd><time datetime="{{ change_request.created|date:'c' }}">{{ change_request.created }}</time></dd>
+        </div>
+    </dl>
+    {% if change_request.comment %}
+        <p class="document-change-reason upload-field-label">{% trans "Reason for change" %}</p>
+        <div>{{ change_request.comment|linebreaks }}</div>
+    {% endif %}
+</article>

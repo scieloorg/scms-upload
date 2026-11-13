@@ -78,6 +78,18 @@ QUEUE_ICONS = {
 }
 
 
+def document_listing_attempts(queryset, params, *, queue=None):
+    package_id = params.get("pkg_zip_id", "")
+    if package_id.isdecimal():
+        return queryset.filter(pkg_zip_id=package_id)
+    if queue is None:
+        queue = params.get("queue", "all")
+    if queue == "archived" or params.get("status") in choices.ARCHIVED_STATUSES:
+        return queryset
+
+    return Package.active_document_attempts(queryset)
+
+
 class PackageIndexView(SnippetIndexView):
     def get_list_more_buttons(self, instance):
         buttons = super().get_list_more_buttons(instance)
@@ -100,7 +112,7 @@ class PackageIndexView(SnippetIndexView):
         selected = self.request.GET.get("queue", "all")
         context["document_queues"] = []
         for key, label in choices.QUEUE_LABELS:
-            queue_base = base
+            queue_base = document_listing_attempts(base, self.request.GET, queue=key)
             queue_base = DocumentFilterSet(
                 self.request.GET, queryset=queue_base, request=self.request
             ).qs
@@ -231,6 +243,7 @@ class PackageAdminInspectView(TeamScopedInspectView):
         return {
             "state": state,
             "is_decision": is_decision,
+            "is_change_request": event.name == "request_article_change",
             "is_delegation": is_delegation,
             "previous_assignee": detail.get("previous_assignee"),
             "comment": detail.get("comment"),
@@ -271,6 +284,9 @@ class PackageAdminInspectView(TeamScopedInspectView):
         )
 
         return {
+            "document_versions": Package.document_versions(
+                get_scoped_package_queryset(self.request.user), self.object
+            ),
             "history_filter": history_filter,
             "timeline_events": [
                 self.get_event_context(
@@ -329,6 +345,7 @@ class PackageAdminInspectView(TeamScopedInspectView):
         )
         data = {
             "document_identity": self.object.document_identity,
+            "article_change_requests": self.object.article_change_requests,
             "validation_in_progress": validation_in_progress,
             "active_tab": active_tab,
             "document_sections": get_document_sections(self.object.pk, active_tab),

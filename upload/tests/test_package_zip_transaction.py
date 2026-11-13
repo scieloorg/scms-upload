@@ -4,10 +4,13 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.test import RequestFactory
 
+from article.models import CHANGE_REQUEST_REQUIRED
 from upload.models import Package, PackageZip, choices
+from upload.tasks import task_receive_packages
 from upload.views.submissions import PackageZipCreateView
 
 
@@ -80,3 +83,45 @@ def test_document_tracking_explains_pending_zip_extraction(client, settings):
     ]
     assert response.context["no_results_message"] != pending_message
     assert client.get("/admin/upload/documents/add/").status_code in (302, 403)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_rejected_submission_keeps_its_document_and_diagnostic(report_scope):
+    scope = report_scope
+    original = scope.package_1
+    original.status = choices.PS_PUBLISHED
+    original.public_ws_status = choices.PUBLISHED
+    original.save(update_fields=["status", "public_ws_status"])
+    submission = PackageZip.objects.create(creator=scope.company_user)
+
+    def split(pkg_zip, user):
+        yield {
+            "package": Package.objects.create(
+                creator=user,
+                pkg_zip=pkg_zip,
+                journal=original.journal,
+                name=original.name,
+            )
+        }
+
+    with (
+        patch.object(PackageZip, "split", split),
+        patch(
+            "upload.tasks.prepare_package_reception",
+            side_effect=ValidationError(CHANGE_REQUEST_REQUIRED),
+        ),
+        patch("upload.tasks.task_receive_package.apply_async") as enqueue,
+    ):
+        task_receive_packages.run(scope.company_user.pk, submission.pk)
+
+    rejected = submission.packages.get()
+    result = rejected.validation_report.get().validation_results.get()
+
+    assert rejected.status == choices.PS_UNEXPECTED
+    assert result.status == choices.VALIDATION_RESULT_BLOCKING
+    assert result.message == str(CHANGE_REQUEST_REQUIRED)
+    enqueue.assert_not_called()
+
+    original.refresh_from_db()
+    assert original.status == choices.PS_PUBLISHED
+    assert original.public_ws_status == choices.PUBLISHED

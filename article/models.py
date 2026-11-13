@@ -3,33 +3,52 @@ import traceback
 from datetime import datetime, timezone
 
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError, models
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import IntegrityError, models, transaction
 from django.db.models import Count, Max, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from packtools.sps.models.article_titles import ArticleTitles
 from packtools.sps.models.article_toc_sections import ArticleTocSections
-from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel, TabbedInterface, ObjectList
+from wagtail.admin.panels import (
+    FieldPanel,
+    InlinePanel,
+    MultiFieldPanel,
+    ObjectList,
+    TabbedInterface,
+)
 from wagtail.models import Orderable
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
-from core.widgets import ReadOnlyPrettyJSONWidget
-from migration import choices as migration_choices
-from migration.models import ClassicWebsiteConfiguration
-from article.page_checker import check_url, check_content, format_url, format_classic_url
+from article.authorization import can_request_article_change
 from article.forms import ArticleForm, RelatedItemForm, RequestArticleChangeForm
-from collection.choices import PUBLIC
-from collection.models import Language, Collection, WebSiteConfiguration
+from article.page_checker import (
+    check_content,
+    check_url,
+    format_classic_url,
+    format_url,
+)
+from collection.models import Collection, Language, WebSiteConfiguration
 from core.models import CommonControlField, HTMLTextModel
+from core.widgets import ReadOnlyPrettyJSONWidget
 from doi.models import DOIWithLang
 from issue.models import TOC, Issue, TocSection
 from journal.models import Journal, JournalSection, OfficialJournal
+from migration import choices as migration_choices
+from migration.models import ClassicWebsiteConfiguration
 from package.models import SPSPkg
-from pid_provider.models import PidProviderXML
 from pid_provider.choices import PPXML_STATUS_INVALID
+from pid_provider.models import PidProviderXML
+from upload import choices as upload_choices
+
 from . import choices
 from .permissions import MAKE_ARTICLE_CHANGE, REQUEST_ARTICLE_CHANGE
+
+CHANGE_REQUEST_REQUIRED = _(
+    "This document is already published in Production. Open the original document "
+    'and choose "Request document change" before sending a compatible replacement.'
+)
 
 User = get_user_model()
 
@@ -305,6 +324,43 @@ class Article(ClusterableModel, CommonControlField):
         return list(langs)
 
     # ── get / dedup ──
+
+    @classmethod
+    def identify(cls, pid_v3=None, pid_v2=None, doi=None, collection_acron=None):
+        """Resolve supplied identifiers without comparing the XML contents."""
+        identifiers = Q()
+        if pid_v3:
+            identifiers |= Q(pid_v3=pid_v3)
+        if pid_v2:
+            identifiers |= Q(pid_v2=pid_v2)
+        if doi:
+            identifiers |= Q(doi_with_lang__doi__iexact=doi)
+        if not identifiers:
+            return None
+
+        matches = list(cls.objects.filter(identifiers).distinct())
+        if len(matches) > 1:
+            raise ValidationError(
+                _("The submitted identifiers refer to different documents.")
+            )
+        if not matches:
+            return None
+
+        article = matches[0]
+        if pid_v3 and article.pid_v3 != pid_v3:
+            raise ValidationError(
+                _("The submitted identifiers refer to different documents.")
+            )
+        if (
+            collection_acron
+            and not article.journal.journal_collections.filter(
+                collection__acron=collection_acron
+            ).exists()
+        ):
+            raise ValidationError(
+                _("The submitted collection does not match the registered document.")
+            )
+        return article
 
     @classmethod
     def get(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, sps_pkg=None):
@@ -1218,6 +1274,148 @@ class RequestArticleChange(CommonControlField):
     article = models.ForeignKey(
         Article, on_delete=models.CASCADE, blank=True, null=True
     )
+    status = models.CharField(
+        _("Status"),
+        max_length=16,
+        choices=choices.REQUEST_CHANGE_STATUS,
+        default=choices.RCS_PENDING,
+    )
+    submission = models.ForeignKey(
+        "upload.PackageZip",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="change_requests",
+    )
+
+    was_public = models.BooleanField(default=False, editable=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["article"],
+                condition=Q(
+                    article__isnull=False,
+                    status__in=(choices.RCS_PENDING, choices.RCS_RECEIVED),
+                ),
+                name="unique_active_article_change_request",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if not self.article_id:
+            errors["article"] = _("Inform the article that needs to be changed")
+        if not self.comment or not self.comment.strip():
+            errors["comment"] = _("Comment what needs to be changed")
+        if self.change_type not in dict(choices.REQUEST_CHANGE_TYPE):
+            errors["change_type"] = _("Inform the type of change")
+        if errors:
+            raise ValidationError(errors)
+
+    @classmethod
+    @transaction.atomic
+    def request(cls, user, article, change_type, comment):
+        """Serialize requests per article without changing its publication state."""
+        if not article or not article.pk:
+            raise ValidationError({"article": _("Inform the article to change")})
+        article = Article.objects.select_for_update(of=("self",)).get(pk=article.pk)
+        change_request = cls(
+            creator=user,
+            article=article,
+            change_type=change_type,
+            comment=comment,
+        )
+        change_request.clean()
+        if not can_request_article_change(user, article, change_type):
+            raise PermissionDenied
+        change_request.was_public = True
+        if cls.objects.filter(
+            article=article,
+            status__in=(choices.RCS_PENDING, choices.RCS_RECEIVED),
+        ).exists():
+            raise ValidationError(_("This article already has an active change request"))
+        change_request.full_clean()
+        change_request.save()
+        return change_request
+
+    @transaction.atomic
+    def cancel(self, user):
+        """Cancel only pending requests, preserving the original article/packages."""
+        current = type(self).objects.select_for_update(of=("self",)).get(pk=self.pk)
+        if current.status != choices.RCS_PENDING:
+            raise ValidationError(_("Only pending requests can be cancelled"))
+        if not can_request_article_change(user, current.article, current.change_type):
+            raise PermissionDenied
+        current.status = choices.RCS_CANCELLED
+        current.updated_by = user
+        current.save(update_fields=["status", "updated_by", "updated"])
+        self.refresh_from_db()
+        return self
+
+    @classmethod
+    def active_for_submission(cls, article, submission):
+        try:
+            change_request = cls.objects.select_for_update(of=("self",)).get(
+                article=article,
+                status__in=(choices.RCS_PENDING, choices.RCS_RECEIVED),
+            )
+        except cls.DoesNotExist:
+            raise ValidationError(CHANGE_REQUEST_REQUIRED)
+
+        if (
+            change_request.submission_id
+            and change_request.submission_id != submission.pk
+        ):
+            if change_request.packages.filter(
+                pkg_zip_id=change_request.submission_id,
+                status__in=(*upload_choices.PS_WIP, upload_choices.PS_PUBLISHED),
+            ).exists():
+                raise ValidationError(
+                    _("This change request already has a submission in progress.")
+                )
+        return change_request
+
+    def receive_submission(self, user, submission):
+        if (
+            self.submission_id == submission.pk
+            and self.status == choices.RCS_RECEIVED
+            and self.was_public
+        ):
+            return
+
+        self.submission = submission
+        self.status = choices.RCS_RECEIVED
+        self.updated_by = user
+        self.was_public = True
+        self.save(
+            update_fields=[
+                "submission",
+                "status",
+                "was_public",
+                "updated_by",
+                "updated",
+            ]
+        )
+
+    @transaction.atomic
+    def complete_if_published(self, user):
+        """Complete only when every linked package in this submission is public."""
+        current = type(self).objects.select_for_update(of=("self",)).get(pk=self.pk)
+        if current.status != choices.RCS_RECEIVED or not current.submission_id:
+            return False
+        packages = current.packages.filter(pkg_zip=current.submission)
+        required = 1 if current.change_type == choices.RCT_UPDATE else 2
+        if packages.count() < required or packages.exclude(
+            public_ws_status="published"
+        ).exists():
+            return False
+        current.status = choices.RCS_COMPLETED
+        current.updated_by = user
+        current.save(update_fields=["status", "updated_by", "updated"])
+        self.refresh_from_db()
+        return True
 
     panels = [
         AutocompletePanel("article"),

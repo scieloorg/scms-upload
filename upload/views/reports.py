@@ -190,6 +190,7 @@ class ValidationReportView(WagtailAdminTemplateMixin, TemplateView):
             is_xml_info=isinstance(self.report, XMLInfoReport),
             success_total=summary["success_total"],
             document_identity=self.report.package.document_identity,
+            article_change_requests=self.report.package.article_change_requests,
             report_title=self.report.display_heading,
             package_url=self.get_package_url(),
             results=self.get_results_context(form),

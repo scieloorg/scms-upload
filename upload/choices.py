@@ -140,6 +140,12 @@ PACKAGE_CATEGORY = (
     (PC_NEW_DOCUMENT, _("New document")),
 )
 
+CPR_ORIGINAL = "original"
+CPR_NOTICE = "notice"
+CHANGE_PACKAGE_ROLE = (
+    (CPR_ORIGINAL, _("Updated original")),
+    (CPR_NOTICE, _("Change notice")),
+)
 
 # Model ValidationResult, campo que agrupo tipos de erro de validação, VR = Validation Report
 VR_XML_OR_DTD = "xml_or_dtd"

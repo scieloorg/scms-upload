@@ -4,6 +4,8 @@ import traceback
 
 from celery import chord
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
@@ -16,13 +18,18 @@ from config import celery_app
 from issue.models import Issue
 from journal.models import Journal
 from package.models import SPSPkg
-from proc.controller import ensure_journal_data_is_updated, ensure_issue_data_is_updated
-from proc.models import JournalProc, IssueProc
+from proc.controller import ensure_issue_data_is_updated, ensure_journal_data_is_updated
+from proc.models import JournalProc
 from proc.tasks import TaskExecution
 from publication.api.issue import sync_issue
 from tracker.models import UnexpectedEvent
 from upload import choices, publication
-from upload.controller import receive_package
+from upload.controller import (
+    prepare_package_reception,
+    receive_package,
+    record_reception_failure,
+    reject_change_packages,
+)
 from upload.models import (
     Package,
     PackageZip,
@@ -246,24 +253,65 @@ def task_validate_renditions(package_id, xml_path, package_files, xml_renditions
 
 
 @celery_app.task(bind=True, priority=0)
-def task_receive_packages(self, user_id, pkg_zip_id):
-    logging.info(f"user_id: {user_id}")
-    logging.info(f"pkg_zip_id: {pkg_zip_id}")
+def task_receive_packages(self, user_id, pkg_zip_id, retry_package_id=None):
     user = User.objects.get(pk=user_id)
-    pkg_zip = PackageZip.objects.get(pk=pkg_zip_id)
-
-    for item in pkg_zip.split(user):
-        try:
-            logging.info(str(item))
-            task_receive_package.apply_async(
-                kwargs=dict(
-                    user_id=user_id,
-                    pkg_id=item["package"].id,
+    packages = []
+    try:
+        with transaction.atomic():
+            if pkg_zip_id:
+                pkg_zip = PackageZip.objects.select_for_update().get(pk=pkg_zip_id)
+                if retry_package_id:
+                    packages = list(pkg_zip.packages.select_for_update().order_by("pk"))
+                else:
+                    if pkg_zip.packages.exists():
+                        return
+                    packages = [
+                        item["package"]
+                        for item in pkg_zip.split(user)
+                        if item.get("package")
+                    ]
+            else:
+                packages = list(
+                    Package.objects.select_for_update().filter(pk=retry_package_id)
                 )
+
+        # Keep the extracted documents available for rejection diagnostics.
+        prepare_package_reception(
+            user, packages, task_receive_package, retry_package_id
+        )
+    except ValidationError as error:
+        rejected = (
+            [package for package in packages if package.pk == retry_package_id]
+            if retry_package_id
+            else packages
+        )
+        reject_change_packages(user, rejected, error)
+        if retry_package_id:
+            attempt = (
+                UploadProcResult.objects.filter(
+                    proc_id=retry_package_id, name="Try processing"
+                )
+                .order_by("-pk")
+                .first()
             )
-        except Exception as exc:
-            logging.exception(exc)
-            continue
+            if attempt:
+                attempt.finish(
+                    user,
+                    completed=False,
+                    detail={**attempt.detail, "state": "failed"},
+                )
+
+    except Exception as error:
+        record_reception_failure(
+            user,
+            (
+                [package for package in packages if package.pk == retry_package_id]
+                if retry_package_id
+                else packages
+            ),
+            error,
+        )
+        raise
 
 
 @celery_app.task(bind=True, priority=0)
@@ -273,7 +321,11 @@ def task_receive_package(self, user_id, pkg_id):
     user = User.objects.get(pk=user_id)
     package = Package.objects.get(pk=pkg_id)
 
-    response = receive_package(user, package)
+    try:
+        response = receive_package(user, package)
+    except Exception as error:
+        record_reception_failure(user, [package], error)
+        raise
 
     logging.info(response)
     if response.get("error_level") != choices.VALIDATION_RESULT_BLOCKING:

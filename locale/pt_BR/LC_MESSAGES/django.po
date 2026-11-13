@@ -525,6 +525,14 @@ msgstr "Publicar artigos"
 msgid "Busca e cria periódicos"
 msgstr "Buscar e criar revistas"
 
+#: bigbang/tasks_scheduler.py:413
+msgid "Busca e registra press releases"
+msgstr "Busca e registra press releases"
+
+#: bigbang/tasks_scheduler.py:439
+msgid "Republica artigos em lote"
+msgstr "Republica artigos em lote"
+
 #: bigbang/utils/scheduler.py:55 core/utils/scheduler.py:51
 msgid "Scheduled task: {}"
 msgstr "Tarefa agendada: {}"
@@ -1134,10 +1142,66 @@ msgstr "Nome"
 msgid "Host"
 msgstr "Host"
 
+#: files_storage/models.py:45
+msgid ""
+"Endpoint do object storage para gravação (sem https://). Ex.: "
+"s3.wasabisys.com."
+msgstr ""
+"Endpoint do armazenamento de objetos para gravação (sem https://). Ex.: "
+"s3.wasabisys.com."
+
+#: files_storage/models.py:49
+msgid "Host root dir"
+msgstr "Diretório raiz no servidor"
+
+#: files_storage/models.py:50
+msgid "Diretório raíz no servidor que contém o bucket. Ex.: scielo"
+msgstr "Diretório raiz no servidor que contém o bucket. Ex.: scielo"
+
+#: files_storage/models.py:55
+msgid "Bucket"
+msgstr "Bucket"
+
+#: files_storage/models.py:57
+msgid ""
+"Bucket no object storage (MinIO/S3/Wasabi) onde os arquivos são fisicamente "
+"gravados. Ex.: upload"
+msgstr ""
+"Bucket no armazenamento de objetos (MinIO/S3/Wasabi) onde os arquivos são "
+"fisicamente gravados. Ex.: upload"
+
+#: files_storage/models.py:62
+msgid "Public base URL"
+msgstr "URL pública base"
+
+#: files_storage/models.py:62
+msgid ""
+"URL pública base usada para montar a URI de leitura salva no banco. Deve já "
+"incluir o caminho público completo até os objetos (inclusive qualquer "
+"prefixo), pois o host_root_dir não é reaplicado aqui. Ex.: "
+"https://minio.scielo.br. Se vazia, a URI é gerada via presigned URL do "
+"próprio object storage. Leitura e gravação são independentes: garanta que "
+"esta URL sirva o mesmo conteúdo gravado sob host_root_dir"
+msgstr ""
+"URL pública base usada para montar a URI de leitura salva no banco. Deve já "
+"incluir o caminho público completo até os objetos (inclusive qualquer "
+"prefixo), pois host_root_dir não é reaplicado aqui. Ex.: "
+"https://minio.scielo.br. Se vazia, a URI é gerada por uma URL pré-assinada "
+"do próprio armazenamento de objetos. Leitura e gravação são independentes: "
+"garanta que esta URL sirva o mesmo conteúdo gravado em host_root_dir"
+
 #: files_storage/models.py:67 location/models.py:235
 #: location/wagtail_hooks.py:14
 msgid "Location"
 msgstr "Localização"
+
+#: files_storage/models.py:73
+msgid ""
+"Região usada ao criar o bucket (ex.: us-east-1). Deixe vazio se o provedor "
+"não exigir."
+msgstr ""
+"Região usada ao criar o bucket (ex.: us-east-1). Deixe vazio se o provedor "
+"não exigir."
 
 #: files_storage/models.py:77
 msgid "Access key"
@@ -1150,6 +1214,13 @@ msgstr "Chave secreta"
 #: files_storage/models.py:81
 msgid "Secure"
 msgstr "Seguro"
+
+#: files_storage/models.py:81
+msgid ""
+"Usar HTTPS na conexão com o object storage. Mantenha marcado em produção."
+msgstr ""
+"Usar HTTPS na conexão com o armazenamento de objetos. Mantenha marcado em "
+"produção."
 
 #: files_storage/models.py:342
 msgid "Basename"
@@ -1274,6 +1345,22 @@ msgstr "Conversões de HTML para XML"
 msgid "Quality"
 msgstr "Qualidade"
 
+#: htmlxml/models.py:611
+msgid "Initial HTML file"
+msgstr "Arquivo HTML inicial"
+
+#: htmlxml/models.py:612
+msgid "Initial HTML structured in body, back, ref-list"
+msgstr "HTML inicial estruturado em body, back e ref-list"
+
+#: htmlxml/models.py:619
+msgid "Body and Back ZIP file"
+msgstr "Arquivo ZIP de body e back"
+
+#: htmlxml/models.py:620
+msgid "ZIP file containing all body and back XML versions"
+msgstr "Arquivo ZIP com todas as versões XML de body e back"
+
 #: htmlxml/models.py:635
 msgid "Body and Back XML files"
 msgstr "Arquivos XML body e back"
@@ -1293,6 +1380,10 @@ msgid ""
 msgstr ""
 "Não foi possível criar ou atualizar o registro da conversão de HTML para XML"
 " de {} {} {}"
+
+#: htmlxml/models.py:929
+msgid "Error generating HTML to XML report: {} {}"
+msgstr "Erro ao gerar o relatório de HTML para XML: {} {}"
 
 #: institution/choices.py:13
 msgid "agência de apoio à pesquisa"
@@ -1511,6 +1602,10 @@ msgstr "Proprietário"
 msgid "Publisher"
 msgstr "Editora"
 
+#: journal/models.py:294
+msgid "Sponsor"
+msgstr "Patrocinador"
+
 #: journal/models.py:298 journal/models.py:305
 msgid "Mission"
 msgstr "Missão"
@@ -1519,6 +1614,10 @@ msgstr "Missão"
 #: upload/templates/modeladmin/upload/package/validation_report/digital_assets_and_renditions.html:23
 msgid "Identification"
 msgstr "Identificação"
+
+#: journal/models.py:304
+msgid "Institutions"
+msgstr "Instituições"
 
 #: journal/models.py:642
 msgid "Journal Title"
@@ -1552,6 +1651,10 @@ msgstr "Código da licença"
 msgid "WoS Areas"
 msgstr "Áreas WoS"
 
+#: journal/models.py:652
+msgid "Journal acronym"
+msgstr "Sigla da revista"
+
 #: journal/models.py:663 journal/tests/test_core_metadata.py:65
 #: pid_provider/models.py:380
 #: upload/templates/upload/documents/inspect/files.html:32
@@ -1584,9 +1687,17 @@ msgstr "editora"
 msgid "study area"
 msgstr "área de estudo"
 
+#: journal/models.py:692
+msgid "history for {}"
+msgstr "histórico de {}"
+
 #: journal/models.py:695 journal/models.py:941
 msgid "Journal collection"
 msgstr "Revista na coleção"
+
+#: journal/models.py:937
+msgid "Journal history"
+msgstr "Histórico da revista"
 
 #: journal/models.py:942
 msgid "Journal collections"
@@ -1624,6 +1735,10 @@ msgstr "Eventos da revista na coleção"
 #: upload/models.py:254
 msgid "Journal"
 msgstr "Revista"
+
+#: journal/wagtail_hooks.py:67
+msgid "Journal Collection"
+msgstr "Revista na coleção"
 
 #: journal/wagtail_hooks.py:93
 msgid "Journals"
@@ -1693,6 +1808,46 @@ msgstr "A ignorar"
 msgid "Imported"
 msgstr "Importado"
 
+#: migration/choices.py:35
+msgid "Missing"
+msgstr "Ausente"
+
+#: migration/choices.py:36
+msgid "Matched"
+msgstr "Correspondente"
+
+#: migration/choices.py:37
+msgid "Exceeding"
+msgstr "Excedente"
+
+#: migration/choices.py:40
+msgid "Published but not found"
+msgstr "Publicado, mas não encontrado"
+
+#: migration/choices.py:41
+msgid "Published and content valid"
+msgstr "Publicado e com conteúdo válido"
+
+#: migration/choices.py:42
+msgid "Published and mismatched content"
+msgstr "Publicado e com conteúdo divergente"
+
+#: migration/choices.py:43
+msgid "Classic and matched content"
+msgstr "Clássico e com conteúdo correspondente"
+
+#: migration/choices.py:44
+msgid "Classic and mismatched content"
+msgstr "Clássico e com conteúdo divergente"
+
+#: migration/choices.py:45
+msgid "Classic found"
+msgstr "Encontrado no site clássico"
+
+#: migration/choices.py:46
+msgid "Classic not found"
+msgstr "Não encontrado no site clássico"
+
 #: migration/controller.py:701
 msgid "Unable to get xml with pre from migrated article ({}) {}: {} {}"
 msgstr ""
@@ -1702,6 +1857,10 @@ msgstr ""
 #: migration/controller.py:767
 msgid "IdFileRecord is already up-to-date with acron.id"
 msgstr "IdFileRecord já está atualizado com acron.id"
+
+#: migration/models.py:69
+msgid "Collection URL"
+msgstr "URL da coleção"
 
 #: migration/models.py:72
 msgid "Title path"
@@ -1907,6 +2066,10 @@ msgstr "duplicado"
 msgid "deduplicated"
 msgstr "deduplicado"
 
+#: pid_provider/choices.py:24
+msgid "unmatched journal or issue"
+msgstr "revista ou fascículo sem correspondência"
+
 #: pid_provider/client.py:145
 msgid "Unable to get api token {} {} {} {} {}"
 msgstr "Não foi possível obter o token da API {} {} {} {} {}"
@@ -2028,6 +2191,10 @@ msgstr "Data de origem"
 msgid "Available since"
 msgstr "Disponível desde"
 
+#: pid_provider/models.py:439
+msgid "Readable data"
+msgstr "Dados legíveis"
+
 #: pid_provider/models.py:463
 msgid "Other PID"
 msgstr "Outro PID"
@@ -2053,6 +2220,10 @@ msgstr ""
 "O conteúdo do XML é uma versão ahead of print, mas o documento {} já está "
 "publicado em um fascículo"
 
+#: pid_provider/models.py:1146
+msgid "{} belongs to {}, not to {}"
+msgstr "{} pertence a {}, não a {}"
+
 #: pid_provider/models.py:1611
 msgid "Incorrect v2"
 msgstr "v2 incorreto"
@@ -2060,6 +2231,34 @@ msgstr "v2 incorreto"
 #: pid_provider/models.py:1614
 msgid "Correct v2"
 msgstr "v2 correto"
+
+#: pid_provider/models.py:1752
+msgid "Gravar todos os eventos de auditoria"
+msgstr "Gravar todos os eventos de auditoria"
+
+#: pid_provider/models.py:1754
+msgid ""
+"Quando ativo, grava auditoria em PidProviderXMLRegistration mesmo para "
+"fluxos limpos (created, updated, skipped)."
+msgstr ""
+"Quando ativo, grava auditoria em PidProviderXMLRegistration mesmo para "
+"fluxos sem problemas (created, updated, skipped)."
+
+#: pid_provider/models.py:1764
+msgid "Configurações do PID Provider"
+msgstr "Configurações do provedor de PID"
+
+#: pid_provider/models.py:1808
+msgid "Event status"
+msgstr "Estado do evento"
+
+#: pid_provider/models.py:1827
+msgid "PidProviderXML Registration"
+msgstr "Registro de PidProviderXML"
+
+#: pid_provider/models.py:1828
+msgid "PidProviderXML Registrations"
+msgstr "Registros de PidProviderXML"
 
 #: pid_provider/query_params.py:185
 msgid "Required Print or Electronic ISSN to identify XML {}"
@@ -2087,6 +2286,10 @@ msgstr "Corrigir PID v2"
 msgid "XML Versions"
 msgstr "Versões do XML"
 
+#: pid_provider/wagtail_hooks.py:202
+msgid "PID Registration Events"
+msgstr "Eventos de registro de PID"
+
 #: pid_provider/wagtail_hooks.py:234
 msgid "Pid Provider"
 msgstr "Provedor de PID"
@@ -2106,6 +2309,10 @@ msgstr "Relatório de processamento"
 #: proc/models.py:290
 msgid "Processing reports"
 msgstr "Relatórios de processamento"
+
+#: proc/models.py:450
+msgid "Registration Status"
+msgstr "Situação do registro"
 
 #: proc/models.py:457
 msgid "QA Website Status"
@@ -2165,6 +2372,10 @@ msgstr "Situação do XML"
 msgid "SPS Pkg status"
 msgstr "Situação do pacote SPS"
 
+#: proc/models.py:2040
+msgid "PID Status"
+msgstr "Situação do PID"
+
 #: proc/models.py:2048
 msgid "Processed XML"
 msgstr "XML processado"
@@ -2176,6 +2387,10 @@ msgstr "XML nativo com modificações ou XML convertido de HTML"
 #: proc/models.py:2218
 msgid "Unable to update article_proc{} {} {} {}"
 msgstr "Não foi possível atualizar article_proc{} {} {} {}"
+
+#: proc/models.py:2280
+msgid "Unable to get xml_with_pre from native for {}: {}"
+msgstr "Não foi possível obter xml_with_pre de native para {}: {}"
 
 #: proc/models.py:2332
 msgid "Unable to get xml_with_pre for {}: {}"
@@ -2189,6 +2404,26 @@ msgstr ""
 #: proc/models.py:2633
 msgid "No migrated XML file found for {} ({})"
 msgstr "Nenhum arquivo XML migrado foi encontrado para {} ({})"
+
+#: proc/source_core_api.py:411
+msgid "Missing SciELO Journal {} registration at core.scielo.org"
+msgstr "Registro da revista SciELO {} ausente em core.scielo.org"
+
+#: proc/source_core_api.py:458
+msgid "Unable to get journal collection data for {}"
+msgstr "Não foi possível obter os dados da coleção da revista para {}"
+
+#: proc/wagtail_hooks.py:24
+msgid "Has Images"
+msgstr "Possui imagens"
+
+#: proc/wagtail_hooks.py:31
+msgid "Has Tables"
+msgstr "Possui tabelas"
+
+#: proc/wagtail_hooks.py:38
+msgid "Has Attention Demands"
+msgstr "Possui demandas de atenção"
 
 #: proc/wagtail_hooks.py:81
 msgid "Journal Processing"
@@ -2557,6 +2792,41 @@ msgstr "Tentar publicar novamente"
 
 msgid "Retry"
 msgstr "Tentar novamente"
+
+#, python-format
+msgid "Original updated via %(category)s"
+msgstr "Original atualizado via %(category)s"
+
+#, python-format
+msgid "Original amended via %(category)s"
+msgstr "Original alterado via %(category)s"
+
+msgid "Type of change"
+msgstr "Tipo de alteração"
+
+msgid "Request status"
+msgstr "Situação da solicitação"
+
+msgid "Requested by"
+msgstr "Solicitado por"
+
+msgid "Requested on"
+msgstr "Data da solicitação"
+
+msgid "Reason for change"
+msgstr "Motivo da alteração"
+
+msgid "Erratum notice"
+msgstr "Aviso de errata"
+
+msgid "Addendum notice"
+msgstr "Aviso de adendo"
+
+msgid "Retraction notice"
+msgstr "Aviso de retratação"
+
+msgid "Partial retraction notice"
+msgstr "Aviso de retratação parcial"
 
 #: upload/bulk_actions/republish.py:76
 #, python-format
@@ -3999,6 +4269,14 @@ msgstr ""
 msgid "Yes, republish"
 msgstr "Sim, republicar"
 
+#: upload/templates/upload/decisions/delegate.html:12
+msgid ""
+"Assigning a reviewer does not change the document decision or publication "
+"status."
+msgstr ""
+"A atribuição de um avaliador não altera a decisão nem a situação da "
+"publicação do documento."
+
 #: upload/templates/upload/decisions/edit.html:14
 #: upload/templates/upload/validationresult/inspect.html:12
 msgid "Back to document"
@@ -4278,6 +4556,10 @@ msgstr "Nenhum resultado corresponde a estes filtros."
 msgid "No results are available yet."
 msgstr "Nenhum resultado está disponível ainda."
 
+#: upload/templates/upload/reports/detail.html:97
+msgid "Save responses"
+msgstr "Salvar respostas"
+
 #: upload/templates/upload/reports/result.html:12
 msgid "Reference"
 msgstr "Referência"
@@ -4522,6 +4804,13 @@ msgstr "Pacotes"
 msgid "Actions"
 msgstr "Ações"
 
+#: upload/wagtail_hooks.py:320
+msgid "Document versions"
+msgstr "Versões do documento"
+
+msgid "Published version preserved; change in progress"
+msgstr "Versão publicada preservada; alteração em andamento"
+
 msgid "Information"
 msgstr "Informação"
 
@@ -4571,13 +4860,252 @@ msgstr "Consulta técnica"
 msgid "Settings"
 msgstr "Configurações"
 
+#: article/choices.py:25
+msgid "Received"
+msgstr "Recebido"
+
+#: article/choices.py:27
+msgid "Cancelled"
+msgstr "Cancelado"
+
+#: article/forms.py:73
+msgid "Change requests must be saved through the request workflow"
+msgstr ""
+"As solicitações de alteração devem ser salvas pelo fluxo de solicitações"
+
+#: article/models.py:1250
+msgid "Published original XML"
+msgstr "XML original publicado"
+
+#: article/models.py:1283
+msgid "Inform the article to change"
+msgstr "Informe o artigo a ser alterado"
+
+#: article/models.py:1299
+msgid "This article already has an active change request"
+msgstr "Este artigo já tem uma solicitação de alteração ativa"
+
+#: article/models.py:1309
+msgid "Only pending requests can be cancelled"
+msgstr "Somente solicitações pendentes podem ser canceladas"
+
 #: upload/admin_buttons.py:107 upload/change_views.py:19
 #: upload/change_views.py:52 upload/document_views.py:44
 msgid "Request document change"
 msgstr "Solicitar alteração"
 
+#: upload/article_changes.py:71 upload/article_changes.py:74
+msgid "The submitted XML identifies more than one article."
+msgstr "O XML enviado identifica mais de um artigo."
+
+#: upload/article_changes.py:88
+msgid ""
+"The original article needs an active, compatible change request before "
+"reception."
+msgstr ""
+"O artigo original precisa de uma solicitação de alteração ativa e compatível"
+" antes do recebimento."
+
+#: upload/article_changes.py:97
+msgid "This change request already has a submission in progress."
+msgstr "Esta solicitação de alteração já tem uma submissão em andamento."
+
+#: upload/article_changes.py:135
+msgid ""
+"The published XML could not be verified. The previous submission was "
+"preserved."
+msgstr ""
+"Não foi possível verificar o XML publicado. A submissão anterior foi "
+"preservada."
+
+#: upload/article_changes.py:143
+msgid "The original journal must have registered ISSNs."
+msgstr "A revista do artigo original deve ter ISSNs cadastrados."
+
+#: upload/article_changes.py:156
+msgid "The notice and updated original must belong to the authorized journal."
+msgstr "O aviso e o original atualizado devem pertencer à revista autorizada."
+
+#: upload/article_changes.py:175
+msgid "Change documents must be received in one submitted package."
+msgstr ""
+"Os documentos de alteração devem ser recebidos em um único pacote enviado."
+
+#: upload/article_changes.py:186 upload/article_changes.py:197
+msgid "This submission no longer belongs to an active change request."
+msgstr ""
+"Esta submissão não pertence mais a uma solicitação de alteração ativa."
+
+#: upload/article_changes.py:228
+msgid "An authorized depositor is required."
+msgstr "É necessário um depositante autorizado."
+
+#: upload/article_changes.py:236
+msgid "The depositor is not authorized for the original article."
+msgstr "O depositante não está autorizado para o artigo original."
+
+#: upload/article_changes.py:267
+msgid "A change notice must identify its original article by DOI."
+msgstr "Um aviso de alteração deve identificar seu artigo original pelo DOI."
+
+#: upload/article_changes.py:274
+msgid "Submit the updated original XML together with its change notice."
+msgstr "Envie o XML original atualizado junto com seu aviso de alteração."
+
+#: upload/article_changes.py:282
+msgid "The notice must refer to an already public original article."
+msgstr "O aviso deve se referir a um artigo original já público."
+
+#: upload/article_changes.py:288
+msgid ""
+"The notice type does not match the active request on the original article."
+msgstr ""
+"O tipo de aviso não corresponde à solicitação ativa do artigo original."
+
+#: upload/article_changes.py:297
+msgid "Keep the previously published original filename in the change package."
+msgstr ""
+"Mantenha o nome do arquivo original publicado anteriormente no pacote de "
+"alteração."
+
+#: upload/article_changes.py:317
+msgid "A submitted document has conflicting change roles."
+msgstr "Um documento enviado tem funções de alteração conflitantes."
+
+#: upload/article_changes.py:329
+msgid ""
+"This request requires both a change notice and the updated original, in XML "
+"and PDF."
+msgstr ""
+"Esta solicitação exige tanto um aviso de alteração quanto o original "
+"atualizado, em XML e PDF."
+
+#: upload/choices.py:128
+msgid "Updated original"
+msgstr "Original atualizado"
+
+#: upload/choices.py:129
+msgid "Change notice"
+msgstr "Aviso de alteração"
+
+#: upload/controller.py:181 upload/controller.py:188
+msgid "Article change package"
+msgstr "Pacote de alteração do artigo"
+
+#: upload/controller.py:392
+msgid "The depositor is not authorized for the registered article."
+msgstr "O depositante não está autorizado para o artigo cadastrado."
+
+#: upload/controller.py:419
+msgid "The received original differs from the authorized article."
+msgstr "O original recebido difere do artigo autorizado."
+
+#: upload/controller.py:428
+msgid ""
+"The public article needs an active, compatible change request before "
+"reception."
+msgstr ""
+"O artigo público precisa de uma solicitação de alteração ativa e compatível "
+"antes do recebimento."
+
+#: upload/forms.py:98
+msgid ""
+"Describe the requested change. Errata, addenda and retractions require a "
+"notice and the updated original document (XML/PDF)."
+msgstr ""
+"Descreva a alteração solicitada. Erratas, adendos e retratações exigem um "
+"aviso e o documento original atualizado (XML/PDF)."
+
+#: upload/models.py:323
+msgid "Article change requests"
+msgstr "Solicitações de alteração do artigo"
+
+#: upload/models.py:328
+msgid "Change package role"
+msgstr "Função no pacote de alteração"
+
+#: upload/models.py:741
+msgid "Republish the latest public submission, not a previous version."
+msgstr "Republique a última submissão pública, não uma versão anterior."
+
+#: upload/models.py:747
+msgid "Publication requires the current, received article change request."
+msgstr "A publicação exige a solicitação atual de alteração do artigo, já recebida."
+
+#: upload/models.py:754
+msgid ""
+"Approve the notice and all updated originals before publication in "
+"Production."
+msgstr ""
+"Aprove o aviso e todos os originais atualizados antes da publicação em "
+"Produção."
+
+#: upload/templates/upload/changes/request.html:12
+msgid ""
+"This request does not change the published document or its publication "
+"status. Submit the corrected content separately for review."
+msgstr ""
+"Esta solicitação não altera o documento publicado nem sua situação de "
+"publicação. Envie o conteúdo corrigido separadamente para avaliação."
+
+#: upload/templates/upload/documents/change_requests.html:3
+#: upload/templates/upload/documents/change_requests.html:4
+msgid "Document change requests"
+msgstr "Solicitações de alteração do documento"
+
+#: upload/templates/upload/documents/change_requests.html:16
+msgid "Change request history"
+msgstr "Histórico de solicitações de alteração"
+
+#: upload/change_views.py:83
+msgid "Document change requested."
+msgstr "Alteração do documento solicitada."
+
+msgid "Published, awaiting access verification"
+msgstr "Publicado, aguardando verificação de acesso"
+
 msgid "The previous request may have been received. Check the destination before confirming another publication."
 msgstr "A solicitação anterior pode ter sido recebida. Confira o destino antes de confirmar outra publicação."
+
+msgid "Reprocess"
+msgstr "Reprocessar"
+
+msgid "Try processing"
+msgstr "Tentar processamento"
+
+msgid "Process the existing ZIP again without creating a new submission?"
+msgstr "Processar novamente o ZIP existente sem criar um novo envio?"
+
+msgid "No interrupted processing is available to retry."
+msgstr "Não há processamento interrompido para retomar."
+
+msgid "The submitted ZIP is no longer available."
+msgstr "O ZIP enviado não está mais disponível."
+
+msgid "Processing retry scheduled."
+msgstr "Nova tentativa de processamento agendada."
+
+msgid ""
+"A newer version of this document has already been accepted. Open the latest "
+"document instead."
+msgstr ""
+"Uma versão mais recente deste documento já foi recebida. Abra o envio mais "
+"recente."
+
+msgid ""
+"This document is already published in Production. Open the original document"
+" and choose \"Request document change\" before sending a compatible "
+"replacement."
+msgstr ""
+"Este documento já está publicado em Produção. Abra o documento original e "
+"registre uma solicitação em \"Solicitar alteração\" para continuar o "
+"processamento deste envio."
+
+msgid "Open related document"
+msgstr "Abrir relacionado"
+
+msgid "Open original document"
+msgstr "Abrir documento original"
 
 msgid "No safe technical details were recorded."
 msgstr "Nenhum detalhe técnico seguro foi registrado."
@@ -4618,6 +5146,18 @@ msgstr "O destino recusou a autenticação ou a permissão."
 msgid "Ask an administrator to check the destination credentials and permissions before retrying."
 msgstr "Peça a um administrador para verificar as credenciais e permissões do destino antes de tentar novamente."
 
+msgid "Publication succeeded and availability was confirmed."
+msgstr "A publicação foi concluída e a disponibilidade foi confirmada."
+
+msgid "No further action is required."
+msgstr "Nenhuma outra ação é necessária."
+
+msgid "Publication succeeded, but availability is not yet confirmed."
+msgstr "A publicação foi concluída, mas a disponibilidade ainda não foi confirmada."
+
+msgid "Wait a few minutes and check availability again."
+msgstr "Aguarde alguns minutos e verifique a disponibilidade novamente."
+
 msgid "The destination did not respond in time; publication could not be confirmed."
 msgstr "O destino não respondeu a tempo; não foi possível confirmar a publicação."
 
@@ -4627,20 +5167,38 @@ msgstr "Verifique se o documento está disponível no destino antes de tentar no
 msgid "A connection to the destination could not be established."
 msgstr "Não foi possível estabelecer uma conexão com o destino."
 
+msgid "Try again later. If this continues, ask an administrator to check connectivity and destination configuration."
+msgstr "Tente novamente mais tarde. Se isso continuar, peça a um administrador para verificar a conectividade e a configuração do destino."
+
 msgid "The destination rejected the publication data."
 msgstr "O destino rejeitou os dados da publicação."
+
+msgid "Review the package validation results and publication metadata before trying again."
+msgstr "Revise os resultados da validação do pacote e os metadados da publicação antes de tentar novamente."
 
 msgid "The publication conflicts with data already at the destination."
 msgstr "A publicação conflita com dados já existentes no destino."
 
+msgid "Ask support to compare the existing destination record before retrying."
+msgstr "Peça ao suporte para comparar o registro existente no destino antes de tentar novamente."
+
 msgid "The destination service reported an internal failure."
 msgstr "O serviço de destino informou uma falha interna."
+
+msgid "Try again later. If the problem persists, contact the destination administrator."
+msgstr "Tente novamente mais tarde. Se o problema persistir, contate o administrador do destino."
 
 msgid "A required publication file was not found."
 msgstr "Um arquivo necessário para a publicação não foi encontrado."
 
+msgid "Check that the package contains the required files before retrying."
+msgstr "Verifique se o pacote contém os arquivos necessários antes de tentar novamente."
+
 msgid "Publication not confirmed"
 msgstr "Publicação não confirmada"
+
+msgid "Published, but access verification failed"
+msgstr "Publicado, mas a verificação de acesso falhou"
 
 msgid "Publication not started"
 msgstr "Publicação não iniciada"
@@ -4651,8 +5209,58 @@ msgstr "A publicação em Produção não foi iniciada porque a publicação em 
 msgid "Review the QA result before trying to publish in Production."
 msgstr "Revise o resultado em QA antes de tentar publicar em Produção."
 
+msgid "No Production request was recorded in this attempt."
+msgstr "Nenhuma solicitação para Produção foi registrada nesta tentativa."
+
 msgid "Publication details"
 msgstr "Detalhes da publicação"
 
 msgid "View reason"
 msgstr "Ver motivo"
+
+msgid "A document DOI is required."
+msgstr "É necessário informar o DOI do documento."
+
+msgid "A translation needs a language for its PDF."
+msgstr "A tradução precisa indicar o idioma de seu PDF."
+
+msgid "An article XML is required."
+msgstr "É necessário um XML de artigo."
+
+msgid "Document authorship changed. Review the updated authors."
+msgstr "A autoria do documento mudou. Confira os autores atualizados."
+
+msgid "Document identity"
+msgstr "Identificação do documento"
+
+msgid "Incorrect notice article-type."
+msgstr "O tipo de documento do aviso está incorreto."
+
+msgid "Missing article metadata."
+msgstr "Faltam os metadados do artigo."
+
+#, python-format
+msgid "Missing direct DOI relationship: %s."
+msgstr "Falta o vínculo direto por DOI: %s."
+
+#, python-format
+msgid "Missing document PDF: %s."
+msgstr "Falta o PDF do documento: %s."
+
+msgid "Original and notice must have distinct DOIs."
+msgstr "O original e o aviso devem ter DOIs diferentes."
+
+msgid "The notice must cover all original languages."
+msgstr "O aviso deve contemplar todos os idiomas do original."
+
+msgid "The submitted collection does not match the registered document."
+msgstr "A coleção informada não corresponde à do documento cadastrado."
+
+msgid "The submitted identifiers refer to different documents."
+msgstr "Os identificadores informados correspondem a documentos diferentes."
+
+msgid "Unsafe package path."
+msgstr "O pacote contém um caminho de arquivo inválido."
+
+msgid "Unsupported change type."
+msgstr "Tipo de alteração não permitido."

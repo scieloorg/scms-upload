@@ -7,7 +7,7 @@ from wagtail.snippets.views.snippets import CreateView
 from core.users.permission_policies import TeamScopedInspectView
 from core.users.scoped_queryset import scope_by_membership
 
-from .models import Article, choices
+from .models import Article
 
 
 class ArticleCreateView(CreateView):
@@ -48,11 +48,10 @@ class ArticleAdminInspectView(TeamScopedInspectView):
             "status": instance.status if instance else None,
         }
 
-        if instance and instance.status in (
-            choices.AS_REQUIRE_UPDATE,
-            choices.AS_REQUIRE_ERRATUM,
-        ):
-            data["requested_changes"] = list(instance.requestarticlechange_set.all())
+        if instance:
+            data["requested_changes"] = instance.requestarticlechange_set.defer(
+                "original_xml"
+            ).order_by("-created", "-pk")
 
         kwargs.update(data)
         return super().get_context_data(**kwargs)

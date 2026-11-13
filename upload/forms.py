@@ -5,6 +5,8 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
+from article.authorization import allowed_article_change_types
+from article.choices import REQUEST_CHANGE_TYPE
 from core.forms import CoreAdminModelForm
 from team.models import CollectionTeamMember, TeamRole
 from upload import choices
@@ -94,6 +96,26 @@ class DelegateReviewForm(forms.Form):
 
         self.fields["reviewer"].queryset = review_assignee_queryset(package)
         self.initial["reviewer"] = package.assignee_id
+
+
+class RequestDocumentChangeForm(forms.Form):
+    change_type = forms.ChoiceField(label=_("Change type"))
+    comment = forms.CharField(
+        label=_("Justification / instructions"),
+        widget=forms.Textarea(attrs={"rows": 4}),
+        help_text=_(
+            "Describe the requested change. Errata, addenda and retractions require "
+            "a notice and the updated original document (XML/PDF)."
+        ),
+    )
+
+    def __init__(self, *args, user, article, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        allowed = allowed_article_change_types(user, article)
+        self.fields["change_type"].choices = [
+            (value, label) for value, label in REQUEST_CHANGE_TYPE if value in allowed
+        ]
 
 
 class PackageDecisionForm(CoreAdminModelForm):

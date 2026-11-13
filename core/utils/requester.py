@@ -110,7 +110,11 @@ def is_http_error_json_response(json, response):
         return
 
     try:
-        return response.json()
+        data = response.json()
+        if isinstance(data, dict):
+            data["status_code"] = response.status_code
+            data.setdefault("error_type", "HTTPError")
+        return data
     except Exception as json_error:
         return
 
