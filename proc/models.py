@@ -2776,7 +2776,6 @@ class ArticleProc(BaseProc, ClusterableModel):
                     ),
                     issue_proc=self.issue_proc,
                 )
-                self.fix_pid_v2(user)
                 self.sps_pkg = SPSPkg.create_or_update(
                     user, sps_pkg_zip_path,
                     origin=package_choices.PKG_ORIGIN_MIGRATION,
@@ -2802,10 +2801,19 @@ class ArticleProc(BaseProc, ClusterableModel):
             )
 
     def fix_pid_v2(self, user):
-        if self.sps_pkg:
-            self.sps_pkg.fix_pid_v2(
-                user, correct_pid_v2=self.migrated_data.pid
-            )
+        """
+        Corrige o pid v2 do documento na coleção, se diferente do pid do
+        artigo no site clássico (MigratedArticle.pid da coleção), reprocessando
+        o artigo: o XML recebe o pid v2 correto e é registrado novamente,
+        atualizando o pid v2 da coleção (CollectionPidV2)
+        """
+        if not self.sps_pkg or not self.migrated_data or not self.migrated_data.pid:
+            return
+        if self.migrated_data.collection_id != self.collection_id:
+            return
+        if self.sps_pkg.get_pid_v2() == self.migrated_data.pid:
+            return
+        self.migrate_article(user, force_update=True)
 
     @classmethod
     def mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect(
