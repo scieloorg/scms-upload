@@ -18,6 +18,83 @@ from upload.validation.article_changes import validate_change_pair
 from upload.views.submissions import retry_processing
 
 
+@pytest.mark.parametrize("public_fails_once", [False, True])
+def test_approved_editorial_group_survives_qa_and_publication_retry(
+    editorial_pair, public_fails_once
+):
+    case = editorial_pair
+    case.notice.article = Article.objects.create(
+        creator=case.user, journal=case.original.journal
+    )
+    case.notice.save(update_fields=["article"])
+    members = (case.original, case.notice)
+    Package.objects.filter(pk__in=[member.pk for member in members]).update(
+        status=choices.PS_READY_TO_PUBLISH,
+        qa_decision=choices.PS_READY_TO_PUBLISH,
+    )
+    for member in members:
+        member.refresh_from_db()
+        transport = Mock(return_value={"result": "OK"})
+        assert member.publish(
+            case.user, transport, website_kind="QA", api_data={}
+        )["completed"]
+        member.refresh_from_db()
+        assert member.status == choices.PS_READY_TO_PUBLISH
+        assert member.qa_ws_status == choices.PUBLISHED
+        member.validate_change_publication()
+        if public_fails_once:
+            transport.return_value = {"result": "ERROR"}
+            assert not member.publish(
+                case.user, transport, website_kind="PUBLIC", api_data={}
+            )["completed"]
+            member.refresh_from_db()
+            assert member.status == choices.PS_READY_TO_PUBLISH
+            transport.return_value = {"result": "OK"}
+        assert member.publish(
+            case.user, transport, website_kind="PUBLIC", api_data={}
+        )["completed"]
+    change = case.original.change_requests.get()
+    assert change.status == article_choices.RCS_COMPLETED
+    # Republishing QA must not revoke a completed group's approval either.
+    case.original.update_publication_stage("QA", True)
+    case.original.refresh_from_db()
+    assert case.original.status == choices.PS_PUBLISHED
+    case.original.validate_change_publication()
+
+
+@pytest.mark.parametrize("missing_approval", ["decision", "status"])
+def test_qa_success_does_not_approve_an_editorial_member(
+    editorial_pair, missing_approval
+):
+    case = editorial_pair
+    Package.objects.filter(pk__in=[case.original.pk, case.notice.pk]).update(
+        status=choices.PS_READY_TO_PUBLISH,
+        qa_decision=choices.PS_READY_TO_PUBLISH,
+    )
+    field = "qa_decision" if missing_approval == "decision" else "status"
+    Package.objects.filter(pk=case.original.pk).update(**{field: choices.PS_PREVIEW})
+    case.original.refresh_from_db()
+    case.original.update_publication_stage("QA", True)
+    case.original.refresh_from_db()
+    assert case.original.status == choices.PS_PREVIEW
+    with pytest.raises(ValidationError):
+        case.original.validate_change_publication()
+
+
+def test_ordinary_qa_publication_keeps_existing_transition(report_scope):
+    package = report_scope.package_1
+    package.article = Article.objects.create(
+        creator=package.creator, journal=package.journal
+    )
+    package.status = choices.PS_READY_TO_PUBLISH
+    package.qa_decision = choices.PS_READY_TO_PUBLISH
+    package.save()
+    package.update_publication_stage("QA", True)
+    package.refresh_from_db()
+    assert package.status == choices.PS_PREVIEW
+    assert package.qa_ws_status == choices.PUBLISHED
+
+
 def retry_request(user, package):
     request = RequestFactory().post("/retry/", {"package_id": package.pk})
     request.user, request._messages = user, Mock()

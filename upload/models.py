@@ -1812,7 +1812,18 @@ class Package(CommonControlField, ClusterableModel):
             if website_kind == collection_choices.QA:
                 self.qa_ws_status = status
                 self.qa_ws_pubdate = datetime.utcnow()
-                self.status = choices.PS_PREVIEW
+                # QA is an intermediate destination for an approved editorial
+                # change, not a revocation of its Production approval.
+                keep_editorial_approval = (
+                    self.change_role
+                    and self.qa_decision == choices.PS_READY_TO_PUBLISH
+                    and self.status in (
+                        choices.PS_READY_TO_PUBLISH,
+                        choices.PS_PUBLISHED,
+                    )
+                )
+                if not keep_editorial_approval:
+                    self.status = choices.PS_PREVIEW
                 self.save()
                 if self.change_role != choices.CPR_ORIGINAL:
                     self.article.update_status(
