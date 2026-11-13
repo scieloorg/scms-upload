@@ -364,7 +364,7 @@ class TOC(CommonControlField, ClusterableModel):
 
 class TocSection(CommonControlField, Orderable):
     toc = ParentalKey(TOC, on_delete=models.CASCADE, related_name="issue_sections")
-    group = models.CharField(max_length=16, null=True, blank=True)
+    group = models.CharField(max_length=200, null=True, blank=True)
     section = models.ForeignKey(
         JournalSection, null=True, blank=True, on_delete=models.CASCADE
     )
