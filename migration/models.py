@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 import sys
@@ -47,6 +48,19 @@ def modified_date(file_path):
         return datetime.fromtimestamp(s.st_mtime).isoformat()
     except Exception as e:
         return datetime.now(timezone.utc).isoformat()
+
+
+def get_checksum(fp, chunk_size=1024 * 1024):
+    """sha256 do conteúdo de um arquivo aberto em modo binário"""
+    h = hashlib.sha256()
+    for chunk in iter(lambda: fp.read(chunk_size), b""):
+        h.update(chunk)
+    return h.hexdigest()
+
+
+def get_file_checksum(file_path):
+    with open(file_path, "rb") as fp:
+        return get_checksum(fp)
 
 
 def has_changed(file_path, other_file_size, other_file_modified_date):
@@ -709,6 +723,15 @@ class MigratedArticle(MigratedData):
 
 
 class JournalAcronIdFile(CommonControlField, ClusterableModel):
+    """
+    Arquivo bases-work/<acron>/<acron>.id de um periódico.
+
+    ``file`` (cópia) e ``file_size`` correspondem ao conteúdo do arquivo de
+    origem na última leitura **completa** (ver ``mark_as_read``). Ficam
+    vazios enquanto o arquivo nunca tiver sido lido completamente; assim,
+    uma leitura interrompida é refeita na próxima execução.
+    """
+
     collection = models.ForeignKey(
         Collection, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -741,26 +764,55 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             models.Index(fields=["source_path"]),
         ]
 
-    @classmethod
-    def has_changes(cls, user, collection, journal_acron, file_path, force_update):
+    def has_changes(self, force_update=False):
+        """
+        Indica se o arquivo de origem precisa ser lido: nunca foi lido
+        completamente ou mudou desde a última leitura completa.
+
+        Tamanho diferente basta para indicar mudança. Com mesmo tamanho,
+        compara o conteúdo (sha256) da origem com o da cópia guardada na
+        última leitura completa; a data de modificação não é considerada,
+        pois pode mudar sem mudança de conteúdo (ex.: arquivo regerado).
+
+        Levanta FileNotFoundError se o arquivo não existe.
+        """
         if force_update:
             return True
-        file_size = get_file_size(file_path)
-        obj = None
+        if not self.id_file_records.exists():
+            return True
+        if not self.file or get_file_size(self.source_path) != self.file_size:
+            return True
+        return self.source_differs_from_copy()
+
+    def source_differs_from_copy(self):
+        """
+        Indica se o conteúdo do arquivo de origem difere do da cópia
+        (``file``): tamanho diferente ou, com mesmo tamanho, sha256 diferente.
+
+        Levanta FileNotFoundError se o arquivo de origem não existe.
+        """
+        if not self.file:
+            return True
         try:
-            obj = cls.objects.get(
-                collection=collection, source_path=file_path, file_size=file_size
-            )
-        except cls.DoesNotExist:
+            copy_size = get_file_size(self.file.path)
+        except FileNotFoundError:
+            # cópia ausente no storage
             return True
-        except cls.MultipleObjectsReturned:
-            obj = cls.objects.filter(
-                collection=collection, source_path=file_path, file_size=file_size
-            ).order_by("-updated").first()
-        if not obj:
+        if get_file_size(self.source_path) != copy_size:
             return True
-        if obj.id_file_records.count() == 0:
-            return True
+        source_checksum = get_file_checksum(self.source_path)
+        copy_checksum = get_file_checksum(self.file.path)
+        return source_checksum != copy_checksum
+
+    def mark_as_read(self, user):
+        """
+        Registra a leitura completa da cópia (``file``), guardando o seu
+        tamanho. Se a origem mudou durante a leitura, o tamanho ou o conteúdo
+        diferem da cópia e o arquivo será lido novamente na próxima execução.
+        """
+        self.file_size = get_file_size(self.file.path)
+        self.updated_by = user
+        self.save()
 
     @classmethod
     def get(
@@ -775,7 +827,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             collection=collection,
             source_path=source_path,
         )
-        raise ValueError(f"JournalAcronIdFile.create requires all parameters. Got {d}")
+        raise ValueError(f"JournalAcronIdFile.get requires all parameters. Got {d}")
 
     @classmethod
     def create(
@@ -802,14 +854,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             obj.journal_acron = journal_acron
             obj.source_path = source_path
             obj.creator = user
-            obj.file_size = get_file_size(source_path)
             obj.save()
-    
-            with open(source_path, "rb") as fp:
-                basename = os.path.basename(source_path)
-                obj.save_file(basename, fp.read())
-                obj.save()
-
             return obj
         except IntegrityError:
             return cls.get(collection, source_path)
@@ -820,7 +865,7 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
                 os.unlink(self.file.path)
         except Exception as e:
             pass
-        self.file.save(name, ContentFile(content))
+        self.file.save(name, ContentFile(content), save=save)
 
     @classmethod
     def create_or_update(
@@ -829,32 +874,35 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
         collection,
         journal_acron,
         source_path,
-        force_update=None,
     ):
-        # raises FileNotFoundError (source_path)
+        """
+        Obtém ou cria o registro do arquivo. Se a origem mudou desde a última
+        leitura completa (``has_changes``), substitui a cópia (``file``), que é
+        o arquivo efetivamente lido, e limpa ``file_size``, que só é
+        registrado em ``mark_as_read``, após leitura completa da cópia.
+
+        Levanta FileNotFoundError se o arquivo de origem não existe.
+        """
         try:
             obj = cls.get(collection, source_path)
         except cls.DoesNotExist:
-            return cls.create(user, collection, journal_acron, source_path)
+            obj = cls.create(user, collection, journal_acron, source_path)
         except cls.MultipleObjectsReturned:
-            obj = cls.filter(collection, source_path).order_by("-updated").first()
-
+            obj = (
+                cls.objects.filter(collection=collection, source_path=source_path)
+                .order_by("-updated")
+                .first()
+            )
         if journal_acron and obj.journal_acron is None:
             obj.journal_acron = journal_acron
-            obj.save()
-        
-        try:
-            if force_update or has_changed(source_path, obj.file_size, obj.updated.isoformat()):
-                obj.updated_by = user
-                obj.updated = datetime.now(timezone.utc)
-                obj.file_size = get_file_size(source_path)
-                basename = os.path.basename(source_path)
-                with open(source_path, "rb") as fp:
-                    obj.save_file(basename, fp.read())
-                obj.save()
-        except FileNotFoundError:
-            # só não atualiza
-            pass
+
+        if obj.source_differs_from_copy():
+            with open(source_path, "rb") as fp:
+                obj.save_file(os.path.basename(source_path), fp.read())
+            # a nova cópia ainda não foi lida completamente (ver mark_as_read)
+            obj.file_size = None
+        obj.updated_by = user
+        obj.save()
         return obj
 
     @property
@@ -885,14 +933,9 @@ class JournalAcronIdFile(CommonControlField, ClusterableModel):
             .order_by("issue_pid")
         )
 
-        need_to_be_updated = (
-            total == 0 or journal_last_updated > record_last_updated
-        )
-
         return {
             "journal_id_file_last_updated": journal_last_updated,
             "id_file_record_last_updated": record_last_updated,
-            "id_file_record_need_to_be_updated": need_to_be_updated,
             "issue_pids": issue_pids,
             "pending_issue_pids": pending_issue_pids,
             "stats": {
