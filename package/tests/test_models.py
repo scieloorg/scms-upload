@@ -270,6 +270,49 @@ class SPSPkgTestCase(TestCase):
         self.pkg.sps_pkg_name = "123456789-extra-path"
         self.assertEqual(self.pkg.subdir, os.path.join("123456789", "extra/path"))
 
+    def make_ppx_in_collections(self, *collection_acrons):
+        """Documento (PidProviderXML) com as coleções do periódico"""
+        ppx = PidProviderXML.objects.create(creator=self.user)
+        for acron in collection_acrons:
+            ppx.collections.add(
+                Collection.objects.get_or_create(
+                    acron=acron, defaults={"creator": self.user}
+                )[0]
+            )
+        return ppx
+
+    def make_linked_sps_pkg(self, acron, sps_pkg_name, ppx):
+        return make_sps_pkg(
+            make_collection_pid_v2(self.user, acron=acron, ppx=ppx),
+            creator=self.user,
+            sps_pkg_name=sps_pkg_name,
+        )
+
+    def test_subdir_ppx_in_one_collection_has_no_collection_prefix(self):
+        ppx = self.make_ppx_in_collections("scl")
+        Collection.objects.create(acron="spa", creator=self.user)
+        sps_pkg = self.make_linked_sps_pkg("scl", "0034-8910-rsp-48-02-0123", ppx)
+        self.assertEqual(sps_pkg.subdir, "0034-8910/rsp/48/02/0123")
+
+    def test_subdir_ppx_in_more_than_one_collection_has_collection_root(self):
+        ppx = self.make_ppx_in_collections("scl", "spa")
+        sps_pkg = self.make_linked_sps_pkg("spa", "0034-8910-rsp-48-02-0123", ppx)
+        self.assertEqual(sps_pkg.subdir, "spa/0034-8910/rsp/48/02/0123")
+
+    def test_subdir_ppx_in_more_than_one_collection_does_not_collide(self):
+        ppx = self.make_ppx_in_collections("scl", "spa")
+        name = "0034-8910-rsp-48-02-0123"
+        scl = self.make_linked_sps_pkg("scl", name, ppx)
+        spa = self.make_linked_sps_pkg("spa", name, ppx)
+        self.assertEqual(scl.subdir, "scl/0034-8910/rsp/48/02/0123")
+        self.assertEqual(spa.subdir, "spa/0034-8910/rsp/48/02/0123")
+
+    def test_subdir_without_collection_keeps_legacy_route(self):
+        ppx = self.make_ppx_in_collections("scl", "spa")
+        self.pkg.ppx = ppx
+        self.pkg.sps_pkg_name = "0034-8910-rsp-48-02-0123"
+        self.assertEqual(self.pkg.subdir, "0034-8910/rsp/48/02/0123")
+
     @patch("package.models.minio_push_file_content")
     def test_upload_to_the_cloud(self, mock_push):
         mock_push.return_value = {"uri": "http://minio.local/file.png"}
