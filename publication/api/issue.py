@@ -9,6 +9,14 @@ from publication.utils.issue import build_issue
 def publish_issue(issue_proc, api_data):
     issue = issue_proc.issue
     issue_id = issue_proc.pid
+    if not issue_proc.journal_proc:
+        raise ValueError(
+            f"IssueProc {issue_proc} has no journal_proc. Run the issue migration first"
+        )
+    if not issue:
+        raise ValueError(
+            f"IssueProc {issue_proc} has no issue. Run the issue migration first"
+        )
     journal_id = issue_proc.journal_proc.pid
 
     data = {}
