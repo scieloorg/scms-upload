@@ -251,7 +251,6 @@ def task_load_record_from_xml_url(
             is_public=True,
             detail=document_item,
             expected_pid_v3=pid_v3,
-            collection_acron=collection_acron,
         )
 
         if article_source.status == ArticleSource.StatusChoices.COMPLETED:
@@ -322,6 +321,9 @@ def subtask_complete_collection_pid_v2_sps_pkg_name(
 ):
     user = _get_user(self.request, username=username, user_id=user_id)
     return CollectionPidV2.complete_sps_pkg_name(user, ids)
+
+
+@celery_app.task(bind=True)
 def task_process_article_sources(
     self,
     username=None,
