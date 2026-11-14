@@ -186,11 +186,7 @@ class LoadRecordFromXMLURLTaskTests(SimpleTestCase):
             article_source_class.create_or_update.call_args.kwargs["source_date"],
             "2024-01-31",
         )
-
-        self.assertEqual(
-            provider.provide_pid_for_xml_uri.call_args.kwargs["collection_acron"],
-            "scl",
-        )
+        collection_class.get.assert_called_once_with("scl")
 
     @patch("pid_provider.tasks.UnexpectedEvent.create")
     @patch("pid_provider.tasks.Collection")
