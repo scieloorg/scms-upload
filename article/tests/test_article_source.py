@@ -189,6 +189,7 @@ class ArticleSourceProcessStoredXMLTest(TestCase):
         self.assertEqual(
             provide_pid.call_args.kwargs["origin_date"], "2024-01-31"
         )
+        self.assertEqual(provide_pid.call_args.kwargs["collection_acron"], "scl")
 
     def test_unreadable_stored_xml_is_not_requested_from_url(
         self, xml_create, provide_pid, get_by_pid_v3
