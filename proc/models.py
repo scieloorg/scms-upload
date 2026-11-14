@@ -2634,6 +2634,30 @@ class ArticleProc(BaseProc, ClusterableModel):
                 _("Unable to get xml_with_pre for {}: {}").format(self, e)
             )
 
+    def free_processed_xml_path(self, filename):
+        """
+        Remove o arquivo que ocupa o caminho de destino de processed_xml
+        quando nenhum outro ArticleProc o referencia (arquivo órfão ou do
+        próprio ArticleProc).
+
+        Sem isso, o storage acrescentaria um sufixo aleatório ao nome
+        (ex.: 0034-8910-rsp-38-02-24_Ba7KXdi.xml), e o nome do arquivo é
+        o nome do pacote nas leituras seguintes.
+        Arquivo de outro ArticleProc é mantido.
+        """
+        field = self.processed_xml.field
+        target = field.generate_filename(self, filename)
+        storage = self.processed_xml.storage
+        if not storage.exists(target):
+            return
+        if (
+            ArticleProc.objects.filter(processed_xml=target)
+            .exclude(pk=self.pk)
+            .exists()
+        ):
+            return
+        storage.delete(target)
+
     def save_processed_xml(
         self, xml_with_pre, detail,
         migrated_document_publication_day,
@@ -2700,6 +2724,7 @@ class ArticleProc(BaseProc, ClusterableModel):
 
             # o nome do arquivo será o sps_pkg_name das próximas leituras
             # de self.xml_with_pre (provided_sps_pkg_name)
+            self.free_processed_xml_path(sps_pkg_name + ".xml")
             self.processed_xml.save(
                 sps_pkg_name + ".xml",
                 ContentFile(xml_with_pre.tostring()),
