@@ -2575,6 +2575,7 @@ class ArticleSource(CommonControlField):
             origin=self.url,
             registered_in_core=False,
             auto_solve_pid_conflict=auto_solve_pid_conflict,
+            collection_acron=collection_acron,
         )
         error_msg = response.get("error_msg") or response.get("error_message")
         v3 = response.get("v3")
