@@ -1,6 +1,9 @@
 import logging
 
 from langdetect import detect
+from django import forms
+from django.apps import apps as django_apps
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
@@ -9,6 +12,11 @@ from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtailautocomplete.edit_handlers import AutocompletePanel
 
 from collection import choices
+from collection import network_classification_completion as completion
+from collection.network_classification_completion import (  # noqa: F401
+    ARTICLEMETA_COLLECTIONS_URL,
+    normalize_network_classification,
+)
 from collection.utils import get_valid_language_code
 from core.choices import LANGUAGE
 from core.forms import CoreAdminModelForm
@@ -16,6 +24,24 @@ from core.models import CommonControlField
 
 
 class LanguageGetOrCreateError(Exception): ...
+
+
+class ChoiceArrayField(ArrayField):
+    """
+    ArrayField cujo formulário apresenta as opções do base_field
+    como múltipla escolha (checkboxes), em vez de texto separado por vírgula.
+    """
+
+    def formfield(self, **kwargs):
+        defaults = {
+            "form_class": forms.TypedMultipleChoiceField,
+            "choices": self.base_field.choices,
+            "coerce": self.base_field.to_python,
+            "widget": forms.CheckboxSelectMultiple,
+        }
+        defaults.update(kwargs)
+        # Ignora ArrayField.formfield (SimpleArrayField)
+        return super(ArrayField, self).formfield(**defaults)
 
 
 class Collection(CommonControlField):
@@ -33,8 +59,31 @@ class Collection(CommonControlField):
         _("Collection Acronym"), max_length=16, null=True, blank=True
     )
     name = models.CharField(_("Collection Name"), max_length=64, null=True, blank=True)
+    platform_status = models.CharField(
+        _("Platform Status"),
+        choices=choices.PLATFORM_STATUS,
+        max_length=20,
+        null=True,
+        blank=True,
+    )
+    network_classification = ChoiceArrayField(
+        models.CharField(
+            max_length=20,
+            choices=choices.NETWORK_CLASSIFICATION,
+        ),
+        verbose_name=_("Network classification"),
+        null=True,
+        blank=True,
+    )
 
     base_form_class = CoreAdminModelForm
+
+    panels = [
+        FieldPanel("acron"),
+        FieldPanel("name"),
+        FieldPanel("platform_status"),
+        FieldPanel("network_classification", widget=forms.CheckboxSelectMultiple),
+    ]
 
     autocomplete_search_field = "name"
 
@@ -48,17 +97,75 @@ class Collection(CommonControlField):
         raise ValueError("Collection.get requires acron")
 
     @classmethod
-    def get_or_create(cls, acron, name=None, user=None):
+    def get_or_create(
+        cls,
+        acron,
+        name=None,
+        user=None,
+        platform_status=None,
+        network_classification=None,
+    ):
+        network_classification = normalize_network_classification(
+            network_classification
+        )
         try:
-            return Collection.get(acron=acron)
+            collection = Collection.get(acron=acron)
         except Collection.DoesNotExist:
             collection = Collection()
             collection.acron = acron
             collection.name = name
+            collection.platform_status = platform_status
+            collection.network_classification = network_classification
             collection.creator = user
             collection.save()
             return collection
-    
+
+        # completa / atualiza os dados informados
+        changed = False
+        if platform_status and collection.platform_status != platform_status:
+            collection.platform_status = platform_status
+            changed = True
+        if (
+            network_classification
+            and collection.network_classification != network_classification
+        ):
+            collection.network_classification = network_classification
+            changed = True
+        if changed:
+            collection.updated_by = user
+            collection.save()
+        return collection
+
+    @classmethod
+    def get_collections_without_network_classification(cls):
+        return completion.get_collections_without_network_classification(
+            django_apps
+        )
+
+    @classmethod
+    def complete_network_classification(cls, user, collections_data=None, verify=False):
+        """
+        Preenche em lote network_classification das coleções que estão
+        sem esse dado, a partir dos dados do articlemeta.
+        Coleções já preenchidas não são alteradas.
+        (ver collection.network_classification_completion.complete)
+        """
+        return completion.complete(
+            django_apps, user and user.id, collections_data, verify
+        )
+
+    @classmethod
+    def get_national_journal_collections(cls):
+        """
+        Retorna as coleções cuja classificação de rede
+        é exclusivamente scielonetwork
+        """
+        return cls.objects.filter(network_classification=["scielonetwork"])
+
+    @property
+    def is_national_journal_collection(self):
+        return self.network_classification == ["scielonetwork"]
+
     def get_website_config(self, purpose, content_type):
         ws = WebSiteConfiguration.get(collection=self, purpose=purpose)
         return ws.get_data(content_type=content_type)

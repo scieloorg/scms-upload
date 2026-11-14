@@ -24,9 +24,9 @@ from article import choices
 
 class ArticleFilterSet(django_filters.FilterSet):
     journal__journal_acron = django_filters.CharFilter(
-        field_name="journal__journal_acron",
+        # acrônimo do periódico na coleção do artigo (JournalProc)
         label=_("Journal Acronym"),
-        lookup_expr="exact",
+        method="filter_journal_acron",
     )
     status = django_filters.ChoiceFilter(
         field_name="status",
@@ -34,10 +34,11 @@ class ArticleFilterSet(django_filters.FilterSet):
         choices=choices.ARTICLE_STATUS,  # ajuste para o nome real das choices
     )
     collection = django_filters.ModelChoiceFilter(
-        field_name="article_collections__collection",
+        # um Article por coleção
+        field_name="collection_pid_v2__collection",
         label=_("Collection"),
         queryset=Collection.objects.filter(
-            articlecollection__article__isnull=False
+            collectionpidv2__article__isnull=False
         ).distinct(),
     )
     absent_sps_pkg = django_filters.BooleanFilter(
@@ -49,6 +50,11 @@ class ArticleFilterSet(django_filters.FilterSet):
     class Meta:
         model = Article
         fields = []
+
+    def filter_journal_acron(self, queryset, name, value):
+        if not value:
+            return queryset
+        return Article.filter_by_journal_acron(queryset, value)
 
 
 class ArticleSnippetViewSet(SnippetViewSet):
@@ -65,11 +71,11 @@ class ArticleSnippetViewSet(SnippetViewSet):
     # exclude_from_explorer = False  # Não aplicável a SnippetViewSet
     list_per_page = 20
     list_display = (
-        "sps_pkg__sps_pkg_name",
+        "__str__",
         "pid_v3",
         "pid_v2",
         "status",
-        "display_collections",
+        "collection",
         "first_pubdate_iso",
         "updated",
         # "updated_by",
@@ -84,8 +90,8 @@ class ArticleSnippetViewSet(SnippetViewSet):
         "journal__official_journal__issn_print",
         "journal__official_journal__issn_electronic",
         "title_with_lang__text",
-        "article_collections__collection__acron",
-        "article_collections__collection__name",
+        "collection_pid_v2__collection__acron",
+        "collection_pid_v2__collection__name",
     )
     # inspect_view_fields não é usado em SnippetViewSet, use inspect_view_class customizada
 

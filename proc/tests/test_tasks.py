@@ -568,8 +568,8 @@ class TaskFixIssueArticlesTest(TestCase):
     """Testes para task_fix_issue_articles (não usa TaskExecution).
 
     Renomeada de task_exclude_invalid_issue_articles (commit ba92d1335be2):
-    agora sempre reconcilia sps_pkg.ppx (Article.complete_sps_pkg_ppx e
-    ArticleProc.complete_sps_pkg_ppx) e só executa as exclusões destrutivas
+    agora sempre reconcilia sps_pkg.collection_pid_v2
+    (ArticleProc.complete_sps_pkg_ppx) e só executa as exclusões destrutivas
     (SPSPkg/Article/ArticleProc.exclude_invalid_records) quando as flags
     delete_* correspondentes são True.
     """
@@ -587,7 +587,6 @@ class TaskFixIssueArticlesTest(TestCase):
         mock_issue_proc.objects.select_related.return_value.get.return_value = (
             mock_issue_proc_instance
         )
-        mock_article.complete_sps_pkg_ppx.return_value = {"completed": 1}
         mock_article_proc.complete_sps_pkg_ppx.return_value = {"completed": 2}
 
         result = tasks.task_fix_issue_articles(
@@ -598,21 +597,19 @@ class TaskFixIssueArticlesTest(TestCase):
         mock_issue_proc.objects.select_related.return_value.get.assert_called_once_with(
             id=10
         )
-        mock_article.complete_sps_pkg_ppx.assert_called_once_with("USER", mock_issue)
         mock_article_proc.complete_sps_pkg_ppx.assert_called_once_with(
             "USER", issue_proc_id_list=[10]
         )
         mock_article.exclude_invalid_records.assert_not_called()
         mock_article_proc.exclude_invalid_records.assert_not_called()
 
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 2)
         self.assertEqual(result[0], {"params": {
             "delete_article_which_is_duplicated": False,
             "delete_article_which_sps_pkg_is_missing": False,
             "delete_sps_pkg_which_ppx_is_missing": False,
         }})
-        self.assertEqual(result[1]["operation"], "Article.complete_sps_pkg_ppx")
-        self.assertEqual(result[2]["operation"], "ArticleProc.complete_sps_pkg_ppx")
+        self.assertEqual(result[1]["operation"], "ArticleProc.complete_sps_pkg_ppx")
 
     @patch("proc.tasks.SPSPkg")
     @patch("proc.tasks.ArticleProc")

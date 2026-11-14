@@ -49,6 +49,10 @@ PRESS_RELEASE_PRIORITY = 1
 
 DATA_AVAILABILITY_STATUS_MINUTES = MINUTES[10]
 DATA_AVAILABILITY_STATUS_PRIORITY = 9
+COMPLETE_NETWORK_CLASSIFICATION_MINUTES = MINUTES[10]
+COMPLETE_NETWORK_CLASSIFICATION_PRIORITY = 1
+COMPLETE_COLLECTION_PID_V2_MINUTES = MINUTES[10]
+COMPLETE_COLLECTION_PID_V2_PRIORITY = 9
 
 TITLE_DB_MIGRATION_PRIORITY = 0
 ISSUE_DB_MIGRATION_PRIORITY = 0
@@ -113,6 +117,8 @@ def schedule_subtasks(username):
     _schedule_fetch_and_create_journal(username, enabled)  # Nova tarefa adicionada
     _schedule_try_fetch_and_register_press_release(username, enabled)
     _schedule_update_data_availability_status(username, enabled)
+    _schedule_complete_network_classification(username, enabled)
+    _schedule_complete_collection_pid_v2(username, enabled)
 
 
 def _schedule_check_article_availability(username, enabled=False):
@@ -402,6 +408,29 @@ def _schedule_fetch_and_create_journal(username, enabled=False):
     )
 
 
+def _schedule_complete_network_classification(username, enabled=False):
+    """
+    Agenda a tarefa de preencher network_classification das coleções
+    que estão sem esse dado (necessário para identificar a coleção
+    principal de periódicos presentes em mais de uma coleção)
+    Deixa a tarefa desabilitada por padrão
+    """
+    schedule_task(
+        task="collection.tasks.task_complete_network_classification",
+        name="complete_network_classification",
+        kwargs=dict(
+            username=username,
+        ),
+        description=_("Completa a classificação de rede das coleções"),
+        priority=COMPLETE_NETWORK_CLASSIFICATION_PRIORITY,
+        enabled=enabled,
+        run_once=True,
+        day_of_week="*",
+        hour="*",
+        minute=COMPLETE_NETWORK_CLASSIFICATION_MINUTES,
+    )
+
+
 def _schedule_try_fetch_and_register_press_release(username, enabled=False):
     """
     Agenda a tarefa de buscar e registrar press releases
@@ -449,4 +478,37 @@ def _schedule_update_data_availability_status(username, enabled=False):
         day_of_week="*",
         hour="*",
         minute=DATA_AVAILABILITY_STATUS_MINUTES,
+    )
+
+
+def _schedule_complete_collection_pid_v2(username, enabled=False):
+    """
+    Agenda a tarefa que vincula aos documentos na coleção
+    (collection_pid_v2), aos poucos, os SPSPkg e Article anteriores à
+    separação por coleção. Executa uma vez: a própria tarefa agenda o
+    lote seguinte (countdown) até terminar; ajustar batch_size e countdown
+    conforme a carga. Para retomar, informar model_name e last_id.
+    Deixa a tarefa desabilitada por padrão
+    """
+    schedule_task(
+        task="article.tasks.task_complete_collection_pid_v2",
+        name="task_complete_collection_pid_v2",
+        kwargs=dict(
+            username=username,
+            model_name="SPSPkg",
+            last_id=0,
+            batch_size=100,
+            countdown=30,
+            max_batches=None,
+            auto_continue=True,
+        ),
+        description=_(
+            "Vincula SPSPkg e Article legados ao documento na coleção (collection_pid_v2)"
+        ),
+        priority=COMPLETE_COLLECTION_PID_V2_PRIORITY,
+        enabled=enabled,
+        run_once=True,
+        day_of_week="*",
+        hour="*",
+        minute=COMPLETE_COLLECTION_PID_V2_MINUTES,
     )

@@ -27,10 +27,40 @@ from package.models import (
     SPSPkgMultipleObjectReturnedException,
     MinioConfiguration,
 )
-from collection.models import Language
-from pid_provider.models import PidProviderXML
+from collection.models import Collection, Language
+from pid_provider.models import CollectionPidV2, PidProviderXML
 
 User = get_user_model()
+
+
+def make_collection_pid_v2(user, acron="scl", ppx=None, pid_v2=None, v3=None):
+    """Documento (PidProviderXML) na coleção (CollectionPidV2)"""
+    collection = Collection.objects.get_or_create(
+        acron=acron, defaults={"creator": user}
+    )[0]
+    ppx = ppx or PidProviderXML.objects.create(creator=user, v3=v3)
+    return CollectionPidV2.objects.create(
+        creator=user, pid_provider_xml=ppx, collection=collection, pid_v2=pid_v2
+    )
+
+
+def make_sps_pkg(collection_pid_v2=None, **kwargs):
+    """
+    SPSPkg vinculado ao documento na coleção, com ppx, pid_v3 e pid_v2
+    iguais aos dele
+    """
+    sps_pkg = SPSPkg(**kwargs)
+    sps_pkg.set_collection_pid_v2(collection_pid_v2)
+    sps_pkg.save()
+    return sps_pkg
+
+
+def make_article_proc(user, collection, sps_pkg=None, pid=None):
+    from proc.models import ArticleProc
+
+    return ArticleProc.objects.create(
+        creator=user, collection=collection, sps_pkg=sps_pkg, pid=pid
+    )
 
 
 class UtilityFunctionsTestCase(TestCase):
@@ -138,8 +168,7 @@ class BasicXMLFileTestCase(SimpleTestCase):
 class SPSPkgComponentTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="testuser", password="password")
-        self.pkg = SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="pkg-01", pid_v3="v3-1234")
+        self.pkg = SPSPkg.objects.create(creator=self.user, sps_pkg_name="pkg-01")
         self.lang = Language.objects.create(creator=self.user, code2="pt")
 
     def test_autocomplete_and_data(self):
@@ -206,8 +235,6 @@ class SPSPkgTestCase(TestCase):
         self.pkg = SPSPkg.objects.create(
             creator=self.user,
             sps_pkg_name="sps-12345-v1",
-            pid_v3="v3-00001",
-            pid_v2="v2-00001",
             registered_in_core=True,
             texts={"xml_langs": ["en"], "pdf_langs": ["en"]},
         )
@@ -224,10 +251,10 @@ class SPSPkgTestCase(TestCase):
 
     def test_raises_type_error(self):
         with self.assertRaises(TypeError):
-            SPSPkg.get(pid_v3="v3-00001")
+            SPSPkg.get(sps_pkg_name="sps-12345-v1")
 
     def test_get_method_single_object(self):
-        found = SPSPkg.get(123, pid_v3="v3-00001")
+        found = SPSPkg.get_unlinked_by_sps_pkg_name("sps-12345-v1")
         self.assertEqual(found, self.pkg)
 
     def test_validate(self):
@@ -242,6 +269,49 @@ class SPSPkgTestCase(TestCase):
     def test_subdir_property(self):
         self.pkg.sps_pkg_name = "123456789-extra-path"
         self.assertEqual(self.pkg.subdir, os.path.join("123456789", "extra/path"))
+
+    def make_ppx_in_collections(self, *collection_acrons):
+        """Documento (PidProviderXML) com as coleções do periódico"""
+        ppx = PidProviderXML.objects.create(creator=self.user)
+        for acron in collection_acrons:
+            ppx.collections.add(
+                Collection.objects.get_or_create(
+                    acron=acron, defaults={"creator": self.user}
+                )[0]
+            )
+        return ppx
+
+    def make_linked_sps_pkg(self, acron, sps_pkg_name, ppx):
+        return make_sps_pkg(
+            make_collection_pid_v2(self.user, acron=acron, ppx=ppx),
+            creator=self.user,
+            sps_pkg_name=sps_pkg_name,
+        )
+
+    def test_subdir_ppx_in_one_collection_has_no_collection_prefix(self):
+        ppx = self.make_ppx_in_collections("scl")
+        Collection.objects.create(acron="spa", creator=self.user)
+        sps_pkg = self.make_linked_sps_pkg("scl", "0034-8910-rsp-48-02-0123", ppx)
+        self.assertEqual(sps_pkg.subdir, "0034-8910/rsp/48/02/0123")
+
+    def test_subdir_ppx_in_more_than_one_collection_has_collection_root(self):
+        ppx = self.make_ppx_in_collections("scl", "spa")
+        sps_pkg = self.make_linked_sps_pkg("spa", "0034-8910-rsp-48-02-0123", ppx)
+        self.assertEqual(sps_pkg.subdir, "spa/0034-8910/rsp/48/02/0123")
+
+    def test_subdir_ppx_in_more_than_one_collection_does_not_collide(self):
+        ppx = self.make_ppx_in_collections("scl", "spa")
+        name = "0034-8910-rsp-48-02-0123"
+        scl = self.make_linked_sps_pkg("scl", name, ppx)
+        spa = self.make_linked_sps_pkg("spa", name, ppx)
+        self.assertEqual(scl.subdir, "scl/0034-8910/rsp/48/02/0123")
+        self.assertEqual(spa.subdir, "spa/0034-8910/rsp/48/02/0123")
+
+    def test_subdir_without_collection_keeps_legacy_route(self):
+        ppx = self.make_ppx_in_collections("scl", "spa")
+        self.pkg.ppx = ppx
+        self.pkg.sps_pkg_name = "0034-8910-rsp-48-02-0123"
+        self.assertEqual(self.pkg.subdir, "0034-8910/rsp/48/02/0123")
 
     @patch("package.models.minio_push_file_content")
     def test_upload_to_the_cloud(self, mock_push):
@@ -286,58 +356,47 @@ class SPSPkgTestCase(TestCase):
         mock_obj.get_complete_publication_date.return_value = "2023-05-15"
         self.assertEqual(self.pkg.pub_date, "2023-05-15")
 
-    def test_get_raises_value_error_when_ppx_id_is_falsy(self):
-        with self.assertRaises(ValueError):
-            SPSPkg.get(None, pid_v3="v3-00001")
-        with self.assertRaises(ValueError):
-            SPSPkg.get(0, pid_v3="v3-00001")
+    def test_data_of_the_document_in_the_collection(self):
+        self.assertIsNone(self.pkg.pid_v3)
+        self.assertIsNone(self.pkg.pid_v2)
+        self.assertIsNone(self.pkg.ppx)
+        self.assertIsNone(self.pkg.collection)
 
-    def test_get_method_single_object_via_ppx_id_fallback(self):
-        # ppx_id informado mas sem correspondencia; como existe um SPSPkg
-        # com ppx nulo, search_by_ppx_id retorna None e get() cai no
-        # fallback por pid_v3
-        other_ppx = PidProviderXML.objects.create(creator=self.user)
-        found = SPSPkg.get(other_ppx.id, pid_v3="v3-00001")
-        self.assertEqual(found, self.pkg)
+        self.pkg.set_collection_pid_v2(
+            make_collection_pid_v2(
+                self.user, "psi", pid_v2="S1678-51772009000300003", v3="v3-00001"
+            )
+        )
+        self.pkg.save()
+        self.pkg.refresh_from_db()
+
+        self.assertEqual(self.pkg.pid_v3, "v3-00001")
+        self.assertEqual(self.pkg.pid_v2, "S1678-51772009000300003")
+        self.assertEqual(self.pkg.ppx_id, self.pkg.collection_pid_v2.pid_provider_xml_id)
+        self.assertEqual(self.pkg.collection.acron, "psi")
+        self.assertEqual(self.pkg.data["collection"], "psi")
+
+    def test_get_does_not_fall_back_to_the_package_name(self):
+        # collection_pid_v2 sem pacote; a busca pelo nome é explícita
+        other = make_collection_pid_v2(self.user)
+        with self.assertRaises(SPSPkg.DoesNotExist):
+            SPSPkg.get(other)
+        self.assertEqual(
+            SPSPkg.get_unlinked_by_sps_pkg_name("sps-12345-v1"), self.pkg
+        )
 
     def test_get_method_does_not_exist(self):
-        # ppx_id informado e sem nenhum SPSPkg com ppx nulo no banco:
-        # search_by_ppx_id levanta DoesNotExist e get() propaga
-        self.pkg.ppx = PidProviderXML.objects.create(creator=self.user)
+        # pacote já vinculado a outro documento na coleção não é encontrado
+        # pelo nome
+        self.pkg.collection_pid_v2 = make_collection_pid_v2(self.user)
         self.pkg.save()
-        other_ppx = PidProviderXML.objects.create(creator=self.user)
         with self.assertRaises(SPSPkg.DoesNotExist):
-            SPSPkg.get(other_ppx.id, pid_v3="non-existent")
+            SPSPkg.get_unlinked_by_sps_pkg_name("sps-12345-v1")
 
-    def test_get_method_multiple_objects_returned(self):
-        # com ppx_id fornecido e sem correspondencia direta, mas com
-        # multiplos SPSPkg de ppx nulo, search_by_ppx_id retorna o mais
-        # recente sem consultar pid_v3 - portanto MultipleObjectsReturned
-        # NAO e mais levantado neste cenario (ver teste abaixo para o
-        # caminho que ainda levanta a excecao via search_by_identifiers)
-        second = SPSPkg.objects.create(
-            creator=self.user,
-            sps_pkg_name="sps-12345-v1",
-            pid_v3="v3-00001",
-            pid_v2="v2-00001",
-        )
-        other_ppx = PidProviderXML.objects.create(creator=self.user)
-        found = SPSPkg.get(other_ppx.id, pid_v3="v3-00001")
+    def test_get_method_multiple_objects_returns_most_recent(self):
+        second = SPSPkg.objects.create(creator=self.user, sps_pkg_name="sps-12345-v1")
+        found = SPSPkg.get_unlinked_by_sps_pkg_name("sps-12345-v1")
         self.assertEqual(found, second)
-
-    def test_get_method_multiple_objects_returned_via_identifiers(self):
-        # forcando o fallback a bater em search_by_identifiers com
-        # identificacao divergente entre os registros
-        SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="sps-12345-v1",
-            pid_v3="v3-00001", pid_v2="v2-diff",
-        )
-        SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="sps-12345-v1-x",
-            pid_v3="v3-00001", pid_v2="v2-diff-3",
-        )
-        with self.assertRaises(SPSPkgMultipleObjectReturnedException):
-            SPSPkg.get(123, pid_v3="v3-00001", sps_pkg_name="sps-12345-v1-x")
 
 
 class SPSPkgSearchByPpxIdTestCase(TestCase):
@@ -346,9 +405,12 @@ class SPSPkgSearchByPpxIdTestCase(TestCase):
             username="searchppxuser", password="pass"
         )
         self.registered_ppx = PidProviderXML.objects.create(creator=self.user)
-        self.pkg_with_ppx = SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="pkg-with-ppx",
-            pid_v3="v3-ppx", ppx=self.registered_ppx,
+        self.pkg_with_ppx = make_sps_pkg(
+            creator=self.user,
+            sps_pkg_name="pkg-with-ppx",
+            collection_pid_v2=make_collection_pid_v2(
+                self.user, "scl", ppx=self.registered_ppx
+            ),
         )
 
     def test_returns_single_match(self):
@@ -356,23 +418,19 @@ class SPSPkgSearchByPpxIdTestCase(TestCase):
         self.assertEqual(found, self.pkg_with_ppx)
 
     def test_returns_most_recent_on_multiple_matches(self):
-        newer = SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="pkg-with-ppx-2",
-            pid_v3="v3-ppx-2", ppx=self.registered_ppx,
+        # o mesmo documento em outra coleção
+        newer = make_sps_pkg(
+            creator=self.user,
+            sps_pkg_name="pkg-with-ppx-2",
+            collection_pid_v2=make_collection_pid_v2(
+                self.user, "psi", ppx=self.registered_ppx
+            ),
         )
         found = SPSPkg.search_by_ppx_id(self.registered_ppx.id)
         self.assertEqual(found, newer)
 
     def test_raises_does_not_exist_when_sps_pkg_and_pid_provider_are_not_related(self):
-        SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="pkg-null-ppx", pid_v3="v3-null",
-        )
-        other_ppx = PidProviderXML.objects.create(creator=self.user)
-        with self.assertRaises(SPSPkg.DoesNotExist):
-            SPSPkg.search_by_ppx_id(other_ppx.id)
-
-    def test_raises_does_not_exist_when_no_match_and_no_null_ppx_items(self):
-        SPSPkg.objects.exclude(id=self.pkg_with_ppx.id).delete()
+        SPSPkg.objects.create(creator=self.user, sps_pkg_name="pkg-null-ppx")
         other_ppx = PidProviderXML.objects.create(creator=self.user)
         with self.assertRaises(SPSPkg.DoesNotExist):
             SPSPkg.search_by_ppx_id(other_ppx.id)
@@ -383,36 +441,31 @@ class SPSPkgSearchByIdentifiersTestCase(TestCase):
         self.user = get_user_model().objects.create_user(
             username="searchiduser", password="pass"
         )
-        self.pkg = SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="sps-1", pid_v3="v3-1", pid_v2="v2-1",
-        )
+        self.pkg = SPSPkg.objects.create(creator=self.user, sps_pkg_name="sps-1")
 
     def test_raises_value_error_without_any_identifier(self):
         with self.assertRaises(ValueError):
             SPSPkg.search_by_identifiers()
 
     def test_returns_single_match(self):
-        found = SPSPkg.search_by_identifiers(pid_v3="v3-1")
+        found = SPSPkg.search_by_identifiers(sps_pkg_name="sps-1")
         self.assertEqual(found, self.pkg)
 
     def test_raises_does_not_exist_when_no_match(self):
         with self.assertRaises(SPSPkg.DoesNotExist):
-            SPSPkg.search_by_identifiers(pid_v3="nonexistent")
+            SPSPkg.search_by_identifiers(sps_pkg_name="nonexistent")
 
     def test_multiple_matches_with_same_identification_returns_most_recent(self):
-        newer = SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="sps-1-dup",
-            pid_v3="v3-1", pid_v2="v2-1",
-        )
-        found = SPSPkg.search_by_identifiers(pid_v3="v3-1", pid_v2="v2-1")
+        newer = SPSPkg.objects.create(creator=self.user, sps_pkg_name="sps-1")
+        found = SPSPkg.search_by_identifiers(sps_pkg_name="sps-1")
         self.assertEqual(found, newer)
 
     def test_multiple_matches_with_different_identification_raises_custom_exception(self):
-        SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="sps-2", pid_v3="v3-2", pid_v2="v2-1",
-        )
+        SPSPkg.objects.create(creator=self.user, sps_pkg_name="sps-2")
         with self.assertRaises(SPSPkgMultipleObjectReturnedException):
-            SPSPkg.search_by_identifiers(pid_v3="v3-1", pid_v2="v2-1")
+            SPSPkg.search_by_identifiers(
+                sps_pkg_name="sps-1", pkg_name_list=["sps-1", "sps-2"]
+            )
 
 
 class SPSPkgGetTestCase(TestCase):
@@ -420,38 +473,29 @@ class SPSPkgGetTestCase(TestCase):
         self.user = get_user_model().objects.create_user(
             username="getuser", password="pass"
         )
-        self.registered_ppx = PidProviderXML.objects.create(creator=self.user)
+        self.collection_pid_v2 = make_collection_pid_v2(self.user)
 
-    def test_get_raises_value_error_without_ppx_id(self):
-        with self.assertRaises(ValueError):
-            SPSPkg.get(None, pid_v3="does-not-matter")
-        with self.assertRaises(ValueError):
-            SPSPkg.get("")
-
-    def test_get_finds_by_ppx_id_first(self):
-        pkg = SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="pkg-a", pid_v3="v3-a",
-            ppx=self.registered_ppx,
-        )
-        found = SPSPkg.get(self.registered_ppx.id, pid_v3="does-not-matter")
-        self.assertEqual(found, pkg)
-
-    def test_get_falls_back_to_identifiers_when_ppx_id_not_found_but_null_items_exist(self):
-        pkg = SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="pkg-b", pid_v3="v3-b",
-        )
-        other_ppx = PidProviderXML.objects.create(creator=self.user)
-        found = SPSPkg.get(other_ppx.id, pid_v3="v3-b")
-        self.assertEqual(found, pkg)
-
-    def test_get_raises_does_not_exist_when_ppx_id_given_and_no_null_items_exist(self):
-        SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="pkg-c", pid_v3="v3-c",
-            ppx=self.registered_ppx,
-        )
-        other_ppx = PidProviderXML.objects.create(creator=self.user)
+    def test_get_raises_does_not_exist_without_collection_pid_v2(self):
         with self.assertRaises(SPSPkg.DoesNotExist):
-            SPSPkg.get(other_ppx.id, pid_v3="v3-c")
+            SPSPkg.get(None)
+
+    def test_get_finds_by_collection_pid_v2_first(self):
+        pkg = make_sps_pkg(
+            creator=self.user,
+            sps_pkg_name="pkg-a",
+            collection_pid_v2=self.collection_pid_v2,
+        )
+        found = SPSPkg.get(self.collection_pid_v2)
+        self.assertEqual(found, pkg)
+
+    def test_get_unlinked_by_sps_pkg_name(self):
+        pkg = SPSPkg.objects.create(creator=self.user, sps_pkg_name="pkg-b")
+        found = SPSPkg.get_unlinked_by_sps_pkg_name("pkg-b")
+        self.assertEqual(found, pkg)
+
+    def test_get_unlinked_by_sps_pkg_name_requires_sps_pkg_name(self):
+        with self.assertRaises(SPSPkg.DoesNotExist):
+            SPSPkg.get_unlinked_by_sps_pkg_name(None)
 
 
 class SPSPkgAddPpxTestCase(TestCase):
@@ -460,37 +504,74 @@ class SPSPkgAddPpxTestCase(TestCase):
             username="testuser", password="pass"
         )
         self.registered_ppx = PidProviderXML.objects.create(creator=self.user)
+        self.collection = Collection.objects.create(creator=self.user, acron="scl")
         self.sps_pkg = SPSPkg.objects.create(
             sps_pkg_name="1234-5678-2024-01-01-0001",
-            pid_v2="S1234-56782024000100001",
             file="fake/path.zip",
             creator=self.user,
+        )
+        # coleção (única) dos ArticleProc do pacote
+        patcher = patch(
+            "package.collection_pid_v2_completion.get_article_proc_of_unique_collection",
+            return_value=Mock(
+                collection=self.collection,
+                collection_id=self.collection.id,
+                pid=None,
+                issue_proc=None,
+            ),
+        )
+        self.mock_collection = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def registered(self):
+        return (
+            {
+                "ppx_id": self.registered_ppx.id,
+                "v3": "v3-registered",
+                "v2": "S1234-56782024000100001",
+            },
         )
 
     @patch("package.models.pid_provider_app.is_registered_xml_zip")
     def test_add_ppx_success_saves_by_default(self, mock_is_registered):
-        ppx_id = self.registered_ppx.id
-        mock_is_registered.return_value = ({"ppx_id": ppx_id},)
+        mock_is_registered.return_value = self.registered()
 
         response = self.sps_pkg.add_ppx(self.user, save=True)
 
         self.assertIsNone(response)
-        self.assertEqual(self.sps_pkg.ppx_id, ppx_id)
         self.sps_pkg.refresh_from_db()
-        self.assertEqual(self.sps_pkg.ppx_id, ppx_id)
+        self.assertEqual(self.sps_pkg.ppx_id, self.registered_ppx.id)
+        self.assertEqual(self.sps_pkg.collection, self.collection)
+        self.assertEqual(self.sps_pkg.pid_v2, "S1234-56782024000100001")
+        self.assertEqual(self.sps_pkg.pid_v3, "v3-registered")
+        self.assertEqual(
+            self.sps_pkg.collection_pid_v2.pid_provider_xml, self.registered_ppx
+        )
 
     @patch("package.models.pid_provider_app.is_registered_xml_zip")
     def test_add_ppx_with_save_false_does_not_persist(self, mock_is_registered):
-        ppx_id = self.registered_ppx.id
-        mock_is_registered.return_value = ({"ppx_id": ppx_id},)
+        mock_is_registered.return_value = self.registered()
 
         response = self.sps_pkg.add_ppx(self.user, save=False)
 
         self.assertIsNone(response)
-        self.assertEqual(self.sps_pkg.ppx_id, ppx_id)
+        self.assertEqual(self.sps_pkg.ppx_id, self.registered_ppx.id)
 
         self.sps_pkg.refresh_from_db()
         self.assertIsNone(self.sps_pkg.ppx_id)
+        self.assertIsNone(self.sps_pkg.collection_pid_v2)
+
+    @patch("package.models.pid_provider_app.is_registered_xml_zip")
+    def test_add_ppx_reuses_the_document_in_the_collection(self, mock_is_registered):
+        existing = make_collection_pid_v2(
+            self.user, "scl", ppx=self.registered_ppx, pid_v2="registered"
+        )
+        mock_is_registered.return_value = self.registered()
+
+        self.sps_pkg.add_ppx(self.user, save=True)
+
+        self.assertEqual(self.sps_pkg.collection_pid_v2, existing)
+        self.assertEqual(self.sps_pkg.pid_v2, "registered")
 
     @patch("package.models.pid_provider_app.is_registered_xml_zip")
     def test_add_ppx_failure_returns_registered_and_does_not_set_ppx(
@@ -503,32 +584,45 @@ class SPSPkgAddPpxTestCase(TestCase):
         self.assertEqual(response, {"error": "xml not found"})
         self.assertIsNone(self.sps_pkg.ppx_id)
 
+    @patch("package.models.pid_provider_app.is_registered_xml_zip")
+    def test_add_ppx_without_collection_sets_ppx_but_does_not_link(
+        self, mock_is_registered
+    ):
+        # pacote de ArticleProc de mais de uma coleção
+        self.mock_collection.return_value = None
+        mock_is_registered.return_value = self.registered()
+
+        response = self.sps_pkg.add_ppx(self.user, save=True)
+
+        self.assertIn("error_msg", response)
+        self.sps_pkg.refresh_from_db()
+        self.assertEqual(self.sps_pkg.ppx_id, self.registered_ppx.id)
+        self.assertIsNone(self.sps_pkg.collection_pid_v2)
+
 
 class SPSPkgCompletePpxTestCase(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(
             username="testuser2", password="pass"
         )
-        self.registered_ppx = PidProviderXML.objects.create(creator=self.user)
+        self.collection_pid_v2 = make_collection_pid_v2(self.user)
         self.pkg_ok = SPSPkg.objects.create(
-            sps_pkg_name="pkg-ok", pid_v2="v2-ok",
-            file="fake/ok.zip", creator=self.user,
+            sps_pkg_name="pkg-ok", file="fake/ok.zip", creator=self.user,
         )
         self.pkg_fail = SPSPkg.objects.create(
-            sps_pkg_name="pkg-fail", pid_v2="v2-fail",
-            file="fake/fail.zip", creator=self.user,
+            sps_pkg_name="pkg-fail", file="fake/fail.zip", creator=self.user,
         )
         self.pkg_error = SPSPkg.objects.create(
-            sps_pkg_name="pkg-error", pid_v2="v2-error",
-            file="fake/error.zip", creator=self.user,
+            sps_pkg_name="pkg-error", file="fake/error.zip", creator=self.user,
         )
 
     @patch.object(SPSPkg, "add_ppx", autospec=True)
-    def test_complete_ppx_calls_add_ppx_with_save_false(self, mock_add_ppx):
+    def test_complete_ppx_calls_add_ppx_with_save(self, mock_add_ppx):
         def fake_add_ppx(self_pkg, user, save=False):
-            self.assertFalse(save)
+            self.assertTrue(save)
             if self_pkg.sps_pkg_name == "pkg-ok":
-                self_pkg.ppx_id = self.registered_ppx.id
+                self_pkg.set_collection_pid_v2(self.collection_pid_v2)
+                self_pkg.save()
                 return None
             if self_pkg.sps_pkg_name == "pkg-error":
                 raise Exception("boom")
@@ -546,7 +640,7 @@ class SPSPkgCompletePpxTestCase(TestCase):
         self.assertIn("pkg-error", failure_names)
 
         self.pkg_ok.refresh_from_db()
-        self.assertEqual(self.pkg_ok.ppx_id, self.registered_ppx.id)
+        self.assertEqual(self.pkg_ok.collection_pid_v2, self.collection_pid_v2)
 
     @patch.object(SPSPkg, "add_ppx", autospec=True)
     def test_complete_ppx_traceback_included_on_exception(self, mock_add_ppx):
@@ -578,10 +672,11 @@ class SPSPkgCompletePpxTestCase(TestCase):
         self.assertEqual(called_names, ["pkg-fail"])
 
     def test_complete_ppx_skips_items_that_already_have_ppx(self):
-        registered_ppx = PidProviderXML.objects.create(creator=self.user)
-        pkg_with_ppx = SPSPkg.objects.create(
-            sps_pkg_name="pkg-has-ppx", pid_v2="v2-has",
-            file="fake/has.zip", creator=self.user, ppx=registered_ppx,
+        pkg_with_ppx = make_sps_pkg(
+            sps_pkg_name="pkg-has-ppx",
+            file="fake/has.zip",
+            creator=self.user,
+            collection_pid_v2=make_collection_pid_v2(self.user, "psi"),
         )
 
         with patch.object(SPSPkg, "add_ppx", autospec=True) as mock_add_ppx:
@@ -590,6 +685,23 @@ class SPSPkgCompletePpxTestCase(TestCase):
 
         called_ids = [call.args[0].id for call in mock_add_ppx.call_args_list]
         self.assertNotIn(pkg_with_ppx.id, called_ids)
+
+    def test_complete_ppx_links_package_with_ppx_without_pid_provider(self):
+        # pacote com ppx, mas sem vínculo: não consulta o pid provider
+        ppx = PidProviderXML.objects.create(creator=self.user, v3="v3-ppx")
+        pkg = SPSPkg.objects.create(
+            sps_pkg_name="pkg-ppx", file="fake/ppx.zip", creator=self.user, ppx=ppx
+        )
+        collection = Collection.objects.get(acron="scl")
+        make_article_proc(self.user, collection, sps_pkg=pkg, pid="S0001")
+
+        with patch.object(SPSPkg, "add_ppx", autospec=True) as mock_add_ppx:
+            response = SPSPkg.complete_ppx(user=self.user, sps_pkg_id_list=[pkg.id])
+
+        mock_add_ppx.assert_not_called()
+        self.assertEqual(response["success"], ["pkg-ppx"])
+        pkg.refresh_from_db()
+        self.assertEqual(pkg.collection, collection)
 
 
 # ============================================================
@@ -609,13 +721,25 @@ class SPSPkgFixSpsPkgNamesTestCase(TestCase):
         self.user = get_user_model().objects.create_user(
             username="fixnamesuser", password="pass"
         )
-        self.pkg_changed = SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="old-name",
-            pid_v3="v3-1", pid_v2="v2-1",
+        self.pkg_changed = make_sps_pkg(
+            creator=self.user,
+            sps_pkg_name="old-name",
+            collection_pid_v2=make_collection_pid_v2(
+                self.user, pid_v2="v2-1", v3="v3-1"
+            ),
         )
-        self.pkg_unchanged = SPSPkg.objects.create(
-            creator=self.user, sps_pkg_name="same-name",
-            pid_v3="v3-2", pid_v2="v2-2",
+        self.pkg_unchanged = make_sps_pkg(
+            creator=self.user,
+            sps_pkg_name="same-name",
+            collection_pid_v2=make_collection_pid_v2(
+                self.user, pid_v2="v2-2", v3="v3-2"
+            ),
+        )
+        self.pkg_without_name = make_sps_pkg(
+            creator=self.user,
+            collection_pid_v2=make_collection_pid_v2(
+                self.user, "psi", pid_v2="v2-3", v3="v3-1"
+            ),
         )
 
     def test_updates_only_items_whose_name_actually_changes(self):
@@ -634,11 +758,14 @@ class SPSPkgFixSpsPkgNamesTestCase(TestCase):
                 pkg_name_list=["old-name", "same-name"],
             )
 
-        self.assertEqual(total, 1)
+        # old-name (pela lista) e o sem nome (pelo pid_v3)
+        self.assertEqual(total, 2)
         self.pkg_changed.refresh_from_db()
         self.pkg_unchanged.refresh_from_db()
+        self.pkg_without_name.refresh_from_db()
         self.assertEqual(self.pkg_changed.sps_pkg_name, "new-name")
         self.assertEqual(self.pkg_unchanged.sps_pkg_name, "same-name")
+        self.assertEqual(self.pkg_without_name.sps_pkg_name, "new-name")
 
     def test_returns_zero_and_skips_bulk_update_when_nothing_changes(self):
         with patch.object(
@@ -693,18 +820,19 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
     """Testes para SPSPkg._exclude_invalid_records().
 
     Fluxo atual:
-    1. `cls.objects.filter(pid_v2__startswith=f"S{issue_pid}")` -> queryset base.
-    2. `sps_pkgs.filter(ppx_id__isnull=True)` -> SPSPkg sem ppx, removidos via
+    1. `cls.select_by_pid_v2_prefix(f"S{issue_pid}")` -> queryset base.
+    2. pacotes com ppx ainda não vinculados ao documento na coleção são
+       vinculados (complete_collection_pid_v2).
+    3. `sps_pkgs.filter(ppx__isnull=True)` -> SPSPkg sem ppx, removidos via
        delete_related_items; se algo foi deletado, sps_pkgs é reconsultado.
-    3. `sps_pkgs.values("ppx_id").annotate(total=Count("id")).filter(total__gt=1)`
-       -> valores de ppx_id duplicados.
-    4. Para cada valor duplicado: mantém o primeiro de
-       `filter(ppx_id=value).order_by("-updated")` e remove os demais via
+    4. pares (ppx, coleção) repetidos -> duplicados; pacotes que continuam
+       sem vínculo (coleção ambígua) não são avaliados.
+    4. Para cada par duplicado: mantém o mais recente e remove os demais via
        delete_related_items.
     """
 
     @patch.object(SPSPkg, "delete_related_items")
-    @patch("package.models.SPSPkg.objects")
+    @patch.object(SPSPkg, "select_by_pid_v2_prefix")
     def test_no_missing_ppx_and_no_duplicates(self, mock_objects, mock_delete_related):
         sps_pkgs_qs = MagicMock()
         sps_pkgs_qs.count.return_value = 5
@@ -714,7 +842,7 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         sps_pkgs_qs.filter.return_value = empty_qs
         sps_pkgs_qs.values.return_value.annotate.return_value.filter.return_value.values_list.return_value = []
 
-        mock_objects.filter.return_value = sps_pkgs_qs
+        mock_objects.return_value = sps_pkgs_qs
 
         result = SPSPkg._exclude_invalid_records(
             Mock(), "0034-777220210006",
@@ -730,7 +858,7 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         mock_delete_related.assert_not_called()
 
     @patch.object(SPSPkg, "delete_related_items", return_value=(3, {}))
-    @patch("package.models.SPSPkg.objects")
+    @patch.object(SPSPkg, "select_by_pid_v2_prefix")
     def test_deletes_sps_pkg_missing_ppx_and_requeries(
         self, mock_objects, mock_delete_related
     ):
@@ -744,7 +872,7 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         second_qs.count.return_value = 2
         second_qs.values.return_value.annotate.return_value.filter.return_value.values_list.return_value = []
 
-        mock_objects.filter.side_effect = [first_qs, second_qs]
+        mock_objects.side_effect = [first_qs, second_qs]
 
         result = SPSPkg._exclude_invalid_records(
             Mock(), "0034-777220210006",
@@ -752,14 +880,14 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
             delete_sps_pkg_which_is_duplicated=False,
         )
 
-        self.assertEqual(mock_objects.filter.call_count, 2)
+        self.assertEqual(mock_objects.call_count, 2)
         mock_delete_related.assert_called_once_with(to_delete_qs)
         self.assertEqual(result["total_sps_pkgs"], 5)
         self.assertEqual(result["total_delete_sps_pkg_which_ppx_is_missing"], 3)
         self.assertEqual(result["total_deleted_items"], 3)
 
     @patch.object(SPSPkg, "delete_related_items", side_effect=Exception("db error"))
-    @patch("package.models.SPSPkg.objects")
+    @patch.object(SPSPkg, "select_by_pid_v2_prefix")
     def test_captures_exception_when_deleting_missing_ppx(
         self, mock_objects, mock_delete_related
     ):
@@ -770,7 +898,7 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         sps_pkgs_qs.filter.return_value = to_delete_qs
         sps_pkgs_qs.values.return_value.annotate.return_value.filter.return_value.values_list.return_value = []
 
-        mock_objects.filter.return_value = sps_pkgs_qs
+        mock_objects.return_value = sps_pkgs_qs
 
         result = SPSPkg._exclude_invalid_records(
             Mock(), "0034-777220210006",
@@ -786,7 +914,7 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         self.assertNotIn("total_delete_sps_pkg_which_ppx_is_missing", result)
 
     @patch.object(SPSPkg, "delete_related_items", return_value=(2, {}))
-    @patch("package.models.SPSPkg.objects")
+    @patch.object(SPSPkg, "select_by_pid_v2_prefix")
     def test_removes_duplicated_ppx_keeping_the_chosen_one(
         self, mock_objects, mock_delete_related
     ):
@@ -797,6 +925,7 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         no_missing_qs.__bool__.return_value = False
 
         duplicados_qs = MagicMock()
+        duplicados_qs.filter.return_value = duplicados_qs
         duplicados_qs.order_by.return_value = duplicados_qs
         duplicados_qs.count.return_value = 3
         keep = Mock()
@@ -806,16 +935,23 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         duplicados_qs.exclude.return_value = remover_qs
 
         def filter_side_effect(**kwargs):
-            if "ppx_id__isnull" in kwargs:
+            if kwargs == {"ppx__isnull": False, "collection_pid_v2__isnull": True}:
+                # nenhum pacote a vincular
+                return []
+            if kwargs == {"ppx__isnull": True}:
                 return no_missing_qs
+            if kwargs == {"ppx__isnull": False, "collection_pid_v2__isnull": False}:
+                # somente os pacotes vinculados são avaliados por duplicidade
+                return sps_pkgs_qs
             if "ppx_id" in kwargs:
                 return duplicados_qs
             raise AssertionError(f"filter inesperado: {kwargs}")
 
         sps_pkgs_qs.filter.side_effect = filter_side_effect
-        sps_pkgs_qs.values.return_value.annotate.return_value.filter.return_value.values_list.return_value = [99]
+        # duplicado é o par (ppx, coleção) repetido
+        sps_pkgs_qs.values.return_value.annotate.return_value.filter.return_value.values_list.return_value = [(99, 5)]
 
-        mock_objects.filter.return_value = sps_pkgs_qs
+        mock_objects.return_value = sps_pkgs_qs
 
         result = SPSPkg._exclude_invalid_records(
             Mock(), "0034-777220210006",
@@ -823,19 +959,26 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
             delete_sps_pkg_which_is_duplicated=True,
         )
 
+        sps_pkgs_qs.values.assert_called_once_with(
+            "ppx_id",
+            "collection_pid_v2__collection_id",
+        )
+        sps_pkgs_qs.filter.assert_any_call(
+            ppx_id=99, collection_pid_v2__collection_id=5
+        )
         duplicados_qs.exclude.assert_called_once_with(id=10)
         mock_delete_related.assert_called_once_with(remover_qs)
 
         self.assertEqual(len(result["duplicated_items"]), 1)
         item = result["duplicated_items"][0]
-        self.assertEqual(item["value"], 99)
+        self.assertEqual(item["value"], (99, 5))
         self.assertEqual(item["total"], 3)
         self.assertEqual(item["total_deleted"], 2)
         self.assertEqual(result["total_deleted_items"], 2)
         self.assertEqual(result["exceptions"], [])
 
     @patch.object(SPSPkg, "delete_related_items")
-    @patch("package.models.SPSPkg.objects")
+    @patch.object(SPSPkg, "select_by_pid_v2_prefix")
     def test_captures_exception_during_duplicate_removal(
         self, mock_objects, mock_delete_related
     ):
@@ -846,14 +989,19 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
         no_missing_qs.__bool__.return_value = False
 
         def filter_side_effect(**kwargs):
-            if "ppx_id__isnull" in kwargs:
+            if kwargs == {"ppx__isnull": False, "collection_pid_v2__isnull": True}:
+                return []
+            if kwargs == {"ppx__isnull": True}:
                 return no_missing_qs
+            if kwargs == {"ppx__isnull": False, "collection_pid_v2__isnull": False}:
+                # somente os pacotes vinculados são avaliados por duplicidade
+                return sps_pkgs_qs
             raise Exception("boom")
 
         sps_pkgs_qs.filter.side_effect = filter_side_effect
-        sps_pkgs_qs.values.return_value.annotate.return_value.filter.return_value.values_list.return_value = [99]
+        sps_pkgs_qs.values.return_value.annotate.return_value.filter.return_value.values_list.return_value = [(99, 5)]
 
-        mock_objects.filter.return_value = sps_pkgs_qs
+        mock_objects.return_value = sps_pkgs_qs
 
         result = SPSPkg._exclude_invalid_records(
             Mock(), "0034-777220210006",
@@ -863,7 +1011,7 @@ class SPSPkgExcludeInvalidRecordsInternalTestCase(unittest.TestCase):
 
         self.assertEqual(len(result["exceptions"]), 1)
         self.assertEqual(result["exceptions"][0]["action"], "removing duplicity")
-        self.assertEqual(result["exceptions"][0]["item"], 99)
+        self.assertEqual(result["exceptions"][0]["item"], (99, 5))
         mock_delete_related.assert_not_called()
         self.assertEqual(result["total_deleted_items"], 0)
 
@@ -888,3 +1036,347 @@ class SPSPkgDeleteRelatedItemsTestCase(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SPSPkgByCollectionTestCase(TestCase):
+    """
+    Artigo presente em mais de uma coleção: o mesmo ppx (pid_v3) tem um
+    SPSPkg por coleção (CollectionPidV2), pois o XML difere por coleção
+    """
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="bycollectionuser", password="pass"
+        )
+        self.scl = Collection.objects.create(creator=self.user, acron="scl")
+        self.psi = Collection.objects.create(creator=self.user, acron="psi")
+        self.ppx = PidProviderXML.objects.create(creator=self.user, v3="v3-same")
+
+    def _create_or_update(self, collection, pid_v2, sps_pkg_name, current_sps_pkg=None):
+        collection_pid_v2 = SPSPkg.get_collection_pid_v2(
+            self.user, self.ppx.id, collection, pid_v2=pid_v2, journal_acron="x"
+        )
+        return SPSPkg._create_or_update(
+            user=self.user,
+            sps_pkg_name=sps_pkg_name,
+            registered_in_core=True,
+            pkg_name_list=[sps_pkg_name],
+            collection_pid_v2=collection_pid_v2,
+            current_sps_pkg=current_sps_pkg,
+        )
+
+    def test_same_ppx_creates_one_sps_pkg_per_collection(self):
+        scl_pkg = self._create_or_update(self.scl, "S0103-65642009000300003", "0103-6564-pusp-20-3-1")
+        psi_pkg = self._create_or_update(self.psi, "S1678-51772009000300003", "1678-5177-psicousp-20-3-1")
+
+        self.assertNotEqual(scl_pkg.id, psi_pkg.id)
+        scl_pkg.refresh_from_db()
+        self.assertEqual(scl_pkg.collection, self.scl)
+        self.assertEqual(scl_pkg.pid_v2, "S0103-65642009000300003")
+        self.assertEqual(scl_pkg.pid_v3, "v3-same")
+        self.assertEqual(psi_pkg.collection, self.psi)
+        self.assertEqual(psi_pkg.pid_v2, "S1678-51772009000300003")
+        self.assertEqual(
+            SPSPkg.objects.filter(
+                collection_pid_v2__pid_provider_xml__v3="v3-same"
+            ).count(),
+            2,
+        )
+
+    def test_get_collection_pid_v2_requires_ppx_and_collection(self):
+        self.assertIsNone(SPSPkg.get_collection_pid_v2(self.user, None, self.scl))
+        self.assertIsNone(SPSPkg.get_collection_pid_v2(self.user, self.ppx.id, None))
+
+    def test_get_collection_pid_v2_keeps_registered_data(self):
+        first = SPSPkg.get_collection_pid_v2(
+            self.user, self.ppx.id, self.scl, pid_v2="registered"
+        )
+        second = SPSPkg.get_collection_pid_v2(
+            self.user, self.ppx.id, self.scl, pid_v2="other"
+        )
+        self.assertEqual(first, second)
+        second.refresh_from_db()
+        self.assertEqual(second.pid_v2, "registered")
+
+    def test_updates_sps_pkg_of_the_same_collection(self):
+        first = self._create_or_update(self.scl, "S0103-65642009000300003", "0103-6564-pusp-20-3-1")
+        second = self._create_or_update(self.scl, "S0103-65642009000300003", "0103-6564-pusp-20-3-1")
+        self.assertEqual(first.id, second.id)
+
+    def test_search_by_ppx_id_filters_by_collection(self):
+        scl_pkg = self._create_or_update(self.scl, "S0103-65642009000300003", "0103-6564-pusp-20-3-1")
+        psi_pkg = self._create_or_update(self.psi, "S1678-51772009000300003", "1678-5177-psicousp-20-3-1")
+        self.assertEqual(SPSPkg.search_by_ppx_id(self.ppx.id, self.scl), scl_pkg)
+        self.assertEqual(SPSPkg.search_by_ppx_id(self.ppx.id, self.psi), psi_pkg)
+
+    def test_reuses_current_sps_pkg_without_collection(self):
+        # pacote migrado antes da separação por coleção
+        legacy = SPSPkg.objects.create(creator=self.user, sps_pkg_name="legacy")
+        obj = self._create_or_update(
+            self.psi, "S1678-51772009000300003", "1678-5177-psicousp-20-3-1",
+            current_sps_pkg=legacy,
+        )
+        self.assertEqual(obj.id, legacy.id)
+        self.assertEqual(obj.collection, self.psi)
+
+    def test_does_not_reuse_current_sps_pkg_of_another_collection(self):
+        scl_pkg = self._create_or_update(self.scl, "S0103-65642009000300003", "0103-6564-pusp-20-3-1")
+        psi_pkg = self._create_or_update(
+            self.psi, "S1678-51772009000300003", "1678-5177-psicousp-20-3-1",
+            current_sps_pkg=scl_pkg,
+        )
+        self.assertNotEqual(psi_pkg.id, scl_pkg.id)
+        scl_pkg.refresh_from_db()
+        self.assertEqual(scl_pkg.collection, self.scl)
+        self.assertEqual(scl_pkg.pid_v2, "S0103-65642009000300003")
+
+    def test_without_collection_finds_unlinked_package_by_name(self):
+        # sem coleção (ex.: ingresso), o pacote não é vinculado a um
+        # documento na coleção
+        pkg = SPSPkg.objects.create(creator=self.user, sps_pkg_name="upload")
+        obj = SPSPkg._create_or_update(
+            user=self.user,
+            sps_pkg_name="upload",
+            registered_in_core=True,
+            pkg_name_list=["upload"],
+            collection_pid_v2=None,
+        )
+        self.assertEqual(obj.id, pkg.id)
+        self.assertIsNone(obj.collection)
+
+
+class SPSPkgCompleteCollectionPidV2TestCase(TestCase):
+    """
+    Pacote anterior à separação por coleção (ppx, pid_v3, pid_v2 sem
+    collection_pid_v2) é vinculado ao documento na coleção pela migração ou
+    pela tarefa em lotes, somente se não houver ambiguidade
+    """
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="completeuser", password="pass"
+        )
+        self.scl = Collection.objects.create(creator=self.user, acron="scl")
+        self.psi = Collection.objects.create(creator=self.user, acron="psi")
+        self.ppx = PidProviderXML.objects.create(creator=self.user, v3="v3-legacy")
+
+    def legacy(self, sps_pkg_name="legacy", ppx=True, pid_v2="S0103-65642009000300003"):
+        return SPSPkg.objects.create(
+            creator=self.user,
+            sps_pkg_name=sps_pkg_name,
+            ppx=self.ppx if ppx else None,
+            pid_v3=self.ppx.v3,
+            pid_v2=pid_v2,
+        )
+
+    def test_links_package_of_a_single_collection(self):
+        pkg = self.legacy()
+        make_article_proc(self.user, self.scl, sps_pkg=pkg, pid=pkg.pid_v2)
+
+        self.assertEqual(pkg.complete_collection_pid_v2(self.user), "linked")
+
+        pkg.refresh_from_db()
+        self.assertEqual(pkg.collection, self.scl)
+        self.assertEqual(pkg.collection_pid_v2.pid_provider_xml, self.ppx)
+        self.assertEqual(pkg.collection_pid_v2.pid_v2, "S0103-65642009000300003")
+        self.assertEqual(pkg.collection_pid_v2.sps_pkg_name, "legacy")
+        self.assertEqual(pkg.ppx, self.ppx)
+        self.assertEqual(pkg.pid_v3, "v3-legacy")
+
+    def test_links_to_the_existing_document_in_the_collection(self):
+        existing = make_collection_pid_v2(
+            self.user, "scl", ppx=self.ppx, pid_v2="S0103-65642009000300003"
+        )
+        pkg = self.legacy()
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+
+        pkg.complete_collection_pid_v2(self.user)
+
+        self.assertEqual(pkg.collection_pid_v2, existing)
+
+    def test_link_keeps_the_legacy_fields(self):
+        existing = make_collection_pid_v2(
+            self.user, "scl", ppx=self.ppx, pid_v2="S0103-65642009000399999"
+        )
+        pkg = self.legacy()
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+
+        self.assertEqual(pkg.complete_collection_pid_v2(self.user), "linked")
+
+        pkg.refresh_from_db()
+        self.assertEqual(pkg.collection_pid_v2, existing)
+        # campo legado mantido; o dado do documento na coleção é preferido
+        self.assertEqual(pkg.pid_v2, "S0103-65642009000300003")
+        self.assertEqual(pkg.get_pid_v2(), "S0103-65642009000399999")
+        self.assertEqual(pkg.get_ppx_id(), self.ppx.id)
+
+    def test_link_completes_the_empty_legacy_fields(self):
+        pkg = self.legacy(ppx=False, pid_v2=None)
+        make_article_proc(self.user, self.scl, sps_pkg=pkg, pid="S0103-65642009000300003")
+
+        self.assertEqual(pkg.complete_collection_pid_v2(self.user), "linked")
+
+        pkg.refresh_from_db()
+        # ppx: o único do pid_v3; pid_v2: o do ArticleProc
+        self.assertEqual(pkg.ppx, self.ppx)
+        self.assertEqual(pkg.pid_v2, "S0103-65642009000300003")
+
+    def test_link_with_sync_fields_updates_the_legacy_fields(self):
+        make_collection_pid_v2(
+            self.user, "scl", ppx=self.ppx, pid_v2="S0103-65642009000399999"
+        )
+        pkg = self.legacy()
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+
+        pkg.complete_collection_pid_v2(self.user, sync_fields=True)
+
+        pkg.refresh_from_db()
+        self.assertEqual(pkg.pid_v2, "S0103-65642009000399999")
+
+    def test_finds_ppx_by_pid_v3(self):
+        pkg = self.legacy(ppx=False)
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+
+        self.assertEqual(pkg.complete_collection_pid_v2(self.user), "linked")
+        pkg.refresh_from_db()
+        self.assertEqual(pkg.ppx, self.ppx)
+
+    def test_does_not_link_package_of_more_than_one_collection(self):
+        pkg = self.legacy()
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+        make_article_proc(self.user, self.psi, sps_pkg=pkg)
+
+        self.assertEqual(pkg.complete_collection_pid_v2(self.user), "no_collection")
+        pkg.refresh_from_db()
+        self.assertIsNone(pkg.collection_pid_v2)
+        self.assertEqual(CollectionPidV2.objects.count(), 0)
+
+    def test_does_not_link_when_the_two_latest_article_procs_are_of_one_collection(self):
+        # ArticleProc.Meta.ordering (-updated) não pode entrar no DISTINCT:
+        # com ele, os 2 primeiros valores seriam da mesma coleção
+        pkg = self.legacy()
+        make_article_proc(self.user, self.psi, sps_pkg=pkg)
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+
+        self.assertIsNone(pkg.get_article_proc_of_unique_collection())
+        self.assertEqual(pkg.complete_collection_pid_v2(self.user), "no_collection")
+
+    def test_exclude_invalid_records_keeps_ambiguous_packages_of_the_same_ppx(self):
+        pid_v2 = "S0103-65642009000300003"
+        older = self.legacy("legacy-a", pid_v2=pid_v2)
+        newer = self.legacy("legacy-b", pid_v2=pid_v2)
+        # coleção ambígua: os dois continuam sem vínculo
+        make_article_proc(self.user, self.scl, pid=pid_v2)
+        make_article_proc(self.user, self.psi, pid=pid_v2)
+
+        result = SPSPkg._exclude_invalid_records(
+            self.user,
+            "0103-656420090003",
+            delete_sps_pkg_which_ppx_is_missing=True,
+            delete_sps_pkg_which_is_duplicated=True,
+        )
+
+        self.assertEqual(result["exceptions"], [])
+        self.assertEqual(result["total_deleted_items"], 0)
+        self.assertEqual(
+            set(SPSPkg.objects.values_list("id", flat=True)), {older.id, newer.id}
+        )
+
+    def test_does_not_link_package_without_ppx(self):
+        pkg = self.legacy(ppx=False)
+        pkg.pid_v3 = None
+        pkg.save()
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+
+        self.assertEqual(pkg.complete_collection_pid_v2(self.user), "no_ppx")
+
+    def test_does_not_link_when_the_document_in_the_collection_has_package(self):
+        linked = make_sps_pkg(
+            creator=self.user,
+            sps_pkg_name="linked",
+            collection_pid_v2=make_collection_pid_v2(self.user, "scl", ppx=self.ppx),
+        )
+        pkg = self.legacy()
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+
+        self.assertEqual(pkg.complete_collection_pid_v2(self.user), "taken")
+        pkg.refresh_from_db()
+        self.assertIsNone(pkg.collection_pid_v2)
+        linked.refresh_from_db()
+        self.assertIsNotNone(linked.collection_pid_v2)
+
+    def test_get_links_and_returns_package_of_the_collection(self):
+        pkg = self.legacy()
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+        collection_pid_v2 = make_collection_pid_v2(self.user, "scl", ppx=self.ppx)
+
+        self.assertEqual(SPSPkg.get(collection_pid_v2, self.user), pkg)
+        pkg.refresh_from_db()
+        self.assertEqual(pkg.collection_pid_v2, collection_pid_v2)
+
+    def test_get_does_not_return_package_of_another_collection(self):
+        pkg = self.legacy()
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+        psi_collection_pid_v2 = make_collection_pid_v2(self.user, "psi", ppx=self.ppx)
+
+        with self.assertRaises(SPSPkg.DoesNotExist):
+            SPSPkg.get(psi_collection_pid_v2, self.user)
+        # completado para a sua coleção
+        pkg.refresh_from_db()
+        self.assertEqual(pkg.collection, self.scl)
+
+    def test_create_or_update_creates_package_for_another_collection(self):
+        pkg = self.legacy()
+        make_article_proc(self.user, self.scl, sps_pkg=pkg)
+        psi_collection_pid_v2 = make_collection_pid_v2(
+            self.user, "psi", ppx=self.ppx, pid_v2="S1678-51772009000300003"
+        )
+
+        obj = SPSPkg._create_or_update(
+            user=self.user,
+            sps_pkg_name="legacy",
+            registered_in_core=True,
+            pkg_name_list=["legacy"],
+            collection_pid_v2=psi_collection_pid_v2,
+            current_sps_pkg=None,
+            ppx_id=self.ppx.id,
+            pid_v3=self.ppx.v3,
+            pid_v2="S1678-51772009000300003",
+        )
+
+        self.assertNotEqual(obj.id, pkg.id)
+        self.assertEqual(obj.collection, self.psi)
+        self.assertEqual(obj.pid_v2, "S1678-51772009000300003")
+        pkg.refresh_from_db()
+        self.assertEqual(pkg.collection, self.scl)
+        self.assertEqual(pkg.pid_v2, "S0103-65642009000300003")
+
+    def test_batch_advances_the_cursor_over_ambiguous_packages(self):
+        ambiguous = self.legacy("ambiguous")
+        make_article_proc(self.user, self.scl, sps_pkg=ambiguous)
+        make_article_proc(self.user, self.psi, sps_pkg=ambiguous)
+        other_ppx = PidProviderXML.objects.create(creator=self.user, v3="v3-other")
+        linkable = SPSPkg.objects.create(
+            creator=self.user, sps_pkg_name="linkable", ppx=other_ppx
+        )
+        make_article_proc(self.user, self.scl, sps_pkg=linkable)
+
+        stats, last_id, done = SPSPkg.complete_collection_pid_v2_batch(
+            self.user, last_id=0, batch_size=1
+        )
+        self.assertEqual(stats, {"no_collection": 1})
+        self.assertEqual(last_id, ambiguous.id)
+        self.assertFalse(done)
+
+        stats, last_id, done = SPSPkg.complete_collection_pid_v2_batch(
+            self.user, last_id=last_id, batch_size=1
+        )
+        self.assertEqual(stats, {"linked": 1})
+        self.assertEqual(last_id, linkable.id)
+
+        stats, last_id, done = SPSPkg.complete_collection_pid_v2_batch(
+            self.user, last_id=last_id, batch_size=1
+        )
+        self.assertEqual(stats, {})
+        self.assertTrue(done)

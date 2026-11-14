@@ -259,6 +259,7 @@ class ArticleProcViewSet(CommonControlFieldViewSet):
     list_per_page = 10
     list_display = [
         "__str__",
+        "collection",
         "xml_status",
         "sps_pkg_status",
         "migration_status",

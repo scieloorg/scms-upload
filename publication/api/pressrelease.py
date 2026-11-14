@@ -12,7 +12,7 @@ def publish_pressrelease(pressrelease, api_data):
     build_pressrelease(pressrelease, builder)
     api = PublicationAPI(**api_data)
     return api.post_data(
-        payload, {"journal_acronym": pressrelease.journal.journal_acron}
+        payload, {"journal_acronym": pressrelease.journal.get_acron()}
     )
 
 

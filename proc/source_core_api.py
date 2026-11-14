@@ -410,8 +410,6 @@ def process_journal_result(
         no_lang = []
 
     # Processa dados específicos do SciELO
-    journal_acron = journal.journal_acron
-
     scielo_journals = result.get("scielo_journal") or []
     if len(scielo_journals) == 0:
         raise ValueError(
@@ -458,7 +456,6 @@ def process_journal_result(
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
             force_update=force_update,
         )
-        journal_acron = journal_acron or item.get("journal_acron")
 
     if not collection:
         raise ValueError(
@@ -466,8 +463,6 @@ def process_journal_result(
                 journal
             )
         )
-    if journal.journal_acron != journal_acron:
-        journal.journal_acron = journal_acron
     journal.core_synchronized = True
     journal.save()
 

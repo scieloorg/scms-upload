@@ -31,8 +31,12 @@ RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY = {
 def try_fetch_and_register_press_release(
     self, journal_acronym=None, pressrelease_lang=None, username=None, user_id=None, verify=False
 ):
-    query_condition = Q(journal_acron=journal_acronym) if journal_acronym else Q()
-    journals_query = Journal.objects.filter(query_condition)
+    query_condition = (
+        Q(journalproc__acron=journal_acronym) | Q(journal_acron=journal_acronym)
+        if journal_acronym
+        else Q()
+    )
+    journals_query = Journal.objects.filter(query_condition).distinct()
 
     dict_aux = {}
     if pressrelease_lang and pressrelease_lang in RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY:
@@ -42,10 +46,11 @@ def try_fetch_and_register_press_release(
 
     dict_aux = RSS_PRESS_RELEASES_FEEDS_BY_CATEGORY
     for journal in journals_query:
+        journal_acron = journal_acronym or journal.get_acron()
         for lang, url in dict_aux.items():
-            if journal.journal_acron:
+            if journal_acron:
                 press_release_url_by_lang = url.get("url").format(
-                    lang, journal.journal_acron
+                    lang, journal_acron
                 )
 
                 response = fetch_data(

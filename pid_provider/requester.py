@@ -173,6 +173,14 @@ class PidRequester(BasePidProvider):
             )
             # Upload segue a mesma regra do Core quando XMLs são iguais
             registered["do_local_registration"] = registered["do_remote_registration"]
+        elif registered.get("is_equal_xml"):
+            # XML recebido é igual ao registrado, mas os dados por coleção
+            # (CollectionPidV2) estão incompletos: registra no Upload para
+            # completá-los; no Core, somente se ainda não registrado
+            registered["do_remote_registration"] = not registered.get(
+                "registered_in_core"
+            )
+            registered["do_local_registration"] = True
         else:
             # XML recebido é diferente do registrado ou não está no Upload
             # Força registro em ambos os sistemas
@@ -263,15 +271,15 @@ class PidRequester(BasePidProvider):
                 detail = resp
                 registered.update(resp)
 
-            op.finish(user, completed=True, detail=detail)
+            op.finish(user, completed=not resp.get("error_type"), detail=detail)
             return resp
         except Exception as e:
             logging.exception(e)
-            logging.error(detail)
             exc_type, exc_value, exc_traceback = sys.exc_info()
             op.finish(user, completed=False, exception=e, exc_traceback=exc_traceback)
             return {"error_msg": str(e), "error_type": str(type(e))}
 
+    # OBSOLETO: o pid v2 é corrigido por coleção em proc.models.ArticleProc.fix_pid_v2
     def fix_pid_v2(
         self,
         user,

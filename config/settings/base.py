@@ -437,3 +437,4 @@ PROFILING_LOG_ALL = env.bool("DJANGO_PROFILING_LOG_ALL", default=True)
 
 # Score mínimo (percentual_score) para considerar um candidato de PidProviderXML como aprovado
 PID_PROVIDER_MIN_RATE = env.float("PID_PROVIDER_MIN_RATE", default=0.65)
+
