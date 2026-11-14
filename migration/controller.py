@@ -2,17 +2,15 @@ import logging
 import os
 import sys
 import traceback
-from copy import deepcopy
-from datetime import datetime, timezone
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from django.db.models import Max
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 from scielo_classic_website import classic_ws
-from scielo_classic_website.iid2json.id2json3 import get_doc_records
+from scielo_classic_website.iid2json.id_file import ClassicIdFile
 
 from article.models import Article
 from collection.models import Language
@@ -31,7 +29,13 @@ from journal.models import (
     Subject,
 )
 from location.models import Location
-from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile, ClassicWebsiteConfiguration
+from migration.models import (
+    ClassicWebsiteConfiguration,
+    IdFileRecord,
+    JournalAcronIdFile,
+    MigratedArticle,
+    MigratedFile,
+)
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
 
@@ -732,7 +736,6 @@ def get_migrated_xml_with_pre(article_proc):
 
 def import_journal_acron_id_records(
     user,
-    article_proc_model,
     journal_proc,
     force_update,
 ):
@@ -764,31 +767,54 @@ def import_journal_acron_id_records(
             journal_acron + ".id",
         )
 
+        # raises FileNotFoundError (source_path)
         journal_id_file = JournalAcronIdFile.create_or_update(
             user=user,
             collection=collection,
             journal_acron=journal_acron,
             source_path=source_path,
-            force_update=force_update,
         )
+        
+        last_run_date = None
+        if not force_update:
+            try:
+                last_run_date = MigratedArticle.objects.filter(
+                    collection=collection,
+                    pid__startswith=f"S{journal_proc.pid}",
+                ).aggregate(d=Max("isis_updated_date"))["d"]
+            except (TypeError, ValueError, AttributeError):
+                last_run_date = None
 
-        if force_update or journal_id_file.data.get(
-            "id_file_record_need_to_be_updated"
-        ):
-            for item in get_bases_work_acron_id_file_records(
-                source_path,
-                classic_website,
-            ):
-                if item.get("exception"):
-                    exceptions.append(item.get("exception"))
-                    continue
+        if journal_id_file.has_changes(force_update=force_update):
+            try:
+                # lê a cópia guardada por create_or_update
+                for item in get_bases_work_acron_id_file_records(
+                    journal_id_file.file.path,
+                    classic_website,
+                    last_run_date=last_run_date
+                ):
+                    if item.get("exception"):
+                        # falha em registro individual: não impede a
+                        # marcação do arquivo como lido
+                        exceptions.append(item.get("exception"))
+                        continue
 
-                item["force_update"] = force_update
-                IdFileRecord.create_or_update(
-                    user,
-                    journal_id_file,
-                    **item,
+                    item["force_update"] = force_update
+                    IdFileRecord.create_or_update(
+                        user,
+                        journal_id_file,
+                        **item,
+                    )
+            except Exception:
+                # leitura incompleta: não marca como lido; os registros já
+                # carregados (todo=True) podem ser processados
+                tb = traceback.format_exc()
+                message = str(
+                    _("Incomplete reading of acron.id; it will be read again in the next execution")
                 )
+            else:
+                # o arquivo só é marcado como lido se for lido completamente
+                journal_id_file.mark_as_read(user)
         else:
             message = str(_("IdFileRecord is already up-to-date with acron.id"))
 
@@ -822,45 +848,58 @@ def import_journal_acron_id_records(
 
 
 def get_bases_work_acron_id_file_records(
-    source_path, classic_website,
+    source_path, classic_website, last_run_date=None
 ):
-    for item in get_doc_records(source_path):
+    paths = classic_website.classic_website_paths
+    id_file = ClassicIdFile(
+        "artigo",
+        source_path,
+        p_records_base_paths=[paths.bases_work_path, paths.bases_path],
+    )
+    for item in id_file.items(since=last_run_date):
         try:
-            issue_id = item.get("issue_id")
-            doc_id = item.get("doc_id")
-
-            if doc_id:
+            if item.kind == "document":
+                # records: registros do acron.id e, se o artigo não tem
+                # registros "p" no acron.id, os de bases-work/artigo/p/<pid>
+                # ou bases/artigo/p/<pid>, se existirem
                 yield dict(
                     item_type="article",
-                    item_pid=doc_id,
-                    data=item["doc_data"],
+                    item_pid=item.pid,
+                    data=item.records,
                 )
-                try:
-                    # se houver bases-work/p/<pid>, obtém os registros de parágrafo
-                    ign_pid, p_records = classic_website.get_p_records(doc_id)
-                    p_records = list(p_records)
-                    if p_records:
-                        # adiciona registros p aos registros do artigo
-                        # info["external_p_records_count"] = len(p_records)
-                        yield dict(
-                            item_type="paragraph",
-                            item_pid=doc_id,
-                            data=p_records,
-                        )
-                except FileNotFoundError:
-                    # é aceitável que bases-work/p/<pid>....id não exista
-                    pass
 
-            elif issue_id:
+            elif item.kind == "issue":
                 yield dict(
                     item_type="issue",
-                    item_pid=issue_id,
-                    data=item["issue_data"],
+                    item_pid=item.pid,
+                    data=item.data,
                 )
 
         except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
             yield dict(
-                item_pid=doc_id or issue_id,
+                item_type="exception",
+                item_pid=item.pid,
+                exception=str(e)
+            )
+
+    # lotes quebrados (ex.: "o" sem "h", "h"... sem "o"): não são documentos;
+    # são armazenados separados, para auditoria
+    for batch in id_file.broken_batches():
+        try:
+            yield dict(
+                item_type="broken",
+                item_pid=(batch.pid or f"MFN{batch.mfn}")[:23],
+                data=dict(
+                    record_types="".join(t or "" for t in batch.record_types),
+                    mfn=batch.mfn,
+                    last_mfn=batch.last_mfn,
+                    offset=batch.offset,
+                    records=batch.main_records,
+                ),
+            )
+        except Exception as e:
+            yield dict(
+                item_type="exception",
+                item_pid=batch.pid,
                 exception=str(e)
             )

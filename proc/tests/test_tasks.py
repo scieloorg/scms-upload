@@ -1,3 +1,4 @@
+import traceback
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -33,11 +34,12 @@ class TaskExecutionInitTest(TestCase):
         mock_tracker_cls.create.assert_called_once_with(name="task", item="item1")
         self.assertEqual(task_exec.task_tracker, mock_tracker)
         self.assertEqual(task_exec.params, {"a": 1})
-        self.assertEqual(task_exec.events, [])
+        self.assertEqual(task_exec.steps, [])
         self.assertEqual(task_exec.stats, {})
-        self.assertEqual(task_exec.exceptions, [])
+        self.assertEqual(task_exec.errors, [])
         self.assertIsNone(task_exec.journal_proc_id)
-        self.assertEqual(task_exec.status_changes, {})
+        self.assertEqual(task_exec.first_status, {})
+        self.assertEqual(task_exec.last_status, {})
 
 
 class TaskExecutionPropertiesTest(TestCase):
@@ -80,54 +82,138 @@ class TaskExecutionPropertiesTest(TestCase):
         self.assertEqual(mock_tracker.total_processed, 5)
 
 
+def _new_task_exec(mock_tracker_cls, total_to_process=0, total_processed=0, params=None):
+    mock_tracker = MagicMock()
+    mock_tracker.total_to_process = total_to_process
+    mock_tracker.total_processed = total_processed
+    mock_tracker_cls.create.return_value = mock_tracker
+    task_exec = tasks.TaskExecution(name="n", item="i", params=params or {})
+    return task_exec, mock_tracker
+
+
+def _titles(task_exec):
+    """Retorna os títulos das etapas sem o prefixo "#N +Xs "."""
+    return [next(iter(step)).split(" ", 1)[1] for step in task_exec.steps]
+
+
+def _contents(task_exec):
+    """Retorna o conteúdo das etapas sem "elapsed"."""
+    return [
+        {k: v for k, v in next(iter(step.values())).items() if k != "elapsed"}
+        for step in task_exec.steps
+    ]
+
+
 class TaskExecutionAddExceptionTest(TestCase):
     """Testes para TaskExecution.add_exception."""
 
     @patch("proc.tasks.TaskTracker")
-    def test_add_exception_appends_type_and_message(self, mock_tracker_cls):
-        mock_tracker_cls.create.return_value = MagicMock()
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
+    def test_add_exception_with_exception_object(self, mock_tracker_cls):
+        task_exec, _ = _new_task_exec(mock_tracker_cls)
 
         try:
             raise ValueError("boom")
         except ValueError as e:
-            task_exec.add_exception(e)
+            task_exec.add_exception(e, item="S0001")
 
-        self.assertEqual(len(task_exec.exceptions), 1)
-        self.assertEqual(task_exec.exceptions[0]["message"], "boom")
-        self.assertIn("ValueError", task_exec.exceptions[0]["type"])
+        self.assertEqual(
+            task_exec.errors,
+            [{"type": "ValueError", "message": "boom", "item": "S0001", "step": "#1"}],
+        )
+        self.assertEqual(_titles(task_exec), ["ERROR ValueError: boom"])
+        self.assertEqual(_contents(task_exec), [{"item": "S0001"}])
+
+    @patch("proc.tasks.TaskTracker")
+    def test_add_exception_parses_format_exc_text(self, mock_tracker_cls):
+        task_exec, _ = _new_task_exec(mock_tracker_cls)
+        task_exec.add_event({"operation": "first"})
+
+        try:
+            raise KeyError("missing")
+        except KeyError:
+            task_exec.add_exception(traceback.format_exc())
+
+        error = task_exec.errors[0]
+        self.assertEqual(error["type"], "KeyError")
+        self.assertEqual(error["message"], "'missing'")
+        self.assertEqual(error["step"], "#2")
+        self.assertIsInstance(error["traceback"], list)
+        self.assertTrue(error["traceback"][0].startswith("Traceback"))
+
+    @patch("proc.tasks.TaskTracker")
+    def test_add_exception_with_plain_message(self, mock_tracker_cls):
+        task_exec, _ = _new_task_exec(mock_tracker_cls)
+
+        task_exec.add_exception("Skip publish X")
+
+        self.assertEqual(task_exec.errors, [{"message": "Skip publish X", "step": "#1"}])
+        self.assertEqual(_titles(task_exec), ["ERROR Skip publish X"])
+
+    @patch("proc.tasks.TaskTracker")
+    def test_add_exception_with_dict_keeps_keys(self, mock_tracker_cls):
+        task_exec, _ = _new_task_exec(mock_tracker_cls)
+
+        task_exec.add_exception({"issue_id": 3, "traceback": "Traceback ...\nValueError: x"})
+
+        error = task_exec.errors[0]
+        self.assertEqual(error["issue_id"], 3)
+        self.assertEqual(error["type"], "ValueError")
+        self.assertEqual(error["message"], "x")
 
 
 class TaskExecutionAddEventTest(TestCase):
-    """Testes para TaskExecution.add_event (evento único e lista)."""
+    """Testes para TaskExecution.add_event."""
 
     @patch("proc.tasks.TaskTracker")
-    def test_add_event_appends_single_event(self, mock_tracker_cls):
-        mock_tracker_cls.create.return_value = MagicMock()
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
+    def test_operation_becomes_step_title(self, mock_tracker_cls):
+        task_exec, _ = _new_task_exec(mock_tracker_cls)
 
-        task_exec.add_event({"a": 1})
+        task_exec.add_event({"operation": "migrate_document_records", "response": {"a": 1}})
 
-        self.assertEqual(task_exec.events, [{"a": 1}])
-
-    @patch("proc.tasks.TaskTracker")
-    def test_add_event_extends_with_list(self, mock_tracker_cls):
-        mock_tracker_cls.create.return_value = MagicMock()
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
-
-        task_exec.add_event([{"a": 1}, {"b": 2}])
-
-        self.assertEqual(task_exec.events, [{"a": 1}, {"b": 2}])
+        self.assertEqual(len(task_exec.steps), 1)
+        (title, values), = task_exec.steps[0].items()
+        self.assertEqual(title, "#1 migrate_document_records")
+        self.assertRegex(values["elapsed"], r"^\d+\.\ds$")
+        self.assertEqual(_contents(task_exec), [{"response": {"a": 1}}])
 
     @patch("proc.tasks.TaskTracker")
-    def test_add_event_mixes_single_and_list_calls(self, mock_tracker_cls):
-        mock_tracker_cls.create.return_value = MagicMock()
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
+    def test_action_becomes_step_title(self, mock_tracker_cls):
+        task_exec, _ = _new_task_exec(mock_tracker_cls)
 
-        task_exec.add_event({"a": 1})
-        task_exec.add_event([{"b": 2}, {"c": 3}])
+        task_exec.add_event({"action": "scheduled", "item": "abc"})
 
-        self.assertEqual(task_exec.events, [{"a": 1}, {"b": 2}, {"c": 3}])
+        self.assertEqual(_titles(task_exec), ["scheduled"])
+        self.assertEqual(_contents(task_exec), [{"item": "abc"}])
+
+    @patch("proc.tasks.TaskTracker")
+    def test_single_key_becomes_step_title(self, mock_tracker_cls):
+        task_exec, _ = _new_task_exec(mock_tracker_cls)
+
+        task_exec.add_event({"websites": [1]})
+
+        self.assertEqual(_titles(task_exec), ["websites"])
+
+    @patch("proc.tasks.TaskTracker")
+    def test_operation_without_content_is_ok(self, mock_tracker_cls):
+        task_exec, _ = _new_task_exec(mock_tracker_cls)
+
+        task_exec.add_event({"operation": "Scheduled articles publication"})
+
+        self.assertEqual(_contents(task_exec), [{}])
+
+    @patch("proc.tasks.TaskTracker")
+    def test_list_adds_one_step_per_item_and_none_is_ignored(self, mock_tracker_cls):
+        task_exec, _ = _new_task_exec(mock_tracker_cls)
+
+        task_exec.add_event(None)
+        task_exec.add_event([{"operation": "a"}, {"operation": "b"}])
+        task_exec.add_event({"operation": "c"})
+
+        self.assertEqual(_titles(task_exec), ["a", "b", "c"])
+        self.assertEqual(
+            [next(iter(step)).split(" ")[0] for step in task_exec.steps],
+            ["#1", "#2", "#3"],
+        )
 
 
 class TaskExecutionAddNumberTest(TestCase):
@@ -135,8 +221,7 @@ class TaskExecutionAddNumberTest(TestCase):
 
     @patch("proc.tasks.TaskTracker")
     def test_add_number_sets_stats_key(self, mock_tracker_cls):
-        mock_tracker_cls.create.return_value = MagicMock()
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
+        task_exec, _ = _new_task_exec(mock_tracker_cls)
 
         task_exec.add_number("total", 5)
 
@@ -144,15 +229,11 @@ class TaskExecutionAddNumberTest(TestCase):
 
 
 class TaskExecutionFinishTest(TestCase):
-    """Testes para TaskExecution.finish: completed flag, fallback JSON e erro interno."""
+    """Testes para TaskExecution.finish: completed flag, resumo, fallback JSON e erro interno."""
 
     @patch("proc.tasks.TaskTracker")
-    def test_completed_true_when_no_exception_no_traceback_no_exceptions(self, mock_tracker_cls):
-        mock_tracker = MagicMock()
-        mock_tracker.total_to_process = 10
-        mock_tracker.total_processed = 10
-        mock_tracker_cls.create.return_value = mock_tracker
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
+    def test_completed_true_when_no_exception_no_traceback_no_errors(self, mock_tracker_cls):
+        task_exec, mock_tracker = _new_task_exec(mock_tracker_cls, 10, 10)
 
         task_exec.finish()
 
@@ -160,26 +241,23 @@ class TaskExecutionFinishTest(TestCase):
         self.assertTrue(kwargs["completed"])
         self.assertIsNone(kwargs["exception"])
         self.assertIsNone(kwargs["exc_traceback"])
+        self.assertEqual(kwargs["detail"]["1_summary"]["result"], "completed")
 
     @patch("proc.tasks.TaskTracker")
     def test_completed_false_when_exception_given(self, mock_tracker_cls):
-        mock_tracker = MagicMock()
-        mock_tracker.total_to_process = 0
-        mock_tracker.total_processed = 0
-        mock_tracker_cls.create.return_value = mock_tracker
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
+        task_exec, mock_tracker = _new_task_exec(mock_tracker_cls)
 
         task_exec.finish(exception=ValueError("x"))
 
-        self.assertFalse(mock_tracker.finish.call_args.kwargs["completed"])
+        kwargs = mock_tracker.finish.call_args.kwargs
+        self.assertFalse(kwargs["completed"])
+        self.assertEqual(
+            kwargs["detail"]["1_summary"]["result"], "interrupted (ValueError: x)"
+        )
 
     @patch("proc.tasks.TaskTracker")
     def test_completed_false_when_exc_traceback_given(self, mock_tracker_cls):
-        mock_tracker = MagicMock()
-        mock_tracker.total_to_process = 0
-        mock_tracker.total_processed = 0
-        mock_tracker_cls.create.return_value = mock_tracker
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
+        task_exec, mock_tracker = _new_task_exec(mock_tracker_cls)
 
         try:
             raise ValueError("boom")
@@ -191,78 +269,84 @@ class TaskExecutionFinishTest(TestCase):
         self.assertFalse(mock_tracker.finish.call_args.kwargs["completed"])
 
     @patch("proc.tasks.TaskTracker")
-    def test_completed_false_when_self_exceptions_present(self, mock_tracker_cls):
-        mock_tracker = MagicMock()
-        mock_tracker.total_to_process = 0
-        mock_tracker.total_processed = 0
-        mock_tracker_cls.create.return_value = mock_tracker
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
+    def test_completed_false_when_errors_present(self, mock_tracker_cls):
+        task_exec, mock_tracker = _new_task_exec(mock_tracker_cls)
         task_exec.add_exception(ValueError("previous failure"))
 
         task_exec.finish()
 
-        self.assertFalse(mock_tracker.finish.call_args.kwargs["completed"])
+        kwargs = mock_tracker.finish.call_args.kwargs
+        self.assertFalse(kwargs["completed"])
+        summary = kwargs["detail"]["1_summary"]
+        self.assertEqual(summary["result"], "completed with errors")
+        self.assertEqual(summary["total_errors"], 1)
+        self.assertEqual(len(kwargs["detail"]["4_errors"]), 1)
 
     @patch("proc.tasks.TaskTracker")
-    def test_stats_totals_are_populated_from_task_tracker(self, mock_tracker_cls):
-        mock_tracker = MagicMock()
-        mock_tracker.total_to_process = 7
-        mock_tracker.total_processed = 3
-        mock_tracker_cls.create.return_value = mock_tracker
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
+    def test_summary_has_totals_stats_and_duration(self, mock_tracker_cls):
+        task_exec, mock_tracker = _new_task_exec(mock_tracker_cls, 7, 3)
+        task_exec.add_number("total_articleprocs", 9)
 
-        task_exec.finish()
+        task_exec.finish(data={"x": 1})
 
         detail = mock_tracker.finish.call_args.kwargs["detail"]
-        self.assertEqual(detail["stats"]["total_to_process"], 7)
-        self.assertEqual(detail["stats"]["total_processed"], 3)
+        summary = detail["1_summary"]
+        self.assertEqual(summary["total_to_process"], 7)
+        self.assertEqual(summary["total_processed"], 3)
+        self.assertEqual(summary["total_articleprocs"], 9)
+        self.assertRegex(summary["duration"], r"^\d+\.\ds$")
+        self.assertNotIn("status", summary)
+        self.assertEqual(detail["5_data"], {"x": 1})
 
     @patch("proc.tasks.TaskTracker")
     def test_falls_back_to_str_for_non_json_serializable_params(self, mock_tracker_cls):
-        mock_tracker = MagicMock()
-        mock_tracker.total_to_process = 0
-        mock_tracker.total_processed = 0
-        mock_tracker_cls.create.return_value = mock_tracker
-        non_serializable = {"bad": ValueError("cannot serialize me")}
-        task_exec = tasks.TaskExecution(name="n", item="i", params=non_serializable)
+        task_exec, mock_tracker = _new_task_exec(
+            mock_tracker_cls, params={"bad": ValueError("cannot serialize me")}
+        )
 
         task_exec.finish()
 
         detail = mock_tracker.finish.call_args.kwargs["detail"]
-        # params could not be json-serialized as a whole, so it was stringified
-        self.assertIsInstance(detail["params"], str)
+        # only the non-serializable value is stringified
+        self.assertEqual(detail["2_params"], {"bad": "cannot serialize me"})
         # the remaining, serializable fields are preserved as-is
-        self.assertEqual(detail["stats"], {"total_to_process": 0, "total_processed": 0})
-        self.assertEqual(detail["events"], [])
-        self.assertEqual(detail["exceptions"], [])
-        self.assertEqual(detail["status_changes"], {})
+        self.assertEqual(detail["1_summary"]["total_to_process"], 0)
+        self.assertEqual(detail["3_steps"], [])
+        self.assertEqual(detail["4_errors"], [])
 
     @patch("proc.tasks.TaskTracker")
     def test_falls_back_to_str_for_non_serializable_set_value(self, mock_tracker_cls):
-        mock_tracker = MagicMock()
-        mock_tracker.total_to_process = 0
-        mock_tracker.total_processed = 0
-        mock_tracker_cls.create.return_value = mock_tracker
-        task_exec = tasks.TaskExecution(name="n", item="i", params={"bad": {1, 2, 3}})
+        task_exec, mock_tracker = _new_task_exec(mock_tracker_cls, params={"bad": {1, 2, 3}})
 
         task_exec.finish()
 
         detail = mock_tracker.finish.call_args.kwargs["detail"]
-        self.assertIsInstance(detail["params"], str)
-        self.assertIn("1", detail["params"])
+        self.assertEqual(detail["2_params"], {"bad": [1, 2, 3]})
+
+    @patch("proc.tasks.TaskTracker")
+    def test_tuple_keys_and_sets_become_readable_json(self, mock_tracker_cls):
+        task_exec, mock_tracker = _new_task_exec(mock_tracker_cls)
+        task_exec.add_event({
+            "operation": "selected",
+            "response": {(4277, "rsp"): {"issue_proc_id_list": {16203, 16196}}},
+        })
+
+        task_exec.finish()
+
+        detail = mock_tracker.finish.call_args.kwargs["detail"]
+        step = detail["3_steps"][0]["#1 selected"]
+        self.assertEqual(
+            step["response"], {"4277 | rsp": {"issue_proc_id_list": [16196, 16203]}}
+        )
 
     @patch("proc.tasks.UnexpectedEvent")
     @patch("proc.tasks.TaskTracker")
     def test_calls_unexpected_event_create_when_task_tracker_finish_raises(
         self, mock_tracker_cls, mock_unexpected_event
     ):
-        mock_tracker = MagicMock()
-        mock_tracker.total_to_process = 0
-        mock_tracker.total_processed = 0
+        task_exec, mock_tracker = _new_task_exec(mock_tracker_cls)
         mock_tracker.item = "item-x"
         mock_tracker.finish.side_effect = Exception("db unavailable")
-        mock_tracker_cls.create.return_value = mock_tracker
-        task_exec = tasks.TaskExecution(name="n", item="item-x", params={})
 
         task_exec.finish()
 
@@ -277,62 +361,91 @@ class TaskExecutionUpdateTotalStatusTest(TestCase):
 
     @patch("proc.tasks.get_total_status_data")
     @patch("proc.tasks.TaskTracker")
-    def test_builds_previous_from_status_changes_history_and_appends(
+    def test_first_call_records_full_status_then_only_changes(
         self, mock_tracker_cls, mock_get_total_status_data
     ):
-        mock_tracker_cls.create.return_value = MagicMock()
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
+        task_exec, mock_tracker = _new_task_exec(mock_tracker_cls)
         task_exec.journal_proc_id = 42
 
         mock_get_total_status_data.return_value = {
-            "journal": ["TODO"],
-            "issue": ["DONE"],
+            "journal": [{"total": 1, "status": {"migration_status": "DONE"}}],
+            "article": [{"migration_status": "TODO", "qa_ws_status": "TODO", "total": 10}],
         }
         task_exec.update_total_status("Start", issue_proc_id=7)
-
         mock_get_total_status_data.assert_called_once_with(42, 7)
-        self.assertEqual(
-            task_exec.status_changes["journal"],
-            [{"events": ["Start"], "total_status": ["TODO"]}],
-        )
-        self.assertEqual(
-            task_exec.status_changes["issue"],
-            [{"events": ["Start"], "total_status": ["DONE"]}],
-        )
 
         mock_get_total_status_data.return_value = {
-            "journal": ["DONE"],
-            "issue": ["DONE"],
+            "journal": [{"total": 1, "status": {"migration_status": "DONE"}}],
+            "article": [
+                {"migration_status": "TODO", "qa_ws_status": "TODO", "total": 1},
+                {"migration_status": "DONE", "qa_ws_status": "TODO", "total": 9},
+            ],
         }
-        task_exec.update_total_status("Next", issue_proc_id=7)
+        task_exec.update_total_status("Migrated", issue_proc_id=7)
+        task_exec.update_total_status("Nothing", issue_proc_id=7)
 
-        mock_get_total_status_data.assert_called_with(42, 7)
-        self.assertEqual(len(task_exec.status_changes["journal"]), 2)
+        self.assertEqual(_titles(task_exec), ["Start", "Migrated", "Nothing"])
+        start, migrated, nothing = _contents(task_exec)
         self.assertEqual(
-            task_exec.status_changes["journal"][1],
-            {"events": ["Next"], "total_status": ["DONE"]},
+            start,
+            {"status": {
+                "journal": {"migration=DONE": 1},
+                "article": {"migration=TODO | qa_ws=TODO": 10},
+            }},
         )
-        # "issue" total_status did not change -> appended to the same entry
-        self.assertEqual(len(task_exec.status_changes["issue"]), 1)
         self.assertEqual(
-            task_exec.status_changes["issue"][0],
-            {"events": ["Start", "Next"], "total_status": ["DONE"]},
+            migrated,
+            {"status_changes": {"article": {
+                "migration=TODO | qa_ws=TODO": "10 -> 1",
+                "migration=DONE | qa_ws=TODO": "0 -> 9",
+            }}},
+        )
+        self.assertEqual(nothing, {"status_changes": "no changes"})
+
+        task_exec.finish()
+        summary = mock_tracker.finish.call_args.kwargs["detail"]["1_summary"]
+        self.assertEqual(
+            summary["status"]["1_before"],
+            {
+                "journal": {"migration=DONE": 1},
+                "article": {"migration=TODO | qa_ws=TODO": 10},
+            },
+        )
+        self.assertEqual(
+            summary["status"]["2_after"],
+            {
+                "journal": {"migration=DONE": 1},
+                "article": {
+                    "migration=TODO | qa_ws=TODO": 1,
+                    "migration=DONE | qa_ws=TODO": 9,
+                },
+            },
+        )
+        self.assertEqual(
+            summary["status"]["3_changes"],
+            {"article": {
+                "migration=TODO | qa_ws=TODO": "10 -> 1",
+                "migration=DONE | qa_ws=TODO": "0 -> 9",
+            }},
         )
 
     @patch("proc.tasks.get_total_status_data")
     @patch("proc.tasks.TaskTracker")
-    def test_previous_defaults_to_empty_list_when_history_entry_is_malformed(
+    def test_summary_status_no_changes_when_only_start(
         self, mock_tracker_cls, mock_get_total_status_data
     ):
-        mock_tracker_cls.create.return_value = MagicMock()
-        task_exec = tasks.TaskExecution(name="n", item="i", params={})
-        # entrada de histórico existente porém vazia -> items[-1] dispara IndexError
-        task_exec.status_changes = {"journal": []}
-        mock_get_total_status_data.return_value = {"journal": ["X"]}
+        task_exec, mock_tracker = _new_task_exec(mock_tracker_cls)
+        mock_get_total_status_data.return_value = {
+            "article": [{"migration_status": "DONE", "total": 3}],
+        }
+        task_exec.update_total_status("Start")
 
-        task_exec.update_total_status("Label")
+        task_exec.finish()
 
-        mock_get_total_status_data.assert_called_once_with(None, None)
+        status = mock_tracker.finish.call_args.kwargs["detail"]["1_summary"]["status"]
+        self.assertEqual(status["1_before"], {"article": {"migration=DONE": 3}})
+        self.assertEqual(status["2_after"], {"article": {"migration=DONE": 3}})
+        self.assertEqual(status["3_changes"], "no changes")
 
 
 class GetUserTest(TestCase):

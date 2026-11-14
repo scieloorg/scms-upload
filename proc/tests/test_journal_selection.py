@@ -256,17 +256,23 @@ class RegisterClassicWebsiteDataTest(TestCase):
         self.assertEqual(obj.migration_status, BLOCKED)
 
 
+def id_file_item(pid, data):
+    # item de ClassicIdFile.items(): pid e data (registro convertido para JSON)
+    return MagicMock(pid=pid, data=data)
+
+
 class CreateOrUpdateMigratedJournalTest(TestCase):
     def setUp(self):
         self.user = MagicMock()
         self.collection = MagicMock()
         self.classic_website = MagicMock()
         self.classic_website.classic_website_paths.title_path = "/bases/title.id"
-        self.classic_website.get_journals_pids_and_records.return_value = [
-            ("0001-0001", [{"v100": "a"}]),
-            ("0002-0002", [{"v100": "b"}]),
+        self.journals_id_file = self.classic_website.get_journals_id_file.return_value
+        self.journals_id_file.items.return_value = [
+            id_file_item("0001-0001", {"v100": "a"}),
+            id_file_item("0002-0002", {"v100": "b"}),
         ]
-        for name in ("MigratedFile", "JournalProc", "UnexpectedEvent"):
+        for name in ("MigratedFile", "MigratedData", "JournalProc", "UnexpectedEvent"):
             patcher = patch.object(source_classic_website, name)
             setattr(self, name, patcher.start())
             self.addCleanup(patcher.stop)
@@ -276,10 +282,13 @@ class CreateOrUpdateMigratedJournalTest(TestCase):
         self.modified_date = patcher.start()
         self.addCleanup(patcher.stop)
         self.MigratedFile.has_changes.return_value = True
+        self.MigratedData.objects.filter.return_value.aggregate.return_value = {
+            "d": "20200101"
+        }
 
-    def _run(self):
+    def _run(self, force_update=False):
         source_classic_website.create_or_update_migrated_journal(
-            self.user, self.collection, self.classic_website, False
+            self.user, self.collection, self.classic_website, force_update
         )
 
     def assert_marked_as_read(self, path="/bases/title.id"):
@@ -336,12 +345,25 @@ class CreateOrUpdateMigratedJournalTest(TestCase):
         self.UnexpectedEvent.create.assert_called_once()
         self.assert_marked_as_read()
 
+    def test_reads_only_records_since_most_recent_registered_date(self):
+        self._run()
+        self.MigratedData.objects.filter.assert_called_once_with(
+            collection=self.collection, content_type="journal"
+        )
+        self.journals_id_file.items.assert_called_once_with(since="20200101")
+
+    def test_force_update_reads_all_records(self):
+        self._run(force_update=True)
+        self.MigratedData.objects.filter.assert_not_called()
+        self.journals_id_file.items.assert_called_once_with(since=None)
+        self.assertEqual(self.JournalProc.register_classic_website_data.call_count, 2)
+
     def test_does_not_mark_as_read_when_reading_is_incomplete(self):
-        def records():
-            yield ("0001-0001", [{"v100": "a"}])
+        def records(since=None):
+            yield id_file_item("0001-0001", {"v100": "a"})
             raise IOError("leitura interrompida")
 
-        self.classic_website.get_journals_pids_and_records.side_effect = records
+        self.journals_id_file.items.side_effect = records
         self._run()
         self.assertEqual(self.JournalProc.register_classic_website_data.call_count, 1)
         self.UnexpectedEvent.create.assert_called_once()
@@ -349,8 +371,8 @@ class CreateOrUpdateMigratedJournalTest(TestCase):
 
     def test_issue_file_uses_same_reading(self):
         self.classic_website.classic_website_paths.issue_path = "/bases/issue.id"
-        self.classic_website.get_issues_pids_and_records.return_value = [
-            ("0001-000120200001", [{"v30": "a"}]),
+        self.classic_website.get_issues_id_file.return_value.items.return_value = [
+            id_file_item("0001-000120200001", {"v30": "a"}),
         ]
         with patch.object(source_classic_website, "IssueProc") as mock_issue_proc:
             mock_issue_proc.register_classic_website_data.return_value = MagicMock()
@@ -361,6 +383,9 @@ class CreateOrUpdateMigratedJournalTest(TestCase):
             self.user, self.collection, "0001-000120200001", {"v30": "a"}, "issue", False
         )
         self.JournalProc.register_classic_website_data.assert_not_called()
+        self.MigratedData.objects.filter.assert_called_once_with(
+            collection=self.collection, content_type="issue"
+        )
         self.MigratedFile.has_changes.assert_called_once_with(
             self.collection, "/bases/issue.id", False
         )
