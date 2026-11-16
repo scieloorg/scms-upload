@@ -142,9 +142,90 @@ class TaskMigrateAndPublishArticlesTest(TestCase):
         self.assertEqual(kwargs["journal_proc_id"], 2)
         self.assertEqual(kwargs["issue_proc_id_list"], [30])
 
+    @patch("proc.tasks.task_migrate_and_publish_articles_by_journal")
+    @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.TaskTracker")
+    def test_explicit_status_is_validated_and_forwarded(
+        self, mock_task_tracker, mock_article_proc, mock_by_journal
+    ):
+        # status explícito: valores inválidos são descartados; o restante
+        # seleciona periódicos/fascículos e é repassado à tarefa do periódico
+        mock_article_proc.get_journal_and_issue_proc_ids.return_value = {
+            (2, "xyz"): {"issue_proc_id_list": {30}, "issue_folder": None},
+        }
+
+        task_migrate_and_publish_articles(
+            collection_acron="scl", status=["BLOCKED", "INVALIDO"]
+        )
+
+        selection_kwargs = (
+            mock_article_proc.get_journal_and_issue_proc_ids.call_args.kwargs
+        )
+        self.assertEqual(selection_kwargs["status_list"], ["BLOCKED"])
+        self.assertEqual(mock_by_journal.delay.call_args.kwargs["status"], ["BLOCKED"])
+
+    @patch("proc.tasks.task_migrate_and_publish_articles_by_journal")
+    @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.TaskTracker")
+    def test_routine_status_is_todo_and_reproc(
+        self, mock_task_tracker, mock_article_proc, mock_by_journal
+    ):
+        mock_article_proc.get_journal_and_issue_proc_ids.return_value = {
+            (2, "xyz"): {"issue_proc_id_list": {30}, "issue_folder": None},
+        }
+
+        task_migrate_and_publish_articles(collection_acron="scl")
+
+        selection_kwargs = (
+            mock_article_proc.get_journal_and_issue_proc_ids.call_args.kwargs
+        )
+        self.assertCountEqual(selection_kwargs["status_list"], ["TODO", "REPROC"])
+        self.assertCountEqual(
+            mock_by_journal.delay.call_args.kwargs["status"], ["TODO", "REPROC"]
+        )
+
 
 class TaskMigrateAndPublishArticlesByJournalTest(TestCase):
     """Testes para task_migrate_and_publish_articles_by_journal."""
+
+    @patch("proc.tasks.get_total_status_data")
+    @patch("proc.tasks.task_migrate_and_publish_articles_by_issue")
+    @patch("proc.tasks.task_fix_issue_articles")
+    @patch("proc.tasks.get_api_data")
+    @patch("proc.tasks.migration_controller")
+    @patch("proc.tasks.ArticleProc.fix_publication_status")
+    @patch("proc.tasks.JournalProc")
+    @patch("proc.tasks.TaskTracker")
+    def test_new_articles_issues_and_explicit_status_are_forwarded(
+        self,
+        mock_task_tracker,
+        mock_journal_proc,
+        mock_fix_pub_status,
+        mock_migration_controller,
+        mock_get_api_data,
+        mock_fix_issue_articles,
+        mock_by_issue,
+        mock_get_total_status_data,
+    ):
+        # fascículo 12 tem artigos novos no acron.id; 10 foi selecionado
+        # pelo status: ambos são agendados com o status pedido
+        mock_get_total_status_data.return_value = {}
+        mock_journal_proc.objects.get.return_value = MagicMock()
+        mock_migration_controller.import_journal_acron_id_records.return_value = {
+            "issue_proc_id_list": [12, 10],
+        }
+
+        task_migrate_and_publish_articles_by_journal(
+            journal_proc_id=1,
+            issue_proc_id_list=[10],
+            status=["BLOCKED"],
+        )
+
+        scheduled = {
+            c.kwargs["issue_proc_id"]: c.kwargs["status"]
+            for c in mock_by_issue.delay.call_args_list
+        }
+        self.assertEqual(scheduled, {10: ["BLOCKED"], 12: ["BLOCKED"]})
 
     @patch("proc.tasks.get_total_status_data")
     @patch("proc.tasks.task_migrate_and_publish_articles_by_issue")
