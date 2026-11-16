@@ -48,7 +48,8 @@ class GenerateProblemReportView(WagtailAdminTemplateMixin, FormView):
     header_icon = "warning"
 
     def dispatch(self, request, *args, **kwargs):
-        if not request.user.has_perm("proc.view_problemreport"):
+        # funcionalidade exclusiva de administradores
+        if not (request.user.is_active and request.user.is_superuser):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
 
@@ -89,6 +90,8 @@ class GenerateProblemReportView(WagtailAdminTemplateMixin, FormView):
                 journal_acron_list=kwargs["journal_acron_list"],
                 publication_year=kwargs["publication_year"],
                 issue_folder=kwargs["issue_folder"],
+                updated_from=kwargs["updated_from"],
+                updated_to=kwargs["updated_to"],
             ),
             PROBLEM_REPORT_ITEM_TYPES[kwargs["content_type"]],
             user=self.request.user,
@@ -96,6 +99,7 @@ class GenerateProblemReportView(WagtailAdminTemplateMixin, FormView):
             status=ProblemReport.STATUS_QUEUED,
             # idioma em uso no admin (o Wagtail ativa a preferência do usuário)
             language=get_language(),
+            max_items=kwargs["max_items"],
         )
         task_generate_problem_report.delay(
             user_id=self.request.user.id,
