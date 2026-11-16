@@ -2,7 +2,16 @@ from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail.snippets.models import register_snippet
-from wagtail.snippets.views.snippets import SnippetViewSetGroup
+from django.shortcuts import redirect
+from django.urls import reverse
+from wagtail.snippets.views.snippets import (
+    CreateView as SnippetCreateView,
+    EditView as SnippetEditView,
+    IndexView as SnippetIndexView,
+    InspectView as SnippetInspectView,
+    SnippetViewSet,
+    SnippetViewSetGroup,
+)
 import django_filters
 
 from config.menu import get_menu_order
@@ -10,7 +19,7 @@ from core.views import CommonControlFieldViewSet
 from htmlxml.models import HTMLXML
 from package.models import SPSPkg
 
-from .models import ArticleProc, IssueProc, JournalProc, ProcReport
+from .models import ArticleProc, IssueProc, JournalProc, ProblemReport, ProcReport
 
 
 class HTMLXMLFilterSet(django_filters.FilterSet):
@@ -310,6 +319,84 @@ class ProcReportViewSet(CommonControlFieldViewSet):
     ]
 
 
+class ProblemReportIndexView(SnippetIndexView):
+    """
+    O botão "Add" vira "Gerar relatório" (situação atual, sob demanda).
+    Relatórios não são editáveis: o título leva à tela de detalhe (só
+    leitura, com o download) e a ação "Editar" não aparece.
+    """
+
+    add_item_label = _("Generate report")
+
+    def get_add_url(self):
+        if self.user_has_permission("view"):
+            return reverse("proc:generate_problem_report")
+
+    def get_edit_url(self, instance):
+        return None
+
+
+class ProblemReportCreateView(SnippetCreateView):
+    """Relatórios só são criados pela task; redireciona para o formulário."""
+
+    def dispatch(self, request, *args, **kwargs):
+        return redirect("proc:generate_problem_report")
+
+
+class ProblemReportEditView(SnippetEditView):
+    """Não há o que editar: redireciona para a tela de detalhe."""
+
+    def dispatch(self, request, *args, **kwargs):
+        return redirect("wagtailsnippets_proc_problemreport:inspect", kwargs["pk"])
+
+
+class ProblemReportInspectView(SnippetInspectView):
+    """Detalhe só leitura, sem o botão "Editar"."""
+
+    def get_edit_url(self):
+        return None
+
+
+class ProblemReportViewSet(SnippetViewSet):
+    model = ProblemReport
+    index_view_class = ProblemReportIndexView
+    add_view_class = ProblemReportCreateView
+    edit_view_class = ProblemReportEditView
+    inspect_view_class = ProblemReportInspectView
+    menu_label = _("Problem reports")
+    inspect_view_enabled = True
+    menu_icon = "warning"
+    menu_order = 200
+    add_to_settings_menu = False
+    list_per_page = 50
+    list_display = [
+        "scope_label",
+        "status",
+        "total_items",
+        "total_categories",
+        "task_name",
+        "download",
+        "created",
+        "expires_at",
+    ]
+    list_filter = ["status", "task_name", "item_types"]
+    search_fields = ["scope_label", "task_name"]
+    inspect_view_fields = [
+        "download",
+        "status",
+        "language",
+        "scope_label",
+        "item_types",
+        "total_items",
+        "total_categories",
+        "task_name",
+        "created",
+        "generated_at",
+        "expires_at",
+        "error",
+    ]
+
+
 class ProcessViewSetGroup(SnippetViewSetGroup):
     menu_label = _("Processing")
     menu_icon = "folder-open-inverse"
@@ -321,6 +408,7 @@ class ProcessViewSetGroup(SnippetViewSetGroup):
         SPSPkgViewSet,
         HTMLXMLViewSet,
         ProcReportViewSet,
+        ProblemReportViewSet,
     )
 
 
