@@ -542,6 +542,33 @@ class IsUpdatedWithCollectionsTest(MultiCollectionJournalTestBase):
             self.is_updated(registered, make_xml_with_pre(SCL_V2, "pusp"))
 
 
+class GetPidV2Test(MultiCollectionJournalTestBase):
+    """pid v2 do documento na coleção (ver complete_missing_xml_pids)"""
+
+    def test_pid_v2_of_the_collection(self):
+        registered = self.create_pid_provider_xml(SCL_V2)
+        self.create_collection_version(registered, "scl", self.scl, SCL_V2, "pusp")
+        self.create_collection_version(
+            registered, "psi", self.psi, PSI_V2, "psicousp"
+        )
+
+        self.assertEqual(registered.get_pid_v2(), SCL_V2)
+        self.assertEqual(registered.get_pid_v2("scl"), SCL_V2)
+        self.assertEqual(registered.get_pid_v2("psi"), PSI_V2)
+
+    def test_pid_v2_of_other_collection_is_not_returned(self):
+        registered = self.create_pid_provider_xml(SCL_V2)
+        self.create_collection_version(registered, "scl", self.scl, SCL_V2, "pusp")
+
+        self.assertIsNone(registered.get_pid_v2("psi"))
+
+    def test_legacy_pid_v2(self):
+        # documento registrado antes de CollectionPidV2
+        registered = self.create_pid_provider_xml(SCL_V2)
+        self.assertEqual(registered.get_pid_v2("psi"), SCL_V2)
+        self.assertEqual(PidProviderXML(v2=SCL_V2).get_pid_v2("psi"), SCL_V2)
+
+
 class RegistrationDemandTest(SimpleTestCase):
     def demand(self, registered):
         from pid_provider.requester import PidRequester
