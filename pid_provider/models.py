@@ -1310,9 +1310,13 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             xml_changed["pid_v3"] = valid_pid
 
         if registered:
-            if not xml_with_pre.v2 and registered.v2:
-                xml_with_pre.v2 = registered.v2
-                xml_changed["pid_v2"] = registered.v2
+            if not xml_with_pre.v2:
+                # pid v2 da coleção do XML, não necessariamente o da
+                # coleção principal (ver get_pid_v2)
+                registered_v2 = registered.get_pid_v2(xml_with_pre.collection)
+                if registered_v2:
+                    xml_with_pre.v2 = registered_v2
+                    xml_changed["pid_v2"] = registered_v2
             if not xml_with_pre.aop_pid and registered.aop_pid:
                 xml_with_pre.aop_pid = registered.aop_pid
                 xml_changed["aop_pid"] = registered.aop_pid
@@ -1389,6 +1393,26 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         (ver CollectionPidV2.get_current_version)
         """
         return CollectionPidV2.get_current_version(self, collection, collection_acron)
+
+    def get_pid_v2(self, collection_acron=None):
+        """
+        Retorna o pid v2 do documento na coleção ou, na falta da coleção,
+        o da coleção principal (self.v2)
+
+        Documento registrado antes de CollectionPidV2: self.v2 é de uma
+        coleção desconhecida, então é retornado se não pertence a outra
+        coleção
+        """
+        if not collection_acron or not self.pk:
+            return self.v2
+        pids_v2 = dict(
+            self.collection_pids_v2.values_list("collection__acron", "pid_v2")
+        )
+        if pids_v2.get(collection_acron):
+            return pids_v2[collection_acron]
+        if self.v2 not in pids_v2.values():
+            return self.v2
+        return None
 
     @staticmethod
     def get_xml_collection_acron_and_main(xml_with_pre, xml_collections):
@@ -1912,10 +1936,12 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             response.update(registered.data)
             # pid v2 do XML de entrada (como em register), completado com o
             # registrado quando ausente (ver complete_missing_xml_pids)
-            response["v2"] = xml_with_pre.v2 or registered.v2
             xml_collections = get_xml_collections(xml_with_pre)
             collection_acron, main = cls.get_xml_collection_acron_and_main(
                 xml_with_pre, xml_collections
+            )
+            response["v2"] = xml_with_pre.v2 or registered.get_pid_v2(
+                collection_acron
             )
             response["is_equal"] = registered.is_equal_to(
                 xml_with_pre, collection_acron
