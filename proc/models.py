@@ -1,15 +1,20 @@
+import hashlib
 import json
 import logging
 import os
+import re
 import sys
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from tempfile import TemporaryDirectory
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
 from django.db.models import Count, Q, F
+from django.utils import timezone
+from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -400,6 +405,256 @@ class ProcReport(CommonControlField):
         paths = [collection_acron, pid[:9], pid[9:13], pid[13:17], pid[17:]]
         paths = [path for path in paths if path]
         return os.path.join(*paths)
+
+
+def problem_report_directory_path(instance, filename):
+    return f"problem_reports/{timezone.now():%Y-%m-%d}/{filename}"
+
+
+class ProblemReport(models.Model):
+    """
+    Relatório (ZIP com CSVs, no idioma de quem solicitou) dos itens BLOCKED/PENDING de um escopo,
+    agrupados por categoria de problema (ver ``proc.problem_report``).
+
+    É temporário: fica obsoleto assim que há correções no sistema. Por
+    isso, ao gerar um novo relatório para o mesmo escopo, os anteriores
+    são apagados, e relatórios vencidos (``expires_at``) são removidos a
+    cada nova geração ou por ``task_delete_expired_problem_reports``.
+
+    O registro é criado assim que o relatório é solicitado; ``status``
+    indica em que ponto está (na fila, aguardando o fim da execução da
+    migração, gerando, pronto ou erro).
+    """
+
+    STATUS_QUEUED = "QUEUED"
+    STATUS_WAITING = "WAITING"
+    STATUS_GENERATING = "DOING"
+    STATUS_DONE = "DONE"
+    STATUS_ERROR = "ERROR"
+    STATUS_CHOICES = [
+        (STATUS_QUEUED, _("Queued")),
+        (STATUS_WAITING, _("Waiting for the migration to finish")),
+        (STATUS_GENERATING, _("Generating")),
+        (STATUS_DONE, _("Ready")),
+        (STATUS_ERROR, _("Error")),
+    ]
+    IN_PROGRESS = (STATUS_QUEUED, STATUS_WAITING, STATUS_GENERATING)
+
+    created = models.DateTimeField(_("Creation date"), auto_now_add=True)
+    updated = models.DateTimeField(_("Last update date"), auto_now=True)
+    creator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name=_("Creator"),
+        related_name="problem_report_creator",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    task_name = models.CharField(_("Triggered by"), max_length=128, null=True, blank=True)
+    scope_key = models.CharField(max_length=40, db_index=True)
+    scope_label = models.CharField(_("Scope"), max_length=255, null=True, blank=True)
+    scope = models.JSONField(_("Scope params"), null=True, blank=True)
+    item_types = models.CharField(_("Item types"), max_length=64, null=True, blank=True)
+    file = models.FileField(
+        _("Report file"),
+        upload_to=problem_report_directory_path,
+        null=True,
+        blank=True,
+        max_length=300,
+    )
+    total_items = models.IntegerField(_("Items with problems"), default=0)
+    total_categories = models.IntegerField(_("Categories"), default=0)
+    stats = models.JSONField(_("Summary"), null=True, blank=True)
+    expires_at = models.DateTimeField(_("Expires at"), null=True, blank=True, db_index=True)
+    status = models.CharField(
+        _("Status"),
+        max_length=8,
+        choices=STATUS_CHOICES,
+        default=STATUS_QUEUED,
+        db_index=True,
+    )
+    error = models.TextField(_("Error"), null=True, blank=True)
+    generated_at = models.DateTimeField(_("Generated at"), null=True, blank=True)
+    language = models.CharField(
+        _("Language"),
+        max_length=5,
+        choices=[("en", "English"), ("pt", "Português"), ("es", "Español")],
+        default="en",
+    )
+
+    panels = [
+        FieldPanel("status", read_only=True),
+        FieldPanel("language", read_only=True),
+        FieldPanel("generated_at", read_only=True),
+        FieldPanel("error", read_only=True),
+        FieldPanel("scope_label", read_only=True),
+        FieldPanel("task_name", read_only=True),
+        FieldPanel("item_types", read_only=True),
+        FieldPanel("total_items", read_only=True),
+        FieldPanel("total_categories", read_only=True),
+        FieldPanel("expires_at", read_only=True),
+        FieldPanel("stats", widget=ReadOnlyPrettyJSONWidget()),
+    ]
+
+    class Meta:
+        ordering = ["-created"]
+        verbose_name = _("Problem report")
+        verbose_name_plural = _("Problem reports")
+
+    def __str__(self):
+        return f"{self.scope_label} {self.created:%Y-%m-%d %H:%M} ({self.get_status_display()})"
+
+    @property
+    def in_progress(self):
+        return self.status in self.IN_PROGRESS
+
+    def download(self):
+        """Link para o ZIP com os CSVs (no idioma do relatório)."""
+        if self.in_progress:
+            return _("(reload the page later)")
+        if self.status != self.STATUS_DONE or not self.file:
+            return "-"
+        return format_html(
+            '<a href="{}" download>{} (.zip)</a>', self.file.url, _("Download")
+        )
+
+    download.short_description = _("Report file")
+
+    @staticmethod
+    def make_scope_key(scope, item_types, language=None):
+        raw = json.dumps(
+            {"scope": scope, "item_types": sorted(item_types), "language": language},
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def make_scope_label(scope, item_types):
+        parts = [
+            ",".join(scope.get("collection_acron_list") or []) or "all",
+            ",".join(scope.get("journal_acron_list") or []),
+            str(scope.get("publication_year") or ""),
+            scope.get("issue_folder") or "",
+        ]
+        label = "-".join(p for p in parts if p)
+        return f"{label} [{','.join(item_types)}]"[:255]
+
+    @staticmethod
+    def filename_prefix():
+        """``upload-{release da aplicação}-`` (ex.: ``upload-v2.14.0-``)."""
+        release = re.sub(r"[^\w.-]+", "_", str(getattr(settings, "VERSION", "") or "")).strip("_")
+        return f"upload-{release}-" if release else "upload-"
+
+    @classmethod
+    def retention_days(cls):
+        return getattr(settings, "PROBLEM_REPORT_RETENTION_DAYS", 15)
+
+    def delete(self, *args, **kwargs):
+        try:
+            self.file.delete(save=False)
+        except Exception:
+            pass
+        return super().delete(*args, **kwargs)
+
+    @classmethod
+    def delete_items(cls, qs):
+        total = 0
+        for item in qs:
+            item.delete()
+            total += 1
+        return total
+
+    @classmethod
+    def delete_expired(cls):
+        return cls.delete_items(cls.objects.filter(expires_at__lt=timezone.now()))
+
+    @classmethod
+    def create_request(
+        cls, scope, item_types, user=None, task_name=None, status=None, language=None
+    ):
+        """
+        Registra a solicitação (aparece de imediato na lista do admin com
+        o status) e retorna o objeto; o conteúdo é gerado por ``run``.
+
+        ``language``: código de idioma (ex.: "pt-br"); se ausente, usa o
+        idioma preferido de ``user`` no Wagtail ou o padrão do sistema.
+        """
+        from proc.problem_report import resolve_language
+
+        now = timezone.now()
+        language = resolve_language(language, user)
+        return cls.objects.create(
+            creator=user,
+            task_name=task_name,
+            language=language,
+            scope_key=cls.make_scope_key(scope, item_types, language),
+            scope_label=cls.make_scope_label(scope, item_types),
+            scope=scope,
+            item_types=",".join(item_types),
+            status=status or cls.STATUS_QUEUED,
+            expires_at=now + timedelta(days=cls.retention_days()),
+        )
+
+    def set_status(self, status, error=None):
+        self.status = status
+        if error is not None:
+            self.error = error
+        self.save(update_fields=["status", "error", "updated"])
+
+    def run(self):
+        """
+        Gera o conteúdo, marca como pronto (ou erro), substitui os
+        relatórios anteriores do mesmo escopo e apaga os vencidos.
+        """
+        from proc.problem_report import build_report
+
+        self.set_status(self.STATUS_GENERATING)
+        try:
+            now = timezone.now()
+            item_types = [t for t in (self.item_types or "").split(",") if t]
+            content, stats = build_report(
+                self.scope or {}, item_types, language=self.language, generated_at=now
+            )
+
+            try:
+                self.file.delete(save=False)
+            except Exception:
+                pass
+            slug = re.sub(r"[^\w.,-]+", "_", self.scope_label or "")[:100]
+            self.file.save(
+                f"{self.filename_prefix()}problems-{slug}-{now:%Y%m%dT%H%M%S}-{self.pk}-{self.language}.zip",
+                ContentFile(content),
+                save=False,
+            )
+            self.total_items = stats["total_items"]
+            self.total_categories = stats["total_categories"]
+            self.stats = stats
+            self.generated_at = now
+            self.expires_at = now + timedelta(days=self.retention_days())
+            self.status = self.STATUS_DONE
+            self.error = None
+            self.save()
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR, error=traceback.format_exc()[-5000:])
+            raise
+
+        # relatórios anteriores (já concluídos) do mesmo escopo ficaram obsoletos
+        self.delete_items(
+            ProblemReport.objects.filter(scope_key=self.scope_key, created__lt=self.created)
+            .exclude(pk=self.pk)
+            .exclude(status__in=self.IN_PROGRESS)
+        )
+        self.delete_expired()
+        return self
+
+    @classmethod
+    def generate(cls, scope, item_types, user=None, task_name=None, language=None):
+        """Solicita e gera imediatamente (usado pelo comando e por testes)."""
+        return cls.create_request(
+            scope, item_types, user=user, task_name=task_name, language=language
+        ).run()
 
 
 class JournalProcResult(Operation, Orderable):
