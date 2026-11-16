@@ -2,7 +2,9 @@ from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail.snippets.models import register_snippet
+from django.contrib.auth import get_user_model
 from django.shortcuts import redirect
+from wagtail.permission_policies.base import BasePermissionPolicy
 from django.urls import reverse
 from wagtail.snippets.views.snippets import (
     CreateView as SnippetCreateView,
@@ -319,6 +321,26 @@ class ProcReportViewSet(CommonControlFieldViewSet):
     ]
 
 
+class SuperuserOnlyPermissionPolicy(BasePermissionPolicy):
+    """
+    Relatórios de problemas são exclusivos de administradores: só
+    superusuários ativos veem o menu, a lista, o detalhe, o download e
+    podem gerar ou apagar relatórios.
+    """
+
+    def user_has_permission(self, user, action):
+        return bool(user.is_authenticated and user.is_active and user.is_superuser)
+
+    def user_has_any_permission(self, user, actions):
+        return self.user_has_permission(user, None)
+
+    def users_with_any_permission(self, actions):
+        return get_user_model().objects.filter(is_active=True, is_superuser=True)
+
+    def users_with_permission(self, action):
+        return self.users_with_any_permission([action])
+
+
 class ProblemReportIndexView(SnippetIndexView):
     """
     O botão "Add" vira "Gerar relatório" (situação atual, sob demanda).
@@ -334,6 +356,11 @@ class ProblemReportIndexView(SnippetIndexView):
 
     def get_edit_url(self, instance):
         return None
+
+    def get_queryset(self):
+        # quem abre a lista vê como erro o que ficou "gerando" além do limite
+        ProblemReport.mark_stale()
+        return super().get_queryset()
 
 
 class ProblemReportCreateView(SnippetCreateView):
@@ -359,6 +386,11 @@ class ProblemReportInspectView(SnippetInspectView):
 
 class ProblemReportViewSet(SnippetViewSet):
     model = ProblemReport
+
+    @property
+    def permission_policy(self):
+        return SuperuserOnlyPermissionPolicy(self.model)
+
     index_view_class = ProblemReportIndexView
     add_view_class = ProblemReportCreateView
     edit_view_class = ProblemReportEditView
@@ -372,6 +404,7 @@ class ProblemReportViewSet(SnippetViewSet):
     list_display = [
         "scope_label",
         "status",
+        "coverage",
         "total_items",
         "total_categories",
         "task_name",
@@ -384,6 +417,9 @@ class ProblemReportViewSet(SnippetViewSet):
     inspect_view_fields = [
         "download",
         "status",
+        "notice",
+        "coverage",
+        "max_items",
         "language",
         "scope_label",
         "item_types",
