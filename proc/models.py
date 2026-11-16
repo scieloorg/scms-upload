@@ -8,8 +8,10 @@ import traceback
 from datetime import datetime, timedelta
 from tempfile import TemporaryDirectory
 
+from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.files import File
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, models
 from django.db.models import Count, Q, F
@@ -430,15 +432,18 @@ class ProblemReport(models.Model):
     STATUS_WAITING = "WAITING"
     STATUS_GENERATING = "DOING"
     STATUS_DONE = "DONE"
+    STATUS_PARTIAL = "PARTIAL"
     STATUS_ERROR = "ERROR"
     STATUS_CHOICES = [
         (STATUS_QUEUED, _("Queued")),
         (STATUS_WAITING, _("Waiting for the migration to finish")),
         (STATUS_GENERATING, _("Generating")),
         (STATUS_DONE, _("Ready")),
+        (STATUS_PARTIAL, _("Ready (incomplete)")),
         (STATUS_ERROR, _("Error")),
     ]
     IN_PROGRESS = (STATUS_QUEUED, STATUS_WAITING, STATUS_GENERATING)
+    DOWNLOADABLE = (STATUS_DONE, STATUS_PARTIAL)
 
     created = models.DateTimeField(_("Creation date"), auto_now_add=True)
     updated = models.DateTimeField(_("Last update date"), auto_now=True)
@@ -475,6 +480,21 @@ class ProblemReport(models.Model):
         db_index=True,
     )
     error = models.TextField(_("Error"), null=True, blank=True)
+    max_items = models.PositiveIntegerField(
+        _("Maximum number of items with problems"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Informed by the administrator according to the server capacity; above "
+            "it, the report is delivered incomplete with the most recent items"
+        ),
+    )
+    notice = models.TextField(
+        _("Notice"),
+        null=True,
+        blank=True,
+        help_text=_("Why the report is incomplete and what it covers"),
+    )
     generated_at = models.DateTimeField(_("Generated at"), null=True, blank=True)
     language = models.CharField(
         _("Language"),
@@ -487,6 +507,8 @@ class ProblemReport(models.Model):
         FieldPanel("status", read_only=True),
         FieldPanel("language", read_only=True),
         FieldPanel("generated_at", read_only=True),
+        FieldPanel("max_items", read_only=True),
+        FieldPanel("notice", read_only=True),
         FieldPanel("error", read_only=True),
         FieldPanel("scope_label", read_only=True),
         FieldPanel("task_name", read_only=True),
@@ -513,7 +535,7 @@ class ProblemReport(models.Model):
         """Link para o ZIP com os CSVs (no idioma do relatório)."""
         if self.in_progress:
             return _("(reload the page later)")
-        if self.status != self.STATUS_DONE or not self.file:
+        if self.status not in self.DOWNLOADABLE or not self.file:
             return "-"
         return format_html(
             '<a href="{}" download>{} (.zip)</a>', self.file.url, _("Download")
@@ -521,10 +543,38 @@ class ProblemReport(models.Model):
 
     download.short_description = _("Report file")
 
+    def coverage(self):
+        """
+        Itens analisados / itens com problema no período (soma dos tipos),
+        para deixar claro, na lista, se o relatório cobre tudo.
+        """
+        coverage = (self.stats or {}).get("coverage") or {}
+        if not coverage:
+            return "-"
+        processed = sum(int(c.get("processed") or 0) for c in coverage.values())
+        totals = [c.get("total") for c in coverage.values()]
+        if all(isinstance(v, int) for v in totals):
+            total = sum(totals)
+            percent = f" ({processed * 100 // total}%)" if total else ""
+            return f"{processed} / {total}{percent}"
+        return f"{processed} / ?"
+
+    coverage.short_description = _("Analyzed / with problems")
+
     @staticmethod
     def make_scope_key(scope, item_types, language=None):
+        # o período de atualização não entra na chave: um relatório mais novo
+        # do mesmo escopo torna os anteriores obsoletos, qualquer que seja o
+        # período deles
+        scope = {
+            k: v for k, v in (scope or {}).items() if k not in ("updated_from", "updated_to")
+        }
         raw = json.dumps(
-            {"scope": scope, "item_types": sorted(item_types), "language": language},
+            {
+                "scope": scope,
+                "item_types": sorted(item_types),
+                "language": language,
+            },
             sort_keys=True,
             default=str,
         )
@@ -539,7 +589,12 @@ class ProblemReport(models.Model):
             scope.get("issue_folder") or "",
         ]
         label = "-".join(p for p in parts if p)
-        return f"{label} [{','.join(item_types)}]"[:255]
+        start, end = scope.get("updated_from"), scope.get("updated_to")
+        period = ""
+        if start or end:
+            # só a data (AAAA-MM-DD) para ficar legível na lista
+            period = f" ({(start or '')[:10]}..{(end or '')[:10]})"
+        return f"{label} [{','.join(item_types)}]{period}"[:255]
 
     @staticmethod
     def filename_prefix():
@@ -570,9 +625,43 @@ class ProblemReport(models.Model):
     def delete_expired(cls):
         return cls.delete_items(cls.objects.filter(expires_at__lt=timezone.now()))
 
+    # sugestão inicial do formulário: ~130 MB medidos para 100 mil itens com
+    # problema (worker de produção: ~200 MB). O administrador informa o valor
+    # adequado à máquina a cada solicitação (fica em ``max_items``).
+    DEFAULT_MAX_ITEMS = 100_000
+
+    @classmethod
+    def generation_time_limit(cls):
+        """Limite (s) de uma geração; acima disso ela é interrompida."""
+        return int(getattr(settings, "PROBLEM_REPORT_TIME_LIMIT", 30 * 60))
+
+    @classmethod
+    def mark_stale(cls):
+        """
+        Relatórios em "gerando" além do limite de tempo foram interrompidos
+        sem registrar o erro (worker reiniciado, falta de memória, limite
+        rígido do celery): marca-os como erro para não ficarem "gerando"
+        para sempre.
+        """
+        limit = timezone.now() - timedelta(seconds=cls.generation_time_limit() + 300)
+        return cls.objects.filter(
+            status=cls.STATUS_GENERATING, updated__lt=limit
+        ).update(
+            status=cls.STATUS_ERROR,
+            error="Generation was interrupted (time limit or worker restart); generate it again.",
+            updated=timezone.now(),
+        )
+
     @classmethod
     def create_request(
-        cls, scope, item_types, user=None, task_name=None, status=None, language=None
+        cls,
+        scope,
+        item_types,
+        user=None,
+        task_name=None,
+        status=None,
+        language=None,
+        max_items=None,
     ):
         """
         Registra a solicitação (aparece de imediato na lista do admin com
@@ -580,6 +669,11 @@ class ProblemReport(models.Model):
 
         ``language``: código de idioma (ex.: "pt-br"); se ausente, usa o
         idioma preferido de ``user`` no Wagtail ou o padrão do sistema.
+
+        ``max_items``: quantos itens com problema cabem no relatório,
+        informado pelo administrador conforme a capacidade da máquina
+        (padrão ``DEFAULT_MAX_ITEMS``). O período pode ser tão antigo quanto
+        se queira: o que limita é a quantidade de problemas.
         """
         from proc.problem_report import resolve_language
 
@@ -589,6 +683,7 @@ class ProblemReport(models.Model):
             creator=user,
             task_name=task_name,
             language=language,
+            max_items=int(max_items) if max_items else cls.DEFAULT_MAX_ITEMS,
             scope_key=cls.make_scope_key(scope, item_types, language),
             scope_label=cls.make_scope_label(scope, item_types),
             scope=scope,
@@ -605,17 +700,32 @@ class ProblemReport(models.Model):
 
     def run(self):
         """
-        Gera o conteúdo, marca como pronto (ou erro), substitui os
-        relatórios anteriores do mesmo escopo e apaga os vencidos.
+        Gera o conteúdo, marca como pronto, pronto (incompleto) ou erro,
+        substitui os relatórios anteriores do mesmo escopo e apaga os
+        vencidos.
+
+        O desejável é analisar tudo o que está no período; o limite é a
+        capacidade da máquina. Relatório incompleto é melhor que nenhum: a
+        coleta para em 80% do limite de tempo (deixando tempo para gravar),
+        ao atingir a memória disponível (``memory_limit_mb``) ou
+        ``max_items``, e o relatório sai com o que foi obtido — os itens
+        atualizados mais recentemente —, com status "pronto (incompleto)" e
+        o motivo e a cobertura em ``notice``.
         """
-        from proc.problem_report import build_report
+        from proc.problem_report import build_report, memory_limit_mb
 
         self.set_status(self.STATUS_GENERATING)
         try:
             now = timezone.now()
             item_types = [t for t in (self.item_types or "").split(",") if t]
-            content, stats = build_report(
-                self.scope or {}, item_types, language=self.language, generated_at=now
+            fileobj, stats = build_report(
+                self.scope or {},
+                item_types,
+                language=self.language,
+                generated_at=now,
+                time_budget=self.generation_time_limit() * 0.8,
+                max_items=self.max_items or self.DEFAULT_MAX_ITEMS,
+                memory_limit=memory_limit_mb(),
             )
 
             try:
@@ -623,19 +733,30 @@ class ProblemReport(models.Model):
             except Exception:
                 pass
             slug = re.sub(r"[^\w.,-]+", "_", self.scope_label or "")[:100]
-            self.file.save(
-                f"{self.filename_prefix()}problems-{slug}-{now:%Y%m%dT%H%M%S}-{self.pk}-{self.language}.zip",
-                ContentFile(content),
-                save=False,
-            )
+            with fileobj:
+                self.file.save(
+                    f"{self.filename_prefix()}problems-{slug}-{now:%Y%m%dT%H%M%S}-{self.pk}-{self.language}.zip",
+                    File(fileobj),
+                    save=False,
+                )
             self.total_items = stats["total_items"]
             self.total_categories = stats["total_categories"]
             self.stats = stats
             self.generated_at = now
             self.expires_at = now + timedelta(days=self.retention_days())
-            self.status = self.STATUS_DONE
+            self.status = self.STATUS_PARTIAL if stats.get("partial") else self.STATUS_DONE
+            self.notice = self.make_notice(stats)
             self.error = None
             self.save()
+        except SoftTimeLimitExceeded:
+            self.set_status(
+                self.STATUS_ERROR,
+                error=(
+                    f"Generation exceeded {self.generation_time_limit()} s; "
+                    "narrow the scope (collection, journal, year) and generate it again."
+                ),
+            )
+            raise
         except Exception as e:
             self.set_status(self.STATUS_ERROR, error=traceback.format_exc()[-5000:])
             raise
@@ -647,13 +768,48 @@ class ProblemReport(models.Model):
             .exclude(status__in=self.IN_PROGRESS)
         )
         self.delete_expired()
+        self.mark_stale()
         return self
 
+    def make_notice(self, stats):
+        """Aviso legível (no idioma do relatório) quando está incompleto."""
+        from proc.problem_report import t
+
+        partial = stats.get("partial")
+        if not partial:
+            return None
+        lang = self.language
+        lines = [
+            f"{t('incomplete', lang)}: {t('partial_' + partial['reason'], lang)}.",
+            t("partial_hint", lang) + ".",
+        ]
+        for item_type, cov in (stats.get("coverage") or {}).items():
+            lines.append(
+                f"{t('coverage', lang)} ({t('type_' + item_type, lang)}): "
+                f"{cov['processed']} {t('of', lang)} {cov['total']}"
+            )
+        if partial.get("detail"):
+            lines.append(partial["detail"])
+        return "\n".join(lines)
+
     @classmethod
-    def generate(cls, scope, item_types, user=None, task_name=None, language=None):
+    def generate(
+        cls,
+        scope,
+        item_types,
+        user=None,
+        task_name=None,
+        language=None,
+        max_items=None,
+    ):
         """Solicita e gera imediatamente (usado pelo comando e por testes)."""
         return cls.create_request(
-            scope, item_types, user=user, task_name=task_name, language=language
+            scope,
+            item_types,
+            user=user,
+            task_name=task_name,
+            language=language,
+            max_items=max_items,
         ).run()
 
 
