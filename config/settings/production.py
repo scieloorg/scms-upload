@@ -169,15 +169,12 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
-        "profiling_file": {
+        # Container log collection handles retention; legacy media files may
+        # belong to a different numeric UID even when both images use "django".
+        "profiling_console": {
             "level": "DEBUG",
-            "class": "logging.handlers.TimedRotatingFileHandler",
-            "filename": APPS_DIR / "media" / "profiling-prod.log",
-            "when": "midnight",
-            "interval": 1,
-            "backupCount": 30,  # Mantém 30 dias
+            "class": "logging.StreamHandler",
             "formatter": "simple",
-            "encoding": "utf-8",
         },
     },
     "loggers": {
@@ -187,7 +184,7 @@ LOGGING = {
             "propagate": True,
         },
         "profiling": {  # <-- Logger usado pelo decorador
-            "handlers": ["profiling_file"],
+            "handlers": ["profiling_console"],
             "level": "DEBUG",
             "propagate": False,
         },
