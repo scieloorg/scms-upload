@@ -227,18 +227,22 @@ class ArticleCreateOrUpdateByCollectionTest(ArticleByCollectionTestBase):
         self.assertEqual(article.sps_pkg, sps_pkg)
         self.assertEqual(article.pid_v2, SCL_V2)
 
-    def test_article_without_collection_is_adopted_by_the_collection(self):
-        # artigo anterior à separação por coleção
+    def test_article_without_collection_is_not_adopted_by_the_collection(self):
+        # artigo anterior à separação por coleção, cujo vínculo não pode ser
+        # completado (sem ArticleProc): não é reaproveitado
         legacy = Article.objects.create(creator=self.user, pid_v3=PID_V3)
         psi_pkg = self.create_sps_pkg(self.psi, PSI_V2, "psi")
 
         psi = self.create_or_update(psi_pkg)
         scl = self.create_or_update(self.create_sps_pkg(self.scl, SCL_V2, "scl"))
 
-        self.assertEqual(psi.pk, legacy.pk)
-        self.assertEqual(psi.collection, self.psi)
+        self.assertNotEqual(psi.pk, legacy.pk)
         self.assertNotEqual(scl.pk, legacy.pk)
-        self.assertEqual(Article.objects.filter(pid_v3=PID_V3).count(), 2)
+        self.assertEqual(psi.collection, self.psi)
+        self.assertEqual(scl.collection, self.scl)
+        legacy.refresh_from_db()
+        self.assertIsNone(legacy.collection_pid_v2)
+        self.assertEqual(Article.objects.filter(pid_v3=PID_V3).count(), 3)
 
     def test_exclude_invalid_records_keeps_articles_of_each_collection(self):
         self.create_or_update(self.create_sps_pkg(self.scl, SCL_V2, "scl"))
@@ -396,6 +400,89 @@ class ArticleCompleteCollectionPidV2Test(ArticleByCollectionTestBase):
         self.assertEqual(stats, {"linked": 1, "no_collection": 1})
         self.assertEqual(last_id, ambiguous.id)
         self.assertTrue(done)
+
+
+class ArticleSeparationByCollectionTest(ArticleByCollectionTestBase):
+    """
+    Artigo sem vínculo ao documento na coleção (collection_pid_v2) não é
+    publicado nem reaproveitado por uma coleção, para que o conteúdo de uma
+    coleção não seja atribuído a outra.
+
+    Ex.: migração da coleção psi não deve trazer para psi os artigos
+    legados (não vinculados) da coleção scl.
+    """
+
+    legacy = ArticleCompleteCollectionPidV2Test.legacy
+
+    def test_create_or_update_does_not_adopt_ambiguous_article(self):
+        # pacote legado com ArticleProc de scl e psi: vínculo não é completado
+        legacy, legacy_pkg = self.legacy(self.scl, self.psi)
+        psi_pkg = create_sps_pkg(
+            self.user, "psi", pid_v3=PID_V3, collection=self.psi, pid_v2=PSI_V2
+        )
+
+        psi = self.create_or_update(psi_pkg, self.psi)
+
+        self.assertNotEqual(psi.pk, legacy.pk)
+        self.assertEqual(psi.collection, self.psi)
+        legacy.refresh_from_db()
+        self.assertIsNone(legacy.collection_pid_v2)
+        self.assertEqual(legacy.sps_pkg, legacy_pkg)
+
+    @patch.object(Article, "complete_collection_pid_v2", return_value="taken")
+    def test_create_or_update_does_not_adopt_unlinked_article_of_another_collection(
+        self, mock_complete
+    ):
+        # vínculo do artigo legado de scl não pode ser completado (ex.: "taken")
+        legacy, legacy_pkg = self.legacy(self.scl)
+        psi_pkg = create_sps_pkg(
+            self.user, "psi", pid_v3=PID_V3, collection=self.psi, pid_v2=PSI_V2
+        )
+
+        psi = self.create_or_update(psi_pkg, self.psi)
+
+        self.assertNotEqual(psi.pk, legacy.pk)
+        self.assertEqual(psi.collection, self.psi)
+        self.assertEqual(psi.sps_pkg, psi_pkg)
+        legacy.refresh_from_db()
+        self.assertIsNone(legacy.collection_pid_v2)
+        self.assertEqual(legacy.sps_pkg, legacy_pkg)
+        self.assertEqual(legacy.pid_v2, SCL_V2)
+
+    def test_article_ids_of_issue_are_only_of_articles_linked_to_the_collection(
+        self,
+    ):
+        from issue.models import Issue
+
+        issue = Issue.objects.create(
+            journal=self.journal,
+            volume="20",
+            number="3",
+            publication_year="2009",
+            creator=self.user,
+        )
+        # legados (não vinculados): de scl, de scl e psi, sem ArticleProc
+        unlinked = [
+            self.legacy(self.scl, name="scl-legacy", pid_v3="V3-SCL-LEGACY")[0],
+            self.legacy(
+                self.scl, self.psi, name="ambiguous", pid_v3="V3-AMBIGUOUS"
+            )[0],
+            self.legacy(name="no-proc", pid_v3="V3-NO-PROC")[0],
+        ]
+        # vinculados
+        psi = self.create_article(self.psi, PSI_V2, "psi")
+        scl = create_sps_pkg(
+            self.user, "scl", pid_v3="V3-SCL", collection=self.scl, pid_v2=SCL_V2
+        )
+        scl = Article.objects.create(
+            creator=self.user, pid_v3="V3-SCL", collection_pid_v2=scl.collection_pid_v2
+        )
+        Article.objects.filter(
+            pk__in=[item.pk for item in unlinked] + [psi.pk, scl.pk]
+        ).update(issue=issue)
+
+        self.assertEqual(issue.get_article_ids(self.psi), [PID_V3])
+        self.assertEqual(issue.get_article_ids(self.scl), ["V3-SCL"])
 
 
 class CompleteCollectionPidV2MigrationTest(ArticleCompleteCollectionPidV2Test):
