@@ -5,8 +5,10 @@ Módulo responsável pela migração de dados do site clássico e processamento 
 import logging
 import sys
 
+from django.db.models import Max
+
+from migration.models import MigratedData, MigratedFile, modified_date
 from migration import controller
-from migration.models import MigratedFile, modified_date
 from proc.models import IssueProc, JournalProc
 from tracker.models import UnexpectedEvent
 
@@ -24,7 +26,7 @@ def create_or_update_migrated_journal(
         user,
         collection,
         classic_website.classic_website_paths.title_path,
-        classic_website.get_journals_pids_and_records,
+        classic_website.get_journals_id_file,
         JournalProc,
         "journal",
         force_update,
@@ -44,7 +46,7 @@ def create_or_update_migrated_issue(
         user,
         collection,
         classic_website.classic_website_paths.issue_path,
-        classic_website.get_issues_pids_and_records,
+        classic_website.get_issues_id_file,
         IssueProc,
         "issue",
         force_update,
@@ -52,12 +54,17 @@ def create_or_update_migrated_issue(
 
 
 def register_id_file_records(
-    user, collection, id_file_path, get_records, proc_class, content_type, force_update
+    user, collection, id_file_path, get_id_file, proc_class, content_type, force_update
 ):
     """
     Registra (proc_class.register_classic_website_data) os registros do
     arquivo .id somente se o arquivo mudou desde a última leitura completa
     (ou se force_update).
+
+    Sem force_update, registra somente os registros novos de title.id ou issue.id,
+    usando os campos de atualização (v941 em title, v091 em issue)
+    igual ou posterior à mais recente já registrada para a coleção. 
+    Só os registros novos são convertidos para JSON.
 
     O arquivo só é marcado como lido se for lido completamente; assim, uma
     leitura interrompida é refeita na próxima execução. Falhas em registros
@@ -72,11 +79,23 @@ def register_id_file_records(
         logging.info(f"skip reading {id_file_path}: records already read")
         return
 
+    last_run_date = None
+    if not force_update:
+        # Max ignora registros sem data (order_by("-...") os poria primeiro
+        # no Postgres e anularia o filtro)
+        last_run_date = MigratedData.objects.filter(
+            collection=collection,
+            content_type=content_type,
+        ).aggregate(d=Max("isis_updated_date"))["d"]
+
     try:
-        for pid, records in get_records():
+        # items() não converte os registros para JSON; item.date não depende
+        # da conversão, que só ocorre para os registrados (item.data)
+        for item in get_id_file().items(since=last_run_date):
+            pid = item.pid
             try:
                 proc_class.register_classic_website_data(
-                    user, collection, pid, records[0], content_type, force_update
+                    user, collection, pid, item.data, content_type, force_update
                 )
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()

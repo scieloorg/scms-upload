@@ -63,6 +63,7 @@ Organização hierárquica das tasks de migração e publicação:
 
 import logging
 import sys
+import time
 import traceback
 import json
 
@@ -104,8 +105,43 @@ class NothingToProcess(Exception):
 
 class TaskExecution:
     """
-    Wrapper para TaskTracker que acumula eventos, estatísticas e exceções
-    durante a execução de uma task, e persiste tudo ao finalizar.
+    Wrapper para TaskTracker que registra, em ordem cronológica, as etapas
+    executadas por uma task e persiste tudo em ``TaskTracker.detail`` ao
+    finalizar.
+
+    Postgres (jsonb) não preserva a ordem das chaves e o widget do admin
+    as exibe em ordem alfabética; por isso a ordem é dada por listas e por
+    prefixos numéricos nas chaves do nível de topo.
+
+    Estrutura de ``detail``::
+
+        {
+          "1_summary": {
+            "result": "completed" | "interrupted (ValueError: ...)",
+            "duration": "1m05.2s",
+            "total_to_process": 10, "total_processed": 9, "total_errors": 1,
+            "status": {  # status dos *Proc antes e depois da execução
+              "1_before": {"article": {"migration=TODO | qa_ws=TODO": 10}},
+              "2_after": {"article": {"migration=TODO | qa_ws=TODO": 1,
+                                      "migration=DONE | qa_ws=TODO": 9}},
+              "3_changes": {"article": {"migration=TODO | qa_ws=TODO": "10 -> 1",
+                                        "migration=DONE | qa_ws=TODO": "0 -> 9"}},
+            },
+            ...  # números registrados com add_number
+          },
+          "2_params": {...},
+          "3_steps": [
+            {"#1 Start": {"elapsed": "0.0s",
+                          "status": {"article": {"migration=TODO": 10}}}},
+            {"#2 migrate_document_records": {"elapsed": "3.1s", "response": {...}}},
+            {"#3 Created or updated ...": {"elapsed": "3.2s",
+                "status_changes": {"article": {"migration=TODO": "10 -> 1",
+                                               "migration=DONE": "0 -> 9"}}}},
+            {"#4 ERROR ValueError: ...": {"elapsed": "3.4s", "item": "S0034-..."}},
+          ],
+          "4_errors": [{"step": "#4", "item": ..., "type": ..., "message": ..., "traceback": [...]}],
+          "5_data": ...,
+        }
     """
 
     def __init__(self, name, item, params):
@@ -114,11 +150,15 @@ class TaskExecution:
             name=name,
             item=item,
         )
-        self.events = []
+        self.steps = []
         self.stats = {}
-        self.exceptions = []
+        self.errors = []
         self.journal_proc_id = None
-        self.status_changes = {}
+        # distribuição de status por entidade (journal/issue/article):
+        # a da primeira chamada de update_total_status e a mais recente
+        self.first_status = {}
+        self.last_status = {}
+        self._started = time.monotonic()
 
     @property
     def item(self):
@@ -144,38 +184,244 @@ class TaskExecution:
     def total_processed(self, value):
         self.task_tracker.total_processed = value
 
-    def add_exception(self, exception):
-        self.exceptions.append(
-            {"type": str(type(exception)), "message": str(exception)}
+    @staticmethod
+    def _format_seconds(seconds):
+        minutes, seconds = divmod(seconds, 60)
+        if minutes:
+            return f"{int(minutes)}m{seconds:04.1f}s"
+        return f"{seconds:.1f}s"
+
+    def _add_step(self, title, content=None):
+        """
+        Acrescenta uma etapa ``{"#N título": {"elapsed": ..., **content}}``,
+        em que ``elapsed`` é o tempo decorrido desde o início da task;
+        retorna o rótulo "#N".
+        """
+        number = f"#{len(self.steps) + 1}"
+        values = {
+            "elapsed": self._format_seconds(time.monotonic() - self._started)
+        }
+        values.update(content or {})
+        self.steps.append({f"{number} {title}": values})
+        return number
+
+    @staticmethod
+    def _parse_exception(exception):
+        """
+        Normaliza ``exception`` em dict com type / message / traceback.
+
+        Aceita uma Exception, o texto de ``traceback.format_exc()``, uma
+        mensagem simples ou um dict (mantido, com o traceback em linhas).
+        """
+        if isinstance(exception, BaseException):
+            return {
+                "type": type(exception).__name__,
+                "message": str(exception),
+            }
+        if isinstance(exception, dict):
+            error = dict(exception)
+            if isinstance(error.get("traceback"), str):
+                error.update(TaskExecution._parse_exception(error["traceback"]))
+            return error
+        text = str(exception).strip()
+        if not text.startswith("Traceback"):
+            return {"message": text}
+        lines = text.splitlines()
+        # última linha: "ModuleName.ErrorType: mensagem"
+        error_type, _, message = lines[-1].partition(": ")
+        return {
+            "type": error_type.split(".")[-1],
+            "message": message,
+            "traceback": lines,
+        }
+
+    def add_exception(self, exception, item=None):
+        """
+        Registra uma falha que não interrompe a task (ex.: um artigo).
+
+        Fica em ``4_errors`` (com traceback) e também como etapa ``ERROR``
+        em ``3_steps``, para ser vista na sequência; ``step`` liga os dois.
+        """
+        error = self._parse_exception(exception)
+        if item is not None:
+            error["item"] = str(item)
+        headline = ": ".join(
+            str(x) for x in (error.get("type"), error.get("message")) if x
         )
+        error["step"] = self._add_step(
+            f"ERROR {headline}"[:200],
+            {"item": error["item"]} if item is not None else None,
+        )
+        self.errors.append(error)
 
     def add_event(self, event):
+        """
+        Registra uma etapa. Se ``event`` é dict com "operation" ou "action",
+        esse valor é o título da etapa e as demais chaves, o conteúdo.
+        """
+        if event is None:
+            return
         if isinstance(event, list):
-            self.events.extend(event)
-        else:
-            self.events.append(event)
+            for item in event:
+                self.add_event(item)
+            return
+        if not isinstance(event, dict):
+            self._add_step(str(event))
+            return
+        content = dict(event)
+        title = content.pop("operation", None) or content.pop("action", None)
+        if not title and len(content) == 1:
+            # ex.: {"websites": [...]}
+            title = next(iter(content))
+        self._add_step(str(title or "event"), content)
 
     def add_number(self, name, number):
         self.stats[name] = number
 
+    @staticmethod
+    def _format_total_status(items):
+        """
+        Converte a lista de ``get_total_status`` em
+        ``{"migration=DONE | qa_ws=TODO | public_ws=TODO": 23, ...}``.
+
+        Aceita os formatos ``{"total": n, "status": {...}}`` e
+        ``{..., "total": n}``.
+        """
+        formatted = {}
+        for item in items or []:
+            if not isinstance(item, dict):
+                formatted[str(item)] = None
+                continue
+            if isinstance(item.get("status"), dict):
+                status = item["status"]
+            else:
+                status = {k: v for k, v in item.items() if k != "total"}
+            key = " | ".join(
+                f"{name[:-len('_status')] if name.endswith('_status') else name}={value}"
+                for name, value in status.items()
+            )
+            formatted[key] = formatted.get(key, 0) + (item.get("total") or 0)
+        return formatted
+
+    def update_total_status(self, label, issue_proc_id=None):
+        """
+        Registra a etapa ``label`` com a distribuição de status de
+        journal/issue/article (via ``get_total_status_data``).
+
+        Na primeira chamada registra a distribuição completa (``status``);
+        nas seguintes, apenas o que mudou (``status_changes``), no formato
+        ``{"migration=TODO": "10 -> 1", "migration=DONE": "0 -> 9"}``.
+        """
+        result = get_total_status_data(self.journal_proc_id, issue_proc_id)
+        current = {
+            key: self._format_total_status(items) for key, items in result.items()
+        }
+        if not self.first_status:
+            self.first_status = current
+            self.last_status = current
+            self._add_step(label, {"status": current})
+            return
+
+        changes = self._status_changes(self.last_status, current)
+        self.last_status = current
+        self._add_step(label, {"status_changes": changes or "no changes"})
+
+    @staticmethod
+    def _status_changes(previous_status, current_status):
+        """
+        Compara duas distribuições de status e retorna somente as
+        combinações cujo total mudou: ``{"article": {"migration=TODO": "10 -> 1"}}``.
+        """
+        changes = {}
+        for key in list(previous_status) + [
+            k for k in current_status if k not in previous_status
+        ]:
+            previous = previous_status.get(key) or {}
+            current = current_status.get(key) or {}
+            entity_changes = {}
+            for combination in list(previous) + [
+                c for c in current if c not in previous
+            ]:
+                before = previous.get(combination, 0)
+                after = current.get(combination, 0)
+                if before != after:
+                    entity_changes[combination] = f"{before} -> {after}"
+            if entity_changes:
+                changes[key] = entity_changes
+        return changes
+
+    @classmethod
+    def _to_json(cls, value):
+        """
+        Converte ``value`` em estrutura serializável em JSON e legível:
+        conjuntos viram listas ordenadas, tuplas viram listas, chaves de
+        dict que são tuplas viram ``"a | b"`` e demais objetos, ``str``.
+        """
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        if isinstance(value, dict):
+            return {
+                (
+                    " | ".join(str(k) for k in key)
+                    if isinstance(key, tuple)
+                    else key if isinstance(key, str) else str(key)
+                ): cls._to_json(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, (set, frozenset)):
+            try:
+                value = sorted(value)
+            except TypeError:
+                value = sorted(value, key=str)
+            return [cls._to_json(item) for item in value]
+        if isinstance(value, (list, tuple)):
+            return [cls._to_json(item) for item in value]
+        return str(value)
+
     def finish(self, exception=None, exc_traceback=None, data=None):
         try:
-            if exception or exc_traceback or self.exceptions:
+            if exception or exc_traceback or self.errors:
                 completed = False
             else:
                 completed = True
-            self.stats["total_to_process"] = self.total_to_process
-            self.stats["total_processed"] = self.total_processed
+
+            if exception:
+                result = f"interrupted ({type(exception).__name__}: {exception})"
+            elif exc_traceback:
+                result = "interrupted"
+            elif self.errors:
+                result = "completed with errors"
+            else:
+                result = "completed"
+
+            summary = dict(self.stats)
+            summary.update({
+                "result": result,
+                "duration": self._format_seconds(time.monotonic() - self._started),
+                "total_to_process": self.total_to_process,
+                "total_processed": self.total_processed,
+                "total_errors": len(self.errors),
+            })
+            if self.first_status:
+                # status dos *Proc antes e depois da execução
+                summary["status"] = {
+                    "1_before": self.first_status,
+                    "2_after": self.last_status,
+                    "3_changes": (
+                        self._status_changes(self.first_status, self.last_status)
+                        or "no changes"
+                    ),
+                }
 
             detail = {
-                "params": self.params,
-                "stats": self.stats,
-                "events": self.events,
-                "exceptions": self.exceptions,
-                "status_changes": self.status_changes
+                "1_summary": summary,
+                "2_params": self.params,
+                "3_steps": self.steps,
+                "4_errors": self.errors,
             }
             if data:
-                detail["data"] = data
+                detail["5_data"] = data
+            detail = self._to_json(detail)
             try:
                 json.dumps(detail)
             except Exception as x:
@@ -202,47 +448,6 @@ class TaskExecution:
                 e=e,
                 exc_traceback=exc_traceback,
             )
-
-    def update_total_status(self, label, issue_proc_id=None):
-        """
-        Atualiza `self.status_changes` com a distribuição atual de status
-        de journal/issue/article (via `get_total_status_data`), rotulando
-        a mudança com `label`. Se o total_status não mudou desde a última
-        chamada para uma chave, só acrescenta `label` aos `events` dessa
-        entrada; caso contrário, cria uma nova entrada.
-
-        Chamado em pontos-chave de tasks como
-        `task_migrate_and_publish_articles_by_issue` para acompanhar a
-        evolução dos contadores de status ao longo da execução.
-
-        Exemplo de `self.status_changes["article"]`:
-            [{
-                "events": ["Start", "Created or updated Article Processing records"],
-                "total_status": [
-                    {"migration_status": "DONE", ..., "xml_status": "DONE", "total": 23},
-                ],
-            }]
-        """
-        previous = {}
-        events = {}
-        for key, items in self.status_changes.items():
-            try:
-                previous[key] = items[-1]["total_status"]
-                events[key] = items[-1]["events"]
-            except (IndexError, KeyError):
-                previous[key] = []
-                events[key] = []
-
-        result = get_total_status_data(self.journal_proc_id, issue_proc_id)
-        for key, items in result.items():
-            changes = self.status_changes.setdefault(key, [])
-            if changes and previous.get(key) == items:
-                self.status_changes[key][-1]["events"] = events.get(key, []) + [label]
-                continue
-            self.status_changes[key].append({
-                "events": [label],
-                "total_status": items,
-            })
 
 
 def _get_user(user_id, username):
@@ -912,7 +1117,7 @@ def task_migrate_and_publish_issues_by_collection(
                 task_exec.total_processed += 1
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
-                task_exec.add_exception(traceback.format_exc())
+                task_exec.add_exception(traceback.format_exc(), item=issue_proc)
         task_exec.finish()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -998,7 +1203,7 @@ def task_publish_issues(
                         total_processed += 1
                     except Exception as e:
                         exc_type, exc_value, exc_traceback = sys.exc_info()
-                        task_exec.add_exception(traceback.format_exc())
+                        task_exec.add_exception(traceback.format_exc(), item=issue_proc)
                 task_exec.total_processed = total_processed
                 task_exec.finish()
     except Exception as e:
@@ -1206,8 +1411,10 @@ def task_migrate_and_publish_articles(
             collection_acron_list=collection_acron_list,
         )
         task_exec.add_event({
-            "operation": "ArticleProc.mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect",
-            "response": response,
+            "operation": "Marked to reproc articles whose sps_pkg.pid_v2 is incorrect",
+            "total_marked_to_reproc": len(response.get("marked_to_reproc") or []),
+            "total_failures": len(response.get("failures") or {}),
+            **response,
         })
 
         status = tracker_choices.get_valid_status(status, force_update)
@@ -1221,20 +1428,35 @@ def task_migrate_and_publish_articles(
             force_migrate_document_files=force_migrate_document_files,
             status_list=status,
         )
-        task_exec.add_event({
-            "operation": "ArticleProc.get_journal_and_issue_proc_ids",
-            "response": items_to_process,
-        })
-
-        total_journals_to_process = len(items_to_process)
-        task_exec.add_number(
-            "total_journals_to_process", total_journals_to_process
+        # por acrônimo do periódico: id do JournalProc e fascículos selecionados
+        selected = {
+            journal_acron: {
+                "journal_proc_id": journal_proc_id,
+                "issue_folder": journal_items.get("issue_folder"),
+                "issue_proc_id_list": sorted(
+                    journal_items.get("issue_proc_id_list") or []
+                ),
+            }
+            for (journal_proc_id, journal_acron), journal_items in sorted(
+                items_to_process.items(), key=lambda item: str(item[0][1])
+            )
+        }
+        total_journals_to_process = len(selected)
+        total_issues_to_process = sum(
+            len(item["issue_proc_id_list"]) for item in selected.values()
         )
+        task_exec.add_event({
+            "operation": "Selected journals and issues to process",
+            "total_journals": total_journals_to_process,
+            "total_issues": total_issues_to_process,
+        })
+        task_exec.add_number("total_issues_to_process", total_issues_to_process)
 
         task_exec.total_to_process = total_journals_to_process
         total_processed = 0
-        for (journal_proc_id, journal_acron), journal_items in items_to_process.items():
-            issue_proc_id_list = list(journal_items.get("issue_proc_id_list") or [])
+        for journal_acron, journal_items in selected.items():
+            journal_proc_id = journal_items["journal_proc_id"]
+            issue_proc_id_list = journal_items["issue_proc_id_list"]
             task_migrate_and_publish_articles_by_journal.delay(
                 user_id=user_id,
                 username=username,
@@ -1251,14 +1473,13 @@ def task_migrate_and_publish_articles(
                 force_migrate_document_files=force_migrate_document_files,
             )
             total_processed += 1
-            task_exec.add_event({
-                "action": "scheduled task_migrate_and_publish_articles_by_journal",
-                "item": journal_acron,
-                "total_issues": len(issue_proc_id_list)
-            })
 
+        task_exec.add_event({
+            "operation": "Scheduled task_migrate_and_publish_articles_by_journal",
+            "total_scheduled": total_processed,
+        })
         task_exec.total_processed = total_processed
-        task_exec.finish()
+        task_exec.finish(data={"scheduled": selected})
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1307,31 +1528,18 @@ def task_migrate_and_publish_articles_by_journal(
        dos artigos conforme os websites habilitados na coleção.
     2. ``controller.import_journal_acron_id_records``: importa/atualiza o
        arquivo acron.id do periódico (respeitando ``force_import_acron_id_file``).
-    3. ``ArticleProc.mark_to_reproc_item_which_sps_pkg_pid_v2_is_incorrect``:
-       marca para reprocessamento os ``ArticleProc`` cujo ``pid_v2`` do
-       ``sps_pkg`` está incorreto (restrito a ``issue_proc_id_list``, quando
-       informado).
-    4. Seleção dos fascículos/artigos a processar:
-       - Se ``issue_proc_id_list`` foi recebido (chamada originada de
-         ``task_migrate_and_publish_articles`` com filtro de fascículo),
-         processa apenas esses ``IssueProc``, sem artigos fixados
-         individualmente.
-       - Caso contrário, seleciona via ``IssueProc.select_items`` os
-         fascículos com ``article_status_list=PROGRESS_STATUS_REGULAR_TODO``
-         (isto é, cujo ``docs_status``/``files_status`` sinaliza documentos
-         pendentes de migração ou reprocessamento) e, para os demais
-         fascículos do periódico, seleciona diretamente os ``ArticleProc``
-         pendentes via ``ArticleProc.select_items``.
-    5. Para cada fascículo resultante, executa **de forma síncrona**
+    3. Fascículos a processar: os de ``issue_proc_id_list`` (selecionados
+       por ``task_migrate_and_publish_articles`` via
+       ``ArticleProc.get_journal_and_issue_proc_ids``) e os com registros
+       novos ou alterados no acron.id (``issue_proc_id_list`` da resposta
+       de ``import_journal_acron_id_records``).
+    4. Para cada fascículo, executa **de forma síncrona**
        ``task_fix_issue_articles`` (corrige/exclui ``SPSPkg``/``Article``/``ArticleProc``
        inconsistentes antes da migração) e então agenda, de forma
        assíncrona, ``task_migrate_and_publish_articles_by_issue`` repassando
        a resposta de ``task_fix_issue_articles`` em
-       ``exclude_invalid_articles_response``.
-
-    Importa o arquivo acron.id via ``migration_controller.import_journal_acron_id_records``
-    e agenda ``task_migrate_and_publish_articles_by_issue`` para cada
-    ``IssueProc`` do periódico.
+       ``exclude_invalid_articles_response``. A decisão de migrar e de
+       publicar cada artigo é tomada nessa tarefa.
     """
     task_params = {
         "user_id": user_id,
@@ -1376,14 +1584,33 @@ def task_migrate_and_publish_articles_by_journal(
         # fonte para criar/atualizar ArticleProc
         response = migration_controller.import_journal_acron_id_records(
             user,
-            ArticleProc,
             journal_proc,
             force_update=force_import_acron_id_file,
         )
 
-        task_exec.add_event({"operation": "import_journal_acron_id_records", "response": response})
+        # resumo da importação: sem repetir params/stats e sem a lista
+        # completa de fascículos do acron.id (só os pendentes)
+        id_file_data = response.get("journal_id_file_data") or {}
+        id_file_exceptions = response.get("exceptions") or []
+        imported = {
+            "operation": "Imported journal acron.id",
+            "source_path": response.get("source_path"),
+            "acron_id_last_updated": id_file_data.get("journal_id_file_last_updated"),
+            "records_last_updated": id_file_data.get("id_file_record_last_updated"),
+            **(response.get("stats") or {}),
+            "pending_issue_pids": id_file_data.get("pending_issue_pids") or [],
+            "pending_issue_proc_id_list": response.get("issue_proc_id_list") or [],
+            "total_exceptions": len(id_file_exceptions),
+        }
+        if response.get("message"):
+            imported["message"] = response["message"]
+        if id_file_exceptions:
+            imported["exceptions"] = id_file_exceptions
+        task_exec.add_event(imported)
+        if response.get("traceback"):
+            task_exec.add_exception(response["traceback"], item=journal_acron)
 
-        task_exec.update_total_status(label="Imported journal acron.id")
+        task_exec.update_total_status(label="Status after importing acron.id")
 
         qa_api_data = get_api_data(
             journal_proc.collection, "issue", "QA"
@@ -1392,13 +1619,19 @@ def task_migrate_and_publish_articles_by_journal(
             journal_proc.collection, "issue", "PUBLIC"
         )
         total_processed = 0
-        issue_proc_id_list = list(
-            set(issue_proc_id_list or []) | set(response.get("issue_proc_id_list") or [])
-        )
+        requested_issue_proc_ids = set(issue_proc_id_list or [])
+        pending_issue_proc_ids = set(response.get("issue_proc_id_list") or [])
+        issue_proc_id_list = sorted(requested_issue_proc_ids | pending_issue_proc_ids)
         total_to_process = len(issue_proc_id_list)
+        task_exec.add_event({
+            "operation": "Selected issues to process",
+            "total_issues": total_to_process,
+            "total_requested": len(requested_issue_proc_ids),
+            "total_pending_in_acron_id": len(pending_issue_proc_ids),
+        })
 
         for issue_proc_id in issue_proc_id_list:
-            
+
             # executa sincronamente a eliminação de registros ArticleProc e Article cujo conteúdo é defeituoso
             response = task_fix_issue_articles(
                 issue_proc_id=issue_proc_id,
@@ -1412,6 +1645,11 @@ def task_migrate_and_publish_articles_by_journal(
                 delete_article_procs_which_sps_pkg_is_missing=delete_article_procs_which_sps_pkg_is_missing,
                 delete_article_procs_which_is_duplicated=delete_article_procs_which_is_duplicated,
             )
+            if isinstance(response, dict) and response.get("traceback"):
+                task_exec.add_exception(
+                    response["traceback"],
+                    item=f"task_fix_issue_articles issue_proc_id={issue_proc_id}",
+                )
 
             task_migrate_and_publish_articles_by_issue.delay(
                 user_id=user_id,
@@ -1426,10 +1664,13 @@ def task_migrate_and_publish_articles_by_journal(
                 exclude_invalid_articles_response=response,
             )
             total_processed += 1
+        task_exec.add_event({
+            "operation": "Scheduled task_migrate_and_publish_articles_by_issue",
+            "total_scheduled": total_processed,
+        })
         task_exec.total_processed = total_processed
         task_exec.total_to_process = total_to_process
-        task_exec.finish()
-
+        task_exec.finish(data={"scheduled_issue_proc_id_list": issue_proc_id_list})
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         task_exec.finish(exception=e, exc_traceback=exc_traceback)
@@ -1452,40 +1693,39 @@ def task_migrate_and_publish_articles_by_issue(
     """
     Migra artigos de um fascículo e agenda a publicação deles.
 
-    Se ``article_proc_id_list`` for informado (fascículo já teve seus
-    ``ArticleProc`` selecionados por
-    ``task_migrate_and_publish_articles_by_journal``), processa apenas
-    esses registros diretamente, sem repetir a migração de
-    registros/arquivos do fascículo. Caso contrário, executa o pipeline
-    completo:
-
     1. ``issue_proc.migrate_document_records``: cria/atualiza os
-       ``ArticleProc`` do fascículo a partir do site clássico.
+       ``ArticleProc`` do fascículo a partir do site clássico (registros
+       com novidades, sem ArticleProc ou cujo ArticleProc tem
+       ``migration_status`` em ``status``, exceto TODO/REPROC). Os com dados novos
+       têm o processo resetado (todas as fases TODO).
     2. ``issue_proc.migrate_document_files``: cria/atualiza os
        ``MigratedFile`` (pacotes SPS) do fascículo via
        ``controller.migrate_issue_files``.
-    3. ``ArticleProc.select_items``: seleciona os ``ArticleProc``
-       pendentes (conforme ``status``/``force_update``) para migração.
+    3. ``ArticleProc.select_items``: seleciona os ``ArticleProc`` com algum
+       status em ``status`` (todos, se ``force_update``) e os resetados
+       no passo 1.
 
-    Para cada ``ArticleProc`` selecionado, chama
-    ``article_proc.migrate_article`` (obtém o XML/pacote SPS e cria ou
-    atualiza os registros ``SPSPkg``/``Article``); falhas individuais são
-    registradas em ``task_exec`` mas não interrompem o loop.
+    Para cada ``ArticleProc`` selecionado, decide com os status atuais:
 
-    Ao final, agenda (assíncrono) ``task_publish_issue_articles`` para
-    publicar os artigos do fascículo e sincronizar o TOC.
+    - migra (``article_proc.migrate_article``: retoma da primeira fase não
+      concluída — XML, pacote SPS/pid provider, Article) se
+      ``force_update``, se resetado no passo 1 ou se
+      ``article_proc.needs_migration(status)``
+    - senão, se já migrado (DONE), apenas o publica
+
+    Falhas individuais são registradas em ``task_exec`` mas não
+    interrompem o loop.
+
+    Ao final, agenda (assíncrono) ``task_publish_issue_articles`` com os
+    artigos migrados nesta execução e os a apenas publicar, para
+    publicá-los e sincronizar o TOC.
 
     Parameters
     ----------
     issue_proc_id : int
         ID do ``IssueProc`` cujo fascículo será migrado.
-    article_proc_id_list : list[int], optional
-        Quando informado, restringe a migração a esses ``ArticleProc``
-        específicos (pula as etapas de migração de registros/arquivos do
-        fascículo).
     status : list, optional
-        Lista de status usada em ``ArticleProc.select_items`` quando
-        ``article_proc_id_list`` não é informado.
+        Lista de status usada na seleção e na decisão de migrar/publicar.
     force_update : bool, default False
         Se True, ignora o filtro de status ao selecionar artigos e força
         remigração em ``migrate_article``.
@@ -1493,10 +1733,8 @@ def task_migrate_and_publish_articles_by_issue(
         Forçam a remigração de registros/arquivos do fascículo mesmo que
         já tenham sido migrados anteriormente.
     qa_api_data / public_api_data : dict, optional
-        Recebidos de ``task_migrate_and_publish_articles_by_journal`` mas
-        não utilizados no corpo atual desta task (não são repassados a
-        ``task_publish_issue_articles``, que recalcula os dados de API
-        por website habilitado).
+        Sem efeito: ``task_publish_issue_articles`` obtém os dados de API
+        de cada website habilitado.
     exclude_invalid_articles_response : list or dict, optional
         Resultado de ``task_fix_issue_articles`` executado antes desta
         task; apenas registrado no histórico de eventos (``task_exec``).
@@ -1531,8 +1769,11 @@ def task_migrate_and_publish_articles_by_issue(
 
         # a partir do IdFileRecord, cria ou atualiza ArticleProc
         response = issue_proc.migrate_document_records(
-            user, force_migrate_document_records
+            user, force_migrate_document_records, status=status
         )
+        # resetados nesta execução (dados novos ou retomada do registro):
+        # migrados mesmo que status não inclua TODO/REPROC
+        reset_article_proc_ids = set(response.get("reset_article_proc_ids") or [])
         task_exec.add_event({"operation": "migrate_document_records", "response": response})
         task_exec.update_total_status(("Created or updated Article Processing records"), issue_proc_id)
 
@@ -1548,26 +1789,44 @@ def task_migrate_and_publish_articles_by_issue(
         article_procs = ArticleProc.select_items(
             issue_proc_id=issue_proc_id,
             status_list=None if force_update else status,
+            include_id_list=list(reset_article_proc_ids),
         )
 
         total_processed = 0
         exceptions = {}
-        articleprocs_id_list = []
+        migrated_ids = []
+        to_publish_ids = []
         for article_proc in article_procs:
             try:
-                # executa get_xml, generate_sps_pkg, cria / atualiza Article
-                article = article_proc.migrate_article(user, force_update)
-                if article:
-                    articleprocs_id_list.append(article_proc.id)
-                    total_processed += 1
+                # decide com o status atual: migra somente os que precisam;
+                # os já migrados (DONE) são apenas publicados
+                was_reset = article_proc.id in reset_article_proc_ids
+                if (
+                    force_update
+                    or was_reset
+                    or article_proc.needs_migration(status)
+                ):
+                    # executa get_xml, generate_sps_pkg, cria / atualiza Article
+                    article = article_proc.migrate_article(user, force_update)
+                    if article:
+                        migrated_ids.append(article_proc.id)
+                        total_processed += 1
+                elif (
+                    article_proc.migration_status
+                    == tracker_choices.PROGRESS_STATUS_DONE
+                ):
+                    to_publish_ids.append(article_proc.id)
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 exceptions[article_proc.pid] = traceback.format_exc()
-                task_exec.add_exception(exceptions[article_proc.pid])
+                task_exec.add_exception(
+                    exceptions[article_proc.pid], item=article_proc.pid
+                )
         task_exec.update_total_status(("Created or updated SPS Package and Article records"), issue_proc_id)
 
         task_exec.total_processed = total_processed
         task_exec.add_number("total_processed", total_processed)
+        task_exec.add_number("total_to_publish_only", len(to_publish_ids))
         task_exec.add_number("total_articleprocs", issue_proc.articleproc_set.count())
 
         task_publish_issue_articles.delay(
@@ -1575,8 +1834,9 @@ def task_migrate_and_publish_articles_by_issue(
             username=username,
             issue_proc_id=issue_proc_id,
             status=status,
-            articleprocs_id_list=articleprocs_id_list,
+            articleprocs_id_list=migrated_ids + to_publish_ids,
             force_update=force_update,
+            migrated_articleprocs_id_list=migrated_ids,
         )
         task_exec.add_event({"operation": "Scheduled articles publication"})
         task_exec.finish()
@@ -1594,18 +1854,22 @@ def task_publish_issue_articles(
     status=None,
     articleprocs_id_list=None,
     force_update=False,
+    migrated_articleprocs_id_list=None,
 ):
     """
     Publica artigos de um fascículo e sincroniza o fascículo no site.
 
-    Seleciona os ``ArticleProc`` do fascículo que já possuem
-    ``sps_pkg.pid_v3`` (isto é, artigos com pacote SPS registrado no PID
-    Provider) e, para cada ``WebSiteConfiguration`` habilitada da coleção
-    (QA e/ou PUBLIC):
+    Considera os ``ArticleProc`` de ``articleprocs_id_list`` ou, se não
+    informado (publicação avulsa, ``task_publish_articles``), todos os do
+    fascículo. Para cada ``WebSiteConfiguration`` habilitada da coleção,
+    primeiro QA e depois PUBLIC:
 
-    1. Filtra os artigos pendentes de publicação naquele website
-       (``qa_ws_status``/``public_ws_status`` em ``status``).
-    2. Publica cada artigo pendente via ``task_publish_article``
+    1. Seleciona os artigos a publicar naquele website
+       (``ArticleProc.select_items_to_publish``): migrados (DONE), com pid
+       v3 e com ``qa_ws_status``/``public_ws_status`` em ``status`` (os de
+       ``migrated_articleprocs_id_list``, também os pendentes); no PUBLIC,
+       somente os já publicados no QA ou cujo QA não é usado.
+    2. Publica cada artigo via ``task_publish_article``
        (chamada síncrona, artigo a artigo).
     3. Agenda (assíncrono) ``task_sync_issue`` para aquele website, para
        que o fascículo seja atualizado no TOC do site.
@@ -1621,15 +1885,22 @@ def task_publish_issue_articles(
     status : list, optional
         Lista de status usada para filtrar artigos pendentes de
         publicação; resolvida por ``tracker_choices.get_valid_status``.
+    articleprocs_id_list : list[int], optional
+        ``ArticleProc`` a considerar; se None, todos os do fascículo.
     force_update : bool, default False
         Se True, ignora o filtro de status (publica mesmo artigos já
         publicados).
+    migrated_articleprocs_id_list : list[int], optional
+        ``ArticleProc`` migrados nesta execução: são publicados também se
+        pendentes (TODO/REPROC), mesmo que não estejam em ``status``
+        (ver ``BaseProc.get_status_to_publish``).
     """
     task_params = {
         "user_id": user_id,
         "username": username,
         "issue_proc_id": issue_proc_id,
         "articleprocs_id_list": articleprocs_id_list,
+        "migrated_articleprocs_id_list": migrated_articleprocs_id_list,
         "status": status,
         "force_update": force_update,
     }
@@ -1646,21 +1917,14 @@ def task_publish_issue_articles(
         user = _get_user(user_id, username)
         status = tracker_choices.get_valid_status(status, force_update)
 
-        articles = ArticleProc.objects.none()
-        if articleprocs_id_list:
-            articles = ArticleProc.objects.select_related(
-                "issue_proc", "sps_pkg"
-            ).filter(
-                id__in=articleprocs_id_list,
-                sps_pkg__pid_v3__isnull=False,
-            )
-
-        if articles.exists():
-            issue_proc = articles.first().issue_proc
+        issue_proc = IssueProc.objects.select_related("collection").get(
+            pk=issue_proc_id
+        )
+        if articleprocs_id_list is None:
+            # publicação avulsa (task_publish_articles): artigos do fascículo
+            articles = ArticleProc.objects.filter(issue_proc=issue_proc)
         else:
-            issue_proc = IssueProc.objects.select_related("collection").get(
-                pk=issue_proc_id
-            )
+            articles = ArticleProc.objects.filter(id__in=articleprocs_id_list)
 
         task_exec.item = f"{issue_proc}"
         task_exec.journal_proc_id = issue_proc.journal_proc_id
@@ -1670,21 +1934,22 @@ def task_publish_issue_articles(
         ArticleProc.fix_publication_status(collection)
         task_exec.update_total_status("Updated publication status", issue_proc_id)
 
-        for website in WebSiteConfiguration.objects.filter(
-            collection=collection, enabled=True
-        ):
+        # QA antes do PUBLIC: no PUBLIC, somente os já publicados no QA
+        websites = sorted(
+            WebSiteConfiguration.objects.filter(
+                collection=collection, enabled=True, purpose__in=(QA, PUBLIC)
+            ),
+            key=lambda website: website.purpose != QA,
+        )
+        for website in websites:
             api_data = website.get_data(content_type="article")
             website_kind = website.purpose
 
-            if website_kind == QA:
-                query_by_status = Q(qa_ws_status__in=status)
-            elif website_kind == PUBLIC:
-                query_by_status = Q(public_ws_status__in=status)
-            else:
-                continue
-
-            article_ids_to_publish = list(
-                articles.filter(query_by_status).values_list("id", flat=True)
+            article_ids_to_publish = ArticleProc.select_items_to_publish(
+                articles,
+                website_kind,
+                status,
+                migrated_ids=migrated_articleprocs_id_list,
             )
             total_to_publish = len(article_ids_to_publish)
             total_to_process += total_to_publish
@@ -1704,7 +1969,10 @@ def task_publish_issue_articles(
                     total_published += 1
                 except Exception:
                     total_failed += 1
-                    task_exec.add_exception(traceback.format_exc())
+                    task_exec.add_exception(
+                        traceback.format_exc(),
+                        item=f"{website_kind} article_proc_id={article_proc_id}",
+                    )
 
             total_processed += total_published
             websites_summary.append({

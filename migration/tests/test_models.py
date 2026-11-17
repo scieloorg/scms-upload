@@ -1,8 +1,11 @@
+import os
+import shutil
+import tempfile
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from collection.models import Collection
 from migration.models import (
@@ -130,6 +133,127 @@ class JournalAcronIdFileDataTests(TestCase):
         self.assertEqual(data["stats"]["total_id_file_records"], 2)
         self.assertEqual(data["stats"]["total_id_file_records_to_migrate"], 1)
         self.assertEqual(data["stats"]["total_issues"], 2)
+
+
+class JournalAcronIdFileHasChangesTests(TestCase):
+    def setUp(self):
+        media_root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media_root, True)
+        settings_override = override_settings(MEDIA_ROOT=media_root)
+        settings_override.enable()
+        self.addCleanup(settings_override.disable)
+
+        self.user = get_user_model().objects.create_user(username="id-file-user")
+        self.collection = Collection.objects.create(
+            creator=self.user, acron="scl", name="SciELO"
+        )
+        fd, self.source_path = tempfile.mkstemp(suffix=".id")
+        os.close(fd)
+        self.addCleanup(os.unlink, self.source_path)
+        self.write(b"conteudo original")
+
+        self.obj = JournalAcronIdFile.create_or_update(
+            self.user, self.collection, "rsp", self.source_path
+        )
+
+    def write(self, content, mtime=None):
+        with open(self.source_path, "wb") as fp:
+            fp.write(content)
+        if mtime is not None:
+            os.utime(self.source_path, (mtime, mtime))
+
+    def create_record(self):
+        IdFileRecord.objects.create(
+            creator=self.user,
+            parent=self.obj,
+            item_type="article",
+            item_pid="S0034-89102004000200001",
+            data={},
+        )
+
+    def read_completely(self):
+        self.create_record()
+        self.obj.mark_as_read(self.user)
+
+    def test_create_or_update_guarda_copia_e_nao_marca_como_lido(self):
+        with open(self.obj.file.path, "rb") as fp:
+            self.assertEqual(fp.read(), b"conteudo original")
+        self.assertIsNone(self.obj.file_size)
+        self.assertEqual(self.obj.updated_by, self.user)
+        self.assertTrue(self.obj.has_changes())
+
+    def test_create_or_update_obtem_registro_existente(self):
+        obj = JournalAcronIdFile.create_or_update(
+            self.user, self.collection, "rsp", self.source_path
+        )
+        self.assertEqual(obj.pk, self.obj.pk)
+        self.assertEqual(JournalAcronIdFile.objects.count(), 1)
+
+    def test_mark_as_read_registra_tamanho_do_arquivo(self):
+        self.read_completely()
+        self.obj.refresh_from_db()
+        self.assertEqual(self.obj.file_size, len(b"conteudo original"))
+
+    def test_arquivo_lido_completamente_sem_mudancas(self):
+        self.read_completely()
+        self.assertFalse(self.obj.has_changes())
+
+    def test_force_update(self):
+        self.read_completely()
+        self.assertTrue(self.obj.has_changes(force_update=True))
+
+    def test_tamanho_diferente(self):
+        self.read_completely()
+        self.write(b"conteudo alterado com outro tamanho")
+        self.assertTrue(self.obj.has_changes())
+
+    def test_mesmo_tamanho_conteudo_diferente(self):
+        self.read_completely()
+        self.write(b"conteudo ORIGINAL")
+        self.assertTrue(self.obj.has_changes())
+
+    def test_mesmo_conteudo_data_diferente(self):
+        self.write(b"conteudo original", mtime=1_700_000_000)
+        self.read_completely()
+        self.write(b"conteudo original", mtime=1_700_000_100)
+        self.assertFalse(self.obj.has_changes())
+
+    def test_arquivo_alterado_durante_a_leitura_sera_lido_novamente(self):
+        # a cópia foi guardada em create_or_update, antes da leitura;
+        # o arquivo muda durante a leitura
+        self.write(b"conteudo ORIGINAL")
+        self.read_completely()
+        self.assertTrue(self.obj.has_changes())
+
+    def test_nova_execucao_com_mesmo_tamanho_e_conteudo_diferente(self):
+        # fluxo real: create_or_update é chamado a cada execução, antes de
+        # has_changes; não pode ocultar a mudança
+        self.read_completely()
+        self.write(b"conteudo ORIGINAL")
+        obj = JournalAcronIdFile.create_or_update(
+            self.user, self.collection, "rsp", self.source_path
+        )
+        self.assertTrue(obj.has_changes())
+        with open(obj.file.path, "rb") as fp:
+            self.assertEqual(fp.read(), b"conteudo ORIGINAL")
+
+    def test_nova_execucao_sem_mudancas_mantem_leitura(self):
+        self.read_completely()
+        obj = JournalAcronIdFile.create_or_update(
+            self.user, self.collection, "rsp", self.source_path
+        )
+        self.assertFalse(obj.has_changes())
+
+    def test_sem_registros(self):
+        self.obj.mark_as_read(self.user)
+        self.assertTrue(self.obj.has_changes())
+
+    def test_arquivo_inexistente(self):
+        self.read_completely()
+        os.unlink(self.source_path)
+        self.addCleanup(self.write, b"")
+        with self.assertRaises(FileNotFoundError):
+            self.obj.has_changes()
 
 
 class MigratedArticleValidPidTestCase(unittest.TestCase):

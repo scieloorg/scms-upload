@@ -239,7 +239,7 @@ class TaskTracker(BaseEvent):
             detail["exception_type"] = str(type(exception))
             completed = False
         if exc_traceback:
-            detail["traceback"] = str(format_traceback(exc_traceback))
+            detail["traceback"] = "".join(format_traceback(exc_traceback)).splitlines()
             completed = False
         if message_type:
             detail["message_type"] = message_type

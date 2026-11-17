@@ -60,3 +60,46 @@ class GetJournalAndIssueProcIdsTest(TestCase):
 
         self.assertEqual(list(items.keys()), [(journal.id, "abc")])
         self.assertEqual(items[(journal.id, "abc")]["issue_proc_id_list"], {issue.id})
+
+    def test_includes_journals_without_pending_items(self):
+        # outro periódico com item pendente não pode impedir que este seja
+        # visitado: as novidades do acron.id só são identificadas em
+        # task_migrate_and_publish_articles_by_journal
+        pending_journal = self.create_journal_proc("J1", acron="abc")
+        pending_issue = self.create_issue_proc("I1", journal_proc=pending_journal)
+        self.create_article_proc("A1", issue_proc=pending_issue)
+
+        journal = self.create_journal_proc("J2", acron="xyz")
+        issue = self.create_issue_proc("I2", journal_proc=journal)
+        IssueProc.objects.filter(id=issue.id).update(
+            docs_status=tracker_choices.PROGRESS_STATUS_DONE,
+            files_status=tracker_choices.PROGRESS_STATUS_DONE,
+        )
+
+        items = self.get_items()
+
+        self.assertEqual(
+            items[(pending_journal.id, "abc")]["issue_proc_id_list"],
+            {pending_issue.id},
+        )
+        self.assertEqual(items[(journal.id, "xyz")]["issue_proc_id_list"], set())
+
+    def test_issue_filter_does_not_include_other_journals(self):
+        pending_journal = self.create_journal_proc("J1", acron="abc")
+        pending_issue = self.create_issue_proc("I1", journal_proc=pending_journal)
+        self.create_article_proc("A1", issue_proc=pending_issue)
+
+        journal = self.create_journal_proc("J2", acron="xyz")
+        issue = self.create_issue_proc("I2", journal_proc=journal)
+        IssueProc.objects.filter(id=issue.id).update(
+            docs_status=tracker_choices.PROGRESS_STATUS_DONE,
+            files_status=tracker_choices.PROGRESS_STATUS_DONE,
+        )
+
+        items = ArticleProc.get_journal_and_issue_proc_ids(
+            collection_acron_list=["scl"],
+            issue_folder="I1",
+            status_list=[tracker_choices.PROGRESS_STATUS_TODO],
+        )
+
+        self.assertEqual(list(items.keys()), [(pending_journal.id, "abc")])
