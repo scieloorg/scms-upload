@@ -1464,12 +1464,10 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 current_version__isnull=False
             ).select_related("collection")
         )
-        # periódico em mais de uma coleção, com menos documentos na coleção
-        # (com versão) do que coleções do periódico
-        if len(journal_collection_ids) > 1 and len(
-            journal_collection_ids & {item.collection_id for item in versions}
-        ) < len(journal_collection_ids):
-            reasons.append("missing_collection_pids_v2")
+        # não se exige CollectionPidV2 de todas as coleções do periódico: o
+        # artigo pode não existir em outra coleção (o periódico pode não ter
+        # sido aceito ou ter sido desindexado nela) e o XML de uma coleção
+        # não completa os dados de outra
 
         item = next(
             (item for item in versions if item.collection.acron == collection_acron),

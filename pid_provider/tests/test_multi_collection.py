@@ -407,7 +407,9 @@ class ReasonsToUpdateTest(MultiCollectionJournalTestBase):
             with self.subTest(xml_with_pre.collection):
                 self.assertEqual(self.reasons(registered, xml_with_pre), [])
 
-    def test_journal_in_more_collections_than_collection_pids_v2(self):
+    def test_article_absent_from_other_journal_collection(self):
+        # periódico em scl e psi, artigo somente em scl (periódico não aceito
+        # ou desindexado em psi)
         registered = self.create_pid_provider_xml(SCL_V2)
         registered.collections.add(self.scl, self.psi)
         version = self.create_collection_version(
@@ -418,17 +420,17 @@ class ReasonsToUpdateTest(MultiCollectionJournalTestBase):
 
         self.assertEqual(
             self.reasons(registered, make_xml_with_pre(SCL_V2, "pusp", collection="scl")),
-            ["missing_collection_pids_v2"],
+            [],
         )
 
-    def test_collection_pid_v2_without_version_is_missing(self):
+    def test_other_collection_without_version_is_not_a_reason(self):
         registered = self.create_complete()
         registered.collection_pids_v2.filter(collection=self.psi).update(
             current_version=None
         )
-        self.assertIn(
-            "missing_collection_pids_v2",
+        self.assertEqual(
             self.reasons(registered, make_xml_with_pre(SCL_V2, "pusp", collection="scl")),
+            [],
         )
 
     def test_missing_journal_collections(self):
@@ -513,18 +515,25 @@ class IsUpdatedWithCollectionsTest(MultiCollectionJournalTestBase):
         return registered
 
     @patch.object(XMLVersion, "is_equal_to", return_value=True)
-    def test_equal_xml_with_incomplete_collection_data_is_updated(self, is_equal):
+    def test_equal_xml_of_article_absent_from_other_collection_is_skipped(
+        self, is_equal
+    ):
         registered = self.create_registered()
-        # psi não registrada: não ignora o XML idêntico de scl
-        self.assertIsNone(
-            self.is_updated(registered, make_xml_with_pre(SCL_V2, "pusp", collection="scl"))
-        )
-
-        self.create_collection_version(registered, "psi", self.psi, PSI_V2, "psicousp")
+        # artigo somente em scl (periódico não aceito ou desindexado em psi):
+        # ignora o XML idêntico de scl
         with self.assertRaises(exceptions.SkipSavePidProviderXML):
             self.is_updated(
                 registered, make_xml_with_pre(SCL_V2, "pusp", collection="scl")
             )
+
+    @patch.object(XMLVersion, "is_equal_to", return_value=True)
+    def test_equal_xml_with_incomplete_collection_data_is_updated(self, is_equal):
+        registered = self.create_registered()
+        registered.collections.remove(self.psi)
+        # coleção do periódico ausente: não ignora o XML idêntico de scl
+        self.assertIsNone(
+            self.is_updated(registered, make_xml_with_pre(SCL_V2, "pusp", collection="scl"))
+        )
 
     @patch.object(XMLVersion, "is_equal_to", return_value=True)
     def test_equal_xml_without_collection_of_single_collection_journal(self, is_equal):
