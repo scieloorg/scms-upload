@@ -1428,10 +1428,18 @@ def task_migrate_and_publish_articles(
             force_migrate_document_files=force_migrate_document_files,
             status_list=status,
         )
-        # por acrônimo do periódico: id do JournalProc e fascículos selecionados
+        # acrônimo da coleção de cada JournalProc selecionado
+        journal_proc_collection_acron = dict(
+            JournalProc.objects.filter(
+                id__in=[journal_proc_id for journal_proc_id, _ in items_to_process]
+            ).values_list("id", "collection__acron")
+        )
+        # por id do JournalProc (o acrônimo se repete entre coleções):
+        # acrônimos da coleção e do periódico e fascículos selecionados
         selected = {
-            journal_acron: {
-                "journal_proc_id": journal_proc_id,
+            journal_proc_id: {
+                "collection_acron": journal_proc_collection_acron.get(journal_proc_id),
+                "journal_acron": journal_acron,
                 "issue_folder": journal_items.get("issue_folder"),
                 "issue_proc_id_list": sorted(
                     journal_items.get("issue_proc_id_list") or []
@@ -1454,13 +1462,13 @@ def task_migrate_and_publish_articles(
 
         task_exec.total_to_process = total_journals_to_process
         total_processed = 0
-        for journal_acron, journal_items in selected.items():
-            journal_proc_id = journal_items["journal_proc_id"]
+        for journal_proc_id, journal_items in selected.items():
+            journal_acron = journal_items["journal_acron"]
             issue_proc_id_list = journal_items["issue_proc_id_list"]
             task_migrate_and_publish_articles_by_journal.delay(
                 user_id=user_id,
                 username=username,
-                collection_acron=collection_acron,
+                collection_acron=journal_items["collection_acron"],
                 journal_acron=journal_acron,
                 journal_proc_id=journal_proc_id,
                 issue_folder=journal_items.get("issue_folder"),
@@ -1861,8 +1869,10 @@ def task_publish_issue_articles(
 
     Considera os ``ArticleProc`` de ``articleprocs_id_list`` ou, se não
     informado (publicação avulsa, ``task_publish_articles``), todos os do
-    fascículo. Para cada ``WebSiteConfiguration`` habilitada da coleção,
-    primeiro QA e depois PUBLIC:
+    fascículo. Antes, completa ``sps_pkg.collection_pid_v2`` dos artigos
+    do fascículo (``ArticleProc.complete_relations``), sem o que não
+    seriam selecionados. Para cada ``WebSiteConfiguration`` habilitada da
+    coleção, primeiro QA e depois PUBLIC:
 
     1. Seleciona os artigos a publicar naquele website
        (``ArticleProc.select_items_to_publish``): migrados (DONE), com pid
@@ -1933,6 +1943,14 @@ def task_publish_issue_articles(
         collection = issue_proc.collection
         ArticleProc.fix_publication_status(collection)
         task_exec.update_total_status("Updated publication status", issue_proc_id)
+
+        # sem collection_pid_v2, o artigo não é selecionado para publicação
+        # (ver select_items_to_publish); na migração já foi completado em
+        # task_fix_issue_articles, mas não na publicação avulsa
+        task_exec.add_event({
+            "operation": "ArticleProc.complete_relations",
+            **ArticleProc.complete_relations(user, issue_proc_id_list=[issue_proc_id]),
+        })
 
         # QA antes do PUBLIC: no PUBLIC, somente os já publicados no QA
         websites = sorted(
@@ -2338,7 +2356,7 @@ def task_fix_issue_articles(
     Corrige e remove artigos duplicados/inconsistentes de um fascículo.
 
     Executa, para o fascículo associado ao ``IssueProc`` informado:
-    1. ``ArticleProc.complete_sps_pkg_ppx``, que completa o vínculo
+    1. ``ArticleProc.complete_relations``, que completa o vínculo
        ``sps_pkg.collection_pid_v2`` dos ArticleProc do fascículo ainda sem PidProviderXML
        associado.
     2. ``Article.exclude_invalid_records``, que remove registros de Article
@@ -2349,7 +2367,7 @@ def task_fix_issue_articles(
 
     A etapa de exclusão (passo 2) é destrutiva: ela apaga definitivamente
     ``SPSPkg``/``Article`` cujo vínculo com ``PidProviderXML`` não pôde ser
-    resolvido. Se a reconciliação do passo 1 (``ArticleProc.complete_sps_pkg_ppx``)
+    resolvido. Se a reconciliação do passo 1 (``ArticleProc.complete_relations``)
     reportar falhas (``response["failures"]``), isso pode significar apenas uma
     falha temporária (PID Provider fora do ar, ZIP inacessível, etc.) e não que
     o registro é de fato inválido. Por isso, quando há falhas na reconciliação,
@@ -2374,7 +2392,7 @@ def task_fix_issue_articles(
         Não utilizado atualmente nesta implementação.
     delete_article_which_sps_pkg_is_missing : bool, optional
         Se True, executa a exclusão de registros inválidos mesmo quando a
-        reconciliação (``ArticleProc.complete_sps_pkg_ppx``) reportou falhas.
+        reconciliação (``ArticleProc.complete_relations``) reportou falhas.
         Se False (padrão), nesse caso a exclusão é pulada e os ArticleProc
         afetados são apenas marcados (``migration_status=BLOCKED``) para que
         o usuário decida, mais tarde, solicitar a exclusão.
@@ -2403,10 +2421,10 @@ def task_fix_issue_articles(
         # Filtra ArticleProc por issue_proc_id e vincula ArticleProc.sps_pkg
         # ao documento na coleção (collection_pid_v2), consultando o pid
         # provider com sps_pkg.file
-        response = ArticleProc.complete_sps_pkg_ppx(
+        response = ArticleProc.complete_relations(
             user, issue_proc_id_list=[issue_proc_id])
         detail.append({
-            "operation": "ArticleProc.complete_sps_pkg_ppx",
+            "operation": "ArticleProc.complete_relations",
             "response": response,
         })
         if delete_sps_pkg_which_ppx_is_missing or delete_sps_pkg_which_is_duplicated:

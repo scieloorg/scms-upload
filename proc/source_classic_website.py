@@ -5,8 +5,6 @@ Módulo responsável pela migração de dados do site clássico e processamento 
 import logging
 import sys
 
-from django.db.models import Max
-
 from migration.models import MigratedData, MigratedFile, modified_date
 from migration import controller
 from proc.models import IssueProc, JournalProc
@@ -61,10 +59,12 @@ def register_id_file_records(
     arquivo .id somente se o arquivo mudou desde a última leitura completa
     (ou se force_update).
 
-    Sem force_update, registra somente os registros novos de title.id ou issue.id,
-    usando os campos de atualização (v941 em title, v091 em issue)
-    igual ou posterior à mais recente já registrada para a coleção. 
-    Só os registros novos são convertidos para JSON.
+    Sem force_update, registra somente os registros novos ou atualizados de
+    title.id ou issue.id: par (PID, data de atualização: v941 em title, v091
+    em issue) ainda não registrado para a coleção. Independe da ordem dos
+    registros no arquivo e de leitura interrompida. Registros sem data
+    (incompletos) não são lidos. Só os registros lidos são convertidos para
+    JSON.
 
     O arquivo só é marcado como lido se for lido completamente; assim, uma
     leitura interrompida é refeita na próxima execução. Falhas em registros
@@ -79,19 +79,25 @@ def register_id_file_records(
         logging.info(f"skip reading {id_file_path}: records already read")
         return
 
-    last_run_date = None
+    registered = None
     if not force_update:
-        # Max ignora registros sem data (order_by("-...") os poria primeiro
-        # no Postgres e anularia o filtro)
-        last_run_date = MigratedData.objects.filter(
-            collection=collection,
-            content_type=content_type,
-        ).aggregate(d=Max("isis_updated_date"))["d"]
+        # (PID, data de atualização) já registrados
+        registered = set(
+            MigratedData.objects.filter(
+                collection=collection,
+                content_type=content_type,
+            ).values_list("pid", "isis_updated_date")
+        )
 
     try:
-        # items() não converte os registros para JSON; item.date não depende
-        # da conversão, que só ocorre para os registrados (item.data)
-        for item in get_id_file().items(since=last_run_date):
+        # items() não converte os registros para JSON; item.pid e item.date
+        # não dependem da conversão, que só ocorre para os registrados
+        # (item.data)
+        for item in get_id_file().items():
+            if registered and (
+                not item.date or (item.pid, item.date) in registered
+            ):
+                continue
             pid = item.pid
             try:
                 proc_class.register_classic_website_data(

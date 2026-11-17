@@ -55,9 +55,11 @@ class BasePidProvider:
         auto_solve_pid_conflict : bool, optional
             Resolve conflitos de PID automaticamente
         collection_acron : str, optional
-            Acrônimo da coleção de origem do XML (custom-meta); necessário
-            para registrar o pid v2 e a versão do XML por coleção
-            (CollectionPidV2) quando o periódico está em mais de uma coleção
+            Acrônimo da coleção de origem do XML, usado quando o XML não a
+            informa (custom-meta), como na coleta de artigos do OPAC
+            (task_load_record_from_xml_url); necessário para registrar o pid
+            v2 e a versão do XML por coleção (CollectionPidV2) quando o
+            periódico está em mais de uma coleção
 
         Returns
         -------
@@ -74,8 +76,12 @@ class BasePidProvider:
         """
         self.caller = caller
 
-        # identifica a coleção de origem do XML (custom-meta)
-        if collection_acron and collection_acron != xml_with_pre.collection:
+        # identifica a coleção de origem do XML (custom-meta): a do XML
+        # prevalece; collection_acron só completa a ausente, como na coleta
+        # de artigos do OPAC (task_load_record_from_xml_url), cujo XML pode
+        # não informar a coleção. No Upload / migração, a coleção já vem no
+        # XML (ver ArticleProc)
+        if collection_acron and not xml_with_pre.collection:
             xml_with_pre.collection = collection_acron
 
         registered = PidProviderXML.register(

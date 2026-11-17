@@ -28,17 +28,22 @@ def make_id_queryset(items):
 class TaskMigrateAndPublishArticlesTest(TestCase):
     """Testes para task_migrate_and_publish_articles."""
 
+    @patch("proc.tasks.JournalProc")
     @patch("proc.tasks.task_migrate_and_publish_articles_by_journal")
     @patch("proc.tasks.ArticleProc")
     @patch("proc.tasks.TaskTracker")
     def test_schedules_task_by_journal_for_each_journal_group(
-        self, mock_task_tracker, mock_article_proc, mock_by_journal
+        self, mock_task_tracker, mock_article_proc, mock_by_journal, mock_journal_proc
     ):
         mock_tracker_instance = MagicMock()
         mock_task_tracker.create.return_value = mock_tracker_instance
         mock_article_proc.get_journal_and_issue_proc_ids.return_value = {
             (1, "abc"): {"issue_proc_id_list": {10, 11}, "issue_folder": None},
         }
+        # acrônimo da coleção do JournalProc
+        mock_journal_proc.objects.filter.return_value.values_list.return_value = [
+            (1, "scl"),
+        ]
 
         task_migrate_and_publish_articles(
             journal_acron="abc",
@@ -55,11 +60,46 @@ class TaskMigrateAndPublishArticlesTest(TestCase):
         self.assertEqual(mock_tracker_instance.total_to_process, 1)
         mock_tracker_instance.finish.assert_called_once()
 
+    @patch("proc.tasks.JournalProc")
+    @patch("proc.tasks.task_migrate_and_publish_articles_by_journal")
+    @patch("proc.tasks.ArticleProc")
+    @patch("proc.tasks.TaskTracker")
+    def test_schedules_journals_with_the_same_acron_in_different_collections(
+        self, mock_task_tracker, mock_article_proc, mock_by_journal, mock_journal_proc
+    ):
+        # periódicos de coleções diferentes com o mesmo acrônimo
+        mock_task_tracker.create.return_value = MagicMock()
+        mock_article_proc.get_journal_and_issue_proc_ids.return_value = {
+            (1, "abc"): {"issue_proc_id_list": {10}, "issue_folder": None},
+            (2, "abc"): {"issue_proc_id_list": {20}, "issue_folder": None},
+        }
+        mock_journal_proc.objects.filter.return_value.values_list.return_value = [
+            (1, "scl"),
+            (2, "psi"),
+        ]
+
+        task_migrate_and_publish_articles(journal_acron="abc")
+
+        scheduled = sorted(
+            (
+                item.kwargs["journal_proc_id"],
+                item.kwargs["collection_acron"],
+                item.kwargs["journal_acron"],
+                item.kwargs["issue_proc_id_list"],
+            )
+            for item in mock_by_journal.delay.call_args_list
+        )
+        self.assertEqual(
+            scheduled,
+            [(1, "scl", "abc", [10]), (2, "psi", "abc", [20])],
+        )
+
+    @patch("proc.tasks.JournalProc")
     @patch("proc.tasks.task_migrate_and_publish_articles_by_journal")
     @patch("proc.tasks.ArticleProc")
     @patch("proc.tasks.TaskTracker")
     def test_report_is_readable(
-        self, mock_task_tracker, mock_article_proc, mock_by_journal
+        self, mock_task_tracker, mock_article_proc, mock_by_journal, mock_journal_proc
     ):
         mock_tracker_instance = MagicMock()
         mock_task_tracker.create.return_value = mock_tracker_instance
@@ -67,6 +107,9 @@ class TaskMigrateAndPublishArticlesTest(TestCase):
         mock_article_proc.get_journal_and_issue_proc_ids.return_value = {
             (4277, "rsp"): {"issue_proc_id_list": {16201, 16203, 16196}, "issue_folder": None},
         }
+        mock_journal_proc.objects.filter.return_value.values_list.return_value = [
+            (4277, "scl"),
+        ]
 
         task_migrate_and_publish_articles(collection_acron="scl")
 
@@ -81,8 +124,9 @@ class TaskMigrateAndPublishArticlesTest(TestCase):
         self.assertEqual(selected["total_issues"], 3)
         self.assertEqual(
             detail["5_data"],
-            {"scheduled": {"rsp": {
-                "journal_proc_id": 4277,
+            {"scheduled": {"4277": {
+                "collection_acron": "scl",
+                "journal_acron": "rsp",
                 "issue_folder": None,
                 "issue_proc_id_list": [16196, 16201, 16203],
             }}},
@@ -792,6 +836,19 @@ class TaskPublishIssueArticlesTest(TestCase):
         )
 
         mock_fix_pub_status.assert_called_once_with(mock_issue.collection)
+        # collection_pid_v2 completado antes da seleção para publicação
+        mock_article_proc.complete_relations.assert_called_once_with(
+            None, issue_proc_id_list=[5]
+        )
+        steps = [
+            name for name, _, _ in mock_article_proc.mock_calls
+            if name in (
+                "complete_relations", "select_items_to_publish"
+            )
+        ]
+        self.assertEqual(
+            steps, ["complete_relations", "select_items_to_publish"]
+        )
         self.assertEqual(mock_publish_article.call_count, 2)
         called_ids = [
             c.kwargs["article_proc_id"] for c in mock_publish_article.call_args_list

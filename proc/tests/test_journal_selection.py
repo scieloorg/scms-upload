@@ -256,9 +256,10 @@ class RegisterClassicWebsiteDataTest(TestCase):
         self.assertEqual(obj.migration_status, BLOCKED)
 
 
-def id_file_item(pid, data):
-    # item de ClassicIdFile.items(): pid e data (registro convertido para JSON)
-    return MagicMock(pid=pid, data=data)
+def id_file_item(pid, data, date="20240101"):
+    # item de ClassicIdFile.items(): pid, date e data (registro convertido
+    # para JSON)
+    return MagicMock(pid=pid, data=data, date=date)
 
 
 class CreateOrUpdateMigratedJournalTest(TestCase):
@@ -282,9 +283,9 @@ class CreateOrUpdateMigratedJournalTest(TestCase):
         self.modified_date = patcher.start()
         self.addCleanup(patcher.stop)
         self.MigratedFile.has_changes.return_value = True
-        self.MigratedData.objects.filter.return_value.aggregate.return_value = {
-            "d": "20200101"
-        }
+        self.MigratedData.objects.filter.return_value.values_list.return_value = [
+            ("0001-0001", "20200101"),
+        ]
 
     def _run(self, force_update=False):
         source_classic_website.create_or_update_migrated_journal(
@@ -345,17 +346,27 @@ class CreateOrUpdateMigratedJournalTest(TestCase):
         self.UnexpectedEvent.create.assert_called_once()
         self.assert_marked_as_read()
 
-    def test_reads_only_records_since_most_recent_registered_date(self):
+    def test_reads_only_new_or_updated_records(self):
+        self.journals_id_file.items.return_value = [
+            # registrado, sem atualização
+            id_file_item("0001-0001", {"v100": "a"}, "20200101"),
+            # novo
+            id_file_item("0002-0002", {"v100": "b"}, "20190101"),
+        ]
         self._run()
         self.MigratedData.objects.filter.assert_called_once_with(
             collection=self.collection, content_type="journal"
         )
-        self.journals_id_file.items.assert_called_once_with(since="20200101")
+        self.journals_id_file.items.assert_called_once_with()
+        self.assertEqual(
+            [c.args[2] for c in self.JournalProc.register_classic_website_data.call_args_list],
+            ["0002-0002"],
+        )
 
     def test_force_update_reads_all_records(self):
         self._run(force_update=True)
         self.MigratedData.objects.filter.assert_not_called()
-        self.journals_id_file.items.assert_called_once_with(since=None)
+        self.journals_id_file.items.assert_called_once_with()
         self.assertEqual(self.JournalProc.register_classic_website_data.call_count, 2)
 
     def test_does_not_mark_as_read_when_reading_is_incomplete(self):
