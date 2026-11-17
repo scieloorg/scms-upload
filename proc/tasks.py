@@ -1428,10 +1428,18 @@ def task_migrate_and_publish_articles(
             force_migrate_document_files=force_migrate_document_files,
             status_list=status,
         )
-        # por acrônimo do periódico: id do JournalProc e fascículos selecionados
+        # acrônimo da coleção de cada JournalProc selecionado
+        journal_proc_collection_acron = dict(
+            JournalProc.objects.filter(
+                id__in=[journal_proc_id for journal_proc_id, _ in items_to_process]
+            ).values_list("id", "collection__acron")
+        )
+        # por id do JournalProc (o acrônimo se repete entre coleções):
+        # acrônimos da coleção e do periódico e fascículos selecionados
         selected = {
-            journal_acron: {
-                "journal_proc_id": journal_proc_id,
+            journal_proc_id: {
+                "collection_acron": journal_proc_collection_acron.get(journal_proc_id),
+                "journal_acron": journal_acron,
                 "issue_folder": journal_items.get("issue_folder"),
                 "issue_proc_id_list": sorted(
                     journal_items.get("issue_proc_id_list") or []
@@ -1454,13 +1462,13 @@ def task_migrate_and_publish_articles(
 
         task_exec.total_to_process = total_journals_to_process
         total_processed = 0
-        for journal_acron, journal_items in selected.items():
-            journal_proc_id = journal_items["journal_proc_id"]
+        for journal_proc_id, journal_items in selected.items():
+            journal_acron = journal_items["journal_acron"]
             issue_proc_id_list = journal_items["issue_proc_id_list"]
             task_migrate_and_publish_articles_by_journal.delay(
                 user_id=user_id,
                 username=username,
-                collection_acron=collection_acron,
+                collection_acron=journal_items["collection_acron"],
                 journal_acron=journal_acron,
                 journal_proc_id=journal_proc_id,
                 issue_folder=journal_items.get("issue_folder"),
