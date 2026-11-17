@@ -5,7 +5,6 @@ import traceback
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.utils.translation import gettext_lazy as _
-from django.db.models import Max
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
@@ -774,24 +773,25 @@ def import_journal_acron_id_records(
             journal_acron=journal_acron,
             source_path=source_path,
         )
-        
-        last_run_date = None
-        if not force_update:
-            try:
-                last_run_date = MigratedArticle.objects.filter(
-                    collection=collection,
-                    pid__startswith=f"S{journal_proc.pid}",
-                ).aggregate(d=Max("isis_updated_date"))["d"]
-            except (TypeError, ValueError, AttributeError):
-                last_run_date = None
 
         if journal_id_file.has_changes(force_update=force_update):
+            registered = None
+            if not force_update:
+                # (PID, data de atualização) dos artigos já migrados; os
+                # demais itens são lidos e IdFileRecord.create_or_update só
+                # atualiza os que mudaram
+                registered = set(
+                    MigratedArticle.objects.filter(
+                        collection=collection,
+                        pid__startswith=f"S{journal_proc.pid}",
+                    ).values_list("pid", "isis_updated_date")
+                )
             try:
                 # lê a cópia guardada por create_or_update
                 for item in get_bases_work_acron_id_file_records(
                     journal_id_file.file.path,
                     classic_website,
-                    last_run_date=last_run_date
+                    registered=registered,
                 ):
                     if item.get("exception"):
                         # falha em registro individual: não impede a
@@ -848,15 +848,24 @@ def import_journal_acron_id_records(
 
 
 def get_bases_work_acron_id_file_records(
-    source_path, classic_website, last_run_date=None
+    source_path, classic_website, registered=None
 ):
+    """
+    Com registered (pares PID, data de atualização já registrados), somente
+    os itens novos ou atualizados, independentemente da ordem dos registros
+    no arquivo (o acron.id concatena arquivos .id) e de leitura
+    interrompida. Itens sem data (incompletos) não são lidos.
+    item.pid e item.date não dependem da conversão dos registros.
+    """
     paths = classic_website.classic_website_paths
     id_file = ClassicIdFile(
         "artigo",
         source_path,
         p_records_base_paths=[paths.bases_work_path, paths.bases_path],
     )
-    for item in id_file.items(since=last_run_date):
+    for item in id_file.items():
+        if registered and (not item.date or (item.pid, item.date) in registered):
+            continue
         try:
             if item.kind == "document":
                 # records: registros do acron.id e, se o artigo não tem

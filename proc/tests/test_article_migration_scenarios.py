@@ -65,7 +65,7 @@ INITIAL_MIGRATION_STATUS = {
 
 
 def fake_get_bases_work_acron_id_file_records(
-    source_path, classic_website, last_run_date=None
+    source_path, classic_website, registered=None
 ):
     """Lê o acron.id simulado: JSON {pid: registro}."""
     with open(source_path) as fp:

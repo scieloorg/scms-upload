@@ -929,6 +929,28 @@ class GetBasesWorkAcronIdFileRecordsTests(unittest.TestCase):
         # sem p no acron.id e sem arquivo p externo: só os registros do acron.id
         self.assertEqual([r["v706"][0]["_"] for r in art3["data"]], ["o", "h"])
 
+    def _pids(self, registered):
+        return [
+            i["item_pid"]
+            for i in migration_controller.get_bases_work_acron_id_file_records(
+                self.source_path, self.classic_website, registered=registered
+            )
+        ]
+
+    def test_le_somente_itens_novos_ou_atualizados(self):
+        self.assertEqual(
+            self._pids({
+                # registrado, sem atualização
+                ("0044-596720190003", "20191001"),
+                ("S0044-59672019000300001", "20191005"),
+                # registrado com outra data: atualizado
+                ("S0044-59672019000300002", "20191010"),
+                # S0044-59672019000300003: novo (ex.: entrou no acron.id
+                # depois, com data antiga, ou leitura interrompida antes dele)
+            }),
+            ["S0044-59672019000300002", "S0044-59672019000300003"],
+        )
+
     def test_paragrafos_externos_sao_incluidos_nos_registros_do_artigo(self):
         # sem p no acron.id: os de bases/artigo/p/.../00001.id entram nos
         # registros do próprio artigo; não há item "paragraph" separado
@@ -1162,7 +1184,7 @@ class ImportJournalAcronIdRecordsTests(unittest.TestCase):
             "pending_issue_pids": list(pending_issue_pids),
         }
 
-        def get_records(source_path, cw, last_run_date=None):
+        def get_records(source_path, cw, registered=None):
             for item in records or []:
                 if isinstance(item, Exception):
                     raise item
@@ -1183,9 +1205,9 @@ class ImportJournalAcronIdRecordsTests(unittest.TestCase):
         ) as mock_migrated_article, translation.override(
             "en"
         ):
-            mock_migrated_article.objects.filter.return_value.aggregate.return_value = {
-                "d": "20191005"
-            }
+            mock_migrated_article.objects.filter.return_value.values_list.return_value = [
+                ("S0000-0000202000010001", "20191005"),
+            ]
             mock_acron_id_file.create_or_update.return_value = journal_id_file
             detail = migration_controller.import_journal_acron_id_records(
                 user, journal_proc, force_update=force_update
@@ -1231,7 +1253,7 @@ class ImportJournalAcronIdRecordsTests(unittest.TestCase):
 
         r["journal_id_file"].has_changes.assert_called_once_with(force_update=True)
 
-    def test_sem_force_update_le_somente_a_partir_da_data_mais_recente(self):
+    def test_sem_force_update_le_somente_itens_novos_ou_atualizados(self):
         r = self._import(has_changes=True)
 
         r["migrated_article"].objects.filter.assert_called_once_with(
@@ -1239,14 +1261,16 @@ class ImportJournalAcronIdRecordsTests(unittest.TestCase):
             pid__startswith=f"S{r['journal_proc'].pid}",
         )
         _, kwargs = r["get_records"].call_args
-        self.assertEqual(kwargs["last_run_date"], "20191005")
+        self.assertEqual(
+            kwargs["registered"], {("S0000-0000202000010001", "20191005")}
+        )
 
     def test_force_update_le_o_arquivo_inteiro(self):
         r = self._import(has_changes=True, force_update=True)
 
         r["migrated_article"].objects.filter.assert_not_called()
         _, kwargs = r["get_records"].call_args
-        self.assertIsNone(kwargs["last_run_date"])
+        self.assertIsNone(kwargs["registered"])
 
     def test_arquivo_ja_lido_completamente_nao_e_relido(self):
         r = self._import(has_changes=False)
