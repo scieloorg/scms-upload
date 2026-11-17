@@ -20,9 +20,10 @@ def make_item(pid, date):
 @patch("proc.source_classic_website.modified_date", return_value="2024-01-01")
 class RegisterIdFileRecordsTest(TestCase):
     """
-    register_id_file_records: o filtro ``since`` é a data mais recente
-    (isis_updated_date) já registrada para a coleção e o content_type; o
-    .id de title/issue é único por coleção.
+    register_id_file_records: sem force_update, lê os registros cujo par
+    (PID, data de atualização) ainda não está registrado para a coleção e
+    o content_type: novos ou atualizados, independentemente da ordem dos
+    registros no arquivo e de leitura interrompida.
     """
 
     def setUp(self):
@@ -32,8 +33,6 @@ class RegisterIdFileRecordsTest(TestCase):
         for collection, pid, date in [
             (self.collection, "0034-891020240001", "20240110"),
             (self.collection, "0001-371420240001", "20240105"),
-            # sem data: não pode anular o filtro
-            (self.collection, "0034-891020240003", None),
             # outra coleção: não é considerada
             (other, "0034-891020240009", "20260101"),
         ]:
@@ -64,33 +63,52 @@ class RegisterIdFileRecordsTest(TestCase):
         ]
         return registered, id_file
 
-    def test_since_e_a_data_mais_recente_da_colecao_ignorando_sem_data(
+    def test_le_somente_registros_novos_ou_atualizados(
         self, mock_modified_date, mock_migrated_file
     ):
         mock_migrated_file.has_changes.return_value = True
-        items = [make_item("0034-891020240002", "20240110")]
+        items = [
+            # registrado, sem atualização
+            make_item("0034-891020240001", "20240110"),
+            # registrado, atualizado (mesmo com data anterior a outras)
+            make_item("0001-371420240001", "20240107"),
+            # novo, com data antiga (ex.: leitura interrompida antes dele)
+            make_item("0034-891020240002", "20230101"),
+            # registrado somente em outra coleção: novo nesta
+            make_item("0034-891020240009", "20260101"),
+            # sem data: incompleto, não é lido
+            make_item("0034-891020240003", None),
+        ]
 
         registered, id_file = self._register(items)
 
-        id_file.items.assert_called_once_with(since="20240110")
-        self.assertEqual(registered, ["0034-891020240002"])
+        id_file.items.assert_called_once_with()
+        self.assertEqual(
+            registered,
+            ["0001-371420240001", "0034-891020240002", "0034-891020240009"],
+        )
         mock_migrated_file.create_or_update.assert_called_once()
 
     def test_sem_registros_do_content_type_le_tudo(
         self, mock_modified_date, mock_migrated_file
     ):
         mock_migrated_file.has_changes.return_value = True
+        items = [
+            make_item("0001-0001", "20240110"),
+            make_item("0002-0002", None),
+        ]
 
-        _, id_file = self._register([], content_type="journal")
+        registered, _ = self._register(items, content_type="journal")
 
-        id_file.items.assert_called_once_with(since=None)
+        self.assertEqual(registered, ["0001-0001", "0002-0002"])
 
     def test_force_update_le_tudo(self, mock_modified_date, mock_migrated_file):
         mock_migrated_file.has_changes.return_value = True
+        items = [make_item("0034-891020240001", "20240110")]
 
-        _, id_file = self._register([], force_update=True)
+        registered, _ = self._register(items, force_update=True)
 
-        id_file.items.assert_called_once_with(since=None)
+        self.assertEqual(registered, ["0034-891020240001"])
 
     def test_arquivo_sem_mudancas_nao_e_lido(
         self, mock_modified_date, mock_migrated_file
