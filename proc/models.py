@@ -3244,11 +3244,13 @@ class ArticleProc(BaseProc, ClusterableModel):
         return response
 
     @classmethod
-    def complete_sps_pkg_ppx(
+    def complete_relations(
         cls, user, journal_proc=None, issue_proc_id_list=None
     ):
         """
-        Vincula sps_pkg ao documento na coleção (collection_pid_v2)
+        Completa os vínculos necessários para processar os artigos dos
+        fascículos (issue_proc_id_list) ou do periódico (journal_proc):
+        sps_pkg ao documento na coleção (collection_pid_v2)
         """
         params = {}
         if issue_proc_id_list:

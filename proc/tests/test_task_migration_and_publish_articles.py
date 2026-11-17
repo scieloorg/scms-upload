@@ -836,6 +836,19 @@ class TaskPublishIssueArticlesTest(TestCase):
         )
 
         mock_fix_pub_status.assert_called_once_with(mock_issue.collection)
+        # collection_pid_v2 completado antes da seleção para publicação
+        mock_article_proc.complete_relations.assert_called_once_with(
+            None, issue_proc_id_list=[5]
+        )
+        steps = [
+            name for name, _, _ in mock_article_proc.mock_calls
+            if name in (
+                "complete_relations", "select_items_to_publish"
+            )
+        ]
+        self.assertEqual(
+            steps, ["complete_relations", "select_items_to_publish"]
+        )
         self.assertEqual(mock_publish_article.call_count, 2)
         called_ids = [
             c.kwargs["article_proc_id"] for c in mock_publish_article.call_args_list
