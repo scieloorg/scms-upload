@@ -23,8 +23,8 @@ from pid_provider import exceptions
 from pid_provider.models import CollectionPidV2, PidProviderXML, XMLVersion
 from pid_provider.multi_collection import (
     get_journal_pid_from_v2,
-    get_xml_collections,
-    normalize_acron,
+    get_xml_categorized_collections,
+    get_xml_collection_acron,
 )
 from pid_provider.query_params import compare
 from proc.models import JournalProc
@@ -62,6 +62,7 @@ def make_xml_with_pre(
         v2=v2,
         v3="V3-PSICOUSP-0000000001",
         aop_pid=None,
+        is_aop=False,
         journal_acron=journal_acron,
         collection=collection,
         journal_issn_print=issn_print,
@@ -135,43 +136,46 @@ class GetJournalPidFromV2Test(SimpleTestCase):
         self.assertIsNone(get_journal_pid_from_v2("S0103-6564"))
 
 
-class NormalizeAcronTest(SimpleTestCase):
-    def test_normalize_acron(self):
-        self.assertEqual(normalize_acron(" PUSP "), "pusp")
-        self.assertIsNone(normalize_acron(None))
+class GetXMLCategorizedCollectionsTest(MultiCollectionJournalTestBase):
+    def result(self, xml_with_pre, key="items"):
+        return {
+            (item["collection_acron"], item["journal_acron"], item["journal_pid"])
+            for item in get_xml_categorized_collections(xml_with_pre)[key]
+        }
 
+    def test_returns_journal_data_by_collection(self):
+        # psi pelo PID do periódico contido no pid v2, scl pelo acrônimo
+        xml_with_pre = make_xml_with_pre(PSI_V2, "pusp")
+        self.assertEqual(
+            self.result(xml_with_pre),
+            {("scl", "pusp", ISSN_PRINT), ("psi", "psicousp", ISSN_ELECTRONIC)},
+        )
+        # nenhuma com o PID e o acrônimo do XML
+        self.assertEqual(self.result(xml_with_pre, "matched_items"), set())
 
-class GetXMLCollectionsTest(MultiCollectionJournalTestBase):
-    def result(self, xml_with_pre):
-        return [
-            (
-                item["collection"].acron,
-                item["journal_acron"],
-                item["journal_pid"],
-                item["is_main"],
-            )
-            for item in get_xml_collections(xml_with_pre)
-        ]
+    def test_matched_items_have_the_journal_pid_and_acron_of_the_xml(self):
+        self.assertEqual(
+            self.result(make_xml_with_pre(PSI_V2, "psicousp"), "matched_items"),
+            {("psi", "psicousp", ISSN_ELECTRONIC)},
+        )
 
-    def test_returns_journal_data_by_collection_with_main_first(self):
+    def test_issn_does_not_identify_the_journal(self):
+        # os ISSNs são comuns às coleções: somente PID e acrônimo
         self.assertEqual(
             self.result(make_xml_with_pre(PSI_V2, "psicousp")),
-            [
-                ("scl", "pusp", ISSN_PRINT, True),
-                ("psi", "psicousp", ISSN_ELECTRONIC, False),
-            ],
+            {("psi", "psicousp", ISSN_ELECTRONIC)},
         )
 
     def test_identifies_journal_by_pid_v2_or_acron(self):
         # sem ISSN, somente a coleção com o PID ou o acrônimo do periódico
-        expected = [("psi", "psicousp", ISSN_ELECTRONIC, False)]
+        expected = {("psi", "psicousp", ISSN_ELECTRONIC)}
         cases = (
             # somente pelo PID do periódico contido no pid v2
             make_xml_with_pre(PSI_V2, issn_print=None, issn_electronic=None),
-            # pelo acrônimo (normalizado), PID do periódico desconhecido
+            # pelo acrônimo, PID do periódico desconhecido
             make_xml_with_pre(
                 "S0000-00002009000300003",
-                " PSICOUSP ",
+                "psicousp",
                 issn_print=None,
                 issn_electronic=None,
             ),
@@ -180,18 +184,12 @@ class GetXMLCollectionsTest(MultiCollectionJournalTestBase):
             with self.subTest(v2=xml_with_pre.v2, acron=xml_with_pre.journal_acron):
                 self.assertEqual(self.result(xml_with_pre), expected)
 
-    def test_no_main_collection(self):
-        Collection.objects.update(network_classification=None)
-        self.assertEqual(
-            {item[3] for item in self.result(make_xml_with_pre(SCL_V2, "pusp"))},
-            {False},
-        )
-
     def test_empty_without_journal_identification(self):
-        xml_with_pre = make_xml_with_pre(
-            None, "pusp", issn_print=None, issn_electronic=None
+        # sem pid v2 e sem acrônimo, mesmo com ISSN
+        self.assertEqual(
+            get_xml_categorized_collections(make_xml_with_pre(None, None)),
+            {"items": [], "matched_items": []},
         )
-        self.assertEqual(get_xml_collections(xml_with_pre), [])
 
     def test_empty_when_journal_is_not_found(self):
         xml_with_pre = make_xml_with_pre(
@@ -200,7 +198,55 @@ class GetXMLCollectionsTest(MultiCollectionJournalTestBase):
             issn_print="0000-0000",
             issn_electronic="0000-0001",
         )
-        self.assertEqual(get_xml_collections(xml_with_pre), [])
+        self.assertEqual(self.result(xml_with_pre), set())
+
+
+class GetXMLCollectionAcronTest(MultiCollectionJournalTestBase):
+    """
+    Coleção do XML que não a informa: a que tem os mesmos PID (contido no
+    pid v2) e acrônimo do periódico
+    """
+
+    def test_single_match(self):
+        for v2, acron, expected in (
+            (SCL_V2, "pusp", "scl"),
+            (PSI_V2, "psicousp", "psi"),
+        ):
+            with self.subTest(expected=expected):
+                self.assertEqual(
+                    get_xml_collection_acron(make_xml_with_pre(v2, acron)), expected
+                )
+
+    def test_no_match(self):
+        for v2, acron in (
+            # PID de psi e acrônimo de scl
+            (PSI_V2, "pusp"),
+            # sem pid v2 ou sem acrônimo
+            (None, "pusp"),
+            (SCL_V2, None),
+        ):
+            with self.subTest(v2=v2, acron=acron):
+                self.assertIsNone(
+                    get_xml_collection_acron(make_xml_with_pre(v2, acron))
+                )
+
+    def test_multiple_matches_is_an_error(self):
+        # mesmos PID e acrônimo do periódico em outra coleção, mesmo sendo
+        # scl a principal
+        xyz = Collection.objects.create(
+            acron="xyz", network_classification=["thematic"], creator=self.user
+        )
+        JournalProc.objects.create(
+            journal=JournalProc.objects.get(collection=self.scl).journal,
+            collection=xyz,
+            acron="pusp",
+            pid=ISSN_PRINT,
+            creator=self.user,
+        )
+        with self.assertRaises(
+            exceptions.MultipleCollectionsMatchedErrorToGetPidProviderXMLError
+        ):
+            get_xml_collection_acron(make_xml_with_pre(SCL_V2, "pusp"))
 
 
 class CurrentVersionByCollectionTest(MultiCollectionJournalTestBase):
@@ -283,20 +329,18 @@ class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
         with patch.object(
             XMLVersion, "get_or_create", return_value=version
         ) as get_or_create:
-            registered.add_collections(
-                self.user, xml_adapter, get_xml_collections(xml_adapter.xml_with_pre)
-            )
+            registered.add_collections(self.user, xml_adapter, self.psi)
 
         get_or_create.assert_called_once_with(self.user, registered, xml_with_pre)
         registered.refresh_from_db()
+        # somente a coleção do XML
         self.assertEqual(
             set(registered.collections.values_list("acron", flat=True)),
-            {"scl", "psi"},
+            {"psi"},
         )
         self.assertEqual(registered.collection_pids_v2_data, [PSI_DATA])
         self.assertEqual(registered.get_current_version(self.psi), version)
-        # current_version vazio é completado com a versão do XML recebido,
-        # até que o XML da coleção principal seja registrado
+        # current_version vazio é completado com a versão do XML recebido
         self.assertEqual(registered.current_version, version)
 
     def test_add_collections_main_collection_xml_is_the_current_version(self):
@@ -307,9 +351,7 @@ class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
         version = self.create_version(registered, "scl")
 
         with patch.object(XMLVersion, "get_or_create", return_value=version):
-            registered.add_collections(
-                self.user, xml_adapter, get_xml_collections(xml_adapter.xml_with_pre)
-            )
+            registered.add_collections(self.user, xml_adapter, self.scl)
 
         registered.refresh_from_db()
         self.assertEqual(registered.current_version, version)
@@ -317,20 +359,60 @@ class PidProviderXMLCollectionsTest(MultiCollectionJournalTestBase):
         self.assertEqual(registered.get_current_version(self.scl), version)
         self.assertEqual(registered.collection_pids_v2_data, [SCL_DATA])
 
+    def test_add_collections_other_collection_keeps_the_main_data(self):
+        # documento em mais de uma coleção: XML da que não é nacional não
+        # altera v2 e current_version
+        registered = self.create_pid_provider_xml(SCL_V2)
+        main_version = self.create_collection_version(
+            registered, "scl", self.scl, SCL_V2, "pusp"
+        )
+        registered.current_version = main_version
+        registered.save()
+        xml_adapter = MagicMock(
+            xml_with_pre=make_xml_with_pre(PSI_V2, "psicousp", collection="psi")
+        )
+        version = self.create_version(registered, "psi")
+
+        with patch.object(XMLVersion, "get_or_create", return_value=version):
+            registered.add_collections(self.user, xml_adapter, self.psi)
+
+        registered.refresh_from_db()
+        self.assertEqual(registered.v2, SCL_V2)
+        self.assertEqual(registered.current_version, main_version)
+        self.assertCountEqual(
+            registered.collection_pids_v2_data, [SCL_DATA, PSI_DATA]
+        )
+
+    def test_add_collections_the_only_collection_updates_current_version(self):
+        # documento em uma única coleção: o XML dela atualiza v2 e
+        # current_version, mesmo sendo temática
+        registered = self.create_pid_provider_xml(SCL_V2)
+        registered.current_version = self.create_version(registered, "previous")
+        registered.save()
+        xml_adapter = MagicMock(
+            xml_with_pre=make_xml_with_pre(PSI_V2, "psicousp", collection="psi")
+        )
+        version = self.create_version(registered, "psi")
+
+        with patch.object(XMLVersion, "get_or_create", return_value=version):
+            registered.add_collections(self.user, xml_adapter, self.psi)
+
+        registered.refresh_from_db()
+        self.assertEqual(registered.v2, PSI_V2)
+        self.assertEqual(registered.current_version, version)
+
     def test_add_collections_without_xml_collection(self):
         registered = self.create_pid_provider_xml(SCL_V2)
         xml_adapter = MagicMock(xml_with_pre=make_xml_with_pre(SCL_V2, "pusp"))
 
         version = self.create_version(registered, "no-collection")
         with patch.object(XMLVersion, "get_or_create", return_value=version):
-            registered.add_collections(
-                self.user, xml_adapter, get_xml_collections(xml_adapter.xml_with_pre)
-            )
+            registered.add_collections(self.user, xml_adapter, None)
 
         registered.refresh_from_db()
-        self.assertEqual(registered.collections.count(), 2)
+        self.assertEqual(registered.collections.count(), 0)
         # coleção desconhecida: sem versão por coleção, mas current_version
-        # (legado) não fica vazio
+        # não fica vazio
         self.assertFalse(registered.collection_pids_v2.exists())
         self.assertEqual(registered.current_version, version)
         self.assertEqual(registered.v2, SCL_V2)
@@ -384,7 +466,7 @@ class ReasonsToUpdateTest(MultiCollectionJournalTestBase):
 
     def reasons(self, registered, xml_with_pre):
         return registered.get_reasons_to_update(
-            xml_with_pre, get_xml_collections(xml_with_pre)
+            xml_with_pre, PidProviderXML.get_xml_collection(xml_with_pre)
         )
 
     def create_complete(self):
@@ -433,12 +515,17 @@ class ReasonsToUpdateTest(MultiCollectionJournalTestBase):
             [],
         )
 
-    def test_missing_journal_collections(self):
+    def test_missing_xml_collection(self):
         registered = self.create_complete()
         registered.collections.remove(self.psi)
+        # somente a coleção do XML é exigida
         self.assertEqual(
             self.reasons(registered, make_xml_with_pre(SCL_V2, "pusp", collection="scl")),
-            ["missing_journal_collections"],
+            [],
+        )
+        self.assertEqual(
+            self.reasons(registered, make_xml_with_pre(PSI_V2, "psicousp", collection="psi")),
+            ["missing_xml_collection"],
         )
 
     def test_collection_pid_v2_differs_from_xml(self):
@@ -451,8 +538,8 @@ class ReasonsToUpdateTest(MultiCollectionJournalTestBase):
             ["collection_pid_v2_differs"],
         )
 
-    def test_main_collection_xml_and_legacy_fields_of_another_collection(self):
-        # ex.: legado da instância do Brasil com os dados de psi
+    def test_national_collection_xml_and_v2_of_another_collection(self):
+        # ex.: registro existente da instância do Brasil com os dados de psi
         registered = self.create_complete()
         registered.v2 = PSI_V2
         registered.current_version = registered.get_current_version(self.psi)
@@ -460,15 +547,16 @@ class ReasonsToUpdateTest(MultiCollectionJournalTestBase):
 
         self.assertEqual(
             self.reasons(registered, make_xml_with_pre(SCL_V2, "pusp", collection="scl")),
-            ["main_collection_data_differs"],
+            ["current_version_differs"],
         )
-        # XML de outra coleção não exige os dados da coleção principal
+        # documento em mais de uma coleção: XML da que não é nacional não
+        # exige v2 e current_version dela
         self.assertEqual(
             self.reasons(registered, make_xml_with_pre(PSI_V2, "psicousp", collection="psi")),
             [],
         )
 
-    def test_empty_legacy_fields(self):
+    def test_empty_v2_and_current_version(self):
         registered = self.create_complete()
         PidProviderXML.objects.filter(pk=registered.pk).update(
             v2=None, current_version=None
@@ -479,16 +567,13 @@ class ReasonsToUpdateTest(MultiCollectionJournalTestBase):
             ["missing_v2", "missing_current_version"],
         )
 
-    def test_unregistered_or_without_journal_collections(self):
+    def test_unregistered_or_without_xml_collection(self):
         xml_with_pre = make_xml_with_pre(SCL_V2, "pusp", collection="scl")
         self.assertEqual(
-            PidProviderXML().get_reasons_to_update(
-                xml_with_pre, get_xml_collections(xml_with_pre)
-            ),
-            [],
+            PidProviderXML().get_reasons_to_update(xml_with_pre, self.scl), []
         )
         self.assertEqual(
-            self.create_complete().get_reasons_to_update(xml_with_pre, []), []
+            self.create_complete().get_reasons_to_update(xml_with_pre, None), []
         )
 
 
@@ -500,7 +585,7 @@ class IsUpdatedWithCollectionsTest(MultiCollectionJournalTestBase):
             force_update=False,
             origin_date=None,
             registered_in_core=None,
-            xml_collections=get_xml_collections(xml_with_pre),
+            collection=PidProviderXML.get_xml_collection(xml_with_pre),
         )
 
     def create_registered(self):
@@ -529,26 +614,17 @@ class IsUpdatedWithCollectionsTest(MultiCollectionJournalTestBase):
     @patch.object(XMLVersion, "is_equal_to", return_value=True)
     def test_equal_xml_with_incomplete_collection_data_is_updated(self, is_equal):
         registered = self.create_registered()
-        registered.collections.remove(self.psi)
-        # coleção do periódico ausente: não ignora o XML idêntico de scl
+        registered.collections.remove(self.scl)
+        # coleção do XML ausente: não ignora o XML idêntico de scl
         self.assertIsNone(
             self.is_updated(registered, make_xml_with_pre(SCL_V2, "pusp", collection="scl"))
         )
 
     @patch.object(XMLVersion, "is_equal_to", return_value=True)
-    def test_equal_xml_without_collection_of_single_collection_journal(self, is_equal):
-        JournalProc.objects.filter(collection=self.psi).delete()
-        registered = self.create_pid_provider_xml(SCL_V2)
-        registered.collections.add(self.scl)
-        registered.current_version = self.create_collection_version(
-            registered, "scl", self.scl, SCL_V2, "pusp"
-        )
-        registered.readable_data = {"x": 1}
-        registered.save()
-
-        # XML sem a coleção de origem é da única coleção do periódico
-        with self.assertRaises(exceptions.SkipSavePidProviderXML):
-            self.is_updated(registered, make_xml_with_pre(SCL_V2, "pusp"))
+    def test_xml_without_collection_is_not_equal(self, is_equal):
+        registered = self.create_registered()
+        # sem a coleção do XML, não há versão da coleção para comparar
+        self.assertIsNone(self.is_updated(registered, make_xml_with_pre(SCL_V2, "pusp")))
 
 
 class GetPidV2Test(MultiCollectionJournalTestBase):
@@ -571,7 +647,7 @@ class GetPidV2Test(MultiCollectionJournalTestBase):
 
         self.assertIsNone(registered.get_pid_v2("psi"))
 
-    def test_legacy_pid_v2(self):
+    def test_pid_v2_of_document_registered_before_collection_pid_v2(self):
         # documento registrado antes de CollectionPidV2
         registered = self.create_pid_provider_xml(SCL_V2)
         self.assertEqual(registered.get_pid_v2("psi"), SCL_V2)
