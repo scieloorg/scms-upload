@@ -1,12 +1,13 @@
 import sys
 
 from django.db import transaction
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre, get_xml_with_pre
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutura
     profile_method,
 )
 from pid_provider.models import PidProviderXML
+from pid_provider.multi_collection import get_xml_collection_acron
 from tracker.models import UnexpectedEvent
 
 
@@ -80,9 +81,18 @@ class BasePidProvider:
         # prevalece; collection_acron só completa a ausente, como na coleta
         # de artigos do OPAC (task_load_record_from_xml_url), cujo XML pode
         # não informar a coleção. No Upload / migração, a coleção já vem no
-        # XML (ver ArticleProc)
-        if collection_acron and not xml_with_pre.collection:
-            xml_with_pre.collection = collection_acron
+        # XML (ver ArticleProc). No Core, o XML pode chegar sem a coleção,
+        # por exemplo, enviado (API) por versão do Upload anterior à inserção
+        # da coleção no XML: a coleção é identificada pelo PID (contido no
+        # pid v2) e pelo acrônimo do periódico; mais de uma coleção
+        # identificada é ambíguo e levanta exceção (ver
+        # get_xml_collection_acron)
+        if not xml_with_pre.collection:
+            collection_acron = collection_acron or get_xml_collection_acron(
+                xml_with_pre
+            )
+            if collection_acron:
+                xml_with_pre.collection = collection_acron
 
         registered = PidProviderXML.register(
             xml_with_pre,

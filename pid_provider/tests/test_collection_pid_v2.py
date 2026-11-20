@@ -48,10 +48,22 @@ class CollectionPidV2Test(CollectionPidV2TestBase):
             current_version=version,
         )
         for name in params:
+            if name == "journal_acron":
+                continue
             with self.subTest(missing=name):
                 with self.assertRaises(ValueError):
                     CollectionPidV2.create_or_update(**{**params, name: None})
         self.assertFalse(CollectionPidV2.objects.exists())
+
+    def test_create_or_update_without_journal_acron(self):
+        # journal_acron é o do XML, que pode não o informar
+        registered = self.create_pid_provider_xml()
+        version = self.create_version(registered, "v1")
+        obj = CollectionPidV2.create_or_update(
+            self.user, registered, self.psi, PSI_V2, None, version
+        )
+        self.assertIsNone(obj.journal_acron)
+        self.assertEqual(obj.current_version, version)
 
     def test_create_or_update(self):
         registered = self.create_pid_provider_xml()
@@ -95,10 +107,10 @@ class CollectionPidV2Test(CollectionPidV2TestBase):
 
     def test_get_current_version_of_document_registered_before_collection_pid_v2(self):
         registered = self.create_pid_provider_xml()
-        registered.current_version = self.create_version(registered, "legacy")
+        registered.current_version = self.create_version(registered, "previous")
         registered.save()
 
-        # legado: nenhuma versão por coleção, usa PidProviderXML.current_version
+        # nenhuma versão por coleção: usa PidProviderXML.current_version
         for collection in (None, self.scl, self.psi):
             with self.subTest(collection=collection):
                 self.assertEqual(

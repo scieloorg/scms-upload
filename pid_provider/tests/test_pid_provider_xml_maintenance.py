@@ -409,7 +409,7 @@ class IsRegisteredTests(TestCase):
                      return_value={"registered": registered},
                  ), \
                  patch.object(
-                     pid_provider_models, "get_xml_collections", return_value=[]
+                     PidProviderXML, "get_xml_collection", return_value=None
                  ):
                 response = PidProviderXML.is_registered(xml_with_pre)
 
@@ -433,7 +433,7 @@ class IsRegisteredTests(TestCase):
                      return_value={"registered": registered},
                  ), \
                  patch.object(
-                     pid_provider_models, "get_xml_collections", return_value=[]
+                     PidProviderXML, "get_xml_collection", return_value=None
                  ):
                 response = PidProviderXML.is_registered(xml_with_pre)
 

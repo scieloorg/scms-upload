@@ -47,12 +47,17 @@ def task_fix_pid_v2(
     username=None,
     user_id=None,
 ):
-    for article_proc in ArticleProc.objects.filter(sps_pkg_id__isnull=False).iterator():
+    # somente os ids: evita carregar os objetos
+    for article_proc_id in (
+        ArticleProc.objects.filter(sps_pkg_id__isnull=False)
+        .values_list("id", flat=True)
+        .iterator()
+    ):
         subtask_fix_pid_v2.apply_async(
             kwargs=dict(
                 username=username,
                 user_id=user_id,
-                article_proc_id=article_proc.id,
+                article_proc_id=article_proc_id,
             )
         )
 
