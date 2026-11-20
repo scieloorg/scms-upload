@@ -40,6 +40,8 @@ from . import choices
 from package import collection_pid_v2_completion as completion
 
 from .exceptions import (
+    ArticleSourceJournalNotRegisteredError,
+    ArticleSourceJournalNotFoundError,
     ArticleSourcePidV3MismatchError,
     RequestXMLException,
     UnableToRegisterPIDError,
@@ -2548,6 +2550,30 @@ class ArticleSource(CommonControlField):
             }
         )
 
+    def check_journal_is_registered(self):
+        """
+        Interrompe antes do registro no PidProvider se o periódico do
+        artigo não está registrado na coleção (o register falharia do mesmo
+        modo, pois as coleções vêm do periódico registrado)
+
+        O periódico é identificado pelo ISSN contido no PID v2
+        (S + ISSN + ...), comparado com JournalProc.pid
+        """
+        from proc.models import JournalProc
+
+        journal_pid = self.pid[1:10] if self.pid and len(self.pid) == 23 else None
+        if not journal_pid:
+            raise ArticleSourceJournalNotFoundError(
+                f"Journal PID not found for {self} (pid={self.pid})"
+            )
+        if not JournalProc.objects.filter(
+            collection=self.collection, pid=journal_pid
+        ).exists():
+            raise ArticleSourceJournalNotRegisteredError(
+                f"Journal {journal_pid} is not registered in collection "
+                f"{self.collection and self.collection.acron}"
+            )
+
     def request_pid(
         self, user, force_update, auto_solve_pid_conflict, expected_pid_v3=None
     ):
@@ -2564,6 +2590,7 @@ class ArticleSource(CommonControlField):
             )
 
         collection_acron = self.collection and self.collection.acron
+        self.check_journal_is_registered()
         response = PidProvider().provide_pid_for_xml_with_pre(
             xml_with_pre,
             f"{collection_acron}_{xml_with_pre.v3}",
