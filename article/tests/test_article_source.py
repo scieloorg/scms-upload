@@ -7,6 +7,7 @@ from django.test import TestCase, override_settings
 from article.models import ArticleSource
 from collection.models import Collection
 from pid_provider.models import PidProviderXML
+from proc.models import JournalProc
 
 User = get_user_model()
 
@@ -29,6 +30,10 @@ class ArticleSourceCreateOrUpdateTest(TestCase):
     def setUp(self):
         self.user = User.objects.create(username="operator")
         self.collection = Collection.objects.create(acron="scl", creator=self.user)
+        # periódico registrado na coleção
+        JournalProc.objects.create(
+            collection=self.collection, acron="rsp", pid="0034-8910", creator=self.user
+        )
 
     def _create_or_update(self, source_date, **kwargs):
         params = dict(
@@ -144,6 +149,51 @@ class ArticleSourceCreateOrUpdateTest(TestCase):
         xml_create.assert_not_called()
         self.assertEqual(obj.status, ArticleSource.StatusChoices.NOT_PUBLIC)
 
+    def test_journal_not_registered_in_collection_does_not_register_pid(
+        self, xml_create, provide_pid, get_by_pid_v3
+    ):
+        self._setup(xml_create, provide_pid, get_by_pid_v3)
+        # periódico registrado só em outra coleção
+        JournalProc.objects.all().delete()
+        other = Collection.objects.create(acron="arg", creator=self.user)
+        JournalProc.objects.create(
+            collection=other, acron="rsp", pid="0034-8910", creator=self.user
+        )
+
+        obj = self._create_or_update("2024-01-31T10:01:00")
+
+        provide_pid.assert_not_called()
+        self.assertEqual(obj.status, ArticleSource.StatusChoices.ERROR)
+        self.assertIn("ArticleSourceJournalNotRegisteredError", obj.detail["error_type"])
+        self.assertIn(
+            "Journal 0034-8910 is not registered in collection scl",
+            obj.detail["error_msg"],
+        )
+
+    def test_journal_not_registered_does_not_register_pid(
+        self, xml_create, provide_pid, get_by_pid_v3
+    ):
+        self._setup(xml_create, provide_pid, get_by_pid_v3)
+
+        obj = self._create_or_update(
+            "2024-01-31T10:01:00", pid="S1234-56782024000100001"
+        )
+
+        provide_pid.assert_not_called()
+        self.assertEqual(obj.status, ArticleSource.StatusChoices.ERROR)
+        self.assertIn("ArticleSourceJournalNotRegisteredError", obj.detail["error_type"])
+
+    def test_journal_pid_not_found_does_not_register_pid(
+        self, xml_create, provide_pid, get_by_pid_v3
+    ):
+        self._setup(xml_create, provide_pid, get_by_pid_v3)
+
+        obj = self._create_or_update("2024-01-31T10:01:00", pid=None)
+
+        provide_pid.assert_not_called()
+        self.assertEqual(obj.status, ArticleSource.StatusChoices.ERROR)
+        self.assertIn("ArticleSourceJournalNotFoundError", obj.detail["error_type"])
+
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 @patch("pid_provider.models.PidProviderXML.get_by_pid_v3")
@@ -153,12 +203,17 @@ class ArticleSourceProcessStoredXMLTest(TestCase):
     def setUp(self):
         self.user = User.objects.create(username="operator")
         self.collection = Collection.objects.create(acron="scl", creator=self.user)
+        # periódico registrado na coleção
+        JournalProc.objects.create(
+            collection=self.collection, acron="rsp", pid="0034-8910", creator=self.user
+        )
 
     def _stored(self, status=ArticleSource.StatusChoices.ERROR, aid="abc123"):
         obj = ArticleSource.objects.create(
             url=URL,
             source_date="2024-01-31T10:01:00",
             collection=self.collection,
+            pid="S0034-89102024000100001",
             status=status,
             detail={"aid": aid, "error_msg": "old error"},
             creator=self.user,
