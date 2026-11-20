@@ -67,6 +67,7 @@ import time
 import traceback
 import json
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
@@ -530,12 +531,17 @@ def task_migrate_and_publish_journals(
     valid_status=None,
     force_import_acron_id_file=False,
     force_core_sync=False,
+    generate_problem_report=True,
+    problem_report_max_items=None,
 ):
     """
     Ponto de entrada para migração e publicação de periódicos.
 
     Agenda task_migrate_and_publish_journals_by_collection para cada coleção.
+    Se ``generate_problem_report``, agenda ``task_generate_problem_report``
+    para quando a execução terminar.
     """
+    started_at = _now_iso()
     try:
         task_params = {
             "task": "proc.tasks.task_migrate_and_publish_journals",
@@ -558,6 +564,17 @@ def task_migrate_and_publish_journals(
                 status=status,
                 force_import_acron_id_file=force_import_acron_id_file,
                 force_core_sync=force_core_sync,
+            )
+        if generate_problem_report:
+            schedule_problem_report(
+                "proc.tasks.task_migrate_and_publish_journals",
+                "journals",
+                user_id=user_id,
+                username=username,
+                collection_acron=collection_acron,
+                journal_acron=journal_acron,
+                updated_from=started_at,
+                max_items=problem_report_max_items,
             )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -972,12 +989,17 @@ def task_migrate_and_publish_issues(
     valid_status=None,
     force_update=False,
     force_migrate_document_records=False,
+    generate_problem_report=True,
+    problem_report_max_items=None,
 ):
     """
     Ponto de entrada para migração e publicação de fascículos.
 
     Agenda task_migrate_and_publish_issues_by_collection para cada coleção.
+    Se ``generate_problem_report``, agenda ``task_generate_problem_report``
+    para quando a execução terminar.
     """
+    started_at = _now_iso()
     task_params = {
         "user_id": user_id,
         "username": username,
@@ -994,6 +1016,19 @@ def task_migrate_and_publish_issues(
         for collection in _get_collections(collection_acron):
             task_params["collection_acron"] = collection.acron
             task_migrate_and_publish_issues_by_collection.delay(**task_params)
+        if generate_problem_report:
+            schedule_problem_report(
+                "proc.tasks.task_migrate_and_publish_issues",
+                "issues",
+                user_id=user_id,
+                username=username,
+                collection_acron=collection_acron,
+                journal_acron=journal_acron,
+                publication_year=publication_year,
+                issue_folder=issue_folder,
+                updated_from=started_at,
+                max_items=problem_report_max_items,
+            )
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         UnexpectedEvent.create(
@@ -1301,6 +1336,8 @@ def task_migrate_and_publish_articles(
     delete_sps_pkg_which_ppx_is_missing=False,
     delete_article_procs_which_sps_pkg_is_missing=False,
     delete_article_procs_which_is_duplicated=False,
+    generate_problem_report=True,
+    problem_report_max_items=None,
 ):
     """
     Ponto de entrada para migração e publicação de artigos.
@@ -1368,7 +1405,15 @@ def task_migrate_and_publish_articles(
     delete_article_procs_which_sps_pkg_is_missing / delete_article_procs_which_is_duplicated : bool, default False
         Repassados até ``task_fix_issue_articles`` / ``ArticleProc.exclude_invalid_records``:
         removem ``ArticleProc`` duplicados ou sem ``sps_pkg`` associado.
+    problem_report_max_items : int, optional
+        Máximo de itens com problema do relatório automático (conforme a
+        capacidade da máquina; padrão ``ProblemReport.DEFAULT_MAX_ITEMS``).
+    generate_problem_report : bool, default True
+        Agenda ``task_generate_problem_report`` (fascículos + artigos do
+        escopo) para quando a execução disparada terminar; o relatório
+        considera os itens atualizados desde o início desta execução.
     """
+    started_at = _now_iso()
     task_params = {
         "user_id": user_id,
         "username": username,
@@ -1487,7 +1532,20 @@ def task_migrate_and_publish_articles(
             "total_scheduled": total_processed,
         })
         task_exec.total_processed = total_processed
-        task_exec.finish(data={"scheduled": selected})
+        if generate_problem_report and total_processed:
+            schedule_problem_report(
+                "proc.tasks.task_migrate_and_publish_articles",
+                "articles",
+                user_id=user_id,
+                username=username,
+                collection_acron_list=collection_acron_list,
+                journal_acron_list=journal_acron_list,
+                publication_year=publication_year,
+                issue_folder=issue_folder,
+                updated_from=started_at,
+                max_items=problem_report_max_items,
+            )
+        task_exec.finish()
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -3043,3 +3101,345 @@ def task_check_migrated_article(
                 "article_proc_id": article_proc_id,
             },
         )
+
+
+############################################
+# RELATÓRIO DE PROBLEMAS
+############################################
+
+PROBLEM_REPORT_ITEM_TYPES = {
+    "journals": ["journal"],
+    "issues": ["issue"],
+    "articles": ["issue", "article"],
+    "all": ["journal", "issue", "article"],
+}
+# espera mínima sem atualização nos itens do escopo para considerar que a
+# execução disparada terminou
+PROBLEM_REPORT_QUIET_MINUTES = 15
+# tempo máximo de espera; depois disso o relatório é gerado assim mesmo
+PROBLEM_REPORT_MAX_WAIT_HOURS = 24
+
+
+def _as_list(value, *more):
+    items = []
+    if isinstance(value, (list, tuple, set)):
+        items.extend(value)
+    elif value:
+        items.append(value)
+    for item in more:
+        if item:
+            items.append(item)
+    return sorted({str(item) for item in items})
+
+
+def _problem_report_scope(
+    collection_acron=None,
+    collection_acron_list=None,
+    journal_acron=None,
+    journal_acron_list=None,
+    publication_year=None,
+    issue_folder=None,
+    updated_from=None,
+    updated_to=None,
+):
+    """
+    Escopo do relatório. ``updated_from``/``updated_to`` (data "AAAA-MM-DD"
+    ou data-hora ISO) limitam, antes de tudo, os itens pela data de
+    atualização; datas são inclusivas.
+    """
+    return {
+        "collection_acron_list": _as_list(collection_acron_list, collection_acron),
+        "journal_acron_list": _as_list(journal_acron_list, journal_acron),
+        "publication_year": str(publication_year) if publication_year else None,
+        "issue_folder": issue_folder or None,
+        "updated_from": _iso_or_none(updated_from),
+        "updated_to": _iso_or_none(updated_to),
+    }
+
+
+def _iso_or_none(value):
+    if not value:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def _now_iso():
+    from django.utils import timezone
+
+    return timezone.now().isoformat()
+
+
+def schedule_problem_report(
+    task_name,
+    content_type,
+    user_id=None,
+    username=None,
+    quiet_minutes=None,
+    max_items=None,
+    **scope_params,
+):
+    """
+    Agenda ``task_generate_problem_report`` ao final das tasks de entrada
+    ``task_migrate_and_publish_*``. Registra de imediato o
+    ``ProblemReport`` com status "aguardando o fim da execução", para que
+    apareça na lista do admin. Falhas no agendamento não interrompem a
+    task chamadora.
+    """
+    from proc.models import ProblemReport
+
+    try:
+        quiet_minutes = quiet_minutes or PROBLEM_REPORT_QUIET_MINUTES
+        item_types = PROBLEM_REPORT_ITEM_TYPES[content_type]
+        report = ProblemReport.create_request(
+            _problem_report_scope(**scope_params),
+            item_types,
+            user=_get_user(user_id, username),
+            task_name=task_name,
+            status=ProblemReport.STATUS_WAITING,
+            max_items=max_items,
+        )
+        task_generate_problem_report.apply_async(
+            kwargs=dict(
+                user_id=user_id,
+                username=username,
+                content_type=content_type,
+                triggered_by=task_name,
+                wait_until_idle=True,
+                quiet_minutes=quiet_minutes,
+                problem_report_id=report.id,
+                **scope_params,
+            ),
+            countdown=quiet_minutes * 60,
+        )
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            action="proc.tasks.schedule_problem_report",
+            item=task_name,
+            e=e,
+            exc_traceback=exc_traceback,
+            detail={"content_type": content_type, "scope_params": scope_params},
+        )
+
+
+def _scope_is_busy(scope, item_types, quiet_minutes):
+    """
+    True se algum item do escopo está em DOING ou foi atualizado nos
+    últimos ``quiet_minutes`` (execução disparada ainda em andamento).
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from proc.problem_report import STATUS_FIELDS, _models, _scope_filters
+
+    since = timezone.now() - timedelta(minutes=quiet_minutes)
+    models = _models()
+    for item_type in item_types:
+        proc_model = models[item_type][0]
+        doing = Q()
+        for field in STATUS_FIELDS[item_type]:
+            doing |= Q(**{field: tracker_choices.PROGRESS_STATUS_DOING})
+        busy = (
+            proc_model.objects.filter(_scope_filters(item_type, scope))
+            .filter(doing | Q(updated__gte=since))
+            .exists()
+        )
+        if busy:
+            return True
+    return False
+
+
+# limite próprio da geração (o global, CELERY_TASK_TIME_LIMIT, é curto para
+# coleções grandes); ao estourar o "soft", o relatório é marcado com erro
+PROBLEM_REPORT_TIME_LIMIT = int(getattr(settings, "PROBLEM_REPORT_TIME_LIMIT", 30 * 60))
+
+
+@celery_app.task(
+    bind=True,
+    soft_time_limit=PROBLEM_REPORT_TIME_LIMIT,
+    time_limit=PROBLEM_REPORT_TIME_LIMIT + 120,
+)
+def task_generate_problem_report(
+    self,
+    user_id=None,
+    username=None,
+    content_type="articles",
+    collection_acron=None,
+    collection_acron_list=None,
+    journal_acron=None,
+    journal_acron_list=None,
+    publication_year=None,
+    issue_folder=None,
+    triggered_by=None,
+    wait_until_idle=False,
+    quiet_minutes=PROBLEM_REPORT_QUIET_MINUTES,
+    max_wait_hours=PROBLEM_REPORT_MAX_WAIT_HOURS,
+    first_attempt_at=None,
+    problem_report_id=None,
+    language=None,
+    max_items=None,
+    updated_from=None,
+    updated_to=None,
+):
+    """
+    Gera um ``ProblemReport`` (planilha para download no admin, em
+    Processing > Problem reports) com os itens BLOCKED/PENDING do escopo
+    agrupados por categoria de problema e ordenados por frequência.
+
+    Pode ser executada diretamente (ex.: agendada no admin do celery beat)
+    ou é agendada automaticamente pelas tasks
+    ``task_migrate_and_publish_{journals,issues,articles}``.
+
+    Com ``wait_until_idle=True``, como as subtasks são assíncronas, adia a
+    geração enquanto houver itens do escopo em DOING ou atualizados nos
+    últimos ``quiet_minutes``, até no máximo ``max_wait_hours``.
+
+    Parameters
+    ----------
+    content_type : str
+        "journals", "issues", "articles" (inclui os fascículos, pois falhas
+        em ``docs_status``/``files_status`` impedem artigos) ou "all".
+
+    Sem ``wait_until_idle`` (padrão), gera imediatamente o retrato da
+    situação atual dos ``*Proc`` do escopo — é o modo usado pelo botão
+    "Gerar relatório" do admin e pelo comando ``generate_problem_report``.
+
+    ``problem_report_id``: registro já criado na solicitação (com status
+    exibido no admin). Se foi apagado pelo usuário enquanto aguardava, a
+    geração é cancelada. Sem ele, um registro novo é criado.
+
+    ``updated_from`` / ``updated_to``: limitam, antes de tudo, os itens pela
+    data de atualização (inclusivas). Nas execuções automáticas,
+    ``updated_from`` é o início da execução de migração.
+
+    Analisa todos os itens com status problemático do período, os mais
+    recentes primeiro, até ``max_items`` (informado pelo administrador
+    conforme a capacidade da máquina; padrão
+    ``ProblemReport.DEFAULT_MAX_ITEMS``); se não couber (quantidade, memória
+    ou tempo), o relatório sai "pronto (incompleto)" com o que foi
+    analisado e a cobertura (ver ``ProblemReport.run``).
+
+    ``language``: idioma do relatório (en, pt, es ou código como "pt-br").
+    Se ausente, usa o idioma preferido do usuário no Wagtail ou o padrão do
+    sistema (``LANGUAGE_CODE``).
+    """
+    from datetime import datetime, timedelta
+
+    from django.utils import timezone
+
+    from proc.models import ProblemReport
+
+    item_types = PROBLEM_REPORT_ITEM_TYPES.get(content_type) or PROBLEM_REPORT_ITEM_TYPES["articles"]
+    scope = _problem_report_scope(
+        collection_acron=collection_acron,
+        collection_acron_list=collection_acron_list,
+        journal_acron=journal_acron,
+        journal_acron_list=journal_acron_list,
+        publication_year=publication_year,
+        issue_folder=issue_folder,
+        updated_from=updated_from,
+        updated_to=updated_to,
+    )
+    task_params = {
+        "content_type": content_type,
+        "scope": scope,
+        "triggered_by": triggered_by,
+        "wait_until_idle": wait_until_idle,
+        "quiet_minutes": quiet_minutes,
+        "first_attempt_at": first_attempt_at,
+    }
+    try:
+        if problem_report_id:
+            report = ProblemReport.objects.filter(pk=problem_report_id).first()
+            if report is None:
+                return {"cancelled": True}
+        else:
+            report = ProblemReport.create_request(
+                scope,
+                item_types,
+                user=_get_user(user_id, username),
+                task_name=triggered_by,
+                status=(
+                    ProblemReport.STATUS_WAITING
+                    if wait_until_idle
+                    else ProblemReport.STATUS_QUEUED
+                ),
+                language=language,
+                max_items=max_items,
+            )
+
+        now = timezone.now()
+        first_attempt_at = first_attempt_at or now.isoformat()
+        if wait_until_idle:
+            started = datetime.fromisoformat(first_attempt_at)
+            deadline = started + timedelta(hours=max_wait_hours)
+            if now < deadline and _scope_is_busy(scope, item_types, quiet_minutes):
+                task_generate_problem_report.apply_async(
+                    kwargs=dict(
+                        user_id=user_id,
+                        username=username,
+                        content_type=content_type,
+                        collection_acron_list=scope["collection_acron_list"],
+                        journal_acron_list=scope["journal_acron_list"],
+                        publication_year=publication_year,
+                        issue_folder=issue_folder,
+                        updated_from=scope["updated_from"],
+                        updated_to=scope["updated_to"],
+                        triggered_by=triggered_by,
+                        wait_until_idle=True,
+                        quiet_minutes=quiet_minutes,
+                        max_wait_hours=max_wait_hours,
+                        first_attempt_at=first_attempt_at,
+                        problem_report_id=report.id,
+                    ),
+                    countdown=quiet_minutes * 60,
+                )
+                if report.status != ProblemReport.STATUS_WAITING:
+                    report.set_status(ProblemReport.STATUS_WAITING)
+                return {"rescheduled": True, "problem_report_id": report.id}
+
+        task_exec = TaskExecution(
+            name="proc.tasks.task_generate_problem_report",
+            item=ProblemReport.make_scope_label(scope, item_types),
+            params=task_params,
+        )
+        try:
+            report.run()
+            task_exec.total_to_process = report.total_items
+            task_exec.total_processed = report.total_items
+            task_exec.finish(
+                data={
+                    "problem_report_id": report.id,
+                    "total_categories": report.total_categories,
+                }
+            )
+            return {"problem_report_id": report.id}
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            task_exec.finish(exception=e, exc_traceback=exc_traceback)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        UnexpectedEvent.create(
+            action="proc.tasks.task_generate_problem_report",
+            item=str(scope),
+            e=e,
+            exc_traceback=exc_traceback,
+            detail=task_params,
+        )
+
+
+@celery_app.task(bind=True)
+def task_delete_expired_problem_reports(self, user_id=None, username=None):
+    """
+    Remove relatórios de problemas vencidos (e seus arquivos) e marca como
+    erro os que ficaram "gerando" além do limite de tempo.
+    """
+    from proc.models import ProblemReport
+
+    return {
+        "deleted": ProblemReport.delete_expired(),
+        "stale": ProblemReport.mark_stale(),
+    }
