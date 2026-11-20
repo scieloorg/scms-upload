@@ -639,8 +639,10 @@ class Article(ClusterableModel, CommonControlField):
         Com documento na coleção (collection_pid_v2): o Article vinculado a
         ele ou, na falta, o Article ainda não vinculado do mesmo pacote ou
         pid_v3 (anterior à separação por coleção), cujo vínculo é
-        completado; é reaproveitado se for desta coleção ou se a coleção
-        continuar ambígua, mas não se for de outra coleção.
+        completado; é reaproveitado somente se ficar vinculado a este
+        documento na coleção. Se continuar sem vínculo (ex.: ambíguo) ou
+        ficar vinculado a outra coleção, não é reaproveitado: é criado um
+        Article para a coleção.
 
         Sem documento na coleção (ex.: ingresso): o Article do pacote ou o
         do pid_v3 (priorizando o não vinculado e, depois, o da coleção
@@ -660,7 +662,7 @@ class Article(ClusterableModel, CommonControlField):
                 "-updated"
             ):
                 item.complete_collection_pid_v2(user)
-                if item.collection_pid_v2_id in (None, collection_pid_v2.id):
+                if item.collection_pid_v2_id == collection_pid_v2.id:
                     return item
             raise cls.DoesNotExist
 

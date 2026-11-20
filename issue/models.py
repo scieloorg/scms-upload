@@ -298,11 +298,9 @@ class Issue(CommonControlField, IssuePublicationDate):
         # artigo em mais de uma coleção tem um Article por coleção
         items = self.article_set.all()
         if collection:
-            # sem vínculo: artigo anterior à separação por coleção
-            items = items.filter(
-                Q(collection_pid_v2__collection=collection)
-                | Q(collection_pid_v2__isnull=True)
-            )
+            # somente os vinculados ao documento na coleção: artigo sem
+            # vínculo (collection_pid_v2) não é publicado
+            items = items.filter(collection_pid_v2__collection=collection)
         return list(dict.fromkeys(item.pid_v3 for item in items))
 
     @classmethod
