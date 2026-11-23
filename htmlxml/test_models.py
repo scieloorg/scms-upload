@@ -167,7 +167,7 @@ class HTMLXMLExceptionsTestCase(TestCase):
 
     def setUp(self):
         self.obj = HTMLXML()
-        for name in ("save", "save_file", "save_bb_init_file", "_save_zip"):
+        for name in ("save", "save_file", "save_bb_init_file", "_save_zip", "review"):
             patcher = patch.object(HTMLXML, name)
             patcher.start()
             self.addCleanup(patcher.stop)
