@@ -10,17 +10,30 @@ class PidProvider(BasePidProvider):
 
     @staticmethod
     @profile_staticmethod
-    def get_xmltree(pid_v3):
+    def get_xmltree(pid_v3, collection_acron=None):
+        """
+        XML da coleção (collection_acron) ou, sem coleção, o de
+        PidProviderXML.current_version (ver PidProviderXML.get_xml_with_pre)
+        """
         try:
-            return PidProviderXML.get_xml_with_pre(pid_v3).xmltree
+            return PidProviderXML.get_xml_with_pre(
+                pid_v3, collection_acron=collection_acron
+            ).xmltree
         except (PidProviderXML.DoesNotExist, AttributeError):
             return None
 
     @staticmethod
     @profile_staticmethod
-    def get_sps_pkg_name(pid_v3):
+    def get_sps_pkg_name(pid_v3, collection_acron=None):
+        """
+        Nome do pacote do XML da coleção (collection_acron) ou, sem coleção,
+        o de PidProviderXML.current_version (ver
+        PidProviderXML.get_xml_with_pre)
+        """
         try:
-            return PidProviderXML.get_xml_with_pre(pid_v3).sps_pkg_name
+            return PidProviderXML.get_xml_with_pre(
+                pid_v3, collection_acron=collection_acron
+            ).sps_pkg_name
         except (PidProviderXML.DoesNotExist, AttributeError):
             return None
 
