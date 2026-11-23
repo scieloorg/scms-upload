@@ -5,6 +5,8 @@ from django.test import SimpleTestCase
 from pid_provider.tasks import (
     task_load_record_from_xml_url,
     task_load_records_from_counter_dict,
+    task_process_article_source,
+    task_process_article_sources,
 )
 
 
@@ -132,28 +134,133 @@ class LoadRecordsFromCounterDictTests(SimpleTestCase):
 
 
 class LoadRecordFromXMLURLTaskTests(SimpleTestCase):
-    @patch("pid_provider.tasks.PidProvider")
+    @patch("pid_provider.tasks.Collection")
+    @patch("pid_provider.tasks.ArticleSource")
     @patch("pid_provider.tasks._get_user")
-    def test_passes_opac_pid_as_expected_pid(self, get_user, provider_class):
-        get_user.return_value = Mock()
-        provider = provider_class.return_value
-        provider.provide_pid_for_xml_uri.return_value = {
-            "v3": "expected-pid",
-            "created": True,
-        }
+    def test_stores_xml_in_article_source_with_expected_pid(
+        self, get_user, article_source_class, collection_class
+    ):
+        user = get_user.return_value
+        collection = collection_class.get.return_value
+        document_item = {"aid": "expected-pid", "pid_v2": "S0001"}
 
         task_load_record_from_xml_url.run(
             username="operator",
             collection_acron="scl",
             pid_v3="expected-pid",
             xml_url="https://www.scielo.br/j/rsp/a/expected-pid/?format=xml",
+            origin_date="2024-01-31",
+            source_date="2024-01-31T10:01:00",
+            document_item=document_item,
+        )
+
+        collection_class.get.assert_called_once_with("scl")
+        article_source_class.create_or_update.assert_called_once_with(
+            user,
+            url="https://www.scielo.br/j/rsp/a/expected-pid/?format=xml",
+            source_date="2024-01-31T10:01:00",
+            collection=collection,
+            pid="S0001",
+            force_update=None,
+            auto_solve_pid_conflict=False,
+            is_public=True,
+            detail=document_item,
+            expected_pid_v3="expected-pid",
+        )
+
+    @patch("pid_provider.tasks.Collection")
+    @patch("pid_provider.tasks.ArticleSource")
+    @patch("pid_provider.tasks._get_user")
+    def test_uses_origin_date_when_source_date_is_missing(
+        self, get_user, article_source_class, collection_class
+    ):
+        task_load_record_from_xml_url.run(
+            username="operator",
+            collection_acron="scl",
+            pid_v3="pid",
+            xml_url="https://www.scielo.br/j/rsp/a/pid/?format=xml",
+            origin_date="2024-01-31",
         )
 
         self.assertEqual(
-            provider.provide_pid_for_xml_uri.call_args.kwargs["expected_pid_v3"],
-            "expected-pid",
+            article_source_class.create_or_update.call_args.kwargs["source_date"],
+            "2024-01-31",
         )
+        collection_class.get.assert_called_once_with("scl")
+
+    @patch("pid_provider.tasks.UnexpectedEvent.create")
+    @patch("pid_provider.tasks.Collection")
+    @patch("pid_provider.tasks.ArticleSource")
+    @patch("pid_provider.tasks._get_user")
+    def test_records_unexpected_event_when_article_source_fails(
+        self, get_user, article_source_class, collection_class, create_event
+    ):
+        article_source_class.create_or_update.side_effect = ValueError("boom")
+
+        task_load_record_from_xml_url.run(
+            username="operator",
+            collection_acron="scl",
+            pid_v3="pid",
+            xml_url="https://www.scielo.br/j/rsp/a/pid/?format=xml",
+        )
+
+        create_event.assert_called_once()
+        self.assertEqual(create_event.call_args.kwargs["item"], "pid")
+
+
+class ProcessArticleSourcesTaskTests(SimpleTestCase):
+    @patch("pid_provider.tasks.task_process_article_source.delay")
+    @patch("pid_provider.tasks.ArticleSource")
+    def test_marks_processing_and_dispatches_each_stored_xml(
+        self, article_source_class, process_one
+    ):
+        ids = Mock()
+        ids.iterator.return_value = iter([1, 2])
+        queryset = article_source_class.get_with_stored_xml.return_value
+        queryset.values_list.return_value = ids
+
+        task_process_article_sources.run(
+            username="operator",
+            collection_acron="scl",
+            force_update=True,
+        )
+
+        article_source_class.get_with_stored_xml.assert_called_once_with(
+            status_list=None,
+            collection_acron="scl",
+            from_date=None,
+            until_date=None,
+        )
+        self.assertEqual(article_source_class.objects.filter.call_count, 2)
         self.assertEqual(
-            provider.provide_pid_for_xml_uri.call_args.kwargs["collection_acron"],
-            "scl",
+            [c.kwargs["article_source_id"] for c in process_one.call_args_list],
+            [1, 2],
+        )
+        self.assertTrue(process_one.call_args.kwargs["force_update"])
+
+    @patch("pid_provider.tasks.task_process_article_source.delay")
+    @patch("pid_provider.tasks.ArticleSource")
+    def test_stop_limits_selected_ids(self, article_source_class, process_one):
+        ids = article_source_class.get_with_stored_xml.return_value.values_list.return_value
+        ids.__getitem__.return_value.iterator.return_value = iter([1])
+
+        task_process_article_sources.run(username="operator", stop=1)
+
+        ids.__getitem__.assert_called_once_with(slice(None, 1))
+        process_one.assert_called_once()
+
+    @patch("pid_provider.tasks.ArticleSource")
+    @patch("pid_provider.tasks._get_user")
+    def test_process_one_uses_stored_xml(self, get_user, article_source_class):
+        article_source = article_source_class.objects.get.return_value
+
+        task_process_article_source.run(
+            username="operator", article_source_id=7, force_update=True
+        )
+
+        article_source_class.objects.get.assert_called_once_with(pk=7)
+        article_source.process_stored_xml.assert_called_once_with(
+            get_user.return_value,
+            force_update=True,
+            auto_solve_pid_conflict=False,
         )
