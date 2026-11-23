@@ -821,7 +821,9 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             report_content = None
             if xml_content:
                 detail["xml_created"] = True
-                if detail.get("xml_exceptions"):
+                # XML gerado, mas com exceções (passo do body que falhou ou
+                # erro nos metadados/referências): pode ter perdido conteúdo
+                if detail["exceptions"]:
                     detail["status"] = tracker_choices.PROGRESS_STATUS_PENDING
                 else:
                     detail["status"] = tracker_choices.PROGRESS_STATUS_DONE
@@ -861,9 +863,12 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         document._translated_html_by_lang = translations
         document.generate_body_and_back_from_html(translations)
 
-        if document.exceptions:    
-            detail["body_and_back_exceptions"] = document.exceptions
-            detail["exceptions"].extend(document.exceptions)
+        # cópia: ``document.exceptions`` continua recebendo exceções na
+        # geração do XML completo
+        exceptions = list(document.exceptions or [])
+        if exceptions:
+            detail["body_and_back_exceptions"] = exceptions
+            detail["exceptions"].extend(exceptions)
 
         index = 1
         if not document.xml_body_and_back:
@@ -872,10 +877,21 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         self.save_bb_init_file(document, index)
 
     def _generate_xml(self, document, xml_filename, detail):
-        xml_content = document.generate_full_xml(None).decode("utf-8")
+        """
+        Gera o XML completo. As exceções registradas nesta etapa
+        (referências, datas, resumos...) vão para ``xml_exceptions`` e
+        ``exceptions`` — com ou sem XML gerado, e sem repetir as do body.
+        """
+        start = len(document.exceptions or [])
+        try:
+            xml_content = document.generate_full_xml(None)
+        finally:
+            exceptions = list((document.exceptions or [])[start:])
+            if exceptions:
+                detail["xml_exceptions"] = exceptions
+                detail["exceptions"].extend(exceptions)
+        xml_content = xml_content.decode("utf-8") if xml_content else None
         if not xml_content:
-            detail["xml_exceptions"] = document.exceptions
-            detail["exceptions"].extend(document.exceptions)
             return None
         self.save_file(xml_filename, xml_content, True)
         return xml_content   
