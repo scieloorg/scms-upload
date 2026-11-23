@@ -41,8 +41,30 @@ class ProblemReportRequestForm(forms.Form):
         ("all", _("Journals, issues and articles")),
     ]
 
+    REPORT_TYPE_CHOICES = [
+        ("problems", _("Migration/publication problems (blocked or pending items)")),
+        ("html2xml", _("HTML to XML conversion (quality of the converted articles)")),
+    ]
+
+    report_type = forms.ChoiceField(
+        label=_("Report"),
+        choices=REPORT_TYPE_CHOICES,
+        initial="problems",
+        required=False,
+        widget=forms.RadioSelect,
+        help_text=_(
+            "HTML to XML conversion: analyzes every article converted from HTML in the "
+            "period (by conversion date), groups the problems found (failed steps, "
+            "lost content, HTML left in the XML, broken links...) by category and shows "
+            "whether each one is spread over many journals (likely systematic) or "
+            "concentrated in one (likely data)."
+        ),
+    )
     content_type = forms.ChoiceField(
-        label=_("Items"), choices=CONTENT_TYPE_CHOICES, initial="articles"
+        label=_("Items"),
+        choices=CONTENT_TYPE_CHOICES,
+        initial="articles",
+        help_text=_("Only for the migration/publication problems report"),
     )
     updated_from = forms.DateField(
         label=_("Items updated from"),
@@ -125,6 +147,7 @@ class ProblemReportRequestForm(forms.Form):
     def task_kwargs(self):
         data = self.cleaned_data
         return {
+            "report_type": data.get("report_type") or "problems",
             "content_type": data["content_type"],
             "max_items": data["max_items"],
             "collection_acron_list": data["collection_acron_list"] or [],

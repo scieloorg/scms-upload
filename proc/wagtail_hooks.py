@@ -403,6 +403,7 @@ class ProblemReportViewSet(SnippetViewSet):
     list_per_page = 50
     list_display = [
         "scope_label",
+        "report_type",
         "status",
         "coverage",
         "total_items",
@@ -412,10 +413,11 @@ class ProblemReportViewSet(SnippetViewSet):
         "created",
         "expires_at",
     ]
-    list_filter = ["status", "task_name", "item_types"]
+    list_filter = ["report_type", "status", "task_name", "item_types"]
     search_fields = ["scope_label", "task_name"]
     inspect_view_fields = [
         "download",
+        "report_type",
         "status",
         "notice",
         "coverage",
