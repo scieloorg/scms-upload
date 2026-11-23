@@ -38,6 +38,7 @@ from core.widgets import ReadOnlyPrettyJSONWidget
 from core.models import CommonControlField
 from core.utils.file_utils import delete_files
 from core.utils.sanitize import sanitize_for_json
+from htmlxml.exceptions import Html2xmlBlockingIssuesError
 from htmlxml.models import HTMLXML
 from issue.models import Issue
 from journal.choices import JOURNAL_AVAILABILTY_STATUS
@@ -3115,6 +3116,16 @@ class ArticleProc(BaseProc, ClusterableModel):
         )
         detail["html_to_xml"] = htmlxml.html_to_xml(user, self)
         self.xml_status = htmlxml.html2xml_status
+        # problemas cuja categoria foi marcada, na revisão, como bloqueante:
+        # o artigo não segue para o site novo (o antigo o mantém público)
+        blocking = [str(issue.problem.category) for issue in htmlxml.blocking_issues()]
+        if blocking:
+            detail["html_to_xml_blocking_issues"] = blocking
+            raise Html2xmlBlockingIssuesError(
+                _("HTML to XML conversion has problems that block publication: {}").format(
+                    "; ".join(blocking)
+                )
+            )
         if os.path.isfile(htmlxml.file.path):
             return htmlxml.file.path
 

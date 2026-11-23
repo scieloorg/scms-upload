@@ -18,7 +18,10 @@ import django_filters
 
 from config.menu import get_menu_order
 from core.views import CommonControlFieldViewSet
-from htmlxml.models import HTMLXML
+from django.db.models import Count
+from django.utils.html import format_html
+
+from htmlxml.models import HTMLXML, Html2xmlIssue, Html2xmlProblem
 from package.models import SPSPkg
 
 from .models import ArticleProc, IssueProc, JournalProc, ProblemReport, ProcReport
@@ -46,6 +49,21 @@ class HTMLXMLFilterSet(django_filters.FilterSet):
         method='filter_has_attention_demands'
     )
     
+    review_severity = django_filters.ChoiceFilter(
+        label=_("Review: severity"),
+        choices=[
+            ("critical", _("critical")),
+            ("major", _("major")),
+            ("minor", _("minor")),
+            ("info", _("information")),
+            ("ok", _("ok")),
+        ],
+    )
+    review_problem = django_filters.NumberFilter(
+        field_name="review_issues__problem",
+        label=_("Review: problem (id)"),
+    )
+
     def filter_has_images(self, queryset, name, value):
         if value is True:
             return queryset.filter(html_img_total__gt=0)
@@ -79,6 +97,8 @@ class HTMLXMLFilterSet(django_filters.FilterSet):
             'has_images',
             'has_tables',
             'has_attention_demands',
+            'review_severity',
+            'review_problem',
         ]
 
 
@@ -167,8 +187,8 @@ class HTMLXMLViewSet(CommonControlFieldViewSet):
     list_display = [
         "migrated_article",
         "html2xml_status",
-        "quality",
-        "attention_demands",
+        "review_severity",
+        "review_text_lost",
         "html_translation_langs",
         "pdf_langs",
         "n_paragraphs",
@@ -321,6 +341,22 @@ class ProcReportViewSet(CommonControlFieldViewSet):
     ]
 
 
+class _CollectionInstanceMixin:
+    """Recusa abrir registros de coleções que o usuário não gerencia."""
+
+    instance_action = "view"
+
+    def get_object(self, queryset=None):
+        from django.core.exceptions import PermissionDenied
+
+        obj = super().get_object(queryset)
+        if not self.permission_policy.user_has_permission_for_instance(
+            self.request.user, self.instance_action, obj
+        ):
+            raise PermissionDenied
+        return obj
+
+
 class SuperuserOnlyPermissionPolicy(BasePermissionPolicy):
     """
     Relatórios de problemas são exclusivos de administradores: só
@@ -339,6 +375,65 @@ class SuperuserOnlyPermissionPolicy(BasePermissionPolicy):
 
     def users_with_permission(self, action):
         return self.users_with_any_permission([action])
+
+
+class ProblemReportPermissionPolicy(SuperuserOnlyPermissionPolicy):
+    """
+    Administradores: tudo. Gestores de coleção (autonomia para acompanhar a
+    conversão sem depender da infraestrutura): veem, baixam e geram os
+    relatórios de conversão HTML -> XML das coleções que gerenciam; não
+    apagam e não veem os relatórios de problemas de migração/publicação.
+    """
+
+    def user_has_permission(self, user, action):
+        if super().user_has_permission(user, action):
+            return True
+        from htmlxml.permissions import can_review
+
+        return action in ("view", "add") and user.is_active and can_review(user)
+
+    def user_has_any_permission(self, user, actions):
+        return any(self.user_has_permission(user, action) for action in actions)
+
+    def users_with_any_permission(self, actions):
+        from htmlxml.permissions import CollectionManagerPermissionPolicy
+
+        return CollectionManagerPermissionPolicy(self.model).users_with_any_permission(actions)
+
+    def user_has_permission_for_instance(self, user, action, instance):
+        if SuperuserOnlyPermissionPolicy.user_has_permission(self, user, action):
+            return True
+        if not self.user_has_permission(user, action):
+            return False
+        return instance.pk in set(manager_reports(ProblemReport.objects.filter(pk=instance.pk), user).values_list("pk", flat=True))
+
+    def instances_user_has_permission_for(self, user, action):
+        if SuperuserOnlyPermissionPolicy.user_has_permission(self, user, action):
+            return self.model.objects.all()
+        if not self.user_has_permission(user, action):
+            return self.model.objects.none()
+        return manager_reports(self.model.objects.all(), user)
+
+
+def manager_reports(qs, user):
+    """
+    Relatórios de conversão HTML -> XML cujo escopo está todo nas coleções
+    que ``user`` gerencia (relatórios de "todas as coleções" ficam com os
+    administradores).
+    """
+    from htmlxml.permissions import managed_collections
+
+    collections = managed_collections(user)
+    if collections is None:
+        return qs
+    acrons = {c.acron for c in collections}
+    qs = qs.filter(report_type=ProblemReport.REPORT_HTML2XML)
+    allowed = [
+        pk for pk, scope in qs.values_list("pk", "scope")
+        if (scope or {}).get("collection_acron_list")
+        and set(scope["collection_acron_list"]) <= acrons
+    ]
+    return qs.filter(pk__in=allowed)
 
 
 class ProblemReportIndexView(SnippetIndexView):
@@ -360,7 +455,7 @@ class ProblemReportIndexView(SnippetIndexView):
     def get_queryset(self):
         # quem abre a lista vê como erro o que ficou "gerando" além do limite
         ProblemReport.mark_stale()
-        return super().get_queryset()
+        return manager_reports(super().get_queryset(), self.request.user)
 
 
 class ProblemReportCreateView(SnippetCreateView):
@@ -377,8 +472,11 @@ class ProblemReportEditView(SnippetEditView):
         return redirect("wagtailsnippets_proc_problemreport:inspect", kwargs["pk"])
 
 
-class ProblemReportInspectView(SnippetInspectView):
-    """Detalhe só leitura, sem o botão "Editar"."""
+class ProblemReportInspectView(_CollectionInstanceMixin, SnippetInspectView):
+    """
+    Detalhe só leitura, sem o botão "Editar"; gestores só abrem os
+    relatórios das suas coleções.
+    """
 
     def get_edit_url(self):
         return None
@@ -389,7 +487,7 @@ class ProblemReportViewSet(SnippetViewSet):
 
     @property
     def permission_policy(self):
-        return SuperuserOnlyPermissionPolicy(self.model)
+        return ProblemReportPermissionPolicy(self.model)
 
     index_view_class = ProblemReportIndexView
     add_view_class = ProblemReportCreateView
@@ -435,6 +533,174 @@ class ProblemReportViewSet(SnippetViewSet):
     ]
 
 
+class Html2xmlProblemIndexView(SnippetIndexView):
+    """
+    Problemas das coleções que o usuário gerencia, os mais graves e mais
+    frequentes primeiro. "Adicionar" vira "Solicitar revisão".
+    """
+
+    add_item_label = _("Request review")
+
+    def get_add_url(self):
+        if self.user_has_permission("view"):
+            return reverse("proc:request_html2xml_review")
+
+    def get_base_queryset(self):
+        from htmlxml.permissions import filter_by_managed_collections
+
+        qs = filter_by_managed_collections(super().get_base_queryset(), self.request.user)
+        return (
+            qs.select_related("category", "collection")
+            .annotate(
+                n_articles=Count("issues", distinct=True),
+                n_journals=Count("issues__journal_acron", distinct=True),
+            )
+            .order_by("category__severity_rank", "-n_articles", "collection__acron")
+        )
+
+
+class Html2xmlProblemEditView(_CollectionInstanceMixin, SnippetEditView):
+    instance_action = "change"
+
+    def save_instance(self):
+        instance = self.form.save(commit=False)
+        instance.updated_by = self.request.user
+        instance.save()
+        return instance
+
+
+class Html2xmlProblemInspectView(_CollectionInstanceMixin, SnippetInspectView):
+    pass
+
+
+class Html2xmlIssueInspectView(_CollectionInstanceMixin, SnippetInspectView):
+    pass
+
+
+class Html2xmlProblemViewSet(SnippetViewSet):
+    """
+    Revisão da conversão HTML -> XML por problema e coleção: classificar
+    (bug do conversor, dado, esperado, corrigido) e decidir se bloqueia a
+    publicação vale para todos os artigos da coleção com o problema.
+    """
+
+    model = Html2xmlProblem
+    index_view_class = Html2xmlProblemIndexView
+    edit_view_class = Html2xmlProblemEditView
+    inspect_view_class = Html2xmlProblemInspectView
+    menu_label = _("HTML to XML review")
+    menu_icon = "warning"
+    menu_order = 310
+    add_to_settings_menu = False
+    inspect_view_enabled = True
+    list_per_page = 50
+    list_display = [
+        "collection_acron",
+        "severity_label",
+        "check_label",
+        "key",
+        "articles",
+        "journals",
+        "status",
+        "blocks_publication",
+        "last_seen",
+    ]
+    list_filter = ["collection", "category__severity", "status", "blocks_publication", "category__check_code"]
+    search_fields = ["category__check_code", "category__key", "note"]
+    inspect_view_fields = [
+        "collection_acron",
+        "severity_label",
+        "check_label",
+        "key",
+        "description",
+        "nature_label",
+        "example",
+        "articles",
+        "journals",
+        "status",
+        "blocks_publication",
+        "note",
+        "first_seen",
+        "last_seen",
+    ]
+
+    @property
+    def permission_policy(self):
+        from htmlxml.permissions import CollectionManagerPermissionPolicy
+
+        return CollectionManagerPermissionPolicy(self.model)
+
+
+def _problem_articles(self):
+    total = getattr(self, "n_articles", None)
+    if total is None:
+        total = self.issues.count()
+    url = reverse("wagtailsnippets_htmlxml_html2xmlissue:list") + f"?problem={self.pk}"
+    return format_html('<a href="{}">{}</a>', url, total)
+
+
+def _problem_journals(self):
+    total = getattr(self, "n_journals", None)
+    if total is None:
+        total = self.issues.values("journal_acron").distinct().count()
+    return total
+
+
+_problem_articles.short_description = _("Articles")
+_problem_journals.short_description = _("Journals")
+Html2xmlProblem.articles = _problem_articles
+Html2xmlProblem.journals = _problem_journals
+
+
+class Html2xmlIssueIndexView(SnippetIndexView):
+    """Ocorrências são só para consulta: sem adicionar nem editar."""
+
+    def get_add_url(self):
+        return None
+
+    def get_edit_url(self, instance):
+        return None
+
+    def get_base_queryset(self):
+        from htmlxml.permissions import filter_by_managed_collections
+
+        qs = filter_by_managed_collections(
+            super().get_base_queryset(), self.request.user, "problem__collection"
+        )
+        return qs.select_related("problem__category").order_by(
+            "problem__category__severity_rank", "collection_acron", "journal_acron", "issue_folder", "pid"
+        )
+
+
+class Html2xmlIssueViewSet(SnippetViewSet):
+    """Ocorrências de cada problema, com o exemplo de cada artigo."""
+
+    model = Html2xmlIssue
+    index_view_class = Html2xmlIssueIndexView
+    inspect_view_class = Html2xmlIssueInspectView
+    inspect_view_enabled = True
+    menu_label = _("HTML to XML problems by article")
+    menu_icon = "list-ul"
+    menu_order = 320
+    add_to_settings_menu = False
+    list_per_page = 50
+    list_display = ["article", "category", "count", "example_html", "conversion_link"]
+    list_filter = [
+        "problem",
+        "problem__category__severity",
+        "problem__status",
+        "collection_acron",
+        "journal_acron",
+    ]
+    search_fields = ["pid", "journal_acron", "issue_folder", "example"]
+
+    @property
+    def permission_policy(self):
+        from htmlxml.permissions import IssuePermissionPolicy
+
+        return IssuePermissionPolicy(self.model)
+
+
 class ProcessViewSetGroup(SnippetViewSetGroup):
     menu_label = _("Processing")
     menu_icon = "folder-open-inverse"
@@ -445,6 +711,8 @@ class ProcessViewSetGroup(SnippetViewSetGroup):
         ArticleProcViewSet,
         SPSPkgViewSet,
         HTMLXMLViewSet,
+        Html2xmlProblemViewSet,
+        Html2xmlIssueViewSet,
         ProcReportViewSet,
         ProblemReportViewSet,
     )

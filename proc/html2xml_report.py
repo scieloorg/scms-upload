@@ -445,6 +445,35 @@ def summarize(rows, categories, examples_per_category=pr.EXAMPLES_PER_CATEGORY):
     return summary
 
 
+def add_review_status(summary):
+    """
+    Situação de cada categoria na revisão (Processing > HTML to XML
+    review), por coleção: status da triagem, se bloqueia a publicação e a
+    nota (ex.: "scl: Converter bug; cri: New").
+    """
+    from htmlxml.models import Html2xmlProblem
+
+    hashes = {an.category_hash(g["check"], g["key"]): g for g in summary}
+    by_hash = {}
+    for item in (
+        Html2xmlProblem.objects.filter(category__key_hash__in=list(hashes))
+        .select_related("collection", "category")
+        .order_by("collection__acron")
+    ):
+        by_hash.setdefault(item.category.key_hash, []).append(item)
+    for key_hash, items in by_hash.items():
+        group = hashes[key_hash]
+        group["review_status"] = "; ".join(
+            f"{i.collection_acron()}: {i.get_status_display()}" for i in items
+        )
+        group["blocks_publication"] = ", ".join(
+            i.collection_acron() for i in items if i.blocks_publication
+        )
+        group["review_note"] = "; ".join(
+            f"{i.collection_acron()}: {i.note}" for i in items if i.note
+        )
+
+
 def by_journal(rows, top=5):
     """Uma linha por periódico: artigos analisados, com achados e principais categorias."""
     journals = {}
@@ -616,6 +645,9 @@ TEXTS = {
         "pt": "a coluna Link abre a conversão do artigo no admin: XML gerado, relatório e ZIP com a saída de cada passo",
         "es": "la columna Enlace abre la conversión del artículo en el admin: XML generado, informe y ZIP con la salida de cada paso",
     },
+    "review_status": {"en": "Review status", "pt": "Status da revisão", "es": "Estado de la revisión"},
+    "blocks_publication": {"en": "Blocks publication", "pt": "Bloqueia a publicação", "es": "Bloquea la publicación"},
+    "review_note": {"en": "Review note", "pt": "Nota da revisão", "es": "Nota de la revisión"},
     "text_lost_percent": {"en": "% of text lost", "pt": "% do texto perdido", "es": "% del texto perdido"},
     "attention": {"en": "Attention points", "pt": "Pontos de atenção", "es": "Puntos de atención"},
     "how_to_read_0": {
@@ -655,6 +687,9 @@ SUMMARY_COLUMNS = [
     ("occurrences", "occurrences"),
     ("example", "example"),
     ("examples", "examples"),
+    ("review_status", "review_status"),
+    ("blocks_publication", "blocks_publication"),
+    ("review_note", "review_note"),
     ("check_code", "check"),
 ]
 
@@ -853,6 +888,7 @@ def build_report(
     collected = collect(scope, deadline=deadline, max_items=max_items, memory_limit=memory_limit)
     rows = collected["rows"]
     summary = summarize(rows, collected["categories"])
+    add_review_status(summary)
     data = {
         "scope": scope,
         "generated_at": generated_at,

@@ -48,10 +48,18 @@ class GenerateProblemReportView(WagtailAdminTemplateMixin, FormView):
     header_icon = "warning"
 
     def dispatch(self, request, *args, **kwargs):
-        # funcionalidade exclusiva de administradores
-        if not (request.user.is_active and request.user.is_superuser):
+        # administradores; gestores de coleção só geram o relatório de
+        # conversão HTML -> XML das suas coleções (ver o formulário)
+        from htmlxml.permissions import can_review
+
+        if not (request.user.is_active and (request.user.is_superuser or can_review(request.user))):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
 
     @property
     def list_url(self):
