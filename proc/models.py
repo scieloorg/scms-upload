@@ -445,6 +445,15 @@ class ProblemReport(models.Model):
     IN_PROGRESS = (STATUS_QUEUED, STATUS_WAITING, STATUS_GENERATING)
     DOWNLOADABLE = (STATUS_DONE, STATUS_PARTIAL)
 
+    # tipo de relatório: problemas (*Proc BLOCKED/PENDING) ou qualidade da
+    # conversão HTML -> XML (``proc.html2xml_report``)
+    REPORT_PROBLEMS = "problems"
+    REPORT_HTML2XML = "html2xml"
+    REPORT_TYPE_CHOICES = [
+        (REPORT_PROBLEMS, _("Migration/publication problems")),
+        (REPORT_HTML2XML, _("HTML to XML conversion")),
+    ]
+
     created = models.DateTimeField(_("Creation date"), auto_now_add=True)
     updated = models.DateTimeField(_("Last update date"), auto_now=True)
     creator = models.ForeignKey(
@@ -457,6 +466,13 @@ class ProblemReport(models.Model):
         editable=False,
     )
     task_name = models.CharField(_("Triggered by"), max_length=128, null=True, blank=True)
+    report_type = models.CharField(
+        _("Report"),
+        max_length=16,
+        choices=REPORT_TYPE_CHOICES,
+        default=REPORT_PROBLEMS,
+        db_index=True,
+    )
     scope_key = models.CharField(max_length=40, db_index=True)
     scope_label = models.CharField(_("Scope"), max_length=255, null=True, blank=True)
     scope = models.JSONField(_("Scope params"), null=True, blank=True)
@@ -504,6 +520,7 @@ class ProblemReport(models.Model):
     )
 
     panels = [
+        FieldPanel("report_type", read_only=True),
         FieldPanel("status", read_only=True),
         FieldPanel("language", read_only=True),
         FieldPanel("generated_at", read_only=True),
@@ -562,26 +579,27 @@ class ProblemReport(models.Model):
     coverage.short_description = _("Analyzed / with problems")
 
     @staticmethod
-    def make_scope_key(scope, item_types, language=None):
+    def make_scope_key(scope, item_types, language=None, report_type=None):
         # o período de atualização não entra na chave: um relatório mais novo
         # do mesmo escopo torna os anteriores obsoletos, qualquer que seja o
         # período deles
         scope = {
             k: v for k, v in (scope or {}).items() if k not in ("updated_from", "updated_to")
         }
-        raw = json.dumps(
-            {
-                "scope": scope,
-                "item_types": sorted(item_types),
-                "language": language,
-            },
-            sort_keys=True,
-            default=str,
-        )
+        data = {
+            "scope": scope,
+            "item_types": sorted(item_types),
+            "language": language,
+        }
+        if report_type and report_type != ProblemReport.REPORT_PROBLEMS:
+            # relatórios de tipos diferentes não se substituem (a chave dos
+            # relatórios de problemas fica como era)
+            data["report_type"] = report_type
+        raw = json.dumps(data, sort_keys=True, default=str)
         return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def make_scope_label(scope, item_types):
+    def make_scope_label(scope, item_types, report_type=None):
         parts = [
             ",".join(scope.get("collection_acron_list") or []) or "all",
             ",".join(scope.get("journal_acron_list") or []),
@@ -594,6 +612,8 @@ class ProblemReport(models.Model):
         if start or end:
             # só a data (AAAA-MM-DD) para ficar legível na lista
             period = f" ({(start or '')[:10]}..{(end or '')[:10]})"
+        if report_type == ProblemReport.REPORT_HTML2XML:
+            return f"{label} [html2xml]{period}"[:255]
         return f"{label} [{','.join(item_types)}]{period}"[:255]
 
     @staticmethod
@@ -662,6 +682,7 @@ class ProblemReport(models.Model):
         status=None,
         language=None,
         max_items=None,
+        report_type=None,
     ):
         """
         Registra a solicitação (aparece de imediato na lista do admin com
@@ -674,18 +695,25 @@ class ProblemReport(models.Model):
         informado pelo administrador conforme a capacidade da máquina
         (padrão ``DEFAULT_MAX_ITEMS``). O período pode ser tão antigo quanto
         se queira: o que limita é a quantidade de problemas.
+
+        ``report_type``: ``REPORT_PROBLEMS`` (padrão) ou ``REPORT_HTML2XML``
+        (qualidade da conversão HTML -> XML; só artigos).
         """
         from proc.problem_report import resolve_language
 
         now = timezone.now()
         language = resolve_language(language, user)
+        report_type = report_type or cls.REPORT_PROBLEMS
+        if report_type == cls.REPORT_HTML2XML:
+            item_types = ["article"]
         return cls.objects.create(
             creator=user,
             task_name=task_name,
+            report_type=report_type,
             language=language,
             max_items=int(max_items) if max_items else cls.DEFAULT_MAX_ITEMS,
-            scope_key=cls.make_scope_key(scope, item_types, language),
-            scope_label=cls.make_scope_label(scope, item_types),
+            scope_key=cls.make_scope_key(scope, item_types, language, report_type),
+            scope_label=cls.make_scope_label(scope, item_types, report_type),
             scope=scope,
             item_types=",".join(item_types),
             status=status or cls.STATUS_QUEUED,
@@ -712,7 +740,12 @@ class ProblemReport(models.Model):
         atualizados mais recentemente —, com status "pronto (incompleto)" e
         o motivo e a cobertura em ``notice``.
         """
-        from proc.problem_report import build_report, memory_limit_mb
+        from proc.problem_report import memory_limit_mb
+
+        if self.report_type == self.REPORT_HTML2XML:
+            from proc.html2xml_report import build_report
+        else:
+            from proc.problem_report import build_report
 
         self.set_status(self.STATUS_GENERATING)
         try:
@@ -735,7 +768,7 @@ class ProblemReport(models.Model):
             slug = re.sub(r"[^\w.,-]+", "_", self.scope_label or "")[:100]
             with fileobj:
                 self.file.save(
-                    f"{self.filename_prefix()}problems-{slug}-{now:%Y%m%dT%H%M%S}-{self.pk}-{self.language}.zip",
+                    f"{self.filename_prefix()}{self.report_type or self.REPORT_PROBLEMS}-{slug}-{now:%Y%m%dT%H%M%S}-{self.pk}-{self.language}.zip",
                     File(fileobj),
                     save=False,
                 )
@@ -801,6 +834,7 @@ class ProblemReport(models.Model):
         task_name=None,
         language=None,
         max_items=None,
+        report_type=None,
     ):
         """Solicita e gera imediatamente (usado pelo comando e por testes)."""
         return cls.create_request(
@@ -810,6 +844,7 @@ class ProblemReport(models.Model):
             task_name=task_name,
             language=language,
             max_items=max_items,
+            report_type=report_type,
         ).run()
 
 
