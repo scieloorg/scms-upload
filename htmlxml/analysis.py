@@ -86,6 +86,7 @@ CHECKS = {
     "text_lost": (GROUP_CONTENT, NATURE_BUG),
     "short_text_lost": (GROUP_CONTENT, NATURE_CHECK),
     "text_not_compared": (GROUP_CONTENT, NATURE_CHECK),
+    "front_in_body": (GROUP_CONTENT, NATURE_BUG),
 }
 
 # status em que há XML gerado (contadores e arquivo válidos)
@@ -1045,6 +1046,7 @@ SEVERITY = {
     "refs_count_differs": SEVERITY_MAJOR,
     "refs_elem_vs_mixed": SEVERITY_MAJOR,
     "images_fewer_in_xml": SEVERITY_MAJOR,
+    "front_in_body": SEVERITY_MAJOR,
     "xref_ref_type_invalid": SEVERITY_MINOR,
     "article_type_not_jats": SEVERITY_MINOR,
     "html_not_converted": SEVERITY_MINOR,
@@ -1080,6 +1082,85 @@ def attention_points(findings):
     return sum(1 for f in findings if severity(f["check"]) in ATTENTION_SEVERITIES)
 
 
+# ---------------------------------------------------------------------------
+# 6. Página de rosto repetida no body
+# ---------------------------------------------------------------------------
+# Os registros de parágrafo (tipo p) do site clássico trazem o texto
+# completo, sem rótulos: página de rosto (título, autores, resumos,
+# palavras-chave), corpo e anexos. O conversor só remove do body o que vem
+# antes de uma seção de introdução reconhecida; sem ela, título, autores e
+# resumos vão para o body e aparecem duas vezes (front e body).
+# Compara o front do próprio XML com o body: não depende do HTML.
+
+FRONT_PIECE = 40  # letras: trecho do front procurado no body
+FRONT_HEAD = 3000  # letras: início do body (nomes curtos só são buscados aí)
+FRONT_PARTS = (
+    # (chave, xpath a partir do front, ignora <title>, só no início do body)
+    ("article-title", ".//title-group/article-title", False, False),
+    ("trans-title", ".//title-group//trans-title", False, False),
+    ("abstract", ".//abstract", True, False),
+    ("trans-abstract", ".//trans-abstract", True, False),
+    ("kwd-group", ".//kwd-group", True, False),
+    ("contrib-group", ".//contrib-group/contrib/name", False, True),
+)
+
+
+def _text_without_titles(node):
+    """Texto de ``node`` sem os ``title`` (ex.: "Resumo", "Palavras-chave")."""
+    from copy import deepcopy
+
+    node = deepcopy(node)
+    for title in node.findall(".//title"):
+        title.getparent().remove(title)
+    return " ".join(node.itertext())
+
+
+def _front_body_pairs(xml):
+    """(front, body) do artigo e de cada sub-article."""
+    front, body = xml.find("front"), xml.find("body")
+    if front is not None and body is not None:
+        yield front, body
+    for sub in xml.iter("sub-article"):
+        front, body = sub.find("front-stub"), sub.find("body")
+        if front is None:
+            front = sub.find("front")
+        if front is not None and body is not None:
+            yield front, body
+
+
+def front_in_body_findings(xml):
+    """Partes do front (título, autores, resumos...) repetidas no body."""
+    found = {}
+    for front, body in _front_body_pairs(xml):
+        body_letters = normalize_letters(" ".join(body.itertext()))
+        if not body_letters:
+            continue
+        head = body_letters[:FRONT_HEAD]
+        for key, xpath, skip_titles, head_only in FRONT_PARTS:
+            nodes = front.findall(xpath)
+            if key == "contrib-group":
+                # nomes curtos: os dois primeiros autores no início do body,
+                # como no HTML (prenome e sobrenome)
+                names = [
+                    " ".join(n.findtext(tag) or "" for tag in ("given-names", "surname"))
+                    for n in nodes[:2]
+                ]
+                letters = [normalize_letters(n) for n in names]
+                if letters and all(len(n) >= 6 and n in head for n in letters):
+                    found.setdefault(key, "; ".join(" ".join(n.split()) for n in names))
+                continue
+            for node in nodes:
+                text = _text_without_titles(node) if skip_titles else " ".join(node.itertext())
+                letters = normalize_letters(text)
+                if len(letters) < FRONT_PIECE:
+                    continue
+                piece = letters[:FRONT_PIECE]
+                if piece in (head if head_only else body_letters):
+                    found.setdefault(key, " ".join(text.split()))
+                    break
+    return [finding("front_in_body", key, example=example) for key, example in found.items()]
+
+
 def evaluate(html, xml, data, journal_acron=""):
     """
     Avaliação de uma conversão com XML gerado.
@@ -1090,6 +1171,7 @@ def evaluate(html, xml, data, journal_acron=""):
     """
     findings = list(content_findings(data))
     findings.extend(structure_findings(xml))
+    findings.extend(front_in_body_findings(xml))
     text = None
     if html is not None:
         findings.extend(html_findings(html, xml, journal_acron))
@@ -1316,6 +1398,16 @@ TEXTS = {
         "en": "short block of the HTML (title, authors, keywords, correspondence...) entirely missing in the XML; usually front matter that was left out of the body: check whether it is in the metadata",
         "pt": "bloco curto do HTML (título, autores, palavras-chave, correspondência...) ausente por inteiro no XML; em geral página de rosto que ficou fora do body: verifique se está nos metadados",
         "es": "bloque corto del HTML (título, autores, palabras clave, correspondencia...) ausente por completo en el XML; en general portada que quedó fuera del body: verifique si está en los metadatos",
+    },
+    "check_front_in_body": {
+        "en": "front matter repeated in the body",
+        "pt": "página de rosto repetida no body",
+        "es": "portada repetida en el body",
+    },
+    "desc_front_in_body": {
+        "en": "part of the front (title, authors, abstracts, keywords) also appears in the body, so it is shown twice. The paragraph records of the classic site contain the whole unlabeled text (front, body and back) and the converter only removes what comes before a recognized introduction section. Fix in the converter (scielo_classic_website) and reprocess",
+        "pt": "parte do front (título, autores, resumos, palavras-chave) aparece também no body e é exibida duas vezes. Os registros de parágrafo do site clássico contêm o texto inteiro sem rótulos (front, body e back) e o conversor só remove o que vem antes de uma seção de introdução reconhecida. Corrigir no conversor (scielo_classic_website) e reprocessar",
+        "es": "parte del front (título, autores, resúmenes, palabras clave) aparece también en el body y se muestra dos veces. Los registros de párrafo del sitio clásico contienen el texto completo sin etiquetas (front, body y back) y el conversor solo elimina lo que viene antes de una sección de introducción reconocida. Corregir en el conversor (scielo_classic_website) y reprocesar",
     },
     "check_text_not_compared": {
         "en": "text not compared",
