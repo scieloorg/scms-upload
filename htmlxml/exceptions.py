@@ -32,3 +32,7 @@ class CreateOrUpdateGeneratedXMLFileError(Exception): ...
 
 
 class MigratedXMLFileNotFoundError(Exception): ...
+
+
+class Html2xmlBlockingIssuesError(Exception):
+    """A conversão tem problemas cuja categoria bloqueia a publicação."""

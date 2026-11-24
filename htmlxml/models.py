@@ -7,7 +7,8 @@ from functools import cached_property
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from django.core.files.base import ContentFile
-from django.db import models
+from django.conf import settings
+from django.db import IntegrityError, models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from lxml import etree
@@ -620,8 +621,25 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         help_text=_("ZIP file containing all body and back XML versions"),
         max_length=300,
     )
+    # revisão da conversão (``htmlxml.review``): substitui os pontos de
+    # atenção e o relatório por artigo
+    review_severity = models.CharField(
+        _("Review: severity"),
+        max_length=16,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_("Most severe problem found (critical, major, minor, info) or ok"),
+    )
+    review_text_lost = models.FloatField(
+        _("Review: % of text lost"), null=True, blank=True
+    )
+    reviewed_at = models.DateTimeField(_("Reviewed at"), null=True, blank=True)
     panel_status = [
         FieldPanel("html2xml_status"),
+        FieldPanel("review_severity", read_only=True),
+        FieldPanel("review_text_lost", read_only=True),
+        FieldPanel("reviewed_at", read_only=True),
         FieldPanel("quality"),
         FieldPanel("n_paragraphs"),
         FieldPanel("n_references"),
@@ -821,13 +839,16 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             report_content = None
             if xml_content:
                 detail["xml_created"] = True
-                if detail.get("xml_exceptions"):
+                # XML gerado, mas com exceções (passo do body que falhou ou
+                # erro nos metadados/referências): pode ter perdido conteúdo
+                if detail["exceptions"]:
                     detail["status"] = tracker_choices.PROGRESS_STATUS_PENDING
                 else:
                     detail["status"] = tracker_choices.PROGRESS_STATUS_DONE
                 self.html2xml_status = detail["status"]
                 self.save()
-                report_content = self.generate_report(str(article_proc), article_proc.issue_proc.journal_proc.acron, detail)
+                # o relatório antigo (pontos de atenção) não é mais gerado:
+                # a revisão (``self.review``) o substitui
     
             self._save_zip(
                 article_proc.pkg_name,
@@ -854,16 +875,44 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
                 exc_traceback=None,
                 detail=detail,
             )
+        # depois de finish: ``detail`` já tem a exceção, se houve
+        self.review(user, article_proc, detail)
         return detail
+
+    def review(self, user, article_proc, detail):
+        """
+        Revisa a conversão (ver ``htmlxml.review``). Nunca interrompe a
+        conversão: um erro na revisão é registrado como evento inesperado.
+        """
+        from htmlxml.review import review_conversion
+
+        try:
+            return review_conversion(self, article_proc=article_proc, detail=detail, user=user)
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            UnexpectedEvent.create(
+                e=e,
+                exc_traceback=exc_traceback,
+                detail={"operation": "HTMLXML.review", "htmlxml": str(self)},
+            )
+
+    def blocking_issues(self):
+        """Problemas desta conversão cuja categoria bloqueia a publicação."""
+        return self.review_issues.filter(problem__blocks_publication=True).select_related(
+            "problem__category"
+        )
 
     def _generate_body_and_back(self, document, translations, detail):
         # Inicializar document
         document._translated_html_by_lang = translations
         document.generate_body_and_back_from_html(translations)
 
-        if document.exceptions:    
-            detail["body_and_back_exceptions"] = document.exceptions
-            detail["exceptions"].extend(document.exceptions)
+        # cópia: ``document.exceptions`` continua recebendo exceções na
+        # geração do XML completo
+        exceptions = list(document.exceptions or [])
+        if exceptions:
+            detail["body_and_back_exceptions"] = exceptions
+            detail["exceptions"].extend(exceptions)
 
         index = 1
         if not document.xml_body_and_back:
@@ -872,10 +921,21 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
         self.save_bb_init_file(document, index)
 
     def _generate_xml(self, document, xml_filename, detail):
-        xml_content = document.generate_full_xml(None).decode("utf-8")
+        """
+        Gera o XML completo. As exceções registradas nesta etapa
+        (referências, datas, resumos...) vão para ``xml_exceptions`` e
+        ``exceptions`` — com ou sem XML gerado, e sem repetir as do body.
+        """
+        start = len(document.exceptions or [])
+        try:
+            xml_content = document.generate_full_xml(None)
+        finally:
+            exceptions = list((document.exceptions or [])[start:])
+            if exceptions:
+                detail["xml_exceptions"] = exceptions
+                detail["exceptions"].extend(exceptions)
+        xml_content = xml_content.decode("utf-8") if xml_content else None
         if not xml_content:
-            detail["xml_exceptions"] = document.exceptions
-            detail["exceptions"].extend(document.exceptions)
             return None
         self.save_file(xml_filename, xml_content, True)
         return xml_content   
@@ -1009,3 +1069,425 @@ class HTMLXML(CommonControlField, ClusterableModel, Html2xmlAnalysis, BasicXMLFi
             ContentFile(report_content),
             save=True,
         )
+
+class Html2xmlIssueCategory(models.Model):
+    """
+    Tipo de problema da conversão HTML -> XML (ex.: "texto perdido após
+    citação em sobrescrito"), identificado pela revisão (``htmlxml.review``).
+    É global; a triagem é feita por coleção em ``Html2xmlProblem``.
+    """
+
+    key_hash = models.CharField(max_length=40, unique=True, editable=False)
+    check_code = models.CharField(_("Check"), max_length=64, db_index=True, editable=False)
+    key = models.CharField(_("Detail"), max_length=255, blank=True, editable=False)
+    severity = models.CharField(_("Severity"), max_length=16, db_index=True, editable=False)
+    severity_rank = models.PositiveSmallIntegerField(default=9, db_index=True, editable=False)
+    group = models.CharField(_("Group"), max_length=16, blank=True, editable=False)
+    nature = models.CharField(_("Probable nature"), max_length=16, blank=True, editable=False)
+    example = models.TextField(_("Example"), blank=True, editable=False)
+    first_seen = models.DateTimeField(_("First seen"), auto_now_add=True)
+
+    class Meta:
+        ordering = ["severity_rank", "check_code", "key"]
+        verbose_name = _("HTML to XML problem type")
+        verbose_name_plural = _("HTML to XML problem types")
+
+    def __str__(self):
+        return f"{self.check_label()}: {self.key}" if self.key else self.check_label()
+
+    def check_label(self):
+        from htmlxml import analysis
+
+        return analysis.t(f"check_{self.check_code}", _language())
+
+    check_label.short_description = _("Check")
+
+    def description(self):
+        from htmlxml import analysis
+
+        return analysis.t(f"desc_{self.check_code}", _language())
+
+    description.short_description = _("Description")
+
+    def severity_label(self):
+        from htmlxml import analysis
+
+        return analysis.t(f"severity_{self.severity}", _language())
+
+    severity_label.short_description = _("Severity")
+
+    def nature_label(self):
+        from htmlxml import analysis
+
+        try:
+            return analysis.t(f"nature_{self.nature}", _language())
+        except KeyError:
+            return self.nature
+
+    nature_label.short_description = _("Probable nature")
+
+    @classmethod
+    def get_or_create_for(cls, check, key, example=""):
+        from htmlxml import analysis
+
+        key_hash = analysis.category_hash(check, key)
+        try:
+            return cls.objects.get(key_hash=key_hash)
+        except cls.DoesNotExist:
+            group, nature = analysis.CHECKS.get(check, ("", ""))
+            severity = analysis.severity(check)
+            try:
+                return cls.objects.create(
+                    key_hash=key_hash,
+                    check_code=check,
+                    key=(key or "")[:255],
+                    severity=severity,
+                    severity_rank=analysis.severity_rank(severity),
+                    group=group,
+                    nature=nature,
+                    example=example or "",
+                )
+            except IntegrityError:
+                # criada em paralelo por outra conversão
+                return cls.objects.get(key_hash=key_hash)
+
+
+def _language():
+    from django.utils.translation import get_language
+
+    code = (get_language() or "en").split("-")[0]
+    return code if code in ("en", "pt", "es") else "en"
+
+
+class Html2xmlProblem(models.Model):
+    """
+    Um tipo de problema da conversão HTML -> XML em uma coleção, com a
+    decisão de quem revisa (gestor da coleção ou administrador).
+
+    A revisão é feita por problema, não por artigo: classificar (bug do
+    conversor, dado, esperado, corrigido) e decidir se bloqueia a
+    publicação no site novo vale para todos os artigos da coleção com o
+    problema.
+    """
+
+    STATUS_NEW = "new"
+    STATUS_CONVERTER = "converter"
+    STATUS_DATA = "data"
+    STATUS_EXPECTED = "expected"
+    STATUS_FIXED = "fixed"
+    STATUS_CHOICES = [
+        (STATUS_NEW, _("New (not reviewed)")),
+        (STATUS_CONVERTER, _("Converter bug")),
+        (STATUS_DATA, _("Source data problem")),
+        (STATUS_EXPECTED, _("Expected (ignore)")),
+        (STATUS_FIXED, _("Fixed (convert again)")),
+    ]
+
+    collection = models.ForeignKey(
+        "collection.Collection",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name=_("Collection"),
+        editable=False,
+    )
+    category = models.ForeignKey(
+        Html2xmlIssueCategory,
+        on_delete=models.CASCADE,
+        related_name="problems",
+        verbose_name=_("Problem type"),
+        editable=False,
+    )
+    status = models.CharField(
+        _("Review status"),
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_NEW,
+        db_index=True,
+    )
+    blocks_publication = models.BooleanField(
+        _("Blocks publication"),
+        default=False,
+        db_index=True,
+        help_text=_(
+            "Articles of this collection with this problem are not published on "
+            "the new website (XML status BLOCKED) until the problem is solved; "
+            "the old website keeps them public. The migration of the other "
+            "articles continues."
+        ),
+    )
+    note = models.TextField(_("Note"), blank=True)
+    first_seen = models.DateTimeField(_("First seen"), auto_now_add=True)
+    last_seen = models.DateTimeField(_("Last seen"), null=True, blank=True)
+    updated = models.DateTimeField(_("Last update date"), auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+    )
+
+    panels = [
+        FieldPanel("status"),
+        FieldPanel("blocks_publication"),
+        FieldPanel("note"),
+    ]
+
+    class Meta:
+        ordering = ["category__severity_rank", "collection__acron"]
+        verbose_name = _("HTML to XML problem")
+        verbose_name_plural = _("HTML to XML problems")
+        constraints = [
+            models.UniqueConstraint(fields=["collection", "category"], name="unique_html2xml_problem"),
+        ]
+
+    def __str__(self):
+        acron = self.collection.acron if self.collection_id else "-"
+        return f"{acron}: {self.category}"
+
+    def collection_acron(self):
+        return self.collection.acron if self.collection_id else ""
+
+    collection_acron.short_description = _("Collection")
+
+    def severity_label(self):
+        return self.category.severity_label()
+
+    severity_label.short_description = _("Severity")
+
+    def check_label(self):
+        return self.category.check_label()
+
+    check_label.short_description = _("Check")
+
+    def key(self):
+        return self.category.key
+
+    key.short_description = _("Detail")
+
+    def description(self):
+        return self.category.description()
+
+    description.short_description = _("Description")
+
+    def nature_label(self):
+        return self.category.nature_label()
+
+    nature_label.short_description = _("Probable nature")
+
+    def example(self):
+        return self.category.example
+
+    example.short_description = _("Example")
+
+    @classmethod
+    def get_or_create_for(cls, collection, category):
+        try:
+            return cls.objects.get(collection=collection, category=category)
+        except cls.DoesNotExist:
+            try:
+                return cls.objects.create(collection=collection, category=category)
+            except IntegrityError:
+                return cls.objects.get(collection=collection, category=category)
+
+
+class Html2xmlIssue(models.Model):
+    """Ocorrência de um problema em uma conversão."""
+
+    htmlxml = models.ForeignKey(
+        HTMLXML, on_delete=models.CASCADE, related_name="review_issues", verbose_name=_("Conversion")
+    )
+    problem = models.ForeignKey(
+        Html2xmlProblem, on_delete=models.CASCADE, related_name="issues", verbose_name=_("Problem")
+    )
+    count = models.PositiveIntegerField(_("Occurrences"), default=1)
+    example = models.TextField(_("Example"), blank=True)
+    collection_acron = models.CharField(_("Collection"), max_length=16, blank=True, db_index=True)
+    journal_acron = models.CharField(_("Journal"), max_length=32, blank=True, db_index=True)
+    issue_folder = models.CharField(_("Issue"), max_length=32, blank=True)
+    pid = models.CharField(_("PID"), max_length=23, blank=True)
+    created = models.DateTimeField(_("Creation date"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("HTML to XML problem occurrence")
+        verbose_name_plural = _("HTML to XML problem occurrences")
+        constraints = [
+            models.UniqueConstraint(fields=["htmlxml", "problem"], name="unique_html2xml_issue"),
+        ]
+
+    def __str__(self):
+        return f"{self.journal_acron} {self.issue_folder} {self.pid}: {self.problem.category}"
+
+    def article(self):
+        return " ".join(p for p in (self.collection_acron, self.journal_acron, self.issue_folder, self.pid) if p)
+
+    article.short_description = _("Article")
+
+    def category(self):
+        return self.problem.category
+
+    category.short_description = _("Problem")
+
+    def example_html(self):
+        """Exemplo com o trecho perdido (entre [[ ]]) destacado."""
+        from django.utils.html import escape
+        from django.utils.safestring import mark_safe
+
+        text = escape(self.example or "")
+        return mark_safe(text.replace("[[", "<mark>").replace("]]", "</mark>"))
+
+    example_html.short_description = _("Example")
+
+    def conversion_link(self):
+        from django.utils.html import format_html
+
+        return format_html(
+            '<a href="/admin/snippets/htmlxml/htmlxml/edit/{}/">{}</a>', self.htmlxml_id, _("Conversion")
+        )
+
+    conversion_link.short_description = _("Conversion")
+
+
+class Html2xmlTicket(models.Model):
+    """
+    Registro tipo "issue do GitHub" de um defeito da conversão HTML -> XML.
+
+    Agrupa um ou mais tipos de problema (``categories``, globais: para quem
+    corrige o conversor, não importa em quantas coleções ocorre) e guarda
+    os artigos afetados (``conversions``), para:
+
+    - abrir o issue real (``description`` em markdown, gerada a partir das
+      ocorrências; ``github_url`` abre o formulário do GitHub preenchido);
+    - saber quem reprocessar quando o defeito for corrigido
+      (``htmlxml.tickets.reprocess_ticket``), sem interromper a migração:
+      os artigos voltam a REPROC e o fluxo regular os converte de novo;
+    - conferir se foi resolvido: ``remaining`` conta os artigos afetados
+      em que o problema ainda ocorre.
+    """
+
+    STATUS_OPEN = "open"
+    STATUS_RESOLVED = "resolved"
+    STATUS_CLOSED = "closed"
+    STATUS_CHOICES = [
+        (STATUS_OPEN, _("Open")),
+        (STATUS_RESOLVED, _("Resolved (fix deployed, reprocess)")),
+        (STATUS_CLOSED, _("Closed")),
+    ]
+
+    title = models.CharField(_("Title"), max_length=255)
+    status = models.CharField(
+        _("Status"), max_length=16, choices=STATUS_CHOICES, default=STATUS_OPEN, db_index=True
+    )
+    external_url = models.URLField(
+        _("Issue URL"),
+        blank=True,
+        help_text=_("Link of the real issue (e.g. GitHub), once it is opened."),
+    )
+    categories = models.ManyToManyField(
+        Html2xmlIssueCategory,
+        related_name="tickets",
+        verbose_name=_("Problem types"),
+    )
+    description = models.TextField(
+        _("Description"),
+        blank=True,
+        help_text=_("Markdown. Generated from the occurrences when left blank."),
+    )
+    conversions = models.ManyToManyField(
+        HTMLXML,
+        related_name="html2xml_tickets",
+        verbose_name=_("Affected conversions"),
+        blank=True,
+        editable=False,
+    )
+    reprocessed_at = models.DateTimeField(_("Reprocessing requested at"), null=True, blank=True, editable=False)
+    reprocessed_total = models.PositiveIntegerField(_("Articles sent to reprocessing"), default=0, editable=False)
+    created = models.DateTimeField(_("Creation date"), auto_now_add=True)
+    updated = models.DateTimeField(_("Last update date"), auto_now=True)
+    creator = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, editable=False, related_name="+"
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, editable=False, related_name="+"
+    )
+
+    panels = [
+        FieldPanel("title"),
+        FieldPanel("status"),
+        FieldPanel("external_url"),
+        FieldPanel("categories"),
+        FieldPanel("description"),
+    ]
+
+    class Meta:
+        ordering = ["-updated"]
+        verbose_name = _("HTML to XML issue")
+        verbose_name_plural = _("HTML to XML issues")
+
+    def __str__(self):
+        return f"#{self.pk} {self.title}"
+
+    def occurrences(self):
+        """Ocorrências atuais dos tipos de problema deste registro."""
+        return Html2xmlIssue.objects.filter(problem__category__in=self.categories.all())
+
+    def refresh_conversions(self):
+        """
+        Acrescenta aos afetados as conversões com ocorrência atual (nunca
+        remove: depois do reprocessamento, as ocorrências somem, mas os
+        afetados continuam registrados). Retorna o total de afetados.
+        """
+        through = self.conversions.through
+        current = set(self.occurrences().values_list("htmlxml_id", flat=True))
+        known = set(through.objects.filter(html2xmlticket=self).values_list("htmlxml_id", flat=True))
+        through.objects.bulk_create(
+            [through(html2xmlticket=self, htmlxml_id=pk) for pk in current - known],
+            ignore_conflicts=True,
+        )
+        return len(current | known)
+
+    def affected(self):
+        return self.conversions.count()
+
+    affected.short_description = _("Affected articles")
+
+    def remaining(self):
+        """Afetados em que algum dos tipos de problema ainda ocorre."""
+        return self.occurrences().filter(htmlxml__in=self.conversions.all()).values("htmlxml").distinct().count()
+
+    remaining.short_description = _("Still with the problem")
+
+    def github_url(self):
+        from htmlxml.tickets import new_issue_url
+
+        return new_issue_url(self)
+
+    def github_link(self):
+        from django.utils.html import format_html
+
+        if self.external_url:
+            return format_html('<a href="{0}" target="_blank" rel="noopener">{0}</a>', self.external_url)
+        return format_html(
+            '<a href="{}" target="_blank" rel="noopener">{}</a>', self.github_url(), _("Open on GitHub")
+        )
+
+    github_link.short_description = _("Issue")
+
+    def reprocess_link(self):
+        from django.urls import reverse
+        from django.utils.html import format_html
+
+        return format_html(
+            '<a href="{}">{}</a>', reverse("proc:reprocess_html2xml_ticket", args=[self.pk]), _("Reprocess")
+        )
+
+    reprocess_link.short_description = _("Reprocess affected articles")
+
+    def description_html(self):
+        from django.utils.html import format_html
+
+        return format_html('<pre style="white-space: pre-wrap">{}</pre>', self.description)
+
+    description_html.short_description = _("Description")

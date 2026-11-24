@@ -48,10 +48,18 @@ class GenerateProblemReportView(WagtailAdminTemplateMixin, FormView):
     header_icon = "warning"
 
     def dispatch(self, request, *args, **kwargs):
-        # funcionalidade exclusiva de administradores
-        if not (request.user.is_active and request.user.is_superuser):
+        # administradores; gestores de coleção só geram o relatório de
+        # conversão HTML -> XML das suas coleções (ver o formulário)
+        from htmlxml.permissions import can_review
+
+        if not (request.user.is_active and (request.user.is_superuser or can_review(request.user))):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
 
     @property
     def list_url(self):
@@ -76,8 +84,8 @@ class GenerateProblemReportView(WagtailAdminTemplateMixin, FormView):
     def form_valid(self, form):
         from proc.models import ProblemReport
         from proc.tasks import (
-            PROBLEM_REPORT_ITEM_TYPES,
             _problem_report_scope,
+            report_item_types,
             task_generate_problem_report,
         )
 
@@ -93,13 +101,14 @@ class GenerateProblemReportView(WagtailAdminTemplateMixin, FormView):
                 updated_from=kwargs["updated_from"],
                 updated_to=kwargs["updated_to"],
             ),
-            PROBLEM_REPORT_ITEM_TYPES[kwargs["content_type"]],
+            report_item_types(kwargs["report_type"], kwargs["content_type"]),
             user=self.request.user,
             task_name=triggered_by,
             status=ProblemReport.STATUS_QUEUED,
             # idioma em uso no admin (o Wagtail ativa a preferência do usuário)
             language=get_language(),
             max_items=kwargs["max_items"],
+            report_type=kwargs["report_type"],
         )
         task_generate_problem_report.delay(
             user_id=self.request.user.id,

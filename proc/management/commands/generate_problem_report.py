@@ -6,6 +6,8 @@ Exemplos (docker):
         python manage.py generate_problem_report --collection scl --journal rsp
     ... generate_problem_report --content-type all
     ... generate_problem_report --async   # delega ao celery
+    ... generate_problem_report --report-type html2xml --journal rsp
+        # qualidade da conversão HTML -> XML (categorias de problemas)
 """
 
 from django.contrib.auth import get_user_model
@@ -15,6 +17,7 @@ from proc.models import ProblemReport
 from proc.tasks import (
     PROBLEM_REPORT_ITEM_TYPES,
     _problem_report_scope,
+    report_item_types,
     task_generate_problem_report,
 )
 
@@ -23,6 +26,15 @@ class Command(BaseCommand):
     help = "Gera o relatório de problemas (BLOCKED/PENDING) com a situação atual dos *Proc"
 
     def add_arguments(self, parser):
+        parser.add_argument(
+            "--report-type",
+            default=ProblemReport.REPORT_PROBLEMS,
+            choices=[c[0] for c in ProblemReport.REPORT_TYPE_CHOICES],
+            help=(
+                "problems: itens BLOCKED/PENDING; html2xml: qualidade da conversão "
+                "HTML -> XML dos artigos (o período é o da conversão)"
+            ),
+        )
         parser.add_argument(
             "--content-type",
             default="articles",
@@ -74,6 +86,7 @@ class Command(BaseCommand):
                 language=options["language"],
                 max_items=options["max_items"],
                 triggered_by="manage.py generate_problem_report",
+                report_type=options["report_type"],
                 **kwargs,
             )
             self.stdout.write("Agendado no celery.")
@@ -93,11 +106,12 @@ class Command(BaseCommand):
         )
         report = ProblemReport.generate(
             scope,
-            PROBLEM_REPORT_ITEM_TYPES[kwargs["content_type"]],
+            report_item_types(options["report_type"], kwargs["content_type"]),
             user=user,
             task_name="manage.py generate_problem_report",
             language=options["language"],
             max_items=options["max_items"],
+            report_type=options["report_type"],
         )
         self.stdout.write(
             f"{report.scope_label}: {report.total_items} itens, "
@@ -111,6 +125,13 @@ class Command(BaseCommand):
         for name in (report.stats or {}).get("files", []):
             self.stdout.write(f"  - {name}")
         for group in (report.stats or {}).get("top_categories", [])[:10]:
+            if report.report_type == ProblemReport.REPORT_HTML2XML:
+                self.stdout.write(
+                    f"  {group['code']} {group['total']:>6} {group['percent']:>6}% "
+                    f"{group['total_journals']:>4} {group['spread']:<12} {group['nature']:<8} "
+                    f"{group['check']} | {group['key'][:80]}"
+                )
+                continue
             self.stdout.write(
                 f"  {group['code']} {group['total']:>6}  {group['item_type']:<8} {group['kind']:<16} "
                 f"{group['operation']} | {group['exception_type']} | "

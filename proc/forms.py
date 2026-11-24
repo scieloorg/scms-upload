@@ -41,8 +41,30 @@ class ProblemReportRequestForm(forms.Form):
         ("all", _("Journals, issues and articles")),
     ]
 
+    REPORT_TYPE_CHOICES = [
+        ("problems", _("Migration/publication problems (blocked or pending items)")),
+        ("html2xml", _("HTML to XML conversion (quality of the converted articles)")),
+    ]
+
+    report_type = forms.ChoiceField(
+        label=_("Report"),
+        choices=REPORT_TYPE_CHOICES,
+        initial="problems",
+        required=False,
+        widget=forms.RadioSelect,
+        help_text=_(
+            "HTML to XML conversion: analyzes every article converted from HTML in the "
+            "period (by conversion date), groups the problems found (failed steps, "
+            "lost content, HTML left in the XML, broken links...) by category and shows "
+            "whether each one is spread over many journals (likely systematic) or "
+            "concentrated in one (likely data)."
+        ),
+    )
     content_type = forms.ChoiceField(
-        label=_("Items"), choices=CONTENT_TYPE_CHOICES, initial="articles"
+        label=_("Items"),
+        choices=CONTENT_TYPE_CHOICES,
+        initial="articles",
+        help_text=_("Only for the migration/publication problems report"),
     )
     updated_from = forms.DateField(
         label=_("Items updated from"),
@@ -86,16 +108,33 @@ class ProblemReportRequestForm(forms.Form):
 
     DEFAULT_PERIOD_DAYS = 7
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         from collection.models import Collection
 
+        from htmlxml.permissions import managed_collections
         from proc.models import ProblemReport
 
         self.fields["updated_from"].initial = (
             timezone.localdate() - timedelta(days=self.DEFAULT_PERIOD_DAYS)
         )
         self.fields["max_items"].initial = ProblemReport.DEFAULT_MAX_ITEMS
+
+        # gestor de coleção (não administrador): só o relatório de conversão
+        # HTML -> XML e só das coleções que gerencia
+        collections = managed_collections(user) if user is not None else None
+        self.restricted = collections is not None
+        if self.restricted:
+            self.fields["report_type"].choices = [
+                c for c in self.REPORT_TYPE_CHOICES if c[0] == "html2xml"
+            ]
+            self.fields["report_type"].initial = "html2xml"
+            self.fields["collection_acron_list"].required = True
+            self.fields["collection_acron_list"].help_text = ""
+            self.fields["collection_acron_list"].choices = [
+                (c.acron, f"{c.acron} - {c.name or ''}") for c in collections if c.acron
+            ]
+            return
 
         self.fields["collection_acron_list"].choices = [
             (acron, f"{acron} - {name or ''}")
@@ -125,6 +164,7 @@ class ProblemReportRequestForm(forms.Form):
     def task_kwargs(self):
         data = self.cleaned_data
         return {
+            "report_type": "html2xml" if self.restricted else (data.get("report_type") or "problems"),
             "content_type": data["content_type"],
             "max_items": data["max_items"],
             "collection_acron_list": data["collection_acron_list"] or [],

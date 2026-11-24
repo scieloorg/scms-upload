@@ -1545,7 +1545,7 @@ def task_migrate_and_publish_articles(
                 updated_from=started_at,
                 max_items=problem_report_max_items,
             )
-        task_exec.finish()
+        task_exec.finish(data={"scheduled": selected})
 
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -3113,6 +3113,15 @@ PROBLEM_REPORT_ITEM_TYPES = {
     "articles": ["issue", "article"],
     "all": ["journal", "issue", "article"],
 }
+
+
+def report_item_types(report_type=None, content_type=None):
+    """Tipos de item do relatório; o de conversão HTML -> XML é só de artigos."""
+    if report_type == "html2xml":
+        return ["article"]
+    return PROBLEM_REPORT_ITEM_TYPES.get(content_type) or PROBLEM_REPORT_ITEM_TYPES["articles"]
+
+
 # espera mínima sem atualização nos itens do escopo para considerar que a
 # execução disparada terminou
 PROBLEM_REPORT_QUIET_MINUTES = 15
@@ -3283,6 +3292,7 @@ def task_generate_problem_report(
     max_items=None,
     updated_from=None,
     updated_to=None,
+    report_type=None,
 ):
     """
     Gera um ``ProblemReport`` (planilha para download no admin, em
@@ -3325,6 +3335,11 @@ def task_generate_problem_report(
     ``language``: idioma do relatório (en, pt, es ou código como "pt-br").
     Se ausente, usa o idioma preferido do usuário no Wagtail ou o padrão do
     sistema (``LANGUAGE_CODE``).
+
+    ``report_type``: "problems" (padrão) ou "html2xml" — qualidade da
+    conversão HTML -> XML dos artigos do escopo, agrupada por categoria de
+    problema (ver ``proc.html2xml_report``); nesse caso ``content_type`` é
+    ignorado e o período se refere à data da conversão.
     """
     from datetime import datetime, timedelta
 
@@ -3332,7 +3347,7 @@ def task_generate_problem_report(
 
     from proc.models import ProblemReport
 
-    item_types = PROBLEM_REPORT_ITEM_TYPES.get(content_type) or PROBLEM_REPORT_ITEM_TYPES["articles"]
+    item_types = report_item_types(report_type, content_type)
     scope = _problem_report_scope(
         collection_acron=collection_acron,
         collection_acron_list=collection_acron_list,
@@ -3344,6 +3359,7 @@ def task_generate_problem_report(
         updated_to=updated_to,
     )
     task_params = {
+        "report_type": report_type,
         "content_type": content_type,
         "scope": scope,
         "triggered_by": triggered_by,
@@ -3369,6 +3385,7 @@ def task_generate_problem_report(
                 ),
                 language=language,
                 max_items=max_items,
+                report_type=report_type,
             )
 
         now = timezone.now()
@@ -3394,6 +3411,7 @@ def task_generate_problem_report(
                         max_wait_hours=max_wait_hours,
                         first_attempt_at=first_attempt_at,
                         problem_report_id=report.id,
+                        report_type=report_type,
                     ),
                     countdown=quiet_minutes * 60,
                 )
