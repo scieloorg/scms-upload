@@ -486,3 +486,126 @@ class ManagerOfSeveralCollectionsTest(ManagerSetupMixin, TestCase):
         )
         listing = self.client.get(reverse("wagtailsnippets_proc_problemreport:list"))
         self.assertNotContains(listing, reverse("wagtailsnippets_proc_problemreport:inspect", args=[report.pk]))
+
+
+class TicketTest(ManagerSetupMixin, TestCase):
+    """Registro tipo issue: descrição, afetados, reprocessamento."""
+
+    def setUp(self):
+        super().setUp()
+        from htmlxml import tickets
+
+        self.tickets = tickets
+        self.category = self.mine.category
+        ArticleProc.objects.update(xml_status="DONE", sps_pkg_status="DONE", migration_status="DONE")
+
+    def _statuses(self):
+        return dict(ArticleProc.objects.values_list("pid", "xml_status"))
+
+    def test_create_ticket_describes_problem_and_keeps_affected(self):
+        ticket = self.tickets.create_ticket([self.category], user=self.user)
+        self.assertTrue(ticket.title.startswith("[html2xml] "))
+        self.assertIn("`font`", ticket.description)
+        self.assertIn("cri, scl", ticket.description)
+        self.assertIn("S0034-89102004000200001", ticket.description)
+        self.assertIn("S1409-00152004000200001", ticket.description)
+        self.assertEqual((ticket.affected(), ticket.remaining()), (2, 2))
+        url = ticket.github_url()
+        self.assertTrue(url.startswith("https://github.com/scieloorg/scielo_classic_website/issues/new?title="))
+
+    def test_reprocess_ticket_marks_affected_without_converting(self):
+        ticket = self.tickets.create_ticket([self.category], user=self.user)
+        total = self.tickets.reprocess_ticket(ticket, user=self.user)
+        self.assertEqual(total, 2)
+        self.assertEqual(set(self._statuses().values()), {"REPROC"})
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.reprocessed_total, 2)
+        self.assertIsNotNone(ticket.reprocessed_at)
+        self.assertEqual(
+            set(ArticleProc.objects.values_list("sps_pkg_status", "migration_status")), {("REPROC", "REPROC")}
+        )
+
+    def test_manager_reprocesses_only_own_collection(self):
+        ticket = self.tickets.create_ticket([self.category], user=self.user)
+        self.tickets.reprocess_ticket(ticket, collection_ids=[self.collection.pk])
+        self.assertEqual(
+            self._statuses(), {"S0034-89102004000200001": "REPROC", "S1409-00152004000200001": "DONE"}
+        )
+
+    def test_remaining_drops_after_new_conversion_and_affected_is_kept(self):
+        ticket = self.tickets.create_ticket([self.category], user=self.user)
+        htmlxml = HTMLXML.objects.get(migrated_article__pid="S0034-89102004000200001")
+        htmlxml.file.name = default_storage.save("t/fixed/a.xml", ContentFile(XML.encode()))
+        htmlxml.save()
+        review.review_existing(htmlxml)
+        ticket.refresh_conversions()
+        self.assertEqual((ticket.affected(), ticket.remaining()), (2, 1))
+
+    def test_problem_marked_fixed_reprocesses_its_collection(self):
+        total = self.tickets.reprocess_problem(self.mine, user=self.manager)
+        self.assertEqual(total, 1)
+        self.assertEqual(
+            self._statuses(), {"S0034-89102004000200001": "REPROC", "S1409-00152004000200001": "DONE"}
+        )
+
+    @patch("htmlxml.tasks.task_reprocess_html2xml.delay")
+    def test_manager_marks_problem_as_fixed(self, mock_delay):
+        self.client.force_login(self.manager)
+        edit = reverse("wagtailsnippets_htmlxml_html2xmlproblem:edit", args=[self.mine.pk])
+        self.client.post(edit, {"status": "converter", "note": ""})
+        mock_delay.assert_not_called()
+        self.client.post(edit, {"status": "fixed", "note": ""})
+        mock_delay.assert_called_once_with(user_id=self.manager.pk, problem_id=self.mine.pk)
+        # salvar de novo, já corrigido, não reprocessa outra vez
+        self.client.post(edit, {"status": "fixed", "note": "ok"})
+        self.assertEqual(mock_delay.call_count, 1)
+
+    @patch("htmlxml.tasks.task_reprocess_html2xml.delay")
+    def test_manager_creates_ticket_and_requests_reprocessing(self, mock_delay):
+        from htmlxml.models import Html2xmlTicket
+
+        self.client.force_login(self.manager)
+        response = self.client.get(reverse("wagtailsnippets_htmlxml_html2xmlproblem:list"))
+        create = reverse("proc:create_html2xml_ticket") + f"?category={self.category.pk}"
+        self.assertContains(response, create.replace("&", "&amp;"))
+
+        response = self.client.get(create)
+        self.assertEqual(response.status_code, 200)
+        response = self.client.post(create, {"title": "Elemento font no XML"})
+        ticket = Html2xmlTicket.objects.get()
+        self.assertRedirects(
+            response, reverse("wagtailsnippets_htmlxml_html2xmlticket:edit", args=[ticket.pk]),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual((ticket.title, ticket.affected()), ("Elemento font no XML", 2))
+        # já existe registro aberto: vai para ele
+        response = self.client.get(create)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Html2xmlTicket.objects.count(), 1)
+
+        response = self.client.get(reverse("wagtailsnippets_htmlxml_html2xmlticket:list"))
+        self.assertContains(response, "Elemento font no XML")
+        response = self.client.get(reverse("wagtailsnippets_htmlxml_html2xmlticket:inspect", args=[ticket.pk]))
+        self.assertContains(response, "scielo_classic_website/issues/new")
+        response = self.client.get(reverse("wagtailsnippets_htmlxml_html2xmlticket:edit", args=[ticket.pk]))
+        self.assertEqual(response.status_code, 200)
+
+        reprocess = reverse("proc:reprocess_html2xml_ticket", args=[ticket.pk])
+        self.assertEqual(self.client.get(reprocess).status_code, 200)
+        self.client.post(reprocess, {"confirm": "on"})
+        mock_delay.assert_called_once_with(
+            user_id=self.manager.pk, ticket_id=ticket.pk, collection_ids=[self.collection.pk]
+        )
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, Html2xmlTicket.STATUS_RESOLVED)
+
+    def test_member_cannot_create_or_reprocess(self):
+        ticket = self.tickets.create_ticket([self.category], user=self.user)
+        self.client.force_login(self.member)
+        create = reverse("proc:create_html2xml_ticket") + f"?category={self.category.pk}"
+        self.assertEqual(self.client.post(create, {"title": "x"}).status_code, 302)
+        reprocess = reverse("proc:reprocess_html2xml_ticket", args=[ticket.pk])
+        self.client.post(reprocess, {"confirm": "on"})
+        self.assertEqual(set(self._statuses().values()), {"DONE"})
+        response = self.client.get(reverse("wagtailsnippets_htmlxml_html2xmlticket:list"))
+        self.assertNotEqual(response.status_code, 200)
