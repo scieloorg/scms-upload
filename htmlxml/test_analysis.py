@@ -127,3 +127,43 @@ class SeverityTest(SimpleTestCase):
         }
         evaluation = an.evaluate(html, xml, data, "rsp")
         self.assertEqual(an.attention_points(evaluation["findings"]), 0, evaluation["findings"])
+
+
+FRONT_XML = (
+    "<article-meta><title-group><article-title>Tratamiento médico en pacientes con infestación "
+    "por Angiostrongylus costaricensis</article-title></title-group>"
+    "<contrib-group><contrib><name><surname>Huertas-Franco</surname><given-names>Verny</given-names></name></contrib>"
+    "<contrib><name><surname>Camacho-Fernández</surname><given-names>Álvaro</given-names></name></contrib></contrib-group>"
+    f"<abstract><title>Resumen</title><p>{P1}</p></abstract>"
+    f'<trans-abstract xml:lang="en"><title>Abstract</title><p>{P3}</p></trans-abstract>'
+    "</article-meta>"
+)
+
+
+class FrontInBodyTest(SimpleTestCase):
+    def test_front_repeated_at_the_start_of_the_body(self):
+        xml = xml_doc(
+            '<p align="center">Tratamiento médico en pacientes con infestación por '
+            "<italic>Angiostrongylus costaricensis</italic></p>"
+            "<p>Verny Huertas- Franco, Álvaro Camacho- Fernández.</p>"
+            f"<p>Resumen</p><p>{P1}</p><sec><title>Caso clínico</title><p>{P2_END}</p></sec>",
+            front=FRONT_XML,
+        )
+        findings = an.front_in_body_findings(xml)
+        self.assertEqual(
+            {f["key"] for f in findings}, {"article-title", "contrib-group", "abstract"}
+        )
+        self.assertEqual({f["check"] for f in findings}, {"front_in_body"})
+        self.assertEqual(an.severity("front_in_body"), an.SEVERITY_MAJOR)
+
+    def test_body_without_front(self):
+        xml = xml_doc(f"<sec><title>Introducción</title><p>{P2_END}</p></sec>", front=FRONT_XML)
+        self.assertEqual(an.front_in_body_findings(xml), [])
+
+    def test_sub_article_front_stub(self):
+        xml = tree(
+            "<article><front><article-meta/></front><body><p>x</p></body>"
+            f'<sub-article article-type="translation"><front-stub><abstract><p>{P3}</p></abstract></front-stub>'
+            f"<body><p>{P3}</p><p>{P1}</p></body></sub-article></article>"
+        )
+        self.assertEqual([f["key"] for f in an.front_in_body_findings(xml)], ["abstract"])
