@@ -1093,7 +1093,8 @@ def attention_points(findings):
 # Compara o front do próprio XML com o body: não depende do HTML.
 
 FRONT_PIECE = 40  # letras: trecho do front procurado no body
-FRONT_HEAD = 3000  # letras: início do body (nomes curtos só são buscados aí)
+FRONT_HEAD = 3000  # letras: início do body
+FRONT_NAMES_MIN_HEAD = 300  # letras: nomes dos autores, num body curto
 FRONT_PARTS = (
     # (chave, xpath a partir do front, ignora <title>, só no início do body)
     ("article-title", ".//title-group/article-title", False, False),
@@ -1136,6 +1137,8 @@ def front_in_body_findings(xml):
         if not body_letters:
             continue
         head = body_letters[:FRONT_HEAD]
+        # nomes: só no início (não na assinatura de um editorial curto)
+        names_head = body_letters[: max(FRONT_NAMES_MIN_HEAD, min(FRONT_HEAD, len(body_letters) // 4))]
         for key, xpath, skip_titles, head_only in FRONT_PARTS:
             nodes = front.findall(xpath)
             if key == "contrib-group":
@@ -1146,7 +1149,7 @@ def front_in_body_findings(xml):
                     for n in nodes[:2]
                 ]
                 letters = [normalize_letters(n) for n in names]
-                if letters and all(len(n) >= 6 and n in head for n in letters):
+                if letters and all(len(n) >= 6 and n in names_head for n in letters):
                     found.setdefault(key, "; ".join(" ".join(n.split()) for n in names))
                 continue
             for node in nodes:
