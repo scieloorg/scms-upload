@@ -78,3 +78,21 @@ class Html2xmlReviewRequestForm(forms.Form):
             "updated_to": data["updated_to"].isoformat() if data.get("updated_to") else None,
             "only_not_reviewed": bool(data.get("only_not_reviewed")),
         }
+
+
+class Html2xmlTicketCreateForm(forms.Form):
+    """Confirma a criação do registro tipo issue de um tipo de problema."""
+
+    title = forms.CharField(label=_("Title"), max_length=255)
+
+
+class Html2xmlReprocessForm(forms.Form):
+    """Confirma o reprocessamento dos artigos afetados."""
+
+    confirm = forms.BooleanField(
+        label=_("Mark the affected articles for reprocessing"),
+        help_text=_(
+            "The migration is not interrupted: the articles are converted again "
+            "by the regular migration flow, and their review is updated."
+        ),
+    )

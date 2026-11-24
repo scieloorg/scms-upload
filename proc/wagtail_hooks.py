@@ -19,9 +19,10 @@ import django_filters
 from config.menu import get_menu_order
 from core.views import CommonControlFieldViewSet
 from django.db.models import Count
+from django.contrib import messages
 from django.utils.html import format_html
 
-from htmlxml.models import HTMLXML, Html2xmlIssue, Html2xmlProblem
+from htmlxml.models import HTMLXML, Html2xmlIssue, Html2xmlProblem, Html2xmlTicket
 from package.models import SPSPkg
 
 from .models import ArticleProc, IssueProc, JournalProc, ProblemReport, ProcReport
@@ -560,12 +561,27 @@ class Html2xmlProblemIndexView(SnippetIndexView):
 
 
 class Html2xmlProblemEditView(_CollectionInstanceMixin, SnippetEditView):
+    """
+    Marcar o problema como corrigido envia para reprocessamento os artigos
+    da coleção com o problema (sem interromper a migração: o fluxo regular
+    os converte de novo).
+    """
+
     instance_action = "change"
 
     def save_instance(self):
+        previous = Html2xmlProblem.objects.filter(pk=self.object.pk).values_list("status", flat=True).first()
         instance = self.form.save(commit=False)
         instance.updated_by = self.request.user
         instance.save()
+        if instance.status == Html2xmlProblem.STATUS_FIXED and previous != Html2xmlProblem.STATUS_FIXED:
+            from htmlxml.tasks import task_reprocess_html2xml
+
+            task_reprocess_html2xml.delay(user_id=self.request.user.id, problem_id=instance.pk)
+            messages.info(
+                self.request,
+                _("The articles with this problem were sent to reprocessing."),
+            )
         return instance
 
 
@@ -603,6 +619,7 @@ class Html2xmlProblemViewSet(SnippetViewSet):
         "journals",
         "status",
         "blocks_publication",
+        "ticket",
         "last_seen",
     ]
     list_filter = ["collection", "category__severity", "status", "blocks_publication", "category__check_code"]
@@ -619,6 +636,7 @@ class Html2xmlProblemViewSet(SnippetViewSet):
         "journals",
         "status",
         "blocks_publication",
+        "ticket",
         "note",
         "first_seen",
         "last_seen",
@@ -650,6 +668,84 @@ _problem_articles.short_description = _("Articles")
 _problem_journals.short_description = _("Journals")
 Html2xmlProblem.articles = _problem_articles
 Html2xmlProblem.journals = _problem_journals
+
+
+def _problem_ticket(self):
+    """Registro tipo issue do tipo de problema, ou link para criá-lo."""
+    ticket = (
+        self.category.tickets.exclude(status=Html2xmlTicket.STATUS_CLOSED).order_by("-updated").first()
+    )
+    if ticket:
+        url = reverse("wagtailsnippets_htmlxml_html2xmlticket:edit", args=[ticket.pk])
+        return format_html('<a href="{}">#{} {}</a>', url, ticket.pk, ticket.get_status_display())
+    url = reverse("proc:create_html2xml_ticket") + f"?category={self.category_id}"
+    return format_html('<a href="{}">{}</a>', url, _("Create issue"))
+
+
+_problem_ticket.short_description = _("Issue")
+Html2xmlProblem.ticket = _problem_ticket
+
+
+class Html2xmlTicketCreateView(SnippetCreateView):
+    def save_instance(self):
+        from htmlxml.tickets import ticket_description
+
+        instance = self.form.save()
+        instance.creator = instance.updated_by = self.request.user
+        if not instance.description:
+            instance.description = ticket_description(instance.categories.all())
+        instance.save()
+        instance.refresh_conversions()
+        return instance
+
+
+class Html2xmlTicketEditView(SnippetEditView):
+    def save_instance(self):
+        instance = self.form.save()
+        instance.updated_by = self.request.user
+        instance.save(update_fields=["updated_by", "updated"])
+        instance.refresh_conversions()
+        return instance
+
+
+class Html2xmlTicketViewSet(SnippetViewSet):
+    """
+    Registros tipo "issue do GitHub" dos defeitos da conversão: descrição
+    para abrir o issue real, artigos afetados e reprocessamento quando o
+    defeito for corrigido.
+    """
+
+    model = Html2xmlTicket
+    add_view_class = Html2xmlTicketCreateView
+    edit_view_class = Html2xmlTicketEditView
+    menu_label = _("HTML to XML issues")
+    menu_icon = "tag"
+    menu_order = 315
+    add_to_settings_menu = False
+    inspect_view_enabled = True
+    list_per_page = 50
+    list_display = ["__str__", "status", "affected", "remaining", "github_link", "reprocess_link", "updated"]
+    list_filter = ["status", "categories__severity", "categories__check_code"]
+    search_fields = ["title", "description", "external_url"]
+    inspect_view_fields = [
+        "title",
+        "status",
+        "github_link",
+        "affected",
+        "remaining",
+        "reprocessed_at",
+        "reprocessed_total",
+        "reprocess_link",
+        "description_html",
+        "created",
+        "updated",
+    ]
+
+    @property
+    def permission_policy(self):
+        from htmlxml.permissions import TicketPermissionPolicy
+
+        return TicketPermissionPolicy(self.model)
 
 
 class Html2xmlIssueIndexView(SnippetIndexView):
@@ -712,6 +808,7 @@ class ProcessViewSetGroup(SnippetViewSetGroup):
         SPSPkgViewSet,
         HTMLXMLViewSet,
         Html2xmlProblemViewSet,
+        Html2xmlTicketViewSet,
         Html2xmlIssueViewSet,
         ProcReportViewSet,
         ProblemReportViewSet,

@@ -38,3 +38,25 @@ def task_review_html2xml(
         only_not_reviewed=only_not_reviewed,
     )
     return review_many(qs, user=user, limit=limit)
+
+
+@celery_app.task(bind=True)
+def task_reprocess_html2xml(self, user_id=None, ticket_id=None, problem_id=None, collection_ids=None):
+    """
+    Marca para reprocessamento os artigos afetados por um registro tipo
+    issue (``ticket_id``) ou por um problema de coleção (``problem_id``),
+    ver ``htmlxml.tickets``. Não converte: o fluxo regular da migração
+    converte de novo os artigos marcados.
+    """
+    from htmlxml import tickets
+    from htmlxml.models import Html2xmlProblem, Html2xmlTicket
+
+    user = get_user_model().objects.filter(pk=user_id).first() if user_id else None
+    result = {}
+    if ticket_id:
+        ticket = Html2xmlTicket.objects.get(pk=ticket_id)
+        result["ticket"] = tickets.reprocess_ticket(ticket, user=user, collection_ids=collection_ids)
+    if problem_id:
+        problem = Html2xmlProblem.objects.get(pk=problem_id)
+        result["problem"] = tickets.reprocess_problem(problem, user=user)
+    return result

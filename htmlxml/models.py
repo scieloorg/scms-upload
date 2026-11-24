@@ -1348,3 +1348,146 @@ class Html2xmlIssue(models.Model):
         )
 
     conversion_link.short_description = _("Conversion")
+
+
+class Html2xmlTicket(models.Model):
+    """
+    Registro tipo "issue do GitHub" de um defeito da conversão HTML -> XML.
+
+    Agrupa um ou mais tipos de problema (``categories``, globais: para quem
+    corrige o conversor, não importa em quantas coleções ocorre) e guarda
+    os artigos afetados (``conversions``), para:
+
+    - abrir o issue real (``description`` em markdown, gerada a partir das
+      ocorrências; ``github_url`` abre o formulário do GitHub preenchido);
+    - saber quem reprocessar quando o defeito for corrigido
+      (``htmlxml.tickets.reprocess_ticket``), sem interromper a migração:
+      os artigos voltam a REPROC e o fluxo regular os converte de novo;
+    - conferir se foi resolvido: ``remaining`` conta os artigos afetados
+      em que o problema ainda ocorre.
+    """
+
+    STATUS_OPEN = "open"
+    STATUS_RESOLVED = "resolved"
+    STATUS_CLOSED = "closed"
+    STATUS_CHOICES = [
+        (STATUS_OPEN, _("Open")),
+        (STATUS_RESOLVED, _("Resolved (fix deployed, reprocess)")),
+        (STATUS_CLOSED, _("Closed")),
+    ]
+
+    title = models.CharField(_("Title"), max_length=255)
+    status = models.CharField(
+        _("Status"), max_length=16, choices=STATUS_CHOICES, default=STATUS_OPEN, db_index=True
+    )
+    external_url = models.URLField(
+        _("Issue URL"),
+        blank=True,
+        help_text=_("Link of the real issue (e.g. GitHub), once it is opened."),
+    )
+    categories = models.ManyToManyField(
+        Html2xmlIssueCategory,
+        related_name="tickets",
+        verbose_name=_("Problem types"),
+    )
+    description = models.TextField(
+        _("Description"),
+        blank=True,
+        help_text=_("Markdown. Generated from the occurrences when left blank."),
+    )
+    conversions = models.ManyToManyField(
+        HTMLXML,
+        related_name="html2xml_tickets",
+        verbose_name=_("Affected conversions"),
+        blank=True,
+        editable=False,
+    )
+    reprocessed_at = models.DateTimeField(_("Reprocessing requested at"), null=True, blank=True, editable=False)
+    reprocessed_total = models.PositiveIntegerField(_("Articles sent to reprocessing"), default=0, editable=False)
+    created = models.DateTimeField(_("Creation date"), auto_now_add=True)
+    updated = models.DateTimeField(_("Last update date"), auto_now=True)
+    creator = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, editable=False, related_name="+"
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, editable=False, related_name="+"
+    )
+
+    panels = [
+        FieldPanel("title"),
+        FieldPanel("status"),
+        FieldPanel("external_url"),
+        FieldPanel("categories"),
+        FieldPanel("description"),
+    ]
+
+    class Meta:
+        ordering = ["-updated"]
+        verbose_name = _("HTML to XML issue")
+        verbose_name_plural = _("HTML to XML issues")
+
+    def __str__(self):
+        return f"#{self.pk} {self.title}"
+
+    def occurrences(self):
+        """Ocorrências atuais dos tipos de problema deste registro."""
+        return Html2xmlIssue.objects.filter(problem__category__in=self.categories.all())
+
+    def refresh_conversions(self):
+        """
+        Acrescenta aos afetados as conversões com ocorrência atual (nunca
+        remove: depois do reprocessamento, as ocorrências somem, mas os
+        afetados continuam registrados). Retorna o total de afetados.
+        """
+        through = self.conversions.through
+        current = set(self.occurrences().values_list("htmlxml_id", flat=True))
+        known = set(through.objects.filter(html2xmlticket=self).values_list("htmlxml_id", flat=True))
+        through.objects.bulk_create(
+            [through(html2xmlticket=self, htmlxml_id=pk) for pk in current - known],
+            ignore_conflicts=True,
+        )
+        return len(current | known)
+
+    def affected(self):
+        return self.conversions.count()
+
+    affected.short_description = _("Affected articles")
+
+    def remaining(self):
+        """Afetados em que algum dos tipos de problema ainda ocorre."""
+        return self.occurrences().filter(htmlxml__in=self.conversions.all()).values("htmlxml").distinct().count()
+
+    remaining.short_description = _("Still with the problem")
+
+    def github_url(self):
+        from htmlxml.tickets import new_issue_url
+
+        return new_issue_url(self)
+
+    def github_link(self):
+        from django.utils.html import format_html
+
+        if self.external_url:
+            return format_html('<a href="{0}" target="_blank" rel="noopener">{0}</a>', self.external_url)
+        return format_html(
+            '<a href="{}" target="_blank" rel="noopener">{}</a>', self.github_url(), _("Open on GitHub")
+        )
+
+    github_link.short_description = _("Issue")
+
+    def reprocess_link(self):
+        from django.urls import reverse
+        from django.utils.html import format_html
+
+        return format_html(
+            '<a href="{}">{}</a>', reverse("proc:reprocess_html2xml_ticket", args=[self.pk]), _("Reprocess")
+        )
+
+    reprocess_link.short_description = _("Reprocess affected articles")
+
+    def description_html(self):
+        from django.utils.html import format_html
+
+        return format_html('<pre style="white-space: pre-wrap">{}</pre>', self.description)
+
+    description_html.short_description = _("Description")

@@ -103,3 +103,24 @@ def filter_by_managed_collections(qs, user, collection_path="collection"):
     if ids is None:
         return qs
     return qs.filter(**{f"{collection_path}__in": ids})
+
+
+class TicketPermissionPolicy(CollectionManagerPermissionPolicy):
+    """
+    Registros tipo issue são globais (o defeito do conversor não depende da
+    coleção): superusuários e gestores de coleção veem, criam e editam;
+    só superusuários apagam. O reprocessamento feito pelo gestor fica
+    restrito às coleções que gerencia (``ReprocessHtml2xmlTicketView``).
+    """
+
+    def user_has_permission(self, user, action):
+        if action == "delete":
+            return bool(user.is_active and user.is_superuser)
+        return can_review(user)
+
+    def user_has_permission_for_instance(self, user, action, instance):
+        return self.user_has_permission(user, action)
+
+    def instances_user_has_permission_for(self, user, action):
+        qs = self.model.objects.all()
+        return qs if self.user_has_permission(user, action) else qs.none()
