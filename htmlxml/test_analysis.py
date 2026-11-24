@@ -167,3 +167,11 @@ class FrontInBodyTest(SimpleTestCase):
             f"<body><p>{P3}</p><p>{P1}</p></body></sub-article></article>"
         )
         self.assertEqual([f["key"] for f in an.front_in_body_findings(xml)], ["abstract"])
+
+    def test_signature_at_the_end_of_an_editorial_is_not_front(self):
+        xml = xml_doc(
+            f"<p>{P2_END}</p><p>{P2_LOST}</p><p>{P2_END}</p><p>{P2_LOST}</p>"
+            "<p>Verny Huertas-Franco, Álvaro Camacho-Fernández</p>",
+            front=FRONT_XML,
+        )
+        self.assertEqual(an.front_in_body_findings(xml), [])
