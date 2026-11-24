@@ -2631,7 +2631,7 @@ class IssueProc(BaseProc, ClusterableModel):
             exceptions = {}
             processed_record_ids = []
             # registros alterados durante o processamento continuam todo=True
-            started_at = datetime.now(timezone.utc)
+            started_at = timezone.now()
             for record in id_file_records:
                 try:
                     data = record.get_record_data(
