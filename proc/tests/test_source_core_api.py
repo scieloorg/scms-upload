@@ -401,6 +401,7 @@ class TestFetchAndProcessIssues(TestCase):
 
         mock_journal_proc = MagicMock()
         mock_journal_proc.collection = MagicMock()
+        mock_journal_proc.collection.acron = "scl"
         mock_journal_proc_filter.return_value = [mock_journal_proc]
 
         result_data = {
@@ -409,7 +410,8 @@ class TestFetchAndProcessIssues(TestCase):
             "supplement": None,
             "year": 2024,
             "order": 1,
-            "issue_pid_suffix": "v10n1",
+            "issue_pid_suffix": "0001",
+            "legacy_issue": [{"pid": "0001-000120240001", "collection": "scl"}],
             "season": "Jan-Mar",
             "month": "1",
         }
@@ -423,7 +425,7 @@ class TestFetchAndProcessIssues(TestCase):
                 self.assertEqual(mock_issue.month, "1")
                 mock_issue.save.assert_called_once()
                 mock_create_issue_proc.assert_called_once_with(
-                    self.user, mock_journal_proc, mock_issue
+                    self.user, mock_journal_proc, mock_issue, "0001-000120240001"
                 )
 
     @patch("proc.source_core_api.Issue.create_or_update")
@@ -438,6 +440,7 @@ class TestFetchAndProcessIssues(TestCase):
 
         mock_journal_proc = MagicMock()
         mock_journal_proc.collection = MagicMock()
+        mock_journal_proc.collection.acron = "scl"
         mock_journal_proc_filter.return_value = [mock_journal_proc]
 
         result_data = {
@@ -446,7 +449,8 @@ class TestFetchAndProcessIssues(TestCase):
             "supplement": None,
             "year": 2024,
             "order": 1,
-            "issue_pid_suffix": "v10n1",
+            "issue_pid_suffix": "0001",
+            "legacy_issue": [{"pid": "0001-000120240001", "collection": "scl"}],
         }
 
         with patch("proc.source_core_api.IssueProc.objects.get") as mock_issue_proc_get:
@@ -456,7 +460,7 @@ class TestFetchAndProcessIssues(TestCase):
 
                 mock_issue.save.assert_not_called()
                 mock_create_issue_proc.assert_called_once_with(
-                    self.user, mock_journal_proc, mock_issue
+                    self.user, mock_journal_proc, mock_issue, "0001-000120240001"
                 )
 
 

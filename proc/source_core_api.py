@@ -672,6 +672,10 @@ def process_issue_result(user, journal, result):
     if save:
         issue.save()
 
+    # PID do fascículo por coleção
+    issue_pids = {
+        item["collection"]: item["pid"] for item in result.get("legacy_issue") or []
+    }
     for journal_proc in JournalProc.objects.filter(journal=journal):
         try:
             issue_proc = IssueProc.objects.get(
@@ -682,10 +686,10 @@ def process_issue_result(user, journal, result):
                 user,
                 journal_proc,
                 issue,
+                issue_pids.get(journal_proc.collection.acron),
             )
 
     # TODO: Processar campos adicionais da API de issues:
-    # - legacy_issue (array) - PIDs legados
     # - sections (array) - seções do issue
     # - issue_titles (array) - títulos específicos
     # - bibliographic_strips (array) - strips bibliográficas
