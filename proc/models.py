@@ -2076,12 +2076,16 @@ class IssueProc(BaseProc, ClusterableModel):
     )
 
     @staticmethod
-    def create_from_journal_proc_and_issue(user, journal_proc, issue):
-        issue_pid_suffix = issue.issue_pid_suffix
+    def create_from_journal_proc_and_issue(user, journal_proc, issue, pid):
+        # PID do fascículo na coleção vem do core; não é calculado localmente
+        if not pid:
+            raise ValueError(
+                f"Missing issue PID at core for {issue} in {journal_proc.collection}"
+            )
         issue_proc = IssueProc.get_or_create(
             user,
             journal_proc.collection,
-            pid=f"{journal_proc.pid}{issue.publication_year}{issue_pid_suffix}",
+            pid=pid,
         )
         issue_proc.issue = issue
         issue_proc.journal_proc = journal_proc
