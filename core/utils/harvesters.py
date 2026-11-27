@@ -37,7 +37,7 @@ class OPACHarvester:
             journal_acron: Acrônimo do periódico para filtrar (ex: 'rsp')
         """
         if not domain.startswith("http"):
-            domain = f"http://{domain}"
+            domain = f"https://{domain}"
         self.domain = domain
 
         self.collection_acron = collection_acron
@@ -108,9 +108,8 @@ class OPACHarvester:
             "origin_date": origin_date,
             "collection_acron": self.collection_acron,
             "item": item,
-            # o nome do é status (o ideal é que fosse is_public) mas o OPAC retorna "false" ou "true" na chave status
-            # e o valor deve ser True se explicitamente é o contrário de "false"
-            "is_public": item.get("status") != "false",
+            "is_public": item.get("status") is True
+            or item.get("status") == "true",
         }
 
     def format_normalized(self, pid_v3, item):

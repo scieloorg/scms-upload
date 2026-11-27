@@ -292,7 +292,18 @@ class Issue(CommonControlField, IssuePublicationDate):
 
     @property
     def article_ids(self):
-        return [item.pid_v3 for item in self.article_set.all()]
+        return self.get_article_ids()
+
+    def get_article_ids(self, collection=None):
+        # artigo em mais de uma coleção tem um Article por coleção
+        items = self.article_set.all()
+        if collection:
+            # sem vínculo: artigo anterior à separação por coleção
+            items = items.filter(
+                Q(collection_pid_v2__collection=collection)
+                | Q(collection_pid_v2__isnull=True)
+            )
+        return list(dict.fromkeys(item.pid_v3 for item in items))
 
     @classmethod
     def get_duplicates(cls, journal=None):
@@ -353,7 +364,7 @@ class TOC(CommonControlField, ClusterableModel):
 
 class TocSection(CommonControlField, Orderable):
     toc = ParentalKey(TOC, on_delete=models.CASCADE, related_name="issue_sections")
-    group = models.CharField(max_length=16, null=True, blank=True)
+    group = models.CharField(max_length=200, null=True, blank=True)
     section = models.ForeignKey(
         JournalSection, null=True, blank=True, on_delete=models.CASCADE
     )

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE article PUBLIC "-//NLM//DTD JATS (Z39.96) Journal Publishing DTD v1.1 20151215//EN" "JATS-journalpublishing1.dtd">
+<article article-type="research-article" dtd-version="1.1" specific-use="sps-1.9" xml:lang="pt" xmlns:mml="http://www.w3.org/1998/Math/MathML" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <front>
+    <journal-meta>
+      <journal-id journal-id-type="nlm-ta">Psicol USP</journal-id>
+      <journal-id journal-id-type="publisher-id">psicousp</journal-id>
+      <journal-title-group>
+        <journal-title>Psicologia USP</journal-title>
+        <abbrev-journal-title abbrev-type="publisher">Psicol. USP</abbrev-journal-title>
+      </journal-title-group>
+      <issn pub-type="ppub">0103-6564</issn>
+      <issn pub-type="epub">1678-5177</issn>
+      <publisher>
+        <publisher-name>Instituto de Psicologia da Universidade de São Paulo</publisher-name>
+      </publisher>
+    </journal-meta>
+    <article-meta>
+      <article-id specific-use="scielo-v2" pub-id-type="publisher-id">S1678-51772009000300003</article-id>
+      <article-id pub-id-type="other">00003</article-id>
+      <article-categories>
+        <subj-group subj-group-type="heading">
+          <subject>Artigos</subject>
+        </subj-group>
+      </article-categories>
+      <title-group>
+        <article-title>A constituição do sujeito e o laço social</article-title>
+        <trans-title-group xml:lang="en">
+          <trans-title>The constitution of the subject and the social bond</trans-title>
+        </trans-title-group>
+      </title-group>
+      <contrib-group>
+        <contrib contrib-type="author">
+          <name>
+            <surname>Silva</surname>
+            <given-names>Maria</given-names>
+          </name>
+          <xref ref-type="aff" rid="aff1"/>
+        </contrib>
+        <contrib contrib-type="author">
+          <name>
+            <surname>Souza</surname>
+            <given-names>João</given-names>
+          </name>
+          <xref ref-type="aff" rid="aff1"/>
+        </contrib>
+      </contrib-group>
+      <aff id="aff1">
+        <institution content-type="orgname">Universidade de São Paulo</institution>
+        <institution content-type="orgdiv1">Instituto de Psicologia</institution>
+        <addr-line>
+          <named-content content-type="city">São Paulo</named-content>
+          <named-content content-type="state">SP</named-content>
+        </addr-line>
+        <country country="BR">Brasil</country>
+        <institution content-type="original">Universidade de São Paulo. Instituto de Psicologia. São Paulo, SP, Brasil</institution>
+      </aff>
+      <pub-date date-type="pub" publication-format="electronic">
+        <day>01</day>
+        <month>09</month>
+        <year>2009</year>
+      </pub-date>
+      <pub-date date-type="collection" publication-format="electronic">
+        <year>2009</year>
+      </pub-date>
+      <volume>20</volume>
+      <issue>3</issue>
+      <fpage>333</fpage>
+      <lpage>350</lpage>
+      <permissions>
+        <license license-type="open-access" xlink:href="http://creativecommons.org/licenses/by-nc/4.0/" xml:lang="pt">
+          <license-p>Este é um artigo publicado em acesso aberto sob uma licença Creative Commons</license-p>
+        </license>
+      </permissions>
+      <abstract>
+        <p>Este artigo discute a constituição do sujeito a partir do laço social, considerando as contribuições da psicanálise para a compreensão das relações entre o indivíduo e a cultura contemporânea.</p>
+      </abstract>
+      <trans-abstract xml:lang="en">
+        <p>This article discusses the constitution of the subject based on the social bond, considering the contributions of psychoanalysis to the understanding of the relationship between the individual and contemporary culture.</p>
+      </trans-abstract>
+      <kwd-group xml:lang="pt">
+        <title>Palavras-chave:</title>
+        <kwd>Psicanálise</kwd>
+        <kwd>Laço social</kwd>
+        <kwd>Subjetividade</kwd>
+      </kwd-group>
+      <kwd-group xml:lang="en">
+        <title>Keywords:</title>
+          <kwd>Psychoanalysis</kwd>
+          <kwd>Social bond</kwd>
+          <kwd>Subjectivity</kwd>
+      </kwd-group>
+    </article-meta>
+  </front>
+  <body>
+    <p>Este artigo discute a constituição do sujeito a partir do laço social, considerando as contribuições da psicanálise para a compreensão das relações entre o indivíduo e a cultura contemporânea (<xref ref-type="bibr" rid="B1">Freud, 1930</xref>).</p>
+    <p>Discute-se, ainda, o lugar do outro na formação da subjetividade e as consequências clínicas dessa perspectiva (<xref ref-type="bibr" rid="B2">Lacan, 1966</xref>).</p>
+  </body>
+  <back>
+    <ref-list>
+      <title>Referências</title>
+        <ref id="B1">
+          <mixed-citation>FREUD, S. (1930). <italic>O mal-estar na civilização</italic>. Rio de Janeiro: Imago.</mixed-citation>
+          <element-citation publication-type="book">
+            <person-group person-group-type="author">
+              <name>
+                <surname>Freud</surname>
+                <given-names>S</given-names>
+              </name>
+            </person-group>
+            <source>O mal-estar na civilização</source>
+            <publisher-loc>Rio de Janeiro</publisher-loc>
+            <publisher-name>Imago</publisher-name>
+            <year>1930</year>
+          </element-citation>
+        </ref>
+        <ref id="B2">
+          <mixed-citation>LACAN, J. (1966). <italic>Écrits</italic>. Paris: Seuil.</mixed-citation>
+          <element-citation publication-type="book">
+            <person-group person-group-type="author">
+              <name>
+                <surname>Lacan</surname>
+                <given-names>J</given-names>
+              </name>
+            </person-group>
+            <source>Écrits</source>
+            <publisher-loc>Paris</publisher-loc>
+            <publisher-name>Seuil</publisher-name>
+            <year>1966</year>
+          </element-citation>
+        </ref>
+    </ref-list>
+  </back>
+</article>
