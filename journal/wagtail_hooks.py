@@ -1,4 +1,6 @@
 from django.utils.translation import gettext_lazy as _
+from django_filters import BooleanFilter
+from wagtail.admin.filters import WagtailFilterSet
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
@@ -35,6 +37,28 @@ class OfficialJournalViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     inspect_view_enabled = True
 
 
+class JournalFilterSet(WagtailFilterSet):
+    is_complete = BooleanFilter(
+        method="filter_is_complete",
+        label=_("Is complete"),
+    )
+
+    class Meta:
+        model = Journal
+        fields = ["core_synchronized"]  # campos reais de banco continuam normais aqui
+
+    def filter_is_complete(self, queryset, name, value):
+        if value is None:
+            return queryset
+
+        if value:
+            ids = [obj.pk for obj in queryset if not obj.missing_fields]
+        else:
+            ids = [obj.pk for obj in queryset if obj.missing_fields]
+
+        return queryset.filter(pk__in=ids)
+
+
 class JournalViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     model = Journal
     journal_field = "id"
@@ -47,9 +71,10 @@ class JournalViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
     list_display = [
         "title",
         "journal_acron",
-        "core_synchronized",
+        "missing_fields",
         "updated",
     ]
+    ordering = ["-updated"]
     search_fields = [
         "official_journal__issn_electronic",
         "official_journal__issn_print",
@@ -57,7 +82,7 @@ class JournalViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
         "title",
         "journal_acron",
     ]
-    list_filter = ["core_synchronized"]
+    filterset_class = JournalFilterSet
 
 
 class JournalCollectionViewSet(TeamScopedSnippetViewSetMixin, SnippetViewSet):
@@ -100,3 +125,5 @@ class JournalViewSetGroup(SnippetViewSetGroup):
 
 
 register_snippet(JournalViewSetGroup)
+# register_snippet(JournalCollectionViewSet)
+
